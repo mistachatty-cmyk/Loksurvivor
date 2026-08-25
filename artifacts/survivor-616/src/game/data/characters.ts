@@ -1,5 +1,38 @@
-import { humanoidRig, quadrupedRig } from '@/game/sprites/rigs';
-import type { CharacterDef } from '@/game/types';
+import { blobRig, humanoidRig, quadrupedRig } from '@/game/sprites/rigs';
+import type { BaseStats, CharacterDef, SpritePalette } from '@/game/types';
+
+/**
+ * Shared defaults so each `CharacterDef` only has to state what it deviates
+ * on, instead of repeating the full `BaseStats`/`SpritePalette` shape by hand
+ * every time.
+ */
+const BASE_STATS_DEFAULTS: BaseStats = {
+  maxHp: 108,
+  speed: 100,
+  power: 1,
+  area: 1,
+  haste: 1,
+  magnet: 55,
+  armor: 0.1,
+};
+
+/**
+ * Builds a full `SpritePalette` from just the two colors that make a
+ * character read distinctly at a glance (accent + glow), filling the shared
+ * ink/body/skin defaults. Pass `overrides` for anything that needs to differ.
+ */
+function palette(accent: string, glow: string, overrides: Partial<SpritePalette> = {}): SpritePalette {
+  return {
+    ink: '#0d0d14',
+    body: '#2a2a3a',
+    bodyDark: '#18181f',
+    accent,
+    accentBright: '#ffffff',
+    skin: '#2a2a3a',
+    glow,
+    ...overrides,
+  };
+}
 
 /**
  * The playable roster. Each entry is fully data-driven: silhouette, palette,
@@ -201,6 +234,156 @@ export const CHARACTERS: CharacterDef[] = [
       effect: { novaDamage: 90, novaRadius: 260, damageMult: 1.4, invulnerable: true },
     },
     unlock: { kind: 'clearArea', areaId: 'crystal-cellar' },
+  },
+  {
+    id: 'bigsal',
+    name: 'Big Sal',
+    handle: 'Doorman',
+    tagline: 'Holds the door. Holds the room.',
+    bio: 'Ran the door at the Sanctum before the block turned. Nothing gets past him -- not customers who forgot the rules, and not whatever this is.',
+    palette: palette('#f59e0b', '#fbbf24', { body: '#3a2f1e', bodyDark: '#221a10', skin: '#6b4a2a' }),
+    rig: humanoidRig({ height: 24, width: 13, bulk: true, headColor: 'bodyDark' }),
+    stats: { ...BASE_STATS_DEFAULTS, maxHp: 175, speed: 76, power: 1.1, area: 1.1, armor: 0.28, magnet: 40 },
+    weapon: {
+      id: 'last-call',
+      name: 'Last Call',
+      kind: 'sweep',
+      description: 'A slow, wide swing that clears everyone off the bar floor at once.',
+      damage: 26,
+      cooldownMs: 1450,
+      range: 130,
+      levelDamageScale: 0.26,
+    },
+    ultimate: {
+      id: 'bouncers-call',
+      name: "Bouncer's Call",
+      description: 'Plants his feet and dares the block to try something.',
+      cooldownMs: 27000,
+      durationMs: 4200,
+      effect: { invulnerable: true, damageMult: 1.6, novaDamage: 50, novaRadius: 130 },
+    },
+    unlock: { kind: 'rescue', allyId: 'deacon' },
+  },
+  {
+    id: 'vex',
+    name: 'Vex',
+    handle: 'Spray Ghost',
+    tagline: 'Tags you before you know you were hit.',
+    bio: 'Learned to move light and hit hard, the way you have to when the whole block is bigger than you. Leaves a mark on everything.',
+    palette: palette('#a3e635', '#d9f99d', { body: '#1f2e12', bodyDark: '#101a0a' }),
+    rig: humanoidRig({ height: 15, width: 8, hunched: true, headColor: 'skin' }),
+    stats: { ...BASE_STATS_DEFAULTS, maxHp: 72, speed: 116, power: 1.25, area: 0.9, haste: 1.05, magnet: 60, armor: 0 },
+    weapon: {
+      id: 'can-shot',
+      name: 'Can Shot',
+      kind: 'projectile',
+      description: 'A hissing can that punches straight through the first thing it finds.',
+      damage: 20,
+      cooldownMs: 560,
+      range: 340,
+      speed: 380,
+      lifetimeMs: 950,
+      levelDamageScale: 0.32,
+    },
+    ultimate: {
+      id: 'blackout-tag',
+      name: 'Blackout Tag',
+      description: 'Every can in the bag goes off at once.',
+      cooldownMs: 23000,
+      durationMs: 3200,
+      effect: { damageMult: 2.1, cooldownMult: 0.25 },
+    },
+    unlock: { kind: 'rescue', allyId: 'nyx' },
+  },
+  {
+    id: 'thechoir',
+    name: 'The Choir',
+    handle: 'Three Voices, One Coat',
+    tagline: 'Hums low. The block gets quiet.',
+    bio: 'Pulled soaking out of the floodwall lanes, humming something in three-part harmony that was not quite words. Nobody asked what happened to the other two coats they used to wear.',
+    palette: palette('#5eead4', '#99f6e4', { body: '#0f2e2b', bodyDark: '#081a18', skin: '#0f2e2b' }),
+    rig: blobRig({ height: 15, width: 12, spikes: true, tendrils: true }),
+    stats: { ...BASE_STATS_DEFAULTS, maxHp: 100, speed: 90, area: 1.3, magnet: 65, armor: 0.08 },
+    weapon: {
+      id: 'hymn',
+      name: 'Hymn',
+      kind: 'aura',
+      description: 'A standing note that wears down anything close enough to hear it.',
+      damage: 7,
+      cooldownMs: 380,
+      range: 98,
+      levelDamageScale: 0.3,
+    },
+    ultimate: {
+      id: 'requiem',
+      name: 'Requiem',
+      description: 'All three voices land the same note at once.',
+      cooldownMs: 26000,
+      durationMs: 3400,
+      effect: { novaDamage: 70, novaRadius: 220, damageMult: 1.3 },
+    },
+    unlock: { kind: 'clearArea', areaId: 'riverfront' },
+  },
+  {
+    id: 'jax',
+    name: 'Jax',
+    handle: 'Roof Runner',
+    tagline: 'Never touches the ground for long.',
+    bio: 'Found the tag on the water tower and figured out how to get up there. Now the whole skyline is a way to get somewhere fast.',
+    palette: palette('#facc15', '#fef08a', { body: '#1c1c0a', bodyDark: '#101006' }),
+    rig: humanoidRig({ height: 19, width: 9 }),
+    stats: { ...BASE_STATS_DEFAULTS, maxHp: 92, speed: 118, power: 1, area: 1.05, haste: 0.95, magnet: 58, armor: 0.05 },
+    weapon: {
+      id: 'spray-halo',
+      name: 'Spray Halo',
+      kind: 'orbit',
+      description: 'A ring of paint cans that circle at reach and clatter off anything close.',
+      damage: 11,
+      cooldownMs: 0,
+      range: 62,
+      speed: 3.1,
+      count: 3,
+      levelDamageScale: 0.24,
+    },
+    ultimate: {
+      id: 'full-send',
+      name: 'Full Send',
+      description: 'Every rooftop shortcut at once.',
+      cooldownMs: 24000,
+      durationMs: 4800,
+      effect: { speedMult: 1.5, cooldownMult: 0.45, damageMult: 1.2 },
+    },
+    unlock: { kind: 'discovery', discoveryId: 'skyline-tag' },
+  },
+  {
+    id: 'thewarden',
+    name: 'The Warden',
+    handle: '616 Veteran',
+    tagline: "Been doing this since before you were born. Undead doesn't change that.",
+    bio: 'Nobody remembers when The Warden started clearing blocks. The Warden does not remember either, and has stopped worrying about it.',
+    palette: palette('#94a3b8', '#e2e8f0', { body: '#2a2f38', bodyDark: '#171a20' }),
+    rig: humanoidRig({ height: 22, width: 12, bulk: true, hood: true, headColor: 'bodyDark' }),
+    stats: { ...BASE_STATS_DEFAULTS, maxHp: 150, speed: 88, power: 1.15, area: 1.1, magnet: 52, armor: 0.22 },
+    weapon: {
+      id: 'long-reach',
+      name: 'Long Reach',
+      kind: 'melee',
+      description: 'A patient, extended arc that has caught a lot of people who thought they were far enough away.',
+      damage: 20,
+      cooldownMs: 760,
+      range: 74,
+      levelDamageScale: 0.3,
+      count: 1,
+    },
+    ultimate: {
+      id: 'war-story',
+      name: 'War Story',
+      description: 'Talks about the old days while doing considerably more damage.',
+      cooldownMs: 25000,
+      durationMs: 4000,
+      effect: { invulnerable: true, damageMult: 1.8 },
+    },
+    unlock: { kind: 'kills', count: 400 },
   },
 ];
 

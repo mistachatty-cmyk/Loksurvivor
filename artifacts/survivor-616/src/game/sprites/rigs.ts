@@ -34,6 +34,10 @@ interface HumanoidOptions {
   headColor?: SpritePart['color'];
   /** Torso color override. */
   torsoColor?: SpritePart['color'];
+  /** Widens the torso and shortens the legs for a heavy, tank-like silhouette. */
+  bulk?: boolean;
+  /** Narrows the frame and drops the head low for a small, hunched silhouette. */
+  hunched?: boolean;
 }
 
 function bobClip(amount: number, frameMs: number): AnimClip {
@@ -145,11 +149,23 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
     wings = false,
     headColor = 'skin',
     torsoColor = 'body',
+    bulk = false,
+    hunched = false,
   } = options;
 
-  const half = Math.floor(width / 2);
-  const legH = seated ? 3 : Math.round(height * 0.3);
-  const torsoH = Math.round(height * 0.4);
+  const effectiveWidth = width + (bulk ? 3 : 0) - (hunched ? 2 : 0);
+  const half = Math.floor(effectiveWidth / 2);
+  let legH = seated ? 3 : Math.round(height * 0.3);
+  let torsoH = Math.round(height * 0.4);
+  if (bulk) {
+    // Heavier torso, shorter legs -- reads as low-slung and hard to knock over.
+    legH = seated ? 3 : Math.round(height * 0.22);
+    torsoH = Math.round(height * 0.5);
+  } else if (hunched) {
+    // Smaller torso, head sits lower on the frame -- reads as scrappy and compact.
+    legH = seated ? 3 : Math.round(height * 0.28);
+    torsoH = Math.round(height * 0.32);
+  }
   const headH = height - legH - torsoH;
   const parts: SpritePart[] = [];
 
@@ -161,7 +177,7 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
   }
 
   if (seated) {
-    parts.push({ key: 'legL', x: -half - 1, y: 0, w: width + 2, h: legH, color: 'bodyDark', z: 1 });
+    parts.push({ key: 'legL', x: -half - 1, y: 0, w: effectiveWidth + 2, h: legH, color: 'bodyDark', z: 1 });
   } else {
     parts.push(
       { key: 'legL', x: -half + 1, y: 0, w: 3, h: legH, color: 'bodyDark', z: 1 },
@@ -171,17 +187,17 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
 
   parts.push(
     { key: 'armL', x: -half - 2, y: legH + 1, w: 2, h: torsoH - 1, color: 'bodyDark', z: 2 },
-    { key: 'torso', x: -half, y: legH, w: width, h: torsoH, color: torsoColor, z: 3 },
+    { key: 'torso', x: -half, y: legH, w: effectiveWidth, h: torsoH, color: torsoColor, z: 3 },
     { key: 'armR', x: half, y: legH + 1, w: 2, h: torsoH - 1, color: 'bodyDark', z: 4 },
-    { key: 'head', x: -half + 1, y: legH + torsoH, w: width - 2, h: headH, color: headColor, z: 5 },
-    { key: 'face', x: -half + 2, y: legH + torsoH + Math.floor(headH / 2), w: width - 4, h: 2, color: 'accentBright', z: 6 },
+    { key: 'head', x: -half + 1, y: legH + torsoH, w: effectiveWidth - 2, h: headH, color: headColor, z: 5 },
+    { key: 'face', x: -half + 2, y: legH + torsoH + Math.floor(headH / 2), w: effectiveWidth - 4, h: 2, color: 'accentBright', z: 6 },
   );
 
   if (hood) {
-    parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 2, w: width, h: 3, color: 'bodyDark', z: 6 });
+    parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 2, w: effectiveWidth, h: 3, color: 'bodyDark', z: 6 });
   }
   if (cap) {
-    parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 1, w: width + 2, h: 2, color: 'accent', z: 7 });
+    parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 1, w: effectiveWidth + 2, h: 2, color: 'accent', z: 7 });
   }
   if (puffs) {
     parts.push(
