@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "616 Survivor"
+description = "A browser beat 'em up survivor game set in a fictionalized 616 Grand Rapids night. The player runs waves of vampires and street threats across urban arenas, rescues allies, upgrades a roster of stylized characters with unique abilities, returns to a hideout hub that unlocks new areas, and can load their own local music files as the in-game soundtrack."
+version = "1.0.0"
+id = "artifacts/survivor-616"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19846
+
+[services.development]
+run = "pnpm --filter @workspace/survivor-616 run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/survivor-616", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/survivor-616/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19846"
+BASE_PATH = "/"
