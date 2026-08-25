@@ -976,4 +976,89 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1;
   }
+
+  drawMinimap(ctx, w, width, height);
+}
+
+/**
+ * Screen-space overview panel, bottom-left (the ultimate dial already owns
+ * bottom-right; the DOM timer/depth/pause stack already owns top-right).
+ * Timed areas are origin-centered on the arena's own bounds; endless mode
+ * is player-centered with a fixed radius since the world is unbounded and
+ * chunk-streamed. Purely a read of existing World state -- no new fields,
+ * no stepWorld changes.
+ */
+function drawMinimap(ctx: CanvasRenderingContext2D, w: World, screenW: number, screenH: number) {
+  const size = 108;
+  const pad = 14;
+  const radius = size / 2;
+  const cx = pad + radius;
+  const cy = screenH - pad - radius;
+
+  const endless = w.area.endless;
+  const worldRadius = endless ? 900 : Math.max(w.bounds.w, w.bounds.h) / 2 + 40;
+  const originX = endless ? w.player.x : 0;
+  const originY = endless ? w.player.y : 0;
+  const scale = radius / worldRadius;
+  const toMap = (x: number, y: number) => ({
+    mx: cx + (x - originX) * scale,
+    my: cy + (y - originY) * scale,
+  });
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(6,6,12,0.72)';
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.stroke();
+  ctx.clip();
+
+  for (const enemy of w.enemies) {
+    if (enemy.dying) continue;
+    const { mx, my } = toMap(enemy.x, enemy.y);
+    const big = enemy.def.family === 'Boss' || enemy.def.family === 'Elite';
+    ctx.fillStyle = '#ff5d6c';
+    ctx.beginPath();
+    ctx.arc(mx, my, big ? 3 : 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (w.rescue.status === 'available' || w.rescue.status === 'freeing') {
+    const { mx, my } = toMap(w.rescue.x, w.rescue.y);
+    ctx.fillStyle = '#ffe08a';
+    ctx.beginPath();
+    ctx.arc(mx, my, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (w.endless) {
+    ctx.fillStyle = '#c084fc';
+    for (const ent of w.endless.dungeonEntrances) {
+      const { mx, my } = toMap(ent.x, ent.y);
+      ctx.beginPath();
+      ctx.arc(mx, my, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (w.endless.exitZone) {
+      const ez = w.endless.exitZone;
+      const { mx, my } = toMap(ez.x, ez.y);
+      ctx.fillStyle = '#4de1ff';
+      ctx.beginPath();
+      ctx.arc(mx, my, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  const p = toMap(w.player.x, w.player.y);
+  ctx.fillStyle = w.character.palette.glow;
+  ctx.beginPath();
+  ctx.arc(p.mx, p.my, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
 }

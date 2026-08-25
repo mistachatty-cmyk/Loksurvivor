@@ -751,9 +751,14 @@ function damageEnemy(
   fromY: number,
 ) {
   if (enemy.dying) return;
-  const dealt = Math.max(1, Math.round(amount));
+  const isCrit = w.rng() < w.stats.crit;
+  const dealt = Math.max(1, Math.round(isCrit ? amount * 2 : amount));
   enemy.hp -= dealt;
   enemy.hitFlashUntil = w.now + 90;
+
+  if (w.stats.lifesteal > 0) {
+    w.player.hp = Math.min(w.player.maxHp, w.player.hp + dealt * w.stats.lifesteal);
+  }
 
   if (knockback > 0) {
     const dx = enemy.x - fromX;
@@ -767,8 +772,8 @@ function damageEnemy(
   w.popups.push({
     x: enemy.x + randRange(w.rng, -5, 5),
     y: enemy.y + enemy.radius + 10,
-    text: String(dealt),
-    color: '#ffe8a3',
+    text: isCrit ? `${dealt}!` : String(dealt),
+    color: isCrit ? '#ffffff' : '#ffe8a3',
     bornAt: w.now,
     vy: 26,
   });

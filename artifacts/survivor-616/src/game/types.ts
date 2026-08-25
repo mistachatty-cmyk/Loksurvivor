@@ -218,6 +218,10 @@ export interface BaseStats {
   magnet: number;
   /** Contact damage resistance, 0..0.6 */
   armor: number;
+  /** Chance, 0..1, that a hit deals double damage. */
+  crit: number;
+  /** Fraction, 0..1, of damage dealt returned to the player as HP. */
+  lifesteal: number;
 }
 
 export type UnlockRule =

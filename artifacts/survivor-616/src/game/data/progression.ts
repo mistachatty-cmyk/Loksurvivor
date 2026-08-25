@@ -280,6 +280,22 @@ export const UPGRADES: UpgradeDef[] = [
       { kind: 'stat', stat: 'power', mult: 1.1 },
     ],
   },
+  {
+    id: 'lucky-strike',
+    name: 'Lucky Strike',
+    description: '+8% chance to hit for double damage.',
+    weight: 7,
+    maxStacks: 6,
+    effects: [{ kind: 'stat', stat: 'crit', add: 0.08 }],
+  },
+  {
+    id: 'vampiric',
+    name: 'Vampiric',
+    description: 'Heal for 4% of the damage you deal.',
+    weight: 7,
+    maxStacks: 5,
+    effects: [{ kind: 'stat', stat: 'lifesteal', add: 0.04 }],
+  },
 ];
 
 export const UPGRADES_BY_ID: Record<string, UpgradeDef> = Object.fromEntries(

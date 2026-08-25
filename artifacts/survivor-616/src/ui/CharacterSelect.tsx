@@ -106,6 +106,14 @@ export function CharacterSelect({ onBack, onConfirm }: CharacterSelectProps) {
                     <span className="text-muted-foreground uppercase tracking-wider">Armor</span>
                     <span className="font-bold text-white">{(stats.armor * 100).toFixed(0)}%</span>
                   </div>
+                  <div className="flex items-center justify-between border-b border-border/50 pb-1">
+                    <span className="text-muted-foreground uppercase tracking-wider">Crit</span>
+                    <span className="font-bold text-white">{(stats.crit * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-border/50 pb-1">
+                    <span className="text-muted-foreground uppercase tracking-wider">Lifesteal</span>
+                    <span className="font-bold text-white">{(stats.lifesteal * 100).toFixed(0)}%</span>
+                  </div>
                 </div>
 
                 <div className="mt-auto space-y-3">
