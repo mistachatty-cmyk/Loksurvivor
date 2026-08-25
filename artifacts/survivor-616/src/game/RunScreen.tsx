@@ -17,9 +17,12 @@ import {
   type World,
 } from '@/game/engine/world';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
+import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { renderWorld } from '@/game/render/draw';
 import { effectiveStats, useMeta } from '@/game/state/metaStore';
-import type { HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import { WeaponIcon } from '@/ui/WeaponIcon';
+import type { HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef, WeaponDef } from '@/game/types';
 
 export interface RunScreenProps {
   areaId: string;
@@ -50,6 +53,23 @@ const STICK_RADIUS = 54;
 const FIXED_STEP = 1 / 60;
 /** Most catch-up steps allowed in one frame before time is dropped. */
 const MAX_SUBSTEPS = 6;
+
+/**
+ * Resolves the WeaponDef a level-up card represents, so its pickup icon
+ * matches the actual weapon -- a "level up X" card for an already-owned
+ * signature weapon (not in the shared WEAPONS pool), a fresh pickup from
+ * the shared pool, or an evolution's result weapon.
+ */
+function resolveCardWeapon(upgrade: UpgradeDef, world: World | null): WeaponDef | undefined {
+  if (upgrade.cardKind === 'weapon' && upgrade.weaponId) {
+    const owned = world?.weapons.find((w) => w.def.id === upgrade.weaponId);
+    return owned?.def ?? WEAPONS_BY_ID[upgrade.weaponId];
+  }
+  if (upgrade.cardKind === 'evolution' && upgrade.evolutionId) {
+    return EVOLUTIONS_BY_ID[upgrade.evolutionId]?.result;
+  }
+  return undefined;
+}
 
 function formatClock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -536,18 +556,26 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
             <p className="text-center font-mono text-xs uppercase tracking-[0.4em] text-white/60">Level {hud?.level}</p>
             <h2 className="text-center text-2xl font-black uppercase text-white">Pick your edge</h2>
             <div className="space-y-2">
-              {choices.map((upgrade) => (
-                <button
-                  key={upgrade.id}
-                  type="button"
-                  onClick={() => pickUpgrade(upgrade)}
-                  className="w-full rounded-sm border border-white/20 bg-white/5 p-4 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
-                  data-testid={`button-upgrade-${upgrade.id}`}
-                >
-                  <p className="font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
-                  <p className="mt-1 font-mono text-xs text-white/70">{upgrade.description}</p>
-                </button>
-              ))}
+              {choices.map((upgrade) => {
+                const weaponDef = resolveCardWeapon(upgrade, worldRef.current);
+                return (
+                  <button
+                    key={upgrade.id}
+                    type="button"
+                    onClick={() => pickUpgrade(upgrade)}
+                    className="w-full rounded-sm border border-white/20 bg-white/5 p-4 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99] flex items-center gap-3"
+                    data-testid={`button-upgrade-${upgrade.id}`}
+                  >
+                    {weaponDef && (
+                      <WeaponIcon kind={weaponDef.kind} color={weaponDef.color} size={30} className="shrink-0" />
+                    )}
+                    <div>
+                      <p className="font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                      <p className="mt-1 font-mono text-xs text-white/70">{upgrade.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
