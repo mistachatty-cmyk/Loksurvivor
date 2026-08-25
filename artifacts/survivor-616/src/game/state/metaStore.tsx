@@ -37,6 +37,7 @@ const META_VERSION = 1;
 export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
+    devModeAllUnlocks: false,
     selectedCharacterId: 'shade',
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
@@ -99,6 +100,7 @@ function normalizeMeta(parsed: Partial<MetaState>): MetaState {
 
   return {
     version: META_VERSION,
+    devModeAllUnlocks: import.meta.env.DEV && parsed.devModeAllUnlocks === true,
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -147,6 +149,8 @@ function saveMeta(meta: MetaState) {
 /* ------------------------------------------------------------------ */
 
 export function isUnlocked(rule: UnlockRule, meta: MetaState): boolean {
+  if (import.meta.env.DEV && meta.devModeAllUnlocks) return true;
+
   switch (rule.kind) {
     case 'default':
       return true;
@@ -220,6 +224,7 @@ type Action =
   | { type: 'clearLastRun' }
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
+  | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'reset' };
 
 function addUnique(list: string[], value?: string): string[] {
@@ -246,6 +251,12 @@ function reducer(state: StoreState, action: Action): StoreState {
       if (state.meta.lootTokens < cost) return state;
       return { ...state, meta: { ...state.meta, lootTokens: state.meta.lootTokens - cost } };
     }
+
+    case 'setDevModeAllUnlocks':
+      return {
+        ...state,
+        meta: { ...state.meta, devModeAllUnlocks: action.enabled },
+      };
 
     case 'completeRun': {
       const result = action.result;
@@ -329,6 +340,7 @@ export interface MetaContextValue {
   clearLastRun: () => void;
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
+  setDevModeAllUnlocks: (enabled: boolean) => void;
   resetProgress: () => void;
 }
 
@@ -349,12 +361,16 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
+  const setDevModeAllUnlocks = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
+    [],
+  );
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
     const { meta } = state;
-    const unlockedCharacters = CHARACTERS.filter((c) => meta.unlockedCharacterIds.includes(c.id));
-    const lockedCharacters = CHARACTERS.filter((c) => !meta.unlockedCharacterIds.includes(c.id));
+    const unlockedCharacters = CHARACTERS.filter((c) => isUnlocked(c.unlock, meta));
+    const lockedCharacters = CHARACTERS.filter((c) => !isUnlocked(c.unlock, meta));
     const unlockedAreas = AREAS.filter((a) => isUnlocked(a.unlock, meta));
     const lockedAreas = AREAS.filter((a) => !isUnlocked(a.unlock, meta));
     const unlockedRooms = HUB_ROOMS.filter((r) => isUnlocked(r.unlock, meta));
@@ -383,9 +399,19 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       clearLastRun,
       markOnboarded,
       spendTokens,
+      setDevModeAllUnlocks,
       resetProgress,
     };
-  }, [state, selectCharacter, completeRun, clearLastRun, markOnboarded, spendTokens, resetProgress]);
+  }, [
+    state,
+    selectCharacter,
+    completeRun,
+    clearLastRun,
+    markOnboarded,
+    spendTokens,
+    setDevModeAllUnlocks,
+    resetProgress,
+  ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;
 }

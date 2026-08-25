@@ -1,3 +1,4 @@
 - [GitHub collaboration bridge](github-collaboration.md) — await the GitHub connection record before obtaining its Octokit client.
+- [Development unlock mode](dev-mode-unlocks.md) — development-only all-unlocks toggle preserves normal progression when disabled.
 - [616 Survivor supplied art](survivor-616-art-assets.md) — the user's character sheets have baked-in labels; render sprite rigs for portraits, never the raw sheet.
 - [Endless mode engine](endless-mode-engine.md) — unbounded world uses chunk-based obstacles rebuilt when player crosses chunk boundaries; dungeons are bounded rooms centred on the player's world-space entry point.

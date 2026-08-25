@@ -5,7 +5,7 @@
 import { useMeta } from '@/game/state/metaStore';
 import { HUB_ROOMS_BY_ID } from '@/game/data/progression';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Skull, Users, BookOpen, Music, Unlock, ArrowRight, Package } from 'lucide-react';
+import { Skull, Users, BookOpen, Music, Unlock, ArrowRight, Package, Settings2 } from 'lucide-react';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks';
 
@@ -25,7 +25,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
-  const { unlockedRooms, rescuedAllies, selectedCharacter, meta } = useMeta();
+  const { unlockedRooms, rescuedAllies, selectedCharacter, meta, setDevModeAllUnlocks } = useMeta();
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
@@ -72,6 +72,31 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
               )}
             </div>
           </div>
+
+          {import.meta.env.DEV && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-dashed border-primary/60 bg-primary/5 px-4 py-3" data-testid="dev-mode-panel">
+              <div className="flex items-center gap-3">
+                <Settings2 className="h-4 w-4 text-primary" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Developer mode</p>
+                  <p className="text-xs text-muted-foreground">Expose every unlockable character, area, and room.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDevModeAllUnlocks(!meta.devModeAllUnlocks)}
+                className={`border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  meta.devModeAllUnlocks
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-card text-muted-foreground hover:border-primary hover:text-white'
+                }`}
+                aria-pressed={meta.devModeAllUnlocks}
+                data-testid="button-toggle-dev-unlocks"
+              >
+                All unlocks: {meta.devModeAllUnlocks ? 'On' : 'Off'}
+              </button>
+            </div>
+          )}
 
           <nav className="flex flex-wrap gap-2 mb-6">
             {unlockedRooms.map((room) => {

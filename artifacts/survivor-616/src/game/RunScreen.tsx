@@ -116,18 +116,34 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
       }
     };
     const up = (event: KeyboardEvent) => keysRef.current.delete(event.key.toLowerCase());
-    const blur = () => {
+    const pauseWhenHidden = () => {
       keysRef.current.clear();
       if (phaseRef.current === 'playing') setPhaseBoth('paused');
+    };
+    const isTouchDevice =
+      navigator.maxTouchPoints > 0 ||
+      window.matchMedia('(pointer: coarse)').matches;
+    const blur = () => {
+      // Mobile browsers can emit window.blur while handling a touch gesture
+      // (for example when the browser chrome or an assistive overlay moves).
+      // Treating that as an app switch makes the game pause during normal
+      // joystick input. Visibility changes still pause when the player truly
+      // leaves the game.
+      if (!isTouchDevice) pauseWhenHidden();
+    };
+    const visibilityChange = () => {
+      if (document.visibilityState === 'hidden') pauseWhenHidden();
     };
 
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     window.addEventListener('blur', blur);
+    document.addEventListener('visibilitychange', visibilityChange);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
+      document.removeEventListener('visibilitychange', visibilityChange);
     };
   }, [setPhaseBoth]);
 

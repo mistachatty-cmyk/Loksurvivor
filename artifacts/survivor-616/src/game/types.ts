@@ -451,6 +451,8 @@ export interface UpgradeDef {
 
 export interface MetaState {
   version: number;
+  /** Development-only switch for exposing every unlockable surface. */
+  devModeAllUnlocks: boolean;
   selectedCharacterId: string;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];
