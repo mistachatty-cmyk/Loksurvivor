@@ -2,10 +2,12 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { useEffect, useState } from 'react';
 import { useMeta } from '@/game/state/metaStore';
 import { HUB_ROOMS_BY_ID } from '@/game/data/progression';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skull, Users, BookOpen, Music, Unlock, ArrowRight, Package } from 'lucide-react';
+import { HideoutVignette } from './HideoutVignette';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks';
 
@@ -29,6 +31,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
+
+  const [pairIndex, setPairIndex] = useState(0);
+
+  useEffect(() => {
+    setPairIndex(0);
+    if (roomAllies.length < 2) return;
+    const id = setInterval(() => {
+      setPairIndex((i) => (i + 1) % roomAllies.length);
+    }, 8000 + Math.random() * 4000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoom?.id, roomAllies.length]);
 
   if (!activeRoom) return null;
 
@@ -154,7 +168,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
             </h2>
             {roomAllies.length === 0 ? (
               <p className="text-sm opacity-50 italic">Nobody is here right now.</p>
-            ) : (
+            ) : roomAllies.length === 1 ? (
               <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {roomAllies.map((ally) => (
                   <li key={ally.id} className="flex flex-col p-3 border border-border bg-card/50">
@@ -163,6 +177,31 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
                   </li>
                 ))}
               </ul>
+            ) : (
+              <AnimatePresence mode="wait">
+                {(() => {
+                  const a = roomAllies[pairIndex % roomAllies.length]!;
+                  const b = roomAllies[(pairIndex + 1) % roomAllies.length]!;
+                  return (
+                    <motion.div
+                      key={`${activeRoom.id}-${a.id}-${b.id}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.4 }}
+                      className="flex flex-col items-center gap-2 p-4 border border-border bg-card/50 w-fit"
+                    >
+                      <HideoutVignette
+                        left={{ name: a.name, rig: a.rig, palette: a.palette }}
+                        right={{ name: b.name, rig: b.rig, palette: b.palette }}
+                      />
+                      <p className="text-xs text-muted-foreground uppercase tracking-widest">
+                        {a.name} &amp; {b.name}
+                      </p>
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
             )}
           </section>
         )}

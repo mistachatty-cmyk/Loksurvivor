@@ -409,6 +409,8 @@ export interface AllyDef {
   boost: Partial<BaseStats>;
   boostLabel: string;
   palette: SpritePalette;
+  /** Procedural rig so the hideout can show the ally, not just their name. */
+  rig: SpriteRig;
 }
 
 export interface HubRoomDef {
