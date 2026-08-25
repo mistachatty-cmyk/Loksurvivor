@@ -26,6 +26,8 @@ export const AREAS: AreaDef[] = [
       { x: -350, y: 70, w: 58, h: 64, kind: 'neon-sign' },
       { x: 120, y: -70, w: 48, h: 48, kind: 'fuse-box' },
       { x: -110, y: 250, w: 28, h: 30, kind: 'street-lamp' },
+      { x: 0, y: -185, w: 96, h: 24, kind: 'cover' },
+      { x: 220, y: 80, w: 54, h: 54, kind: 'reflective-surface' },
     ],
     durationSec: 120,
     threat: 'low',
@@ -339,7 +341,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/street.jpeg',
     bounds: { w: 99999, h: 99999 }, // not used directly -- world is unbounded
     ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848' },
-    obstacles: [],
+     obstacles: [{ x: -140, y: 90, w: 100, h: 24, kind: 'cover' }, { x: 140, y: -90, w: 52, h: 52, kind: 'reflective-surface' }],
     durationSec: 0, // endless -- win condition is "head home", loss is death
     threat: 'rising',
     unlock: { kind: 'clearArea', areaId: 'monroe-strip' },

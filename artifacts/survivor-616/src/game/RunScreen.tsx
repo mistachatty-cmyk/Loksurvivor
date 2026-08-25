@@ -468,6 +468,22 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           </div>
         ) : null}
 
+        {hud?.activeEffects && hud.activeEffects.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5" data-testid="row-status-effects">
+            {hud.activeEffects.map((effect) => (
+              <div
+                key={effect.id}
+                title={`${effect.name}: affecting ${effect.count} enemies`}
+                className="flex items-center gap-1 border bg-black/75 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide"
+                style={{ borderColor: `${effect.color}99`, color: effect.color }}
+              >
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: effect.color, boxShadow: `0 0 7px ${effect.color}` }} />
+                {effect.name} <span className="opacity-70">×{effect.count}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {hud?.alerts.slice(-1).map((alert) => (
           <div key={alert} className="mx-auto w-fit font-mono text-sm uppercase tracking-[0.25em] text-white/90 drop-shadow">
             {alert}

@@ -155,6 +155,30 @@ export interface WeaponDef {
   levelDamageScale: number;
   /** Optional tint used when this weapon is not a character signature. */
   color?: string;
+  /** How this projectile behaves when it meets reflective cover. */
+  obstacleInteraction?: 'block' | 'reflect';
+  /** Optional crowd-control effect applied by this weapon's hits. */
+  statusEffectId?: string;
+}
+
+/** Designer-facing metadata for a combat status effect. */
+export interface StatusEffectDef {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  durationMs: number;
+  maxStacks: number;
+  /** Movement multiplier while active (0 completely stops movement). */
+  speedMultiplier?: number;
+}
+
+/** A status effect currently affecting an actor. */
+export interface StatusEffectInstance {
+  id: string;
+  stacks: number;
+  appliedAt: number;
+  expiresAt: number;
 }
 
 export interface RunWeapon {
@@ -305,7 +329,7 @@ export interface ObstacleDef {
   h: number;
   kind: 'dumpster' | 'car' | 'crate' | 'planter' | 'barrier' | 'ac-unit'
     | 'neon-sign' | 'barrel' | 'fuse-box' | 'street-lamp' | 'car-wreck'
-    | 'crate-breakable' | 'security-camera';
+    | 'crate-breakable' | 'security-camera' | 'cover' | 'reflective-surface';
 }
 
 export interface AreaDef {
@@ -580,6 +604,8 @@ export interface HudSnapshot {
   rescueAvailable: boolean;
   rescueProgressPct: number;
   lootBoxesOpened: number;
+  /** Effects currently active on the player's enemies, grouped for HUD display. */
+  activeEffects: Array<{ id: string; name: string; color: string; count: number }>;
   objectives: Array<{
     label: string;
     progress: number;

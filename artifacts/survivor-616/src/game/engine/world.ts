@@ -17,6 +17,7 @@ import { UPGRADES } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
 import { OBJECTIVES } from '@/game/data/objectives';
+import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type {
   AreaDef,
   BaseStats,
@@ -31,6 +32,7 @@ import type {
   RunResult,
   RunPassive,
   RunWeapon,
+  StatusEffectInstance,
   UpgradeDef,
   WeaponDef,
   ObstacleDef,
@@ -97,6 +99,7 @@ export interface EnemyActor extends Actor {
   specialKind: 'shockwave' | 'current' | null;
   dying: boolean;
   deathAt: number;
+  activeEffects: StatusEffectInstance[];
 }
 
 export interface Projectile {
@@ -117,6 +120,10 @@ export interface Projectile {
   trail: Array<{ x: number; y: number }>;
   pierce: number;
   hitUids: Set<number>;
+  /** Obstacles already reflected from, preventing a single frame from looping. */
+  obstacleUids?: Set<number>;
+  obstacleInteraction?: 'block' | 'reflect';
+  statusEffectId?: string;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring';
@@ -213,6 +220,7 @@ export interface BreakableObstacle extends Aabb {
 const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
   crate: 40, 'crate-breakable': 40, 'neon-sign': 60, barrel: 80,
   'fuse-box': 100, 'street-lamp': 55, dumpster: 90, 'car-wreck': 150, car: 120,
+  cover: 180,
 };
 
 /* ------------------------------------------------------------------ */
@@ -621,6 +629,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
     specialKind: null,
     dying: false,
     deathAt: 0,
+    activeEffects: [],
   };
   w.enemies.push(enemy);
 
@@ -675,8 +684,10 @@ function damageEnemy(
   knockback: number,
   fromX: number,
   fromY: number,
+  statusEffectId?: string,
 ) {
   if (enemy.dying) return;
+  if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
   const dealt = Math.max(1, Math.round(amount));
   enemy.hp -= dealt;
   enemy.hitFlashUntil = w.now + 90;
@@ -705,8 +716,36 @@ function damageEnemy(
   }
 }
 
+/** Apply a metadata-defined effect, refreshing duration and stacking safely. */
+function applyStatusEffect(w: World, enemy: EnemyActor, id: string) {
+  const def = STATUS_EFFECTS_BY_ID[id];
+  if (!def) return;
+  const existing = enemy.activeEffects.find((effect) => effect.id === id);
+  if (existing) {
+    existing.expiresAt = Math.max(existing.expiresAt, w.now + def.durationMs);
+    existing.stacks = Math.min(def.maxStacks, existing.stacks + 1);
+    return;
+  }
+  enemy.activeEffects.push({ id, stacks: 1, appliedAt: w.now, expiresAt: w.now + def.durationMs });
+}
+
+function updateStatusEffects(w: World) {
+  for (const enemy of w.enemies) {
+    enemy.activeEffects = enemy.activeEffects.filter((effect) => effect.expiresAt > w.now);
+  }
+}
+
+function statusSpeedMultiplier(enemy: EnemyActor): number {
+  return enemy.activeEffects.reduce((multiplier, effect) => {
+    const def = STATUS_EFFECTS_BY_ID[effect.id];
+    return multiplier * (def?.speedMultiplier ?? 1);
+  }, 1);
+}
+
 function killEnemy(w: World, enemy: EnemyActor) {
   enemy.dying = true;
+  // Effects do not linger on a defeated actor or leak into later snapshots.
+  enemy.activeEffects = [];
   enemy.deathAt = w.now;
   enemy.anim = 'death';
   enemy.animStartedAt = w.now;
@@ -803,12 +842,12 @@ function damagePlayer(w: World, amount: number, fromX: number, fromY: number) {
 }
 
 /** Damage every enemy inside a circle once. */
-function novaDamage(w: World, x: number, y: number, radius: number, damage: number, knockback: number) {
+function novaDamage(w: World, x: number, y: number, radius: number, damage: number, knockback: number, statusEffectId?: string) {
   forEachNearby(w, x, y, radius + 40, (enemy) => {
     if (enemy.dying) return;
     const reach = radius + enemy.radius;
     if (dist2(enemy.x, enemy.y, x, y) <= reach * reach) {
-      damageEnemy(w, enemy, damage, knockback, x, y);
+      damageEnemy(w, enemy, damage, knockback, x, y, statusEffectId);
     }
   });
 }
@@ -900,7 +939,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         hitUids: new Set(),
         followPlayer: false,
       });
-      novaDamage(w, p.x, p.y, reach, damage, 5.5);
+      novaDamage(w, p.x, p.y, reach, damage, 5.5, weapon.statusEffectId);
       damageBreakable(w, p.x, p.y, reach, damage);
       p.anim = 'attack';
       p.animStartedAt = w.now;
@@ -942,6 +981,9 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           trail: [],
           pierce: 0,
           hitUids: new Set(),
+          obstacleUids: new Set(),
+          obstacleInteraction: weapon.obstacleInteraction ?? 'block',
+          statusEffectId: weapon.statusEffectId,
         });
       }
       p.anim = 'attack';
@@ -962,6 +1004,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         fromPlayer: true, expiresAt: w.now + (weapon.lifetimeMs ?? 1200), targetUid: null,
         turnRate: 0, color: weapon.color ?? palette.accent, trail: [], pierce: 999,
         hitUids: new Set(),
+         obstacleUids: new Set(),
       });
       pushAlert(w, 'The Bus');
       w.shake = Math.max(w.shake, 5);
@@ -1313,6 +1356,44 @@ function damageBreakable(w: World, x: number, y: number, radius: number, amount:
   w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x: bx, y: by, w: bw, h: bh }) => ({ x: bx, y: by, w: bw, h: bh }));
 }
 
+/** Resolve a projectile against the two combat-specific obstacle types. */
+function collideProjectileObstacle(w: World, proj: Projectile): boolean {
+  for (const b of w.breakables) {
+    if (b.broken || (b.kind !== 'cover' && b.kind !== 'reflective-surface')) continue;
+    if (proj.obstacleUids?.has(b.uid)) continue;
+    if (Math.abs(proj.x - b.x) > b.w / 2 + proj.radius || Math.abs(proj.y - b.y) > b.h / 2 + proj.radius) continue;
+
+    const dx = proj.x - b.x;
+    const dy = proj.y - b.y;
+    const horizontal = Math.abs(dx) / (b.w / 2 + proj.radius);
+    const vertical = Math.abs(dy) / (b.h / 2 + proj.radius);
+    const hitX = horizontal > vertical;
+    const nx = hitX ? (dx < 0 ? -1 : 1) : 0;
+    const ny = hitX ? 0 : (dy < 0 ? -1 : 1);
+    if (b.kind === 'reflective-surface' && proj.fromPlayer && proj.obstacleInteraction === 'reflect') {
+      (proj.obstacleUids ??= new Set()).add(b.uid);
+      if (hitX) proj.vx *= -1;
+      else proj.vy *= -1;
+      // Move clear of the face so a reflected shot cannot immediately collide again.
+      proj.x = b.x + nx * (b.w / 2 + proj.radius + 1);
+      proj.y = b.y + ny * (b.h / 2 + proj.radius + 1);
+      spawnParticles(w, proj.x, proj.y, '#d8b4fe', 5, 70);
+      pushAlert(w, 'Ricochet');
+      continue;
+    }
+    if (b.kind === 'reflective-surface') {
+      spawnParticles(w, proj.x, proj.y, '#d8b4fe', 3, 45);
+      return true;
+    }
+    if (b.kind === 'cover') {
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35);
+      spawnParticles(w, proj.x, proj.y, '#fbbf24', 4, 55);
+      return true;
+    }
+  }
+  return false;
+}
+
 function updateBreakables(w: World, dt: number) {
   for (const b of w.breakables) {
     if (b.broken) continue;
@@ -1354,12 +1435,12 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   collideObstacles(w, p);
   clampToArena(w, p);
   for (const b of w.breakables) {
-    if (b.broken || !['dumpster', 'car-wreck'].includes(b.kind)) continue;
+    if (b.broken || !['dumpster', 'car-wreck', 'cover'].includes(b.kind)) continue;
     if (Math.abs(p.x - b.x) < b.w / 2 + p.radius && Math.abs(p.y - b.y) < b.h / 2 + p.radius) {
       b.contacts += 1;
       if (b.kind === 'car-wreck' && b.contacts < 3) continue;
       const dx = b.x - p.x; const dy = b.y - p.y; const len = Math.hypot(dx, dy) || 1;
-      const force = b.kind === 'car-wreck' ? 24 : 42;
+      const force = b.kind === 'car-wreck' ? 24 : b.kind === 'cover' ? 55 : 42;
       b.vx += (dx / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
       b.vy += (dy / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
     }
@@ -1391,7 +1472,7 @@ function updateEnemies(w: World, dt: number) {
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
 
-    let speed = enemy.speed;
+    let speed = enemy.speed * statusSpeedMultiplier(enemy);
 
     switch (enemy.def.behavior) {
       case 'charger': {
@@ -1639,6 +1720,10 @@ function updateProjectiles(w: World, dt: number) {
 
     let remove = w.now > proj.expiresAt;
 
+    // Cover absorbs shots; reflective surfaces redirect player projectiles.
+    // This runs before actor hits so a wall cannot be shot through.
+    if (!remove && collideProjectileObstacle(w, proj)) remove = true;
+
     if (!remove) {
       if (w.area.endless) {
         // In endless mode, cull by distance from player rather than fixed arena walls.
@@ -1656,7 +1741,7 @@ function updateProjectiles(w: World, dt: number) {
         const reach = proj.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
           proj.hitUids.add(enemy.uid);
-          damageEnemy(w, enemy, proj.damage, proj.knockback, proj.x, proj.y);
+          damageEnemy(w, enemy, proj.damage, proj.knockback, proj.x, proj.y, proj.statusEffectId);
           damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
           if (proj.pierce > 0) proj.pierce -= 1;
@@ -2167,6 +2252,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
     updateSpawning(w, dt);
   }
 
+  updateStatusEffects(w);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
 
@@ -2210,6 +2296,12 @@ export function hudSnapshot(w: World): HudSnapshot {
   const ultRemaining = Math.max(0, w.ultReadyAt - w.now);
   const ultTotal = w.character.ultimate.cooldownMs * w.ultCooldownMult;
   const e = w.endless;
+  const effectCounts = new Map<string, number>();
+  for (const enemy of w.enemies) {
+    for (const effect of enemy.activeEffects) {
+      effectCounts.set(effect.id, (effectCounts.get(effect.id) ?? 0) + 1);
+    }
+  }
   return {
     hp: Math.max(0, Math.round(w.player.hp)),
     maxHp: Math.round(w.player.maxHp),
@@ -2231,6 +2323,12 @@ export function hudSnapshot(w: World): HudSnapshot {
     rescueAvailable: w.rescue.status === 'available' || w.rescue.status === 'freeing',
     rescueProgressPct: Math.round(w.rescue.progress * 100),
     lootBoxesOpened: w.lootBoxesOpened,
+    activeEffects: [...effectCounts.entries()].map(([id, count]) => ({
+      id,
+      name: STATUS_EFFECTS_BY_ID[id]?.name ?? id,
+      color: STATUS_EFFECTS_BY_ID[id]?.color ?? '#fff',
+      count,
+    })),
     objectives: w.objectives.map((o) => ({
       label: o.def.label,
       progress: Math.min(o.def.targetCount, Math.round(o.progress)),

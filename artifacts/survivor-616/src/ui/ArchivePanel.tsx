@@ -5,10 +5,11 @@
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { ALLIES, DISCOVERIES } from '@/game/data/progression';
+import { STATUS_EFFECTS } from '@/game/data/statusEffects';
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles } from 'lucide-react';
 
 export interface ArchivePanelProps {
   onBack: () => void;
@@ -81,6 +82,19 @@ export function ArchivePanel({ onBack }: ArchivePanelProps) {
           testId: `card-character-${char.id}`
         };
       })
+    },
+    {
+      title: 'Status Effects',
+      icon: Sparkles,
+      count: STATUS_EFFECTS.length,
+      total: STATUS_EFFECTS.length,
+      items: STATUS_EFFECTS.map(effect => ({
+        id: effect.id,
+        name: effect.name,
+        desc: effect.description,
+        found: true,
+        testId: `card-status-effect-${effect.id}`
+      }))
     }
   ];
 

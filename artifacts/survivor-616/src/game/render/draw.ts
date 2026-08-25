@@ -8,6 +8,7 @@
 
 import type { World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
+import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type { ObstacleDef } from '@/game/types';
 
 import { drawRig, drawShadow } from './sprite';
@@ -322,6 +323,8 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'car-wreck': { top: '#493a4d', side: '#29232d', trim: '#a77aa8' },
   'crate-breakable': { top: '#6b4a2c', side: '#3f2b19', trim: '#d69b5d' },
   'security-camera': { top: '#3e4650', side: '#252a31', trim: '#ff7ab8' },
+  cover: { top: '#5f4b35', side: '#33281e', trim: '#fbbf24' },
+  'reflective-surface': { top: '#263e5b', side: '#142438', trim: '#d8b4fe' },
 };
 
 function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
@@ -351,6 +354,32 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
     ctx.strokeStyle = colors.trim;
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y - height + 1, obstacle.w - 2, obstacle.h - 2);
+
+    // Combat props get a strong, readable symbol in addition to their silhouette.
+    if (obstacle.kind === 'cover') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.18, y - height + obstacle.h * 0.65);
+      ctx.lineTo(x + obstacle.w * 0.38, y - height + obstacle.h * 0.28);
+      ctx.lineTo(x + obstacle.w * 0.62, y - height + obstacle.h * 0.65);
+      ctx.lineTo(x + obstacle.w * 0.82, y - height + obstacle.h * 0.28);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'reflective-surface') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#f5e8ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
+      ctx.lineTo(x + obstacle.w * 0.5, y - height + obstacle.h * 0.2);
+      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
     if (live && !live.broken && live.hp <= live.maxHp * 0.5) {
@@ -797,6 +826,20 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       ctx.restore();
     }
     const dissolve = enemy.dying ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : 0;
+    const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
+    if (freeze && !enemy.dying) {
+      const freezeDef = STATUS_EFFECTS_BY_ID.freeze!;
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.1 * Math.sin(w.now / 100);
+      ctx.strokeStyle = freezeDef.color;
+      ctx.shadowColor = freezeDef.color;
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - dissolve * 0.6));
     const shadowed = w.breakables.some((b) => !b.broken &&
       enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
@@ -817,6 +860,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss',
         dissolve,
+        tint: freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
       },
     );
     ctx.restore();

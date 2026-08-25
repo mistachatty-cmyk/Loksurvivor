@@ -15,6 +15,8 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: 180, y: -120, w: 70, h: 50, kind: 'crate' },
       { x: -160, y: 140, w: 100, h: 44, kind: 'barrier' },
       { x: 160, y: 150, w: 60, h: 60, kind: 'crate' },
+      { x: 0, y: 20, w: 100, h: 22, kind: 'cover' },
+      { x: 100, y: -80, w: 44, h: 44, kind: 'reflective-surface' },
     ],
   },
   {
