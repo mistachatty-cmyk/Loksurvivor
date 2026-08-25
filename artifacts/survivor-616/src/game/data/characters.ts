@@ -1,4 +1,4 @@
-import { humanoidRig, quadrupedRig } from '@/game/sprites/rigs';
+import { expressiveRig, humanoidRig, quadrupedRig } from '@/game/sprites/rigs';
 import type { CharacterDef } from '@/game/types';
 
 /**
@@ -285,6 +285,48 @@ export const CHARACTERS: CharacterDef[] = [
       effect: { novaDamage: 78, novaRadius: 180, damageMult: 1.45, speedMult: 1.2 },
     },
     unlock: { kind: 'default' },
+  },
+  {
+    id: 'prismrunner',
+    name: 'Prism Runner',
+    handle: 'Seven-Color Getaway',
+    tagline: 'Never takes the same shortcut twice.',
+    bio: 'A courier who maps the city in flashes of impossible color. Their jacket catches the streetlight and throws it back sharper.',
+    referenceArt: 'attached_assets/IMG_9340_1787696127871.jpeg',
+    palette: { ink: '#120d2b', body: '#392c78', bodyDark: '#20174b', accent: '#f0abfc', accentBright: '#fff7ed', skin: '#d8b4fe', glow: '#67e8f9' },
+    rig: expressiveRig('prism', 22),
+    stats: { maxHp: 94, speed: 118, power: 1.02, area: 1.15, haste: 1.1, magnet: 68, armor: 0.02 },
+    weapon: { id: 'prism-burst', name: 'Prism Burst', kind: 'projectile', description: 'A fan of hard-light shards that leaves a starburst at the first hit.', damage: 14, cooldownMs: 700, range: 410, speed: 430, count: 3, lifetimeMs: 1100, levelDamageScale: 0.23, color: '#f0abfc', obstacleInteraction: 'reflect' },
+    ultimate: { id: 'rainbow-cut', name: 'Rainbow Cut', description: 'Splits the block into seven bright lanes and makes every lane count.', cooldownMs: 23000, durationMs: 4200, effect: { novaDamage: 84, novaRadius: 205, damageMult: 1.4, speedMult: 1.25 } },
+    unlock: { kind: 'kills', count: 75 },
+  },
+  {
+    id: 'cinderhalo',
+    name: 'Cinder Halo',
+    handle: 'Last Match',
+    tagline: 'The smoke is part of the outfit.',
+    bio: 'A night-shift spark who carries a tiny weather system above their head. Every swing starts small, then remembers how to burn.',
+    referenceArt: 'attached_assets/IMG_9341_1787696127871.jpeg',
+    palette: { ink: '#17070b', body: '#4a1721', bodyDark: '#210b13', accent: '#ff6b35', accentBright: '#ffe7a3', skin: '#9f3f32', glow: '#ffb000' },
+    rig: expressiveRig('flame', 22),
+    stats: { maxHp: 112, speed: 99, power: 1.16, area: 1.06, haste: 0.96, magnet: 48, armor: 0.1 },
+    weapon: { id: 'cinder-arc', name: 'Cinder Arc', kind: 'melee', description: 'A close flame sweep that leaves a bright afterimage on the pavement.', damage: 23, cooldownMs: 760, range: 72, levelDamageScale: 0.3, color: '#ff6b35' },
+    ultimate: { id: 'matchstorm', name: 'Matchstorm', description: 'A crown of ember lanes erupts outward and turns the crowd into silhouettes.', cooldownMs: 26000, durationMs: 4500, effect: { novaDamage: 96, novaRadius: 190, damageMult: 1.55, invulnerable: true } },
+    unlock: { kind: 'clearArea', areaId: 'rooftops' },
+  },
+  {
+    id: 'orbitanchor',
+    name: 'Orbit Anchor',
+    handle: 'Gravity With Manners',
+    tagline: 'Everything comes around eventually.',
+    bio: 'A compact astronomer with a pocket-sized sky. Their rings are not jewelry; they are a polite warning about where the next hit will land.',
+    referenceArt: 'attached_assets/IMG_9343_1787696127871.jpeg',
+    palette: { ink: '#110c1f', body: '#9a6b2f', bodyDark: '#382246', accent: '#c4b5fd', accentBright: '#fff1b8', skin: '#f4d5a2', glow: '#facc15' },
+    rig: expressiveRig('astral', 20),
+    stats: { maxHp: 98, speed: 94, power: 1.1, area: 1.22, haste: 1.02, magnet: 76, armor: 0.04 },
+    weapon: { id: 'orbit-rings', name: 'Orbit Rings', kind: 'orbit', description: 'Two small gold-violet rings orbit outward and snap back through enemies.', damage: 13, cooldownMs: 0, range: 64, speed: 3.2, count: 2, levelDamageScale: 0.24, color: '#c4b5fd' },
+    ultimate: { id: 'aphelion', name: 'Aphelion', description: 'The pocket sky opens: orbiting rings expand, strike, and pull the eye outward.', cooldownMs: 24000, durationMs: 5200, effect: { novaDamage: 76, novaRadius: 230, damageMult: 1.35, cooldownMult: 0.5 } },
+    unlock: { kind: 'rescue', allyId: 'sable' },
   },
 ];
 

@@ -656,6 +656,9 @@ function updateSpawning(w: World, dt: number) {
       const def = getEnemy(wave.enemyId);
       for (let b = 0; b < wave.burst; b += 1) {
         spawnEnemy(w, def, wave.hpMult ?? 1);
+        for (const groupEnemyId of wave.group ?? []) {
+          spawnEnemy(w, getEnemy(groupEnemyId), wave.hpMult ?? 1);
+        }
       }
     }
   }

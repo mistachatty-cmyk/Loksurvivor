@@ -11,6 +11,9 @@ export const WEAPONS: WeaponDef[] = [
   { id: 'glassline', name: 'Glassline', kind: 'projectile', description: 'A piercing glass bolt that stops cold behind heavy cover.', damage: 30, cooldownMs: 1100, range: 500, speed: 540, lifetimeMs: 1100, levelDamageScale: 0.24, color: '#67e8f9', obstacleInteraction: 'block' },
   { id: 'glacier-staff', name: 'Glacier Staff', kind: 'projectile', description: 'Launches a cold star that freezes the first thing it strikes.', damage: 18, cooldownMs: 780, range: 390, speed: 330, lifetimeMs: 1800, levelDamageScale: 0.24, color: '#8be9ff', obstacleInteraction: 'block', statusEffectId: 'freeze' },
   { id: 'rift-arc', name: 'Rift Arc', kind: 'projectile', description: 'Throws twin hot-pink tears through the dark, one for each side of the street.', damage: 15, cooldownMs: 760, range: 360, speed: 380, count: 2, lifetimeMs: 1300, levelDamageScale: 0.26, color: '#ff4fa3', obstacleInteraction: 'reflect' },
+  { id: 'prism-burst', name: 'Prism Burst', kind: 'projectile', description: 'A fan of hard-light shards that leaves a starburst at the first hit.', damage: 14, cooldownMs: 700, range: 410, speed: 430, count: 3, lifetimeMs: 1100, levelDamageScale: 0.23, color: '#f0abfc', obstacleInteraction: 'reflect' },
+  { id: 'cinder-arc', name: 'Cinder Arc', kind: 'melee', description: 'A close flame sweep that leaves a bright afterimage on the pavement.', damage: 23, cooldownMs: 760, range: 72, levelDamageScale: 0.3, color: '#ff6b35' },
+  { id: 'orbit-rings', name: 'Orbit Rings', kind: 'orbit', description: 'Two small gold-violet rings orbit outward and snap back through enemies.', damage: 13, cooldownMs: 0, range: 64, speed: 3.2, count: 2, levelDamageScale: 0.24, color: '#c4b5fd' },
 ];
 
 export const WEAPONS_BY_ID: Record<string, WeaponDef> = Object.fromEntries(WEAPONS.map((weapon) => [weapon.id, weapon]));

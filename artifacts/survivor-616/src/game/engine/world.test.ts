@@ -119,6 +119,25 @@ test('a projectile is absorbed by heavy cover', () => {
   assert.equal(world.breakables[0]!.hp, 173);
 });
 
+test('a grouped wave releases its mixed formation together', () => {
+  const groupedArea: AreaDef = {
+    ...AREAS[0]!,
+    id: 'grouped-wave-test',
+    durationSec: 30,
+    waves: [
+      { fromSec: 0, toSec: 30, enemyId: 'nightcrawler', ratePerSec: 1, burst: 2, group: ['spiral-moth'] },
+    ],
+    obstacles: [],
+    rescueAllyId: undefined,
+  };
+  const world = createWorld(groupedArea, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.enemies.length, 4);
+  assert.equal(world.enemies.filter((enemy) => enemy.defId === 'nightcrawler').length, 2);
+  assert.equal(world.enemies.filter((enemy) => enemy.defId === 'spiral-moth').length, 2);
+});
+
 test('a reflective surface redirects a compatible projectile', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 24, h: 40, kind: 'reflective-surface' }),

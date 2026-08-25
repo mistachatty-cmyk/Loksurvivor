@@ -318,6 +318,8 @@ export interface WaveDef {
   ratePerSec: number;
   /** Enemies released together per spawn tick. */
   burst: number;
+  /** Additional enemy ids released with each burst to form a mixed group. */
+  group?: string[];
   /** Multiplier applied to enemy hp for this wave. */
   hpMult?: number;
 }

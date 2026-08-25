@@ -38,6 +38,76 @@ interface HumanoidOptions {
   torsoColor?: SpritePart['color'];
 }
 
+export type ExpressiveStyle = 'prism' | 'flame' | 'spiral' | 'river' | 'astral';
+
+/**
+ * A deliberately exaggerated pixel language for new moodboard-inspired
+ * characters. It composes with the familiar humanoid rig so collision and
+ * animation contracts stay unchanged while the silhouette gets a signature.
+ */
+export function expressiveRig(style: ExpressiveStyle, height = 21): SpriteRig {
+  const rig = humanoidRig({
+    height,
+    width: style === 'flame' ? 10 : style === 'astral' ? 9 : 11,
+    hood: style === 'spiral',
+    halo: style === 'astral',
+    staff: style === 'prism' || style === 'astral',
+    headColor: style === 'spiral' ? 'bodyDark' : 'skin',
+    torsoColor: style === 'flame' ? 'bodyDark' : 'body',
+  });
+  const top = height + (style === 'astral' ? 5 : 1);
+  const signature: SpritePart[] = [];
+  if (style === 'prism') {
+    signature.push(
+      { key: 'aura', x: -9, y: top - 8, w: 3, h: 7, color: 'accent', z: 0 },
+      { key: 'aura', x: 6, y: top - 8, w: 3, h: 7, color: 'glow', z: 0 },
+      { key: 'crest', x: -3, y: top + 1, w: 2, h: 2, color: 'accentBright', z: 9 },
+      { key: 'crest', x: 1, y: top + 3, w: 2, h: 2, color: 'accent', z: 9 },
+    );
+  } else if (style === 'flame') {
+    signature.push(
+      { key: 'crest', x: -4, y: top, w: 3, h: 5, color: 'accent', z: 8 },
+      { key: 'crest', x: 0, y: top + 2, w: 3, h: 6, color: 'accentBright', z: 9 },
+      { key: 'aura', x: -7, y: 2, w: 2, h: 5, color: 'glow', z: 0 },
+      { key: 'aura', x: 5, y: 4, w: 2, h: 4, color: 'accent', z: 0 },
+    );
+  } else if (style === 'spiral') {
+    signature.push(
+      { key: 'face', x: -4, y: top - 5, w: 2, h: 2, color: 'glow', z: 8 },
+      { key: 'face', x: 2, y: top - 5, w: 2, h: 2, color: 'glow', z: 8 },
+      { key: 'aura', x: -8, y: 5, w: 2, h: 8, color: 'accent', z: 0 },
+      { key: 'aura', x: 6, y: 7, w: 2, h: 6, color: 'glow', z: 0 },
+    );
+  } else if (style === 'river') {
+    signature.push(
+      { key: 'crest', x: -6, y: top, w: 2, h: 6, color: 'accent', z: 8 },
+      { key: 'crest', x: 4, y: top + 1, w: 2, h: 5, color: 'accent', z: 8 },
+      { key: 'aura', x: -8, y: 1, w: 3, h: 6, color: 'glow', z: 0 },
+      { key: 'aura', x: 5, y: 2, w: 3, h: 5, color: 'accent', z: 0 },
+    );
+  } else {
+    signature.push(
+      { key: 'aura', x: -10, y: top - 4, w: 2, h: 2, color: 'accent', z: 0 },
+      { key: 'aura', x: 8, y: top - 1, w: 2, h: 2, color: 'glow', z: 0 },
+      { key: 'crest', x: -2, y: top + 4, w: 4, h: 1, color: 'accentBright', z: 9 },
+    );
+  }
+  rig.parts.push(...signature);
+  const offset = style === 'flame' ? 1 : style === 'river' ? 1.15 : 1;
+  rig.anims.idle = bobClip(style === 'river' ? 2 : 1, 150 * offset);
+  rig.anims.attack = {
+    frameMs: 64,
+    loop: false,
+    frames: [
+      { armR: { dx: -2, dy: -1 }, torso: { dx: -1 }, aura: { dx: -1 } },
+      { armR: { dx: 2, dy: 2, dw: 2 }, torso: { dx: 1 }, crest: { dy: 2 } },
+      { armR: { dx: 6, dy: 1, dw: 4 }, torso: { dx: 2 }, head: { dx: 2 }, aura: { dx: 3, dw: 2 } },
+      { armR: { dx: 2 }, torso: { dx: 1 }, head: { dx: 1 } },
+    ],
+  };
+  return rig;
+}
+
 function bobClip(amount: number, frameMs: number): AnimClip {
   return {
     frameMs,
