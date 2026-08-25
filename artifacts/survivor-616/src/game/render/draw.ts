@@ -81,6 +81,43 @@ function drawGround(ctx: CanvasRenderingContext2D, w: World, left: number, top: 
   ctx.globalAlpha = 1;
 }
 
+/**
+ * Color-graded time-of-day wash. `phase` is 0..1 (midnight -> pre-dawn ->
+ * neutral -> dusk -> back to midnight). 0.5 resolves to fully transparent so
+ * this is a no-op until something (the day/night clock) actually drives
+ * `w.cycle.phase` -- today's baked-in night palette is untouched by default.
+ */
+const TIME_OF_DAY_STOPS: Array<[number, [number, number, number, number]]> = [
+  [0, [10, 14, 40, 0.16]],
+  [0.25, [60, 24, 70, 0.12]],
+  [0.5, [0, 0, 0, 0]],
+  [0.75, [90, 46, 12, 0.1]],
+  [1, [10, 14, 40, 0.16]],
+];
+
+function timeOfDayTint(phase: number): string {
+  const clamped = Math.min(1, Math.max(0, phase));
+  let a = TIME_OF_DAY_STOPS[0]!;
+  let b = TIME_OF_DAY_STOPS[TIME_OF_DAY_STOPS.length - 1]!;
+  for (let i = 0; i < TIME_OF_DAY_STOPS.length - 1; i += 1) {
+    if (clamped >= TIME_OF_DAY_STOPS[i]![0] && clamped <= TIME_OF_DAY_STOPS[i + 1]![0]) {
+      a = TIME_OF_DAY_STOPS[i]!;
+      b = TIME_OF_DAY_STOPS[i + 1]!;
+      break;
+    }
+  }
+  const span = b[0] - a[0] || 1;
+  const t = (clamped - a[0]) / span;
+  const lerp = (x: number, y: number) => x + (y - x) * t;
+  const [r1, g1, b1, alpha1] = a[1];
+  const [r2, g2, b2, alpha2] = b[1];
+  const r = Math.round(lerp(r1, r2));
+  const g = Math.round(lerp(g1, g2));
+  const bl = Math.round(lerp(b1, b2));
+  const alpha = lerp(alpha1, alpha2);
+  return `rgba(${r}, ${g}, ${bl}, ${alpha.toFixed(3)})`;
+}
+
 /** A streetlight pool that keeps the middle of the fight readable. */
 function drawLightPool(ctx: CanvasRenderingContext2D, w: World) {
   const radius = 340;
@@ -318,7 +355,9 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
   }
   const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
+  const neonDistrict = w.area.ground.glowStrategy === 'neon';
   let dynamicCount = 0;
+  let shaftCount = 0;
   for (const b of sources) {
     const isBarrel = b.kind === 'barrel';
     const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : 80;
@@ -338,6 +377,41 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fillRect(b.x - b.w * 0.8, b.y + b.h / 2, b.w * 1.6, 10);
     }
     ctx.restore();
+
+    // Neon districts push their strong sources harder with a bright glow
+    // core (shadowBlur) on top of the plain radial gradient above -- only
+    // changes how the light source itself renders, never the rig.
+    if (neonDistrict && (b.kind === 'neon-sign' || b.kind === 'street-lamp')) {
+      ctx.save();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 18 * pulse;
+      ctx.globalAlpha = 0.55 * pulse;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Fake volumetric light shaft: a thin, low-alpha cone falling away from
+    // overhead street lamps. Capped to the first 3 so it can't scale with
+    // an unbounded breakable count.
+    if (b.kind === 'street-lamp' && shaftCount++ < 3) {
+      const shaftLen = 130;
+      const shaftGradient = ctx.createLinearGradient(b.x, b.y, b.x, b.y + shaftLen);
+      shaftGradient.addColorStop(0, `${color}30`);
+      shaftGradient.addColorStop(1, `${color}00`);
+      ctx.save();
+      ctx.fillStyle = shaftGradient;
+      ctx.beginPath();
+      ctx.moveTo(b.x - 10, b.y);
+      ctx.lineTo(b.x + 10, b.y);
+      ctx.lineTo(b.x + 34, b.y + shaftLen);
+      ctx.lineTo(b.x - 34, b.y + shaftLen);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
 
     if (dynamicCount++ < 3 && isBarrel) {
       for (const actor of [w.player, ...w.enemies].slice(0, 45)) {
@@ -374,9 +448,19 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
         (b.x * awayX + b.y * awayY) - (a.x * awayX + a.y * awayY),
       ).slice(0, 2);
       const length = Math.min(180, Math.max(55, 300 - distance));
+      // Darker near the object, lighter at the projected far edge -- a
+      // cheap ambient-occlusion approximation using the same corners
+      // already computed for the flat shadow quad.
+      const nearMidX = (far[0]!.x + far[1]!.x) / 2;
+      const nearMidY = (far[0]!.y + far[1]!.y) / 2;
+      const shadowGradient = ctx.createLinearGradient(
+        nearMidX, nearMidY,
+        nearMidX + awayX * length, nearMidY + awayY * length,
+      );
+      shadowGradient.addColorStop(0, 'rgba(2,2,8,0.62)');
+      shadowGradient.addColorStop(1, 'rgba(2,2,8,0.14)');
       ctx.save();
-      ctx.globalAlpha = 0.56;
-      ctx.fillStyle = '#020208';
+      ctx.fillStyle = shadowGradient;
       ctx.beginPath();
       ctx.moveTo(far[0]!.x, far[0]!.y);
       ctx.lineTo(far[1]!.x, far[1]!.y);
@@ -827,6 +911,14 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.globalAlpha = 0.1 + Math.min(0.08, w.endless.dungeonEraIndex * 0.015);
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
+  }
+  // Optional-chained until Phase 4 adds World.cycle -- resolves to 0.5
+  // (fully transparent) so this is a no-op today.
+  const cyclePhase = (w as unknown as { cycle?: { phase: number } }).cycle?.phase ?? 0.5;
+  const tint = timeOfDayTint(cyclePhase);
+  if (tint !== 'rgba(0, 0, 0, 0.000)') {
+    ctx.fillStyle = tint;
+    ctx.fillRect(left, top, right - left, bottom - top);
   }
   drawLightPool(ctx, w);
   drawObjectLighting(ctx, w);

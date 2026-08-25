@@ -13,7 +13,7 @@ export const AREAS: AreaDef[] = [
       'Three blocks of storefronts, a shuttered variety store and a streetlight that never quite commits. Where every run starts.',
     backdrop: 'art/street.jpeg',
     bounds: { w: 900, h: 620 },
-    ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848' },
+    ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848', glowStrategy: 'neon' },
     obstacles: [
       { x: -320, y: -180, w: 120, h: 60, kind: 'car' },
       { x: 250, y: -220, w: 70, h: 50, kind: 'dumpster' },
@@ -83,7 +83,7 @@ export const AREAS: AreaDef[] = [
       'Tar paper, vent stacks and a view of every light in the city. Open ground with nowhere to hide.',
     backdrop: 'art/rooftops.jpeg',
     bounds: { w: 1000, h: 560 },
-    ground: { base: '#0f1119', tile: '#171a25', seam: '#080910', glow: '#ff7ab8' },
+    ground: { base: '#0f1119', tile: '#171a25', seam: '#080910', glow: '#ff7ab8', glowStrategy: 'neon' },
     obstacles: [
       { x: -380, y: 120, w: 60, h: 60, kind: 'ac-unit' },
       { x: -140, y: -140, w: 60, h: 60, kind: 'ac-unit' },

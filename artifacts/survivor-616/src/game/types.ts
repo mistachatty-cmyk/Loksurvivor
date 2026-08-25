@@ -322,6 +322,13 @@ export interface AreaDef {
     tile: string;
     seam: string;
     glow: string;
+    /**
+     * How this district's static light sources (neon signs, street lamps)
+     * render. 'neon' adds an extra bright glow core to strong sources;
+     * omitted/'flat' keeps the plain radial-gradient look. Purely visual --
+     * never affects gameplay.
+     */
+    glowStrategy?: 'neon' | 'flat';
   };
   obstacles: ObstacleDef[];
   /** Seconds the player must survive to clear the area. */

@@ -113,8 +113,10 @@ export function drawShadow(
   radius: number,
 ) {
   ctx.save();
-  ctx.globalAlpha = 0.32;
-  ctx.fillStyle = '#000000';
+  const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, radius);
+  gradient.addColorStop(0, 'rgba(0,0,0,0.4)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.ellipse(screenX, screenY, radius, radius * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
