@@ -324,6 +324,13 @@ export interface AreaDef {
     glow: string;
   };
   obstacles: ObstacleDef[];
+  /** A readable set piece drawn into the arena as a visual story cue. */
+  landmark?: {
+    name: string;
+    description: string;
+    kind: 'market' | 'rail-yard' | 'plaza' | 'floodgate';
+    accent: string;
+  };
   /** Seconds the player must survive to clear the area. */
   durationSec: number;
   waves: WaveDef[];

@@ -136,6 +136,10 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'skyline-tag', name: 'Skyline Tag', blurb: 'Nyx signed the water tower in paint that only shows under streetlight.' },
   { id: 'lantern-shard', name: 'Lantern Shard', blurb: 'A splinter of the cellar glass. Warm to the touch, hums faintly.' },
   { id: 'sire-ledger', name: "The Sire's Ledger", blurb: 'A book of names and dates. Half the block is in it. So are you.' },
+  { id: 'floodwall-mark', name: 'Floodwall Mark', blurb: 'A hand-painted arrow under the floodwall: east to the market, north to the rail cut.' },
+  { id: 'market-bell', name: 'The Market Bell', blurb: 'A brass bell from the old market hall. Vee says it rang once for every person who made it home.' },
+  { id: 'northline-switch', name: 'Northline Switch', blurb: 'A rail switch marked with the Sanctum symbol. Someone has been moving supplies under the city.' },
+  { id: 'civic-fountain', name: 'The Civic Fountain', blurb: 'The plaza fountain still runs red at midnight, carrying the Sire’s oldest route toward the river.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

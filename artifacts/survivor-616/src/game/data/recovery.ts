@@ -76,4 +76,20 @@ export const RECOVERY_HUTS: RecoveryHutDef[] = [
     facility: 'hot-tub',
     unlock: { kind: 'clearArea', areaId: 'riverfront' },
   },
+  {
+    id: 'market-loft',
+    name: 'Market Loft',
+    areaId: 'old-market',
+    description: 'A shuttered vendor loft above the market hall. The old bell keeps time with the pipes.',
+    facility: 'shower',
+    unlock: { kind: 'clearArea', areaId: 'old-market' },
+  },
+  {
+    id: 'northline-cabin',
+    name: 'Northline Cabin',
+    areaId: 'northline-yard',
+    description: 'A rail signal cabin with a cot, a hot plate, and a window full of empty tracks.',
+    facility: 'hot-tub',
+    unlock: { kind: 'clearArea', areaId: 'northline-yard' },
+  },
 ];

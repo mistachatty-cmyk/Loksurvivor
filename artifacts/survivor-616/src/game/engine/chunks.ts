@@ -22,7 +22,7 @@ export const CHUNK_SIZE = 640;
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 
-export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot';
+export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot' | 'market' | 'rail' | 'plaza';
 
 export interface StreetChunk {
   cx: number;
@@ -43,7 +43,7 @@ export interface StreetChunk {
 /* Chunk generation                                                    */
 /* ------------------------------------------------------------------ */
 
-const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot'];
+const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot', 'market', 'rail', 'plaza'];
 const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable'];
 
 /**
@@ -87,6 +87,9 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     alley: [3, 5],
     parking: [4, 7],
     lot: [1, 3],
+    market: [4, 7],
+    rail: [3, 6],
+    plaza: [2, 5],
   };
   const [minProps, maxProps] = propCounts[variant];
   const propCount = minProps + Math.floor(rng() * (maxProps - minProps + 1));
@@ -100,6 +103,12 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     parking: [6, 1, 1, 0, 1, 0],
     // lot: mixed
     lot: [1, 2, 3, 2, 1, 2, 1, 1, 1, 1, 1, 1],
+    // market: stalls, barriers, signs
+    market: [1, 1, 3, 2, 4, 0, 3, 1, 1, 1, 0, 2],
+    // rail: long barriers, wrecks and signal boxes
+    rail: [1, 0, 1, 0, 5, 1, 0, 1, 3, 2, 4, 1],
+    // plaza: open lanes with lamps and planters
+    plaza: [0, 0, 1, 5, 3, 0, 1, 0, 1, 4, 0, 1],
   };
   const weights = kindWeights[variant];
 

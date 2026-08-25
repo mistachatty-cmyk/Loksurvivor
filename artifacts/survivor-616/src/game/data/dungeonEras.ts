@@ -64,4 +64,30 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: 220, y: 150, w: 50, h: 50, kind: 'crate' },
     ],
   },
+  {
+    name: 'Flooded Archive',
+    ground: { base: '#08181b', tile: '#0d292b', seam: '#061012', glow: '#35d0bb' },
+    bounds: { w: 720, h: 520 },
+    obstacles: [
+      { x: -280, y: -180, w: 180, h: 30, kind: 'barrier' },
+      { x: 240, y: -170, w: 120, h: 30, kind: 'barrier' },
+      { x: -230, y: 150, w: 60, h: 90, kind: 'planter' },
+      { x: 0, y: 70, w: 70, h: 70, kind: 'fuse-box' },
+      { x: 230, y: 160, w: 90, h: 60, kind: 'car-wreck' },
+      { x: 0, y: -190, w: 28, h: 30, kind: 'street-lamp' },
+    ],
+  },
+  {
+    name: 'Municipal Rotunda',
+    ground: { base: '#171221', tile: '#251936', seam: '#0b0810', glow: '#b58cff' },
+    bounds: { w: 640, h: 640 },
+    obstacles: [
+      { x: -210, y: -210, w: 70, h: 70, kind: 'planter' },
+      { x: 210, y: -210, w: 70, h: 70, kind: 'planter' },
+      { x: -210, y: 210, w: 70, h: 70, kind: 'planter' },
+      { x: 210, y: 210, w: 70, h: 70, kind: 'planter' },
+      { x: -300, y: 0, w: 24, h: 180, kind: 'barrier' },
+      { x: 300, y: 0, w: 24, h: 180, kind: 'barrier' },
+    ],
+  },
 ];

@@ -82,6 +82,11 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                 <p className="text-xs text-muted-foreground line-clamp-2 mb-4 group-hover:text-gray-300 transition-colors">
                   {area.description}
                 </p>
+                {area.landmark && (
+                  <p className="mb-3 truncate border-l-2 border-primary/60 pl-2 text-[10px] font-bold uppercase tracking-widest text-primary/80">
+                    Landmark: {area.landmark.name}
+                  </p>
+                )}
 
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center gap-1.5 px-2 py-1 border ${threatColor}`}>
@@ -124,10 +129,16 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
             
             <div className="relative z-20 flex flex-col items-center justify-center h-full text-center">
               <Lock className="w-8 h-8 text-muted-foreground mb-3" />
-              <h2 className="text-xl font-black text-muted-foreground uppercase tracking-tight mb-2">Locked Zone</h2>
+              <h2 className="text-xl font-black text-white uppercase tracking-tight mb-1">{area.name}</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">{area.district}</p>
               <p className="text-xs text-primary font-bold uppercase tracking-wider max-w-[200px]">
                 {describeUnlock(area.unlock)}
               </p>
+              {area.landmark && (
+                <p className="mt-2 text-[10px] uppercase tracking-widest text-muted-foreground/80">
+                  Landmark: {area.landmark.name}
+                </p>
+              )}
             </div>
           </motion.div>
         ))}

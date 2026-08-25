@@ -92,6 +92,76 @@ function drawLightPool(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillRect(w.player.x - radius, w.player.y - radius, radius * 2, radius * 2);
 }
 
+function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
+  const landmark = w.area.landmark;
+  if (!landmark) return;
+  const x = 0;
+  const y = -150;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = landmark.accent;
+  ctx.fillStyle = `${landmark.accent}22`;
+  ctx.shadowColor = landmark.accent;
+  ctx.shadowBlur = 16;
+
+  if (landmark.kind === 'market') {
+    ctx.fillRect(x - 130, y - 26, 260, 58);
+    ctx.strokeRect(x - 130, y - 26, 260, 58);
+    ctx.fillStyle = landmark.accent;
+    for (let i = -2; i <= 2; i += 1) {
+      ctx.globalAlpha = i % 2 === 0 ? 0.85 : 0.32;
+      ctx.fillRect(x + i * 44 - 20, y - 42, 40, 18);
+    }
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(x, y + 2, 14, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (landmark.kind === 'rail-yard') {
+    ctx.globalAlpha = 0.5;
+    for (const trackY of [-44, 44]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 190, y + trackY);
+      ctx.lineTo(x + 190, y + trackY);
+      ctx.stroke();
+      for (let trackX = -170; trackX <= 170; trackX += 34) {
+        ctx.fillRect(x + trackX - 2, y + trackY - 9, 4, 18);
+      }
+    }
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(x - 8, y - 58, 16, 116);
+    ctx.strokeRect(x - 28, y - 76, 56, 18);
+  } else if (landmark.kind === 'plaza') {
+    ctx.beginPath();
+    ctx.arc(x, y, 58, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 28, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillRect(x - 4, y - 80, 8, 28);
+    ctx.fillRect(x - 4, y + 52, 8, 28);
+  } else {
+    ctx.fillRect(x - 170, y - 38, 340, 76);
+    ctx.strokeRect(x - 170, y - 38, 340, 76);
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x - 130, y + 26);
+    ctx.lineTo(x - 60, y - 24);
+    ctx.lineTo(x + 15, y + 26);
+    ctx.lineTo(x + 90, y - 24);
+    ctx.lineTo(x + 150, y + 26);
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(landmark.name.toUpperCase(), x, y - 92);
+  ctx.restore();
+}
+
 function effectiveGround(w: World) {
   if (w.endless?.inDungeon) {
     const era = DUNGEON_ERAS[w.endless.dungeonEraIndex];
@@ -829,6 +899,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.globalAlpha = 1;
   }
   drawLightPool(ctx, w);
+  drawLandmark(ctx, w);
   drawObjectLighting(ctx, w);
   drawArenaEdges(ctx, w);
   drawDungeonRoomBorder(ctx, w);
