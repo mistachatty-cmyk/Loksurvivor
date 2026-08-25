@@ -3,9 +3,11 @@
  * Owned by the design pass -- keep the export name and props stable.
  */
 import { useMeta } from '@/game/state/metaStore';
-import { HUB_ROOMS_BY_ID } from '@/game/data/progression';
+import { ALLIES, HUB_ROOMS_BY_ID } from '@/game/data/progression';
+import { humanoidRig } from '@/game/sprites/rigs';
+import { RigPortrait } from './RigPortrait';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves } from 'lucide-react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils } from 'lucide-react';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery';
 
@@ -24,6 +26,15 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   music: { label: 'Soundtrack', icon: Music, testId: 'button-open-music', description: 'Set the mood' },
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
 };
+
+const HANGOUTS = [
+  { activity: 'working the room', detail: 'keeps one eye on the door and one hand on the till', icon: Coffee },
+  { activity: 'ringing the hour', detail: 'tests the hideout alarm for anyone still asleep', icon: Waves },
+  { activity: 'painting the skyline', detail: 'adds a fresh mark to the edge of the city', icon: SprayCan },
+  { activity: 'running the sound system', detail: 'finds a bassline that makes the pipes hum', icon: Headphones },
+  { activity: 'feeding the crew', detail: 'has already put something warm on the stove', icon: Utensils },
+];
+const ALLIES_INDEX = Object.fromEntries(ALLIES.map((ally, index) => [ally.id, index]));
 
 export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
   const { unlockedRooms, rescuedAllies, selectedCharacter, meta, setDevModeAllUnlocks } = useMeta();
@@ -183,9 +194,24 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {roomAllies.map((ally) => (
-                  <li key={ally.id} className="flex flex-col p-3 border border-border bg-card/50">
-                    <span className="font-bold text-white text-sm uppercase tracking-wide">{ally.name}</span>
-                    <span className="text-xs text-primary mt-1">{ally.boostLabel}</span>
+                  <li key={ally.id} className="relative flex min-h-[148px] flex-col justify-end overflow-hidden border border-border bg-card/60 p-3">
+                    <div className="absolute inset-x-0 top-0 flex h-24 items-end justify-center bg-gradient-to-b from-primary/10 to-transparent">
+                      <RigPortrait
+                        rig={humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' })}
+                        palette={ally.palette}
+                        anim="idle"
+                        size={96}
+                      />
+                    </div>
+                    <div className="relative z-10 mt-20">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-white text-sm uppercase tracking-wide">{ally.name}</span>
+                        {(() => { const Icon = HANGOUTS[ALLIES_INDEX[ally.id] ?? 0].icon; return <Icon className="h-3.5 w-3.5 text-primary" />; })()}
+                      </div>
+                      <span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-primary">{HANGOUTS[ALLIES_INDEX[ally.id] ?? 0].activity}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{HANGOUTS[ALLIES_INDEX[ally.id] ?? 0].detail}.</span>
+                      <span className="mt-2 block border-t border-border/50 pt-2 text-[10px] text-muted-foreground">{ally.boostLabel}</span>
+                    </div>
                   </li>
                 ))}
               </ul>
