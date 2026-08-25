@@ -16,6 +16,7 @@ import { IntroScreen } from '@/ui/IntroScreen';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
+import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 
 const queryClient = new QueryClient();
 
@@ -167,7 +168,10 @@ function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <MetaProvider>
-        <MusicProvider>{children}</MusicProvider>
+        <MusicProvider>
+          {children}
+          <MusicNowPlaying />
+        </MusicProvider>
       </MetaProvider>
       <Toaster />
     </QueryClientProvider>
