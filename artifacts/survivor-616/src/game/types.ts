@@ -349,6 +349,31 @@ export interface AreaDef {
 }
 
 /* ------------------------------------------------------------------ */
+/* Ambient life                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Non-combat background actors (civilians, cats). No HP, no contact
+ * damage, no XP -- purely cosmetic reactions to the player and to the
+ * time-of-day cycle. Adding a new kind is a data change, same as an
+ * enemy or character.
+ */
+export type AmbientKind = 'civilian' | 'cat';
+
+export interface AmbientKindDef {
+  id: AmbientKind;
+  name: string;
+  palette: SpritePalette;
+  rig: SpriteRig;
+  /** Wander speed in world units per second. */
+  speed: number;
+  /** Speed multiplier while fleeing the player. */
+  fleeSpeedMult: number;
+  /** Distance at which the player is close enough to spook this kind. */
+  fleeRadius: number;
+}
+
+/* ------------------------------------------------------------------ */
 /* Endless world                                                       */
 /* ------------------------------------------------------------------ */
 

@@ -8,6 +8,7 @@
 
 import type { World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
+import { getAmbientKind } from '@/game/data/ambient';
 import type { ObstacleDef } from '@/game/types';
 
 import { drawRig, drawShadow } from './sprite';
@@ -496,6 +497,20 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
+/** Non-combat background life -- drawn like any other rig, never health-barred. */
+function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
+  for (const a of w.ambient) {
+    const kind = getAmbientKind(a.kindId);
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    drawShadow(ctx, a.x, a.y + 1, kind.rig.pixelHeight * 0.16);
+    drawRig(ctx, kind.rig, kind.palette, a.anim, w.now - a.animStartedAt, a.x, a.y + 1, a.facing, SPRITE_SCALE * 0.85, {
+      outline: false,
+    });
+    ctx.restore();
+  }
+}
+
 function drawAwarenessArrow(ctx: CanvasRenderingContext2D, w: World) {
   const elite = w.enemies.find((e) => !e.dying && (e.def.family === 'Boss' || e.maxHp > 100) && Math.hypot(e.x - w.player.x, e.y - w.player.y) < 500);
   if (!elite) return;
@@ -912,10 +927,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
   }
-  // Optional-chained until Phase 4 adds World.cycle -- resolves to 0.5
-  // (fully transparent) so this is a no-op today.
-  const cyclePhase = (w as unknown as { cycle?: { phase: number } }).cycle?.phase ?? 0.5;
-  const tint = timeOfDayTint(cyclePhase);
+  const tint = timeOfDayTint(w.cycle.phase);
   if (tint !== 'rgba(0, 0, 0, 0.000)') {
     ctx.fillStyle = tint;
     ctx.fillRect(left, top, right - left, bottom - top);
@@ -930,6 +942,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawDungeonEntrances(ctx, w);
   drawDungeonExit(ctx, w);
   drawObstacles(ctx, w);
+  drawAmbient(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);
   drawOrbiters(ctx, w);

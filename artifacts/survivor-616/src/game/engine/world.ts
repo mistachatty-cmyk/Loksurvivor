@@ -10,6 +10,7 @@
  */
 
 import { getEnemy } from '@/game/data/enemies';
+import { getAmbientKind } from '@/game/data/ambient';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
@@ -18,6 +19,7 @@ import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
 import { OBJECTIVES } from '@/game/data/objectives';
 import type {
+  AmbientKind,
   AreaDef,
   BaseStats,
   CharacterDef,
@@ -97,6 +99,28 @@ export interface EnemyActor extends Actor {
   specialKind: 'shockwave' | 'current' | null;
   dying: boolean;
   deathAt: number;
+}
+
+/**
+ * Non-combat background actor. No hp/mass/damage -- deliberately not an
+ * `Actor` -- and never touched by resolveCircleBox or any hit-detection
+ * code. Purely a cosmetic reaction to the player.
+ */
+export interface AmbientActor {
+  uid: number;
+  kindId: string;
+  x: number;
+  y: number;
+  homeX: number;
+  homeY: number;
+  facing: 1 | -1;
+  anim: 'idle' | 'walk';
+  animStartedAt: number;
+  /** World time this actor is fleeing until; 0 when not fleeing. */
+  fleeUntil: number;
+  /** World time the next idle/wander decision is made. */
+  nextDecisionAt: number;
+  wanderAngle: number;
 }
 
 export interface Projectile {
@@ -229,9 +253,16 @@ export interface World {
   time: number;
   /** Milliseconds since the run started -- used for all timers. */
   now: number;
+  /**
+   * Day/night clock. `phase` is 0..1 and driven purely by `now` (no
+   * wall-clock) -- 0/1 is midnight, 0.5 is neutral daylight.
+   */
+  cycle: { phase: number; cycleMs: number };
 
   player: PlayerActor;
   enemies: EnemyActor[];
+  /** Non-combat background life; never touched by collision/damage code. */
+  ambient: AmbientActor[];
   projectiles: Projectile[];
   effects: Effect[];
   orbiters: Orbiter[];
@@ -379,8 +410,13 @@ export function createWorld(
     stats: { ...stats },
     time: 0,
     now: 0,
+    // Start at the neutral midpoint so a fresh run looks like it always
+    // did; cycleMs (~7 real minutes) is long relative to a typical timed
+    // run, so most runs see at most one transition.
+    cycle: { phase: 0.5, cycleMs: 420000 },
     player,
     enemies: [],
+    ambient: [],
     projectiles: [],
     effects: [],
     orbiters: [],
@@ -437,6 +473,32 @@ export function createWorld(
     const hp = BREAKABLE_HP[o.kind] ?? 999999;
     return { ...o, uid: uid(world), kind: o.kind, hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 };
   });
+
+  // Scattered background life for timed districts. Endless mode streams
+  // its world in chunks with no fixed bounds, so ambient life is scoped
+  // out of it for now rather than reworking chunk generation for it.
+  if (!area.endless) {
+    const halfW = area.bounds.w / 2 - 40;
+    const halfH = area.bounds.h / 2 - 40;
+    const count = 4 + Math.floor(rng() * 3);
+    for (let i = 0; i < count; i += 1) {
+      const kindId: AmbientKind = rng() < 0.75 ? 'civilian' : 'cat';
+      const x = randRange(rng, -halfW, halfW);
+      const y = randRange(rng, -halfH, halfH);
+      world.ambient.push({
+        uid: uid(world),
+        kindId,
+        x, y,
+        homeX: x, homeY: y,
+        facing: rng() < 0.5 ? 1 : -1,
+        anim: 'idle',
+        animStartedAt: 0,
+        fleeUntil: 0,
+        nextDecisionAt: randRange(rng, 500, 3000),
+        wanderAngle: randRange(rng, 0, Math.PI * 2),
+      });
+    }
+  }
 
   if (area.endless) {
     world.endless = {
@@ -1326,6 +1388,60 @@ function updateBreakables(w: World, dt: number) {
   w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
 }
 
+/**
+ * Steps background life: slow wander near a home point, or a brisk flee
+ * when the player gets close. No HP, no collision, no interaction with any
+ * combat system -- this is the entire extent of what "living world"
+ * touches in the simulation loop (one new call from stepWorld, not new
+ * branches threaded through enemy/collision code).
+ */
+function stepAmbient(w: World, dt: number) {
+  for (const a of w.ambient) {
+    const kind = getAmbientKind(a.kindId);
+    const distToPlayer = Math.hypot(a.x - w.player.x, a.y - w.player.y);
+
+    if (distToPlayer < kind.fleeRadius) {
+      a.fleeUntil = w.now + 900;
+    }
+
+    const fleeing = w.now < a.fleeUntil;
+    let vx = 0;
+    let vy = 0;
+
+    if (fleeing) {
+      const dx = a.x - w.player.x;
+      const dy = a.y - w.player.y;
+      const len = Math.hypot(dx, dy) || 1;
+      vx = (dx / len) * kind.speed * kind.fleeSpeedMult;
+      vy = (dy / len) * kind.speed * kind.fleeSpeedMult;
+    } else {
+      if (w.now >= a.nextDecisionAt) {
+        a.wanderAngle += randRange(w.rng, -1.2, 1.2);
+        a.nextDecisionAt = w.now + randRange(w.rng, 1500, 4000);
+      }
+      // Gentle pull back toward home so wandering stays local, plus a
+      // slow drift in the current wander direction.
+      const homeDx = a.homeX - a.x;
+      const homeDy = a.homeY - a.y;
+      const homeDist = Math.hypot(homeDx, homeDy);
+      const pullback = homeDist > 60 ? 0.6 : 0;
+      vx = Math.cos(a.wanderAngle) * kind.speed * (1 - pullback) + (homeDist > 0 ? (homeDx / homeDist) * kind.speed * pullback : 0);
+      vy = Math.sin(a.wanderAngle) * kind.speed * (1 - pullback) + (homeDist > 0 ? (homeDy / homeDist) * kind.speed * pullback : 0);
+    }
+
+    a.x += vx * dt;
+    a.y += vy * dt;
+    if (Math.abs(vx) > 1) a.facing = vx >= 0 ? 1 : -1;
+
+    const moving = Math.hypot(vx, vy) > 4;
+    const nextAnim = moving ? 'walk' : 'idle';
+    if (nextAnim !== a.anim) {
+      a.anim = nextAnim;
+      a.animStartedAt = w.now;
+    }
+  }
+}
+
 function applyKnockback(actor: Actor, dt: number) {
   actor.x += actor.kx * dt;
   actor.y += actor.ky * dt;
@@ -2113,11 +2229,25 @@ const ENDLESS_ENEMY_POOLS: string[][] = [
   ['bass-bruiser', 'bridge-lookout', 'river-wraith', 'lightless-prowler'],
 ];
 
+/**
+ * Deep night pushes endless-mode difficulty up slightly. Distance-from-
+ * midnight on the 0..1 cycle (0/1 = midnight, 0.5 = neutral), so this is
+ * 1.0 in daylight and rises to a hard 1.15 ceiling at true midnight --
+ * multiplied *inside* updateEndlessSpawning's existing Math.min() caps
+ * below, never stacked on top of them.
+ */
+function nightDifficultyMult(cyclePhase: number): number {
+  const distFromMidnight = Math.min(cyclePhase, 1 - cyclePhase);
+  const nightIntensity = clamp(1 - distFromMidnight / 0.5, 0, 1);
+  return 1 + nightIntensity * 0.15;
+}
+
 function updateEndlessSpawning(w: World, dt: number) {
   const e = w.endless!;
   const tier = endlessDiffTier(e);
-  const spawnRate = Math.min(3.2, 0.8 + tier * 0.14);
-  const hpMult = Math.min(1.7, 1 + tier * 0.07);
+  const nightMult = nightDifficultyMult(w.cycle.phase);
+  const spawnRate = Math.min(3.2, (0.8 + tier * 0.14) * nightMult);
+  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
   const pool = ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
 
@@ -2154,6 +2284,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   const dt = Math.min(dtSeconds, 1 / 30);
   w.time += dt;
   w.now += dt * 1000;
+  w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   if (input.ultimate) activateUltimate(w);
 
@@ -2169,6 +2300,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   updateEnemies(w, dt);
   updateBreakables(w, dt);
+  stepAmbient(w, dt);
 
   // Weapon cadence.
   updateOrbiters(w, dt);
