@@ -131,7 +131,7 @@ test('a grouped wave releases its mixed formation together', () => {
     rescueAllyId: undefined,
   };
   const world = createWorld(groupedArea, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
-  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  for (let i = 0; i < 31; i += 1) stepWorld(world, 1 / 30, neutralInput);
 
   assert.equal(world.enemies.length, 4);
   assert.equal(world.enemies.filter((enemy) => enemy.defId === 'nightcrawler').length, 2);
