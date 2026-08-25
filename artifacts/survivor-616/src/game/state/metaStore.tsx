@@ -20,6 +20,11 @@ import { AREAS, getArea } from '@/game/data/areas';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { ENEMIES } from '@/game/data/enemies';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
+import {
+  RECOVERY_FACILITIES,
+  RECOVERY_FACILITIES_BY_ID,
+  RECOVERY_HUTS,
+} from '@/game/data/recovery';
 import type {
   AllyDef,
   AreaDef,
@@ -28,11 +33,54 @@ import type {
   HubRoomDef,
   MetaState,
   RunResult,
+  FacilityTier,
+  RecoverySession,
   UnlockRule,
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 1;
+const META_VERSION = 2;
+export const MAX_FATIGUE_PCT = 5;
+export const FATIGUE_PER_RUN_PCT = 0.5;
+
+const FACILITY_ORDER: FacilityTier[] = RECOVERY_FACILITIES.map((facility) => facility.id);
+
+function defaultRecovery(): RecoverySession {
+  return { characterId: null, locationId: 'rooftop', startedAt: null, lastUpdatedAt: Date.now() };
+}
+
+function facilityIndex(id: string): number {
+  const index = FACILITY_ORDER.indexOf(id as FacilityTier);
+  return index >= 0 ? index : 0;
+}
+
+function facilityForLocation(locationId: string, rooftopTier: FacilityTier = 'tub') {
+  const direct = RECOVERY_FACILITIES_BY_ID[locationId];
+  if (direct) return direct;
+  const hut = RECOVERY_HUTS.find((candidate) => candidate.id === locationId);
+  return RECOVERY_FACILITIES_BY_ID[hut?.facility ?? rooftopTier] ?? RECOVERY_FACILITIES[0];
+}
+
+function settleRecovery(meta: MetaState, now = Date.now()): MetaState {
+  const recovery = meta.recovery;
+  if (!recovery.characterId || !recovery.startedAt) {
+    return { ...meta, recovery: { ...recovery, lastUpdatedAt: now } };
+  }
+  const facility = facilityForLocation(recovery.locationId, meta.facilityTier);
+  const elapsedMinutes = Math.max(0, now - recovery.lastUpdatedAt) / 60000;
+  if (elapsedMinutes <= 0) return meta;
+  const current = meta.fatigueByCharacter[recovery.characterId] ?? 0;
+  const nextFatigue = Math.max(0, current - elapsedMinutes * facility.recoveryPctPerMinute);
+  return {
+    ...meta,
+    fatigueByCharacter: { ...meta.fatigueByCharacter, [recovery.characterId]: nextFatigue },
+    recovery: {
+      ...recovery,
+      lastUpdatedAt: now,
+      ...(nextFatigue <= 0 ? { characterId: null, startedAt: null } : {}),
+    },
+  };
+}
 
 export function createInitialMeta(): MetaState {
   return {
@@ -52,6 +100,10 @@ export function createInitialMeta(): MetaState {
     onboarded: false,
     endlessRecordDistancePx: 0,
     endlessRecordDepth: 0,
+    fatigueByCharacter: {},
+    recovery: defaultRecovery(),
+    facilityTier: 'tub',
+    discoveredHutIds: [],
   };
 }
 
@@ -79,6 +131,39 @@ function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const allyIds = new Set(ALLIES.map((a) => a.id));
   const discoveryIds = new Set(DISCOVERIES.map((d) => d.id));
   const enemyIds = new Set(ENEMIES.map((e) => e.id));
+  const fatigueByCharacter: Record<string, number> = {};
+  if (parsed.fatigueByCharacter && typeof parsed.fatigueByCharacter === 'object') {
+    for (const [key, value] of Object.entries(parsed.fatigueByCharacter)) {
+      if (characterIds.has(key) && typeof value === 'number' && Number.isFinite(value)) {
+        fatigueByCharacter[key] = Math.min(MAX_FATIGUE_PCT, Math.max(0, value));
+      }
+    }
+  }
+  const parsedRecovery = parsed.recovery;
+  const recovery: RecoverySession = {
+    characterId:
+      parsedRecovery && typeof parsedRecovery.characterId === 'string' && characterIds.has(parsedRecovery.characterId)
+        ? parsedRecovery.characterId
+        : null,
+    locationId:
+      parsedRecovery && typeof parsedRecovery.locationId === 'string' &&
+      (RECOVERY_FACILITIES_BY_ID[parsedRecovery.locationId] || RECOVERY_HUTS.some((hut) => hut.id === parsedRecovery.locationId))
+        ? parsedRecovery.locationId
+        : 'rooftop',
+    startedAt:
+      parsedRecovery && typeof parsedRecovery.startedAt === 'number' && Number.isFinite(parsedRecovery.startedAt)
+        ? parsedRecovery.startedAt
+        : null,
+    lastUpdatedAt:
+      parsedRecovery && typeof parsedRecovery.lastUpdatedAt === 'number' && Number.isFinite(parsedRecovery.lastUpdatedAt)
+        ? parsedRecovery.lastUpdatedAt
+        : Date.now(),
+  };
+  const discoveredHutIds = idList(parsed.discoveredHutIds, new Set(RECOVERY_HUTS.map((hut) => hut.id)), []);
+  const tier =
+    typeof parsed.facilityTier === 'string' && RECOVERY_FACILITIES_BY_ID[parsed.facilityTier]
+      ? parsed.facilityTier as FacilityTier
+      : 'tub';
 
   const bestiary: Record<string, number> = {};
   if (parsed.bestiary && typeof parsed.bestiary === 'object') {
@@ -115,6 +200,10 @@ function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     onboarded: parsed.onboarded === true,
     endlessRecordDistancePx: counter(parsed.endlessRecordDistancePx),
     endlessRecordDepth: counter(parsed.endlessRecordDepth),
+    fatigueByCharacter,
+    recovery,
+    facilityTier: tier,
+    discoveredHutIds,
   };
 }
 
@@ -125,7 +214,7 @@ function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -199,13 +288,34 @@ export function allyBoostTotals(meta: MetaState): Partial<BaseStats> {
 
 /** A character's stats after permanent ally boosts are applied. */
 export function effectiveStats(character: CharacterDef, meta: MetaState): BaseStats {
+  const settled = settleRecovery(meta);
   const boosts = allyBoostTotals(meta);
   const stats: BaseStats = { ...character.stats };
   for (const [key, value] of Object.entries(boosts) as Array<[keyof BaseStats, number]>) {
     stats[key] = stats[key] + value;
   }
   stats.armor = Math.min(stats.armor, 0.6);
+  const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
+  stats.maxHp *= 1 - fatigue;
+  stats.speed *= 1 - fatigue;
+  stats.power *= 1 - fatigue;
+  stats.area *= 1 - fatigue;
+  stats.magnet *= 1 - fatigue;
+  stats.armor = Math.max(0, stats.armor * (1 - fatigue));
+  stats.haste *= 1 + fatigue;
   return stats;
+}
+
+export function currentFatiguePct(meta: MetaState, characterId: string): number {
+  return Math.min(MAX_FATIGUE_PCT, Math.max(0, settleRecovery(meta).fatigueByCharacter[characterId] ?? 0));
+}
+
+export function recoveryRemainingMs(meta: MetaState): number {
+  const settled = settleRecovery(meta);
+  if (!settled.recovery.characterId) return 0;
+  const facility = facilityForLocation(settled.recovery.locationId, settled.facilityTier);
+  const fatigue = currentFatiguePct(settled, settled.recovery.characterId);
+  return (fatigue / facility.recoveryPctPerMinute) * 60000;
 }
 
 /* ------------------------------------------------------------------ */
@@ -225,6 +335,10 @@ type Action =
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
+  | { type: 'startRecovery'; characterId: string; locationId?: string }
+  | { type: 'stopRecovery' }
+  | { type: 'tickRecovery'; now: number }
+  | { type: 'upgradeFacility' }
   | { type: 'reset' };
 
 function addUnique(list: string[], value?: string): string[] {
@@ -257,6 +371,42 @@ function reducer(state: StoreState, action: Action): StoreState {
         ...state,
         meta: { ...state.meta, devModeAllUnlocks: action.enabled },
       };
+
+    case 'tickRecovery':
+      return { ...state, meta: settleRecovery(state.meta, action.now) };
+
+    case 'startRecovery': {
+      const settled = settleRecovery(state.meta);
+      if (!settled.unlockedCharacterIds.includes(action.characterId)) return state;
+      return {
+        ...state,
+        meta: {
+          ...settled,
+          recovery: {
+            characterId: action.characterId,
+            locationId: action.locationId ?? 'rooftop',
+            startedAt: Date.now(),
+            lastUpdatedAt: Date.now(),
+          },
+        },
+      };
+    }
+
+    case 'stopRecovery':
+      {
+        const settled = settleRecovery(state.meta);
+        return { ...state, meta: { ...settled, recovery: { ...settled.recovery, characterId: null, startedAt: null } } };
+      }
+
+    case 'upgradeFacility': {
+      const currentIndex = facilityIndex(state.meta.facilityTier);
+      const nextFacility = RECOVERY_FACILITIES[currentIndex + 1];
+      if (!nextFacility || state.meta.cred < nextFacility.cost) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, cred: state.meta.cred - nextFacility.cost, facilityTier: nextFacility.id },
+      };
+    }
 
     case 'completeRun': {
       const result = action.result;
@@ -299,6 +449,16 @@ function reducer(state: StoreState, action: Action): StoreState {
         endlessRecordDepth: result.endless
           ? Math.max(prev.endlessRecordDepth, result.endless.dungeonDepth)
           : prev.endlessRecordDepth,
+        fatigueByCharacter: {
+          ...prev.fatigueByCharacter,
+          [result.characterId]: Math.min(
+            MAX_FATIGUE_PCT,
+            (prev.fatigueByCharacter[result.characterId] ?? 0) + FATIGUE_PER_RUN_PCT,
+          ),
+        },
+        discoveredHutIds: RECOVERY_HUTS.filter(
+          (hut) => clearedAreaIds.includes(hut.areaId),
+        ).map((hut) => hut.id),
       };
 
       // Characters whose unlock rule just became true.
@@ -341,6 +501,10 @@ export interface MetaContextValue {
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
+  startRecovery: (characterId: string, locationId?: string) => void;
+  stopRecovery: () => void;
+  tickRecovery: () => void;
+  upgradeFacility: () => void;
   resetProgress: () => void;
 }
 
@@ -365,6 +529,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
   );
+  const startRecovery = useCallback((characterId: string, locationId?: string) => dispatch({ type: 'startRecovery', characterId, locationId }), []);
+  const stopRecovery = useCallback(() => dispatch({ type: 'stopRecovery' }), []);
+  const tickRecovery = useCallback(() => dispatch({ type: 'tickRecovery', now: Date.now() }), []);
+  const upgradeFacility = useCallback(() => dispatch({ type: 'upgradeFacility' }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -401,6 +569,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       spendTokens,
       setDevModeAllUnlocks,
       resetProgress,
+      startRecovery,
+      stopRecovery,
+      tickRecovery,
+      upgradeFacility,
     };
   }, [
     state,
@@ -411,6 +583,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     spendTokens,
     setDevModeAllUnlocks,
     resetProgress,
+    startRecovery,
+    stopRecovery,
+    tickRecovery,
+    upgradeFacility,
   ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;

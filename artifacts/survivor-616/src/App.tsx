@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
 import { RunScreen } from '@/game/RunScreen';
-import { MetaProvider, useMeta } from '@/game/state/metaStore';
+import { FATIGUE_PER_RUN_PCT, MAX_FATIGUE_PCT, MetaProvider, useMeta } from '@/game/state/metaStore';
 import type { RunResult } from '@/game/types';
 import { ArchivePanel } from '@/ui/ArchivePanel';
 import { AreaSelect } from '@/ui/AreaSelect';
@@ -15,6 +15,7 @@ import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
+import { RecoveryPanel } from '@/ui/RecoveryPanel';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ type Screen =
   | { name: 'bestiary' }
   | { name: 'archive' }
   | { name: 'music' }
+  | { name: 'recovery' }
   | { name: 'run'; areaId: string }
   | { name: 'summary'; result: RunResult };
 
@@ -45,7 +47,8 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'areas' ||
       requested === 'bestiary' ||
       requested === 'archive' ||
-      requested === 'music'
+      requested === 'music' ||
+      requested === 'recovery'
     ) {
       return { name: requested };
     }
@@ -77,15 +80,25 @@ function Game() {
       case 'music':
         setScreen({ name: 'music' });
         break;
+      case 'recovery':
+        setScreen({ name: 'recovery' });
+        break;
     }
   }, []);
 
   const handleFinish = useCallback(
     (result: RunResult) => {
-      completeRun(result);
-      setScreen({ name: 'summary', result });
+      const fatigueBefore = meta.fatigueByCharacter[result.characterId] ?? 0;
+      const fatigueAfter = Math.min(MAX_FATIGUE_PCT, fatigueBefore + FATIGUE_PER_RUN_PCT);
+      const resultWithFatigue = {
+        ...result,
+        fatigueAddedPct: fatigueAfter - fatigueBefore,
+        fatigueAfterPct: fatigueAfter,
+      };
+      completeRun(resultWithFatigue);
+      setScreen({ name: 'summary', result: resultWithFatigue });
     },
-    [completeRun],
+    [completeRun, meta.fatigueByCharacter],
   );
 
   switch (screen.name) {
@@ -116,6 +129,9 @@ function Game() {
 
     case 'music':
       return <MusicPanel onBack={goHub} />;
+
+    case 'recovery':
+      return <RecoveryPanel onBack={goHub} />;
 
     case 'run':
       return (

@@ -103,12 +103,12 @@ export const HUB_ROOMS: HubRoomDef[] = [
   {
     id: 'rooftop-perch',
     name: 'The Perch',
-    subtitle: 'Rooftop above the bar',
+    subtitle: 'Rooftop recovery deck',
     description:
-      'Tar paper, a folding chair and the whole grid laid out below. Best place to read the city before a run.',
+      'Tar paper, warm steam, a folding chair and the whole grid laid out below. Best place to let the city wait.',
     backdrop: 'art/rooftops.jpeg',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
-    features: ['runs', 'bestiary', 'unlocks'],
+    features: ['runs', 'recovery', 'bestiary', 'unlocks'],
   },
   {
     id: 'the-cellar',

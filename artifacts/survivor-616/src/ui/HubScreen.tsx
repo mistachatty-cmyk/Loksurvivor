@@ -5,9 +5,9 @@
 import { useMeta } from '@/game/state/metaStore';
 import { HUB_ROOMS_BY_ID } from '@/game/data/progression';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Skull, Users, BookOpen, Music, Unlock, ArrowRight, Package, Settings2 } from 'lucide-react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves } from 'lucide-react';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -22,6 +22,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   bestiary: { label: 'Bestiary', icon: Skull, testId: 'button-open-bestiary', description: 'Known threats' },
   unlocks: { label: 'Archive', icon: Unlock, testId: 'button-open-unlocks', description: 'Progress & secrets' },
   music: { label: 'Soundtrack', icon: Music, testId: 'button-open-music', description: 'Set the mood' },
+  recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {

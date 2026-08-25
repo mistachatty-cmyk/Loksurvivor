@@ -10,7 +10,7 @@ import type { RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
-import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle } from 'lucide-react';
+import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow } from 'lucide-react';
 
 export interface RunSummaryProps {
   result: RunResult;
@@ -111,6 +111,29 @@ export function RunSummary({ result, onReturnToHub, onRetry }: RunSummaryProps) 
             </div>
           </div>
         </div>
+
+        {typeof result.fatigueAfterPct === 'number' && (
+          <div className="border border-amber-500/30 bg-amber-500/5 p-5" data-testid="section-fatigue">
+            <div className="flex items-center gap-2 text-amber-300">
+              <BatteryLow className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-widest">Post-run fatigue</span>
+            </div>
+            <div className="mt-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                {character.name} needs rooftop recovery before their stats return to full strength.
+              </p>
+              <p className="font-mono text-xl font-bold text-amber-300">
+                {result.fatigueAfterPct.toFixed(1)}% penalty
+              </p>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden bg-black">
+              <div className="h-full bg-amber-400" style={{ width: `${result.fatigueAfterPct * 20}%` }} />
+            </div>
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+              Open the rooftop recovery deck from the Hideout to restore {result.fatigueAddedPct?.toFixed(1) ?? '0.5'}% over time.
+            </p>
+          </div>
+        )}
 
         {/* Unlocks & Discoveries */}
         {(ally || discovery || result.newlyUnlockedCharacterIds.length > 0) && (

@@ -412,7 +412,35 @@ export interface HubRoomDef {
   backdrop: string;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery'>;
+}
+
+export type FacilityTier = 'tub' | 'shower' | 'hot-tub' | 'sauna' | 'rooftop-hot-tub';
+
+export interface RecoveryFacilityDef {
+  id: FacilityTier;
+  name: string;
+  description: string;
+  recoveryPctPerMinute: number;
+  socialCapacity: number;
+  cost: number;
+  unlockText: string;
+}
+
+export interface RecoveryHutDef {
+  id: string;
+  name: string;
+  areaId: string;
+  description: string;
+  facility: FacilityTier;
+  unlock: UnlockRule;
+}
+
+export interface RecoverySession {
+  characterId: string | null;
+  locationId: string;
+  startedAt: number | null;
+  lastUpdatedAt: number;
 }
 
 export interface DiscoveryDef {
@@ -473,6 +501,14 @@ export interface MetaState {
   endlessRecordDistancePx: number;
   /** Deepest dungeon depth ever reached in endless mode. */
   endlessRecordDepth: number;
+  /** Character id -> current fatigue penalty percentage, capped at 5. */
+  fatigueByCharacter: Record<string, number>;
+  /** The active recovery session, if anyone is resting. */
+  recovery: RecoverySession;
+  /** Highest hideout facility purchased by the player. */
+  facilityTier: FacilityTier;
+  /** Field recovery huts discovered in explored areas. */
+  discoveredHutIds: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -501,6 +537,10 @@ export interface RunResult {
   openedPrizes: string[];
   /** Loot tokens earned this run. */
   lootTokensGained: number;
+  /** Fatigue applied to the operative after this run. */
+  fatigueAddedPct?: number;
+  /** Operative's fatigue after this run, before recovery begins. */
+  fatigueAfterPct?: number;
   /** Objectives completed this run. */
   completedObjectives: CompletedObjective[];
   /** Endless-mode stats (undefined for timed runs). */
