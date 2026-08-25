@@ -4,10 +4,12 @@
  */
 import { useMeta } from '@/game/state/metaStore';
 import { ALLIES, HUB_ROOMS_BY_ID } from '@/game/data/progression';
+import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { RigPortrait } from './RigPortrait';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees } from 'lucide-react';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery';
 
@@ -35,12 +37,28 @@ const HANGOUTS = [
   { activity: 'feeding the crew', detail: 'has already put something warm on the stove', icon: Utensils },
 ];
 const ALLIES_INDEX = Object.fromEntries(ALLIES.map((ally, index) => [ally.id, index]));
+const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
 
 export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
   const { unlockedRooms, rescuedAllies, selectedCharacter, meta, setDevModeAllUnlocks } = useMeta();
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
+  const scene = getHideoutScene(activeRoom?.id ?? roomId);
+  const [isPageVisible, setIsPageVisible] = useState(true);
+
+  useEffect(() => {
+    const updateVisibility = () => setIsPageVisible(document.visibilityState === 'visible');
+    updateVisibility();
+    document.addEventListener('visibilitychange', updateVisibility);
+    return () => document.removeEventListener('visibilitychange', updateVisibility);
+  }, []);
+
+  const weatherIcon = WEATHER_ICONS[scene.weather];
+  const crewMoment = useMemo(
+    () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
+    [roomAllies.length, scene.flavorLines, selectedCharacter.id],
+  );
 
   if (!activeRoom) return null;
 
@@ -62,6 +80,26 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
           <div className="absolute inset-0 bg-background/90 z-10" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent z-10" />
           <img src={`${import.meta.env.BASE_URL}${activeRoom.backdrop}`} className="w-full h-full object-cover opacity-40 mix-blend-luminosity grayscale" alt="" />
+           <div
+             className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)}`}
+             style={{ '--scene-accent': scene.homeAccent, '--scene-sky': scene.skyAccent, animationPlayState: isPageVisible ? 'running' : 'paused' } as React.CSSProperties}
+             aria-hidden="true"
+           >
+             <div className="hideout-sky-glow" />
+             <div className="hideout-cloud hideout-cloud-one" />
+             <div className="hideout-cloud hideout-cloud-two" />
+             <div className={`hideout-fliers hideout-fliers-${scene.motionKind}`}>
+               <span className="hideout-flier flier-one">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
+               <span className="hideout-flier flier-two">{scene.motionKind === 'motes' ? '·' : scene.motionKind === 'drones' ? '◇' : '⌁'}</span>
+               <span className="hideout-flier flier-three">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
+             </div>
+             <div className="hideout-weather-particles" />
+             <div className="hideout-home-art">
+               {scene.biome === 'sanctum' && <div className="hideout-window-grid"><span /><span /><span /></div>}
+               {scene.biome === 'rooftop' && <RadioTower className="h-20 w-20 opacity-40" />}
+               {scene.biome === 'cellar' && <Trees className="h-20 w-20 opacity-35" />}
+             </div>
+           </div>
         </motion.div>
       </AnimatePresence>
 
@@ -136,6 +174,25 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
             <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
             <p className="text-sm text-muted-foreground">{activeRoom.description}</p>
           </div>
+           <div className="mt-3 grid gap-3 border border-primary/30 bg-black/35 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center" data-testid="hideout-scene">
+             <div className="flex items-center gap-3">
+               <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                 {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
+               </span>
+               <div>
+                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{scene.weatherLabel}</p>
+                 <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
+               </div>
+             </div>
+             <div className="hidden h-px bg-border sm:block" />
+             <div className="flex items-center gap-2 text-right">
+               <Building2 className="hidden h-4 w-4 text-primary sm:block" />
+               <div>
+                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
+                 <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
+               </div>
+             </div>
+           </div>
         </header>
 
         <section className="mb-10 flex-1">
@@ -190,8 +247,13 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
               Crew in room ({roomAllies.length})
             </h2>
             {roomAllies.length === 0 ? (
-              <p className="text-sm opacity-50 italic">Nobody is here right now.</p>
+               <div className="border border-dashed border-border bg-card/30 p-4">
+                 <p className="text-sm italic text-muted-foreground">Nobody is here right now.</p>
+                 <p className="mt-1 text-xs uppercase tracking-widest text-primary/80">The room is waiting for a friend</p>
+               </div>
             ) : (
+               <>
+               <p className="mb-3 border-l-2 border-primary/60 pl-3 text-xs italic text-muted-foreground" data-testid="crew-moment">{crewMoment}</p>
               <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {roomAllies.map((ally) => (
                   <li key={ally.id} className="relative flex min-h-[148px] flex-col justify-end overflow-hidden border border-border bg-card/60 p-3">
@@ -204,17 +266,26 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
                       />
                     </div>
                     <div className="relative z-10 mt-20">
+                       {(() => {
+                         const hangout = HANGOUTS[((ALLIES_INDEX[ally.id] ?? 0) + scene.weather.length + activeRoom.id.length) % HANGOUTS.length];
+                         const Icon = hangout.icon;
+                         return (
+                           <>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold text-white text-sm uppercase tracking-wide">{ally.name}</span>
-                        {(() => { const Icon = HANGOUTS[ALLIES_INDEX[ally.id] ?? 0].icon; return <Icon className="h-3.5 w-3.5 text-primary" />; })()}
+                         <Icon className="h-3.5 w-3.5 text-primary" />
                       </div>
-                      <span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-primary">{HANGOUTS[ALLIES_INDEX[ally.id] ?? 0].activity}</span>
-                      <span className="mt-1 block text-xs text-muted-foreground">{HANGOUTS[ALLIES_INDEX[ally.id] ?? 0].detail}.</span>
+                       <span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-primary">{hangout.activity}</span>
+                       <span className="mt-1 block text-xs text-muted-foreground">{hangout.detail}.</span>
                       <span className="mt-2 block border-t border-border/50 pt-2 text-[10px] text-muted-foreground">{ally.boostLabel}</span>
+                           </>
+                         );
+                       })()}
                     </div>
                   </li>
                 ))}
               </ul>
+               </>
             )}
           </section>
         )}

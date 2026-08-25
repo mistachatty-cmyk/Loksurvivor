@@ -441,9 +441,28 @@ export interface HubRoomDef {
   subtitle: string;
   description: string;
   backdrop: string;
+  /** Visual identity used by the hideout atmosphere layer. */
+  biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
   features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery'>;
+}
+
+export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar';
+
+export type HideoutWeather = 'clear' | 'rain' | 'fog' | 'snow' | 'heat';
+
+export interface HideoutSceneDef {
+  biome: HideoutBiome;
+  weather: HideoutWeather;
+  weatherLabel: string;
+  weatherDescription: string;
+  homeName: string;
+  homeDescription: string;
+  homeAccent: string;
+  skyAccent: string;
+  motionKind: 'birds' | 'drones' | 'motes';
+  flavorLines: string[];
 }
 
 export type FacilityTier = 'tub' | 'shower' | 'hot-tub' | 'sauna' | 'rooftop-hot-tub';

@@ -97,6 +97,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     description:
       'A basement bar with the lights kept low on purpose. Everyone you have pulled off the street ends up here first.',
     backdrop: 'art/bar.jpeg',
+    biome: 'sanctum',
     unlock: { kind: 'default' },
     features: ['runs', 'roster', 'allies', 'music'],
   },
@@ -107,6 +108,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     description:
       'Tar paper, warm steam, a folding chair and the whole grid laid out below. Best place to let the city wait.',
     backdrop: 'art/rooftops.jpeg',
+    biome: 'rooftop',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
     features: ['runs', 'recovery', 'bestiary', 'unlocks'],
   },
@@ -117,6 +119,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     description:
       'Behind the walk-in cooler, down a hatch nobody mentions. Lantern light, glass growths, and a record wall.',
     backdrop: 'art/cellar.jpeg',
+    biome: 'cellar',
     unlock: { kind: 'discovery', discoveryId: 'lantern-shard' },
     features: ['music', 'bestiary', 'allies', 'unlocks'],
   },
