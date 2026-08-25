@@ -16,6 +16,7 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: -160, y: 140, w: 100, h: 44, kind: 'barrier' },
       { x: 160, y: 150, w: 60, h: 60, kind: 'crate' },
       { x: 0, y: 20, w: 100, h: 22, kind: 'cover' },
+      { x: -40, y: -90, w: 50, h: 50, kind: 'crate-breakable' },
       { x: 100, y: -80, w: 44, h: 44, kind: 'reflective-surface' },
     ],
   },
@@ -29,6 +30,7 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: 0, y: -180, w: 120, h: 40, kind: 'barrier' },
       { x: -180, y: 160, w: 70, h: 70, kind: 'dumpster' },
       { x: 200, y: 170, w: 60, h: 60, kind: 'crate' },
+      { x: 80, y: 100, w: 44, h: 48, kind: 'flora' },
     ],
   },
   {
@@ -40,6 +42,7 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: 150, y: -100, w: 70, h: 80, kind: 'planter' },
       { x: 0, y: 150, w: 90, h: 50, kind: 'planter' },
       { x: -180, y: 120, w: 50, h: 50, kind: 'planter' },
+      { x: 80, y: 40, w: 42, h: 46, kind: 'flora' },
     ],
   },
   {
@@ -52,6 +55,7 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: -200, y: 180, w: 120, h: 44, kind: 'barrier' },
       { x: 190, y: 190, w: 80, h: 44, kind: 'barrier' },
       { x: 0, y: 0, w: 60, h: 60, kind: 'ac-unit' },
+      { x: -80, y: -40, w: 54, h: 54, kind: 'crate-breakable' },
     ],
   },
   {

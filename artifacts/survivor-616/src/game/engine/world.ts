@@ -215,6 +215,10 @@ export interface BreakableObstacle extends Aabb {
   broken: boolean;
   brokenAt: number;
   contacts: number;
+  /** Falling light-pole state. */
+  fallAngle?: number;
+  hazardUntil?: number;
+  hazardNextTickAt?: number;
 }
 
 const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
@@ -222,6 +226,8 @@ const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
   'fuse-box': 100, 'street-lamp': 55, dumpster: 90, 'car-wreck': 150, car: 120,
   cover: 180,
 };
+const PUSHABLE_KINDS = new Set<ObstacleDef['kind']>(['crate-breakable', 'dumpster', 'car-wreck', 'cover']);
+const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>(['crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface']);
 
 /* ------------------------------------------------------------------ */
 /* World                                                               */
@@ -1351,6 +1357,24 @@ function damageBreakable(w: World, x: number, y: number, radius: number, amount:
     }
     if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel') {
       w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : 6, bornAt: w.now });
+      if (b.kind === 'crate-breakable' && w.rng() > 0.45) {
+        w.pickups.push({
+          uid: uid(w),
+          kind: w.rng() > 0.5 ? 'cred' : 'health',
+          x: b.x + randRange(w.rng, -10, 10),
+          y: b.y + randRange(w.rng, -10, 10),
+          vx: 0,
+          vy: 0,
+          value: w.rng() > 0.5 ? 8 : 10,
+          bornAt: w.now,
+        });
+      }
+    }
+    if (b.kind === 'street-lamp') {
+      b.hazardUntil = w.now + 5200;
+      b.hazardNextTickAt = w.now;
+      b.fallAngle = (w.rng() > 0.5 ? 1 : -1) * (Math.PI / 2);
+      pushAlert(w, 'LIVE WIRE — KEEP CLEAR');
     }
   }
   w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x: bx, y: by, w: bw, h: bh }) => ({ x: bx, y: by, w: bw, h: bh }));
@@ -1359,7 +1383,7 @@ function damageBreakable(w: World, x: number, y: number, radius: number, amount:
 /** Resolve a projectile against the two combat-specific obstacle types. */
 function collideProjectileObstacle(w: World, proj: Projectile): boolean {
   for (const b of w.breakables) {
-    if (b.broken || (b.kind !== 'cover' && b.kind !== 'reflective-surface')) continue;
+    if (b.broken || !PROJECTILE_BLOCKING_KINDS.has(b.kind)) continue;
     if (proj.obstacleUids?.has(b.uid)) continue;
     if (Math.abs(proj.x - b.x) > b.w / 2 + proj.radius || Math.abs(proj.y - b.y) > b.h / 2 + proj.radius) continue;
 
@@ -1385,9 +1409,9 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
       spawnParticles(w, proj.x, proj.y, '#d8b4fe', 3, 45);
       return true;
     }
-    if (b.kind === 'cover') {
+    if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp') {
       damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35);
-      spawnParticles(w, proj.x, proj.y, '#fbbf24', 4, 55);
+      spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
       return true;
     }
   }
@@ -1396,7 +1420,21 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
 
 function updateBreakables(w: World, dt: number) {
   for (const b of w.breakables) {
-    if (b.broken) continue;
+    if (b.broken) {
+      if (b.kind === 'street-lamp' && b.hazardUntil && w.now < b.hazardUntil && w.now >= (b.hazardNextTickAt ?? 0)) {
+        b.hazardNextTickAt = w.now + 260;
+        const radius = 92;
+        if (dist2(w.player.x, w.player.y, b.x, b.y) <= (radius + w.player.radius) ** 2) {
+          damagePlayer(w, 9, b.x, b.y);
+        }
+        for (const enemy of w.enemies) {
+          if (!enemy.dying && dist2(enemy.x, enemy.y, b.x, b.y) <= (radius + enemy.radius) ** 2) {
+            damageEnemy(w, enemy, 14 * w.stats.power, 0.5, b.x, b.y);
+          }
+        }
+      }
+      continue;
+    }
     if (b.vx || b.vy) {
       b.x += b.vx * dt; b.y += b.vy * dt;
       b.vx *= Math.pow(0.88, dt * 60); b.vy *= Math.pow(0.88, dt * 60);
@@ -1435,12 +1473,12 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   collideObstacles(w, p);
   clampToArena(w, p);
   for (const b of w.breakables) {
-    if (b.broken || !['dumpster', 'car-wreck', 'cover'].includes(b.kind)) continue;
+    if (b.broken || !PUSHABLE_KINDS.has(b.kind)) continue;
     if (Math.abs(p.x - b.x) < b.w / 2 + p.radius && Math.abs(p.y - b.y) < b.h / 2 + p.radius) {
       b.contacts += 1;
       if (b.kind === 'car-wreck' && b.contacts < 3) continue;
       const dx = b.x - p.x; const dy = b.y - p.y; const len = Math.hypot(dx, dy) || 1;
-      const force = b.kind === 'car-wreck' ? 24 : b.kind === 'cover' ? 55 : 42;
+       const force = b.kind === 'car-wreck' ? 24 : b.kind === 'cover' ? 55 : 48;
       b.vx += (dx / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
       b.vy += (dy / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
     }
@@ -1632,7 +1670,7 @@ function updateEnemies(w: World, dt: number) {
       damagePlayer(w, enemy.damage, enemy.x, enemy.y);
     }
     for (const b of w.breakables) {
-      if (b.broken || !['dumpster', 'car-wreck'].includes(b.kind)) continue;
+       if (b.broken || !PUSHABLE_KINDS.has(b.kind)) continue;
       if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
         b.contacts += 1;
         if (b.kind === 'car-wreck' && b.contacts < 3) continue;

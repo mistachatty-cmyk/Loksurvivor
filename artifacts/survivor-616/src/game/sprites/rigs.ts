@@ -28,6 +28,8 @@ interface HumanoidOptions {
   puffs?: boolean;
   /** Adds a hood shape over the head. */
   hood?: boolean;
+  /** Adds a tall arcane staff silhouette to the fighter's right side. */
+  staff?: boolean;
   /** Adds wings behind the torso. */
   wings?: boolean;
   /** Head color override. */
@@ -142,6 +144,7 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
     cap = false,
     puffs = false,
     hood = false,
+    staff = false,
     wings = false,
     headColor = 'skin',
     torsoColor = 'body',
@@ -179,6 +182,13 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
 
   if (hood) {
     parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 2, w: width, h: 3, color: 'bodyDark', z: 6 });
+  }
+  if (staff) {
+    parts.push(
+      { key: 'aura', x: half + 3, y: 0, w: 2, h: height + 5, color: 'bodyDark', z: 1 },
+      { key: 'crest', x: half + 1, y: height + 3, w: 6, h: 2, color: 'accent', z: 8 },
+      { key: 'crest', x: half + 3, y: height + 5, w: 2, h: 3, color: 'accentBright', z: 9 },
+    );
   }
   if (cap) {
     parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 1, w: width + 2, h: 2, color: 'accent', z: 7 });

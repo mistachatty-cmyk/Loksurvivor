@@ -198,3 +198,53 @@ test('ordinary weapons damage enemies without applying Freeze', () => {
   assert.ok(enemy.hp < enemy.maxHp);
   assert.deepEqual(enemy.activeEffects, []);
 });
+
+test('a breakable box blocks a shot, breaks, and drops a pickup', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 40, h: 40, kind: 'crate-breakable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    5,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  world.breakables[0]!.hp = 1;
+  addProjectile(world, 'block');
+
+  for (let i = 0; i < 10 && world.projectiles.length > 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.equal(world.breakables[0]!.broken, true);
+  assert.ok(world.pickups.length >= 1);
+  assert.equal(world.obstacles.length, 0);
+});
+
+test('a destroyed street lamp becomes a temporary electricity hazard', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 28, h: 30, kind: 'street-lamp' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    6,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  world.breakables[0]!.hp = 1;
+  world.player.x = 150;
+  addProjectile(world, 'block');
+
+  for (let i = 0; i < 10 && world.projectiles.length > 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  const pole = world.breakables[0]!;
+  assert.equal(pole.broken, true);
+  assert.ok((pole.hazardUntil ?? 0) > world.now);
+  assert.equal(world.obstacles.length, 0);
+
+  const hpBefore = world.player.hp;
+  world.player.x = 0;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(world.player.hp < hpBefore);
+
+  for (let i = 0; i < 180; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok((pole.hazardUntil ?? 0) <= world.now);
+});

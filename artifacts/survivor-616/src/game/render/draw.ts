@@ -325,6 +325,7 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'security-camera': { top: '#3e4650', side: '#252a31', trim: '#ff7ab8' },
   cover: { top: '#5f4b35', side: '#33281e', trim: '#fbbf24' },
   'reflective-surface': { top: '#263e5b', side: '#142438', trim: '#d8b4fe' },
+  flora: { top: '#244b32', side: '#142a1d', trim: '#54b96e' },
 };
 
 function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
@@ -335,7 +336,7 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
   const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> =
     w.area.endless
       ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
-      : w.area.obstacles;
+      : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
 
   for (const obstacle of obstacleList) {
     const colors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
@@ -379,6 +380,20 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
       ctx.stroke();
       ctx.restore();
+    } else if (obstacle.kind === 'flora') {
+      ctx.save();
+      ctx.fillStyle = '#18321f';
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(obstacle.x - 3, y - height + obstacle.h * 0.55, 6, obstacle.h * 0.45);
+      ctx.fillStyle = '#4fbd68';
+      for (let i = 0; i < 5; i += 1) {
+        const leafX = obstacle.x + Math.sin(i * 2.7) * obstacle.w * 0.35;
+        const leafY = y - height + obstacle.h * (0.2 + i * 0.13);
+        ctx.beginPath();
+        ctx.ellipse(leafX, leafY, obstacle.w * 0.28, obstacle.h * 0.13, i % 2 ? 0.45 : -0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
@@ -398,6 +413,26 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
+  for (const pole of w.breakables) {
+    if (pole.kind !== 'street-lamp' || !pole.broken || !pole.hazardUntil || pole.hazardUntil <= w.now) continue;
+    const radius = 92;
+    const pulse = 0.65 + Math.sin(w.now / 85) * 0.2;
+    const gradient = ctx.createRadialGradient(pole.x, pole.y, 4, pole.x, pole.y, radius);
+    gradient.addColorStop(0, '#ffe66d88');
+    gradient.addColorStop(0.55, '#8be9fd35');
+    gradient.addColorStop(1, '#8be9fd00');
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(pole.x, pole.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d9f7ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 7]);
+    ctx.stroke();
+    ctx.restore();
+  }
   if (w.now < w.ultActiveUntil) {
     const radius = 160;
     const g = ctx.createRadialGradient(w.player.x, w.player.y, 8, w.player.x, w.player.y, radius);
@@ -508,6 +543,18 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     gradient.addColorStop(0, '#ffffff30'); gradient.addColorStop(1, '#ff7ab800');
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(angle); ctx.globalAlpha = 0.22;
     ctx.fillStyle = gradient; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 170, -0.18, 0.18); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  for (const pole of w.breakables) {
+    if (pole.kind !== 'street-lamp' || !pole.broken || !pole.hazardUntil || pole.hazardUntil <= w.now) continue;
+    const angle = pole.fallAngle ?? Math.PI / 2;
+    ctx.save();
+    ctx.translate(pole.x, pole.y);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#302614';
+    ctx.fillRect(-4, -pole.h, 8, pole.h);
+    ctx.fillStyle = '#ffd166';
+    ctx.fillRect(-10, -pole.h - 4, 20, 8);
+    ctx.restore();
   }
 }
 
