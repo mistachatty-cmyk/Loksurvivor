@@ -305,7 +305,7 @@ export interface ObstacleDef {
   h: number;
   kind: 'dumpster' | 'car' | 'crate' | 'planter' | 'barrier' | 'ac-unit'
     | 'neon-sign' | 'barrel' | 'fuse-box' | 'street-lamp' | 'car-wreck'
-    | 'crate-breakable' | 'security-camera';
+    | 'crate-breakable' | 'security-camera' | 'vending-machine';
 }
 
 export interface AreaDef {

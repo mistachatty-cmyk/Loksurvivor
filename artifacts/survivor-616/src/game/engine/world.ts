@@ -39,6 +39,7 @@ import type {
 } from '@/game/types';
 
 import {
+  circleHitsBox,
   clamp,
   createRng,
   dist2,
@@ -237,7 +238,18 @@ export interface BreakableObstacle extends Aabb {
 const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
   crate: 40, 'crate-breakable': 40, 'neon-sign': 60, barrel: 80,
   'fuse-box': 100, 'street-lamp': 55, dumpster: 90, 'car-wreck': 150, car: 120,
+  'vending-machine': 65,
 };
+
+/**
+ * Kinds light enough to shove -- bumping one of these (as the player or an
+ * enemy) gives it a shove away from whoever hit it, so it can be pushed into
+ * a lane to block incoming shots. Heavier fixed street furniture (ac-unit,
+ * fuse-box, street-lamp, neon-sign, barrier, security-camera, car) stays put.
+ */
+const PUSHABLE_KINDS: ObstacleDef['kind'][] = [
+  'dumpster', 'car-wreck', 'crate', 'crate-breakable', 'barrel', 'planter', 'vending-machine',
+];
 
 /* ------------------------------------------------------------------ */
 /* World                                                               */
@@ -1354,13 +1366,13 @@ function damageBreakable(w: World, x: number, y: number, radius: number, amount:
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     b.hp -= Math.max(1, amount);
     if (b.hp > 0) {
-      if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
+      if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : b.kind === 'vending-machine' ? '#5eead4' : '#ffe08a', 2, 35);
       continue;
     }
     b.broken = true;
     b.brokenAt = w.now;
-    const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : 10;
-    spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : '#c99055', count, 130);
+    const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : b.kind === 'vending-machine' ? 12 : 10;
+    spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : b.kind === 'vending-machine' ? '#5eead4' : '#c99055', count, 130);
     if (b.kind === 'barrel') {
       forEachNearby(w, b.x, b.y, 100, (enemy) => {
         if (dist2(enemy.x, enemy.y, b.x, b.y) <= (80 + enemy.radius) ** 2) {
@@ -1368,8 +1380,8 @@ function damageBreakable(w: World, x: number, y: number, radius: number, amount:
         }
       });
     }
-    if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel') {
-      w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : 6, bornAt: w.now });
+    if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel' || b.kind === 'vending-machine') {
+      w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : b.kind === 'vending-machine' ? 9 : 6, bornAt: w.now });
     }
   }
   w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x: bx, y: by, w: bw, h: bh }) => ({ x: bx, y: by, w: bw, h: bh }));
@@ -1470,7 +1482,7 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   collideObstacles(w, p);
   clampToArena(w, p);
   for (const b of w.breakables) {
-    if (b.broken || !['dumpster', 'car-wreck'].includes(b.kind)) continue;
+    if (b.broken || !PUSHABLE_KINDS.includes(b.kind)) continue;
     if (Math.abs(p.x - b.x) < b.w / 2 + p.radius && Math.abs(p.y - b.y) < b.h / 2 + p.radius) {
       b.contacts += 1;
       if (b.kind === 'car-wreck' && b.contacts < 3) continue;
@@ -1667,7 +1679,7 @@ function updateEnemies(w: World, dt: number) {
       damagePlayer(w, enemy.damage, enemy.x, enemy.y);
     }
     for (const b of w.breakables) {
-      if (b.broken || !['dumpster', 'car-wreck'].includes(b.kind)) continue;
+      if (b.broken || !PUSHABLE_KINDS.includes(b.kind)) continue;
       if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
         b.contacts += 1;
         if (b.kind === 'car-wreck' && b.contacts < 3) continue;
@@ -1763,6 +1775,20 @@ function updateProjectiles(w: World, dt: number) {
         const halfW = w.bounds.w / 2;
         const halfH = w.bounds.h / 2;
         if (proj.x < -halfW || proj.x > halfW || proj.y < -halfH || proj.y > halfH) remove = true;
+      }
+    }
+
+    // Solid scenery blocks any shot, player or enemy -- the same obstacle
+    // list actors already collide against (`collideObstacles`), so a crate
+    // shoved into a doorway is real cover, not just a walking obstruction.
+    if (!remove) {
+      for (const box of w.obstacles) {
+        if (circleHitsBox(proj.x, proj.y, proj.radius, box)) {
+          remove = true;
+          damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage);
+          spawnParticles(w, proj.x, proj.y, proj.color, 4, 70);
+          break;
+        }
       }
     }
 

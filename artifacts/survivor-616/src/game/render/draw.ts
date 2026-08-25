@@ -290,6 +290,7 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'car-wreck': { top: '#493a4d', side: '#29232d', trim: '#a77aa8' },
   'crate-breakable': { top: '#6b4a2c', side: '#3f2b19', trim: '#d69b5d' },
   'security-camera': { top: '#3e4650', side: '#252a31', trim: '#ff7ab8' },
+  'vending-machine': { top: '#0f3d38', side: '#082420', trim: '#5eead4' },
 };
 
 function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
@@ -355,14 +356,14 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.save(); ctx.globalAlpha = Math.max(0, fade) * 0.32; ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
+  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'vending-machine'].includes(b.kind));
   const neonDistrict = w.area.ground.glowStrategy === 'neon';
   let dynamicCount = 0;
   let shaftCount = 0;
   for (const b of sources) {
     const isBarrel = b.kind === 'barrel';
-    const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : 80;
-    const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'fuse-box' ? '#7ef0bd' : '#ffd166';
+    const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : b.kind === 'vending-machine' ? 70 : 80;
+    const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'vending-machine' ? '#5eead4' : b.kind === 'fuse-box' ? '#7ef0bd' : '#ffd166';
     const pulse = b.kind === 'neon-sign' ? 0.8 + Math.sin(w.now / 420) * 0.15 : 1;
     const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
     gradient.addColorStop(0, `${color}55`);
@@ -432,7 +433,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   // each nearby obstacle are projected away from the moving light source, so
   // shadows rotate, stretch, and vanish immediately when a breakable breaks.
   const shadowSources = sources.slice(0, 5);
-  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
+  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'vending-machine'].includes(b.kind));
   for (const source of shadowSources) {
     for (const object of shadowObjects) {
       const distance = Math.hypot(object.x - source.x, object.y - source.y);

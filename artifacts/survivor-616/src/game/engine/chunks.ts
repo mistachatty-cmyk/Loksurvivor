@@ -132,6 +132,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       'car-wreck': [110, 140, 48, 64],
       'crate-breakable': [44, 72, 44, 72],
       'security-camera': [36, 48, 36, 48],
+      'vending-machine': [36, 48, 44, 58],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);

@@ -22,3 +22,17 @@ as backdrops directly.
 Related standing constraint from the user: do not invent real artists, names, likenesses, or
 represent music as licensed. The soundtrack feature only plays files the player picks from
 their own device.
+
+**Added later:** three more supplementary reference images the user shared in chat, saved into
+`public/art/` but **not** wired to any `CharacterDef.referenceArt`:
+- `ref-charactersheet-template.jpeg` — a generic character-sheet template (idle/walk/attack/
+  death frame layout) illustrating the stat-card format; useful as a format reference only.
+- `ref-cuu-gameplay.jpeg` — a screenshot of another game's bee-swarm ultimate, useful as a
+  visual reference for swarm/orbit-style ability effects.
+- `ref-unified-asset-sheet.jpeg` — a composite sheet covering four characters at once (including
+  ones that map to Shade and Masky already in this roster); general mood/style reference, not a
+  single character's working sheet.
+
+The user separately shared several sexualized reference images (pin-up/pinup-style character
+art) across multiple messages. Those were **not** saved, wired to any character, or used as
+design inspiration in any way -- flag this again if asked to revisit that request.

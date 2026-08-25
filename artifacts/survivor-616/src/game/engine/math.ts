@@ -49,6 +49,17 @@ export interface Aabb {
   h: number;
 }
 
+/** Whether a circle overlaps an axis-aligned box, with no side effects. */
+export function circleHitsBox(x: number, y: number, radius: number, box: Aabb): boolean {
+  const halfW = box.w / 2;
+  const halfH = box.h / 2;
+  const nearestX = clamp(x, box.x - halfW, box.x + halfW);
+  const nearestY = clamp(y, box.y - halfH, box.y + halfH);
+  const dx = x - nearestX;
+  const dy = y - nearestY;
+  return dx * dx + dy * dy <= radius * radius;
+}
+
 /**
  * Push a circle out of an axis-aligned box along the shallowest axis.
  * Returns true when a correction was applied.
