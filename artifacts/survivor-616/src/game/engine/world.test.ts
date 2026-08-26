@@ -4,6 +4,12 @@ import test from 'node:test';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { getEnemy } from '@/game/data/enemies';
+import {
+  crewActivityEffects,
+  normalizeCrewActivities,
+  preferredActivitiesForAlly,
+  rollCrewActivities,
+} from '@/game/data/crewActivities';
 import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
@@ -1082,13 +1088,52 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 4);
+    assert.equal(loaded.version, 5);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
     assert.equal(loaded.cred, 12);
     assert.equal(loaded.lokPetCatalog.length, 0);
   }
+});
+
+test('crew activities stay autonomous, preferred, seeded, and safely normalized', () => {
+  const allies = ['vee', 'deacon', 'nyx', 'sable', 'mamajo'];
+  const first = rollCrewActivities(allies, 12);
+  const repeat = rollCrewActivities(allies, 12);
+  const next = rollCrewActivities(allies, 13);
+
+  assert.deepEqual(first, repeat);
+  assert.notDeepEqual(first, next);
+  for (const allyId of allies) {
+    assert.ok(preferredActivitiesForAlly(allyId).some((activity) => activity.id === first[allyId]));
+  }
+
+  const repaired = normalizeCrewActivities(
+    { vee: 'not-an-activity', deacon: 'fortify-doors', unknown: 'field-rations' },
+    allies,
+    12,
+  );
+  assert.equal(repaired.vee, first.vee);
+  assert.equal(repaired.deacon, 'fortify-doors');
+  assert.equal('unknown' in repaired, false);
+
+  const meta = createInitialMeta();
+  const crewMeta = {
+    ...meta,
+    rescuedAllyIds: allies,
+    crewActivitySeed: 12,
+    crewActivityByAlly: first,
+  };
+  const effects = crewActivityEffects(crewMeta);
+  assert.ok(effects.length >= allies.length);
+  assert.ok(effects.every((effect) => ['maxHp', 'armor', 'magnet', 'speed', 'area', 'haste', 'power'].includes(effect.stat)));
+  const entered = reducer({ meta: crewMeta, lastRun: null }, { type: 'enterHideout' });
+  assert.equal(entered.meta.crewActivitySeed, 13);
+  assert.deepEqual(
+    entered.meta.crewActivityByAlly,
+    rollCrewActivities(allies, 13),
+  );
 });
 
 test('vendor purchases spend cred exactly once and stop at the catalog cap', () => {
@@ -1339,7 +1384,8 @@ test('city blocks are deterministic and keep a central crossing through river ro
   const second = generateChunk(4, 3, 616);
   assert.deepEqual(first, second);
   assert.equal(first.hasRiver, true);
-  assert.equal(first.obstacles.filter((obstacle) => obstacle.kind === 'building').length, 4);
+  assert.equal(first.buildings.length, 4);
+  assert.ok(first.obstacles.filter((obstacle) => obstacle.kind === 'building').length >= 16);
   assert.equal(first.obstacles.filter((obstacle) => obstacle.kind === 'river').length, 2);
   assert.ok(first.buildingEntrances.length > 0);
 });
@@ -1365,6 +1411,29 @@ test('endless snapshot exposes loaded blocks, river crossings, and doors', () =>
   assert.ok(snapshot.endless.cityBlocks.length >= 9);
   assert.ok(snapshot.endless.buildingEntrances.length > 0);
   assert.equal(snapshot.endless.playerX, world.player.x);
+});
+
+test('endless buildings expose distinct facades and enterable prefab interiors', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  stepWorld(world, 1 / 60, neutralInput);
+
+  const endless = world.endless!;
+  assert.ok(endless.buildings.length >= 8);
+  assert.ok(new Set(endless.buildings.map((building) => building.prefabId)).size >= 3);
+  const door = endless.buildingEntrances[0]!;
+  world.player.x = door.x;
+  world.player.y = door.y;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(endless.inBuilding, true);
+  assert.ok(endless.buildingLabel.length > 0);
+  assert.ok(world.obstacles.some((obstacle) => obstacle.w > 300 || obstacle.h > 300));
+  assert.ok(world.obstacles.some((obstacle) => obstacle.w < 30 && obstacle.h > 100));
+
+  endless.exitZone = { x: world.player.x, y: world.player.y, w: 52, h: 42 };
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(endless.inBuilding, false);
 });
 
 test('entering a landmark block adds a non-blocking navigation cue', () => {

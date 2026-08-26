@@ -365,7 +365,7 @@ export const AREAS: AreaDef[] = [
     name: 'Endless Streets',
     district: 'All of 616',
     description:
-      'No walls. No clock. Walk any direction and the blocks keep going. Find the stairs down and see how deep the city goes.',
+      'A living grid of streets, marked facades, and districts that keep going. Walk into a building, find its way back out, and see how deep the city goes.',
     backdrop: 'art/street.jpeg',
     bounds: { w: 99999, h: 99999 }, // not used directly -- world is unbounded
     ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848' },

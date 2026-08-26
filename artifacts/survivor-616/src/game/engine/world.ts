@@ -53,7 +53,17 @@ import {
   resolveCircleBox,
   type Aabb,
 } from './math';
-import { CHUNK_SIZE, chunkKey, chunkOrigin, generateChunk, worldToChunkCoords } from './chunks';
+import {
+  BUILDING_PREFABS,
+  CHUNK_SIZE,
+  buildingWallObstacles,
+  chunkKey,
+  chunkOrigin,
+  generateChunk,
+  getBuildingPrefab,
+  worldToChunkCoords,
+  type BuildingPrefabId,
+} from './chunks';
 
 /* ------------------------------------------------------------------ */
 /* Entities                                                            */
@@ -637,6 +647,9 @@ export function createWorld(
       inDungeon: false,
       inBuilding: false,
       buildingLabel: '',
+      buildingPrefabId: null,
+      buildingCenterX: 0,
+      buildingCenterY: 0,
       buildingReturnX: 0,
       buildingReturnY: 0,
       dungeonRoom: 0,
@@ -659,6 +672,7 @@ export function createWorld(
       cityBlocks: [],
       riverSegments: [],
       buildingEntrances: [],
+      buildings: [],
     };
     // The endless area bounds sentinel won't be used for clamping, but the
     // rescue system reads durationSec.  Keep rescue disabled in endless mode.
@@ -3271,6 +3285,7 @@ function updateEndlessChunks(w: World) {
       e.chunkObstacles.delete(key);
       e.dungeonEntrances = e.dungeonEntrances.filter((en) => en.chunkKey !== key);
       e.cityBlocks = e.cityBlocks.filter((block) => block.key !== key);
+      e.buildings = e.buildings.filter((building) => !building.id.startsWith(`${key}:`));
       e.riverSegments = e.riverSegments.filter((segment) => !(
         Math.abs(segment.x - (parseInt(key.split(',')[0]!, 10) * CHUNK_SIZE)) < CHUNK_SIZE &&
         Math.abs(segment.y - (parseInt(key.split(',')[1]!, 10) * CHUNK_SIZE)) < CHUNK_SIZE
@@ -3316,8 +3331,25 @@ function updateEndlessChunks(w: World) {
       h: CHUNK_SIZE,
       river: chunk.hasRiver,
       crossing: chunk.riverCrossingX !== null,
+      streetAxis: chunk.streetAxis,
+      district: chunk.district,
+      districtAccent: chunk.districtAccent,
       landmark: chunk.landmark,
     });
+    for (const building of chunk.buildings) {
+      e.buildings.push({
+        id: building.id,
+        prefabId: building.prefabId,
+        name: building.name,
+        sign: building.sign,
+        accent: building.accent,
+        x: cwx + building.x,
+        y: cwy + building.y,
+        w: building.w,
+        h: building.h,
+        doorSide: building.doorSide,
+      });
+    }
     if (chunk.hasRiver) {
       e.riverSegments.push({
         x: cwx,
@@ -3328,14 +3360,19 @@ function updateEndlessChunks(w: World) {
       });
     }
     for (const door of chunk.buildingEntrances) {
+      const building = chunk.buildings.find((candidate) => candidate.id === door.buildingId);
+      if (!building) continue;
       e.buildingEntrances.push({
         x: cwx + door.x,
         y: cwy + door.y,
         w: 34,
         h: 28,
         label: door.label,
-        returnX: cwx + door.x,
-        returnY: cwy + door.y + 48,
+        returnX: cwx + door.x + (door.doorSide === 'west' ? -48 : door.doorSide === 'east' ? 48 : 0),
+        returnY: cwy + door.y + (door.doorSide === 'north' ? -48 : door.doorSide === 'south' ? 48 : 0),
+        buildingId: door.buildingId,
+        prefabId: door.prefabId,
+        doorSide: door.doorSide,
       });
     }
 
@@ -3454,27 +3491,53 @@ function enterDungeon(w: World) {
 
 function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]) {
   const e = w.endless!;
+  const building = e.buildings.find((candidate) => candidate.id === door.buildingId);
+  const prefab = getBuildingPrefab(door.prefabId as BuildingPrefabId);
+  if (!building) return;
+
   resolvePotholes(w);
   e.buildingReturnX = door.returnX;
   e.buildingReturnY = door.returnY;
-  e.dungeonCenterX = door.x;
-  e.dungeonCenterY = door.y;
-  e.buildingLabel = door.label;
+  e.buildingCenterX = building.x;
+  e.buildingCenterY = building.y;
+  e.dungeonCenterX = building.x;
+  e.dungeonCenterY = building.y;
+  e.buildingLabel = prefab.name;
+  e.buildingPrefabId = prefab.id;
   e.inBuilding = true;
-  e.dungeonBounds = { w: 420, h: 320 };
-  e.exitZone = { x: door.x, y: door.y + 125, w: 52, h: 42 };
-  w.obstacles = [
-    { x: door.x - 140, y: door.y - 120, w: 28, h: 240 },
-    { x: door.x + 140, y: door.y - 120, w: 28, h: 240 },
-    { x: door.x, y: door.y - 145, w: 260, h: 28 },
-  ];
-  w.breakables = w.obstacles.map((obs) => createBreakable(w, { ...obs, kind: 'building' }));
+  e.dungeonBounds = { ...prefab.interiorBounds };
+
+  const exitOffset = Math.max(22, Math.min(prefab.interiorBounds.w, prefab.interiorBounds.h) / 2 - 24);
+  const exitX = building.x + (door.doorSide === 'west' ? -exitOffset : door.doorSide === 'east' ? exitOffset : 0);
+  const exitY = building.y + (door.doorSide === 'north' ? -exitOffset : door.doorSide === 'south' ? exitOffset : 0);
+  e.exitZone = { x: exitX, y: exitY, w: 52, h: 42 };
+
+  const interiorShell = buildingWallObstacles({
+    x: building.x,
+    y: building.y,
+    w: prefab.interiorBounds.w,
+    h: prefab.interiorBounds.h,
+    doorX: building.x,
+    doorY: building.y,
+    doorSide: door.doorSide,
+  });
+  const interiorProps = prefab.interiorProps.map((obs) => ({
+    ...obs,
+    x: building.x + obs.x,
+    y: building.y + obs.y,
+  }));
+  w.obstacles = [...interiorShell, ...interiorProps];
+  w.breakables = [...interiorShell, ...interiorProps].map((obs) => createBreakable(w, { ...obs, kind: obs.kind }));
   w.potholes = [];
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
   w.projectiles = [];
+  w.player.x = exitX + (door.doorSide === 'west' ? 28 : door.doorSide === 'east' ? -28 : 0);
+  w.player.y = exitY + (door.doorSide === 'north' ? 28 : door.doorSide === 'south' ? -28 : 0);
+  w.player.vx = 0;
+  w.player.vy = 0;
   e.pendingTransition = 'enter';
-  pushAlert(w, `${door.label} — inside`);
+  pushAlert(w, `${prefab.name} — inside`);
 }
 
 function exitDungeon(w: World) {
@@ -3486,6 +3549,8 @@ function exitDungeon(w: World) {
     w.player.vx = 0;
     w.player.vy = 0;
     e.inBuilding = false;
+    e.buildingPrefabId = null;
+    e.buildingLabel = '';
     e.exitZone = null;
     restoreStreetObstacles(w);
     e.pendingTransition = 'exit';
@@ -3779,13 +3844,22 @@ export function hudSnapshot(w: World): HudSnapshot {
             worldToChunkCoords(w.player.x, w.player.y).cx,
             worldToChunkCoords(w.player.x, w.player.y).cy,
           ))?.kind ?? 'street',
+          currentDistrict: e.cityBlocks.find((block) => block.key === chunkKey(
+            worldToChunkCoords(w.player.x, w.player.y).cx,
+            worldToChunkCoords(w.player.x, w.player.y).cy,
+          ))?.district ?? 'Unmapped district',
+          inBuilding: e.inBuilding,
+          buildingLabel: e.buildingLabel,
           playerX: w.player.x,
           playerY: w.player.y,
-          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing, landmark }) => ({
-            x, y, w: width, h: height, kind, river, crossing, landmark,
+          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, landmark }) => ({
+            x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, landmark,
           })),
           riverSegments: [...e.riverSegments],
-          buildingEntrances: e.buildingEntrances.map(({ x, y, label }) => ({ x, y, label })),
+          buildingEntrances: e.buildingEntrances.map(({ x, y, label, prefabId, doorSide }) => ({ x, y, label, prefabId, doorSide })),
+          buildings: e.buildings.map(({ id, prefabId, name, sign, accent, x, y, w: width, h: height, doorSide }) => ({
+            id, prefabId, name, sign, accent, x, y, w: width, h: height, doorSide,
+          })),
         }
       : undefined,
   };

@@ -25,6 +25,32 @@ export const CHUNK_SIZE = 640;
 export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot' | 'market' | 'rail' | 'plaza';
 export type BlockKind = 'storefronts' | 'residential' | 'parking' | 'industrial' | 'park' | 'bridge' | 'river-edge';
 export type ChunkLandmarkKind = 'bridge' | 'market' | 'rail-yard' | 'plaza';
+export type BuildingPrefabId = 'corner-store' | 'duplex' | 'warehouse' | 'apartment' | 'laundromat' | 'clinic' | 'bar' | 'auto-shop';
+
+export interface BuildingPrefab {
+  id: BuildingPrefabId;
+  name: string;
+  sign: string;
+  accent: string;
+  footprint: { w: number; h: number };
+  interiorBounds: { w: number; h: number };
+  interiorProps: Array<Pick<ObstacleDef, 'x' | 'y' | 'w' | 'h' | 'kind' | 'propVariant'>>;
+}
+
+export interface ChunkBuilding {
+  id: string;
+  prefabId: BuildingPrefabId;
+  name: string;
+  sign: string;
+  accent: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  doorX: number;
+  doorY: number;
+  doorSide: 'north' | 'south' | 'east' | 'west';
+}
 
 export interface ChunkLandmark {
   name: string;
@@ -36,6 +62,9 @@ export interface ChunkBuildingEntrance {
   x: number;
   y: number;
   label: string;
+  buildingId: string;
+  prefabId: BuildingPrefabId;
+  doorSide: ChunkBuilding['doorSide'];
 }
 
 export interface StreetChunk {
@@ -56,6 +85,9 @@ export interface StreetChunk {
   hasRiver: boolean;
   riverCrossingX: number | null;
   buildingEntrances: ChunkBuildingEntrance[];
+  buildings: ChunkBuilding[];
+  district: string;
+  districtAccent: string;
   landmark?: ChunkLandmark;
 }
 
@@ -66,6 +98,174 @@ export interface StreetChunk {
 const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot', 'market', 'rail', 'plaza'];
 const BLOCK_KINDS: BlockKind[] = ['storefronts', 'residential', 'parking', 'industrial', 'park', 'bridge', 'river-edge'];
 const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable', 'cover', 'reflective-surface', 'flora', 'metal-box', 'bench'];
+
+export const BUILDING_PREFABS: BuildingPrefab[] = [
+  {
+    id: 'corner-store',
+    name: 'Corner Store',
+    sign: 'OPEN LATE',
+    accent: '#ff8bd8',
+    footprint: { w: 176, h: 132 },
+    interiorBounds: { w: 360, h: 280 },
+    interiorProps: [
+      { x: -100, y: -54, w: 120, h: 22, kind: 'crate', propVariant: 'fixed-bench' },
+      { x: 92, y: 58, w: 78, h: 34, kind: 'crate-breakable', propVariant: 'light-breakable' },
+      { x: 4, y: 78, w: 52, h: 34, kind: 'metal-box', propVariant: 'heavy-metal' },
+    ],
+  },
+  {
+    id: 'duplex',
+    name: 'Two-Family Duplex',
+    sign: '616 HOMES',
+    accent: '#a7f3d0',
+    footprint: { w: 184, h: 148 },
+    interiorBounds: { w: 380, h: 300 },
+    interiorProps: [
+      { x: 0, y: -12, w: 18, h: 236, kind: 'building' },
+      { x: -112, y: 74, w: 64, h: 28, kind: 'bench', propVariant: 'fixed-bench' },
+      { x: 112, y: -72, w: 58, h: 42, kind: 'crate', propVariant: 'fixed-bench' },
+    ],
+  },
+  {
+    id: 'warehouse',
+    name: 'Riverline Warehouse',
+    sign: 'RIVERLINE FREIGHT',
+    accent: '#ffd166',
+    footprint: { w: 214, h: 156 },
+    interiorBounds: { w: 430, h: 330 },
+    interiorProps: [
+      { x: -126, y: -68, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -42, y: -68, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 42, y: -68, w: 54, h: 54, kind: 'crate-breakable', propVariant: 'light-breakable' },
+      { x: 126, y: -68, w: 54, h: 54, kind: 'crate-breakable', propVariant: 'light-breakable' },
+      { x: 0, y: 80, w: 220, h: 18, kind: 'barrier', propVariant: 'fixed-bench' },
+    ],
+  },
+  {
+    id: 'apartment',
+    name: 'Brick Walk-Up',
+    sign: 'WALK-UP',
+    accent: '#fda4af',
+    footprint: { w: 158, h: 188 },
+    interiorBounds: { w: 340, h: 390 },
+    interiorProps: [
+      { x: -105, y: -120, w: 58, h: 32, kind: 'bench', propVariant: 'fixed-bench' },
+      { x: 100, y: -24, w: 42, h: 42, kind: 'crate', propVariant: 'fixed-bench' },
+      { x: -82, y: 92, w: 116, h: 18, kind: 'barrier', propVariant: 'fixed-bench' },
+    ],
+  },
+  {
+    id: 'laundromat',
+    name: 'Spin Cycle Laundromat',
+    sign: 'SPIN CYCLE',
+    accent: '#60a5fa',
+    footprint: { w: 196, h: 128 },
+    interiorBounds: { w: 390, h: 260 },
+    interiorProps: [
+      { x: -112, y: -62, w: 32, h: 32, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -64, y: -62, w: 32, h: 32, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -16, y: -62, w: 32, h: 32, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 32, y: -62, w: 32, h: 32, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 110, y: 68, w: 150, h: 18, kind: 'barrier', propVariant: 'fixed-bench' },
+    ],
+  },
+  {
+    id: 'clinic',
+    name: 'Neighborhood Clinic',
+    sign: 'CLINIC',
+    accent: '#7ef0bd',
+    footprint: { w: 206, h: 144 },
+    interiorBounds: { w: 410, h: 290 },
+    interiorProps: [
+      { x: -112, y: -60, w: 70, h: 26, kind: 'bench', propVariant: 'fixed-bench' },
+      { x: 8, y: -60, w: 70, h: 26, kind: 'bench', propVariant: 'fixed-bench' },
+      { x: -98, y: 72, w: 48, h: 42, kind: 'fuse-box', propVariant: 'light-breakable' },
+      { x: 100, y: 70, w: 62, h: 32, kind: 'crate-breakable', propVariant: 'light-breakable' },
+    ],
+  },
+  {
+    id: 'bar',
+    name: 'Last Stop Bar',
+    sign: 'LAST STOP',
+    accent: '#c084fc',
+    footprint: { w: 198, h: 136 },
+    interiorBounds: { w: 400, h: 280 },
+    interiorProps: [
+      { x: -116, y: -68, w: 172, h: 22, kind: 'barrier', propVariant: 'fixed-bench' },
+      { x: 118, y: -26, w: 30, h: 80, kind: 'neon-sign', propVariant: 'fixed-bench' },
+      { x: -76, y: 76, w: 52, h: 32, kind: 'barrel', propVariant: 'light-breakable' },
+      { x: 18, y: 76, w: 52, h: 32, kind: 'barrel', propVariant: 'light-breakable' },
+    ],
+  },
+  {
+    id: 'auto-shop',
+    name: 'Northline Auto',
+    sign: 'NORTHLINE AUTO',
+    accent: '#fb923c',
+    footprint: { w: 228, h: 164 },
+    interiorBounds: { w: 450, h: 340 },
+    interiorProps: [
+      { x: -132, y: -82, w: 76, h: 54, kind: 'car-wreck', propVariant: 'medium-movable' },
+      { x: 0, y: -82, w: 76, h: 54, kind: 'car-wreck', propVariant: 'medium-movable' },
+      { x: 132, y: -82, w: 76, h: 54, kind: 'car-wreck', propVariant: 'medium-movable' },
+      { x: -98, y: 86, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 98, y: 86, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
+    ],
+  },
+];
+
+const BUILDING_PREFABS_BY_ID = Object.fromEntries(
+  BUILDING_PREFABS.map((prefab) => [prefab.id, prefab]),
+) as Record<BuildingPrefabId, BuildingPrefab>;
+
+const DISTRICTS: Array<{ name: string; accent: string }> = [
+  { name: 'Downtown Core', accent: '#ff8bd8' },
+  { name: 'Westside Row', accent: '#a7f3d0' },
+  { name: 'River Market', accent: '#4de1ff' },
+  { name: 'Rail Cut', accent: '#ffd166' },
+  { name: 'Warehouse Belt', accent: '#fb923c' },
+  { name: 'Uptown Blocks', accent: '#c084fc' },
+];
+
+export function getBuildingPrefab(id: BuildingPrefabId): BuildingPrefab {
+  return BUILDING_PREFABS_BY_ID[id] ?? BUILDING_PREFABS[0]!;
+}
+
+export function buildingWallObstacles(building: Pick<ChunkBuilding, 'x' | 'y' | 'w' | 'h' | 'doorX' | 'doorY' | 'doorSide'>): ObstacleDef[] {
+  const thickness = 18;
+  const doorWidth = 44;
+  const walls: ObstacleDef[] = [];
+  const { x, y, w, h, doorSide } = building;
+  const addHorizontal = (wallY: number, openingX: number | null) => {
+    if (openingX === null) {
+      walls.push({ x, y: wallY, w, h: thickness, kind: 'building' });
+      return;
+    }
+    const leftWidth = Math.max(24, openingX - (x - w / 2));
+    const rightWidth = Math.max(24, (x + w / 2) - openingX - doorWidth);
+    walls.push(
+      { x: x - w / 2 + leftWidth / 2, y: wallY, w: leftWidth, h: thickness, kind: 'building' },
+      { x: x + w / 2 - rightWidth / 2, y: wallY, w: rightWidth, h: thickness, kind: 'building' },
+    );
+  };
+  const addVertical = (wallX: number, openingY: number | null) => {
+    if (openingY === null) {
+      walls.push({ x: wallX, y, w: thickness, h, kind: 'building' });
+      return;
+    }
+    const topHeight = Math.max(24, openingY - (y - h / 2));
+    const bottomHeight = Math.max(24, (y + h / 2) - openingY - doorWidth);
+    walls.push(
+      { x: wallX, y: y - h / 2 + topHeight / 2, w: thickness, h: topHeight, kind: 'building' },
+      { x: wallX, y: y + h / 2 - bottomHeight / 2, w: thickness, h: bottomHeight, kind: 'building' },
+    );
+  };
+  addHorizontal(y - h / 2, doorSide === 'north' ? x - doorWidth / 2 : null);
+  addHorizontal(y + h / 2, doorSide === 'south' ? x - doorWidth / 2 : null);
+  addVertical(x - w / 2, doorSide === 'west' ? y - doorWidth / 2 : null);
+  addVertical(x + w / 2, doorSide === 'east' ? y - doorWidth / 2 : null);
+  return walls;
+}
 
 /**
  * Generate a single chunk.  The run seed is mixed with the chunk
@@ -99,6 +299,9 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
           : undefined;
 
   const obstacles: ObstacleDef[] = [];
+  const districtInfo = hasRiver
+    ? DISTRICTS[2]!
+    : DISTRICTS[(Math.abs(cx * 3 + cy * 5) + variantIndex) % DISTRICTS.length]!;
 
   // Each block gets a different street spine. These are still ordinary
   // obstacles for collision, but the profiles make streamed blocks read as
@@ -106,23 +309,62 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   const spine = Math.floor(rng() * 3);
   const streetAxis: 'horizontal' | 'vertical' = spine === 1 ? 'vertical' : 'horizontal';
 
-  // Four-block-corner footprints make every generated chunk read as a city
-  // block instead of an open arena. The central cross remains a safe route.
-  const buildingLayouts = streetAxis === 'horizontal'
+  // Four city-block corners are occupied by reusable building prefabs. Each
+  // footprint is made from four wall segments with one real door opening, so
+  // streets remain readable and the player can approach an actual facade.
+  const buildings: ChunkBuilding[] = [];
+  const prefabPools: Record<BlockKind, BuildingPrefabId[]> = {
+    storefronts: ['corner-store', 'laundromat', 'bar', 'clinic'],
+    residential: ['duplex', 'apartment', 'clinic'],
+    parking: ['auto-shop', 'corner-store', 'laundromat'],
+    industrial: ['warehouse', 'auto-shop', 'warehouse'],
+    park: [],
+    bridge: ['corner-store'],
+    'river-edge': [],
+  };
+  const prefabPool = prefabPools[blockKind];
+  const anchors = streetAxis === 'horizontal'
     ? [
-        { x: -210, y: -208, w: 150, h: 120 },
-        { x: 210, y: -208, w: 150, h: 120 },
-        { x: -210, y: 208, w: 150, h: 120 },
-        { x: 210, y: 208, w: 150, h: 120 },
+        { x: -198, y: -196, side: 'south' as const },
+        { x: 198, y: -196, side: 'south' as const },
+        { x: -198, y: 196, side: 'north' as const },
+        { x: 198, y: 196, side: 'north' as const },
       ]
     : [
-        { x: -208, y: -210, w: 120, h: 150 },
-        { x: -208, y: 210, w: 120, h: 150 },
-        { x: 208, y: -210, w: 120, h: 150 },
-        { x: 208, y: 210, w: 120, h: 150 },
+        { x: -196, y: -198, side: 'east' as const },
+        { x: -196, y: 198, side: 'east' as const },
+        { x: 196, y: -198, side: 'west' as const },
+        { x: 196, y: 198, side: 'west' as const },
       ];
-  for (const building of buildingLayouts) {
-    obstacles.push({ ...building, kind: 'building' });
+  if (blockKind !== 'river-edge' && prefabPool.length > 0) {
+    anchors.forEach((anchor, index) => {
+      const prefabId = prefabPool[(index + Math.abs(cx) + Math.abs(cy)) % prefabPool.length]!;
+      const prefab = getBuildingPrefab(prefabId);
+      const building: ChunkBuilding = {
+        id: `${cx},${cy}:building:${index}`,
+        prefabId,
+        name: prefab.name,
+        sign: prefab.sign,
+        accent: prefab.accent,
+        x: anchor.x,
+        y: anchor.y,
+        w: prefab.footprint.w,
+        h: prefab.footprint.h,
+        doorX: anchor.side === 'west'
+          ? anchor.x - prefab.footprint.w / 2 - 18
+          : anchor.side === 'east'
+            ? anchor.x + prefab.footprint.w / 2 + 18
+            : anchor.x,
+        doorY: anchor.side === 'north'
+          ? anchor.y - prefab.footprint.h / 2 - 18
+          : anchor.side === 'south'
+            ? anchor.y + prefab.footprint.h / 2 + 18
+            : anchor.y,
+        doorSide: anchor.side,
+      };
+      buildings.push(building);
+      obstacles.push(...buildingWallObstacles(building));
+    });
   }
 
   // A persistent river row runs horizontally through the city. Split banks
@@ -305,13 +547,14 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   const isDungeonChunk = (cx !== 0 || cy !== 0) && rng() > 0.875;
   const entranceLocalX = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
   const entranceLocalY = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
-  const buildingEntrances: ChunkBuildingEntrance[] = [];
-  if (blockKind !== 'park') {
-    buildingEntrances.push(
-      { x: -135, y: streetAxis === 'horizontal' ? -142 : 0, label: blockKind === 'bridge' ? 'Bridge kiosk' : blockKind === 'storefronts' ? 'Corner shop' : 'Front door' },
-      { x: 135, y: streetAxis === 'horizontal' ? 142 : 0, label: blockKind === 'bridge' ? 'Toll house' : blockKind === 'industrial' ? 'Loading bay' : 'Side entrance' },
-    );
-  }
+  const buildingEntrances: ChunkBuildingEntrance[] = buildings.map((building) => ({
+    x: building.doorX,
+    y: building.doorY,
+    label: building.sign,
+    buildingId: building.id,
+    prefabId: building.prefabId,
+    doorSide: building.doorSide,
+  }));
 
   return {
     cx,
@@ -326,6 +569,9 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     hasRiver,
     riverCrossingX,
     buildingEntrances,
+    buildings,
+    district: districtInfo.name,
+    districtAccent: districtInfo.accent,
     landmark,
   };
 }

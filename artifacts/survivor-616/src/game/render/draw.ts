@@ -10,6 +10,7 @@ import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type { ObstacleDef } from '@/game/types';
+import { getBuildingPrefab } from '@/game/engine/chunks';
 
 import { drawRig, drawShadow } from './sprite';
 import { clamp } from '@/game/engine/math';
@@ -244,17 +245,35 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
 
   for (const block of e.cityBlocks) {
     ctx.save();
-    ctx.globalAlpha = 0.22;
-    ctx.strokeStyle = block.river ? '#4de1ff' : '#f6c453';
-    ctx.setLineDash([10, 12]);
+    const roadWidth = 112;
+    const sidewalk = 12;
+    ctx.globalAlpha = 0.74;
+    ctx.fillStyle = '#0e1720';
+    ctx.fillRect(block.x - block.w / 2, block.y - roadWidth / 2, block.w, roadWidth);
+    ctx.fillRect(block.x - roadWidth / 2, block.y - block.h / 2, roadWidth, block.h);
+    ctx.globalAlpha = 0.48;
+    ctx.strokeStyle = block.districtAccent;
     ctx.lineWidth = 2;
-    ctx.strokeRect(block.x - block.w / 2 + 8, block.y - block.h / 2 + 8, block.w - 16, block.h - 16);
+    ctx.setLineDash([22, 18]);
+    ctx.beginPath();
+    if (block.streetAxis === 'horizontal') {
+      ctx.moveTo(block.x - block.w / 2, block.y);
+      ctx.lineTo(block.x + block.w / 2, block.y);
+    } else {
+      ctx.moveTo(block.x, block.y - block.h / 2);
+      ctx.lineTo(block.x, block.y + block.h / 2);
+    }
+    ctx.stroke();
     ctx.setLineDash([]);
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = block.landmark?.accent ?? (block.river ? '#6ee7ff' : '#f6c453');
-    ctx.font = '10px monospace';
+    ctx.globalAlpha = 0.26;
+    ctx.strokeStyle = block.river ? '#4de1ff' : block.districtAccent;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(block.x - block.w / 2 + sidewalk, block.y - block.h / 2 + sidewalk, block.w - sidewalk * 2, block.h - sidewalk * 2);
+    ctx.globalAlpha = 0.74;
+    ctx.fillStyle = block.landmark?.accent ?? block.districtAccent;
+    ctx.font = 'bold 10px monospace';
     ctx.fillText(
-      `${block.landmark?.name.toUpperCase() ?? block.kind.toUpperCase()} · ${block.cx},${block.cy}`,
+      `${block.district.toUpperCase()} · ${block.landmark?.name.toUpperCase() ?? block.kind.toUpperCase()}`,
       block.x - block.w / 2 + 18,
       block.y - block.h / 2 + 22,
     );
@@ -301,6 +320,51 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     drawChunkLandmark(ctx, block);
   }
 
+  for (const building of e.buildings) {
+    const left = building.x - building.w / 2;
+    const top = building.y - building.h / 2;
+    ctx.save();
+    ctx.fillStyle = '#131a25';
+    ctx.globalAlpha = 0.96;
+    ctx.fillRect(left, top, building.w, building.h);
+    ctx.fillStyle = `${building.accent}18`;
+    ctx.fillRect(left + 8, top + 8, building.w - 16, building.h - 16);
+    ctx.strokeStyle = building.accent;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(left, top, building.w, building.h);
+    ctx.globalAlpha = 0.5;
+    ctx.setLineDash([7, 7]);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(left + 7, top + 7, building.w - 14, building.h - 14);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = '#dbeafe';
+    const windowCount = Math.max(2, Math.floor((building.w - 36) / 34));
+    for (let index = 0; index < windowCount; index += 1) {
+      const wx = left + 18 + index * ((building.w - 36) / Math.max(1, windowCount - 1));
+      ctx.fillRect(wx - 5, top + 18, 10, 5);
+      ctx.fillRect(wx - 5, top + building.h - 23, 10, 5);
+    }
+    const isVerticalDoor = building.doorSide === 'east' || building.doorSide === 'west';
+    ctx.fillStyle = '#fff3b0';
+    if (isVerticalDoor) {
+      const dx = building.doorSide === 'west' ? left - 3 : left + building.w - 3;
+      ctx.fillRect(dx, building.y - 10, 6, 20);
+    } else {
+      const dy = building.doorSide === 'north' ? top - 3 : top + building.h - 3;
+      ctx.fillRect(building.x - 10, dy, 20, 6);
+    }
+    ctx.fillStyle = building.accent;
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(building.x - Math.min(58, building.sign.length * 4), building.y - 5, Math.min(116, building.sign.length * 8), 15);
+    ctx.fillStyle = '#08111a';
+    ctx.font = 'bold 7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(building.sign, building.x, building.y + 5);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
   for (const door of e.buildingEntrances) {
     ctx.save();
     ctx.globalAlpha = 0.85;
@@ -309,9 +373,43 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillStyle = '#fff3b0';
     ctx.fillRect(door.x - 5, door.y - 8, 10, 16);
     ctx.font = '9px monospace';
-    ctx.fillText(door.label.toUpperCase(), door.x - 35, door.y - 20);
+    ctx.fillText('ENTER', door.x - 18, door.y - 20);
     ctx.restore();
   }
+}
+
+function drawBuildingInterior(ctx: CanvasRenderingContext2D, w: World) {
+  const e = w.endless;
+  if (!e?.inBuilding || !e.buildingPrefabId) return;
+  const prefab = getBuildingPrefab(e.buildingPrefabId as Parameters<typeof getBuildingPrefab>[0]);
+  const { w: width, h: height } = e.dungeonBounds;
+  const left = e.buildingCenterX - width / 2;
+  const top = e.buildingCenterY - height / 2;
+
+  ctx.save();
+  ctx.fillStyle = '#0a1118';
+  ctx.globalAlpha = 0.98;
+  ctx.fillRect(left, top, width, height);
+  ctx.fillStyle = `${prefab.accent}12`;
+  ctx.fillRect(left + 12, top + 12, width - 24, height - 24);
+  ctx.strokeStyle = prefab.accent;
+  ctx.lineWidth = 5;
+  ctx.strokeRect(left, top, width, height);
+  ctx.globalAlpha = 0.45;
+  ctx.setLineDash([9, 7]);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(left + 10, top + 10, width - 20, height - 20);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(prefab.name.toUpperCase(), e.buildingCenterX, top - 16);
+  ctx.font = '9px monospace';
+  ctx.fillStyle = prefab.accent;
+  ctx.fillText('INTERIOR · FIND THE EXIT', e.buildingCenterX, top - 3);
+  ctx.textAlign = 'left';
+  ctx.restore();
 }
 
 function groundAccent(w: World): string {
@@ -517,7 +615,7 @@ function drawDungeonEntrances(ctx: CanvasRenderingContext2D, w: World) {
 /** Exit zone marker shown inside dungeon rooms. */
 function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
   const e = w.endless;
-  if (!e || !e.inDungeon || !e.exitZone) return;
+  if (!e || (!e.inDungeon && !e.inBuilding) || !e.exitZone) return;
 
   const exit = e.exitZone;
   const x = exit.x - exit.w / 2;
@@ -533,7 +631,7 @@ function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
   ctx.lineWidth = 3;
   ctx.strokeRect(x + 2, y + 2, exit.w - 4, exit.h - 4);
 
-  // Arrow pointing right (the exit)
+  // Arrow points toward the outside of the active room.
   ctx.fillStyle = '#7ef0bd';
   ctx.globalAlpha = 0.55 * pulse;
   ctx.beginPath();
@@ -544,6 +642,11 @@ function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
   ctx.lineTo(mx - 8, my + 6);
   ctx.closePath();
   ctx.fill();
+  ctx.globalAlpha = 0.9;
+  ctx.font = 'bold 9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(e.inBuilding ? 'OUT' : 'EXIT', exit.x, exit.y + 31);
+  ctx.textAlign = 'left';
 
   ctx.restore();
 }
@@ -1619,6 +1722,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.globalAlpha = 1;
   }
   drawCityMapFeatures(ctx, w);
+  drawBuildingInterior(ctx, w);
   drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   drawLightPool(ctx, w);
   drawLandmark(ctx, w);

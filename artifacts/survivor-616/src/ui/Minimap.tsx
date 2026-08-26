@@ -21,9 +21,9 @@ export function Minimap({ map }: MinimapProps) {
       aria-label={`City minimap, current block ${map.currentBlock}`}
     >
       <div className="border border-cyan-200/30 bg-[#050911]/85 p-1 shadow-[0_0_24px_rgba(34,211,238,.12)]">
-        <div className="mb-1 flex items-center justify-between px-1 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/75">
-          <span>Block map</span>
-          <span className="text-amber-200/80">{map.currentBlock}</span>
+        <div className="mb-1 flex items-center justify-between gap-2 px-1 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/75">
+          <span className="truncate">{map.currentDistrict}</span>
+          <span className="shrink-0 text-amber-200/80">{map.currentBlock}</span>
         </div>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="h-auto w-full" role="img">
           <rect width={MAP_W} height={MAP_H} fill="#08111a" />
@@ -79,6 +79,25 @@ export function Minimap({ map }: MinimapProps) {
               </g>
             );
           })}
+          {map.buildings.map((building) => {
+            const point = toMap(building.x, building.y);
+            const width = Math.max(5, building.w * SCALE);
+            const height = Math.max(4, building.h * SCALE);
+            return (
+              <g key={`building:${building.id}`}>
+                <rect
+                  x={point.x - width / 2}
+                  y={point.y - height / 2}
+                  width={width}
+                  height={height}
+                  fill={`${building.accent}55`}
+                  stroke={building.accent}
+                  strokeWidth="1"
+                />
+                <circle cx={point.x} cy={point.y} r="1.5" fill="#fff3b0" />
+              </g>
+            );
+          })}
           {map.buildingEntrances.map((door, index) => {
             const point = toMap(door.x, door.y);
             return <circle key={`door:${index}`} cx={point.x} cy={point.y} r="3" fill="#fbbf24" />;
@@ -88,11 +107,12 @@ export function Minimap({ map }: MinimapProps) {
         </svg>
         <div className="mt-1 flex items-center justify-between gap-2 px-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
           <span>● you</span>
-          <span>{map.inDungeon ? `room ${map.dungeonRoom}/3` : 'streets'}</span>
+          <span>{map.inBuilding ? `inside · ${map.buildingLabel}` : map.inDungeon ? `room ${map.dungeonRoom}/3` : 'streets'}</span>
         </div>
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 px-1 font-mono text-[7px] uppercase tracking-wide text-white/55">
           <span className="text-amber-300">■ bridge</span>
           <span className="text-rose-300">┄ river edge</span>
+          <span className="text-amber-100">□ building</span>
           <span className="text-fuchsia-200">◆ landmark</span>
         </div>
       </div>

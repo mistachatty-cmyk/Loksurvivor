@@ -572,6 +572,9 @@ export interface EndlessState {
   /** Whether the player is exploring an enterable city building. */
   inBuilding: boolean;
   buildingLabel: string;
+  buildingPrefabId: string | null;
+  buildingCenterX: number;
+  buildingCenterY: number;
   buildingReturnX: number;
   buildingReturnY: number;
   /** Current room in the active dungeon visit (1–3). */
@@ -626,12 +629,39 @@ export interface EndlessState {
     h: number;
     river: boolean;
     crossing: boolean;
+    streetAxis: 'horizontal' | 'vertical';
+    district: string;
+    districtAccent: string;
     landmark?: { name: string; kind: string; accent: string };
   }>;
   /** River bands currently loaded around the player. */
   riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number | null }>;
   /** Enterable building doors currently loaded around the player. */
-  buildingEntrances: Array<{ x: number; y: number; w: number; h: number; label: string; returnX: number; returnY: number }>;
+  buildingEntrances: Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    label: string;
+    returnX: number;
+    returnY: number;
+    buildingId: string;
+    prefabId: string;
+    doorSide: 'north' | 'south' | 'east' | 'west';
+  }>;
+  /** Exterior footprints used to draw a consistent city facade layer. */
+  buildings: Array<{
+    id: string;
+    prefabId: string;
+    name: string;
+    sign: string;
+    accent: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    doorSide: 'north' | 'south' | 'east' | 'west';
+  }>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -982,6 +1012,9 @@ export interface HudSnapshot {
     dungeonChestUnlocked: boolean;
     dungeonChestOpened: boolean;
     currentBlock: string;
+    currentDistrict: string;
+    inBuilding: boolean;
+    buildingLabel: string;
     playerX: number;
     playerY: number;
     cityBlocks: Array<{
@@ -992,10 +1025,14 @@ export interface HudSnapshot {
       kind: string;
       river: boolean;
       crossing: boolean;
+      streetAxis: 'horizontal' | 'vertical';
+      district: string;
+      districtAccent: string;
       landmark?: { name: string; kind: string; accent: string };
     }>;
     riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number | null }>;
-    buildingEntrances: Array<{ x: number; y: number; label: string }>;
+    buildingEntrances: Array<{ x: number; y: number; label: string; prefabId: string; doorSide: 'north' | 'south' | 'east' | 'west' }>;
+    buildings: Array<{ id: string; prefabId: string; name: string; sign: string; accent: string; x: number; y: number; w: number; h: number; doorSide: 'north' | 'south' | 'east' | 'west' }>;
   };
 }
 

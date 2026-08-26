@@ -511,7 +511,13 @@ export function RunScreen({
             <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-widest text-white/80">
               <span data-testid="text-level">Lv {hud?.level ?? 1}</span>
               <span data-testid="text-kills">{hud?.kills ?? 0} down</span>
-              <span>{area.name}</span>
+              <span>
+                {area.endless && hud?.endless
+                  ? hud.endless.inBuilding
+                    ? `Inside · ${hud.endless.buildingLabel}`
+                    : `${hud.endless.currentDistrict} · ${hud.endless.currentBlock}`
+                  : area.name}
+              </span>
             </div>
           </div>
 
@@ -519,9 +525,15 @@ export function RunScreen({
             <div className="rounded-sm border border-white/20 bg-black/70 px-2.5 py-1 font-mono text-lg font-bold text-white tabular-nums" data-testid="text-timer">
               {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
             </div>
-            {area.endless && dungeonDepth > 0 && (
+            {area.endless && hud?.endless && (
               <div className="font-mono text-[10px] uppercase tracking-widest text-primary/80 bg-black/60 px-2 py-0.5 border border-primary/20">
-                {inDungeon ? `${dungeonEraName} · room ${hud?.endless?.dungeonRoom ?? 1}/3` : `Depth ${dungeonDepth}`}
+                {inDungeon
+                  ? `${dungeonEraName} · room ${hud.endless.dungeonRoom}/3`
+                  : hud.endless.inBuilding
+                    ? 'Interior route · find the lit door out'
+                    : dungeonDepth > 0
+                      ? `Depth ${dungeonDepth}`
+                      : 'Street grid · explore the block'}
               </div>
             )}
             {phase === 'playing' || phase === 'paused' ? (
@@ -680,7 +692,7 @@ export function RunScreen({
           <h2 className="mt-2 text-4xl font-black uppercase text-white">{area.name}</h2>
           <p className="mt-3 max-w-xs px-6 font-mono text-xs text-white/60">
             {area.endless
-              ? 'Walk. Find the stairs down. Head home when you\'re done.'
+              ? 'Follow the street grid. Enter marked buildings, find the way back out, and head home when you\'re done.'
               : `Survive ${Math.round(area.durationSec)} seconds. Drag anywhere to move.`}
           </p>
         </div>
