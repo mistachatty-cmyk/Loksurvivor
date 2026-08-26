@@ -10,3 +10,11 @@ Separating force from damage keeps weapon balance readable and lets harmless uti
 
 **How to apply:**  
 Route new weapon hit paths through the shared impact value, keep fixed props indestructible, and send every actual enemy death through the existing single kill/reward function. Secondary burst hits must be below the burst threshold or otherwise guarded against recursion.
+
+Clickable movable props are a one-shot mechanic: pointer selection primes the next player impact, which launches the prop in the reverse of its most recent player-hit direction and uses a strong velocity multiplier. Sweep the prop from its previous to current position when applying path damage.
+
+**Why:**  
+The feature needs deliberate setup without changing ordinary weapon balance, and endpoint-only overlap misses enemies crossed between simulation frames.
+
+**How to apply:**  
+Keep priming gated by the persisted physics-interaction setting, consume the prime on the next qualifying player impact, and preserve the existing idempotent enemy-kill path for launch damage.

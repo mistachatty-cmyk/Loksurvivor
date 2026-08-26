@@ -13,6 +13,7 @@ import {
   buildResult,
   createWorld,
   hudSnapshot,
+  primePhysicsObject,
   rollUpgradeChoices,
   stepWorld,
   type World,
@@ -29,6 +30,7 @@ export interface RunScreenProps {
   challengeIds?: string[];
   startingWeaponLevel?: number;
   utilityRewardMultiplier?: number;
+  physicsObjectClicksEnabled?: boolean;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -41,6 +43,8 @@ interface StickState {
   dx: number;
   dy: number;
 }
+
+type PointerMode = 'none' | 'stick' | 'object';
 
 type ReelPhase = 'spinning' | 'landed';
 
@@ -69,6 +73,7 @@ export function RunScreen({
   challengeIds = [],
   startingWeaponLevel: startingWeaponLevelProp,
   utilityRewardMultiplier: utilityRewardMultiplierProp,
+  physicsObjectClicksEnabled = true,
   onAbort,
   onFinish,
 }: RunScreenProps) {
@@ -87,6 +92,7 @@ export function RunScreen({
     dx: 0,
     dy: 0,
   });
+  const pointerModeRef = useRef<PointerMode>('none');
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
@@ -118,6 +124,7 @@ export function RunScreen({
       undefined,
       challenges,
       initialWeaponLevel,
+      physicsObjectClicksEnabled,
     );
   }
 
@@ -172,8 +179,28 @@ export function RunScreen({
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'playing') return;
-    if (stickRef.current.active) return;
+    if (stickRef.current.active || pointerModeRef.current !== 'none') return;
     (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+
+    const canvas = canvasRef.current;
+    const world = worldRef.current;
+    if (physicsObjectClicksEnabled && canvas && world) {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const target = primePhysicsObject(
+        world,
+        (event.clientX - rect.left - width / 2) / zoom + world.camera.x,
+        (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y,
+      );
+      if (target) {
+        pointerModeRef.current = 'object';
+        return;
+      }
+    }
+
+    pointerModeRef.current = 'stick';
     const next: StickState = {
       active: true,
       pointerId: event.pointerId,
@@ -184,11 +211,11 @@ export function RunScreen({
     };
     stickRef.current = next;
     setStickVisual(next);
-  }, []);
+  }, [physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
-    if (!stick.active || stick.pointerId !== event.pointerId) return;
+    if (pointerModeRef.current !== 'stick' || !stick.active || stick.pointerId !== event.pointerId) return;
     let dx = event.clientX - stick.originX;
     let dy = event.clientY - stick.originY;
     const len = Math.hypot(dx, dy);
@@ -203,7 +230,12 @@ export function RunScreen({
 
   const endPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
+    if (pointerModeRef.current === 'object') {
+      pointerModeRef.current = 'none';
+      return;
+    }
     if (stick.pointerId !== event.pointerId) return;
+    pointerModeRef.current = 'none';
     const next: StickState = { active: false, pointerId: null, originX: 0, originY: 0, dx: 0, dy: 0 };
     stickRef.current = next;
     setStickVisual(next);

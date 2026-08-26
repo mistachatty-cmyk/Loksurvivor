@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees } from 'lucide-react';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor' | 'settings';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -28,6 +28,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   music: { label: 'Soundtrack', icon: Music, testId: 'button-open-music', description: 'Set the mood' },
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
+  settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
 };
 
 const HANGOUTS = [

@@ -422,6 +422,8 @@ export interface World {
   rngSeed: number;
   /** Present only when area.endless === true. */
   endless?: EndlessState;
+  /** Whether pointer clicks can prime movable props during this run. */
+  physicsObjectClicksEnabled: boolean;
   /** Optional difficulty contracts selected before the run. */
   challenges: ChallengeContractDef[];
 
@@ -497,6 +499,7 @@ export function createWorld(
   seed = Date.now() % 100000,
   challenges: ChallengeContractDef[] = [],
   startingWeaponLevel = 1,
+  physicsObjectClicksEnabled = true,
 ): World {
   const player: PlayerActor = {
     uid: 1,
@@ -578,6 +581,7 @@ export function createWorld(
     grid: new Map(),
     rngSeed: seed,
     endless: undefined,
+    physicsObjectClicksEnabled,
     challenges: [...challenges],
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
@@ -659,6 +663,11 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     broken: false,
     brokenAt: 0,
     contacts: 0,
+    lastPlayerImpactX: 0,
+    lastPlayerImpactY: 0,
+    clickPrimed: false,
+    clickPrimedAt: 0,
+    impactVelocityMultiplier: 1,
   };
 }
 
@@ -1997,6 +2006,20 @@ function activatePotholes(w: World, x: number, y: number, radius: number, trigge
   }
 }
 
+/** Prime the nearest movable prop for a single, boosted reverse launch. */
+export function primePhysicsObject(w: World, x: number, y: number): BreakableObstacle | null {
+  if (!w.physicsObjectClicksEnabled) return null;
+  const target = w.breakables
+    .filter((b) => !b.broken && b.movable)
+    .filter((b) => Math.abs(x - b.x) <= b.w / 2 + 12 && Math.abs(y - b.y) <= b.h / 2 + 12)
+    .sort((a, b) => (a.x - x) ** 2 + (a.y - y) ** 2 - ((b.x - x) ** 2 + (b.y - y) ** 2))[0];
+  if (!target) return null;
+  target.clickPrimed = true;
+  target.clickPrimedAt = w.now;
+  w.popups.push({ x: target.x, y: target.y - target.h / 2 - 14, text: 'NEXT HIT: REVERSE LAUNCH', color: '#7dd3fc', bornAt: w.now, vy: 20 });
+  return target;
+}
+
 function applyPropImpact(
   w: World,
   x: number,
@@ -2006,13 +2029,13 @@ function applyPropImpact(
   fromX = x,
   fromY = y,
   impactTrigger?: PotholeTrigger,
+  fromPlayer = true,
 ) {
   if (intensity <= 0) return;
   activatePotholes(w, x, y, radius, impactTrigger);
   for (const b of w.breakables) {
     if (b.broken || !b.movable || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     const requiredIntensity = b.propVariant === 'heavy-metal' ? 4 : b.propVariant === 'medium-movable' ? 2 : 1;
-    if (intensity < requiredIntensity) continue;
     let dx = b.x - fromX;
     let dy = b.y - fromY;
     let length = Math.hypot(dx, dy);
@@ -2026,10 +2049,23 @@ function applyPropImpact(
       dy = 0;
       length = 1;
     }
-    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0);
+    dx /= length;
+    dy /= length;
+    if (fromPlayer) {
+      b.lastPlayerImpactX = dx;
+      b.lastPlayerImpactY = dy;
+    }
+    if (intensity < requiredIntensity) continue;
+    const reverseLaunch = fromPlayer && b.clickPrimed;
+    const launchDirectionX = reverseLaunch ? -b.lastPlayerImpactX : dx;
+    const launchDirectionY = reverseLaunch ? -b.lastPlayerImpactY : dy;
+    const velocityMultiplier = reverseLaunch ? 4 : 1;
+    if (reverseLaunch) b.clickPrimed = false;
+    b.impactVelocityMultiplier = velocityMultiplier;
+    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier;
     const pushScale = b.propVariant === 'heavy-metal' ? 0.62 : 0.78;
-    b.vx += (dx / length) * launchSpeed * pushScale;
-    b.vy += (dy / length) * launchSpeed * pushScale;
+    b.vx += launchDirectionX * launchSpeed * pushScale;
+    b.vy += launchDirectionY * launchSpeed * pushScale;
     b.impactIntensity = intensity > b.impactIntensity ? intensity : b.impactIntensity;
     if (intensity >= 3) {
       spawnParticles(w, b.x, b.y, b.propVariant === 'heavy-metal' ? '#cbd5e1' : '#ffd166', 4, 65);
@@ -2054,8 +2090,9 @@ function damageBreakable(
   fromX = x,
   fromY = y,
   impactTrigger?: PotholeTrigger,
+  fromPlayer = true,
 ) {
-  applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY, impactTrigger);
+  applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY, impactTrigger, fromPlayer);
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
@@ -2191,7 +2228,7 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
       return true;
     }
     if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp' || b.kind === 'metal-box' || b.kind === 'bench') {
-      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger);
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
       spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
       return true;
     }
@@ -2215,18 +2252,31 @@ function resolveMovingPropCollisions(w: World, prop: BreakableObstacle) {
   }
 }
 
-function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle) {
+function pointToSegmentDistanceSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq < 0.0001) return (px - ax) ** 2 + (py - ay) ** 2;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / lengthSq, 0, 1);
+  const closestX = ax + dx * t;
+  const closestY = ay + dy * t;
+  return (px - closestX) ** 2 + (py - closestY) ** 2;
+}
+
+function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle, previousX: number, previousY: number) {
   const speed = Math.hypot(prop.vx, prop.vy);
   if (speed < 52 || prop.impactIntensity < 2 || w.now < prop.nextImpactDamageAt) return;
   prop.nextImpactDamageAt = w.now + 260;
   forEachNearby(w, prop.x, prop.y, Math.max(prop.w, prop.h) + 40, (enemy) => {
     if (enemy.dying) return;
-    if (Math.abs(enemy.x - prop.x) > prop.w / 2 + enemy.radius || Math.abs(enemy.y - prop.y) > prop.h / 2 + enemy.radius) return;
+    const hitRadius = Math.max(prop.w, prop.h) / 2 + enemy.radius;
+    if (pointToSegmentDistanceSq(enemy.x, enemy.y, previousX, previousY, prop.x, prop.y) > hitRadius * hitRadius) return;
+    const boosted = prop.impactVelocityMultiplier > 1;
     damageEnemy(
       w,
       enemy,
-      Math.max(1, Math.round(speed * prop.impactIntensity * 0.08)),
-      Math.min(4, prop.impactIntensity) as ImpactIntensity,
+      Math.max(1, Math.round(speed * prop.impactIntensity * (boosted ? 0.2 : 0.08))),
+      Math.min(5, boosted ? prop.impactIntensity + 1 : prop.impactIntensity) as ImpactIntensity,
       prop.x,
       prop.y,
     );
@@ -2252,9 +2302,11 @@ function updateBreakables(w: World, dt: number) {
       continue;
     }
     if (b.vx || b.vy) {
+      const previousX = b.x;
+      const previousY = b.y;
       b.x += b.vx * dt; b.y += b.vy * dt;
       resolveMovingPropCollisions(w, b);
-      damageEnemiesFromMovingProp(w, b);
+      damageEnemiesFromMovingProp(w, b, previousX, previousY);
       b.vx *= Math.pow(b.friction, dt * 60);
       b.vy *= Math.pow(b.friction, dt * 60);
     }
@@ -2653,7 +2705,7 @@ function updateProjectiles(w: World, dt: number) {
           } else {
             damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
           }
-            damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger);
+            damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
           if (proj.pierce > 0) proj.pierce -= 1;
           else remove = true;

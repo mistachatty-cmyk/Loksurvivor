@@ -99,7 +99,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'vendor', 'allies', 'music'],
+    features: ['runs', 'roster', 'vendor', 'allies', 'music', 'settings'],
   },
   {
     id: 'rooftop-perch',
@@ -110,7 +110,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/rooftops.jpeg',
     biome: 'rooftop',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
-    features: ['runs', 'recovery', 'bestiary', 'unlocks'],
+    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings'],
   },
   {
     id: 'the-cellar',
@@ -121,7 +121,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/cellar.jpeg',
     biome: 'cellar',
     unlock: { kind: 'discovery', discoveryId: 'lantern-shard' },
-    features: ['music', 'bestiary', 'allies', 'unlocks'],
+    features: ['music', 'bestiary', 'allies', 'unlocks', 'settings'],
   },
 ];
 

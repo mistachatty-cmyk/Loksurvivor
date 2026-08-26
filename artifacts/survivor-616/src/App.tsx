@@ -25,6 +25,7 @@ import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { VendorPanel } from '@/ui/VendorPanel';
+import { SettingsPanel } from '@/ui/SettingsPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 
@@ -40,6 +41,7 @@ type Screen =
   | { name: 'music' }
   | { name: 'recovery' }
   | { name: 'vendor' }
+  | { name: 'settings' }
   | { name: 'run'; areaId: string; challengeIds?: string[] }
   | { name: 'summary'; result: RunResult };
 
@@ -64,7 +66,8 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'archive' ||
       requested === 'music' ||
       requested === 'recovery' ||
-      requested === 'vendor'
+      requested === 'vendor' ||
+      requested === 'settings'
     ) {
       return { name: requested };
     }
@@ -101,6 +104,9 @@ function Game() {
         break;
       case 'vendor':
         setScreen({ name: 'vendor' });
+        break;
+      case 'settings':
+        setScreen({ name: 'settings' });
         break;
     }
   }, []);
@@ -156,6 +162,9 @@ function Game() {
     case 'vendor':
       return <VendorPanel onBack={goHub} />;
 
+    case 'settings':
+      return <SettingsPanel onBack={goHub} />;
+
     case 'run':
       return (
         <RunScreen
@@ -165,6 +174,7 @@ function Game() {
           challengeIds={screen.challengeIds}
           startingWeaponLevel={startingWeaponLevel(meta)}
           utilityRewardMultiplier={rewardCredMultiplier(meta)}
+          physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
           onAbort={goHub}
           onFinish={handleFinish}
         />

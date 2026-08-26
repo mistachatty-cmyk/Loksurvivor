@@ -750,6 +750,21 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
     }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+    if (live?.clickPrimed) {
+      ctx.save();
+      const pulse = 0.7 + Math.sin(w.now / 120) * 0.2;
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#7dd3fc';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('NEXT HIT REVERSES', obstacle.x, y - height - 10);
+      ctx.restore();
+    }
     if (live && !live.broken && live.hp <= live.maxHp * 0.5) {
       ctx.save();
       ctx.strokeStyle = live.kind === 'barrel' ? '#ffb347' : '#f5d7a1';

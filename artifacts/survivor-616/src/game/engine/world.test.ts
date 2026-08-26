@@ -11,6 +11,7 @@ import {
   createWorld,
   buildResult,
   hudSnapshot,
+  primePhysicsObject,
   spawnLokPet,
   resolveImpactTravel,
   type EnemyActor,
@@ -498,6 +499,63 @@ test('a heavy metal box absorbs a hit, moves under strong impact, and never brea
   assert.ok(box.x > xBefore);
 });
 
+test('clicking a movable prop primes one reverse launch and gives it a damaging path', () => {
+  const world = createWorld(
+    testArea({ x: 80, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    623,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const prop = world.breakables[0]!;
+
+  addShockEffect(world, prop.x);
+  stepWorld(world, 1 / 60, neutralInput);
+  const ordinarySpeed = Math.abs(prop.vx);
+  assert.ok(ordinarySpeed > 0);
+  prop.vx = 0;
+  prop.vy = 0;
+
+  const enemy = addEnemy(world, 'nightcrawler', 116, 0);
+  enemy.speed = 0;
+  const primed = primePhysicsObject(world, prop.x, prop.y);
+  assert.equal(primed, prop);
+  assert.equal(prop.clickPrimed, true);
+
+  addShockEffect(world, prop.x);
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(prop.clickPrimed, false);
+  assert.ok(prop.vx < 0, 'the boosted launch should reverse the previous rightward impact');
+  assert.ok(Math.abs(prop.vx) > ordinarySpeed * 3);
+
+  for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.ok(enemy.hp < enemy.maxHp, 'the moving prop should damage an enemy along its travel path');
+});
+
+test('physics object click priming respects the saved setting', () => {
+  const world = createWorld(
+    testArea({ x: 80, y: 0, w: 56, h: 42, kind: 'car' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    624,
+  );
+  world.physicsObjectClicksEnabled = false;
+  assert.equal(primePhysicsObject(world, 80, 0), null);
+  assert.equal(world.breakables[0]?.clickPrimed, false);
+});
+
+test('physics object click setting persists and safely defaults for older saves', () => {
+  const enabled = normalizeMeta({ version: 4 });
+  assert.equal(enabled.physicsObjectClicksEnabled, true);
+  const disabled = normalizeMeta({ version: 4, physicsObjectClicksEnabled: false });
+  assert.equal(disabled.physicsObjectClicksEnabled, false);
+  const updated = reducer(
+    { meta: enabled, lastRun: null },
+    { type: 'setPhysicsObjectClicks', enabled: false },
+  );
+  assert.equal(updated.meta.physicsObjectClicksEnabled, false);
+});
+
 test('a fixed bench blocks but ignores impact and damage', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 112, h: 28, kind: 'bench', propVariant: 'fixed-bench' }),
@@ -598,6 +656,7 @@ function addShockEffect(
   world: ReturnType<typeof createWorld>,
   x: number,
   impactTrigger?: 'stomp' | 'ground-shock',
+  durationMs = 16,
 ) {
   world.effects.push({
     uid: 12_000 + world.effects.length,
@@ -608,7 +667,7 @@ function addShockEffect(
     angle: 0,
     spread: Math.PI,
     bornAt: world.now,
-    expiresAt: Number.POSITIVE_INFINITY,
+    expiresAt: world.now + durationMs,
     color: '#fff',
     damage: 1,
     impactIntensity: 4,

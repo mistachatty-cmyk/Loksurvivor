@@ -95,6 +95,7 @@ export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
     devModeAllUnlocks: false,
+    physicsObjectClicksEnabled: true,
     selectedCharacterId: 'shade',
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
@@ -455,6 +456,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   return {
     version: META_VERSION,
     devModeAllUnlocks: Boolean(import.meta.env?.DEV) && parsed.devModeAllUnlocks === true,
+    physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -642,6 +644,7 @@ type Action =
   | { type: 'spendTokens'; amount: number }
   | { type: 'buyVendorItem'; id: string }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
+  | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
   | { type: 'tickRecovery'; now: number }
@@ -692,6 +695,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, devModeAllUnlocks: action.enabled },
+      };
+
+    case 'setPhysicsObjectClicks':
+      return {
+        ...state,
+        meta: { ...state.meta, physicsObjectClicksEnabled: action.enabled },
       };
 
     case 'tickRecovery':
@@ -841,6 +850,7 @@ export interface MetaContextValue {
   spendTokens: (amount: number) => void;
   buyVendorItem: (id: string) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
+  setPhysicsObjectClicks: (enabled: boolean) => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
   tickRecovery: () => void;
@@ -868,6 +878,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
+    [],
+  );
+  const setPhysicsObjectClicks = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setPhysicsObjectClicks', enabled }),
     [],
   );
   const startRecovery = useCallback((characterId: string, locationId?: string) => dispatch({ type: 'startRecovery', characterId, locationId }), []);
@@ -910,6 +924,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       spendTokens,
       buyVendorItem,
       setDevModeAllUnlocks,
+      setPhysicsObjectClicks,
       resetProgress,
       startRecovery,
       stopRecovery,
@@ -925,6 +940,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     spendTokens,
     buyVendorItem,
     setDevModeAllUnlocks,
+    setPhysicsObjectClicks,
     resetProgress,
     startRecovery,
     stopRecovery,
