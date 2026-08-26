@@ -774,6 +774,8 @@ export interface MetaState {
   version: number;
   /** Development-only switch for exposing every unlockable surface. */
   devModeAllUnlocks: boolean;
+  /** Enables tapping/clicking a movable prop to prime its next player impact. */
+  physicsObjectClicksEnabled: boolean;
   selectedCharacterId: string;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];

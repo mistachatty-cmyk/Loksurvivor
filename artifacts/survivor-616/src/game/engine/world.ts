@@ -265,6 +265,13 @@ export interface BreakableObstacle extends Aabb {
   broken: boolean;
   brokenAt: number;
   contacts: number;
+  /** The most recent direction this prop was hit from by the player. */
+  lastPlayerImpactX: number;
+  lastPlayerImpactY: number;
+  /** A click primes the next player hit for a boosted reverse launch. */
+  clickPrimed: boolean;
+  clickPrimedAt: number;
+  impactVelocityMultiplier: number;
   /** Falling light-pole state. */
   fallAngle?: number;
   hazardUntil?: number;
