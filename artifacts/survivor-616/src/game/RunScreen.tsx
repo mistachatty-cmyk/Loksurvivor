@@ -134,7 +134,7 @@ export function RunScreen({
       keysRef.current.add(key);
       if (key === ' ') ultRequestRef.current = true;
       if (key === 'escape' || key === 'p') {
-        if (phaseRef.current === 'playing') setPhaseBoth('paused');
+        if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
         else if (phaseRef.current === 'paused') setPhaseBoth('playing');
       }
     };
@@ -389,7 +389,7 @@ export function RunScreen({
   /** End the run successfully ("head home"). Only available in endless mode. */
   const headHome = useCallback(() => {
     const world = worldRef.current;
-    if (!world || world.outcome !== 'running') return;
+    if (!world || world.outcome !== 'running' || world.player.falling) return;
     world.outcome = 'cleared';
     setPhaseBoth('over');
   }, [setPhaseBoth]);
@@ -769,7 +769,11 @@ export function RunScreen({
       {phase === 'over' ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
           <h2 className="text-4xl font-black uppercase tracking-widest text-white drop-shadow" data-testid="text-outcome">
-            {worldRef.current?.outcome === 'cleared' ? 'Block cleared' : 'Down'}
+            {worldRef.current?.outcome === 'cleared'
+              ? 'Block cleared'
+              : worldRef.current?.deathCause === 'lethal-pothole'
+                ? 'FELL THROUGH'
+                : 'Down'}
           </h2>
         </div>
       ) : null}

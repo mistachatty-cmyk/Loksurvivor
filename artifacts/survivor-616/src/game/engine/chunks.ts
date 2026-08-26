@@ -241,6 +241,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       river: [300, 400, 110, 126],
       'metal-box': [52, 76, 52, 76],
       bench: [90, 130, 24, 34],
+      pothole: [58, 82, 46, 68],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);
@@ -273,6 +274,30 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
             ? 'medium-movable'
             : undefined;
     obstacles.push({ x, y, w, h, kind, propVariant });
+  }
+
+  // Potholes are rare, deterministic ground hazards. They are deliberately
+  // generated separately from solid props so they never become collision
+  // walls or projectile blockers.
+  if (!hasRiver && rng() > 0.78) {
+    const trigger = rng() > 0.5 ? 'stomp' : 'ground-shock';
+    const w = 64 + rng() * 18;
+    const h = 48 + rng() * 18;
+    let x = 0;
+    let y = 0;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      x = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - Math.max(w, h) / 2 - 28);
+      y = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - Math.max(w, h) / 2 - 28);
+      if (Math.abs(x) > 70 || Math.abs(y) > 70) break;
+    }
+    obstacles.push({
+      x,
+      y,
+      w,
+      h,
+      kind: 'pothole',
+      pothole: { trigger, warningMs: 760, openingMs: 520, lethalRadius: Math.min(w, h) * 0.42 },
+    });
   }
 
   // Dungeon entrance: appears on roughly 1-in-8 chunks, never on the

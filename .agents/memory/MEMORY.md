@@ -5,3 +5,4 @@
 - [City navigation grammar](city-navigation-grammar.md) — river rows use deterministic bridge columns, while landmark metadata drives shared canvas, minimap, and HUD cues.
 - [Browser regression tests](browser-regression-tests.md) — Playwright tests use an explicit Chromium executable override when the Nix shell lacks bundled browser libraries.
 - [Impact physics contract](impact-physics.md) — authored force stays separate from damage, and lethal bursts must reuse the single kill/reward path.
+- [Pothole impact contract](potholes.md) — pits activate only from explicit stomp/ground-shock tags and remain separate from solid collision props.

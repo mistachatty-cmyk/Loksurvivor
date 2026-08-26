@@ -655,6 +655,25 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
   };
 }
 
+function createPothole(w: World, obstacle: ObstacleDef): PotholeObstacle {
+  const config = obstacle.pothole;
+  return {
+    x: obstacle.x,
+    y: obstacle.y,
+    w: obstacle.w,
+    h: obstacle.h,
+    uid: uid(w),
+    state: 'dormant',
+    trigger: config?.trigger ?? 'stomp',
+    warningMs: config?.warningMs ?? 760,
+    openingMs: config?.openingMs ?? 520,
+    lethalRadius: config?.lethalRadius ?? Math.min(obstacle.w, obstacle.h) * 0.42,
+    openingStartedAt: 0,
+    openedAt: 0,
+    resolvedAt: 0,
+  };
+}
+
 function pushAlert(w: World, text: string) {
   w.alerts.push({ text, bornAt: w.now });
   if (w.alerts.length > 4) w.alerts.shift();
@@ -812,6 +831,8 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     dying: false,
     deathAt: 0,
     activeEffects: [],
+    falling: false,
+    fallStartedAt: 0,
   };
   w.enemies.push(enemy);
 
@@ -1254,6 +1275,7 @@ function statusSpeedMultiplier(enemy: EnemyActor): number {
 }
 
 function killEnemy(w: World, enemy: EnemyActor) {
+  if (enemy.dying) return;
   enemy.dying = true;
   // Effects do not linger on a defeated actor or leak into later snapshots.
   enemy.activeEffects = [];
@@ -1329,6 +1351,7 @@ function killEnemy(w: World, enemy: EnemyActor) {
 
 function damagePlayer(w: World, amount: number, fromX: number, fromY: number) {
   const p = w.player;
+  if (p.falling || w.outcome !== 'running') return;
   if (w.now < p.invulnUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
 
@@ -1352,6 +1375,7 @@ function damagePlayer(w: World, amount: number, fromX: number, fromY: number) {
   if (p.hp <= 0) {
     p.hp = 0;
     w.outcome = 'dead';
+    w.deathCause = 'ordinary-hazard';
     p.anim = 'death';
     p.animStartedAt = w.now;
   }
@@ -1436,6 +1460,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         color: palette.accent,
         damage,
         impactIntensity: weaponImpact(weapon),
+        impactTrigger: weapon.impactTrigger,
         hitUids: new Set(),
         followPlayer: true,
       });
@@ -1458,11 +1483,12 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         color: palette.accent,
         damage,
         impactIntensity: weaponImpact(weapon),
+        impactTrigger: weapon.impactTrigger,
         hitUids: new Set(),
         followPlayer: false,
       });
       novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
-      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y);
+      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
       p.anim = 'attack';
       p.animStartedAt = w.now;
       w.shake = Math.max(w.shake, 3);
@@ -1472,7 +1498,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
     case 'aura': {
       // The aura is permanent; each activation is a damage tick.
       novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon));
-      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y);
+      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
       break;
     }
 
@@ -1484,7 +1510,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         w.effects.push({
           uid: uid(w), kind: 'wave', x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
           angle, spread: 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
-          color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false,
+          color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
         });
       }
       p.anim = 'attack'; p.animStartedAt = w.now;
@@ -1497,7 +1523,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       w.effects.push({
         uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: 0.055,
         bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
-        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false,
+         damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
       });
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
@@ -1521,7 +1547,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         p.x = target.x - (dx / len) * (p.radius + target.radius + 8);
         p.y = target.y - (dy / len) * (p.radius + target.radius + 8);
         novaDamage(w, p.x, p.y, 42, damage, weaponImpact(weapon), weapon.statusEffectId);
-        damageBreakable(w, p.x, p.y, 42, damage, weaponImpact(weapon), p.x, p.y);
+        damageBreakable(w, p.x, p.y, 42, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
         w.effects.push({ uid: uid(w), kind: 'teleport', x: p.x, y: p.y, radius: 42, angle: 0, spread: 0,
           bornAt: w.now, expiresAt: w.now + 420, color: weapon.color ?? palette.accent, damage: 0, impactIntensity: 0,
           hitUids: new Set(), followPlayer: false });
@@ -1551,7 +1577,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
       w.effects.push({ uid: uid(w), kind: 'slash', x: p.x, y: p.y, radius: reach, angle, spread: 0.7,
         bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 420), color: weapon.color ?? palette.accent,
-        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false });
+        damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false });
       p.anim = 'attack'; p.animStartedAt = w.now; w.shake = Math.max(w.shake, 12);
       pushAlert(w, 'POW!');
       break;
@@ -1588,6 +1614,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           obstacleUids: new Set(),
           obstacleInteraction: weapon.obstacleInteraction ?? 'block',
           statusEffectId: weapon.statusEffectId,
+          impactTrigger: weapon.impactTrigger,
         });
       }
       p.anim = 'attack';
@@ -1608,7 +1635,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         fromPlayer: true, expiresAt: w.now + (weapon.lifetimeMs ?? 1200), targetUid: null,
         turnRate: 0, color: weapon.color ?? palette.accent, trail: [], pierce: 999,
         hitUids: new Set(),
-         obstacleUids: new Set(),
+        obstacleUids: new Set(),
+        impactTrigger: weapon.impactTrigger,
       });
       pushAlert(w, 'The Bus');
       w.shake = Math.max(w.shake, 5);
@@ -1948,6 +1976,20 @@ function collideObstacles(w: World, actor: Actor) {
   }
 }
 
+function activatePotholes(w: World, x: number, y: number, radius: number, trigger?: PotholeTrigger) {
+  if (!trigger) return;
+  for (const pothole of w.potholes) {
+    if (pothole.state !== 'dormant' || pothole.trigger !== trigger) continue;
+    if (Math.abs(x - pothole.x) > pothole.w / 2 + radius || Math.abs(y - pothole.y) > pothole.h / 2 + radius) continue;
+    pothole.state = 'opening';
+    pothole.openingStartedAt = w.now;
+    spawnParticles(w, pothole.x, pothole.y, '#f97316', 12, 100);
+    w.shake = Math.max(w.shake, 5);
+    pushAlert(w, 'GROUND BREAK — POTHOLE OPENING');
+    w.popups.push({ x: pothole.x, y: pothole.y - pothole.h / 2 - 12, text: 'MOVE', color: '#ffb347', bornAt: w.now, vy: 26 });
+  }
+}
+
 function applyPropImpact(
   w: World,
   x: number,
@@ -1956,8 +1998,10 @@ function applyPropImpact(
   intensity: ImpactIntensity,
   fromX = x,
   fromY = y,
+  impactTrigger?: PotholeTrigger,
 ) {
   if (intensity <= 0) return;
+  activatePotholes(w, x, y, radius, impactTrigger);
   for (const b of w.breakables) {
     if (b.broken || !b.movable || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     const requiredIntensity = b.propVariant === 'heavy-metal' ? 4 : b.propVariant === 'medium-movable' ? 2 : 1;
@@ -2002,8 +2046,9 @@ function damageBreakable(
   impactIntensity: ImpactIntensity = 0,
   fromX = x,
   fromY = y,
+  impactTrigger?: PotholeTrigger,
 ) {
-  applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY);
+  applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY, impactTrigger);
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
@@ -2048,6 +2093,67 @@ function damageBreakable(
   syncObstacleAabbs(w);
 }
 
+function potholeContains(pothole: PotholeObstacle, actor: Actor): boolean {
+  const dx = Math.max(Math.abs(actor.x - pothole.x) - pothole.w / 2, 0);
+  const dy = Math.max(Math.abs(actor.y - pothole.y) - pothole.h / 2, 0);
+  return dx * dx + dy * dy <= actor.radius * actor.radius + pothole.lethalRadius * pothole.lethalRadius * 0.35;
+}
+
+function startPotholeFall(w: World, actor: Actor, pothole: PotholeObstacle) {
+  if (actor.falling) return;
+  actor.falling = true;
+  actor.fallStartedAt = w.now;
+  actor.kx = 0;
+  actor.ky = 0;
+  actor.vx = 0;
+  actor.vy = 0;
+  actor.anim = 'death';
+  actor.animStartedAt = w.now;
+  spawnParticles(w, actor.x, actor.y + actor.radius, '#2a1720', 8, 70);
+  w.shake = Math.max(w.shake, actor === w.player ? 12 : 4);
+  if (actor === w.player) {
+    w.player.hp = 0;
+    w.player.invulnUntil = Number.POSITIVE_INFINITY;
+    w.player.lastDamageAt = w.now;
+    w.deathCause = 'lethal-pothole';
+    w.outcome = 'dead';
+    pushAlert(w, 'LETHAL POTHOLE — OPERATIVE LOST');
+    w.popups.push({ x: actor.x, y: actor.y - actor.radius - 16, text: 'FELL THROUGH', color: '#ff6b6b', bornAt: w.now, vy: 24 });
+  } else {
+    killEnemy(w, actor as EnemyActor);
+  }
+  pothole.resolvedAt = w.now;
+}
+
+function updatePotholes(w: World) {
+  for (const pothole of w.potholes) {
+    if (pothole.state === 'opening' && w.now - pothole.openingStartedAt >= pothole.openingMs) {
+      pothole.state = 'open';
+      pothole.openedAt = w.now;
+      spawnParticles(w, pothole.x, pothole.y, '#ef4444', 16, 120);
+      w.shake = Math.max(w.shake, 7);
+      pushAlert(w, 'POTHOLE OPEN — KEEP CLEAR');
+    }
+    if (pothole.state !== 'open') continue;
+
+    if (!w.player.falling && potholeContains(pothole, w.player)) {
+      startPotholeFall(w, w.player, pothole);
+    }
+    for (const enemy of w.enemies) {
+      if (!enemy.dying && !enemy.falling && potholeContains(pothole, enemy)) {
+        startPotholeFall(w, enemy, pothole);
+      }
+    }
+  }
+}
+
+function resolvePotholes(w: World) {
+  for (const pothole of w.potholes) {
+    pothole.state = 'resolved';
+    pothole.resolvedAt = w.now;
+  }
+}
+
 /** Resolve a projectile against the two combat-specific obstacle types. */
 function collideProjectileObstacle(w: World, proj: Projectile): boolean {
   for (const b of w.breakables) {
@@ -2078,7 +2184,7 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
       return true;
     }
     if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp' || b.kind === 'metal-box' || b.kind === 'bench') {
-      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02);
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger);
       spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
       return true;
     }
@@ -2540,7 +2646,7 @@ function updateProjectiles(w: World, dt: number) {
           } else {
             damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
           }
-      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02);
+            damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
           if (proj.pierce > 0) proj.pierce -= 1;
           else remove = true;
@@ -2581,7 +2687,7 @@ function updateEffects(w: World) {
         effect.hitUids.add(enemy.uid);
         damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y);
       });
-      damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y);
+        damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
     }
 
     if (active && effect.kind === 'hazard' && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
@@ -2874,6 +2980,7 @@ function updateEndlessChunks(w: World) {
       h: obs.h,
       kind: obs.kind,
       propVariant: obs.propVariant,
+        pothole: obs.pothole,
     }));
     e.chunkObstacles.set(key, worldObs);
     e.cityBlocks.push({
@@ -2923,15 +3030,20 @@ function updateEndlessChunks(w: World) {
   }
 
   if (changed) {
+    resolvePotholes(w);
     w.obstacles = [];
-     w.obstacles = [];
-     w.breakables = [];
-     for (const obsArr of e.chunkObstacles.values()) {
-       for (const o of obsArr) {
-         w.obstacles.push(o);
-        w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
-       }
-     }
+    w.breakables = [];
+    w.potholes = [];
+    for (const obsArr of e.chunkObstacles.values()) {
+      for (const o of obsArr) {
+        if (o.kind === 'pothole') {
+          w.potholes.push(createPothole(w, { ...o, kind: 'pothole' }));
+        } else {
+          w.obstacles.push(o);
+          w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
+        }
+      }
+    }
   }
 }
 
@@ -2956,22 +3068,28 @@ function updateEndlessLandmarkCue(w: World) {
 function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 'exit') {
   const e = w.endless!;
   const p = w.player;
+  resolvePotholes(w);
   e.dungeonRoom = room;
   const era = DUNGEON_ERAS[e.dungeonEraIndex]!;
   e.dungeonBounds = { ...era.bounds };
 
   // Place dungeon obstacles in world space, centred on the entry point.
-   w.obstacles = era.obstacles.map((obs) => ({
+   w.obstacles = era.obstacles.filter((obs) => obs.kind !== 'pothole').map((obs) => ({
     x: p.x + obs.x,
     y: p.y + obs.y,
     w: obs.w,
     h: obs.h,
   }));
-  w.breakables = era.obstacles.map((obs) => createBreakable(w, {
+   w.breakables = era.obstacles.filter((obs) => obs.kind !== 'pothole').map((obs) => createBreakable(w, {
     ...obs,
     x: p.x + obs.x,
     y: p.y + obs.y,
-  }));
+   }));
+   w.potholes = era.obstacles.filter((obs) => obs.kind === 'pothole').map((obs) => createPothole(w, {
+     ...obs,
+     x: p.x + obs.x,
+     y: p.y + obs.y,
+   }));
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -3014,6 +3132,7 @@ function enterDungeon(w: World) {
 
 function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]) {
   const e = w.endless!;
+  resolvePotholes(w);
   e.buildingReturnX = door.returnX;
   e.buildingReturnY = door.returnY;
   e.dungeonCenterX = door.x;
@@ -3028,6 +3147,7 @@ function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]
     { x: door.x, y: door.y - 145, w: 260, h: 28 },
   ];
   w.breakables = w.obstacles.map((obs) => createBreakable(w, { ...obs, kind: 'building' }));
+  w.potholes = [];
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
   w.projectiles = [];
@@ -3078,12 +3198,17 @@ function exitDungeon(w: World) {
 
 function restoreStreetObstacles(w: World) {
   const e = w.endless!;
+  resolvePotholes(w);
   w.obstacles = [];
   w.breakables = [];
+  w.potholes = [];
   for (const obsArr of e.chunkObstacles.values()) {
     for (const o of obsArr) {
-      w.obstacles.push(o);
-      w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
+      if (o.kind === 'pothole') w.potholes.push(createPothole(w, { ...o, kind: 'pothole' }));
+      else {
+        w.obstacles.push(o);
+        w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
+      }
     }
   }
 }
@@ -3230,6 +3355,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   updateProjectiles(w, dt);
   updateEffects(w);
+  updatePotholes(w);
   updatePickups(w, dt);
   updateObjectives(w);
   updateParticles(w, dt);

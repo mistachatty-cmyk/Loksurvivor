@@ -100,6 +100,18 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
           </div>
         )}
 
+        {result.deathCause === 'lethal-pothole' && (
+          <div className="border border-red-500/50 bg-red-950/30 p-5" data-testid="section-pothole-death">
+            <div className="flex items-center gap-2 text-red-300">
+              <TrendingDown className="h-4 w-4" />
+              <span className="text-xs font-bold uppercase tracking-widest">Cause of loss — lethal pothole</span>
+            </div>
+            <p className="mt-2 text-sm text-red-100/80">
+              The ground opened beneath the operative. Potholes only become lethal after a visible opening telegraph.
+            </p>
+          </div>
+        )}
+
         {result.challenges && result.challenges.length > 0 && (
           <div className="border border-red-500/30 bg-red-500/5 p-4" data-testid="section-challenge-rewards">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

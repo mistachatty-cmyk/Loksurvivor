@@ -12,6 +12,7 @@ import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type { ObstacleDef } from '@/game/types';
 
 import { drawRig, drawShadow } from './sprite';
+import { clamp } from '@/game/engine/math';
 
 /** World units of sprite height per rig pixel. */
 const SPRITE_SCALE = 2.05;
@@ -612,7 +613,55 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   river: { top: '#123b58', side: '#0a2030', trim: '#4de1ff' },
   'metal-box': { top: '#536273', side: '#2d3745', trim: '#cbd5e1' },
   bench: { top: '#70543a', side: '#3b2c20', trim: '#c58b5d' },
+  pothole: { top: '#17131a', side: '#0a080d', trim: '#ef4444' },
 };
+
+function drawPotholes(ctx: CanvasRenderingContext2D, w: World) {
+  for (const pothole of w.potholes) {
+    const progress = pothole.state === 'opening'
+      ? clamp((w.now - pothole.openingStartedAt) / pothole.openingMs, 0, 1)
+      : pothole.state === 'open' || pothole.state === 'resolved' ? 1 : 0;
+    const pulse = 0.72 + Math.sin(w.now / 90) * 0.2;
+    const x = pothole.x;
+    const y = pothole.y;
+    ctx.save();
+    ctx.globalAlpha = pothole.state === 'dormant' ? 0.5 : 0.88;
+    ctx.fillStyle = pothole.state === 'open' ? '#050308' : '#17131a';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 6, pothole.w * (0.42 + progress * 0.08), pothole.h * (0.28 + progress * 0.08), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = pothole.state === 'dormant' ? '#5b4050' : '#ef4444';
+    ctx.lineWidth = pothole.state === 'opening' ? 3 : 2;
+    if (pothole.state === 'opening') {
+      ctx.globalAlpha = 0.6 + progress * 0.35;
+      ctx.setLineDash([8, 6]);
+      ctx.lineDashOffset = -w.now / 18;
+    }
+    ctx.beginPath();
+    ctx.ellipse(x, y + 5, pothole.w * (0.46 + progress * 0.1), pothole.h * (0.31 + progress * 0.09), 0, 0, Math.PI * 2);
+    ctx.stroke();
+    if (pothole.state === 'open') {
+      ctx.globalAlpha = pulse * 0.42;
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(x, y + 5, pothole.w * 0.58, pothole.h * 0.44, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#ff6b6b';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('KEEP CLEAR', x, y - pothole.h * 0.42);
+    } else if (pothole.state === 'opening') {
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#ffb347';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('MOVE', x, y - pothole.h * 0.42);
+    }
+    ctx.restore();
+  }
+}
 
 function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
   const height = 16;
@@ -1244,7 +1293,8 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     playerDrawn.done = true;
     const p = w.player;
     const scale = SPRITE_SCALE;
-    drawShadow(ctx, p.x, p.y + 2, p.radius);
+    const fallProgress = p.falling ? clamp((w.now - p.fallStartedAt) / 700, 0, 1) : 0;
+    drawShadow(ctx, p.x, p.y + 2, p.radius * (1 - fallProgress * 0.65));
 
     // A faint accent ring keeps the player findable in a crowd.
     ctx.save();
@@ -1273,14 +1323,14 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       p.anim,
       w.now - p.animStartedAt,
       p.x,
-      p.y + 2,
+      p.y + 2 + fallProgress * 12,
       p.facing,
-      scale,
+      scale * (1 - fallProgress * 0.72),
       {
         flash: w.now < p.hitFlashUntil,
         outline: true,
         alpha: blink ? 0.45 : 1,
-        dissolve: w.outcome === 'dead' ? Math.min(0.85, (w.now - p.animStartedAt) / 900) : 0,
+        dissolve: w.outcome === 'dead' && !p.falling ? Math.min(0.85, (w.now - p.animStartedAt) / 900) : fallProgress * 0.25,
         tint:
           w.now < w.ultActiveUntil
             ? { color: w.character.palette.glow, alpha: 0.28 }
@@ -1313,7 +1363,8 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       }
       ctx.restore();
     }
-    const dissolve = enemy.dying ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : 0;
+    const fallProgress = enemy.falling ? clamp((w.now - enemy.fallStartedAt) / 620, 0, 1) : 0;
+    const dissolve = enemy.dying && !enemy.falling ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : fallProgress * 0.28;
     const ghosting = enemy.ghostUntil > w.now && !enemy.dying;
     const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
     if (converted) {
@@ -1354,7 +1405,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       ctx.stroke();
       ctx.restore();
     }
-    drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - dissolve * 0.6));
+    drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - Math.max(dissolve, fallProgress) * 0.6));
     const shadowed = w.breakables.some((b) => !b.broken &&
       enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
@@ -1367,9 +1418,9 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.anim,
       w.now - enemy.animStartedAt,
       enemy.x,
-      enemy.y + 2,
+      enemy.y + 2 + fallProgress * 10,
       enemy.facing,
-      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius),
+      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72),
       {
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss',
@@ -1471,6 +1522,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawDungeonEntrances(ctx, w);
   drawDungeonExit(ctx, w);
   drawDungeonChest(ctx, w);
+  drawPotholes(ctx, w);
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);

@@ -73,6 +73,8 @@ function addEnemy(
     anim: 'idle',
     animStartedAt: 0,
     hitFlashUntil: 0,
+    falling: false,
+    fallStartedAt: 0,
     speed: def.speed,
     damage: def.damage,
     xp: def.xp,
@@ -590,6 +592,103 @@ test('a destroyed street lamp becomes a temporary electricity hazard', () => {
 
   for (let i = 0; i < 180; i += 1) stepWorld(world, 1 / 30, neutralInput);
   assert.ok((pole.hazardUntil ?? 0) <= world.now);
+});
+
+function addShockEffect(
+  world: ReturnType<typeof createWorld>,
+  x: number,
+  impactTrigger?: 'stomp' | 'ground-shock',
+) {
+  world.effects.push({
+    uid: 12_000 + world.effects.length,
+    kind: 'slash',
+    x,
+    y: 0,
+    radius: 48,
+    angle: 0,
+    spread: Math.PI,
+    bornAt: world.now,
+    expiresAt: Number.POSITIVE_INFINITY,
+    color: '#fff',
+    damage: 1,
+    impactIntensity: 4,
+    impactTrigger,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+}
+
+test('dormant potholes stay harmless and only tagged ground attacks open them', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 72, h: 54, kind: 'pothole', pothole: { trigger: 'ground-shock' } }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    620,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.potholes[0]?.state, 'dormant');
+  assert.equal(world.outcome, 'running');
+  assert.equal(world.player.hp, world.player.maxHp);
+
+  addShockEffect(world, 0);
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.potholes[0]?.state, 'dormant');
+
+  addShockEffect(world, 0, 'ground-shock');
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.potholes[0]?.state, 'opening');
+  assert.equal(world.outcome, 'running');
+});
+
+test('open potholes telegraph, then resolve a player fall exactly once', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 72, h: 54, kind: 'pothole', pothole: { trigger: 'stomp', openingMs: 120 } }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    621,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  addShockEffect(world, 0, 'stomp');
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.potholes[0]?.state, 'opening');
+
+  for (let i = 0; i < 12; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.potholes[0]?.state, 'open');
+  assert.equal(world.outcome, 'dead');
+  assert.equal(world.deathCause, 'lethal-pothole');
+  assert.equal(world.player.falling, true);
+  const fallStartedAt = world.player.fallStartedAt;
+  const result = buildResult(world);
+  stepWorld(world, 1, neutralInput);
+  assert.equal(world.player.fallStartedAt, fallStartedAt);
+  assert.equal(buildResult(world).deathCause, result.deathCause);
+});
+
+test('enemies fall through an open pothole and use the single reward path', () => {
+  const world = createWorld(
+    testArea({ x: 100, y: 0, w: 72, h: 54, kind: 'pothole', pothole: { trigger: 'ground-shock', openingMs: 80 } }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    622,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'nightcrawler', 100, 0);
+  enemy.speed = 0;
+  addShockEffect(world, 100, 'ground-shock');
+  stepWorld(world, 1 / 60, neutralInput);
+  for (let i = 0; i < 8; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.potholes[0]?.state, 'open');
+  assert.equal(enemy.falling, true);
+  assert.equal(enemy.dying, true);
+  assert.equal(world.kills, 1);
+  assert.equal(world.killsByEnemy[enemy.defId], 1);
+  assert.equal(world.pickups.filter((pickup) => pickup.kind === 'xp').length, 1);
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.kills, 1);
+  assert.equal(world.killsByEnemy[enemy.defId], 1);
 });
 
 test('followers spawn, grow, attack, and expire without exceeding the cap', () => {
