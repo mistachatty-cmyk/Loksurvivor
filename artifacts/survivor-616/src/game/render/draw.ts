@@ -82,6 +82,58 @@ function drawGround(ctx: CanvasRenderingContext2D, w: World, left: number, top: 
   ctx.globalAlpha = 1;
 }
 
+/** Small, deterministic bits of city dressing that sit between the combat props. */
+function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const endless = Boolean(w.area.endless);
+  const dungeon = Boolean(w.endless?.inDungeon);
+  const accent = groundAccent(w);
+  const step = 192;
+  const startX = Math.floor(left / step) * step;
+  const startY = Math.floor(top / step) * step;
+
+  ctx.save();
+  ctx.lineWidth = 2;
+  for (let x = startX; x < right; x += step) {
+    for (let y = startY; y < bottom; y += step) {
+      const n = hashCell(x / step, y / step);
+      // Broken curb segments and painted lane fragments stop the grid reading
+      // as a collection of square arenas while remaining purely cosmetic.
+      if (n > 0.42) {
+        ctx.globalAlpha = dungeon ? 0.12 : 0.2;
+        ctx.strokeStyle = dungeon ? w.area.ground.glow : w.area.ground.seam;
+        ctx.setLineDash(n > 0.72 ? [18, 12] : [5, 15]);
+        ctx.beginPath();
+        ctx.moveTo(x + 18, y + 34 + n * 18);
+        ctx.lineTo(x + 142, y + 34 + n * 18);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (!dungeon && n > 0.78) {
+        ctx.globalAlpha = 0.16;
+        ctx.strokeStyle = accent;
+        ctx.beginPath();
+        ctx.moveTo(x + 20, y + 150);
+        ctx.lineTo(x + 76, y + 132);
+        ctx.lineTo(x + 134, y + 150);
+        ctx.stroke();
+      }
+      if (endless && n < 0.16) {
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = '#101018';
+        ctx.beginPath();
+        ctx.ellipse(x + 96, y + 96, 38 + n * 30, 11 + n * 8, n * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function groundAccent(w: World): string {
+  if (w.endless?.inDungeon) return effectiveGround(w).glow;
+  return w.area.ground.glow;
+}
+
 /** A streetlight pool that keeps the middle of the fight readable. */
 function drawLightPool(ctx: CanvasRenderingContext2D, w: World) {
   const radius = 340;
@@ -99,19 +151,28 @@ function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
   const x = 0;
   const y = -150;
   ctx.save();
-  ctx.globalAlpha = 0.85;
+  ctx.globalAlpha = 0.88;
   ctx.strokeStyle = landmark.accent;
   ctx.fillStyle = `${landmark.accent}22`;
   ctx.shadowColor = landmark.accent;
   ctx.shadowBlur = 16;
 
   if (landmark.kind === 'market') {
-    ctx.fillRect(x - 130, y - 26, 260, 58);
-    ctx.strokeRect(x - 130, y - 26, 260, 58);
+    // Long hall, repeated awnings, and a high bell tower.
+    ctx.fillRect(x - 142, y - 26, 284, 58);
+    ctx.strokeRect(x - 142, y - 26, 284, 58);
+    ctx.fillRect(x - 22, y - 76, 44, 50);
+    ctx.strokeRect(x - 22, y - 76, 44, 50);
     ctx.fillStyle = landmark.accent;
-    for (let i = -2; i <= 2; i += 1) {
+    for (let i = -3; i <= 3; i += 1) {
       ctx.globalAlpha = i % 2 === 0 ? 0.85 : 0.32;
-      ctx.fillRect(x + i * 44 - 20, y - 42, 40, 18);
+      ctx.beginPath();
+      ctx.moveTo(x + i * 40 - 20, y - 42);
+      ctx.lineTo(x + i * 40 + 20, y - 42);
+      ctx.lineTo(x + i * 40 + 12, y - 20);
+      ctx.lineTo(x + i * 40 - 12, y - 20);
+      ctx.closePath();
+      ctx.fill();
     }
     ctx.globalAlpha = 0.85;
     ctx.beginPath();
@@ -129,9 +190,20 @@ function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
       }
     }
     ctx.globalAlpha = 0.85;
-    ctx.fillRect(x - 8, y - 58, 16, 116);
-    ctx.strokeRect(x - 28, y - 76, 56, 18);
+    // Signal tower with a stepped cap, deliberately taller than nearby props.
+    ctx.fillRect(x - 9, y - 78, 18, 136);
+    ctx.strokeRect(x - 30, y - 94, 60, 18);
+    ctx.fillRect(x - 42, y - 76, 84, 5);
+    ctx.fillRect(x - 34, y - 58, 5, 116);
+    ctx.fillRect(x + 29, y - 58, 5, 116);
+    ctx.fillStyle = '#fff1d0';
+    ctx.fillRect(x - 4, y - 72, 8, 8);
   } else if (landmark.kind === 'plaza') {
+    // Four approach paths make the rotunda readable even at mobile zoom.
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(x - 155, y - 8, 310, 16);
+    ctx.fillRect(x - 8, y - 155, 16, 310);
+    ctx.globalAlpha = 0.88;
     ctx.beginPath();
     ctx.arc(x, y, 58, 0, Math.PI * 2);
     ctx.fill();
@@ -142,8 +214,13 @@ function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillRect(x - 4, y - 80, 8, 28);
     ctx.fillRect(x - 4, y + 52, 8, 28);
   } else {
+    // Floodgate: twin buttresses and a central gate face.
     ctx.fillRect(x - 170, y - 38, 340, 76);
     ctx.strokeRect(x - 170, y - 38, 340, 76);
+    ctx.fillRect(x - 190, y - 64, 26, 102);
+    ctx.fillRect(x + 164, y - 64, 26, 102);
+    ctx.strokeRect(x - 190, y - 64, 26, 102);
+    ctx.strokeRect(x + 164, y - 64, 26, 102);
     ctx.globalAlpha = 0.5;
     ctx.beginPath();
     ctx.moveTo(x - 130, y + 26);
@@ -152,6 +229,9 @@ function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
     ctx.lineTo(x + 90, y - 24);
     ctx.lineTo(x + 150, y + 26);
     ctx.stroke();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = landmark.accent;
+    ctx.fillRect(x - 5, y - 30, 10, 60);
   }
 
   ctx.shadowBlur = 0;
@@ -393,6 +473,25 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
         ctx.ellipse(leafX, leafY, obstacle.w * 0.28, obstacle.h * 0.13, i % 2 ? 0.45 : -0.45, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.restore();
+    } else if (obstacle.kind === 'barrier') {
+      // Add a curb and repeating reflectors so long cover reads as a street
+      // object instead of another arena wall.
+      ctx.save();
+      ctx.fillStyle = colors.trim;
+      ctx.globalAlpha = 0.75;
+      for (let marker = x + 12; marker < x + obstacle.w - 6; marker += 24) {
+        ctx.fillRect(marker, y - height + obstacle.h * 0.35, 8, 3);
+      }
+      ctx.restore();
+    } else if (obstacle.kind === 'car' || obstacle.kind === 'car-wreck') {
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#d8b4fe';
+      ctx.fillRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.22, obstacle.w * 0.64, 5);
+      ctx.fillStyle = '#11121a';
+      ctx.fillRect(x + obstacle.w * 0.16, y - height + obstacle.h * 0.7, 12, 5);
+      ctx.fillRect(x + obstacle.w * 0.72, y - height + obstacle.h * 0.7, 12, 5);
       ctx.restore();
     }
 
@@ -989,6 +1088,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
   }
+  drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   drawLightPool(ctx, w);
   drawLandmark(ctx, w);
   drawObjectLighting(ctx, w);

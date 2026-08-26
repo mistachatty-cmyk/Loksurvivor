@@ -60,6 +60,27 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
 
   const obstacles: ObstacleDef[] = [];
 
+  // Each block gets a different street spine. These are still ordinary
+  // obstacles for collision, but the profiles make streamed blocks read as
+  // streets, yards, and civic spaces instead of identical square rooms.
+  const spine = Math.floor(rng() * 3);
+  if (variant === 'rail' || spine === 2) {
+    for (const y of [-116, 116]) {
+      obstacles.push({
+        x: 0,
+        y,
+        w: variant === 'rail' ? 250 : 170,
+        h: 14,
+        kind: 'barrier',
+      });
+    }
+  } else if (variant === 'market' || variant === 'plaza') {
+    obstacles.push({ x: -142, y: -6, w: 18, h: 220, kind: 'barrier' });
+    obstacles.push({ x: 142, y: 6, w: 18, h: 220, kind: 'barrier' });
+  } else if (variant === 'alley') {
+    obstacles.push({ x: -188, y: 0, w: 18, h: 250, kind: 'barrier' });
+  }
+
   // Sidewalk barriers along top/bottom edges (y = ±CHUNK_SIZE/2 ± padding).
   // Only add them on some chunks to avoid a feeling of rigid lanes.
   if (rng() > 0.35) {
@@ -83,13 +104,13 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
 
   // Interior props – number and kind depend on variant.
   const propCounts: Record<ChunkVariant, [number, number]> = {
-    strip: [2, 4],
-    alley: [3, 5],
-    parking: [4, 7],
-    lot: [1, 3],
-    market: [4, 7],
-    rail: [3, 6],
-    plaza: [2, 5],
+    strip: [3, 6],
+    alley: [4, 7],
+    parking: [5, 8],
+    lot: [2, 5],
+    market: [5, 8],
+    rail: [4, 7],
+    plaza: [3, 6],
   };
   const [minProps, maxProps] = propCounts[variant];
   const propCount = minProps + Math.floor(rng() * (maxProps - minProps + 1));
@@ -150,9 +171,21 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     const h = minH + rng() * (maxH - minH);
     const margin = Math.max(w, h) / 2 + 24;
 
-    // Scatter within chunk, keeping clear of the very centre.
-    const x = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - margin);
-    const y = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - margin);
+    // Scatter within chunk, keeping clear of the very centre and the
+    // deterministic street spine. The rejection is bounded so generation
+    // remains cheap and exactly reproducible.
+    let attempts = 0;
+    let x = 0;
+    let y = 0;
+    do {
+      x = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - margin);
+      y = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - margin);
+      attempts += 1;
+    } while (attempts < 8 && (
+      (spine === 0 && Math.abs(y) < 48) ||
+      (spine === 1 && Math.abs(x) < 48) ||
+      (variant === 'rail' && Math.abs(y) > 78 && Math.abs(y) < 154)
+    ));
 
     obstacles.push({ x, y, w, h, kind });
   }
