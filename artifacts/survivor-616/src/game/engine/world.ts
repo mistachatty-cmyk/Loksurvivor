@@ -192,6 +192,25 @@ export interface Particle {
   lifeMs: number;
 }
 
+export interface Follower {
+  uid: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  baseRadius: number;
+  damage: number;
+  bornAt: number;
+  expiresAt: number;
+  growAfterMs: number;
+  maxRadius: number;
+  orbitAngle: number;
+  orbitRadius: number;
+  color: string;
+  weaponId: string;
+}
+
 export interface RescueState {
   status: 'pending' | 'available' | 'freeing' | 'freed';
   x: number;
@@ -258,6 +277,7 @@ export interface World {
   pickups: Pickup[];
   popups: Popup[];
   particles: Particle[];
+  followers: Follower[];
 
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
@@ -407,6 +427,7 @@ export function createWorld(
     pickups: [],
     popups: [],
     particles: [],
+    followers: [],
     obstacles: area.obstacles.map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
     bounds: area.bounds,

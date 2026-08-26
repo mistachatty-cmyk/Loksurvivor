@@ -139,6 +139,7 @@ export type WeaponKind =
   | 'teleport'
   | 'convert'
   | 'punch';
+  | 'follower';
 
 export interface WeaponDef {
   id: string;
@@ -167,6 +168,8 @@ export interface WeaponDef {
   statusEffectId?: string;
   /** Optional staged field or conversion lifetime. */
   durationMs?: number;
+  /** Follower behavior metadata for swarm-style signature weapons. */
+  follower?: { speed: number; radius: number; count: number; growAfterMs?: number; maxRadius?: number; lifetimeMs?: number };
 }
 
 /** Designer-facing metadata for a combat status effect. */
@@ -289,7 +292,11 @@ export type EnemyBehavior =
   | 'shockwave'
   | 'prowler'
   | 'lookout'
-  | 'current';
+  | 'current'
+  | 'teleporter'
+  | 'ghost'
+  | 'shifter'
+  | 'orbit';
 
 export interface EnemyDef {
   id: string;
@@ -311,6 +318,9 @@ export interface EnemyDef {
   lore: string;
   /** Spitter-only tuning. */
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
+  faction?: string;
+  role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor';
+  traits?: { teleportMs?: number; ghostMs?: number; shiftMs?: number; shiftScale?: number; burstSpeed?: number };
 }
 
 /* ------------------------------------------------------------------ */
@@ -331,6 +341,8 @@ export interface WaveDef {
   group?: string[];
   /** Multiplier applied to enemy hp for this wave. */
   hpMult?: number;
+  formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait';
+  faction?: string;
 }
 
 export interface ObstacleDef {
