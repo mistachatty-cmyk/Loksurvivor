@@ -1311,6 +1311,25 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     const fallProgress = p.falling ? clamp((w.now - p.fallStartedAt) / 700, 0, 1) : 0;
     drawShadow(ctx, p.x, p.y + 2, p.radius * (1 - fallProgress * 0.65));
 
+    if (p.dashUntil > w.now) {
+      const dashProgress = clamp((w.now - p.dashStartedAt) / 180, 0, 1);
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (let i = 4; i >= 1; i -= 1) {
+        ctx.globalAlpha = (1 - i / 5) * (1 - dashProgress * 0.35);
+        ctx.strokeStyle = w.character.palette.accentBright;
+        ctx.lineWidth = 3 + (5 - i);
+        ctx.beginPath();
+        ctx.moveTo(
+          p.x - p.dashDirectionX * (i * 13 + 12),
+          p.y - p.dashDirectionY * (i * 13 + 12),
+        );
+        ctx.lineTo(p.x - p.dashDirectionX * (i * 13), p.y - p.dashDirectionY * (i * 13));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // A faint accent ring keeps the player findable in a crowd.
     ctx.save();
     const ring = ctx.createRadialGradient(p.x, p.y + 2, 2, p.x, p.y + 2, p.radius + 15);

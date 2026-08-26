@@ -85,6 +85,12 @@ export interface Actor {
 export interface PlayerActor extends Actor {
   invulnUntil: number;
   lastDamageAt: number;
+  dashDirectionX: number;
+  dashDirectionY: number;
+  dashUntil: number;
+  dashReadyAt: number;
+  dashStartedAt: number;
+  dashHitUids: Set<number>;
 }
 
 export interface EnemyActor extends Actor {
@@ -520,6 +526,12 @@ export function createWorld(
     fallStartedAt: 0,
     invulnUntil: 0,
     lastDamageAt: -9999,
+    dashDirectionX: 0,
+    dashDirectionY: 0,
+    dashUntil: 0,
+    dashReadyAt: 0,
+    dashStartedAt: 0,
+    dashHitUids: new Set(),
   };
 
   const rng = createRng(seed);
@@ -2325,6 +2337,26 @@ function applyKnockback(actor: Actor, dt: number) {
   if (Math.abs(actor.ky) < 1) actor.ky = 0;
 }
 
+function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
+  const p = w.player;
+  for (const enemy of w.enemies) {
+    if (enemy.dying || p.dashHitUids.has(enemy.uid)) continue;
+    const hitRadius = p.radius + enemy.radius + 8;
+    if (pointToSegmentDistanceSq(enemy.x, enemy.y, previousX, previousY, p.x, p.y) > hitRadius * hitRadius) continue;
+    p.dashHitUids.add(enemy.uid);
+    const resistance = enemyImpactResistance(enemy);
+    const impulse = resolveImpactTravel(5, enemy.mass, resistance) * DASH_KNOCKBACK_MULTIPLIER;
+    enemy.kx += p.dashDirectionX * impulse;
+    enemy.ky += p.dashDirectionY * impulse;
+    enemy.hitFlashUntil = Math.max(enemy.hitFlashUntil, w.now + 140);
+    if (enemy.anim !== 'death') {
+      enemy.anim = 'hurt';
+      enemy.animStartedAt = w.now;
+    }
+    spawnParticles(w, enemy.x, enemy.y, '#fef08a', 5, 80);
+  }
+}
+
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
   const speed = w.stats.speed * speedMult(w);
@@ -2332,16 +2364,29 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
 
-  p.vx = nx * speed;
-  p.vy = ny * speed;
+  const dashing = p.dashUntil > w.now;
+  if (dashing) {
+    p.vx = p.dashDirectionX * DASH_SPEED;
+    p.vy = p.dashDirectionY * DASH_SPEED;
+  } else {
+    p.vx = nx * speed;
+    p.vy = ny * speed;
+  }
+  const previousX = p.x;
+  const previousY = p.y;
   p.x += p.vx * dt;
   p.y += p.vy * dt;
-  applyKnockback(p, dt);
+  if (!dashing) applyKnockback(p, dt);
 
-  if (Math.abs(nx) > 0.05) p.facing = nx > 0 ? 1 : -1;
+  if (dashing) {
+    p.facing = p.dashDirectionX < -0.05 ? -1 : p.dashDirectionX > 0.05 ? 1 : p.facing;
+  } else if (Math.abs(nx) > 0.05) {
+    p.facing = nx > 0 ? 1 : -1;
+  }
 
   collideObstacles(w, p);
   clampToArena(w, p);
+  if (dashing) knockEnemiesAlongDash(w, previousX, previousY);
   for (const b of w.breakables) {
     if (b.broken || !b.movable) continue;
     if (Math.abs(p.x - b.x) < b.w / 2 + p.radius && Math.abs(p.y - b.y) < b.h / 2 + p.radius) {
@@ -2365,6 +2410,45 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
     p.anim = nextAnim;
     p.animStartedAt = w.now;
   }
+}
+
+const DASH_SPEED = 760;
+const DASH_DURATION_MS = 180;
+const DASH_COOLDOWN_MS = 820;
+const DASH_KNOCKBACK_MULTIPLIER = 1.8;
+
+export function dashPlayer(w: World, directionX: number, directionY: number): boolean {
+  if (
+    w.outcome !== 'running' ||
+    w.player.falling ||
+    w.endless?.pendingTransition ||
+    w.now < w.player.dashReadyAt ||
+    w.player.dashUntil > w.now
+  ) {
+    return false;
+  }
+  const length = Math.hypot(directionX, directionY);
+  if (length < 0.15) return false;
+
+  w.player.dashDirectionX = directionX / length;
+  w.player.dashDirectionY = directionY / length;
+  w.player.dashUntil = w.now + DASH_DURATION_MS;
+  w.player.dashReadyAt = w.now + DASH_COOLDOWN_MS;
+  w.player.dashStartedAt = w.now;
+  w.player.dashHitUids.clear();
+  w.player.vx = w.player.dashDirectionX * DASH_SPEED;
+  w.player.vy = w.player.dashDirectionY * DASH_SPEED;
+  w.shake = Math.max(w.shake, 9);
+  spawnParticles(w, w.player.x, w.player.y, w.character.palette.accentBright, 12, 150);
+  w.popups.push({
+    x: w.player.x,
+    y: w.player.y - 28,
+    text: 'DASH!',
+    color: w.character.palette.accentBright,
+    bornAt: w.now,
+    vy: 34,
+  });
+  return true;
 }
 
 function updateEnemies(w: World, dt: number) {

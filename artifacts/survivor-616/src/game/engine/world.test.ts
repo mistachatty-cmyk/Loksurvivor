@@ -9,6 +9,7 @@ import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/ven
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import {
   createWorld,
+  dashPlayer,
   buildResult,
   hudSnapshot,
   primePhysicsObject,
@@ -554,6 +555,56 @@ test('physics object click setting persists and safely defaults for older saves'
     { type: 'setPhysicsObjectClicks', enabled: false },
   );
   assert.equal(updated.meta.physicsObjectClicksEnabled, false);
+});
+
+test('a dash moves the player diagonally and knocks back each enemy in its swept path once', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    625,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'nightcrawler', 48, 48);
+  enemy.speed = 0;
+  const initialPlayerX = world.player.x;
+  const initialPlayerY = world.player.y;
+
+  assert.equal(dashPlayer(world, 1, 1), true);
+  assert.equal(dashPlayer(world, 1, 0), false, 'a second dash should be blocked during recovery');
+  for (let i = 0; i < 8; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(world.player.x > initialPlayerX);
+  assert.ok(world.player.y > initialPlayerY);
+  assert.ok(enemy.kx > 0);
+  assert.ok(enemy.ky > 0);
+  assert.equal(world.player.dashHitUids.has(enemy.uid), true);
+  const knockbackX = enemy.kx;
+  const knockbackY = enemy.ky;
+  for (let i = 0; i < 8; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.ok(enemy.kx < knockbackX);
+  assert.ok(enemy.ky < knockbackY);
+  assert.equal(world.player.dashHitUids.has(enemy.uid), true);
+});
+
+test('dash input is ignored after a run ends and becomes available after recovery', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    626,
+  );
+  assert.equal(dashPlayer(world, 1, 0), true);
+  for (let i = 0; i < 55; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(dashPlayer(world, -1, 0), true);
+  world.outcome = 'dead';
+  assert.equal(dashPlayer(world, 1, 0), false);
+
+  const endlessArea = AREAS.find((area) => area.endless);
+  assert.ok(endlessArea);
+  const transitionWorld = createWorld(endlessArea, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 627);
+  transitionWorld.endless!.pendingTransition = 'enter';
+  assert.equal(dashPlayer(transitionWorld, 1, 0), false);
 });
 
 test('a fixed bench blocks but ignores impact and damage', () => {

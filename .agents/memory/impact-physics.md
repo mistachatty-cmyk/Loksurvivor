@@ -18,3 +18,11 @@ The feature needs deliberate setup without changing ordinary weapon balance, and
 
 **How to apply:**  
 Keep priming gated by the persisted physics-interaction setting, consume the prime on the next qualifying player impact, and preserve the existing idempotent enemy-kill path for launch damage.
+
+Player dashes use a separate short-lived movement impulse: double-click/tap direction is derived from the player toward the tap, and each enemy swept by one dash receives one strong knockback impulse without dash damage.
+
+**Why:**  
+Dash movement should feel like a reliable crowd escape without introducing another damage or reward source, while per-dash hit tracking prevents repeated impulses across its animation window.
+
+**How to apply:**  
+Keep dash recovery and transition/outcome guards in the world command, preserve obstacle and arena collision handling, and render a directional trail so the input reads clearly on desktop and mobile.

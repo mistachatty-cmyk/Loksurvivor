@@ -12,6 +12,7 @@ import {
   applyUpgrade,
   buildResult,
   createWorld,
+  dashPlayer,
   hudSnapshot,
   primePhysicsObject,
   rollUpgradeChoices,
@@ -45,6 +46,12 @@ interface StickState {
 }
 
 type PointerMode = 'none' | 'stick' | 'object';
+
+interface TapRecord {
+  time: number;
+  x: number;
+  y: number;
+}
 
 type ReelPhase = 'spinning' | 'landed';
 
@@ -93,6 +100,7 @@ export function RunScreen({
     dy: 0,
   });
   const pointerModeRef = useRef<PointerMode>('none');
+  const lastTapRef = useRef<TapRecord | null>(null);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
@@ -179,11 +187,29 @@ export function RunScreen({
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'playing') return;
+    if (dungeonTransition) return;
     if (stickRef.current.active || pointerModeRef.current !== 'none') return;
     (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
 
     const canvas = canvasRef.current;
     const world = worldRef.current;
+    const now = performance.now();
+    const previousTap = lastTapRef.current;
+    if (canvas && world && previousTap &&
+      now - previousTap.time <= 300 &&
+      Math.hypot(event.clientX - previousTap.x, event.clientY - previousTap.y) <= 48) {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      dashPlayer(world, targetX - world.player.x, targetY - world.player.y);
+      lastTapRef.current = null;
+      pointerModeRef.current = 'none';
+      return;
+    }
+    lastTapRef.current = null;
     if (physicsObjectClicksEnabled && canvas && world) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
@@ -211,7 +237,7 @@ export function RunScreen({
     };
     stickRef.current = next;
     setStickVisual(next);
-  }, [physicsObjectClicksEnabled]);
+  }, [dungeonTransition, physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
@@ -232,13 +258,22 @@ export function RunScreen({
     const stick = stickRef.current;
     if (pointerModeRef.current === 'object') {
       pointerModeRef.current = 'none';
+      if (event.type !== 'pointercancel') {
+        lastTapRef.current = { time: performance.now(), x: event.clientX, y: event.clientY };
+      }
       return;
     }
     if (stick.pointerId !== event.pointerId) return;
+    const wasTap = Math.hypot(stick.dx, stick.dy) <= 12;
     pointerModeRef.current = 'none';
     const next: StickState = { active: false, pointerId: null, originX: 0, originY: 0, dx: 0, dy: 0 };
     stickRef.current = next;
     setStickVisual(next);
+    if (event.type === 'pointercancel' || !wasTap) {
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = { time: performance.now(), x: event.clientX, y: event.clientY };
+    }
   }, []);
 
   /* -------------------------------------------------------------- */
