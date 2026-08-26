@@ -22,6 +22,7 @@ import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type {
   AreaDef,
   BaseStats,
+  ChallengeContractDef,
   CharacterDef,
   CompletedObjective,
   EnemyDef,
@@ -331,6 +332,8 @@ export interface World {
   rngSeed: number;
   /** Present only when area.endless === true. */
   endless?: EndlessState;
+  /** Optional difficulty contracts selected before the run. */
+  challenges: ChallengeContractDef[];
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -402,6 +405,8 @@ export function createWorld(
   character: CharacterDef,
   stats: BaseStats,
   seed = Date.now() % 100000,
+  challenges: ChallengeContractDef[] = [],
+  startingWeaponLevel = 1,
 ): World {
   const player: PlayerActor = {
     uid: 1,
@@ -435,7 +440,7 @@ export function createWorld(
     projectiles: [],
     effects: [],
     orbiters: [],
-    weapons: [{ def: character.weapon, level: 1, count: character.weapon.count ?? 1, readyAt: 400 }],
+    weapons: [{ def: character.weapon, level: startingWeaponLevel, count: character.weapon.count ?? 1, readyAt: 400 }],
     passives: [],
     pickups: [],
     popups: [],
@@ -452,7 +457,7 @@ export function createWorld(
     xp: 0,
     xpToNext: xpForLevel(1),
     pendingLevelUps: 0,
-    weaponLevel: 1,
+    weaponLevel: startingWeaponLevel,
     weaponCount: character.weapon.count ?? 1,
     ultCooldownMult: 1,
     weaponReadyAt: 400,
@@ -478,6 +483,7 @@ export function createWorld(
     grid: new Map(),
     rngSeed: seed,
     endless: undefined,
+    challenges: [...challenges],
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     lootBoxesOpened: 0,
@@ -656,7 +662,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     }
   }
 
-  const hp = def.hp * hpMult;
+  const hp = def.hp * hpMult * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1);
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -675,7 +681,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     animStartedAt: w.now,
     hitFlashUntil: 0,
     speed: def.speed,
-    damage: def.damage,
+    damage: def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1),
     xp: def.xp,
     mass: def.mass,
     contactReadyAt: 0,
@@ -742,7 +748,8 @@ function updateSpawning(w: World, dt: number) {
   for (let i = 0; i < waves.length; i += 1) {
     const wave = waves[i]!;
     if (w.time < wave.fromSec || w.time > wave.toSec) continue;
-    w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * dt;
+    const spawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+    w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
       const def = getEnemy(wave.enemyId);
@@ -2918,7 +2925,8 @@ const ENDLESS_ENEMY_POOLS: string[][] = [
 function updateEndlessSpawning(w: World, dt: number) {
   const e = w.endless!;
   const tier = endlessDiffTier(e);
-  const spawnRate = Math.min(3.2, 0.8 + tier * 0.14);
+  const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+  const spawnRate = Math.min(3.2, (0.8 + tier * 0.14) * contractSpawnMultiplier);
   const hpMult = Math.min(1.7, 1 + tier * 0.07);
 
   const pool = ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
@@ -3101,11 +3109,14 @@ export function hudSnapshot(w: World): HudSnapshot {
   };
 }
 
-export function buildResult(w: World): RunResult {
+export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
   const cleared = w.outcome === 'cleared';
   const survival = w.area.endless ? w.time : Math.min(w.time, w.area.durationSec);
   const bonus = cleared ? 120 : 0;
   const e = w.endless;
+  const baseCred = w.cred + bonus + Math.floor(survival / 4);
+  const challengeMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.rewardMultiplier, 1);
+  const finalCred = Math.floor(baseCred * challengeMultiplier * utilityRewardMultiplier);
   return {
     areaId: w.area.id,
     characterId: w.character.id,
@@ -3113,7 +3124,7 @@ export function buildResult(w: World): RunResult {
     survivedSec: survival,
     kills: w.kills,
     level: w.level,
-    cred: w.cred + bonus + Math.floor(survival / 4),
+    cred: finalCred,
     killsByEnemy: { ...w.killsByEnemy },
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
@@ -3145,6 +3156,12 @@ export function buildResult(w: World): RunResult {
     lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     completedObjectives: [...w.completedObjectives],
+    challenges: w.challenges.map((challenge) => ({
+      id: challenge.id,
+      name: challenge.name,
+      rewardMultiplier: challenge.rewardMultiplier,
+      bonusCred: Math.max(0, Math.floor(baseCred * challengeMultiplier) - baseCred),
+    })),
     endless: e
       ? {
           maxDistancePx: e.maxDistancePx,

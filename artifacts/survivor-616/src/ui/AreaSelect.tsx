@@ -3,13 +3,15 @@
  * and props stable.
  */
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { availableChallengeContracts } from '@/game/data/vendor';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity } from 'lucide-react';
+import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull } from 'lucide-react';
+import { useState } from 'react';
 
 export interface AreaSelectProps {
   onBack: () => void;
-  onLaunch: (areaId: string) => void;
+  onLaunch: (areaId: string, challengeIds: string[]) => void;
 }
 
 const THREAT_COLORS = {
@@ -21,6 +23,15 @@ const THREAT_COLORS = {
 
 export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const { unlockedAreas, lockedAreas, meta, selectedCharacter } = useMeta();
+  const challenges = availableChallengeContracts(meta);
+  const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
+
+  const toggleChallenge = (id: string) => {
+    setSelectedChallengeIds((current) => {
+      if (current.includes(id)) return current.filter((challengeId) => challengeId !== id);
+      return current.length < 2 ? [...current, id] : current;
+    });
+  };
 
   return (
     <ScreenLayout 
@@ -34,6 +45,44 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
         </div>
       }
     >
+      {challenges.length > 0 && (
+        <section className="mb-6 border border-red-500/30 bg-red-950/10 p-4 sm:p-5" data-testid="section-run-contracts">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-red-300">
+                <Skull className="h-4 w-4" />
+                <p className="text-xs font-bold uppercase tracking-[0.25em]">Optional contracts</p>
+              </div>
+              <h2 className="mt-1 text-2xl font-black uppercase text-white">Raise the stakes</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Owned contracts are selected before launch. Choose up to two for a larger cred payout.</p>
+            </div>
+            <span className="font-mono text-xs text-red-200/80">{selectedChallengeIds.length}/2 selected</span>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-3">
+            {challenges.map((challenge) => {
+              const selected = selectedChallengeIds.includes(challenge.id);
+              return (
+                <button
+                  key={challenge.id}
+                  type="button"
+                  onClick={() => toggleChallenge(challenge.id)}
+                  aria-pressed={selected}
+                  className={`border p-3 text-left transition-colors ${selected ? 'border-red-400 bg-red-500/15' : 'border-border bg-card hover:border-red-400/60'}`}
+                  data-testid={`button-toggle-challenge-${challenge.id}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold uppercase text-white">{challenge.name}</span>
+                    <span className="font-mono text-xs text-red-300">×{challenge.rewardMultiplier.toFixed(2)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{challenge.description}</p>
+                  <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-red-200">{selected ? 'Selected for next run' : 'Available contract'}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {unlockedAreas.map((area, i) => {
           const isCleared = meta.clearedAreaIds.includes(area.id);
@@ -46,7 +95,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
               type="button"
-              onClick={() => onLaunch(area.id)}
+              onClick={() => onLaunch(area.id, selectedChallengeIds)}
               className="group relative w-full text-left border border-border bg-card overflow-hidden flex flex-col hover:border-primary transition-colors h-64"
               data-testid={`button-area-${area.id}`}
             >

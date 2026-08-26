@@ -615,7 +615,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar';
@@ -667,6 +667,33 @@ export interface DiscoveryDef {
   id: string;
   name: string;
   blurb: string;
+}
+
+export type VendorItemCategory = 'stat' | 'utility' | 'challenge';
+
+export type VendorEffect =
+  | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
+  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult'; amount: number };
+
+export interface VendorItemDef {
+  id: string;
+  name: string;
+  description: string;
+  category: VendorItemCategory;
+  cost: number;
+  maxStacks: number;
+  effects?: VendorEffect[];
+  challengeId?: string;
+}
+
+export interface ChallengeContractDef {
+  id: string;
+  name: string;
+  description: string;
+  rewardMultiplier: number;
+  enemySpawnMultiplier: number;
+  enemyHealthMultiplier: number;
+  enemyDamageMultiplier: number;
 }
 
 export type UpgradeEffect =
@@ -731,6 +758,8 @@ export interface MetaState {
   facilityTier: FacilityTier;
   /** Field recovery huts discovered in explored areas. */
   discoveredHutIds: string[];
+  /** Hideout vendor purchases, keyed by curated catalog id. */
+  vendorPurchases: Record<string, number>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -786,6 +815,13 @@ export interface RunResult {
   fatigueAfterPct?: number;
   /** Objectives completed this run. */
   completedObjectives: CompletedObjective[];
+  /** Optional difficulty contracts selected before this run. */
+  challenges?: Array<{
+    id: string;
+    name: string;
+    rewardMultiplier: number;
+    bonusCred: number;
+  }>;
   /** Endless-mode stats (undefined for timed runs). */
   endless?: {
     maxDistancePx: number;

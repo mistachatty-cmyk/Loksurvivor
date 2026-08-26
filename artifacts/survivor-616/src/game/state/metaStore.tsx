@@ -26,6 +26,7 @@ import {
   RECOVERY_FACILITIES_BY_ID,
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
+import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import type {
   AllyDef,
   AreaDef,
@@ -46,7 +47,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 3;
+const META_VERSION = 4;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -112,6 +113,7 @@ export function createInitialMeta(): MetaState {
     recovery: defaultRecovery(),
     facilityTier: 'tub',
     discoveredHutIds: [],
+    vendorPurchases: {},
   };
 }
 
@@ -129,6 +131,18 @@ function counter(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : fallback;
+}
+
+function normalizeVendorPurchases(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const purchases: Record<string, number> = {};
+  for (const [id, rawCount] of Object.entries(value)) {
+    const item = VENDOR_CATALOG_BY_ID[id];
+    if (!item) continue;
+    const count = counter(rawCount);
+    if (count > 0) purchases[id] = Math.min(item.maxStacks, count);
+  }
+  return purchases;
 }
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
@@ -399,6 +413,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     recovery,
     facilityTier: tier,
     discoveredHutIds,
+    vendorPurchases: normalizeVendorPurchases(parsed.vendorPurchases),
   };
 }
 
@@ -409,7 +424,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -489,6 +504,16 @@ export function effectiveStats(character: CharacterDef, meta: MetaState): BaseSt
   for (const [key, value] of Object.entries(boosts) as Array<[keyof BaseStats, number]>) {
     stats[key] = stats[key] + value;
   }
+  for (const item of VENDOR_CATALOG) {
+    const stacks = Math.min(item.maxStacks, Math.max(0, Math.floor(meta.vendorPurchases[item.id] ?? 0)));
+    if (!stacks) continue;
+    for (const effect of item.effects ?? []) {
+      if (effect.kind !== 'stat') continue;
+      if (effect.add) stats[effect.stat] += effect.add * stacks;
+      if (effect.mult) stats[effect.stat] *= Math.pow(effect.mult, stacks);
+      if (effect.cap !== undefined) stats[effect.stat] = Math.min(stats[effect.stat], effect.cap);
+    }
+  }
   stats.armor = Math.min(stats.armor, 0.6);
   const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
   stats.maxHp *= 1 - fatigue;
@@ -499,6 +524,30 @@ export function effectiveStats(character: CharacterDef, meta: MetaState): BaseSt
   stats.armor = Math.max(0, stats.armor * (1 - fatigue));
   stats.haste *= 1 + fatigue;
   return stats;
+}
+
+/** Permanent utility bonuses used when constructing a new run. */
+export function startingWeaponLevel(meta: MetaState): number {
+  const levelBoost = VENDOR_CATALOG.reduce((total, item) => {
+    const stacks = Math.min(item.maxStacks, Math.max(0, Math.floor(meta.vendorPurchases[item.id] ?? 0)));
+    return total + (item.effects ?? []).reduce(
+      (sum, effect) => sum + (effect.kind === 'utility' && effect.utility === 'starting-weapon-level' ? effect.amount * stacks : 0),
+      0,
+    );
+  }, 0);
+  return Math.min(8, 1 + levelBoost);
+}
+
+/** Permanent utility bonuses applied to the final cred payout. */
+export function rewardCredMultiplier(meta: MetaState): number {
+  const bonus = VENDOR_CATALOG.reduce((total, item) => {
+    const stacks = Math.min(item.maxStacks, Math.max(0, Math.floor(meta.vendorPurchases[item.id] ?? 0)));
+    return total + (item.effects ?? []).reduce(
+      (sum, effect) => sum + (effect.kind === 'utility' && effect.utility === 'reward-cred-mult' ? effect.amount * stacks : 0),
+      0,
+    );
+  }, 0);
+  return 1 + bonus;
 }
 
 export function currentFatiguePct(meta: MetaState, characterId: string): number {
@@ -529,6 +578,7 @@ type Action =
   | { type: 'clearLastRun' }
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
+  | { type: 'buyVendorItem'; id: string }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
@@ -559,6 +609,21 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const cost = action.amount;
       if (state.meta.lootTokens < cost) return state;
       return { ...state, meta: { ...state.meta, lootTokens: state.meta.lootTokens - cost } };
+    }
+
+    case 'buyVendorItem': {
+      const item = VENDOR_CATALOG_BY_ID[action.id];
+      if (!item) return state;
+      const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
+      if (owned >= item.maxStacks || state.meta.cred < item.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - item.cost,
+          vendorPurchases: { ...state.meta.vendorPurchases, [item.id]: owned + 1 },
+        },
+      };
     }
 
     case 'setDevModeAllUnlocks':
@@ -698,6 +763,7 @@ export interface MetaContextValue {
   clearLastRun: () => void;
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
+  buyVendorItem: (id: string) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
@@ -723,6 +789,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
+  const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -765,6 +832,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       clearLastRun,
       markOnboarded,
       spendTokens,
+      buyVendorItem,
       setDevModeAllUnlocks,
       resetProgress,
       startRecovery,
@@ -779,6 +847,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     clearLastRun,
     markOnboarded,
     spendTokens,
+    buyVendorItem,
     setDevModeAllUnlocks,
     resetProgress,
     startRecovery,

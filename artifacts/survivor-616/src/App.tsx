@@ -10,6 +10,8 @@ import {
   getLokPetDiscoveries,
   MAX_FATIGUE_PCT,
   MetaProvider,
+  rewardCredMultiplier,
+  startingWeaponLevel,
   useMeta,
 } from '@/game/state/metaStore';
 import type { RunResult } from '@/game/types';
@@ -22,6 +24,7 @@ import { IntroScreen } from '@/ui/IntroScreen';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
+import { VendorPanel } from '@/ui/VendorPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 
@@ -36,7 +39,8 @@ type Screen =
   | { name: 'archive'; variantId?: string }
   | { name: 'music' }
   | { name: 'recovery' }
-  | { name: 'run'; areaId: string }
+  | { name: 'vendor' }
+  | { name: 'run'; areaId: string; challengeIds?: string[] }
   | { name: 'summary'; result: RunResult };
 
 /**
@@ -59,7 +63,8 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'bestiary' ||
       requested === 'archive' ||
       requested === 'music' ||
-      requested === 'recovery'
+      requested === 'recovery' ||
+      requested === 'vendor'
     ) {
       return { name: requested };
     }
@@ -93,6 +98,9 @@ function Game() {
         break;
       case 'recovery':
         setScreen({ name: 'recovery' });
+        break;
+      case 'vendor':
+        setScreen({ name: 'vendor' });
         break;
     }
   }, []);
@@ -131,7 +139,7 @@ function Game() {
       return <CharacterSelect onBack={goHub} onConfirm={() => setScreen({ name: 'areas' })} />;
 
     case 'areas':
-      return <AreaSelect onBack={goHub} onLaunch={(areaId) => setScreen({ name: 'run', areaId })} />;
+      return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
 
     case 'bestiary':
       return <BestiaryPanel onBack={goHub} />;
@@ -145,12 +153,18 @@ function Game() {
     case 'recovery':
       return <RecoveryPanel onBack={goHub} />;
 
+    case 'vendor':
+      return <VendorPanel onBack={goHub} />;
+
     case 'run':
       return (
         <RunScreen
-          key={`${screen.areaId}-${selectedCharacter.id}`}
+          key={`${screen.areaId}-${selectedCharacter.id}-${(screen.challengeIds ?? []).join('-')}`}
           areaId={screen.areaId}
           characterId={selectedCharacter.id}
+          challengeIds={screen.challengeIds}
+          startingWeaponLevel={startingWeaponLevel(meta)}
+          utilityRewardMultiplier={rewardCredMultiplier(meta)}
           onAbort={goHub}
           onFinish={handleFinish}
         />
@@ -165,7 +179,13 @@ function Game() {
           onReturnToHub={goHub}
           onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
           onRetry={() =>
-            canRetry ? setScreen({ name: 'run', areaId: screen.result.areaId }) : goHub()
+            canRetry
+              ? setScreen({
+                  name: 'run',
+                  areaId: screen.result.areaId,
+                  challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
+                })
+              : goHub()
           }
         />
       );

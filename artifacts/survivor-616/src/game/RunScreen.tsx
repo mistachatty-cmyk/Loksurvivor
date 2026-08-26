@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
@@ -18,13 +19,16 @@ import {
 } from '@/game/engine/world';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { renderWorld } from '@/game/render/draw';
-import { effectiveStats, useMeta } from '@/game/state/metaStore';
+import { effectiveStats, rewardCredMultiplier, startingWeaponLevel, useMeta } from '@/game/state/metaStore';
 import type { HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { Minimap } from '@/ui/Minimap';
 
 export interface RunScreenProps {
   areaId: string;
   characterId: string;
+  challengeIds?: string[];
+  startingWeaponLevel?: number;
+  utilityRewardMultiplier?: number;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -59,7 +63,15 @@ function formatClock(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenProps) {
+export function RunScreen({
+  areaId,
+  characterId,
+  challengeIds = [],
+  startingWeaponLevel: startingWeaponLevelProp,
+  utilityRewardMultiplier: utilityRewardMultiplierProp,
+  onAbort,
+  onFinish,
+}: RunScreenProps) {
   const { meta } = useMeta();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
@@ -86,6 +98,9 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
 
   const area = getArea(areaId);
   const character = getCharacter(characterId);
+  const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
+  const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
+  const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
 
   const setPhaseBoth = useCallback((next: RunPhase) => {
     // Once a run is over it stays over -- nothing may steal the hand-off.
@@ -96,7 +111,14 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
 
   // Build the world once per mount.
   if (worldRef.current === null) {
-    worldRef.current = createWorld(area, character, effectiveStats(character, meta));
+    worldRef.current = createWorld(
+      area,
+      character,
+      effectiveStats(character, meta),
+      undefined,
+      challenges,
+      initialWeaponLevel,
+    );
   }
 
   /* -------------------------------------------------------------- */
@@ -313,10 +335,10 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
     const timer = window.setTimeout(() => {
       if (finishedRef.current) return;
       finishedRef.current = true;
-      onFinish(buildResult(world));
+       onFinish(buildResult(world, finalRewardMultiplier));
     }, 1100);
     return () => window.clearTimeout(timer);
-  }, [phase, onFinish]);
+  }, [finalRewardMultiplier, onFinish, phase]);
 
   const pickUpgrade = useCallback(
     (upgrade: UpgradeDef) => {
@@ -451,6 +473,16 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
         {hud?.rescueAvailable ? (
           <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
             Someone is caged — stand with them {hud.rescueProgressPct > 0 ? `(${hud.rescueProgressPct}%)` : ''}
+          </div>
+        ) : null}
+
+        {challenges.length > 0 ? (
+          <div className="mx-auto flex w-fit flex-wrap justify-center gap-1.5" data-testid="row-active-contracts">
+            {challenges.map((challenge) => (
+              <span key={challenge.id} className="border border-red-400/45 bg-black/75 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-200">
+                Contract: {challenge.name}
+              </span>
+            ))}
           </div>
         ) : null}
 

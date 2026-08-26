@@ -5,9 +5,11 @@ import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { getEnemy } from '@/game/data/enemies';
 import { rollLokPet } from '@/game/data/lokPets';
+import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import {
   createWorld,
+  buildResult,
   hudSnapshot,
   spawnLokPet,
   type EnemyActor,
@@ -18,9 +20,13 @@ import { generateChunk } from '@/game/engine/chunks';
 import { createRng } from '@/game/engine/math';
 import {
   createInitialMeta,
+  effectiveStats,
   getLokPetDiscoveries,
   loadMeta,
+  normalizeMeta,
+  rewardCredMultiplier,
   reducer,
+  startingWeaponLevel,
 } from '@/game/state/metaStore';
 import type { AreaDef, CharacterDef, LokPetRoll, RunResult } from '@/game/types';
 
@@ -621,13 +627,103 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 3);
+    assert.equal(loaded.version, 4);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
     assert.equal(loaded.cred, 12);
     assert.equal(loaded.lokPetCatalog.length, 0);
   }
+});
+
+test('vendor purchases spend cred exactly once and stop at the catalog cap', () => {
+  const item = VENDOR_CATALOG_BY_ID['running-shoes']!;
+  let state = { meta: { ...createInitialMeta(), cred: item.cost * 3 }, lastRun: null };
+
+  state = reducer(state, { type: 'buyVendorItem', id: item.id });
+  assert.equal(state.meta.cred, item.cost * 2);
+  assert.equal(state.meta.vendorPurchases[item.id], 1);
+
+  state = reducer(state, { type: 'buyVendorItem', id: item.id });
+  assert.equal(state.meta.cred, item.cost);
+  assert.equal(state.meta.vendorPurchases[item.id], 2);
+
+  state = reducer(state, { type: 'buyVendorItem', id: item.id });
+  assert.equal(state.meta.cred, 0);
+  assert.equal(state.meta.vendorPurchases[item.id], 3);
+  state = reducer(state, { type: 'buyVendorItem', id: item.id });
+  assert.equal(state.meta.cred, 0);
+  assert.equal(state.meta.vendorPurchases[item.id], 3);
+});
+
+test('vendor save migration sanitizes unknown ids and clamps stacks', () => {
+  const item = VENDOR_CATALOG_BY_ID['reinforced-hoodie']!;
+  const normalized = normalizeMeta({
+    version: 4,
+    cred: 40,
+    vendorPurchases: {
+      [item.id]: 999,
+      'not-a-real-item': 80,
+      'negative-item': -4,
+    },
+  });
+
+  assert.equal(normalized.vendorPurchases[item.id], item.maxStacks);
+  assert.equal(normalized.vendorPurchases['not-a-real-item'], undefined);
+  assert.equal(normalized.vendorPurchases['negative-item'], undefined);
+
+  const refreshed = withStoredMeta(
+    { version: 4, cred: 40, vendorPurchases: { [item.id]: 2 } },
+    loadMeta,
+  );
+  assert.equal(refreshed.vendorPurchases[item.id], 2);
+});
+
+test('vendor stat caps and utilities affect runs without developer unlock grants', () => {
+  const base = createInitialMeta();
+  const meta = {
+    ...base,
+    devModeAllUnlocks: true,
+    vendorPurchases: {
+      'reinforced-hoodie': 99,
+      'plated-vest': 99,
+      'starting-edge': 2,
+      'scavenger-cut': 3,
+    },
+  };
+  const armoredCharacter = {
+    ...CHARACTERS[0]!,
+    stats: { ...CHARACTERS[0]!.stats, armor: 0.55 },
+  };
+  const stats = effectiveStats(armoredCharacter, meta);
+
+  assert.equal(stats.armor, 0.6);
+  assert.ok(stats.maxHp <= 300);
+  assert.equal(startingWeaponLevel(meta), 3);
+  assert.equal(rewardCredMultiplier(meta), 1.3);
+
+  const noPurchases = effectiveStats(CHARACTERS[0]!, { ...base, devModeAllUnlocks: true });
+  assert.equal(noPurchases.maxHp, CHARACTERS[0]!.stats.maxHp);
+});
+
+test('owned challenge contracts scale enemy pressure and payout', () => {
+  const area: AreaDef = {
+    ...AREAS[0]!,
+    id: 'challenge-test-area',
+    durationSec: 30,
+    waves: [{ fromSec: 0, toSec: 30, enemyId: 'nightcrawler', ratePerSec: 1, burst: 1 }],
+    obstacles: [],
+    rescueAllyId: undefined,
+  };
+  const redline = CHALLENGE_CONTRACTS_BY_ID.redline!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616, [redline]);
+  world.cred = 100;
+  const result = buildResult(world);
+
+  assert.equal(world.challenges[0]?.id, 'redline');
+  assert.equal(result.cred, 130);
+  assert.equal(result.challenges?.[0]?.name, redline.name);
+  assert.equal(result.challenges?.[0]?.bonusCred, 30);
 });
 
 test('malformed catalog records are ignored and cannot inject presentation fields', () => {

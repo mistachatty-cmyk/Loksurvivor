@@ -100,6 +100,27 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
           </div>
         )}
 
+        {result.challenges && result.challenges.length > 0 && (
+          <div className="border border-red-500/30 bg-red-500/5 p-4" data-testid="section-challenge-rewards">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-red-300">Contract payout</p>
+                <p className="mt-1 text-sm text-white/70">You took the harder route and brought home the difference.</p>
+              </div>
+              <p className="font-mono text-sm font-bold text-red-200">
+                {result.challenges.map((challenge) => challenge.name).join(' + ')}
+              </p>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {result.challenges.map((challenge) => (
+                <span key={challenge.id} className="border border-red-400/30 bg-black/30 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-red-200">
+                  {challenge.name} ×{challenge.rewardMultiplier.toFixed(2)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2" data-testid="section-loadout">
           <div className="border border-border bg-card p-5">
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">Final weapons</p>
