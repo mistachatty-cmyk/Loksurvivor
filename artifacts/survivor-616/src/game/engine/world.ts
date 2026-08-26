@@ -97,6 +97,9 @@ export interface EnemyActor extends Actor {
   specialUntil: number;
   specialRadius: number;
   specialKind: 'shockwave' | 'current' | null;
+  ghostUntil: number;
+  burstUntil: number;
+  baseRadius: number;
   convertedUntil: number;
   convertedAttackReadyAt: number;
   dying: boolean;
@@ -209,6 +212,7 @@ export interface Follower {
   orbitRadius: number;
   color: string;
   weaponId: string;
+  readyAt?: number;
 }
 
 export interface RescueState {
@@ -504,6 +508,7 @@ export function createWorld(
   if (character.weapon.kind === 'orbit') {
     rebuildOrbiters(world);
   }
+  if (character.weapon.follower?.lifetimeMs === 0) spawnFollowers(world, character.weapon);
   return world;
 }
 
@@ -591,13 +596,16 @@ function forEachNearby(w: World, x: number, y: number, radius: number, fn: (e: E
 /* Spawning                                                            */
 /* ------------------------------------------------------------------ */
 
-function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
+function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
   if (w.enemies.length >= MAX_ENEMIES) return;
 
   let x = 0;
   let y = 0;
 
-  if (w.area.endless) {
+  if (position) {
+    x = position.x;
+    y = position.y;
+  } else if (w.area.endless) {
     // No arena walls — spawn on a ring around the player, clamped only inside dungeon rooms.
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const angle = w.rng() * Math.PI * 2;
@@ -658,6 +666,9 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
     specialUntil: 0,
     specialRadius: 0,
     specialKind: null,
+    ghostUntil: 0,
+    burstUntil: 0,
+    baseRadius: def.radius,
     convertedUntil: 0,
     convertedAttackReadyAt: 0,
     dying: false,
@@ -672,6 +683,38 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
   }
 }
 
+function formationPositions(w: World, formation: NonNullable<import('@/game/types').WaveDef['formation']>, count: number) {
+  const positions: Array<{ x: number; y: number }> = [];
+  const angle = w.rng() * Math.PI * 2;
+  const distance = 300;
+  for (let i = 0; i < count; i += 1) {
+    const t = i / Math.max(1, count - 1);
+    let x = Math.cos(angle) * distance;
+    let y = Math.sin(angle) * distance;
+    if (formation === 'ring') {
+      const a = angle + (Math.PI * 2 * i) / count;
+      x = Math.cos(a) * distance;
+      y = Math.sin(a) * distance;
+    } else if (formation === 'wedge' || formation === 'pincer') {
+      const side = i % 2 === 0 ? -1 : 1;
+      const spread = (Math.floor(i / 2) + 1) * 34;
+      x += Math.cos(angle + side * 0.55) * spread;
+      y += Math.sin(angle + side * 0.55) * spread;
+    } else if (formation === 'wall') {
+      x += Math.cos(angle + Math.PI / 2) * ((t - 0.5) * 260);
+      y += Math.sin(angle + Math.PI / 2) * ((t - 0.5) * 260);
+    } else if (formation === 'file' || formation === 'escort') {
+      x += Math.cos(angle) * (i * 42);
+      y += Math.sin(angle) * (i * 42);
+    } else if (formation === 'bait') {
+      const bait = i === 0 ? 0.6 : 1;
+      x *= bait; y *= bait;
+    }
+    positions.push({ x: w.player.x + x, y: w.player.y + y });
+  }
+  return positions;
+}
+
 function updateSpawning(w: World, dt: number) {
   const waves = w.area.waves;
   for (let i = 0; i < waves.length; i += 1) {
@@ -681,10 +724,14 @@ function updateSpawning(w: World, dt: number) {
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
       const def = getEnemy(wave.enemyId);
+      const ids = [wave.enemyId, ...(wave.group ?? [])];
+      const total = wave.burst * ids.length;
+      const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
+      let positionIndex = 0;
       for (let b = 0; b < wave.burst; b += 1) {
-        spawnEnemy(w, def, wave.hpMult ?? 1);
+        spawnEnemy(w, def, wave.hpMult ?? 1, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
-          spawnEnemy(w, getEnemy(groupEnemyId), wave.hpMult ?? 1);
+          spawnEnemy(w, getEnemy(groupEnemyId), wave.hpMult ?? 1, positions[positionIndex++]);
         }
       }
     }
@@ -711,6 +758,72 @@ function spawnParticles(w: World, x: number, y: number, color: string, count: nu
     });
   }
   if (w.particles.length > 320) w.particles.splice(0, w.particles.length - 320);
+}
+
+function spawnFollower(w: World, weapon: WeaponDef, index: number) {
+  const spec = weapon.follower;
+  if (!spec || w.followers.length >= 18) return;
+  const angle = (Math.PI * 2 * index) / Math.max(1, spec.count) + w.rng() * 0.35;
+  const radius = spec.radius;
+  w.followers.push({
+    uid: uid(w),
+    x: w.player.x + Math.cos(angle) * (radius + 18),
+    y: w.player.y + Math.sin(angle) * (radius + 18),
+    vx: 0,
+    vy: 0,
+    radius: 7,
+    baseRadius: 7,
+    damage: weapon.damage,
+    bornAt: w.now,
+    expiresAt: spec.lifetimeMs ? w.now + spec.lifetimeMs : Number.POSITIVE_INFINITY,
+    growAfterMs: spec.growAfterMs ?? 0,
+    maxRadius: spec.maxRadius ?? 12,
+    orbitAngle: angle,
+    orbitRadius: radius,
+    color: weapon.color ?? w.character.palette.accent,
+    weaponId: weapon.id,
+  });
+}
+
+function spawnFollowers(w: World, weapon: WeaponDef) {
+  const spec = weapon.follower;
+  if (!spec) return;
+  for (let i = 0; i < spec.count; i += 1) spawnFollower(w, weapon, i);
+  spawnParticles(w, w.player.x, w.player.y, weapon.color ?? w.character.palette.accent, Math.min(10, spec.count * 2), 70);
+}
+
+function updateFollowers(w: World, dt: number) {
+  for (let i = w.followers.length - 1; i >= 0; i -= 1) {
+    const follower = w.followers[i]!;
+    if (w.now >= follower.expiresAt) {
+      spawnParticles(w, follower.x, follower.y, follower.color, 4, 45);
+      w.followers.splice(i, 1);
+      continue;
+    }
+    const age = w.now - follower.bornAt;
+    const growth = follower.growAfterMs > 0 ? clamp((age - follower.growAfterMs) / 900, 0, 1) : 1;
+    follower.radius = follower.baseRadius + (follower.maxRadius - follower.baseRadius) * growth;
+    follower.orbitAngle += dt * (follower.maxRadius > follower.baseRadius ? 1.7 : 3.2);
+    const target = nearestEnemy(w, follower.x, follower.y, 240);
+    const tx = target ? target.x : w.player.x + Math.cos(follower.orbitAngle) * follower.orbitRadius;
+    const ty = target ? target.y : w.player.y + Math.sin(follower.orbitAngle) * follower.orbitRadius;
+    const dx = tx - follower.x;
+    const dy = ty - follower.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const speed = target ? 145 : 95;
+    follower.vx += (dx / len * speed - follower.vx) * Math.min(1, dt * 7);
+    follower.vy += (dy / len * speed - follower.vy) * Math.min(1, dt * 7);
+    follower.x += follower.vx * dt;
+    follower.y += follower.vy * dt;
+    if (target && dist2(target.x, target.y, follower.x, follower.y) <= (target.radius + follower.radius) ** 2) {
+      const cooldown = follower.readyAt ?? 0;
+      if (w.now >= cooldown) {
+        follower.readyAt = w.now + 620;
+        damageEnemy(w, target, follower.damage * damageMult(w), 1.4, follower.x, follower.y);
+        spawnParticles(w, follower.x, follower.y, follower.color, 3, 55);
+      }
+    }
+  }
 }
 
 function damageEnemy(
@@ -940,6 +1053,12 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
   const palette = w.character.palette;
 
   switch (weapon.kind) {
+    case 'follower': {
+      spawnFollowers(w, weapon);
+      p.anim = 'attack';
+      p.animStartedAt = w.now;
+      break;
+    }
     case 'melee': {
       const target = nearestEnemy(w, p.x, p.y, reach + 120);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.facing > 0 ? 0 : Math.PI;
@@ -1050,6 +1169,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
     }
 
     case 'convert': {
+      if (weapon.follower) spawnFollowers(w, weapon);
       const target = nearestEnemy(w, p.x, p.y, reach);
       if (target) {
         // Conversion is represented by a brief ally flash and a harmless stun;
@@ -1635,6 +1755,27 @@ function updateEnemies(w: World, dt: number) {
       continue;
     }
 
+    const traits = enemy.def.traits;
+    if (traits?.teleportMs && w.now >= enemy.specialReadyAt) {
+      const side = w.rng() > 0.5 ? 1 : -1;
+      enemy.x = p.x - (p.x - enemy.x) * 0.35 + side * 180;
+      enemy.y = p.y - (p.y - enemy.y) * 0.35 - side * 120;
+      enemy.specialReadyAt = w.now + traits.teleportMs;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 8, 80);
+    }
+    if (traits?.ghostMs && w.now >= enemy.specialReadyAt) {
+      enemy.ghostUntil = w.now + traits.ghostMs;
+      enemy.specialReadyAt = w.now + traits.ghostMs + 1800;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 5, 45);
+    }
+    if (traits?.shiftMs && w.now >= enemy.fireReadyAt) {
+      enemy.fireReadyAt = w.now + traits.shiftMs;
+      enemy.radius = enemy.radius === enemy.baseRadius
+        ? enemy.baseRadius * (traits.shiftScale ?? 1.45)
+        : enemy.baseRadius;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
+    }
+
     const dx = p.x - enemy.x;
     const dy = p.y - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
@@ -1643,6 +1784,11 @@ function updateEnemies(w: World, dt: number) {
     enemy.facing = dirX >= 0 ? 1 : -1;
 
     let speed = enemy.speed * statusSpeedMultiplier(enemy);
+    if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
+    if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
+      enemy.burstUntil = w.now + 360;
+      enemy.chargeReadyAt = w.now + 2200;
+    }
 
     switch (enemy.def.behavior) {
       case 'charger': {
@@ -1797,7 +1943,7 @@ function updateEnemies(w: World, dt: number) {
 
     // Contact damage.
     const contact = enemy.radius + p.radius;
-    if (distance <= contact && w.now >= enemy.contactReadyAt) {
+    if (enemy.ghostUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
       damagePlayer(w, enemy.damage, enemy.x, enemy.y);
     }
@@ -2439,6 +2585,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   }
 
   updateStatusEffects(w);
+  updateFollowers(w, dt);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
 

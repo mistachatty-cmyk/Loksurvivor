@@ -70,3 +70,30 @@ weapons are records in the shared catalog: `wave`, `laser`, `hazard`,
 character-specific branches. Fire and acid fields remain visible, expire, tick
 damage, and can hurt the survivor as well as enemies, making placement a real
 tradeoff.
+
+## Ability preview and tactical vocabulary
+
+The roster uses one reusable field-preview standard for every survivor:
+the selected rig advances in a walking loop, a compact attack window shows
+the weapon's cadence and target response, and a second window shows the
+ultimate's anticipation, release, persistence, and expiry language. The
+preview is intentionally schematic so it stays readable on a phone and never
+depends on a character-specific UI branch.
+
+Followers are capped, owned by their weapon record, and communicate their
+role through size and timing. A tiny permanent orbit group stays fast and
+legible; Allymaker's temporary followers begin small, grow after a delay, seek
+targets, attack on their own cadence, and dissolve with particles.
+
+Enemy factions are built from palette, body plan, role, and movement rhythm:
+the Afterimage Choir uses flanks, short teleports, and ghost windows; the
+Cinder Procession uses heavy anchors, size shifts, and burst charges; the
+River Antler Court uses current pushes, repositioning, and ranged support.
+Formation records use rings, wedges, walls, escorts, pincers, staggered files,
+and bait groups. Their positions are seeded from the run RNG, so a replay
+does not become a different encounter.
+
+Originality boundary: these names, silhouettes, effects, and formation
+relationships are authored for 616 Survivor. Supplied references remain a
+moodboard for broad color and motion only; no source figure, logo, costume,
+name, or frame is copied into the game.

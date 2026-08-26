@@ -38,10 +38,10 @@ export const AREAS: AreaDef[] = [
     unlock: { kind: 'default' },
     waves: [
       { fromSec: 0, toSec: 40, enemyId: 'nightcrawler', ratePerSec: 1.1, burst: 1 },
-      { fromSec: 18, toSec: 75, enemyId: 'neon-leech', ratePerSec: 0.8, burst: 2, group: ['nightcrawler'] },
+      { fromSec: 18, toSec: 75, enemyId: 'neon-leech', ratePerSec: 0.8, burst: 2, group: ['nightcrawler'], formation: 'wedge', faction: 'Street Chorus' },
       { fromSec: 45, toSec: 120, enemyId: 'nightcrawler', ratePerSec: 1.5, burst: 2, hpMult: 1.2 },
       { fromSec: 62, toSec: 120, enemyId: 'bloodhound', ratePerSec: 0.45, burst: 1 },
-      { fromSec: 76, toSec: 120, enemyId: 'corner-cutter', ratePerSec: 0.42, burst: 1 },
+      { fromSec: 76, toSec: 120, enemyId: 'corner-cutter', ratePerSec: 0.42, burst: 1, formation: 'pincer', faction: 'Afterimage Choir' },
       { fromSec: 95, toSec: 120, enemyId: 'crypt-bouncer', ratePerSec: 0.12, burst: 1 },
     ],
   },

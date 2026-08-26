@@ -138,7 +138,7 @@ export type WeaponKind =
   | 'hazard'
   | 'teleport'
   | 'convert'
-  | 'punch';
+  | 'punch'
   | 'follower';
 
 export interface WeaponDef {

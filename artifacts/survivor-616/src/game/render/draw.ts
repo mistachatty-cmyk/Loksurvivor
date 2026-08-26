@@ -935,6 +935,24 @@ function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
 function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   const outlineEnemies = w.enemies.length < 70;
 
+  // Followers stay just above the ground layer and use a compact mark so
+  // swarms remain readable on phones without needing a second sprite atlas.
+  for (const follower of w.followers) {
+    const pulse = 0.8 + Math.sin(w.now / 110 + follower.uid) * 0.2;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.shadowColor = follower.color;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = follower.color;
+    ctx.beginPath();
+    ctx.arc(follower.x, follower.y - follower.radius * 0.35, follower.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(follower.x - 2, follower.y - follower.radius * 0.65, 4, 3);
+    ctx.restore();
+  }
+
   // Painter's order: things further up the screen render first.
   const sorted = [...w.enemies].sort((a, b) => a.y - b.y);
   const playerDrawn = { done: false };
@@ -1014,6 +1032,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       ctx.restore();
     }
     const dissolve = enemy.dying ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : 0;
+    const ghosting = enemy.ghostUntil > w.now && !enemy.dying;
     const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
     if (converted) {
       const pulse = 0.72 + Math.sin(w.now / 130) * 0.18;
@@ -1058,7 +1077,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
     ctx.save();
-    ctx.globalAlpha = shadowed ? 0.4 : 1;
+    ctx.globalAlpha = ghosting ? 0.22 : shadowed ? 0.4 : 1;
     drawRig(
       ctx,
       enemy.def.rig,
@@ -1068,7 +1087,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.x,
       enemy.y + 2,
       enemy.facing,
-      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1),
+      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius),
       {
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss',

@@ -402,3 +402,38 @@ test('a destroyed street lamp becomes a temporary electricity hazard', () => {
   for (let i = 0; i < 180; i += 1) stepWorld(world, 1 / 30, neutralInput);
   assert.ok((pole.hazardUntil ?? 0) <= world.now);
 });
+
+test('followers spawn, grow, attack, and expire without exceeding the cap', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('allymaker'),
+    CHARACTERS[0]!.stats,
+    44,
+  );
+  const enemy = addEnemy(world, 'nightcrawler', 70, 0);
+  world.weapons[0]!.readyAt = 0;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.followers.length, 4);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const smallRadius = world.followers[0]!.radius;
+  for (let i = 0; i < 40; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(world.followers[0]!.radius > smallRadius);
+  assert.ok(enemy.hp < enemy.maxHp);
+  for (let i = 0; i < 240; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.followers.length, 0);
+});
+
+test('formation-tagged waves release deterministic positions', () => {
+  const area = {
+    ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    waves: [{ fromSec: 0, toSec: 10, enemyId: 'nightcrawler', ratePerSec: 1, burst: 3, formation: 'wall' as const }],
+  };
+  const first = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 91);
+  const second = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 91);
+  for (let i = 0; i < 31; i += 1) {
+    stepWorld(first, 1 / 30, neutralInput);
+    stepWorld(second, 1 / 30, neutralInput);
+  }
+  assert.equal(first.enemies.length, 3);
+  assert.deepEqual(first.enemies.map((enemy) => [enemy.x, enemy.y]), second.enemies.map((enemy) => [enemy.x, enemy.y]));
+});

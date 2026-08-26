@@ -7,6 +7,7 @@ import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
 import { Shield, Zap, Swords } from 'lucide-react';
+import { CharacterAbilityVisualizer } from './CharacterAbilityVisualizer';
 
 export interface CharacterSelectProps {
   onBack: () => void;
@@ -33,6 +34,7 @@ export function CharacterSelect({ onBack, onConfirm }: CharacterSelectProps) {
         </button>
       }
     >
+      <CharacterAbilityVisualizer character={selectedCharacter} />
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {unlockedCharacters.map((character, i) => {
           const stats = effectiveStats(character, meta);
