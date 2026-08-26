@@ -1140,6 +1140,17 @@ export interface RunResult {
   };
   /** City relic knowledge found by clearing a district for the first time. */
   newlyDiscoveredRelicIds?: string[];
+  /** Optional district setpiece encounter state from this run. */
+  districtIncursion?: {
+    id: string;
+    title: string;
+    landmark: string;
+    phase: DistrictIncursionPhase;
+    progress: number;
+    target: number;
+    rewardCred: number;
+    rewardTokens: number;
+  };
   /** Relic recipe applied during the run, if one was chosen at level-up. */
   relicRecipe?: {
     id: string;
@@ -1239,6 +1250,17 @@ export interface HudSnapshot {
     chapter: number;
     title: string;
     text: string;
+  };
+  districtIncursion?: {
+    id: string;
+    title: string;
+    landmark: string;
+    objectiveLabel: string;
+    phase: DistrictIncursionPhase;
+    progress: number;
+    target: number;
+    accent: string;
+    remainingSec: number;
   };
   episode?: {
     id: string;

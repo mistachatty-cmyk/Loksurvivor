@@ -534,6 +534,78 @@ function effectiveGround(w: World) {
   return w.area.ground;
 }
 
+function drawDistrictIncursion(ctx: CanvasRenderingContext2D, w: World) {
+  const state = w.districtIncursion;
+  if (!state || state.phase === 'pending') return;
+  const x = 0;
+  const y = -150;
+  const accent = state.accent;
+  ctx.save();
+  ctx.globalAlpha = state.phase === 'warning' ? 0.34 : state.phase === 'active' ? 0.56 : 0.22;
+  ctx.strokeStyle = accent;
+  ctx.fillStyle = `${accent}18`;
+  ctx.lineWidth = 3;
+  ctx.setLineDash(state.phase === 'warning' ? [10, 8] : []);
+
+  if (state.kind === 'flood-surge') {
+    const safeLane = ((state.cycle + 1) % 3 - 1) * 180;
+    for (const lane of [-180, 0, 180]) {
+      ctx.fillStyle = lane === safeLane ? `${accent}32` : '#147e8c18';
+      ctx.fillRect(lane - 48, y - 275, 96, 550);
+      ctx.strokeRect(lane - 48, y - 275, 96, 550);
+    }
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(state.phase === 'active' ? 'SAFE LANE' : 'LANES SHIFTING', safeLane, y - 286);
+  } else if (state.kind === 'market-bell') {
+    ctx.beginPath();
+    ctx.arc(x, y, 160, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 188, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.fillRect(x - 12, y - 24, 24, 24);
+    ctx.beginPath();
+    ctx.arc(x, y - 24, 17, Math.PI, 0);
+    ctx.stroke();
+  } else if (state.kind === 'freight-arrival') {
+    for (const trackY of [-72, 0, 72]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 300, y + trackY);
+      ctx.lineTo(x + 300, y + trackY);
+      ctx.stroke();
+      for (let trackX = -280; trackX <= 280; trackX += 42) {
+        ctx.fillRect(trackX - 2, y + trackY - 8, 4, 16);
+      }
+    }
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('MOVING COVER', x, y - 116);
+  } else if (state.kind === 'fountain-ritual') {
+    const safeAngle = Math.PI / 2 + (state.cycle % 4) * (Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, 260, safeAngle - 0.88, safeAngle + 0.88);
+    ctx.closePath();
+    ctx.fillStyle = `${accent}38`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 260, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 90, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SAFE QUARTER', x, y - 272);
+  }
+  ctx.restore();
+}
+
 function inferObstacleKind(obs: { w: number; h: number }): ObstacleDef['kind'] {
   const aspect = obs.w / obs.h;
   if (aspect > 2.5) return 'barrier';
@@ -1726,6 +1798,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   drawLightPool(ctx, w);
   drawLandmark(ctx, w);
+  drawDistrictIncursion(ctx, w);
   drawObjectLighting(ctx, w);
   drawArenaEdges(ctx, w);
   drawDungeonRoomBorder(ctx, w);

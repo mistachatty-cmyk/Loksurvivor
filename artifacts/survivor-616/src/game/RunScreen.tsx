@@ -663,6 +663,37 @@ export function RunScreen({
           </div>
         ) : null}
 
+        {hud?.districtIncursion && hud.districtIncursion.phase !== 'pending' ? (
+          <div
+            className="mx-auto w-full max-w-xl border bg-black/80 px-3 py-2"
+            style={{ borderColor: `${hud.districtIncursion.accent}88` }}
+            data-testid="row-district-incursion"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: hud.districtIncursion.accent }}>
+                {hud.districtIncursion.title} · {hud.districtIncursion.landmark}
+              </span>
+              <span className="font-mono text-[10px] uppercase text-white/70">
+                {hud.districtIncursion.phase === 'active'
+                  ? `${hud.districtIncursion.progress}/${hud.districtIncursion.target} · ${hud.districtIncursion.remainingSec}s`
+                  : hud.districtIncursion.phase}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-white/80">{hud.districtIncursion.objectiveLabel}</p>
+            {hud.districtIncursion.phase === 'active' ? (
+              <div className="mt-2 h-1 overflow-hidden bg-white/10">
+                <div
+                  className="h-full transition-[width]"
+                  style={{
+                    width: `${Math.min(100, (hud.districtIncursion.progress / Math.max(1, hud.districtIncursion.target)) * 100)}%`,
+                    backgroundColor: hud.districtIncursion.accent,
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {hud?.evolution ? (
           <div
             className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"

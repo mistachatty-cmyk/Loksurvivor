@@ -93,6 +93,34 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
             <p className="mt-4 border-t border-cyan-200/15 pt-3 text-xs italic leading-relaxed text-cyan-100/70">“{firstNight.thread}”</p>
           </section>
         ) : null}
+
+        {result.districtIncursion ? (
+          <section
+            className="border p-5"
+            style={{ borderColor: result.districtIncursion.phase === 'complete' ? '#35d0bb88' : '#f26b5e88', backgroundColor: result.districtIncursion.phase === 'complete' ? '#35d0bb0d' : '#f26b5e0d' }}
+            data-testid="section-district-incursion"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-white/60">Landmark setpiece · {result.districtIncursion.landmark}</p>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">{result.districtIncursion.title}</h2>
+              </div>
+              <span className={`font-mono text-[10px] font-bold uppercase tracking-widest ${result.districtIncursion.phase === 'complete' ? 'text-primary' : 'text-amber-200'}`}>
+                {result.districtIncursion.phase === 'complete' ? 'Completed' : 'Failed'}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-white/75">
+              <span>Progress {result.districtIncursion.progress}/{result.districtIncursion.target}</span>
+              {result.districtIncursion.phase === 'complete' ? (
+                <span className="text-primary">
+                  +{result.districtIncursion.rewardCred} cred{result.districtIncursion.rewardTokens > 0 ? ` · +${result.districtIncursion.rewardTokens} token${result.districtIncursion.rewardTokens === 1 ? '' : 's'}` : ''}
+                </span>
+              ) : (
+                <span>The encounter reward was not claimed.</span>
+              )}
+            </div>
+          </section>
+        ) : null}
         
         {result.episode ? (
           <section className="border border-primary/35 bg-primary/5 p-5" data-testid="section-character-episode">

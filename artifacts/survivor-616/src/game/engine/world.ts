@@ -22,6 +22,7 @@ import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
+import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -30,6 +31,7 @@ import type {
   ChallengeContractDef,
   CharacterDef,
   CompletedObjective,
+  DistrictIncursionState,
   EnemyDef,
   EndlessState,
   EvolutionBehavior,
@@ -496,6 +498,8 @@ export interface World {
   /** Authored opening-campaign cue for this area, when one exists. */
   firstNightChapter?: ReturnType<typeof getFirstNightChapter>;
   firstNightBeatTriggered: boolean;
+  /** Optional, short landmark encounter selected for this run. */
+  districtIncursion?: DistrictIncursionState;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -581,6 +585,7 @@ export function createWorld(
     knownRelicIds?: string[];
     episode?: CharacterEpisodeDef;
     episodeProgress?: number;
+    districtIncursionId?: string;
   } = {},
 ): World {
   const player: PlayerActor = {
@@ -611,6 +616,7 @@ export function createWorld(
   };
 
   const rng = createRng(seed);
+  const selectedIncursion = chooseDistrictIncursion(area.id, rng, setup.districtIncursionId);
   const evolved = EVOLUTIONS.find((candidate) =>
     candidate.characterId === character.id &&
     candidate.baseWeaponId === character.weapon.id &&
@@ -694,6 +700,30 @@ export function createWorld(
     rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
     firstNightChapter: getFirstNightChapter(area.id),
     firstNightBeatTriggered: false,
+    districtIncursion: selectedIncursion
+      ? {
+          id: selectedIncursion.id,
+          kind: selectedIncursion.kind,
+          title: selectedIncursion.title,
+          landmark: selectedIncursion.landmark,
+          objectiveLabel: selectedIncursion.objectiveLabel,
+          phase: 'pending',
+          progress: 0,
+          target: selectedIncursion.target,
+          accent: selectedIncursion.accent,
+          startedAt: 0,
+          endsAt: 0,
+          cycle: -1,
+          nextPulseAt: 0,
+          nextHazardTickAt: 0,
+          outsideSafeSince: 0,
+          startingKills: 0,
+          rewardCred: selectedIncursion.rewardCred,
+          rewardTokens: selectedIncursion.rewardTokens,
+          rewardGranted: false,
+          propUids: [],
+        }
+      : undefined,
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     lootBoxesOpened: 0,
@@ -1061,6 +1091,261 @@ function updateSpawning(w: World, dt: number) {
         }
       }
     }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* District setpiece incursions                                        */
+/* ------------------------------------------------------------------ */
+
+function incursionEffect(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+  lifetimeMs = 760,
+) {
+  w.effects.push({
+    uid: uid(w),
+    kind: 'hazard',
+    x,
+    y,
+    radius,
+    angle: 0,
+    spread: Math.PI,
+    bornAt: w.now,
+    expiresAt: w.now + lifetimeMs,
+    color,
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+}
+
+function incursionAnchor() {
+  return { x: 0, y: -150 };
+}
+
+function startDistrictIncursion(w: World, state: DistrictIncursionState) {
+  const def = DISTRICT_INCURSIONS_BY_ID[state.id];
+  if (!def || state.phase !== 'warning') return;
+
+  state.phase = 'active';
+  state.startedAt = w.now;
+  state.endsAt = w.now + def.durationSec * 1000;
+  state.startingKills = w.kills;
+  state.nextPulseAt = w.now;
+  state.nextHazardTickAt = w.now;
+  state.outsideSafeSince = 0;
+  state.cycle = -1;
+  pushAlert(w, `${def.title} — ${def.activeText}`);
+  spawnParticles(w, 0, -150, def.accent, 22, 150);
+  w.shake = Math.max(w.shake, 8);
+
+  const anchor = incursionAnchor();
+  if (state.kind === 'flood-surge') {
+    for (const offset of [-260, -120, 120, 260]) {
+      spawnEnemy(w, getEnemy('river-wraith'), 1.08, { x: anchor.x + offset, y: anchor.y + 40 });
+    }
+  } else if (state.kind === 'market-bell') {
+    const crowd = [
+      ['belfry-bat', -210, -50],
+      ['belfry-bat', -120, 40],
+      ['corner-cutter', -250, 90],
+      ['corner-cutter', 210, 90],
+      ['belfry-bat', 120, 40],
+      ['belfry-bat', 210, -50],
+      ['bloodhound', -70, 110],
+      ['bloodhound', 70, 110],
+    ] as const;
+    for (const [enemyId, x, y] of crowd) {
+      spawnEnemy(w, getEnemy(enemyId), 1.12, { x: anchor.x + x, y: anchor.y + y });
+    }
+  } else if (state.kind === 'freight-arrival') {
+    for (const [enemyId, x, y] of [
+      ['lightless-prowler', -250, -120],
+      ['bloodhound', 250, -120],
+      ['river-wraith', -260, 120],
+      ['crypt-bouncer', 250, 120],
+    ] as const) {
+      spawnEnemy(w, getEnemy(enemyId), enemyId === 'crypt-bouncer' ? 0.78 : 1.08, {
+        x: anchor.x + x,
+        y: anchor.y + y,
+      });
+    }
+    for (const [index, x] of [-230, 0, 230].entries()) {
+      const freight = createBreakable(w, {
+        x,
+        y: anchor.y + (index - 1) * 72,
+        w: 156,
+        h: 46,
+        kind: 'car-wreck',
+        propVariant: 'medium-movable',
+      });
+      freight.vx = index % 2 === 0 ? 130 : -130;
+      state.propUids.push(freight.uid);
+      w.breakables.push(freight);
+    }
+    syncObstacleAabbs(w);
+  } else if (state.kind === 'fountain-ritual') {
+    for (const [enemyId, x, y] of [
+      ['ring-scribe', -250, -80],
+      ['ring-scribe', 250, -80],
+      ['ash-wisp', -220, 120],
+      ['ash-wisp', 220, 120],
+      ['corner-cutter', 0, 190],
+    ] as const) {
+      spawnEnemy(w, getEnemy(enemyId), 1.1, { x: anchor.x + x, y: anchor.y + y });
+    }
+    // Reuse plaza planters as the ritual's rearranging cover. If an authored
+    // layout has fewer than four, supplement it with the same live prop type.
+    const existing = w.breakables.filter((prop) => prop.kind === 'planter').slice(0, 4);
+    state.propUids.push(...existing.map((prop) => prop.uid));
+    for (let i = existing.length; i < 4; i += 1) {
+      const planter = createBreakable(w, {
+        x: 0,
+        y: -150,
+        w: 52,
+        h: 52,
+        kind: 'planter',
+        propVariant: 'fixed-bench',
+      });
+      state.propUids.push(planter.uid);
+      w.breakables.push(planter);
+    }
+    syncObstacleAabbs(w);
+  }
+}
+
+function finishDistrictIncursion(w: World, completed: boolean) {
+  const state = w.districtIncursion;
+  if (!state || (state.phase !== 'active' && state.phase !== 'warning')) return;
+  const def = DISTRICT_INCURSIONS_BY_ID[state.id];
+  if (!def) return;
+
+  state.phase = completed ? 'complete' : 'failed';
+  if (completed && !state.rewardGranted) {
+    state.rewardGranted = true;
+    w.cred += state.rewardCred;
+    w.lootTokensGained += state.rewardTokens;
+    pushAlert(w, def.completeText);
+    spawnParticles(w, 0, -150, def.accent, 18, 120);
+  } else if (!completed) {
+    pushAlert(w, def.failureText);
+  }
+  if (state.kind === 'freight-arrival') {
+    for (const prop of w.breakables) {
+      if (state.propUids.includes(prop.uid)) {
+        prop.vx = 0;
+        prop.vy = 0;
+      }
+    }
+  }
+}
+
+function incursionSafeLane(state: DistrictIncursionState): number {
+  return ((state.cycle + 1) % 3 - 1) * 180;
+}
+
+function incursionSafeSector(state: DistrictIncursionState): number {
+  return Math.PI / 2 + (state.cycle % 4) * (Math.PI / 2);
+}
+
+function inSafeSector(w: World, state: DistrictIncursionState): boolean {
+  const anchor = incursionAnchor();
+  const dx = w.player.x - anchor.x;
+  const dy = w.player.y - anchor.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance > 330) return false;
+  const angle = Math.atan2(dy, dx);
+  let diff = angle - incursionSafeSector(state);
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return Math.abs(diff) <= 0.88;
+}
+
+function updateDistrictIncursion(w: World, dt: number) {
+  const state = w.districtIncursion;
+  if (!state) return;
+  const def = DISTRICT_INCURSIONS_BY_ID[state.id];
+  if (!def) return;
+
+  if (state.phase === 'pending' && w.time >= def.triggerAtSec - def.warningLeadSec) {
+    state.phase = 'warning';
+    pushAlert(w, `${def.title} — ${def.warningText}`);
+    spawnParticles(w, 0, -150, def.accent, 10, 80);
+  }
+  if (state.phase === 'warning' && w.time >= def.triggerAtSec) startDistrictIncursion(w, state);
+  if (state.phase !== 'active') return;
+
+  const elapsed = Math.max(0, (w.now - state.startedAt) / 1000);
+  state.cycle = Math.floor(elapsed / (state.kind === 'fountain-ritual' ? 3.6 : state.kind === 'flood-surge' ? 4 : 5));
+
+  if (state.kind === 'market-bell') {
+    state.progress = Math.min(state.target, Math.max(0, w.kills - state.startingKills));
+    if (w.now >= state.nextPulseAt) {
+      state.nextPulseAt = w.now + 3000;
+      const anchor = incursionAnchor();
+      incursionEffect(w, anchor.x, anchor.y, 160, state.accent, 580);
+      for (const enemy of w.enemies) {
+        if (enemy.dying) continue;
+        const dx = enemy.x - anchor.x;
+        const dy = enemy.y - anchor.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance > 220) continue;
+        const length = distance || 1;
+        const force = 180 * Math.max(0.25, 1 - distance / 220);
+        enemy.kx += (dx / length) * force;
+        enemy.ky += (dy / length) * force;
+      }
+      spawnParticles(w, anchor.x, anchor.y, state.accent, 8, 90);
+      pushAlert(w, 'BELL PULSE — crowd pushed back');
+    }
+  } else if (state.kind === 'freight-arrival') {
+    for (const [index, prop] of state.propUids.map((uid) => w.breakables.find((candidate) => candidate.uid === uid)).entries()) {
+      if (!prop || prop.broken) continue;
+      const direction = state.cycle % 2 === 0 ? 1 : -1;
+      prop.vx = direction * (120 + index * 18);
+      prop.vy = 0;
+      if (prop.x > w.bounds.w / 2 - 110 || prop.x < -w.bounds.w / 2 + 110) prop.vx *= -1;
+    }
+    const covered = state.propUids.some((propUid) => {
+      const prop = w.breakables.find((candidate) => candidate.uid === propUid);
+      return prop && !prop.broken && dist2(w.player.x, w.player.y, prop.x, prop.y) < 125 * 125;
+    });
+    if (covered) state.progress = Math.min(state.target, state.progress + dt);
+  } else {
+    const safe = state.kind === 'flood-surge'
+      ? Math.abs(w.player.x - incursionSafeLane(state)) <= 92
+      : inSafeSector(w, state);
+    if (safe) {
+      state.progress = Math.min(state.target, state.progress + dt);
+      state.outsideSafeSince = 0;
+    } else {
+      if (state.outsideSafeSince === 0) state.outsideSafeSince = w.now;
+      if (w.now >= state.nextHazardTickAt) {
+        state.nextHazardTickAt = w.now + 760;
+        damagePlayer(w, state.kind === 'flood-surge' ? 5 : 4, w.player.x + (w.player.x >= 0 ? 90 : -90), w.player.y);
+      }
+      if (w.now - state.outsideSafeSince > 4600) {
+        finishDistrictIncursion(w, false);
+        return;
+      }
+    }
+    if (w.now >= state.nextPulseAt) {
+      state.nextPulseAt = w.now + (state.kind === 'flood-surge' ? 4000 : 3600);
+      const anchor = incursionAnchor();
+      incursionEffect(w, state.kind === 'flood-surge' ? incursionSafeLane(state) : anchor.x, anchor.y, 125, state.accent, 900);
+      spawnParticles(w, anchor.x, anchor.y, state.accent, 7, 90);
+    }
+  }
+
+  if (state.progress >= state.target) {
+    finishDistrictIncursion(w, true);
+  } else if (w.now >= state.endsAt) {
+    finishDistrictIncursion(w, false);
   }
 }
 
@@ -4176,6 +4461,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  updateDistrictIncursion(w, dt);
 
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
@@ -4342,6 +4628,21 @@ export function hudSnapshot(w: World): HudSnapshot {
           text: w.firstNightChapter.beatText,
         }
       : undefined,
+    districtIncursion: w.districtIncursion
+      ? {
+          id: w.districtIncursion.id,
+          title: w.districtIncursion.title,
+          landmark: w.districtIncursion.landmark,
+          objectiveLabel: w.districtIncursion.objectiveLabel,
+          phase: w.districtIncursion.phase,
+          progress: Math.min(w.districtIncursion.target, Math.floor(w.districtIncursion.progress)),
+          target: w.districtIncursion.target,
+          accent: w.districtIncursion.accent,
+          remainingSec: w.districtIncursion.phase === 'active'
+            ? Math.max(0, Math.ceil((w.districtIncursion.endsAt - w.now) / 1000))
+            : 0,
+        }
+      : undefined,
     objectives: w.objectives.map((o) => ({
       label: o.def.label,
       progress: Math.min(o.def.targetCount, Math.round(o.progress)),
@@ -4487,6 +4788,18 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
           beatTitle: w.firstNightChapter.beatTitle,
           beatTriggered: w.firstNightBeatTriggered,
           thread: w.firstNightChapter.thread,
+        }
+      : undefined,
+    districtIncursion: w.districtIncursion
+      ? {
+          id: w.districtIncursion.id,
+          title: w.districtIncursion.title,
+          landmark: w.districtIncursion.landmark,
+          phase: w.districtIncursion.phase,
+          progress: Math.min(w.districtIncursion.target, Math.floor(w.districtIncursion.progress)),
+          target: w.districtIncursion.target,
+          rewardCred: w.districtIncursion.rewardCred,
+          rewardTokens: w.districtIncursion.rewardTokens,
         }
       : undefined,
     challenges: w.challenges.map((challenge) => ({

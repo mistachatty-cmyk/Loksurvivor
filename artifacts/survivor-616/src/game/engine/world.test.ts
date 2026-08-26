@@ -18,6 +18,7 @@ import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
+import { DISTRICT_INCURSIONS, DISTRICT_INCURSIONS_BY_ID, chooseDistrictIncursion } from '@/game/data/incursions';
 import {
   createWorld,
   dashPlayer,
@@ -1862,4 +1863,97 @@ test('completed character episodes persist progress and unlock their signature a
   assert.ok(state.meta.completedEpisodeIds.includes(episode.id));
   assert.ok(state.meta.unlockedEvolutionIds.includes(episode.evolutionId));
   assert.equal(state.meta.episodeProgressById[episode.id], episode.objective.targetCount);
+});
+
+function activateIncursion(world: ReturnType<typeof createWorld>, id: string) {
+  const def = DISTRICT_INCURSIONS_BY_ID[id]!;
+  world.time = def.triggerAtSec - def.warningLeadSec;
+  world.now = world.time * 1000;
+  for (let elapsed = 0; elapsed < def.warningLeadSec; elapsed += 1 / 30) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+  assert.equal(world.districtIncursion?.phase, 'active');
+}
+
+test('district incursions are optional by seed and every authored landmark has a fixed-step trigger', () => {
+  assert.equal(chooseDistrictIncursion('riverfront', () => 0.99), undefined);
+  assert.equal(chooseDistrictIncursion('riverfront', () => 0), DISTRICT_INCURSIONS_BY_ID['floodwall-surge']);
+
+  for (const def of DISTRICT_INCURSIONS) {
+    const area = AREAS.find((candidate) => candidate.id === def.areaId)!;
+    const world = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616, [], 1, true, null, {
+      districtIncursionId: def.id,
+    });
+    assert.equal(world.districtIncursion?.id, def.id);
+    activateIncursion(world, def.id);
+    assert.equal(world.districtIncursion?.phase, 'active');
+    if (def.kind === 'freight-arrival') assert.equal(world.districtIncursion?.propUids.length, 3);
+  }
+});
+
+test('market bell completion pays once and remains safe after the encounter ends', () => {
+  const def = DISTRICT_INCURSIONS_BY_ID['market-bell']!;
+  const area = AREAS.find((candidate) => candidate.id === def.areaId)!;
+  const world = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616, [], 1, true, null, {
+    districtIncursionId: def.id,
+  });
+  activateIncursion(world, def.id);
+  world.kills += def.target;
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.districtIncursion?.phase, 'complete');
+  assert.equal(world.cred, def.rewardCred);
+  assert.equal(world.lootTokensGained, def.rewardTokens);
+  const paidTokens = world.lootTokensGained;
+  for (let elapsed = 0; elapsed < 4; elapsed += 1 / 30) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.cred, def.rewardCred);
+  assert.ok(world.lootTokensGained >= paidTokens);
+});
+
+test('floodwall failure recovers without ending the normal run', () => {
+  const def = DISTRICT_INCURSIONS_BY_ID['floodwall-surge']!;
+  const area = AREAS.find((candidate) => candidate.id === def.areaId)!;
+  const world = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616, [], 1, true, null, {
+    districtIncursionId: def.id,
+  });
+  activateIncursion(world, def.id);
+  world.player.x = 330;
+  for (let elapsed = 0; elapsed < 5; elapsed += 1 / 30) stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.districtIncursion?.phase, 'failed');
+  assert.equal(world.outcome, 'running');
+  assert.equal(world.cred, 0);
+});
+
+test('freight cover moves inside bounds and stops cleanly on completion', () => {
+  const def = DISTRICT_INCURSIONS_BY_ID['freight-arrival']!;
+  const area = AREAS.find((candidate) => candidate.id === def.areaId)!;
+  const world = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616, [], 1, true, null, {
+    districtIncursionId: def.id,
+  });
+  activateIncursion(world, def.id);
+  const initialX = world.breakables.find((prop) => prop.uid === world.districtIncursion?.propUids[0])?.x;
+  for (let elapsed = 0; elapsed < 1; elapsed += 1 / 30) stepWorld(world, 1 / 30, neutralInput);
+  const freight = world.breakables.filter((prop) => world.districtIncursion?.propUids.includes(prop.uid));
+  assert.ok(freight.length === 3);
+  assert.ok(freight.every((prop) => Math.abs(prop.x) <= world.bounds.w / 2));
+  assert.notEqual(freight[0]?.x, initialX);
+
+  world.districtIncursion!.progress = def.target;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.districtIncursion?.phase, 'complete');
+  assert.ok(freight.every((prop) => prop.vx === 0 && prop.vy === 0));
+});
+
+test('completed or dead outcomes do not advance a pending district incursion', () => {
+  const def = DISTRICT_INCURSIONS_BY_ID['fountain-ritual']!;
+  const area = AREAS.find((candidate) => candidate.id === def.areaId)!;
+  const world = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616, [], 1, true, null, {
+    districtIncursionId: def.id,
+  });
+  world.outcome = 'dead';
+  world.time = def.triggerAtSec + 2;
+  world.now = world.time * 1000;
+  stepWorld(world, 1, neutralInput);
+  assert.equal(world.districtIncursion?.phase, 'pending');
 });

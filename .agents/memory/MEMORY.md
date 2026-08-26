@@ -6,3 +6,4 @@
 - [Browser regression tests](browser-regression-tests.md) — Playwright tests use an explicit Chromium executable override when the Nix shell lacks bundled browser libraries.
 - [Impact physics contract](impact-physics.md) — authored force stays separate from damage, and lethal bursts must reuse the single kill/reward path.
 - [Pothole impact contract](potholes.md) — pits activate only from explicit stomp/ground-shock tags and remain separate from solid collision props.
+- [District setpiece contract](district-setpieces.md) — landmark incursions are optional seeded interruptions with shared simulation, bounded one-time rewards, and normal run recovery.
