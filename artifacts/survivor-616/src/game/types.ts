@@ -153,6 +153,26 @@ export interface LokPetRoll {
   traitLabel: string;
 }
 
+/** A run-independent record of a LokPet variant seen in any run. */
+export interface LokPetCatalogTrait {
+  attackKind: LokPetAttackKind;
+  element: LokPetElement;
+  elementLabel: string;
+  label: string;
+}
+
+export interface LokPetCatalogEntry {
+  variantId: string;
+  family: LokPetFamily;
+  silhouette: LokPetSilhouette;
+  palette: LokPetPalette;
+  /** Rarities observed for this variant across all runs. */
+  rarities: LokPetRarity[];
+  /** Distinct combat traits observed for this variant across all runs. */
+  traits: LokPetCatalogTrait[];
+  sightings: number;
+}
+
 /** A generated LokPet currently orbiting the player in a run. */
 export interface LokPetInstance extends LokPetRoll {
   uid: number;
@@ -671,6 +691,8 @@ export interface MetaState {
   clearedAreaIds: string[];
   rescuedAllyIds: string[];
   discoveryIds: string[];
+  /** Variant discoveries recorded from generated LokPets between runs. */
+  lokPetCatalog: LokPetCatalogEntry[];
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
   totalKills: number;
@@ -723,10 +745,16 @@ export interface RunResult {
   /** LokPets generated from chest rewards during this run. */
   lokPets: Array<{
     name: string;
+    variantId: string;
     family: LokPetFamily;
+    silhouette: LokPetSilhouette;
+    palette: LokPetPalette;
     rarity: LokPetRarity;
+    rarityLabel: string;
     attackKind: LokPetAttackKind;
     element: LokPetElement;
+    elementLabel: string;
+    traitLabel: string;
     health: number;
     damage: number;
     cooldownMs: number;

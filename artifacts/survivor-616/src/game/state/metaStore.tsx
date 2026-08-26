@@ -19,6 +19,7 @@ import {
 import { AREAS, getArea } from '@/game/data/areas';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { ENEMIES } from '@/game/data/enemies';
+import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
 import {
   RECOVERY_FACILITIES,
@@ -31,6 +32,11 @@ import type {
   BaseStats,
   CharacterDef,
   HubRoomDef,
+  LokPetAttackKind,
+  LokPetCatalogEntry,
+  LokPetCatalogTrait,
+  LokPetElement,
+  LokPetRarity,
   MetaState,
   RunResult,
   FacilityTier,
@@ -39,7 +45,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 2;
+const META_VERSION = 3;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -91,6 +97,7 @@ export function createInitialMeta(): MetaState {
     clearedAreaIds: [],
     rescuedAllyIds: [],
     discoveryIds: [],
+    lokPetCatalog: [],
     bestiary: {},
     totalKills: 0,
     totalRuns: 0,
@@ -121,6 +128,124 @@ function counter(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : fallback;
+}
+
+const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
+const LOKPET_ATTACK_KINDS: LokPetAttackKind[] = ['shot', 'rapid-shot', 'heavy-shot', 'pulse', 'explosion'];
+const LOKPET_ELEMENTS: LokPetElement[] = ['none', 'fire', 'freeze', 'slow'];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+function isOneOf<T extends string>(value: unknown, values: T[]): value is T {
+  return typeof value === 'string' && values.includes(value as T);
+}
+
+function catalogTraitKey(trait: Pick<LokPetCatalogTrait, 'attackKind' | 'element'>): string {
+  return `${trait.attackKind}:${trait.element}`;
+}
+
+/**
+ * Normalize catalog records independently from the rest of the save. The
+ * variant sheet is the source of truth for presentation fields, so malformed
+ * localStorage cannot inject a different palette or identity into the archive.
+ */
+function normalizeLokPetCatalog(value: unknown): LokPetCatalogEntry[] {
+  if (!Array.isArray(value)) return [];
+
+  const entries = new Map<string, LokPetCatalogEntry>();
+  for (const rawValue of value) {
+    if (!isRecord(rawValue) || typeof rawValue.variantId !== 'string') continue;
+    const variant = LOKPET_VARIANTS_BY_ID[rawValue.variantId];
+    if (!variant) continue;
+
+    const rarities = Array.isArray(rawValue.rarities)
+      ? rawValue.rarities.filter((rarity): rarity is LokPetRarity => isOneOf(rarity, LOKPET_RARITIES))
+      : [];
+    const traits: LokPetCatalogTrait[] = [];
+    if (Array.isArray(rawValue.traits)) {
+      for (const traitValue of rawValue.traits) {
+        if (!isRecord(traitValue)) continue;
+        if (!isOneOf(traitValue.attackKind, LOKPET_ATTACK_KINDS)) continue;
+        if (!isOneOf(traitValue.element, LOKPET_ELEMENTS)) continue;
+        const trait: LokPetCatalogTrait = {
+          attackKind: traitValue.attackKind,
+          element: traitValue.element,
+          elementLabel: typeof traitValue.elementLabel === 'string' ? traitValue.elementLabel : traitValue.element,
+          label: typeof traitValue.label === 'string' ? traitValue.label : traitValue.attackKind,
+        };
+        if (!traits.some((candidate) => catalogTraitKey(candidate) === catalogTraitKey(trait))) {
+          traits.push(trait);
+        }
+      }
+    }
+
+    const current = entries.get(variant.id);
+    if (current) {
+      current.rarities = [...new Set([...current.rarities, ...rarities])];
+      for (const trait of traits) {
+        if (!current.traits.some((candidate) => catalogTraitKey(candidate) === catalogTraitKey(trait))) {
+          current.traits.push(trait);
+        }
+      }
+      current.sightings += counter(rawValue.sightings);
+      continue;
+    }
+
+    entries.set(variant.id, {
+      variantId: variant.id,
+      family: variant.family,
+      silhouette: variant.silhouette,
+      palette: variant.palette,
+      rarities: [...new Set(rarities)],
+      traits,
+      sightings: counter(rawValue.sightings),
+    });
+  }
+
+  return [...entries.values()];
+}
+
+function recordLokPetCatalog(existing: LokPetCatalogEntry[], pets: RunResult['lokPets']): LokPetCatalogEntry[] {
+  const entries = new Map(
+    existing.map((entry) => [
+      entry.variantId,
+      {
+        ...entry,
+        rarities: [...entry.rarities],
+        traits: entry.traits.map((trait) => ({ ...trait })),
+      },
+    ]),
+  );
+
+  for (const pet of pets) {
+    const variant = LOKPET_VARIANTS_BY_ID[pet.variantId];
+    if (!variant) continue;
+    const entry = entries.get(variant.id) ?? {
+      variantId: variant.id,
+      family: variant.family,
+      silhouette: variant.silhouette,
+      palette: variant.palette,
+      rarities: [],
+      traits: [],
+      sightings: 0,
+    };
+    entry.sightings += 1;
+    if (!entry.rarities.includes(pet.rarity)) entry.rarities.push(pet.rarity);
+    const trait: LokPetCatalogTrait = {
+      attackKind: pet.attackKind,
+      element: pet.element,
+      elementLabel: pet.elementLabel,
+      label: pet.traitLabel,
+    };
+    if (!entry.traits.some((candidate) => catalogTraitKey(candidate) === catalogTraitKey(trait))) {
+      entry.traits.push(trait);
+    }
+    entries.set(variant.id, entry);
+  }
+
+  return [...entries.values()];
 }
 
 /** Coerce an untrusted save payload into a usable MetaState. */
@@ -191,6 +316,7 @@ function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
     rescuedAllyIds: idList(parsed.rescuedAllyIds, allyIds, []),
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
+    lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
     bestiary,
     totalKills: counter(parsed.totalKills),
     totalRuns: counter(parsed.totalRuns),
@@ -214,7 +340,7 @@ function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -430,12 +556,14 @@ function reducer(state: StoreState, action: Action): StoreState {
       const clearedAreaIds = result.cleared
         ? addUnique(prev.clearedAreaIds, result.areaId)
         : prev.clearedAreaIds;
+      const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
 
       const next: MetaState = {
         ...prev,
         bestiary,
         rescuedAllyIds,
         discoveryIds,
+        lokPetCatalog,
         clearedAreaIds,
         totalKills: prev.totalKills + result.kills,
         totalRuns: prev.totalRuns + 1,

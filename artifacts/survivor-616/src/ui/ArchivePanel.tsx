@@ -4,9 +4,16 @@
  */
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
+import {
+  LOKPET_ELEMENT_COLORS,
+  LOKPET_RARITY_COLORS,
+  LOKPET_SILHOUETTE_LABELS,
+  LOKPET_VARIANTS,
+} from '@/game/data/lokPets';
 import { ALLIES, DISCOVERIES } from '@/game/data/progression';
 import { STATUS_EFFECTS } from '@/game/data/statusEffects';
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { LokPetIcon } from './LokPetVariantSheet';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
 import { Trash2, Users, MapPin, User, Search, Sparkles } from 'lucide-react';
@@ -17,6 +24,7 @@ export interface ArchivePanelProps {
 
 export function ArchivePanel({ onBack }: ArchivePanelProps) {
   const { meta, resetProgress } = useMeta();
+  const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
 
   const sections = [
     {
@@ -116,6 +124,100 @@ export function ArchivePanel({ onBack }: ArchivePanelProps) {
       }
     >
       <div className="space-y-12">
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-lokpet-catalog"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Sparkles className="h-5 w-5 text-pink-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">LokPet Catalog</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Temporary companions, permanent discoveries</p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">
+              {catalogByVariant.size} / {LOKPET_VARIANTS.length}
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {LOKPET_VARIANTS.map((variant) => {
+              const entry = catalogByVariant.get(variant.id);
+              const found = Boolean(entry);
+              return (
+                <article
+                  key={variant.id}
+                  className={`border border-l-4 p-4 ${found ? 'border-border border-l-pink-300 bg-card' : 'border-border/50 border-l-border/50 bg-card/30'}`}
+                  data-testid={`card-lokpet-${variant.id}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={found ? '' : 'opacity-25 grayscale'}>
+                      <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} className="h-12 w-12" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className={`truncate text-sm font-black uppercase tracking-wide ${found ? 'text-white' : 'text-muted-foreground'}`}>
+                            {found ? variant.name : 'Unknown signal'}
+                          </h3>
+                          <p className={`mt-1 text-[10px] font-bold uppercase tracking-widest ${found ? 'text-pink-300' : 'text-muted-foreground/60'}`}>
+                            {found ? `${variant.family} · ${LOKPET_SILHOUETTE_LABELS[variant.silhouette]}` : 'Undiscovered LokPet'}
+                          </p>
+                        </div>
+                        {found && (
+                          <span className="shrink-0 font-mono text-[9px] uppercase tracking-widest text-white/40">
+                            {entry?.sightings ?? 0} seen
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {found && entry ? (
+                    <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
+                      <p className="text-xs leading-relaxed text-muted-foreground">{variant.description}</p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="mr-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Rarity</span>
+                        {entry.rarities.map((rarity) => (
+                          <span
+                            key={rarity}
+                            className="border border-white/10 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase"
+                            style={{ color: LOKPET_RARITY_COLORS[rarity] }}
+                          >
+                            {rarity}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="mr-1 text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Traits</span>
+                        {entry.traits.map((trait) => (
+                          <span
+                            key={`${trait.attackKind}:${trait.element}`}
+                            className="border border-white/10 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase"
+                            style={{ color: LOKPET_ELEMENT_COLORS[trait.element] }}
+                            title={trait.label}
+                          >
+                            {trait.label}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5" title="Recorded palette">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Palette</span>
+                        {[variant.palette.body, variant.palette.bodyDark, variant.palette.accent, variant.palette.glow].map((color) => (
+                          <span key={color} className="h-3 w-3 border border-white/20" style={{ backgroundColor: color }} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-4 border-t border-white/10 pt-3 text-xs italic text-muted-foreground/60">
+                      Open a blue loot box during a run to catalogue this signal.
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </motion.section>
+
         {sections.map((section, sIdx) => {
           const Icon = section.icon;
           return (
