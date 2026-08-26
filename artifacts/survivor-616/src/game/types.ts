@@ -188,6 +188,16 @@ export interface LokPetRunDiscovery {
   newTraits: LokPetCatalogTrait[];
 }
 
+/** A persisted, per-run snapshot of LokPet catalog progress. */
+export interface LokPetDiscoveryHistoryEntry {
+  runNumber: number;
+  recordedAt: number;
+  areaId: string;
+  characterId: string;
+  cleared: boolean;
+  discoveries: LokPetRunDiscovery[];
+}
+
 /** A generated LokPet currently orbiting the player in a run. */
 export interface LokPetInstance extends LokPetRoll {
   uid: number;
@@ -735,6 +745,8 @@ export interface MetaState {
   discoveryIds: string[];
   /** Variant discoveries recorded from generated LokPets between runs. */
   lokPetCatalog: LokPetCatalogEntry[];
+  /** Chronological LokPet catalog progress, grouped by run. */
+  lokPetHistory: LokPetDiscoveryHistoryEntry[];
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
   totalKills: number;

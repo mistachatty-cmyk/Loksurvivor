@@ -533,6 +533,9 @@ test('generated LokPets are recorded after both cleared and failed runs', () => 
     result: runResult([runPet(roll)], true),
   });
   assert.equal(state.lastRun?.lokPetDiscoveries?.[0]?.newVariant, true);
+  assert.equal(state.meta.lokPetHistory.length, 1);
+  assert.equal(state.meta.lokPetHistory[0]?.runNumber, 1);
+  assert.equal(state.meta.lokPetHistory[0]?.discoveries[0]?.newVariant, true);
   state = reducer(state, {
     type: 'completeRun',
     result: runResult([runPet(roll)], false),
@@ -543,6 +546,9 @@ test('generated LokPets are recorded after both cleared and failed runs', () => 
   assert.equal(state.meta.lokPetCatalog[0]?.variantId, roll.variantId);
   assert.equal(state.meta.lokPetCatalog[0]?.sightings, 2);
   assert.equal(state.lastRun?.lokPetDiscoveries?.[0]?.newVariant, false);
+  assert.equal(state.meta.lokPetHistory.length, 2);
+  assert.equal(state.meta.lokPetHistory[0]?.runNumber, 2);
+  assert.equal(state.meta.lokPetHistory[0]?.discoveries[0]?.newVariant, false);
 });
 
 test('repeated LokPet sightings merge rarities and distinct traits without duplicates', () => {
@@ -757,6 +763,31 @@ test('malformed catalog records are ignored and cannot inject presentation field
         ],
       },
     ],
+    lokPetHistory: [
+      null,
+      {
+        runNumber: 4,
+        recordedAt: Date.now(),
+        areaId: 'not-a-real-area',
+        characterId: 'not-a-real-character',
+        discoveries: [{
+          variantId: roll.variantId,
+          sightings: 2,
+          totalSightings: 2,
+          newVariant: true,
+          newRarities: ['mythic', 'not-a-rarity', 'mythic'],
+          newTraits: [
+            {
+              attackKind: 'pulse',
+              element: 'freeze',
+              elementLabel: 'untrusted',
+              label: '<script>bad</script>',
+            },
+            { attackKind: 'bad-attack', element: 'freeze' },
+          ],
+        }],
+      },
+    ],
   }, loadMeta);
   const entry = loaded.lokPetCatalog[0]!;
 
@@ -770,6 +801,14 @@ test('malformed catalog records are ignored and cannot inject presentation field
     label: 'single shot · fire',
   }]);
   assert.equal(entry.sightings, 2);
+  assert.equal(loaded.lokPetHistory.length, 1);
+  assert.deepEqual(loaded.lokPetHistory[0]?.discoveries[0]?.newRarities, ['mythic']);
+  assert.deepEqual(loaded.lokPetHistory[0]?.discoveries[0]?.newTraits, [{
+    attackKind: 'pulse',
+    element: 'freeze',
+    elementLabel: 'freeze',
+    label: 'pulsating field · freeze',
+  }]);
 });
 
 test('a LokPet chest prize spawns a generated companion and exposes it to the HUD', () => {

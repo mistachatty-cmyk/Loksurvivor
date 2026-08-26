@@ -36,6 +36,7 @@ import type {
   LokPetAttackKind,
   LokPetCatalogEntry,
   LokPetCatalogTrait,
+  LokPetDiscoveryHistoryEntry,
   LokPetElement,
   LokPetRarity,
   LokPetRunDiscovery,
@@ -100,6 +101,7 @@ export function createInitialMeta(): MetaState {
     rescuedAllyIds: [],
     discoveryIds: [],
     lokPetCatalog: [],
+    lokPetHistory: [],
     bestiary: {},
     totalKills: 0,
     totalRuns: 0,
@@ -331,6 +333,65 @@ function recordLokPetCatalog(existing: LokPetCatalogEntry[], pets: RunResult['lo
   return [...entries.values()];
 }
 
+function normalizeLokPetHistory(value: unknown): LokPetDiscoveryHistoryEntry[] {
+  if (!Array.isArray(value)) return [];
+
+  const history: LokPetDiscoveryHistoryEntry[] = [];
+  for (const rawValue of value) {
+    if (!isRecord(rawValue)) continue;
+    const rawDiscoveries = rawValue.discoveries;
+    if (!Array.isArray(rawDiscoveries)) continue;
+
+    const discoveries: LokPetRunDiscovery[] = [];
+    for (const rawDiscovery of rawDiscoveries) {
+      if (!isRecord(rawDiscovery) || typeof rawDiscovery.variantId !== 'string') continue;
+      if (!LOKPET_VARIANTS_BY_ID[rawDiscovery.variantId]) continue;
+
+      const newRarities = Array.isArray(rawDiscovery.newRarities)
+        ? [...new Set(rawDiscovery.newRarities.filter((rarity): rarity is LokPetRarity => isOneOf(rarity, LOKPET_RARITIES)))]
+        : [];
+      const newTraits: LokPetCatalogTrait[] = [];
+      if (Array.isArray(rawDiscovery.newTraits)) {
+        for (const rawTrait of rawDiscovery.newTraits) {
+          if (!isRecord(rawTrait)) continue;
+          if (!isOneOf(rawTrait.attackKind, LOKPET_ATTACK_KINDS)) continue;
+          if (!isOneOf(rawTrait.element, LOKPET_ELEMENTS)) continue;
+          const trait = canonicalCatalogTrait(rawTrait.attackKind, rawTrait.element);
+          if (!newTraits.some((candidate) => catalogTraitKey(candidate) === catalogTraitKey(trait))) {
+            newTraits.push(trait);
+          }
+        }
+      }
+
+      discoveries.push({
+        variantId: rawDiscovery.variantId,
+        sightings: counter(rawDiscovery.sightings),
+        totalSightings: counter(rawDiscovery.totalSightings),
+        newVariant: rawDiscovery.newVariant === true,
+        newRarities,
+        newTraits,
+      });
+    }
+
+    if (discoveries.length === 0) continue;
+    history.push({
+      runNumber: counter(rawValue.runNumber),
+      recordedAt:
+        typeof rawValue.recordedAt === 'number' && Number.isFinite(rawValue.recordedAt)
+          ? rawValue.recordedAt
+          : 0,
+      areaId: typeof rawValue.areaId === 'string' ? rawValue.areaId : 'unknown',
+      characterId: typeof rawValue.characterId === 'string' ? rawValue.characterId : 'unknown',
+      cleared: rawValue.cleared === true,
+      discoveries,
+    });
+  }
+
+  return history
+    .sort((left, right) => right.recordedAt - left.recordedAt || right.runNumber - left.runNumber)
+    .slice(0, 100);
+}
+
 /** Coerce an untrusted save payload into a usable MetaState. */
 export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
@@ -400,6 +461,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     rescuedAllyIds: idList(parsed.rescuedAllyIds, allyIds, []),
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
+    lokPetHistory: normalizeLokPetHistory(parsed.lokPetHistory),
     bestiary,
     totalKills: counter(parsed.totalKills),
     totalRuns: counter(parsed.totalRuns),
@@ -692,6 +754,19 @@ export function reducer(state: StoreState, action: Action): StoreState {
         : prev.clearedAreaIds;
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
       const lokPetDiscoveries = getLokPetDiscoveries(prev.lokPetCatalog, result.lokPets);
+      const lokPetHistory = lokPetDiscoveries.length > 0
+        ? [
+            {
+              runNumber: prev.totalRuns + 1,
+              recordedAt: Date.now(),
+              areaId: result.areaId,
+              characterId: result.characterId,
+              cleared: result.cleared,
+              discoveries: lokPetDiscoveries,
+            },
+            ...prev.lokPetHistory,
+          ].slice(0, 100)
+        : prev.lokPetHistory;
 
       const next: MetaState = {
         ...prev,
@@ -699,6 +774,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         rescuedAllyIds,
         discoveryIds,
         lokPetCatalog,
+        lokPetHistory,
         clearedAreaIds,
         totalKills: prev.totalKills + result.kills,
         totalRuns: prev.totalRuns + 1,

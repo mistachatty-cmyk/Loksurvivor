@@ -8,6 +8,7 @@ import {
   LOKPET_ELEMENT_COLORS,
   LOKPET_RARITY_COLORS,
   LOKPET_SILHOUETTE_LABELS,
+  LOKPET_VARIANTS_BY_ID,
   LOKPET_VARIANTS,
 } from '@/game/data/lokPets';
 import { ALLIES, DISCOVERIES } from '@/game/data/progression';
@@ -16,8 +17,8 @@ import { describeUnlock, useMeta } from '@/game/state/metaStore';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles } from 'lucide-react';
-import { useEffect } from 'react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
   onBack: () => void;
@@ -26,7 +27,12 @@ export interface ArchivePanelProps {
 
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   const { meta, resetProgress } = useMeta();
+  const [showHistory, setShowHistory] = useState(false);
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
+  const formatHistoryDate = (timestamp: number) => {
+    if (!Number.isFinite(timestamp) || timestamp <= 0 || timestamp > 8640000000000000) return 'Earlier run';
+    return new Date(timestamp).toLocaleDateString();
+  };
 
   useEffect(() => {
     if (!focusVariantId) return;
@@ -227,6 +233,106 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               );
             })}
           </div>
+        </motion.section>
+
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-lokpet-history"
+        >
+          <div className="flex flex-col gap-3 border border-pink-300/20 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <History className="mt-0.5 h-5 w-5 shrink-0 text-pink-300" />
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-widest text-white">Discovery history</h2>
+                <p className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {meta.lokPetHistory.length > 0
+                    ? `${meta.lokPetHistory.length} run${meta.lokPetHistory.length === 1 ? '' : 's'} logged · first sightings and new intel`
+                    : 'Run a blue loot box to start your permanent log'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowHistory((visible) => !visible)}
+              className="inline-flex items-center justify-center gap-2 border border-pink-300/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-pink-200 transition-colors hover:border-pink-200 hover:bg-pink-300/10 sm:shrink-0"
+              aria-expanded={showHistory}
+              data-testid="button-toggle-lokpet-history"
+            >
+              {showHistory ? 'Hide history' : 'View history'}
+              {showHistory ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+
+          {showHistory && (
+            <div className="mt-3 space-y-3" data-testid="lokpet-history-list">
+              {meta.lokPetHistory.length === 0 ? (
+                <div className="border border-dashed border-white/15 bg-black/20 p-5 text-center">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">No signals logged yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground/70">Generated LokPets will appear here after the run ends.</p>
+                </div>
+              ) : (
+                meta.lokPetHistory.map((run) => (
+                  <article key={`${run.runNumber}-${run.recordedAt}`} className="border border-white/10 bg-card p-4" data-testid={`lokpet-history-run-${run.runNumber}`}>
+                    <div className="flex flex-col gap-1 border-b border-white/10 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-white">
+                          Run {run.runNumber} · {AREAS.find((area) => area.id === run.areaId)?.name ?? 'Unknown district'}
+                        </p>
+                        <p className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {CHARACTERS.find((character) => character.id === run.characterId)?.name ?? 'Unknown operative'} · {run.cleared ? 'block cleared' : 'run ended'}
+                        </p>
+                      </div>
+                      <time className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground" dateTime={run.recordedAt > 0 && run.recordedAt <= 8640000000000000 ? new Date(run.recordedAt).toISOString() : undefined}>
+                        {formatHistoryDate(run.recordedAt)}
+                      </time>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {run.discoveries.map((discovery) => {
+                        const variant = LOKPET_VARIANTS_BY_ID[discovery.variantId];
+                        if (!variant) return null;
+                        const hasNewData = discovery.newVariant || discovery.newRarities.length > 0 || discovery.newTraits.length > 0;
+                        return (
+                          <div key={discovery.variantId} className="border border-white/10 bg-black/20 px-3 py-2.5" data-testid={`lokpet-history-${run.runNumber}-${discovery.variantId}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} className="h-7 w-7 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="truncate text-xs font-black uppercase tracking-wide text-white">{variant.name}</p>
+                                  <p className={`mt-0.5 text-[9px] font-bold uppercase tracking-widest ${hasNewData ? 'text-pink-200' : 'text-muted-foreground'}`}>
+                                    {discovery.newVariant ? 'First sighting' : hasNewData ? 'New catalog data' : 'Repeat sighting'}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                                {discovery.sightings} seen · {discovery.totalSightings} total
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {discovery.newVariant && (
+                                <span className="border border-pink-300/40 bg-pink-300/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-pink-100">Variant logged</span>
+                              )}
+                              {discovery.newRarities.map((rarity) => (
+                                <span key={rarity} className="border border-white/10 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider" style={{ color: LOKPET_RARITY_COLORS[rarity] }}>
+                                  New rarity: {rarity}
+                                </span>
+                              ))}
+                              {discovery.newTraits.map((trait) => (
+                                <span key={`${trait.attackKind}:${trait.element}`} className="border border-white/10 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider" style={{ color: LOKPET_ELEMENT_COLORS[trait.element] }}>
+                                  New trait: {trait.label}
+                                </span>
+                              ))}
+                              {!hasNewData && <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">No duplicate discovery</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          )}
         </motion.section>
 
         {sections.map((section, sIdx) => {
