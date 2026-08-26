@@ -41,6 +41,7 @@ import type {
   WeaponDef,
   ObstacleDef,
   ImpactIntensity,
+  PotholeTrigger,
   PropVariant,
 } from '@/game/types';
 
@@ -76,6 +77,9 @@ export interface Actor {
   anim: AnimState;
   animStartedAt: number;
   hitFlashUntil: number;
+  /** Set for the readable fall beat before a lethal pothole resolves. */
+  falling: boolean;
+  fallStartedAt: number;
 }
 
 export interface PlayerActor extends Actor {
@@ -135,6 +139,8 @@ export interface Projectile {
   obstacleUids?: Set<number>;
   obstacleInteraction?: 'block' | 'reflect';
   statusEffectId?: string;
+  /** Ground-impact tag forwarded to pothole activation. */
+  impactTrigger?: PotholeTrigger;
   /** Pet shots can detonate into a second area hit on contact. */
   explosionRadius?: number;
   explosionDamage?: number;
@@ -157,6 +163,7 @@ export interface Effect {
   /** Effects that damage over their lifetime re-check on a cadence. */
   damage: number;
   impactIntensity: ImpactIntensity;
+  impactTrigger?: PotholeTrigger;
   hitUids: Set<number>;
   followPlayer: boolean;
   nextTickAt?: number;
@@ -264,6 +271,20 @@ export interface BreakableObstacle extends Aabb {
   hazardNextTickAt?: number;
 }
 
+export type PotholeState = 'dormant' | 'opening' | 'open' | 'resolved';
+
+export interface PotholeObstacle extends Aabb {
+  uid: number;
+  state: PotholeState;
+  trigger: PotholeTrigger;
+  warningMs: number;
+  openingMs: number;
+  lethalRadius: number;
+  openingStartedAt: number;
+  openedAt: number;
+  resolvedAt: number;
+}
+
 const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
   crate: 40, 'crate-breakable': 40, 'neon-sign': 60, barrel: 80,
   'fuse-box': 100, 'street-lamp': 55, dumpster: 90, 'car-wreck': 150, car: 120,
@@ -355,6 +376,7 @@ export interface World {
 
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
+  potholes: PotholeObstacle[];
   bounds: { w: number; h: number };
 
   camera: { x: number; y: number };
@@ -380,6 +402,7 @@ export interface World {
   rescue: RescueState;
   alerts: Alert[];
   outcome: RunOutcome;
+  deathCause?: RunResult['deathCause'];
 
   upgradeStacks: Record<string, number>;
   spawnCredit: number[];
@@ -483,6 +506,8 @@ export function createWorld(
     anim: 'idle',
     animStartedAt: 0,
     hitFlashUntil: 0,
+    falling: false,
+    fallStartedAt: 0,
     invulnUntil: 0,
     lastDamageAt: -9999,
   };
@@ -508,8 +533,11 @@ export function createWorld(
     followers: [],
     lokPets: [],
     lokPetHistory: [],
-    obstacles: area.obstacles.map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
+    obstacles: area.obstacles
+      .filter((o) => o.kind !== 'pothole')
+      .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
+    potholes: [],
     bounds: area.bounds,
     camera: { x: 0, y: 0 },
     shake: 0,
@@ -553,7 +581,8 @@ export function createWorld(
     completedObjectives: [],
   };
 
-  world.breakables = area.obstacles.map((o) => createBreakable(world, o));
+  world.breakables = area.obstacles.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
+  world.potholes = area.obstacles.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
 
   if (area.endless) {
     world.endless = {

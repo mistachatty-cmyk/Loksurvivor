@@ -275,6 +275,8 @@ export type WeaponKind =
  */
 export type ImpactIntensity = 0 | 1 | 2 | 3 | 4 | 5;
 
+export type PotholeTrigger = 'stomp' | 'ground-shock';
+
 export interface WeaponDef {
   id: string;
   name: string;
@@ -296,6 +298,8 @@ export interface WeaponDef {
   levelDamageScale: number;
   /** Authored physical force on the shared 0–5 impact spectrum. */
   impactIntensity: ImpactIntensity;
+  /** Only explicitly tagged ground attacks can open lethal potholes. */
+  impactTrigger?: PotholeTrigger;
   /** Optional tint used when this weapon is not a character signature. */
   color?: string;
   /** How this projectile behaves when it meets reflective cover. */
@@ -491,9 +495,16 @@ export interface ObstacleDef {
   kind: 'dumpster' | 'car' | 'crate' | 'planter' | 'barrier' | 'ac-unit'
     | 'neon-sign' | 'barrel' | 'fuse-box' | 'street-lamp' | 'car-wreck'
     | 'crate-breakable' | 'security-camera' | 'cover' | 'reflective-surface' | 'flora'
-    | 'building' | 'river' | 'metal-box' | 'bench';
+     | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
+  /** Lethal pothole tuning; present only when kind === 'pothole'. */
+  pothole?: {
+    trigger: PotholeTrigger;
+    warningMs?: number;
+    openingMs?: number;
+    lethalRadius?: number;
+  };
 }
 
 export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench';
@@ -588,7 +599,15 @@ export interface EndlessState {
   /** Entrance chunk keys whose entrance has already been used once. */
   consumedEntranceChunks: Set<string>;
   /** Map from chunkKey to the flat Aabb list that chunk contributed to w.obstacles. */
-  chunkObstacles: Map<string, Array<{ x: number; y: number; w: number; h: number; kind?: ObstacleDef['kind']; propVariant?: PropVariant }>>;
+  chunkObstacles: Map<string, Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    kind?: ObstacleDef['kind'];
+    propVariant?: PropVariant;
+    pothole?: ObstacleDef['pothole'];
+  }>>;
   /** Fractional enemy spawn budget (accumulates over time). */
   spawnBudget: number;
   /** The run seed, forwarded here so chunk generation stays deterministic. */
@@ -799,6 +818,8 @@ export interface RunResult {
   areaId: string;
   characterId: string;
   cleared: boolean;
+  /** Present for a failed run; distinguishes lethal environmental deaths. */
+  deathCause?: 'lethal-pothole' | 'ordinary-hazard';
   survivedSec: number;
   kills: number;
   level: number;
