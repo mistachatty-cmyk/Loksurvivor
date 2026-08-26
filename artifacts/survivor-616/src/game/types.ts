@@ -250,6 +250,58 @@ export interface CompletedObjective {
   rewardTokens: number;
 }
 
+export type EpisodeObjectiveKind =
+  | 'kill-any'
+  | 'kill-enemy'
+  | 'survive-sec'
+  | 'walk-blocks'
+  | 'rescue-ally'
+  | 'discover'
+  | 'clear-area';
+
+export interface EpisodeObjectiveDef {
+  id: string;
+  label: string;
+  kind: EpisodeObjectiveKind;
+  targetCount: number;
+  enemyId?: string;
+  allyId?: string;
+  discoveryId?: string;
+  areaId?: string;
+}
+
+export interface CharacterEpisodeDef {
+  id: string;
+  characterId: string;
+  title: string;
+  teaser: string;
+  cityLocation: string;
+  areaId: string;
+  crewAllyId: string;
+  unlock: UnlockRule;
+  objective: EpisodeObjectiveDef;
+  completionText: string;
+  evolutionId: string;
+}
+
+export type EvolutionBehaviorKind =
+  | 'chain'
+  | 'split'
+  | 'field'
+  | 'orbit-burst'
+  | 'status-spread'
+  | 'delayed-burst';
+
+export interface EvolutionBehavior {
+  kind: EvolutionBehaviorKind;
+  /** Optional secondary effect radius for behavior-specific follow-up damage. */
+  radius?: number;
+  /** Optional number of follow-up instances. */
+  count?: number;
+  /** Optional status effect propagated by the evolved attack. */
+  statusEffectId?: string;
+}
+
 export type WeaponKind =
   | 'orbit'
   | 'projectile'
@@ -359,7 +411,13 @@ export interface EvolutionDef {
   name: string;
   description: string;
   baseWeaponId: string;
-  requiredPassiveId: string;
+  /** Legacy passive gate retained for compatibility with the original three cards. */
+  requiredPassiveId?: string;
+  characterId?: string;
+  episodeId?: string;
+  identity: string;
+  color: string;
+  behavior?: EvolutionBehavior;
   result: WeaponDef;
 }
 
@@ -924,6 +982,12 @@ export interface MetaState {
   crewActivitySeed: number;
   /** One autonomous crew rumor held for the next completed run. */
   activeCrewRumor: ActiveCrewRumor | null;
+  /** Episodes completed account-wide. */
+  completedEpisodeIds: string[];
+  /** Signature evolutions earned account-wide. */
+  unlockedEvolutionIds: string[];
+  /** Persisted progress toward each character episode objective. */
+  episodeProgressById: Record<string, number>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -981,6 +1045,22 @@ export interface RunResult {
   fatigueAfterPct?: number;
   /** Objectives completed this run. */
   completedObjectives: CompletedObjective[];
+  /** Active character episode progress, when this run was on its episode route. */
+  episode?: {
+    id: string;
+    title: string;
+    objectiveLabel: string;
+    progress: number;
+    target: number;
+    completed: boolean;
+    completedThisRun: boolean;
+  };
+  /** Account-wide signature evolution active in this run, if any. */
+  evolution?: {
+    id: string;
+    name: string;
+    identity: string;
+  };
   /** The bounded hideout rumor carried into this run, if any. */
   crewRumor?: {
     rumorId: CrewRumorId;
@@ -1074,6 +1154,20 @@ export interface HudSnapshot {
     chapter: number;
     title: string;
     text: string;
+  };
+  episode?: {
+    id: string;
+    title: string;
+    label: string;
+    progress: number;
+    target: number;
+    completed: boolean;
+  };
+  evolution?: {
+    id: string;
+    name: string;
+    identity: string;
+    color: string;
   };
   objectives: Array<{
     label: string;

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
@@ -34,6 +35,7 @@ export interface RunScreenProps {
   startingWeaponLevel?: number;
   utilityRewardMultiplier?: number;
   physicsObjectClicksEnabled?: boolean;
+  episodeId?: string;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -83,6 +85,7 @@ export function RunScreen({
   startingWeaponLevel: startingWeaponLevelProp,
   utilityRewardMultiplier: utilityRewardMultiplierProp,
   physicsObjectClicksEnabled = true,
+  episodeId,
   onAbort,
   onFinish,
 }: RunScreenProps) {
@@ -115,6 +118,7 @@ export function RunScreen({
   const area = getArea(areaId);
   const character = getCharacter(characterId);
   const firstNightChapter = getFirstNightChapter(areaId);
+  const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
@@ -137,6 +141,11 @@ export function RunScreen({
       initialWeaponLevel,
       physicsObjectClicksEnabled,
       meta.activeCrewRumor,
+      {
+        unlockedEvolutionIds: meta.unlockedEvolutionIds,
+        episode,
+        episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
+      },
     );
   }
 
@@ -650,6 +659,30 @@ export function RunScreen({
               First Night · {hud.firstNightBeat.title}
             </p>
             <p className="mt-1 text-xs leading-relaxed text-white/80">{hud.firstNightBeat.text}</p>
+          </div>
+        ) : null}
+
+        {hud?.evolution ? (
+          <div
+            className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
+            style={{ borderColor: `${hud.evolution.color}88`, backgroundColor: `${hud.evolution.color}18`, color: hud.evolution.color }}
+            data-testid="text-signature-evolution"
+          >
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Signature · {hud.evolution.name}</span>
+            <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.evolution.identity}</span>
+          </div>
+        ) : null}
+
+        {hud?.episode ? (
+          <div className="mx-auto w-full max-w-xl border border-primary/35 bg-black/75 px-3 py-2" data-testid="row-character-episode">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Episode · {hud.episode.title}</span>
+              <span className="font-mono text-[10px] uppercase text-white/70">{hud.episode.progress}/{hud.episode.target}</span>
+            </div>
+            <p className="mt-1 text-xs text-white/80">{hud.episode.label}</p>
+            <div className="mt-2 h-1 overflow-hidden bg-white/10">
+              <div className="h-full bg-primary transition-[width]" style={{ width: `${(hud.episode.progress / Math.max(1, hud.episode.target)) * 100}%` }} />
+            </div>
           </div>
         ) : null}
 

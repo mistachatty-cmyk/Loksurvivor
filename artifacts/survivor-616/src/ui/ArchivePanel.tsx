@@ -4,6 +4,8 @@
  */
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
+import { CHARACTER_EPISODES } from '@/game/data/episodes';
+import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import {
   LOKPET_ELEMENT_COLORS,
   LOKPET_RARITY_COLORS,
@@ -13,11 +15,11 @@ import {
 } from '@/game/data/lokPets';
 import { ALLIES, DISCOVERIES } from '@/game/data/progression';
 import { STATUS_EFFECTS } from '@/game/data/statusEffects';
-import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -119,6 +121,31 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
         found: true,
         testId: `card-status-effect-${effect.id}`
       }))
+    },
+    {
+      title: 'Character Episodes',
+      icon: BookOpen,
+      count: meta.completedEpisodeIds.length,
+      total: CHARACTER_EPISODES.length,
+      items: CHARACTER_EPISODES.map((episode) => {
+        const status = episodeStatus(episode.id, meta);
+        const completed = status === 'completed';
+        const progress = episodeProgress(episode.id, meta);
+        const evolution = EVOLUTIONS_BY_ID[episode.evolutionId];
+        return {
+          id: episode.id,
+          name: completed
+            ? `${episode.title} · ${evolution?.name ?? 'Evolution'}`
+            : status === 'locked' ? 'Classified episode' : episode.title,
+          desc: completed
+            ? `${episode.completionText} ${evolution?.description ?? ''}`
+            : status === 'locked'
+              ? 'Unlock the operative and discover this episode in the city.'
+              : `${episode.teaser} · ${progress}/${episode.objective.targetCount}`,
+          found: completed,
+          testId: `card-episode-${episode.id}`,
+        };
+      }),
     }
   ];
 

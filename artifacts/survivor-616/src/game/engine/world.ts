@@ -25,11 +25,14 @@ import type {
   ActiveCrewRumor,
   AreaDef,
   BaseStats,
+  CharacterEpisodeDef,
   ChallengeContractDef,
   CharacterDef,
   CompletedObjective,
   EnemyDef,
   EndlessState,
+  EvolutionBehavior,
+  EvolutionDef,
   HudSnapshot,
   LootPrizeDef,
   LokPetInstance,
@@ -163,6 +166,7 @@ export interface Projectile {
   /** Pet shots can detonate into a second area hit on contact. */
   explosionRadius?: number;
   explosionDamage?: number;
+  evolutionBehavior?: EvolutionBehavior;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport';
@@ -187,6 +191,8 @@ export interface Effect {
   followPlayer: boolean;
   nextTickAt?: number;
   hurtsPlayer?: boolean;
+  statusEffectId?: string;
+  evolutionBehavior?: EvolutionBehavior;
 }
 
 export interface Orbiter {
@@ -414,6 +420,8 @@ export interface World {
   effects: Effect[];
   orbiters: Orbiter[];
   weapons: RunWeapon[];
+  /** Account-wide signature evolution active for the selected character. */
+  activeEvolution?: EvolutionDef;
   passives: RunPassive[];
   pickups: Pickup[];
   popups: Popup[];
@@ -497,6 +505,11 @@ export interface World {
   /* ---- Objective system ---- */
   objectives: RunObjective[];
   completedObjectives: CompletedObjective[];
+  /** Active character episode and its persisted starting progress. */
+  episode?: {
+    def: CharacterEpisodeDef;
+    startingProgress: number;
+  };
 }
 
 const MAX_ENEMIES = 190;
@@ -556,6 +569,11 @@ export function createWorld(
   startingWeaponLevel = 1,
   physicsObjectClicksEnabled = true,
   activeCrewRumor: ActiveCrewRumor | null = null,
+  setup: {
+    unlockedEvolutionIds?: string[];
+    episode?: CharacterEpisodeDef;
+    episodeProgress?: number;
+  } = {},
 ): World {
   const player: PlayerActor = {
     uid: 1,
@@ -585,6 +603,12 @@ export function createWorld(
   };
 
   const rng = createRng(seed);
+  const evolved = EVOLUTIONS.find((candidate) =>
+    candidate.characterId === character.id &&
+    candidate.baseWeaponId === character.weapon.id &&
+    setup.unlockedEvolutionIds?.includes(candidate.id),
+  );
+  const signatureWeapon = evolved?.result ?? character.weapon;
 
   const world: World = {
     area,
@@ -597,7 +621,8 @@ export function createWorld(
     projectiles: [],
     effects: [],
     orbiters: [],
-    weapons: [{ def: character.weapon, level: startingWeaponLevel, count: character.weapon.count ?? 1, readyAt: 400 }],
+    weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
+    activeEvolution: evolved,
     passives: [],
     pickups: [],
     popups: [],
@@ -618,7 +643,7 @@ export function createWorld(
     xpToNext: xpForLevel(1),
     pendingLevelUps: 0,
     weaponLevel: startingWeaponLevel,
-    weaponCount: character.weapon.count ?? 1,
+    weaponCount: signatureWeapon.count ?? 1,
     ultCooldownMult: 1,
     weaponReadyAt: 400,
     ultReadyAt: 4000,
@@ -665,6 +690,15 @@ export function createWorld(
     lootTokensGained: 0,
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
+    episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
+      ? {
+          def: setup.episode,
+          startingProgress: Math.min(
+            setup.episode.objective.targetCount,
+            Math.max(0, Math.floor(setup.episodeProgress ?? 0)),
+          ),
+        }
+      : undefined,
   };
 
   world.breakables = area.obstacles.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
@@ -709,10 +743,10 @@ export function createWorld(
     world.rescue.status = 'freed';
   }
 
-  if (character.weapon.kind === 'orbit') {
+  if (signatureWeapon.kind === 'orbit') {
     rebuildOrbiters(world);
   }
-  if (character.weapon.follower?.lifetimeMs === 0) spawnFollowers(world, character.weapon);
+  if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
   return world;
 }
 
@@ -1588,12 +1622,58 @@ function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?
   return best;
 }
 
+function triggerEvolutionHit(
+  w: World,
+  behavior: EvolutionBehavior | undefined,
+  x: number,
+  y: number,
+  damage: number,
+  color: string,
+  impactIntensity: ImpactIntensity,
+  statusEffectId?: string,
+  excludeUid?: number,
+) {
+  if (!behavior) return;
+  const radius = behavior.radius ?? 64;
+  if (behavior.kind === 'chain') {
+    const target = nearestEnemy(w, x, y, radius + 90, excludeUid ? new Set([excludeUid]) : undefined);
+    if (target) {
+      damageEnemy(w, target, damage * 0.55, 0, x, y, statusEffectId);
+      spawnParticles(w, target.x, target.y, color, 4, 55);
+    }
+  } else if (behavior.kind === 'status-spread') {
+    novaDamage(w, x, y, radius, damage * 0.45, 0, behavior.statusEffectId ?? statusEffectId);
+  } else if (behavior.kind === 'field') {
+    w.effects.push({
+      uid: uid(w),
+      kind: 'hazard',
+      x,
+      y,
+      radius,
+      angle: 0,
+      spread: Math.PI * 2,
+      bornAt: w.now,
+      expiresAt: w.now + 1250,
+      color,
+      damage: damage * 0.42,
+      impactIntensity: Math.min(2, impactIntensity) as ImpactIntensity,
+      hitUids: new Set(),
+      followPlayer: false,
+      nextTickAt: w.now,
+      hurtsPlayer: false,
+      statusEffectId: behavior.statusEffectId ?? statusEffectId,
+    });
+    spawnParticles(w, x, y, color, 8, 70);
+  }
+}
+
 function fireWeapon(w: World, runWeapon: RunWeapon) {
   const weapon = runWeapon.def;
   const p = w.player;
   const damage = runWeaponDamage(w, runWeapon);
   const reach = weapon.range * areaMult(w);
   const palette = w.character.palette;
+  const behavior = w.activeEvolution?.result.id === weapon.id ? w.activeEvolution.behavior : undefined;
 
   switch (weapon.kind) {
     case 'follower': {
@@ -1622,6 +1702,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         impactTrigger: weapon.impactTrigger,
         hitUids: new Set(),
         followPlayer: true,
+        evolutionBehavior: behavior,
       });
       p.anim = 'attack';
       p.animStartedAt = w.now;
@@ -1645,8 +1726,12 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         impactTrigger: weapon.impactTrigger,
         hitUids: new Set(),
         followPlayer: false,
+        evolutionBehavior: behavior,
       });
       novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
+      if (behavior?.kind === 'field') {
+        triggerEvolutionHit(w, behavior, p.x, p.y, damage, weapon.color ?? palette.accent, weaponImpact(weapon), weapon.statusEffectId);
+      }
       damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
       p.anim = 'attack';
       p.animStartedAt = w.now;
@@ -1670,6 +1755,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           uid: uid(w), kind: 'wave', x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
           angle, spread: 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
           color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
+          evolutionBehavior: behavior,
         });
       }
       p.anim = 'attack'; p.animStartedAt = w.now;
@@ -1683,6 +1769,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: 0.055,
         bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
          damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
+        evolutionBehavior: behavior,
       });
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
@@ -1694,6 +1781,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
         damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
         hurtsPlayer: true,
+        statusEffectId: weapon.statusEffectId,
+        evolutionBehavior: behavior,
       });
       pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
       break;
@@ -1774,6 +1863,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           obstacleInteraction: weapon.obstacleInteraction ?? 'block',
           statusEffectId: weapon.statusEffectId,
           impactTrigger: weapon.impactTrigger,
+          evolutionBehavior: behavior,
         });
       }
       p.anim = 'attack';
@@ -1826,6 +1916,27 @@ function updateOrbiters(w: World, dt: number) {
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
         damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy);
+        const behavior = w.activeEvolution?.result.id === weapon.id ? w.activeEvolution.behavior : undefined;
+        if (behavior?.kind === 'orbit-burst') {
+          const burstRadius = behavior.radius ?? 56;
+          novaDamage(w, ox, oy, burstRadius, damage * 0.35, 0, behavior.statusEffectId);
+          w.effects.push({
+            uid: uid(w),
+            kind: 'ring',
+            x: ox,
+            y: oy,
+            radius: burstRadius,
+            angle: 0,
+            spread: 0,
+            bornAt: w.now,
+            expiresAt: w.now + 220,
+            color: weapon.color ?? w.character.palette.accent,
+            damage: 0,
+            impactIntensity: 0,
+            hitUids: new Set(),
+            followPlayer: false,
+          });
+        }
       }
     });
     }
@@ -3068,6 +3179,48 @@ function updateProjectiles(w: World, dt: number) {
           } else {
             damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
           }
+          triggerEvolutionHit(
+            w,
+            proj.evolutionBehavior,
+            proj.x,
+            proj.y,
+            proj.damage,
+            proj.color,
+            proj.impactIntensity,
+            proj.statusEffectId,
+            enemy.uid,
+          );
+          if (proj.evolutionBehavior?.kind === 'split') {
+            const baseAngle = Math.atan2(proj.vy, proj.vx);
+            const splitCount = Math.max(2, proj.evolutionBehavior.count ?? 2);
+            for (let splitIndex = 0; splitIndex < splitCount; splitIndex += 1) {
+              const offset = (splitIndex - (splitCount - 1) / 2) * 0.34;
+              const splitAngle = baseAngle + offset;
+              w.projectiles.push({
+                uid: uid(w),
+                x: proj.x,
+                y: proj.y,
+                vx: Math.cos(splitAngle) * Math.max(150, Math.hypot(proj.vx, proj.vy) * 0.82),
+                vy: Math.sin(splitAngle) * Math.max(150, Math.hypot(proj.vx, proj.vy) * 0.82),
+                radius: 4,
+                damage: proj.damage * 0.42,
+                impactIntensity: Math.min(2, proj.impactIntensity) as ImpactIntensity,
+                fromPlayer: true,
+                expiresAt: w.now + 560,
+                targetUid: null,
+                turnRate: 0,
+                color: proj.color,
+                trail: [],
+                pierce: 0,
+                hitUids: new Set([enemy.uid]),
+                obstacleUids: new Set(),
+                obstacleInteraction: proj.obstacleInteraction,
+                statusEffectId: proj.statusEffectId,
+              });
+            }
+            proj.evolutionBehavior = undefined;
+            pushAlert(w, 'SIGNATURE SPLIT');
+          }
             damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
           if (proj.pierce > 0) proj.pierce -= 1;
@@ -3107,7 +3260,18 @@ function updateEffects(w: World) {
         while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
         if (diff > effect.spread) return;
         effect.hitUids.add(enemy.uid);
-        damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y);
+        damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId);
+        triggerEvolutionHit(
+          w,
+          effect.evolutionBehavior,
+          enemy.x,
+          enemy.y,
+          effect.damage,
+          effect.color,
+          effect.impactIntensity,
+          effect.statusEffectId,
+          enemy.uid,
+        );
       });
         damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
     }
@@ -3120,14 +3284,38 @@ function updateEffects(w: World) {
         const reach = effect.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, effect.x, effect.y) > reach * reach) return;
         effect.hitUids.add(enemy.uid);
-        damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.color.includes('b8ff') ? 'acid' : 'burning');
+        damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.statusEffectId ?? (effect.color.includes('b8ff') ? 'acid' : 'burning'));
       });
       if (effect.hurtsPlayer && dist2(p.x, p.y, effect.x, effect.y) <= (effect.radius + p.radius) ** 2) {
         damagePlayer(w, Math.max(1, Math.round(effect.damage * 0.45)), effect.x, effect.y);
       }
     }
 
-    if (w.now > effect.expiresAt) w.effects.splice(i, 1);
+    if (w.now > effect.expiresAt) {
+      if (effect.evolutionBehavior?.kind === 'delayed-burst') {
+        const burstRadius = effect.radius * (effect.evolutionBehavior.radius ?? 0.82);
+        const burstDamage = effect.damage * 0.55;
+        novaDamage(w, effect.x, effect.y, burstRadius, burstDamage, 0, effect.evolutionBehavior.statusEffectId ?? effect.statusEffectId);
+        w.effects.push({
+          uid: uid(w),
+          kind: 'ring',
+          x: effect.x,
+          y: effect.y,
+          radius: burstRadius,
+          angle: 0,
+          spread: 0,
+          bornAt: w.now,
+          expiresAt: w.now + 260,
+          color: effect.color,
+          damage: 0,
+          impactIntensity: 0,
+          hitUids: new Set(),
+          followPlayer: false,
+        });
+        spawnParticles(w, effect.x, effect.y, effect.color, 8, 85);
+      }
+      w.effects.splice(i, 1);
+    }
   }
 }
 
@@ -3325,6 +3513,44 @@ function updateObjectives(w: World) {
       w.objectives = w.objectives.filter((o) => o !== obj);
     }
   }
+}
+
+export function episodeSnapshot(w: World): NonNullable<HudSnapshot['episode']> | undefined {
+  if (!w.episode) return undefined;
+  const { def, startingProgress } = w.episode;
+  let progress = startingProgress;
+  switch (def.objective.kind) {
+    case 'kill-any':
+      progress += w.kills;
+      break;
+    case 'kill-enemy':
+      progress += w.killsByEnemy[def.objective.enemyId ?? ''] ?? 0;
+      break;
+    case 'survive-sec':
+      progress += w.time;
+      break;
+    case 'walk-blocks':
+      progress += w.endless ? Math.round(w.endless.maxDistancePx / CHUNK_SIZE) : 0;
+      break;
+    case 'rescue-ally':
+      if (w.rescue.status === 'freed' && w.rescue.allyId === def.objective.allyId) progress += 1;
+      break;
+    case 'discover':
+      if (w.outcome === 'cleared' && w.area.discoveryId === def.objective.discoveryId) progress += 1;
+      break;
+    case 'clear-area':
+      if (w.outcome === 'cleared' && w.area.id === (def.objective.areaId ?? def.areaId)) progress += 1;
+      break;
+  }
+  const target = def.objective.targetCount;
+  return {
+    id: def.id,
+    title: def.title,
+    label: def.objective.label,
+    progress: Math.min(target, Math.max(0, Math.floor(progress))),
+    target,
+    completed: progress >= target,
+  };
 }
 
 function updateParticles(w: World, dt: number) {
@@ -3976,6 +4202,27 @@ export function hudSnapshot(w: World): HudSnapshot {
       color: STATUS_EFFECTS_BY_ID[id]?.color ?? '#fff',
       count,
     })),
+    episode: (() => {
+      const snapshot = episodeSnapshot(w);
+      return snapshot
+        ? {
+            id: snapshot.id,
+            title: snapshot.title,
+            label: snapshot.label,
+            progress: snapshot.progress,
+            target: snapshot.target,
+            completed: snapshot.completed,
+          }
+        : undefined;
+    })(),
+    evolution: w.activeEvolution
+      ? {
+          id: w.activeEvolution.id,
+          name: w.activeEvolution.name,
+          identity: w.activeEvolution.identity,
+          color: w.activeEvolution.color,
+        }
+      : undefined,
     crewRumor: w.activeCrewRumor
       ? (() => {
           const rumor = getCrewRumor(w.activeCrewRumor.rumorId);
@@ -4088,6 +4335,27 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     completedObjectives: [...w.completedObjectives],
+    episode: (() => {
+      const snapshot = episodeSnapshot(w);
+      return snapshot
+        ? {
+            id: snapshot.id,
+            title: snapshot.title,
+            objectiveLabel: snapshot.label,
+            progress: snapshot.progress,
+            target: snapshot.target,
+            completed: snapshot.completed,
+            completedThisRun: snapshot.completed && (w.episode?.startingProgress ?? 0) < snapshot.target,
+          }
+        : undefined;
+    })(),
+    evolution: w.activeEvolution
+      ? {
+          id: w.activeEvolution.id,
+          name: w.activeEvolution.name,
+          identity: w.activeEvolution.identity,
+        }
+      : undefined,
     crewRumor: w.activeCrewRumor
       ? (() => {
           const rumor = getCrewRumor(w.activeCrewRumor.rumorId);

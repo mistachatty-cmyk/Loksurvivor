@@ -42,7 +42,7 @@ type Screen =
   | { name: 'recovery' }
   | { name: 'vendor' }
   | { name: 'settings' }
-  | { name: 'run'; areaId: string; challengeIds?: string[] }
+  | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
   | { name: 'summary'; result: RunResult };
 
 /**
@@ -145,7 +145,13 @@ function Game() {
       return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} />;
 
     case 'roster':
-      return <CharacterSelect onBack={goHub} onConfirm={() => setScreen({ name: 'areas' })} />;
+      return (
+        <CharacterSelect
+          onBack={goHub}
+          onConfirm={() => setScreen({ name: 'areas' })}
+          onLaunchEpisode={(episodeId, areaId) => setScreen({ name: 'run', areaId, episodeId })}
+        />
+      );
 
     case 'areas':
       return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
@@ -171,10 +177,11 @@ function Game() {
     case 'run':
       return (
         <RunScreen
-          key={`${screen.areaId}-${selectedCharacter.id}-${(screen.challengeIds ?? []).join('-')}`}
+          key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
           areaId={screen.areaId}
           characterId={selectedCharacter.id}
           challengeIds={screen.challengeIds}
+          episodeId={screen.episodeId}
           startingWeaponLevel={startingWeaponLevel(meta)}
           utilityRewardMultiplier={rewardCredMultiplier(meta)}
           physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
@@ -196,6 +203,7 @@ function Game() {
               ? setScreen({
                   name: 'run',
                   areaId: screen.result.areaId,
+                  episodeId: screen.result.episode?.id,
                   challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
                 })
               : goHub()

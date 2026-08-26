@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
+import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
+import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { getEnemy } from '@/game/data/enemies';
 import {
   crewActivityEffects,
@@ -20,6 +22,7 @@ import {
   dashPlayer,
   buildResult,
   claimRumorEmergencyHeal,
+  episodeSnapshot,
   hudSnapshot,
   primePhysicsObject,
   spawnLokPet,
@@ -1091,7 +1094,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 5);
+    assert.equal(loaded.version, 6);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1693,4 +1696,71 @@ test('final dungeon chest is boss-gated and idempotent', () => {
   stepWorld(world, 1 / 60, neutralInput);
   assert.equal(world.lootBoxesOpened, boxesAfterOpen);
   assert.equal(world.openedPrizes.length, prizesAfterChest);
+});
+
+test('unlocked signature evolutions replace the starting weapon without changing its kind', () => {
+  const character = CHARACTERS.find((candidate) => candidate.id === 'prismrunner')!;
+  const evolution = EVOLUTIONS_BY_ID['prism-splinter']!;
+  const world = createWorld(
+    AREAS[0]!,
+    character,
+    character.stats,
+    616,
+    [],
+    1,
+    true,
+    null,
+    { unlockedEvolutionIds: [evolution.id] },
+  );
+
+  assert.equal(world.activeEvolution?.id, evolution.id);
+  assert.equal(world.weapons[0]?.def.id, evolution.id);
+  assert.equal(world.weapons[0]?.def.kind, character.weapon.kind);
+});
+
+test('character episode snapshots combine persisted progress with run progress', () => {
+  const episode = CHARACTER_EPISODES_BY_ID['shade-afterglow']!;
+  const character = CHARACTERS.find((candidate) => candidate.id === episode.characterId)!;
+  const world = createWorld(
+    AREAS.find((candidate) => candidate.id === episode.areaId)!,
+    character,
+    character.stats,
+    616,
+    [],
+    1,
+    true,
+    null,
+    { episode, episodeProgress: 3 },
+  );
+  world.killsByEnemy.nightcrawler = 5;
+  world.kills = 5;
+  const snapshot = episodeSnapshot(world);
+
+  assert.equal(snapshot?.id, episode.id);
+  assert.equal(snapshot?.progress, 8);
+  assert.equal(snapshot?.completed, true);
+});
+
+test('completed character episodes persist progress and unlock their signature account-wide', () => {
+  const episode = CHARACTER_EPISODES_BY_ID['shade-afterglow']!;
+  const result = runResult([], true);
+  result.areaId = episode.areaId;
+  result.characterId = episode.characterId;
+  result.episode = {
+    id: episode.id,
+    title: episode.title,
+    objectiveLabel: episode.objective.label,
+    progress: episode.objective.targetCount,
+    target: episode.objective.targetCount,
+    completed: true,
+    completedThisRun: true,
+  };
+  const state = reducer(
+    { meta: createInitialMeta(), lastRun: null },
+    { type: 'completeRun', result },
+  );
+
+  assert.ok(state.meta.completedEpisodeIds.includes(episode.id));
+  assert.ok(state.meta.unlockedEvolutionIds.includes(episode.evolutionId));
+  assert.equal(state.meta.episodeProgressById[episode.id], episode.objective.targetCount);
 });

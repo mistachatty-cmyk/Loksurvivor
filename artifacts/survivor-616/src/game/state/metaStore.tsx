@@ -18,6 +18,8 @@ import {
 
 import { AREAS, getArea } from '@/game/data/areas';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
+import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
+import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { ENEMIES } from '@/game/data/enemies';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
@@ -40,6 +42,7 @@ import type {
   AllyDef,
   AreaDef,
   BaseStats,
+  CharacterEpisodeDef,
   CharacterDef,
   HubRoomDef,
   LokPetAttackKind,
@@ -57,7 +60,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 5;
+const META_VERSION = 6;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -129,6 +132,9 @@ export function createInitialMeta(): MetaState {
     crewActivityByAlly: {},
     crewActivitySeed: 0,
     activeCrewRumor: null,
+    completedEpisodeIds: [],
+    unlockedEvolutionIds: [],
+    episodeProgressById: {},
   };
 }
 
@@ -413,6 +419,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const allyIds = new Set(ALLIES.map((a) => a.id));
   const discoveryIds = new Set(DISCOVERIES.map((d) => d.id));
   const enemyIds = new Set(ENEMIES.map((e) => e.id));
+  const episodeIds = new Set(CHARACTER_EPISODES.map((episode) => episode.id));
+  const evolutionIds = new Set(Object.keys(EVOLUTIONS_BY_ID));
   const fatigueByCharacter: Record<string, number> = {};
   if (parsed.fatigueByCharacter && typeof parsed.fatigueByCharacter === 'object') {
     for (const [key, value] of Object.entries(parsed.fatigueByCharacter)) {
@@ -474,6 +482,26 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     rescuedAllyIds,
     crewActivitySeed,
   );
+  const completedEpisodeIds = idList(parsed.completedEpisodeIds, episodeIds, []);
+  const episodeProgressById: Record<string, number> = {};
+  if (parsed.episodeProgressById && typeof parsed.episodeProgressById === 'object') {
+    for (const [episodeId, value] of Object.entries(parsed.episodeProgressById)) {
+      const definition = CHARACTER_EPISODES_BY_ID[episodeId];
+      if (!definition || typeof value !== 'number' || !Number.isFinite(value)) continue;
+      episodeProgressById[episodeId] = Math.min(
+        definition.objective.targetCount,
+        Math.max(0, Math.floor(value)),
+      );
+    }
+  }
+  const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
+    const evolution = EVOLUTIONS_BY_ID[evolutionId];
+    return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
+  });
+  const completedEvolutionIds = completedEpisodeIds
+    .map((episodeId) => CHARACTER_EPISODES_BY_ID[episodeId]?.evolutionId)
+    .filter((evolutionId): evolutionId is string => Boolean(evolutionId));
+  const unlockedEvolutionIds = [...new Set([...explicitEvolutionIds, ...completedEvolutionIds])];
 
   return {
     version: META_VERSION,
@@ -508,6 +536,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       crewActivityByAlly,
       crewActivitySeed,
     ),
+    completedEpisodeIds,
+    unlockedEvolutionIds,
+    episodeProgressById,
   };
 }
 
@@ -518,7 +549,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -575,6 +606,34 @@ export function describeUnlock(rule: UnlockRule): string {
     default:
       return 'Locked';
   }
+}
+
+export type EpisodeStatus = 'locked' | 'available' | 'in-progress' | 'completed';
+
+export function episodeStatus(episodeId: string, meta: MetaState): EpisodeStatus {
+  const episode = CHARACTER_EPISODES_BY_ID[episodeId];
+  if (!episode) return 'locked';
+  if (meta.completedEpisodeIds.includes(episode.id)) return 'completed';
+  const characterUnlocked = meta.unlockedCharacterIds.includes(episode.characterId) || (
+    import.meta.env?.DEV && meta.devModeAllUnlocks
+  );
+  if (!characterUnlocked || !isUnlocked(episode.unlock, meta)) return 'locked';
+  return (meta.episodeProgressById[episode.id] ?? 0) > 0 ? 'in-progress' : 'available';
+}
+
+export function episodeProgress(episodeId: string, meta: MetaState): number {
+  const episode = CHARACTER_EPISODES_BY_ID[episodeId];
+  if (!episode) return 0;
+  return Math.min(episode.objective.targetCount, Math.max(0, Math.floor(meta.episodeProgressById[episode.id] ?? 0)));
+}
+
+function validEpisodeResult(result: RunResult): CharacterEpisodeDef | undefined {
+  const record = result.episode;
+  if (!record) return undefined;
+  const definition = CHARACTER_EPISODES_BY_ID[record.id];
+  if (!definition || definition.characterId !== result.characterId || definition.areaId !== result.areaId) return undefined;
+  if (record.target !== definition.objective.targetCount || record.objectiveLabel !== definition.objective.label) return undefined;
+  return definition;
 }
 
 /** Total permanent stat boost granted by every rescued ally. */
@@ -861,7 +920,23 @@ export function reducer(state: StoreState, action: Action): StoreState {
           (hut) => clearedAreaIds.includes(hut.areaId),
         ).map((hut) => hut.id),
         activeCrewRumor: result.crewRumor ? null : prev.activeCrewRumor,
+        completedEpisodeIds: [...prev.completedEpisodeIds],
+        unlockedEvolutionIds: [...prev.unlockedEvolutionIds],
+        episodeProgressById: { ...prev.episodeProgressById },
       };
+
+      const episodeDefinition = validEpisodeResult(result);
+      if (episodeDefinition && result.episode) {
+        const nextProgress = Math.max(
+          next.episodeProgressById[episodeDefinition.id] ?? 0,
+          Math.min(episodeDefinition.objective.targetCount, Math.max(0, Math.floor(result.episode.progress))),
+        );
+        next.episodeProgressById[episodeDefinition.id] = nextProgress;
+        if (result.episode.completed && result.episode.completedThisRun) {
+          next.completedEpisodeIds = addUnique(next.completedEpisodeIds, episodeDefinition.id);
+          next.unlockedEvolutionIds = addUnique(next.unlockedEvolutionIds, episodeDefinition.evolutionId);
+        }
+      }
 
       // Characters whose unlock rule just became true.
       const newlyUnlocked = CHARACTERS.filter(

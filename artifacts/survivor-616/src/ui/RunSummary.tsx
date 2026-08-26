@@ -93,6 +93,38 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
           </section>
         ) : null}
         
+        {result.episode ? (
+          <section className="border border-primary/35 bg-primary/5 p-5" data-testid="section-character-episode">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Character episode</p>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">{result.episode.title}</h2>
+              </div>
+              <span className={`font-mono text-[10px] font-bold uppercase tracking-widest ${result.episode.completed ? 'text-primary' : 'text-amber-200'}`}>
+                {result.episode.completed ? (result.episode.completedThisRun ? 'Evolution unlocked' : 'Completed') : 'Progress saved'}
+              </span>
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="h-2 flex-1 overflow-hidden bg-white/10">
+                <div className="h-full bg-primary" style={{ width: `${(result.episode.progress / Math.max(1, result.episode.target)) * 100}%` }} />
+              </div>
+              <span className="font-mono text-xs text-white/80">{result.episode.progress}/{result.episode.target}</span>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-white/80">{result.episode.objectiveLabel}</p>
+            {result.evolution ? (
+              <p className="mt-2 text-xs uppercase tracking-wider text-primary">Signature equipped · {result.evolution.name} — {result.evolution.identity}</p>
+            ) : null}
+          </section>
+        ) : null}
+
+        {result.evolution && !result.episode ? (
+          <section className="border border-cyan-300/30 bg-cyan-950/10 p-5" data-testid="section-signature-evolution">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">Signature evolution</p>
+            <h2 className="mt-1 text-xl font-black uppercase text-white">{result.evolution.name}</h2>
+            <p className="mt-2 text-sm text-white/80">{result.evolution.identity}</p>
+          </section>
+        ) : null}
+
         {/* Core Stats */}
         <div className="bg-card border border-border p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
