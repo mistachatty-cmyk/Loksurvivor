@@ -133,6 +133,19 @@ function counter(value: unknown, fallback = 0): number {
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
 const LOKPET_ATTACK_KINDS: LokPetAttackKind[] = ['shot', 'rapid-shot', 'heavy-shot', 'pulse', 'explosion'];
 const LOKPET_ELEMENTS: LokPetElement[] = ['none', 'fire', 'freeze', 'slow'];
+const LOKPET_ATTACK_LABELS: Record<LokPetAttackKind, string> = {
+  shot: 'single shot',
+  'rapid-shot': 'rapid fire',
+  'heavy-shot': 'heavy shot',
+  pulse: 'pulsating field',
+  explosion: 'burst explosion',
+};
+const LOKPET_ELEMENT_LABELS: Record<LokPetElement, string> = {
+  none: 'kinetic',
+  fire: 'fire',
+  freeze: 'freeze',
+  slow: 'slow',
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object';
@@ -146,12 +159,26 @@ function catalogTraitKey(trait: Pick<LokPetCatalogTrait, 'attackKind' | 'element
   return `${trait.attackKind}:${trait.element}`;
 }
 
+function canonicalCatalogTrait(
+  attackKind: LokPetAttackKind,
+  element: LokPetElement,
+): LokPetCatalogTrait {
+  const elementLabel = LOKPET_ELEMENT_LABELS[element];
+  const attackLabel = LOKPET_ATTACK_LABELS[attackKind];
+  return {
+    attackKind,
+    element,
+    elementLabel,
+    label: element === 'none' ? attackLabel : `${attackLabel} · ${elementLabel}`,
+  };
+}
+
 /**
  * Normalize catalog records independently from the rest of the save. The
  * variant sheet is the source of truth for presentation fields, so malformed
  * localStorage cannot inject a different palette or identity into the archive.
  */
-function normalizeLokPetCatalog(value: unknown): LokPetCatalogEntry[] {
+export function normalizeLokPetCatalog(value: unknown): LokPetCatalogEntry[] {
   if (!Array.isArray(value)) return [];
 
   const entries = new Map<string, LokPetCatalogEntry>();
@@ -169,12 +196,7 @@ function normalizeLokPetCatalog(value: unknown): LokPetCatalogEntry[] {
         if (!isRecord(traitValue)) continue;
         if (!isOneOf(traitValue.attackKind, LOKPET_ATTACK_KINDS)) continue;
         if (!isOneOf(traitValue.element, LOKPET_ELEMENTS)) continue;
-        const trait: LokPetCatalogTrait = {
-          attackKind: traitValue.attackKind,
-          element: traitValue.element,
-          elementLabel: typeof traitValue.elementLabel === 'string' ? traitValue.elementLabel : traitValue.element,
-          label: typeof traitValue.label === 'string' ? traitValue.label : traitValue.attackKind,
-        };
+        const trait = canonicalCatalogTrait(traitValue.attackKind, traitValue.element);
         if (!traits.some((candidate) => catalogTraitKey(candidate) === catalogTraitKey(trait))) {
           traits.push(trait);
         }
@@ -233,12 +255,7 @@ function recordLokPetCatalog(existing: LokPetCatalogEntry[], pets: RunResult['lo
     };
     entry.sightings += 1;
     if (!entry.rarities.includes(pet.rarity)) entry.rarities.push(pet.rarity);
-    const trait: LokPetCatalogTrait = {
-      attackKind: pet.attackKind,
-      element: pet.element,
-      elementLabel: pet.elementLabel,
-      label: pet.traitLabel,
-    };
+    const trait = canonicalCatalogTrait(pet.attackKind, pet.element);
     if (!entry.traits.some((candidate) => catalogTraitKey(candidate) === catalogTraitKey(trait))) {
       entry.traits.push(trait);
     }
@@ -249,7 +266,7 @@ function recordLokPetCatalog(existing: LokPetCatalogEntry[], pets: RunResult['lo
 }
 
 /** Coerce an untrusted save payload into a usable MetaState. */
-function normalizeMeta(parsed: Partial<MetaState>): MetaState {
+export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
   const characterIds = new Set(CHARACTERS.map((c) => c.id));
   const areaIds = new Set(AREAS.map((a) => a.id));
@@ -310,7 +327,7 @@ function normalizeMeta(parsed: Partial<MetaState>): MetaState {
 
   return {
     version: META_VERSION,
-    devModeAllUnlocks: import.meta.env.DEV && parsed.devModeAllUnlocks === true,
+    devModeAllUnlocks: Boolean(import.meta.env?.DEV) && parsed.devModeAllUnlocks === true,
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -333,7 +350,7 @@ function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   };
 }
 
-function loadMeta(): MetaState {
+export function loadMeta(): MetaState {
   if (typeof window === 'undefined') return createInitialMeta();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -364,7 +381,7 @@ function saveMeta(meta: MetaState) {
 /* ------------------------------------------------------------------ */
 
 export function isUnlocked(rule: UnlockRule, meta: MetaState): boolean {
-  if (import.meta.env.DEV && meta.devModeAllUnlocks) return true;
+  if (import.meta.env?.DEV && meta.devModeAllUnlocks) return true;
 
   switch (rule.kind) {
     case 'default':
@@ -472,7 +489,7 @@ function addUnique(list: string[], value?: string): string[] {
   return [...list, value];
 }
 
-function reducer(state: StoreState, action: Action): StoreState {
+export function reducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
     case 'selectCharacter':
       return { ...state, meta: { ...state.meta, selectedCharacterId: action.id } };

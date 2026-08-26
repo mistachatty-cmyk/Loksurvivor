@@ -16,7 +16,12 @@ import {
 } from '@/game/engine/world';
 import { generateChunk } from '@/game/engine/chunks';
 import { createRng } from '@/game/engine/math';
-import type { AreaDef, CharacterDef } from '@/game/types';
+import {
+  createInitialMeta,
+  loadMeta,
+  reducer,
+} from '@/game/state/metaStore';
+import type { AreaDef, CharacterDef, LokPetRoll, RunResult } from '@/game/types';
 
 const neutralInput = { moveX: 0, moveY: 0, ultimate: false };
 
@@ -110,6 +115,76 @@ function addProjectile(
   };
   world.projectiles.push(projectile);
   return projectile;
+}
+
+function runResult(lokPets: RunResult['lokPets'], cleared: boolean): RunResult {
+  return {
+    areaId: AREAS[0]!.id,
+    characterId: CHARACTERS[0]!.id,
+    cleared,
+    survivedSec: 30,
+    kills: 4,
+    level: 2,
+    cred: 10,
+    killsByEnemy: {},
+    newlyUnlockedCharacterIds: [],
+    loadout: { weapons: [], passives: [] },
+    lootBoxesOpened: lokPets.length,
+    openedPrizes: lokPets.map((pet) => pet.name),
+    lokPets,
+    lootTokensGained: 0,
+    completedObjectives: [],
+  };
+}
+
+function runPet(
+  roll: LokPetRoll,
+  overrides: Partial<RunResult['lokPets'][number]> = {},
+): RunResult['lokPets'][number] {
+  return {
+    name: roll.name,
+    variantId: roll.variantId,
+    family: roll.family,
+    silhouette: roll.silhouette,
+    palette: roll.palette,
+    rarity: roll.rarity,
+    rarityLabel: roll.rarityLabel,
+    attackKind: roll.attackKind,
+    element: roll.element,
+    elementLabel: roll.elementLabel,
+    traitLabel: roll.traitLabel,
+    health: roll.stats.health,
+    damage: roll.stats.damage,
+    cooldownMs: roll.stats.cooldownMs,
+    range: roll.stats.range,
+    ghosted: false,
+    ...overrides,
+  };
+}
+
+function withStoredMeta<T>(payload: unknown, callback: () => T): T {
+  const hadWindow = 'window' in globalThis;
+  const previousWindow = globalThis.window;
+  const localStorage = {
+    getItem: () => (payload === null ? null : JSON.stringify(payload)),
+    setItem: () => undefined,
+  };
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: { localStorage },
+  });
+  try {
+    return callback();
+  } finally {
+    if (hadWindow) {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: previousWindow,
+      });
+    } else {
+      delete (globalThis as { window?: unknown }).window;
+    }
+  }
 }
 
 test('a projectile is absorbed by heavy cover', () => {
@@ -439,6 +514,132 @@ test('LokPet rolls are deterministic, bounded, and carry a complete variant shee
   assert.ok(first.stats.cooldownMs >= 400);
   assert.ok(first.stats.lifetimeMs >= 90_000);
   assert.ok(first.traitLabel.includes(first.elementLabel) || first.element === 'none');
+});
+
+test('generated LokPets are recorded after both cleared and failed runs', () => {
+  const roll = rollLokPet(createRng(616));
+  let state = { meta: createInitialMeta(), lastRun: null };
+
+  state = reducer(state, {
+    type: 'completeRun',
+    result: runResult([runPet(roll)], true),
+  });
+  state = reducer(state, {
+    type: 'completeRun',
+    result: runResult([runPet(roll)], false),
+  });
+
+  assert.equal(state.meta.totalRuns, 2);
+  assert.equal(state.meta.lokPetCatalog.length, 1);
+  assert.equal(state.meta.lokPetCatalog[0]?.variantId, roll.variantId);
+  assert.equal(state.meta.lokPetCatalog[0]?.sightings, 2);
+});
+
+test('repeated LokPet sightings merge rarities and distinct traits without duplicates', () => {
+  const roll = rollLokPet(createRng(44));
+  const first = runPet(roll, {
+    rarity: 'common',
+    attackKind: 'shot',
+    element: 'none',
+    elementLabel: 'untrusted element',
+    traitLabel: 'untrusted trait',
+  });
+  const second = runPet(roll, {
+    rarity: 'mythic',
+    attackKind: 'pulse',
+    element: 'freeze',
+    elementLabel: 'untrusted element',
+    traitLabel: 'untrusted trait',
+  });
+  let state = { meta: createInitialMeta(), lastRun: null };
+
+  state = reducer(state, { type: 'completeRun', result: runResult([first], false) });
+  state = reducer(state, { type: 'completeRun', result: runResult([second], false) });
+  const entry = state.meta.lokPetCatalog[0]!;
+
+  assert.equal(state.meta.lokPetCatalog.length, 1);
+  assert.equal(entry.sightings, 2);
+  assert.deepEqual(entry.rarities, ['common', 'mythic']);
+  assert.deepEqual(
+    entry.traits.map(({ attackKind, element }) => `${attackKind}:${element}`),
+    ['shot:none', 'pulse:freeze'],
+  );
+  assert.equal(entry.traits[0]?.label, 'single shot');
+  assert.equal(entry.traits[1]?.label, 'pulsating field · freeze');
+});
+
+test('version 1 and version 2 saves retain progression and initialize the catalog', () => {
+  for (const version of [1, 2]) {
+    const legacySave = {
+      version,
+      selectedCharacterId: CHARACTERS[0]!.id,
+      unlockedCharacterIds: [CHARACTERS[0]!.id],
+      clearedAreaIds: [AREAS[0]!.id],
+      rescuedAllyIds: [],
+      discoveryIds: [],
+      bestiary: {},
+      totalKills: 17,
+      totalRuns: 3,
+      bestSurvivalSec: 42,
+      cred: 12,
+      lootTokens: 2,
+      onboarded: true,
+    };
+    const loaded = withStoredMeta(legacySave, loadMeta);
+
+    assert.equal(loaded.version, 3);
+    assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
+    assert.equal(loaded.totalKills, 17);
+    assert.equal(loaded.totalRuns, 3);
+    assert.equal(loaded.cred, 12);
+    assert.equal(loaded.lokPetCatalog.length, 0);
+  }
+});
+
+test('malformed catalog records are ignored and cannot inject presentation fields', () => {
+  const roll = rollLokPet(createRng(616));
+  const loaded = withStoredMeta({
+    version: 3,
+    lokPetCatalog: [
+      null,
+      { variantId: 'unknown-variant', sightings: 99 },
+      {
+        variantId: roll.variantId,
+        family: 'unsafe-family',
+        silhouette: 'unsafe-silhouette',
+        palette: { body: '<script>bad</script>' },
+        rarities: ['rare', 'not-a-rarity', 'rare'],
+        sightings: 2,
+        traits: [
+          {
+            attackKind: 'shot',
+            element: 'fire',
+            elementLabel: '<script>bad</script>',
+            label: '<img src=x onerror=alert(1)>',
+          },
+          {
+            attackKind: 'shot',
+            element: 'fire',
+            elementLabel: 'duplicate',
+            label: 'duplicate',
+          },
+          { attackKind: 'not-an-attack', element: 'fire' },
+        ],
+      },
+    ],
+  }, loadMeta);
+  const entry = loaded.lokPetCatalog[0]!;
+
+  assert.equal(loaded.lokPetCatalog.length, 1);
+  assert.deepEqual(entry.palette, roll.palette);
+  assert.deepEqual(entry.rarities, ['rare']);
+  assert.deepEqual(entry.traits, [{
+    attackKind: 'shot',
+    element: 'fire',
+    elementLabel: 'fire',
+    label: 'single shot · fire',
+  }]);
+  assert.equal(entry.sightings, 2);
 });
 
 test('a LokPet chest prize spawns a generated companion and exposes it to the HUD', () => {
