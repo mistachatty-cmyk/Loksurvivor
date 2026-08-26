@@ -5,18 +5,18 @@ description: Durable rules for authored weapon force, prop physics, and enemy im
 
 Impact intensity is an authored 0–5 gameplay signal separate from damage. Enemy mass and optional resistance convert it into travel, while props resolve through explicit light, medium, heavy, or fixed profiles.
 
-**Why:**  
+**Why:**
 Separating force from damage keeps weapon balance readable and lets harmless utility hits move scenery without creating reward bugs. Lethal impact bursts need secondary damage but must not create duplicate XP, cred, loot, or kill counts.
 
-**How to apply:**  
+**How to apply:**
 Route new weapon hit paths through the shared impact value, keep fixed props indestructible, and send every actual enemy death through the existing single kill/reward function. Secondary burst hits must be below the burst threshold or otherwise guarded against recursion.
 
 Clickable movable props are a one-shot mechanic: pointer selection primes the next player impact, which launches the prop in the reverse of its most recent player-hit direction and uses a strong velocity multiplier. Sweep the prop from its previous to current position when applying path damage.
 
-**Why:**  
+**Why:**
 The feature needs deliberate setup without changing ordinary weapon balance, and endpoint-only overlap misses enemies crossed between simulation frames.
 
-**How to apply:**  
+**How to apply:**
 Keep priming gated by the persisted physics-interaction setting, consume the prime on the next qualifying player impact, and preserve the existing idempotent enemy-kill path for launch damage.
 
 Player dashes use a separate short-lived movement impulse: double-click/tap direction is derived from the player toward the tap, and each enemy swept by one dash receives one strong knockback impulse without dash damage.
@@ -26,3 +26,11 @@ Dash movement should feel like a reliable crowd escape without introducing anoth
 
 **How to apply:**  
 Keep dash recovery and transition/outcome guards in the world command, preserve obstacle and arena collision handling, and render a directional trail so the input reads clearly on desktop and mobile.
+
+Impact chains are bounded by a per-prop velocity budget: each lethal follow-through may double the current speed, but consumes 10% of the remaining budget, and a prop only becomes a persistent heat hazard after three completed cycles.
+
+**Why:**
+The escalating feedback should feel explosive without becoming an unbounded recursive physics or reward system, while the three-cycle threshold makes the landed hazard an earned state rather than a common collision side effect.
+
+**How to apply:**
+Keep chain contacts unique per enemy, route every death through the shared kill path, and keep the heat effect as a separate nearby damage/status tick rather than recursively re-launching the prop.

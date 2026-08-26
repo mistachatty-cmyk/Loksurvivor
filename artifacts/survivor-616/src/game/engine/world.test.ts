@@ -519,6 +519,7 @@ test('clicking a movable prop primes one reverse launch and gives it a damaging 
 
   const enemy = addEnemy(world, 'nightcrawler', 116, 0);
   enemy.speed = 0;
+  world.breakables[0]!.nextEnemyImpactAt = Number.POSITIVE_INFINITY;
   const primed = primePhysicsObject(world, prop.x, prop.y);
   assert.equal(primed, prop);
   assert.equal(prop.clickPrimed, true);
@@ -531,6 +532,84 @@ test('clicking a movable prop primes one reverse launch and gives it a damaging 
 
   for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 60, neutralInput);
   assert.ok(enemy.hp < enemy.maxHp, 'the moving prop should damage an enemy along its travel path');
+});
+
+test('enemy contact launches an impact chain and lethal hits accelerate the follow-through', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    628,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  world.player.x = -350;
+  const prop = world.breakables[0]!;
+  const bumper = addEnemy(world, 'nightcrawler', 28, 0);
+  bumper.speed = 0;
+
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(prop.chainActive, true);
+  assert.ok(prop.vx < 0, 'the enemy should launch the prop away from its contact point');
+  assert.ok(prop.chainCycles >= 0);
+  assert.ok(world.popups.some((popup) => popup.text === 'IMPACT CHAIN'));
+
+  prop.vx = 960;
+  prop.vy = 0;
+  prop.chainActive = true;
+  prop.chainCycles = 0;
+  prop.chainVelocityBudget = 1800;
+  prop.nextEnemyImpactAt = Number.POSITIVE_INFINITY;
+  prop.chainHitUids.clear();
+  world.player.x = -350;
+  bumper.x = 80;
+  bumper.uid = 901;
+  bumper.hp = bumper.maxHp = 1;
+  const follow = addEnemy(world, 'nightcrawler', 100, 0);
+  follow.uid = 902;
+  follow.speed = 0;
+  follow.hp = follow.maxHp = 1;
+  const final = addEnemy(world, 'nightcrawler', 120, 0);
+  final.uid = 903;
+  final.speed = 0;
+  final.hp = final.maxHp = 1;
+
+  for (let i = 0; i < 2400 && !prop.landedHeatActive; i += 1) {
+    stepWorld(world, 1 / 60, neutralInput);
+  }
+  assert.equal(bumper.dying, true);
+  assert.equal(follow.dying, true);
+  assert.equal(final.dying, true);
+  assert.ok(Math.abs(prop.chainVelocityBudget - 1800 * 0.9 ** 3) < 1, 'each lethal cycle should lose 10% of its available velocity');
+  assert.ok(prop.chainCycles >= 3);
+  assert.equal(prop.landedHeatActive, true);
+  assert.equal(world.kills, 3, 'the chain should use one reward path per enemy');
+});
+
+test('a landed three-cycle prop becomes a pulsing heat hazard that burns nearby enemies', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 56, h: 56, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    629,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  world.player.x = -100;
+  const prop = world.breakables[0]!;
+  prop.chainActive = true;
+  prop.chainCycles = 3;
+  prop.landedHeatActive = true;
+  prop.heatNextTickAt = 0;
+  const enemy = addEnemy(world, 'nightcrawler', 100, 0);
+  enemy.speed = 0;
+  const enemyHp = enemy.hp;
+  const playerHp = world.player.hp;
+
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(enemy.hp < enemyHp);
+  assert.ok(enemy.activeEffects.some((effect) => effect.id === 'burning'));
+  assert.ok(world.player.hp < playerHp);
+  assert.equal(prop.landedHeatActive, true);
 });
 
 test('physics object click priming respects the saved setting', () => {

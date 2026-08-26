@@ -278,6 +278,15 @@ export interface BreakableObstacle extends Aabb {
   clickPrimed: boolean;
   clickPrimedAt: number;
   impactVelocityMultiplier: number;
+  /** Enemy-prop impact chain state. */
+  chainActive: boolean;
+  chainCycles: number;
+  chainVelocityBudget: number;
+  chainBoostPending: boolean;
+  chainHitUids: Set<number>;
+  nextEnemyImpactAt: number;
+  landedHeatActive: boolean;
+  heatNextTickAt: number;
   /** Falling light-pole state. */
   fallAngle?: number;
   hazardUntil?: number;
@@ -339,6 +348,14 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant'>): PropP
   }
   return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
 }
+
+export const LANDED_HEAT_RADIUS = 116;
+
+const PROP_CHAIN_MIN_CYCLES = 3;
+const PROP_CHAIN_MAX_SPEED = 1800;
+const PROP_CHAIN_STOP_SPEED = 24;
+const PROP_HEAT_TICK_MS = 300;
+const PROP_HEAT_DAMAGE = 11;
 
 /** Convert authored impact into travel speed after mass and resistance. */
 export function resolveImpactTravel(intensity: number, mass: number, resistance = 0): number {
@@ -680,6 +697,14 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     clickPrimed: false,
     clickPrimedAt: 0,
     impactVelocityMultiplier: 1,
+    chainActive: false,
+    chainCycles: 0,
+    chainVelocityBudget: 0,
+    chainBoostPending: false,
+    chainHitUids: new Set(),
+    nextEnemyImpactAt: 0,
+    landedHeatActive: false,
+    heatNextTickAt: 0,
   };
 }
 
@@ -2032,6 +2057,81 @@ export function primePhysicsObject(w: World, x: number, y: number): BreakableObs
   return target;
 }
 
+function resetPropChain(prop: BreakableObstacle, active = false) {
+  prop.chainActive = active;
+  prop.chainCycles = 0;
+  prop.chainVelocityBudget = active ? PROP_CHAIN_MAX_SPEED : 0;
+  prop.chainBoostPending = false;
+  prop.chainHitUids.clear();
+  prop.landedHeatActive = false;
+  prop.heatNextTickAt = 0;
+}
+
+function startEnemyPropChain(w: World, prop: BreakableObstacle, enemy: EnemyActor) {
+  if (prop.landedHeatActive) resetPropChain(prop);
+  if (!prop.chainActive) {
+    resetPropChain(prop, true);
+    w.popups.push({
+      x: prop.x,
+      y: prop.y - prop.h / 2 - 12,
+      text: 'IMPACT CHAIN',
+      color: '#ffb347',
+      bornAt: w.now,
+      vy: 24,
+    });
+  }
+
+  let dx = prop.x - enemy.x;
+  let dy = prop.y - enemy.y;
+  const length = Math.hypot(dx, dy) || 1;
+  dx /= length;
+  dy /= length;
+  const intensity = prop.propVariant === 'heavy-metal' ? 2 : 3;
+  const launchSpeed = resolveImpactTravel(
+    intensity,
+    prop.mass,
+    prop.propVariant === 'heavy-metal' ? 0.15 : 0,
+  );
+  const enemyMomentum = Math.max(80, enemy.speed * 0.7) / Math.max(1, prop.mass);
+  prop.vx += dx * (launchSpeed * 0.78 + enemyMomentum);
+  prop.vy += dy * (launchSpeed * 0.78 + enemyMomentum);
+  prop.impactIntensity = Math.max(prop.impactIntensity, intensity) as ImpactIntensity;
+  prop.nextEnemyImpactAt = w.now + 260;
+  spawnParticles(w, prop.x, prop.y, '#ffb347', 5, 80);
+  w.shake = Math.max(w.shake, 3);
+}
+
+function activateLandedHeat(w: World, prop: BreakableObstacle) {
+  if (prop.landedHeatActive) return;
+  prop.vx = 0;
+  prop.vy = 0;
+  prop.landedHeatActive = true;
+  prop.heatNextTickAt = w.now;
+  w.popups.push({
+    x: prop.x,
+    y: prop.y - prop.h / 2 - 12,
+    text: 'SUPERHEATED',
+    color: '#ff4d5e',
+    bornAt: w.now,
+    vy: 22,
+  });
+  spawnParticles(w, prop.x, prop.y, '#ff4d5e', 12, 120);
+  w.shake = Math.max(w.shake, 4);
+}
+
+function updateLandedHeat(w: World, prop: BreakableObstacle) {
+  if (!prop.landedHeatActive || w.now < prop.heatNextTickAt) return;
+  prop.heatNextTickAt = w.now + PROP_HEAT_TICK_MS;
+  if (dist2(w.player.x, w.player.y, prop.x, prop.y) <= (LANDED_HEAT_RADIUS + w.player.radius) ** 2) {
+    damagePlayer(w, PROP_HEAT_DAMAGE, prop.x, prop.y);
+  }
+  for (const enemy of w.enemies) {
+    if (enemy.dying || dist2(enemy.x, enemy.y, prop.x, prop.y) > (LANDED_HEAT_RADIUS + enemy.radius) ** 2) continue;
+    damageEnemy(w, enemy, PROP_HEAT_DAMAGE * w.stats.power, 0, prop.x, prop.y, 'burning');
+  }
+  spawnParticles(w, prop.x, prop.y, '#ff4d5e', 3, 55);
+}
+
 function applyPropImpact(
   w: World,
   x: number,
@@ -2068,6 +2168,7 @@ function applyPropImpact(
       b.lastPlayerImpactY = dy;
     }
     if (intensity < requiredIntensity) continue;
+    if (b.landedHeatActive) resetPropChain(b);
     const reverseLaunch = fromPlayer && b.clickPrimed;
     const launchDirectionX = reverseLaunch ? -b.lastPlayerImpactX : dx;
     const launchDirectionY = reverseLaunch ? -b.lastPlayerImpactY : dy;
@@ -2278,20 +2379,60 @@ function pointToSegmentDistanceSq(px: number, py: number, ax: number, ay: number
 function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle, previousX: number, previousY: number) {
   const speed = Math.hypot(prop.vx, prop.vy);
   if (speed < 52 || prop.impactIntensity < 2 || w.now < prop.nextImpactDamageAt) return;
-  prop.nextImpactDamageAt = w.now + 260;
+  prop.nextImpactDamageAt = w.now + (prop.chainActive ? 90 : 260);
   forEachNearby(w, prop.x, prop.y, Math.max(prop.w, prop.h) + 40, (enemy) => {
-    if (enemy.dying) return;
+    if (enemy.dying || (prop.chainActive && prop.chainHitUids.has(enemy.uid))) return;
     const hitRadius = Math.max(prop.w, prop.h) / 2 + enemy.radius;
     if (pointToSegmentDistanceSq(enemy.x, enemy.y, previousX, previousY, prop.x, prop.y) > hitRadius * hitRadius) return;
-    const boosted = prop.impactVelocityMultiplier > 1;
+    const clickBoosted = prop.impactVelocityMultiplier > 1;
+    const chainBoosted = prop.chainBoostPending;
+    if (prop.chainActive) prop.chainHitUids.add(enemy.uid);
+    const trajectoryScale = clamp(speed / 180, 0.65, 3);
+    const impactIntensity = Math.min(
+      4,
+      Math.max(2, Math.round(trajectoryScale)) + (clickBoosted || chainBoosted ? 1 : 0),
+    ) as ImpactIntensity;
+    const wasDying = enemy.dying;
     damageEnemy(
       w,
       enemy,
-      Math.max(1, Math.round(speed * prop.impactIntensity * (boosted ? 0.2 : 0.08))),
-      Math.min(5, boosted ? prop.impactIntensity + 1 : prop.impactIntensity) as ImpactIntensity,
+      Math.max(1, Math.round(speed * prop.impactIntensity * (clickBoosted ? 0.2 : chainBoosted ? 0.16 : 0.08))),
+      impactIntensity,
       prop.x,
       prop.y,
     );
+    if (prop.chainActive) {
+      prop.chainCycles = Math.min(999, prop.chainCycles + 1);
+      prop.chainBoostPending = false;
+      if (!wasDying && enemy.dying) {
+        const speedBeforeBoost = Math.hypot(prop.vx, prop.vy);
+        const directionLength = speedBeforeBoost || 1;
+        prop.chainVelocityBudget = Math.max(0, prop.chainVelocityBudget * 0.9);
+        const nextSpeed = Math.min(
+          PROP_CHAIN_MAX_SPEED,
+          speedBeforeBoost * 2,
+          prop.chainVelocityBudget,
+        );
+        if (nextSpeed >= PROP_CHAIN_STOP_SPEED) {
+          prop.vx = (prop.vx / directionLength) * nextSpeed;
+          prop.vy = (prop.vy / directionLength) * nextSpeed;
+          prop.chainBoostPending = true;
+        } else {
+          prop.vx = 0;
+          prop.vy = 0;
+        }
+        w.popups.push({
+          x: enemy.x,
+          y: enemy.y - enemy.radius - 10,
+          text: 'CHAIN x2',
+          color: '#ff4d5e',
+          bornAt: w.now,
+          vy: 28,
+        });
+        spawnParticles(w, enemy.x, enemy.y, '#ff4d5e', 10, 150);
+        w.shake = Math.max(w.shake, 7);
+      }
+    }
     spawnParticles(w, enemy.x, enemy.y, '#ffd166', 3, 55);
   });
 }
@@ -2313,14 +2454,35 @@ function updateBreakables(w: World, dt: number) {
       }
       continue;
     }
+    if (b.landedHeatActive) {
+      updateLandedHeat(w, b);
+      continue;
+    }
     if (b.vx || b.vy) {
       const previousX = b.x;
       const previousY = b.y;
+      const speedBeforeMove = Math.hypot(b.vx, b.vy);
       b.x += b.vx * dt; b.y += b.vy * dt;
       resolveMovingPropCollisions(w, b);
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
-      b.vx *= Math.pow(b.friction, dt * 60);
-      b.vy *= Math.pow(b.friction, dt * 60);
+      const friction = b.chainActive ? Math.max(b.friction, 0.98) : b.friction;
+      b.vx *= Math.pow(friction, dt * 60);
+      b.vy *= Math.pow(friction, dt * 60);
+      if (Math.hypot(b.vx, b.vy) < PROP_CHAIN_STOP_SPEED) {
+        b.vx = 0;
+        b.vy = 0;
+        if (b.chainActive && b.chainCycles >= PROP_CHAIN_MIN_CYCLES) {
+          activateLandedHeat(w, b);
+        } else if (b.chainActive) {
+          resetPropChain(b);
+        }
+      } else if (speedBeforeMove > PROP_CHAIN_STOP_SPEED && b.chainActive && b.chainVelocityBudget <= 0) {
+        b.vx = 0;
+        b.vy = 0;
+      }
+    } else if (b.chainActive) {
+      if (b.chainCycles >= PROP_CHAIN_MIN_CYCLES) activateLandedHeat(w, b);
+      else resetPropChain(b);
     }
   }
   // Project live positions to the collision list, preserving all props.
@@ -2656,6 +2818,14 @@ function updateEnemies(w: World, dt: number) {
     enemy.x += moveX * speed * dt;
     enemy.y += moveY * speed * dt;
     applyKnockback(enemy, dt);
+    for (const b of w.breakables) {
+      if (b.broken || !b.movable || w.now < b.nextEnemyImpactAt) continue;
+      if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
+        b.contacts += 1;
+        if (b.kind === 'car-wreck' && b.contacts < 3) continue;
+        startEnemyPropChain(w, b, enemy);
+      }
+    }
     collideObstacles(w, enemy);
     clampToArena(w, enemy);
 
@@ -2665,18 +2835,6 @@ function updateEnemies(w: World, dt: number) {
       enemy.contactReadyAt = w.now + 520;
       damagePlayer(w, enemy.damage, enemy.x, enemy.y);
     }
-    for (const b of w.breakables) {
-       if (b.broken || !b.movable) continue;
-      if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
-        b.contacts += 1;
-        if (b.kind === 'car-wreck' && b.contacts < 3) continue;
-        const dx = b.x - enemy.x; const dy = b.y - enemy.y; const len = Math.hypot(dx, dy) || 1;
-        const force = b.propVariant === 'heavy-metal' ? 6 : b.propVariant === 'medium-movable' ? 18 : 30;
-        b.vx += (dx / len) * force / Math.max(1, b.mass);
-        b.vy += (dy / len) * force / Math.max(1, b.mass);
-      }
-    }
-
     const elapsed = w.now - enemy.animStartedAt;
     if (enemy.anim === 'attack' && elapsed < 260) continue;
     if (enemy.anim !== 'walk') {

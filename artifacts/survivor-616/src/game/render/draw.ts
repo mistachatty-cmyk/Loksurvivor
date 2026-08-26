@@ -6,7 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
-import type { World } from '@/game/engine/world';
+import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type { ObstacleDef } from '@/game/types';
@@ -750,6 +750,20 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
     }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+    if (live?.landedHeatActive) {
+      ctx.save();
+      const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
+      ctx.globalAlpha = pulse;
+      ctx.shadowColor = '#ff4d5e';
+      ctx.shadowBlur = 18;
+      ctx.strokeStyle = '#ff4d5e';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
+      ctx.fillStyle = '#ff4d5e';
+      ctx.globalAlpha = 0.28 + pulse * 0.18;
+      ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
+      ctx.restore();
+    }
     if (live?.clickPrimed) {
       ctx.save();
       const pulse = 0.7 + Math.sin(w.now / 120) * 0.2;
@@ -806,6 +820,28 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.landedHeatActive) continue;
+    const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
+    const radius = LANDED_HEAT_RADIUS + Math.sin(w.now / 72) * 10;
+    const gradient = ctx.createRadialGradient(prop.x, prop.y, 5, prop.x, prop.y, radius);
+    gradient.addColorStop(0, '#ff4d5e66');
+    gradient.addColorStop(0.48, '#ff7a1830');
+    gradient.addColorStop(1, '#ff2d5500');
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(prop.x, prop.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff4d5e';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 7]);
+    ctx.beginPath();
+    ctx.arc(prop.x, prop.y, radius * (0.78 + pulse * 0.12), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
   for (const pole of w.breakables) {
     if (pole.kind !== 'street-lamp' || !pole.broken || !pole.hazardUntil || pole.hazardUntil <= w.now) continue;
     const radius = 92;
