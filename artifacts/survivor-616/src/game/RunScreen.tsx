@@ -469,6 +469,29 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           </div>
         ) : null}
 
+        {hud?.lokPets && hud.lokPets.length > 0 ? (
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5" data-testid="row-lokpets">
+            {hud.lokPets.map((pet) => (
+              <div
+                key={pet.uid}
+                title={`${pet.name} · ${pet.traitLabel} · ${pet.expiresInSec}s remaining`}
+                className={`flex min-h-9 min-w-[148px] items-center gap-2 border bg-black/80 px-2 py-1 font-mono text-[9px] uppercase tracking-wide ${pet.ghost ? 'border-white/25' : 'border-pink-400/50'}`}
+                style={{ color: pet.color, opacity: pet.ghost ? 0.68 : 1 }}
+              >
+                <span className="h-3 w-3 shrink-0 rotate-45 border" style={{ borderColor: pet.color, backgroundColor: `${pet.color}55`, boxShadow: `0 0 8px ${pet.color}` }} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold text-white">{pet.name}</span>
+                  <span className="block truncate opacity-80">{pet.traitLabel} · {pet.damage} dmg / {pet.cooldownMs}ms</span>
+                </span>
+                <span className="shrink-0 text-right opacity-80">
+                  <span className="block">{pet.ghost ? 'ghost' : `${pet.expiresInSec}s`}</span>
+                  <span className="block text-[8px]">{pet.silhouette}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {hud?.activeEffects && hud.activeEffects.length > 0 ? (
           <div className="flex flex-wrap gap-1.5" data-testid="row-status-effects">
             {hud.activeEffects.map((effect) => (
@@ -671,6 +694,19 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
               >
                 {reel.prize.label}
               </p>
+              {reel.prize.lokPet ? (
+                <div className="mt-3 border border-pink-400/30 bg-pink-400/5 px-4 py-3 text-left font-mono text-[11px] uppercase tracking-widest text-white/80">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-black text-pink-200">{reel.prize.lokPet.rarityLabel} {reel.prize.lokPet.family} signal</span>
+                    <span className="text-pink-300">{reel.prize.lokPet.elementLabel}</span>
+                  </div>
+                  <p className="mt-1 text-white">{reel.prize.lokPet.traitLabel}</p>
+                  <p className="mt-1 text-[9px] text-pink-100/70">
+                    {reel.prize.lokPet.stats.damage} dmg · {reel.prize.lokPet.stats.cooldownMs}ms cadence · {reel.prize.lokPet.stats.range} range · {Math.round(reel.prize.lokPet.stats.lifetimeMs / 1000)}s lifespan
+                  </p>
+                  <p className="mt-1 text-[9px] text-white/50">{reel.prize.lokPet.description}</p>
+                </div>
+              ) : null}
               <p className="mt-1 font-mono text-xs text-white/40">already applied — you keep it</p>
             </div>
           ) : (

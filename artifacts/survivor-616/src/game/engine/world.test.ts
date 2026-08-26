@@ -4,15 +4,18 @@ import test from 'node:test';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { getEnemy } from '@/game/data/enemies';
+import { rollLokPet } from '@/game/data/lokPets';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import {
   createWorld,
   hudSnapshot,
+  spawnLokPet,
   type EnemyActor,
   type Projectile,
   stepWorld,
 } from '@/game/engine/world';
 import { generateChunk } from '@/game/engine/chunks';
+import { createRng } from '@/game/engine/math';
 import type { AreaDef, CharacterDef } from '@/game/types';
 
 const neutralInput = { moveX: 0, moveY: 0, ultimate: false };
@@ -423,6 +426,78 @@ test('followers spawn, grow, attack, and expire without exceeding the cap', () =
   assert.ok(enemy.hp < enemy.maxHp);
   for (let i = 0; i < 240; i += 1) stepWorld(world, 1 / 30, neutralInput);
   assert.equal(world.followers.length, 0);
+});
+
+test('LokPet rolls are deterministic, bounded, and carry a complete variant sheet', () => {
+  const first = rollLokPet(createRng(616));
+  const second = rollLokPet(createRng(616));
+  assert.deepEqual(first, second);
+  assert.ok(['animal', 'ghoul', 'bat', 'mote', 'blob', 'mechanical'].includes(first.family));
+  assert.ok(first.name.includes('·'));
+  assert.ok(first.stats.health >= 18);
+  assert.ok(first.stats.damage >= 1);
+  assert.ok(first.stats.cooldownMs >= 400);
+  assert.ok(first.stats.lifetimeMs >= 90_000);
+  assert.ok(first.traitLabel.includes(first.elementLabel) || first.element === 'none');
+});
+
+test('a LokPet chest prize spawns a generated companion and exposes it to the HUD', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    616,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  // The LokPet entry is the final weighted entry in the prize table.
+  world.rng = () => 0.99;
+  world.pickups.push({ uid: 800, kind: 'loot-box', x: 0, y: 0, vx: 0, vy: 0, value: 0, bornAt: 0 });
+
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.lokPets.length, 1);
+  assert.equal(world.pendingReel[0]?.kind, 'lokpet');
+  assert.equal(world.pendingReel[0]?.lokPet?.variantId, world.lokPets[0]?.variantId);
+  const snapshot = hudSnapshot(world);
+  assert.equal(snapshot.lokPets.length, 1);
+  assert.equal(snapshot.lokPets[0]?.ghost, false);
+});
+
+test('LokPets follow, apply elemental attacks, explode, and become transparent ghosts', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    44,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const base = rollLokPet(createRng(44));
+  const petRoll = {
+    ...base,
+    attackKind: 'explosion' as const,
+    element: 'freeze' as const,
+    elementLabel: 'freeze',
+    stats: { ...base.stats, cooldownMs: 120, range: 260, explosionRadius: 110 },
+  };
+  const pet = spawnLokPet(world, petRoll);
+  const firstEnemy = addEnemy(world, 'nightcrawler', 78, 0);
+  const secondEnemy = addEnemy(world, 'nightcrawler', 98, 0);
+  pet.readyAt = 0;
+
+  for (let i = 0; i < 100; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(firstEnemy.hp < firstEnemy.maxHp);
+  assert.ok(secondEnemy.hp < secondEnemy.maxHp);
+  assert.ok(firstEnemy.activeEffects.some((effect) => effect.id === 'freeze') || firstEnemy.dying);
+  pet.ghostAt = world.now + 10;
+  for (let i = 0; i < 3; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(pet.ghost, true);
+  assert.equal(hudSnapshot(world).lokPets[0]?.ghost, true);
+
+  pet.expiresAt = world.now + 10;
+  for (let i = 0; i < 3; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.lokPets.length, 0);
+  assert.equal(world.lokPetHistory.length, 1);
 });
 
 test('formation-tagged waves release deterministic positions', () => {

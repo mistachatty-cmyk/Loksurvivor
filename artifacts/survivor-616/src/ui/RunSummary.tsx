@@ -23,6 +23,7 @@ export function RunSummary({ result, onReturnToHub, onRetry }: RunSummaryProps) 
   const character = getCharacter(result.characterId);
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
+  const lokPets = result.lokPets ?? [];
 
   return (
     <ScreenLayout 
@@ -205,7 +206,7 @@ export function RunSummary({ result, onReturnToHub, onRetry }: RunSummaryProps) 
         )}
 
         {/* Loot & Objectives */}
-        {(result.lootBoxesOpened > 0 || result.completedObjectives.length > 0) && (
+        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0) && (
           <div className="grid gap-4 md:grid-cols-2">
             {result.lootBoxesOpened > 0 && (
               <div className="border border-border bg-card p-5" data-testid="section-loot">
@@ -225,6 +226,32 @@ export function RunSummary({ result, onReturnToHub, onRetry }: RunSummaryProps) 
                     <span key={i} className="border border-blue-800/60 bg-blue-950/40 px-2 py-0.5 font-mono text-[11px] text-blue-200">
                       {label}
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {lokPets.length > 0 && (
+              <div className="border border-pink-400/30 bg-card p-5" data-testid="section-lokpets">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-lg text-pink-300">✦</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    LokPets — {lokPets.length} generated
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {lokPets.map((pet, i) => (
+                    <div key={`${pet.name}-${i}`} className="flex items-center justify-between gap-3 border border-white/10 bg-black/25 px-2 py-1.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-[11px] font-black uppercase tracking-wide text-white">{pet.name}</p>
+                        <p className="truncate font-mono text-[9px] uppercase tracking-wider text-pink-300">
+                          {pet.rarity} {pet.family} · {pet.attackKind} · {pet.element}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 font-mono text-[9px] uppercase tracking-widest ${pet.ghosted ? 'text-white/50' : 'text-emerald-300'}`}>
+                        {pet.ghosted ? 'ghosted' : 'active'}
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>

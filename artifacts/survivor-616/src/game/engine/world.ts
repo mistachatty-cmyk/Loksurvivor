@@ -16,6 +16,7 @@ import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
 import { UPGRADES } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
+import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type {
@@ -27,6 +28,8 @@ import type {
   EndlessState,
   HudSnapshot,
   LootPrizeDef,
+  LokPetInstance,
+  LokPetRoll,
   ObjectiveDef,
   RunObjective,
   RunResult,
@@ -129,6 +132,9 @@ export interface Projectile {
   obstacleUids?: Set<number>;
   obstacleInteraction?: 'block' | 'reflect';
   statusEffectId?: string;
+  /** Pet shots can detonate into a second area hit on contact. */
+  explosionRadius?: number;
+  explosionDamage?: number;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport';
@@ -282,6 +288,9 @@ export interface World {
   popups: Popup[];
   particles: Particle[];
   followers: Follower[];
+  lokPets: LokPetInstance[];
+  /** All LokPets generated this run, including companions that have expired. */
+  lokPetHistory: LokPetInstance[];
 
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
@@ -432,6 +441,8 @@ export function createWorld(
     popups: [],
     particles: [],
     followers: [],
+    lokPets: [],
+    lokPetHistory: [],
     obstacles: area.obstacles.map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
     bounds: area.bounds,
@@ -800,6 +811,173 @@ function spawnFollowers(w: World, weapon: WeaponDef) {
   if (!spec) return;
   for (let i = 0; i < spec.count; i += 1) spawnFollower(w, weapon, i);
   spawnParticles(w, w.player.x, w.player.y, weapon.color ?? w.character.palette.accent, Math.min(10, spec.count * 2), 70);
+}
+
+const MAX_LOKPETS = 4;
+const LOKPET_GHOST_AFTER_MS = 60_000;
+
+function lokPetStatusId(pet: LokPetInstance): string | undefined {
+  if (pet.element === 'fire') return 'burning';
+  if (pet.element === 'freeze') return 'freeze';
+  if (pet.element === 'slow') return 'slow';
+  return undefined;
+}
+
+function lokPetDamage(w: World, pet: LokPetInstance): number {
+  const attackMultiplier = pet.attackKind === 'rapid-shot'
+    ? 0.55
+    : pet.attackKind === 'heavy-shot'
+      ? 1.8
+      : pet.attackKind === 'explosion'
+        ? 0.95
+        : 1;
+  return Math.max(1, pet.stats.damage * attackMultiplier * damageMult(w));
+}
+
+function showLokPetBurst(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  damage: number,
+  color: string,
+  statusEffectId?: string,
+  explosive = false,
+) {
+  novaDamage(w, x, y, radius, damage, explosive ? 4 : 1.5, statusEffectId);
+  damageBreakable(w, x, y, radius, damage);
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x,
+    y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 380,
+    color,
+    damage: 0,
+    knockback: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, x, y, color, explosive ? 12 : 6, explosive ? 130 : 80);
+  if (explosive) w.shake = Math.max(w.shake, 5);
+}
+
+function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
+  const dx = target.x - pet.x;
+  const dy = target.y - pet.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const speed = pet.stats.projectileSpeed;
+  const explosion = pet.attackKind === 'explosion';
+  w.projectiles.push({
+    uid: uid(w),
+    x: pet.x,
+    y: pet.y,
+    vx: (dx / distance) * speed,
+    vy: (dy / distance) * speed,
+    radius: pet.attackKind === 'heavy-shot' ? 7 : 5,
+    damage: lokPetDamage(w, pet),
+    knockback: pet.attackKind === 'heavy-shot' ? 4 : 1.5,
+    fromPlayer: true,
+    expiresAt: w.now + 1900,
+    targetUid: target.uid,
+    turnRate: pet.attackKind === 'rapid-shot' ? 5.5 : 3.8,
+    color: pet.palette.accent,
+    trail: [],
+    pierce: pet.attackKind === 'heavy-shot' ? 1 : 0,
+    hitUids: new Set(),
+    obstacleInteraction: 'block',
+    statusEffectId: lokPetStatusId(pet),
+    explosionRadius: explosion ? pet.stats.explosionRadius : undefined,
+    explosionDamage: explosion ? lokPetDamage(w, pet) : undefined,
+  });
+  spawnParticles(w, pet.x, pet.y, pet.palette.glow, 2, 40);
+}
+
+/** Spawn one generated chest companion, replacing the oldest at the mobile-safe cap. */
+export function spawnLokPet(w: World, roll: LokPetRoll): LokPetInstance {
+  if (w.lokPets.length >= MAX_LOKPETS) {
+    const oldest = w.lokPets.shift();
+    if (oldest) spawnParticles(w, oldest.x, oldest.y, oldest.palette.glow, 6, 65);
+    pushAlert(w, 'LokPet signal rotated');
+  }
+  const index = w.lokPets.length;
+  const orbitAngle = (Math.PI * 2 * index) / MAX_LOKPETS + w.rng() * 0.2;
+  const pet: LokPetInstance = {
+    ...roll,
+    uid: uid(w),
+    x: w.player.x + Math.cos(orbitAngle) * (40 + index * 6),
+    y: w.player.y + Math.sin(orbitAngle) * (40 + index * 6),
+    vx: 0,
+    vy: 0,
+    orbitAngle,
+    orbitRadius: 40 + index * 6,
+    bornAt: w.now,
+    ghostAt: w.now + LOKPET_GHOST_AFTER_MS,
+    expiresAt: w.now + roll.stats.lifetimeMs,
+    ghost: false,
+    readyAt: w.now + 500,
+    nextPulseAt: w.now + 500,
+    hp: roll.stats.health,
+    maxHp: roll.stats.health,
+  };
+  w.lokPets.push(pet);
+  w.lokPetHistory.push(pet);
+  spawnParticles(w, pet.x, pet.y, pet.palette.glow, 10, 85);
+  pushAlert(w, `${pet.name} joined the run`);
+  return pet;
+}
+
+function updateLokPets(w: World, dt: number) {
+  for (let i = w.lokPets.length - 1; i >= 0; i -= 1) {
+    const pet = w.lokPets[i]!;
+    if (w.now >= pet.expiresAt) {
+      spawnParticles(w, pet.x, pet.y, pet.palette.glow, 8, 55);
+      w.lokPets.splice(i, 1);
+      continue;
+    }
+
+    if (!pet.ghost && w.now >= pet.ghostAt) {
+      pet.ghost = true;
+      spawnParticles(w, pet.x, pet.y, '#dbeafe', 14, 95);
+      pushAlert(w, `${pet.name} crossed into ghost phase`);
+    }
+
+    pet.orbitAngle += dt * (pet.ghost ? 1.35 : 1.8);
+    const tx = w.player.x + Math.cos(pet.orbitAngle) * pet.orbitRadius;
+    const ty = w.player.y + Math.sin(pet.orbitAngle) * pet.orbitRadius;
+    const dx = tx - pet.x;
+    const dy = ty - pet.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const speed = pet.stats.moveSpeed * (Math.hypot(dx, dy) > 120 ? 1.35 : 1);
+    pet.vx += (dx / len * speed - pet.vx) * Math.min(1, dt * 7);
+    pet.vy += (dy / len * speed - pet.vy) * Math.min(1, dt * 7);
+    pet.x += pet.vx * dt;
+    pet.y += pet.vy * dt;
+
+    const target = nearestEnemy(w, pet.x, pet.y, pet.stats.range);
+    if (!target || w.now < pet.readyAt) continue;
+
+    if (pet.attackKind === 'pulse') {
+      showLokPetBurst(
+        w,
+        pet.x,
+        pet.y,
+        pet.stats.pulseRadius,
+        lokPetDamage(w, pet),
+        pet.palette.glow,
+        lokPetStatusId(pet),
+      );
+      pet.nextPulseAt = w.now + pet.stats.cooldownMs;
+      pet.readyAt = pet.nextPulseAt;
+    } else {
+      fireLokPetShot(w, pet, target);
+      pet.readyAt = w.now + pet.stats.cooldownMs;
+    }
+  }
 }
 
 function updateFollowers(w: World, dt: number) {
@@ -1494,6 +1672,19 @@ function applyLootPrize(w: World, prize: LootPrizeDef) {
       }
       break;
     }
+    case 'lokpet': {
+      const pet = prize.lokPet ?? rollLokPet(w.rng);
+      spawnLokPet(w, pet);
+      w.popups.push({
+        x: w.player.x,
+        y: w.player.y + 30,
+        text: `+ ${pet.name}`,
+        color: LOKPET_ELEMENT_COLORS[pet.element],
+        bornAt: w.now,
+        vy: 28,
+      });
+      break;
+    }
   }
 }
 
@@ -2072,7 +2263,20 @@ function updateProjectiles(w: World, dt: number) {
         const reach = proj.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
           proj.hitUids.add(enemy.uid);
-          damageEnemy(w, enemy, proj.damage, proj.knockback, proj.x, proj.y, proj.statusEffectId);
+          if (proj.explosionRadius) {
+            showLokPetBurst(
+              w,
+              proj.x,
+              proj.y,
+              proj.explosionRadius,
+              proj.explosionDamage ?? proj.damage,
+              proj.color,
+              proj.statusEffectId,
+              true,
+            );
+          } else {
+            damageEnemy(w, enemy, proj.damage, proj.knockback, proj.x, proj.y, proj.statusEffectId);
+          }
           damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
           if (proj.pierce > 0) proj.pierce -= 1;
@@ -2746,6 +2950,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   }
 
   updateStatusEffects(w);
+  updateLokPets(w, dt);
   updateFollowers(w, dt);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
@@ -2817,6 +3022,24 @@ export function hudSnapshot(w: World): HudSnapshot {
     rescueAvailable: w.rescue.status === 'available' || w.rescue.status === 'freeing',
     rescueProgressPct: Math.round(w.rescue.progress * 100),
     lootBoxesOpened: w.lootBoxesOpened,
+    lokPets: w.lokPets.map((pet) => ({
+      uid: pet.uid,
+      name: pet.name,
+      family: pet.family,
+      silhouette: pet.silhouette,
+      rarity: pet.rarity,
+      attackKind: pet.attackKind,
+      element: pet.element,
+      traitLabel: pet.traitLabel,
+      health: pet.stats.health,
+      damage: Math.round(pet.stats.damage),
+      cooldownMs: pet.stats.cooldownMs,
+      range: pet.stats.range,
+      ghost: pet.ghost,
+      ghostPct: pet.ghost ? 100 : clamp((w.now - pet.bornAt) / Math.max(1, pet.ghostAt - pet.bornAt) * 100, 0, 100),
+      expiresInSec: Math.max(0, Math.ceil((pet.expiresAt - w.now) / 1000)),
+      color: LOKPET_ELEMENT_COLORS[pet.element],
+    })),
     activeEffects: [...effectCounts.entries()].map(([id, count]) => ({
       id,
       name: STATUS_EFFECTS_BY_ID[id]?.name ?? id,
@@ -2880,6 +3103,18 @@ export function buildResult(w: World): RunResult {
     },
     lootBoxesOpened: w.lootBoxesOpened,
     openedPrizes: [...w.openedPrizes],
+    lokPets: w.lokPetHistory.map((pet) => ({
+      name: pet.name,
+      family: pet.family,
+      rarity: pet.rarity,
+      attackKind: pet.attackKind,
+      element: pet.element,
+      health: pet.stats.health,
+      damage: Math.round(pet.stats.damage),
+      cooldownMs: pet.stats.cooldownMs,
+      range: pet.stats.range,
+      ghosted: pet.ghost,
+    })),
     lootTokensGained: w.lootTokensGained,
     completedObjectives: [...w.completedObjectives],
     endless: e

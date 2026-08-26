@@ -83,13 +83,93 @@ export interface SpriteRig {
 /* ------------------------------------------------------------------ */
 
 export interface LootPrizeDef {
-  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon';
+  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon' | 'lokpet';
   amount?: number;
   label: string;
   /** Stat key when kind === 'stat'. */
   stat?: keyof BaseStats;
   /** Additive amount when kind === 'stat'. */
   add?: number;
+  /** Generated companion payload when kind === 'lokpet'. */
+  lokPet?: LokPetRoll;
+}
+
+export type LokPetFamily = 'animal' | 'ghoul' | 'bat' | 'mote' | 'blob' | 'mechanical';
+export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jelly' | 'clockwork';
+export type LokPetAttackKind = 'shot' | 'rapid-shot' | 'heavy-shot' | 'pulse' | 'explosion';
+export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow';
+export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
+
+/** Compact palette for original, vector-drawn companion variants. */
+export interface LokPetPalette {
+  body: string;
+  bodyDark: string;
+  accent: string;
+  glow: string;
+  eye: string;
+}
+
+/** The visual “variant sheet” entry used by the deterministic pet generator. */
+export interface LokPetVariantDef {
+  id: string;
+  name: string;
+  family: LokPetFamily;
+  silhouette: LokPetSilhouette;
+  palette: LokPetPalette;
+  description: string;
+}
+
+/** Rarity-tuned stat sheet used when a chest generates a LokPet. */
+export interface LokPetStatSheet {
+  rarity: LokPetRarity;
+  label: string;
+  powerMultiplier: number;
+  health: number;
+  moveSpeed: number;
+  damage: number;
+  cooldownMs: number;
+  range: number;
+  projectileSpeed: number;
+  explosionRadius: number;
+  pulseRadius: number;
+  lifetimeMs: number;
+  weight: number;
+}
+
+/** A generated chest payload; it becomes a live LokPet when applied to a world. */
+export interface LokPetRoll {
+  name: string;
+  variantId: string;
+  family: LokPetFamily;
+  silhouette: LokPetSilhouette;
+  palette: LokPetPalette;
+  rarity: LokPetRarity;
+  rarityLabel: string;
+  attackKind: LokPetAttackKind;
+  element: LokPetElement;
+  elementLabel: string;
+  description: string;
+  stats: Omit<LokPetStatSheet, 'rarity' | 'label' | 'weight' | 'powerMultiplier'>;
+  traitLabel: string;
+}
+
+/** A generated LokPet currently orbiting the player in a run. */
+export interface LokPetInstance extends LokPetRoll {
+  uid: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  orbitAngle: number;
+  orbitRadius: number;
+  bornAt: number;
+  ghostAt: number;
+  expiresAt: number;
+  ghost: boolean;
+  readyAt: number;
+  nextPulseAt: number;
+  hp: number;
+  maxHp: number;
 }
 
 export type ObjectiveKind = 'kill-any' | 'kill-enemy' | 'survive-sec' | 'walk-blocks';
@@ -637,6 +717,19 @@ export interface RunResult {
   lootBoxesOpened: number;
   /** Prize labels collected from loot boxes. */
   openedPrizes: string[];
+  /** LokPets generated from chest rewards during this run. */
+  lokPets: Array<{
+    name: string;
+    family: LokPetFamily;
+    rarity: LokPetRarity;
+    attackKind: LokPetAttackKind;
+    element: LokPetElement;
+    health: number;
+    damage: number;
+    cooldownMs: number;
+    range: number;
+    ghosted: boolean;
+  }>;
   /** Loot tokens earned this run. */
   lootTokensGained: number;
   /** Fatigue applied to the operative after this run. */
@@ -675,6 +768,25 @@ export interface HudSnapshot {
   rescueAvailable: boolean;
   rescueProgressPct: number;
   lootBoxesOpened: number;
+  /** Generated companions currently following the player. */
+  lokPets: Array<{
+    uid: number;
+    name: string;
+    family: LokPetFamily;
+    silhouette: LokPetSilhouette;
+    rarity: LokPetRarity;
+    attackKind: LokPetAttackKind;
+    element: LokPetElement;
+    traitLabel: string;
+    health: number;
+    damage: number;
+    cooldownMs: number;
+    range: number;
+    ghost: boolean;
+    ghostPct: number;
+    expiresInSec: number;
+    color: string;
+  }>;
   /** Effects currently active on the player's enemies, grouped for HUD display. */
   activeEffects: Array<{ id: string; name: string; color: string; count: number }>;
   objectives: Array<{
