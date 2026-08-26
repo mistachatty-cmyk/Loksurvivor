@@ -65,7 +65,7 @@ export interface StreetChunk {
 
 const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot', 'market', 'rail', 'plaza'];
 const BLOCK_KINDS: BlockKind[] = ['storefronts', 'residential', 'parking', 'industrial', 'park', 'bridge', 'river-edge'];
-const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable', 'cover', 'reflective-surface', 'flora'];
+const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable', 'cover', 'reflective-surface', 'flora', 'metal-box', 'bench'];
 
 /**
  * Generate a single chunk.  The run seed is mixed with the chunk
@@ -189,19 +189,19 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
 
   const kindWeights: Record<ChunkVariant, number[]> = {
     // strip: lots of cars, some planters
-    strip: [4, 1, 1, 2, 1, 0],
+    strip: [4, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
     // alley: dumpsters and crates
-    alley: [1, 3, 4, 1, 2, 1],
+    alley: [1, 3, 4, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
     // parking: mostly cars
-    parking: [6, 1, 1, 0, 1, 0],
+    parking: [6, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
     // lot: mixed
-     lot: [1, 2, 3, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 3],
+     lot: [1, 2, 3, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 3, 2, 1],
     // market: stalls, barriers, signs
-     market: [1, 1, 3, 2, 4, 0, 3, 1, 1, 1, 0, 2, 2, 1, 3],
+     market: [1, 1, 3, 2, 4, 0, 3, 1, 1, 1, 0, 2, 2, 1, 3, 1, 2],
     // rail: long barriers, wrecks and signal boxes
-     rail: [1, 0, 1, 0, 5, 1, 0, 1, 3, 2, 4, 1, 3, 2, 2],
+     rail: [1, 0, 1, 0, 5, 1, 0, 1, 3, 2, 4, 1, 3, 2, 2, 3, 1],
     // plaza: open lanes with lamps and planters
-     plaza: [0, 0, 1, 5, 3, 0, 1, 0, 1, 4, 0, 1, 2, 1, 4],
+     plaza: [0, 0, 1, 5, 3, 0, 1, 0, 1, 4, 0, 1, 2, 1, 4, 1, 3],
   };
   const weights = kindWeights[variant];
 
@@ -239,6 +239,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       flora: [28, 60, 28, 60],
       building: [120, 180, 100, 150],
       river: [300, 400, 110, 126],
+      'metal-box': [52, 76, 52, 76],
+      bench: [90, 130, 24, 34],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);
@@ -261,7 +263,16 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       (variant === 'rail' && Math.abs(y) > 78 && Math.abs(y) < 154)
     ));
 
-    obstacles.push({ x, y, w, h, kind });
+    const propVariant = kind === 'metal-box'
+      ? 'heavy-metal'
+      : kind === 'bench'
+        ? 'fixed-bench'
+        : kind === 'crate-breakable'
+          ? 'light-breakable'
+          : kind === 'dumpster' || kind === 'car-wreck' || kind === 'cover'
+            ? 'medium-movable'
+            : undefined;
+    obstacles.push({ x, y, w, h, kind, propVariant });
   }
 
   // Dungeon entrance: appears on roughly 1-in-8 chunks, never on the

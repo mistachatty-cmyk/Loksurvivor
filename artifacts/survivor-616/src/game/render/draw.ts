@@ -610,13 +610,14 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   flora: { top: '#244b32', side: '#142a1d', trim: '#54b96e' },
   building: { top: '#303344', side: '#171923', trim: '#70769a' },
   river: { top: '#123b58', side: '#0a2030', trim: '#4de1ff' },
+  'metal-box': { top: '#536273', side: '#2d3745', trim: '#cbd5e1' },
+  bench: { top: '#70543a', side: '#3b2c20', trim: '#c58b5d' },
 };
 
 function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
   const height = 16;
-  // In endless mode obstacles come from the live chunk list (no kind stored),
-  // so we infer the visual kind from dimensions. In timed arenas use the
-  // static definitions which carry explicit kinds.
+  // Draw the live prop records so streamed chunks and moving props share the
+  // same authored silhouette and profile.
   const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> =
     w.area.endless
       ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
@@ -709,6 +710,31 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.moveTo(x + obstacle.w * 0.25, y - height + 5);
       ctx.lineTo(x + obstacle.w * 0.48, y - height + obstacle.h * 0.6);
       ctx.lineTo(x + obstacle.w * 0.7, y - height + obstacle.h * 0.25);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'metal-box') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 7, y - height + 7, obstacle.w - 14, obstacle.h - 14);
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.2);
+      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.8);
+      ctx.moveTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.2);
+      ctx.lineTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.8);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'bench') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#e2b07a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.12, y - height + obstacle.h * 0.32);
+      ctx.lineTo(x + obstacle.w * 0.88, y - height + obstacle.h * 0.32);
+      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
+      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
       ctx.stroke();
       ctx.restore();
     }

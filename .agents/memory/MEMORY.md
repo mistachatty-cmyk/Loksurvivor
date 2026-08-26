@@ -4,3 +4,4 @@
 - [Endless mode engine](endless-mode-engine.md) — unbounded world uses chunk-based obstacles rebuilt when player crosses chunk boundaries; dungeons are bounded rooms centred on the player's world-space entry point.
 - [City navigation grammar](city-navigation-grammar.md) — river rows use deterministic bridge columns, while landmark metadata drives shared canvas, minimap, and HUD cues.
 - [Browser regression tests](browser-regression-tests.md) — Playwright tests use an explicit Chromium executable override when the Nix shell lacks bundled browser libraries.
+- [Impact physics contract](impact-physics.md) — authored force stays separate from damage, and lethal bursts must reuse the single kill/reward path.

@@ -266,6 +266,15 @@ export type WeaponKind =
   | 'punch'
   | 'follower';
 
+/**
+ * Shared physical-impact spectrum for authored attacks.
+ *
+ * 0 = no physical response, 1 = tap, 2 = shove, 3 = heavy hit,
+ * 4 = launch, 5 = contained burst.  This is intentionally separate from
+ * damage: a low-damage attack can still move a prop, and vice versa.
+ */
+export type ImpactIntensity = 0 | 1 | 2 | 3 | 4 | 5;
+
 export interface WeaponDef {
   id: string;
   name: string;
@@ -285,6 +294,8 @@ export interface WeaponDef {
   lifetimeMs?: number;
   /** Damage multiplier gained for each weapon level above 1. */
   levelDamageScale: number;
+  /** Authored physical force on the shared 0–5 impact spectrum. */
+  impactIntensity: ImpactIntensity;
   /** Optional tint used when this weapon is not a character signature. */
   color?: string;
   /** How this projectile behaves when it meets reflective cover. */
@@ -438,6 +449,8 @@ export interface EnemyDef {
   xp: number;
   /** Mass affects how far knockback pushes it. */
   mass: number;
+  /** Optional authored resistance to physical impact, 0 = none, 0.8 = stout. */
+  impactResistance?: number;
   palette: SpritePalette;
   rig: SpriteRig;
   lore: string;
@@ -478,8 +491,12 @@ export interface ObstacleDef {
   kind: 'dumpster' | 'car' | 'crate' | 'planter' | 'barrier' | 'ac-unit'
     | 'neon-sign' | 'barrel' | 'fuse-box' | 'street-lamp' | 'car-wreck'
     | 'crate-breakable' | 'security-camera' | 'cover' | 'reflective-surface' | 'flora'
-    | 'building' | 'river';
+    | 'building' | 'river' | 'metal-box' | 'bench';
+  /** Optional authored prop physics profile; omitted props use kind defaults. */
+  propVariant?: PropVariant;
 }
+
+export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench';
 
 export interface AreaDef {
   id: string;
@@ -571,7 +588,7 @@ export interface EndlessState {
   /** Entrance chunk keys whose entrance has already been used once. */
   consumedEntranceChunks: Set<string>;
   /** Map from chunkKey to the flat Aabb list that chunk contributed to w.obstacles. */
-  chunkObstacles: Map<string, Array<{ x: number; y: number; w: number; h: number; kind?: ObstacleDef['kind'] }>>;
+  chunkObstacles: Map<string, Array<{ x: number; y: number; w: number; h: number; kind?: ObstacleDef['kind']; propVariant?: PropVariant }>>;
   /** Fractional enemy spawn budget (accumulates over time). */
   spawnBudget: number;
   /** The run seed, forwarded here so chunk generation stays deterministic. */

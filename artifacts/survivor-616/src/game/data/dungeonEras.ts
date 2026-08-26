@@ -18,6 +18,7 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: 0, y: 20, w: 100, h: 22, kind: 'cover' },
       { x: -40, y: -90, w: 50, h: 50, kind: 'crate-breakable' },
       { x: 100, y: -80, w: 44, h: 44, kind: 'reflective-surface' },
+      { x: 0, y: -210, w: 58, h: 58, kind: 'metal-box', propVariant: 'heavy-metal' },
     ],
   },
   {
@@ -56,6 +57,7 @@ export const DUNGEON_ERAS: DungeonEra[] = [
       { x: 190, y: 190, w: 80, h: 44, kind: 'barrier' },
       { x: 0, y: 0, w: 60, h: 60, kind: 'ac-unit' },
       { x: -80, y: -40, w: 54, h: 54, kind: 'crate-breakable' },
+      { x: 0, y: 100, w: 112, h: 26, kind: 'bench', propVariant: 'fixed-bench' },
     ],
   },
   {

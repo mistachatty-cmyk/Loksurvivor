@@ -40,6 +40,8 @@ import type {
   UpgradeDef,
   WeaponDef,
   ObstacleDef,
+  ImpactIntensity,
+  PropVariant,
 } from '@/game/types';
 
 import {
@@ -119,7 +121,7 @@ export interface Projectile {
   vy: number;
   radius: number;
   damage: number;
-  knockback: number;
+  impactIntensity: ImpactIntensity;
   fromPlayer: boolean;
   expiresAt: number;
   /** Homing projectiles steer toward this enemy. */
@@ -154,7 +156,7 @@ export interface Effect {
   color: string;
   /** Effects that damage over their lifetime re-check on a cadence. */
   damage: number;
-  knockback: number;
+  impactIntensity: ImpactIntensity;
   hitUids: Set<number>;
   followPlayer: boolean;
   nextTickAt?: number;
@@ -242,10 +244,17 @@ export interface Alert {
 export interface BreakableObstacle extends Aabb {
   uid: number;
   kind: ObstacleDef['kind'];
+  propVariant: PropVariant | undefined;
   hp: number;
   maxHp: number;
   vx: number;
   vy: number;
+  mass: number;
+  friction: number;
+  breakable: boolean;
+  movable: boolean;
+  impactIntensity: ImpactIntensity;
+  nextImpactDamageAt: number;
   broken: boolean;
   brokenAt: number;
   contacts: number;
@@ -260,8 +269,59 @@ const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
   'fuse-box': 100, 'street-lamp': 55, dumpster: 90, 'car-wreck': 150, car: 120,
   cover: 180,
 };
-const PUSHABLE_KINDS = new Set<ObstacleDef['kind']>(['crate-breakable', 'dumpster', 'car-wreck', 'cover']);
-const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>(['crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface']);
+const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
+  'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
+]);
+
+interface PropPhysicsProfile {
+  variant: PropVariant;
+  mass: number;
+  friction: number;
+  breakable: boolean;
+  movable: boolean;
+}
+
+function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant'>): PropPhysicsProfile {
+  const variant = obstacle.propVariant
+    ?? (obstacle.kind === 'metal-box'
+      ? 'heavy-metal'
+      : obstacle.kind === 'bench'
+        ? 'fixed-bench'
+        : obstacle.kind === 'crate-breakable'
+          ? 'light-breakable'
+          : obstacle.kind === 'dumpster' || obstacle.kind === 'car-wreck' || obstacle.kind === 'cover' || obstacle.kind === 'car'
+            ? 'medium-movable'
+            : BREAKABLE_HP[obstacle.kind] !== undefined
+              ? 'light-breakable'
+              : 'fixed-bench');
+  if (variant === 'light-breakable') {
+    return { variant, mass: 0.8, friction: 0.82, breakable: BREAKABLE_HP[obstacle.kind] !== undefined, movable: true };
+  }
+  if (variant === 'medium-movable') {
+    return { variant, mass: 2.6, friction: 0.88, breakable: BREAKABLE_HP[obstacle.kind] !== undefined, movable: true };
+  }
+  if (variant === 'heavy-metal') {
+    return { variant, mass: 8, friction: 0.94, breakable: false, movable: true };
+  }
+  return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
+}
+
+/** Convert authored impact into travel speed after mass and resistance. */
+export function resolveImpactTravel(intensity: number, mass: number, resistance = 0): number {
+  if (intensity <= 0 || !Number.isFinite(mass)) return 0;
+  const resistanceFactor = 1 + clamp(resistance, 0, 0.8);
+  return (intensity * 78) / Math.max(0.35, mass) / resistanceFactor;
+}
+
+function enemyImpactResistance(enemy: EnemyActor): number {
+  // Heavy enemies still feel hits when they omit authored resistance, but
+  // their mass provides a gentle fallback rather than a second mass penalty.
+  return enemy.def.impactResistance ?? clamp((enemy.mass - 1) * 0.06, 0, 0.32);
+}
+
+function weaponImpact(weapon: Pick<WeaponDef, 'impactIntensity'>): ImpactIntensity {
+  return weapon.impactIntensity ?? 1;
+}
 
 /* ------------------------------------------------------------------ */
 /* World                                                               */
@@ -493,10 +553,7 @@ export function createWorld(
     completedObjectives: [],
   };
 
-  world.breakables = area.obstacles.map((o) => {
-    const hp = BREAKABLE_HP[o.kind] ?? 999999;
-    return { ...o, uid: uid(world), kind: o.kind, hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 };
-  });
+  world.breakables = area.obstacles.map((o) => createBreakable(world, o));
 
   if (area.endless) {
     world.endless = {
@@ -543,6 +600,30 @@ export function createWorld(
 function uid(w: World): number {
   w.nextUid += 1;
   return w.nextUid;
+}
+
+function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
+  const profile = propProfile(obstacle);
+  const hp = profile.breakable ? (BREAKABLE_HP[obstacle.kind] ?? 40) : Number.POSITIVE_INFINITY;
+  return {
+    ...obstacle,
+    uid: uid(w),
+    kind: obstacle.kind,
+    propVariant: profile.variant,
+    hp,
+    maxHp: hp,
+    vx: 0,
+    vy: 0,
+    mass: profile.mass,
+    friction: profile.friction,
+    breakable: profile.breakable,
+    movable: profile.movable,
+    impactIntensity: 0,
+    nextImpactDamageAt: 0,
+    broken: false,
+    brokenAt: 0,
+    contacts: 0,
+  };
 }
 
 function pushAlert(w: World, text: string) {
@@ -852,8 +933,8 @@ function showLokPetBurst(
   statusEffectId?: string,
   explosive = false,
 ) {
-  novaDamage(w, x, y, radius, damage, explosive ? 4 : 1.5, statusEffectId);
-  damageBreakable(w, x, y, radius, damage);
+  novaDamage(w, x, y, radius, damage, explosive ? 4 : 2, statusEffectId);
+  damageBreakable(w, x, y, radius, damage, explosive ? 4 : 2, x, y);
   w.effects.push({
     uid: uid(w),
     kind: 'nova',
@@ -866,7 +947,7 @@ function showLokPetBurst(
     expiresAt: w.now + 380,
     color,
     damage: 0,
-    knockback: 0,
+    impactIntensity: 0,
     hitUids: new Set(),
     followPlayer: false,
   });
@@ -888,7 +969,7 @@ function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
     vy: (dy / distance) * speed,
     radius: pet.attackKind === 'heavy-shot' ? 7 : 5,
     damage: lokPetDamage(w, pet),
-    knockback: pet.attackKind === 'heavy-shot' ? 4 : 1.5,
+    impactIntensity: pet.attackKind === 'heavy-shot' ? 4 : 1,
     fromPlayer: true,
     expiresAt: w.now + 1900,
     targetUid: target.uid,
@@ -1015,21 +1096,66 @@ function updateFollowers(w: World, dt: number) {
       const cooldown = follower.readyAt ?? 0;
       if (w.now >= cooldown) {
         follower.readyAt = w.now + 620;
-        damageEnemy(w, target, follower.damage * damageMult(w), 1.4, follower.x, follower.y);
+        damageEnemy(w, target, follower.damage * damageMult(w), WEAPONS_BY_ID[follower.weaponId]?.impactIntensity ?? 1, follower.x, follower.y);
         spawnParticles(w, follower.x, follower.y, follower.color, 3, 55);
       }
     }
   }
 }
 
+function emitEnemyImpactBurst(
+  w: World,
+  source: EnemyActor,
+  amount: number,
+  color: string,
+) {
+  const radius = 58;
+  const burstDamage = Math.max(1, Math.round(amount * 0.22));
+  forEachNearby(w, source.x, source.y, radius + 30, (enemy) => {
+    if (enemy === source || enemy.dying) return;
+    const reach = radius + enemy.radius;
+    if (dist2(enemy.x, enemy.y, source.x, source.y) > reach * reach) return;
+    // Secondary hits deliberately use a shove, not the burst threshold, so
+    // one impact cannot recursively duplicate its own reward chain.
+    damageEnemy(w, enemy, burstDamage, 1, source.x, source.y, undefined, 1);
+  });
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: source.x,
+    y: source.y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 240,
+    color,
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, source.x, source.y, color, 12, 150);
+  w.popups.push({
+    x: source.x,
+    y: source.y + source.radius + 14,
+    text: 'BURST',
+    color: '#fff1a8',
+    bornAt: w.now,
+    vy: 30,
+  });
+  w.shake = Math.max(w.shake, 6);
+}
+
 function damageEnemy(
   w: World,
   enemy: EnemyActor,
   amount: number,
-  knockback: number,
+  impactIntensity: ImpactIntensity,
   fromX: number,
   fromY: number,
   statusEffectId?: string,
+  burstDepth = 0,
 ) {
   if (enemy.dying) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
@@ -1037,11 +1163,11 @@ function damageEnemy(
   enemy.hp -= dealt;
   enemy.hitFlashUntil = w.now + 90;
 
-  if (knockback > 0) {
+  if (impactIntensity > 0) {
     const dx = enemy.x - fromX;
     const dy = enemy.y - fromY;
     const len = Math.hypot(dx, dy) || 1;
-    const impulse = (knockback * 60) / Math.max(0.35, enemy.mass);
+    const impulse = resolveImpactTravel(impactIntensity, enemy.mass, enemyImpactResistance(enemy));
     enemy.kx += (dx / len) * impulse;
     enemy.ky += (dy / len) * impulse;
   }
@@ -1055,6 +1181,10 @@ function damageEnemy(
     vy: 26,
   });
   if (w.popups.length > 40) w.popups.shift();
+
+  if (impactIntensity >= 5 && burstDepth === 0) {
+    emitEnemyImpactBurst(w, enemy, dealt, '#fff1a8');
+  }
 
   if (enemy.hp <= 0) {
     killEnemy(w, enemy);
@@ -1199,12 +1329,12 @@ function damagePlayer(w: World, amount: number, fromX: number, fromY: number) {
 }
 
 /** Damage every enemy inside a circle once. */
-function novaDamage(w: World, x: number, y: number, radius: number, damage: number, knockback: number, statusEffectId?: string) {
+function novaDamage(w: World, x: number, y: number, radius: number, damage: number, impactIntensity: ImpactIntensity, statusEffectId?: string) {
   forEachNearby(w, x, y, radius + 40, (enemy) => {
     if (enemy.dying) return;
     const reach = radius + enemy.radius;
     if (dist2(enemy.x, enemy.y, x, y) <= reach * reach) {
-      damageEnemy(w, enemy, damage, knockback, x, y, statusEffectId);
+      damageEnemy(w, enemy, damage, impactIntensity, x, y, statusEffectId);
     }
   });
 }
@@ -1276,7 +1406,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         expiresAt: w.now + 170,
         color: palette.accent,
         damage,
-        knockback: 3.4,
+        impactIntensity: weaponImpact(weapon),
         hitUids: new Set(),
         followPlayer: true,
       });
@@ -1298,12 +1428,12 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         expiresAt: w.now + 280,
         color: palette.accent,
         damage,
-        knockback: 5.5,
+        impactIntensity: weaponImpact(weapon),
         hitUids: new Set(),
         followPlayer: false,
       });
-      novaDamage(w, p.x, p.y, reach, damage, 5.5, weapon.statusEffectId);
-      damageBreakable(w, p.x, p.y, reach, damage);
+      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
+      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y);
       p.anim = 'attack';
       p.animStartedAt = w.now;
       w.shake = Math.max(w.shake, 3);
@@ -1312,7 +1442,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
 
     case 'aura': {
       // The aura is permanent; each activation is a damage tick.
-      novaDamage(w, p.x, p.y, reach, damage, 0.6);
+      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon));
+      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y);
       break;
     }
 
@@ -1324,7 +1455,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         w.effects.push({
           uid: uid(w), kind: 'wave', x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
           angle, spread: 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
-          color: weapon.color ?? palette.accent, damage, knockback: 4.5, hitUids: new Set(), followPlayer: false,
+          color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false,
         });
       }
       p.anim = 'attack'; p.animStartedAt = w.now;
@@ -1337,7 +1468,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       w.effects.push({
         uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: 0.055,
         bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
-        damage, knockback: 2, hitUids: new Set(), followPlayer: false,
+        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false,
       });
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
@@ -1347,7 +1478,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       w.effects.push({
         uid: uid(w), kind: 'hazard', x: p.x, y: p.y, radius: reach, angle: 0, spread: Math.PI * 2,
         bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
-        damage, knockback: 0, hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
         hurtsPlayer: true,
       });
       pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
@@ -1360,9 +1491,10 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         const dx = target.x - p.x; const dy = target.y - p.y; const len = Math.hypot(dx, dy) || 1;
         p.x = target.x - (dx / len) * (p.radius + target.radius + 8);
         p.y = target.y - (dy / len) * (p.radius + target.radius + 8);
-        novaDamage(w, p.x, p.y, 42, damage, 3.5, weapon.statusEffectId);
+        novaDamage(w, p.x, p.y, 42, damage, weaponImpact(weapon), weapon.statusEffectId);
+        damageBreakable(w, p.x, p.y, 42, damage, weaponImpact(weapon), p.x, p.y);
         w.effects.push({ uid: uid(w), kind: 'teleport', x: p.x, y: p.y, radius: 42, angle: 0, spread: 0,
-          bornAt: w.now, expiresAt: w.now + 420, color: weapon.color ?? palette.accent, damage: 0, knockback: 0,
+          bornAt: w.now, expiresAt: w.now + 420, color: weapon.color ?? palette.accent, damage: 0, impactIntensity: 0,
           hitUids: new Set(), followPlayer: false });
       }
       p.anim = 'attack'; p.animStartedAt = w.now;
@@ -1390,7 +1522,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
       w.effects.push({ uid: uid(w), kind: 'slash', x: p.x, y: p.y, radius: reach, angle, spread: 0.7,
         bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 420), color: weapon.color ?? palette.accent,
-        damage, knockback: 12, hitUids: new Set(), followPlayer: false });
+        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false });
       p.anim = 'attack'; p.animStartedAt = w.now; w.shake = Math.max(w.shake, 12);
       pushAlert(w, 'POW!');
       break;
@@ -1415,7 +1547,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           vy: Math.sin(angle) * speed,
           radius: 6,
           damage,
-          knockback: 1.8,
+          impactIntensity: weaponImpact(weapon),
           fromPlayer: true,
           expiresAt: w.now + (weapon.lifetimeMs ?? 2000),
           targetUid: weapon.kind === 'homing' ? (target?.uid ?? null) : null,
@@ -1443,7 +1575,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       const y = w.player.y + randRange(w.rng, -reach * 0.55, reach * 0.55);
       const vx = fromLeft ? (weapon.speed ?? 480) : -(weapon.speed ?? 480);
       w.projectiles.push({
-        uid: uid(w), x, y, vx, vy: 0, radius: 24, damage, knockback: 7,
+        uid: uid(w), x, y, vx, vy: 0, radius: 24, damage, impactIntensity: weaponImpact(weapon),
         fromPlayer: true, expiresAt: w.now + (weapon.lifetimeMs ?? 1200), targetUid: null,
         turnRate: 0, color: weapon.color ?? palette.accent, trail: [], pierce: 999,
         hitUids: new Set(),
@@ -1477,7 +1609,7 @@ function updateOrbiters(w: World, dt: number) {
       const reach = 11 + enemy.radius;
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
-        damageEnemy(w, enemy, damage, 2.2, ox, oy);
+        damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy);
       }
     });
     }
@@ -1492,7 +1624,8 @@ export function activateUltimate(w: World): boolean {
 
   if (ult.effect.novaDamage && ult.effect.novaRadius) {
     const radius = ult.effect.novaRadius * areaMult(w);
-    novaDamage(w, w.player.x, w.player.y, radius, ult.effect.novaDamage * w.stats.power, 8);
+    novaDamage(w, w.player.x, w.player.y, radius, ult.effect.novaDamage * w.stats.power, 4);
+    damageBreakable(w, w.player.x, w.player.y, radius, ult.effect.novaDamage * w.stats.power, 4, w.player.x, w.player.y);
     w.effects.push({
       uid: uid(w),
       kind: 'ring',
@@ -1505,7 +1638,7 @@ export function activateUltimate(w: World): boolean {
       expiresAt: w.now + 520,
       color: w.character.palette.glow,
       damage: 0,
-      knockback: 0,
+      impactIntensity: 0,
       hitUids: new Set(),
       followPlayer: false,
     });
@@ -1786,9 +1919,65 @@ function collideObstacles(w: World, actor: Actor) {
   }
 }
 
-function damageBreakable(w: World, x: number, y: number, radius: number, amount: number) {
+function applyPropImpact(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  intensity: ImpactIntensity,
+  fromX = x,
+  fromY = y,
+) {
+  if (intensity <= 0) return;
+  for (const b of w.breakables) {
+    if (b.broken || !b.movable || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
+    const requiredIntensity = b.propVariant === 'heavy-metal' ? 4 : b.propVariant === 'medium-movable' ? 2 : 1;
+    if (intensity < requiredIntensity) continue;
+    let dx = b.x - fromX;
+    let dy = b.y - fromY;
+    let length = Math.hypot(dx, dy);
+    if (length < 0.01) {
+      dx = b.x - w.player.x;
+      dy = b.y - w.player.y;
+      length = Math.hypot(dx, dy);
+    }
+    if (length < 0.01) {
+      dx = 1;
+      dy = 0;
+      length = 1;
+    }
+    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0);
+    const pushScale = b.propVariant === 'heavy-metal' ? 0.62 : 0.78;
+    b.vx += (dx / length) * launchSpeed * pushScale;
+    b.vy += (dy / length) * launchSpeed * pushScale;
+    b.impactIntensity = intensity > b.impactIntensity ? intensity : b.impactIntensity;
+    if (intensity >= 3) {
+      spawnParticles(w, b.x, b.y, b.propVariant === 'heavy-metal' ? '#cbd5e1' : '#ffd166', 4, 65);
+      w.shake = Math.max(w.shake, intensity >= 4 ? 4 : 2);
+    }
+  }
+}
+
+function syncObstacleAabbs(w: World) {
+  w.obstacles = w.breakables
+    .filter((b) => !b.broken)
+    .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+}
+
+function damageBreakable(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  amount: number,
+  impactIntensity: ImpactIntensity = 0,
+  fromX = x,
+  fromY = y,
+) {
+  applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY);
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
+    if (!b.breakable) continue;
     b.hp -= Math.max(1, amount);
     if (b.hp > 0) {
       if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
@@ -1827,7 +2016,7 @@ function damageBreakable(w: World, x: number, y: number, radius: number, amount:
       pushAlert(w, 'LIVE WIRE — KEEP CLEAR');
     }
   }
-  w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x: bx, y: by, w: bw, h: bh }) => ({ x: bx, y: by, w: bw, h: bh }));
+  syncObstacleAabbs(w);
 }
 
 /** Resolve a projectile against the two combat-specific obstacle types. */
@@ -1859,13 +2048,48 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
       spawnParticles(w, proj.x, proj.y, '#d8b4fe', 3, 45);
       return true;
     }
-    if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp') {
-      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35);
+    if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp' || b.kind === 'metal-box' || b.kind === 'bench') {
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02);
       spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
       return true;
     }
   }
   return false;
+}
+
+function resolveMovingPropCollisions(w: World, prop: BreakableObstacle) {
+  for (const other of w.breakables) {
+    if (other === prop || other.broken) continue;
+    const overlapX = prop.w / 2 + other.w / 2 - Math.abs(prop.x - other.x);
+    const overlapY = prop.h / 2 + other.h / 2 - Math.abs(prop.y - other.y);
+    if (overlapX <= 0 || overlapY <= 0) continue;
+    if (overlapX < overlapY) {
+      prop.x += (prop.x >= other.x ? overlapX : -overlapX);
+      prop.vx *= -0.28;
+    } else {
+      prop.y += (prop.y >= other.y ? overlapY : -overlapY);
+      prop.vy *= -0.28;
+    }
+  }
+}
+
+function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle) {
+  const speed = Math.hypot(prop.vx, prop.vy);
+  if (speed < 52 || prop.impactIntensity < 2 || w.now < prop.nextImpactDamageAt) return;
+  prop.nextImpactDamageAt = w.now + 260;
+  forEachNearby(w, prop.x, prop.y, Math.max(prop.w, prop.h) + 40, (enemy) => {
+    if (enemy.dying) return;
+    if (Math.abs(enemy.x - prop.x) > prop.w / 2 + enemy.radius || Math.abs(enemy.y - prop.y) > prop.h / 2 + enemy.radius) return;
+    damageEnemy(
+      w,
+      enemy,
+      Math.max(1, Math.round(speed * prop.impactIntensity * 0.08)),
+      Math.min(4, prop.impactIntensity) as ImpactIntensity,
+      prop.x,
+      prop.y,
+    );
+    spawnParticles(w, enemy.x, enemy.y, '#ffd166', 3, 55);
+  });
 }
 
 function updateBreakables(w: World, dt: number) {
@@ -1879,7 +2103,7 @@ function updateBreakables(w: World, dt: number) {
         }
         for (const enemy of w.enemies) {
           if (!enemy.dying && dist2(enemy.x, enemy.y, b.x, b.y) <= (radius + enemy.radius) ** 2) {
-            damageEnemy(w, enemy, 14 * w.stats.power, 0.5, b.x, b.y);
+            damageEnemy(w, enemy, 14 * w.stats.power, 1, b.x, b.y);
           }
         }
       }
@@ -1887,12 +2111,14 @@ function updateBreakables(w: World, dt: number) {
     }
     if (b.vx || b.vy) {
       b.x += b.vx * dt; b.y += b.vy * dt;
-      b.vx *= Math.pow(0.88, dt * 60); b.vy *= Math.pow(0.88, dt * 60);
-      collideObstacles(w, { ...w.player, x: b.x, y: b.y, radius: Math.max(b.w, b.h) / 2 });
+      resolveMovingPropCollisions(w, b);
+      damageEnemiesFromMovingProp(w, b);
+      b.vx *= Math.pow(b.friction, dt * 60);
+      b.vy *= Math.pow(b.friction, dt * 60);
     }
   }
   // Project live positions to the collision list, preserving all props.
-  w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+  syncObstacleAabbs(w);
 }
 
 function applyKnockback(actor: Actor, dt: number) {
@@ -1923,14 +2149,14 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   collideObstacles(w, p);
   clampToArena(w, p);
   for (const b of w.breakables) {
-    if (b.broken || !PUSHABLE_KINDS.has(b.kind)) continue;
+    if (b.broken || !b.movable) continue;
     if (Math.abs(p.x - b.x) < b.w / 2 + p.radius && Math.abs(p.y - b.y) < b.h / 2 + p.radius) {
       b.contacts += 1;
       if (b.kind === 'car-wreck' && b.contacts < 3) continue;
       const dx = b.x - p.x; const dy = b.y - p.y; const len = Math.hypot(dx, dy) || 1;
-       const force = b.kind === 'car-wreck' ? 24 : b.kind === 'cover' ? 55 : 48;
-      b.vx += (dx / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
-      b.vy += (dy / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
+      const force = b.propVariant === 'heavy-metal' ? 8 : b.propVariant === 'medium-movable' ? 24 : 42;
+      b.vx += (dx / len) * force / Math.max(1, b.mass);
+      b.vy += (dy / len) * force / Math.max(1, b.mass);
     }
   }
 
@@ -1962,7 +2188,7 @@ function updateEnemies(w: World, dt: number) {
         const attackDistance = Math.hypot(allyTarget.x - enemy.x, allyTarget.y - enemy.y);
         w.effects.push({
           uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: attackDistance, angle: attackAngle, spread: 0,
-          bornAt: w.now, expiresAt: w.now + 180, color: '#65f6d1', damage: 0, knockback: 0,
+          bornAt: w.now, expiresAt: w.now + 180, color: '#65f6d1', damage: 0, impactIntensity: 0,
           hitUids: new Set(), followPlayer: false,
         });
       }
@@ -2032,7 +2258,7 @@ function updateEnemies(w: World, dt: number) {
               vy: dirY * ranged.projectileSpeed,
               radius: 7,
               damage: ranged.damage,
-              knockback: 0,
+          impactIntensity: 0,
               fromPlayer: false,
               expiresAt: w.now + 3200,
               targetUid: null,
@@ -2076,7 +2302,7 @@ function updateEnemies(w: World, dt: number) {
             w.projectiles.push({
               uid: uid(w), x: enemy.x, y: enemy.y + 8,
               vx: dirX * ranged.projectileSpeed, vy: dirY * ranged.projectileSpeed,
-              radius: 7, damage: ranged.damage, knockback: 0, fromPlayer: false,
+              radius: 7, damage: ranged.damage, impactIntensity: 0, fromPlayer: false,
               expiresAt: w.now + 3200, targetUid: null, turnRate: 0,
               color: enemy.def.palette.accent, trail: [], pierce: 0, hitUids: new Set(),
             });
@@ -2114,7 +2340,7 @@ function updateEnemies(w: World, dt: number) {
           w.effects.push({
             uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius,
             angle: 0, spread: Math.PI * 2, bornAt: w.now, expiresAt: w.now + 360,
-            color: enemy.def.palette.accent, damage: 0, knockback: 0,
+            color: enemy.def.palette.accent, damage: 0, impactIntensity: 0,
             hitUids: new Set(), followPlayer: false,
           });
         }
@@ -2162,14 +2388,14 @@ function updateEnemies(w: World, dt: number) {
       damagePlayer(w, enemy.damage, enemy.x, enemy.y);
     }
     for (const b of w.breakables) {
-       if (b.broken || !PUSHABLE_KINDS.has(b.kind)) continue;
+       if (b.broken || !b.movable) continue;
       if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
         b.contacts += 1;
         if (b.kind === 'car-wreck' && b.contacts < 3) continue;
         const dx = b.x - enemy.x; const dy = b.y - enemy.y; const len = Math.hypot(dx, dy) || 1;
-        const force = b.kind === 'car-wreck' ? 18 : 30;
-        b.vx += (dx / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
-        b.vy += (dy / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
+        const force = b.propVariant === 'heavy-metal' ? 6 : b.propVariant === 'medium-movable' ? 18 : 30;
+        b.vx += (dx / len) * force / Math.max(1, b.mass);
+        b.vy += (dy / len) * force / Math.max(1, b.mass);
       }
     }
 
@@ -2283,9 +2509,9 @@ function updateProjectiles(w: World, dt: number) {
               true,
             );
           } else {
-            damageEnemy(w, enemy, proj.damage, proj.knockback, proj.x, proj.y, proj.statusEffectId);
+            damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
           }
-          damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage);
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
           if (proj.pierce > 0) proj.pierce -= 1;
           else remove = true;
@@ -2324,9 +2550,9 @@ function updateEffects(w: World) {
         while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
         if (diff > effect.spread) return;
         effect.hitUids.add(enemy.uid);
-        damageEnemy(w, enemy, effect.damage, effect.knockback, effect.x, effect.y);
+        damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y);
       });
-      damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage);
+      damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y);
     }
 
     if (active && effect.kind === 'hazard' && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
@@ -2398,11 +2624,12 @@ function updatePickups(w: World, dt: number) {
         }
         case 'sweep': {
           // A street sweep: everything on screen takes a hit.
-          novaDamage(w, p.x, p.y, 320 * areaMult(w), 45 * w.stats.power, 6);
+          novaDamage(w, p.x, p.y, 320 * areaMult(w), 45 * w.stats.power, 5);
+          damageBreakable(w, p.x, p.y, 320 * areaMult(w), 45 * w.stats.power, 5, p.x, p.y);
           w.effects.push({
             uid: uid(w), kind: 'ring', x: p.x, y: p.y, radius: 320 * areaMult(w),
             angle: 0, spread: 0, bornAt: w.now, expiresAt: w.now + 480,
-            color: '#ffffff', damage: 0, knockback: 0, hitUids: new Set(), followPlayer: false,
+            color: '#ffffff', damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
           });
           w.shake = Math.max(w.shake, 10);
           pushAlert(w, 'Street sweep');
@@ -2617,6 +2844,7 @@ function updateEndlessChunks(w: World) {
       w: obs.w,
       h: obs.h,
       kind: obs.kind,
+      propVariant: obs.propVariant,
     }));
     e.chunkObstacles.set(key, worldObs);
     e.cityBlocks.push({
@@ -2672,8 +2900,7 @@ function updateEndlessChunks(w: World) {
      for (const obsArr of e.chunkObstacles.values()) {
        for (const o of obsArr) {
          w.obstacles.push(o);
-         const hp = BREAKABLE_HP[o.kind ?? 'crate'] ?? 999999;
-         w.breakables.push({ ...o, uid: uid(w), kind: o.kind ?? 'crate', hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 });
+        w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
        }
      }
   }
@@ -2711,10 +2938,11 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
     w: obs.w,
     h: obs.h,
   }));
-  w.breakables = era.obstacles.map((obs) => {
-    const hp = BREAKABLE_HP[obs.kind] ?? 999999;
-    return { x: p.x + obs.x, y: p.y + obs.y, w: obs.w, h: obs.h, uid: uid(w), kind: obs.kind, hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 };
-  });
+  w.breakables = era.obstacles.map((obs) => createBreakable(w, {
+    ...obs,
+    x: p.x + obs.x,
+    y: p.y + obs.y,
+  }));
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -2770,18 +2998,7 @@ function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]
     { x: door.x + 140, y: door.y - 120, w: 28, h: 240 },
     { x: door.x, y: door.y - 145, w: 260, h: 28 },
   ];
-  w.breakables = w.obstacles.map((obs) => ({
-    ...obs,
-    uid: uid(w),
-    kind: 'building' as const,
-    hp: 999999,
-    maxHp: 999999,
-    vx: 0,
-    vy: 0,
-    broken: false,
-    brokenAt: 0,
-    contacts: 0,
-  }));
+  w.breakables = w.obstacles.map((obs) => createBreakable(w, { ...obs, kind: 'building' }));
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
   w.projectiles = [];
@@ -2837,19 +3054,7 @@ function restoreStreetObstacles(w: World) {
   for (const obsArr of e.chunkObstacles.values()) {
     for (const o of obsArr) {
       w.obstacles.push(o);
-      const hp = BREAKABLE_HP[o.kind ?? 'crate'] ?? 999999;
-      w.breakables.push({
-        ...o,
-        uid: uid(w),
-        kind: o.kind ?? 'crate',
-        hp,
-        maxHp: hp,
-        vx: 0,
-        vy: 0,
-        broken: false,
-        brokenAt: 0,
-        contacts: 0,
-      });
+      w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
     }
   }
 }

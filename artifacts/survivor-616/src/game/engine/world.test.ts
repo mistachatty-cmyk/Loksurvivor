@@ -12,6 +12,7 @@ import {
   buildResult,
   hudSnapshot,
   spawnLokPet,
+  resolveImpactTravel,
   type EnemyActor,
   type Projectile,
   stepWorld,
@@ -99,6 +100,7 @@ function addEnemy(
 function addProjectile(
   world: ReturnType<typeof createWorld>,
   interaction: Projectile['obstacleInteraction'],
+  impactIntensity: Projectile['impactIntensity'] = 3,
 ): Projectile {
   const projectile: Projectile = {
     uid: 700,
@@ -108,7 +110,7 @@ function addProjectile(
     vy: 0,
     radius: 5,
     damage: 20,
-    knockback: 0,
+    impactIntensity,
     fromPlayer: true,
     expiresAt: Number.POSITIVE_INFINITY,
     targetUid: null,
@@ -123,6 +125,16 @@ function addProjectile(
   world.projectiles.push(projectile);
   return projectile;
 }
+
+test('impact travel respects authored force, mass, and resistance', () => {
+  const light = resolveImpactTravel(3, 0.6);
+  const heavy = resolveImpactTravel(3, 3.2);
+  const resisted = resolveImpactTravel(3, 0.6, 0.6);
+  assert.ok(light > heavy);
+  assert.ok(heavy > 0);
+  assert.ok(resisted < light);
+  assert.equal(resolveImpactTravel(0, 1), 0);
+});
 
 function runResult(lokPets: RunResult['lokPets'], cleared: boolean): RunResult {
   return {
@@ -459,6 +471,95 @@ test('a breakable box blocks a shot, breaks, and drops a pickup', () => {
   assert.equal(world.breakables[0]!.broken, true);
   assert.ok(world.pickups.length >= 1);
   assert.equal(world.obstacles.length, 0);
+});
+
+test('a heavy metal box absorbs a hit, moves under strong impact, and never breaks', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 56, h: 56, kind: 'metal-box', propVariant: 'heavy-metal' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    616,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  addProjectile(world, 'block', 5);
+
+  for (let i = 0; i < 12 && world.projectiles.length > 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+  const box = world.breakables[0]!;
+  assert.ok(box.vx > 0);
+  assert.equal(box.broken, false);
+  assert.equal(box.hp, Number.POSITIVE_INFINITY);
+
+  const xBefore = box.x;
+  for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(box.x > xBefore);
+});
+
+test('a fixed bench blocks but ignores impact and damage', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 112, h: 28, kind: 'bench', propVariant: 'fixed-bench' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    617,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  addProjectile(world, 'block', 5);
+
+  for (let i = 0; i < 12 && world.projectiles.length > 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+  const bench = world.breakables[0]!;
+  assert.equal(bench.vx, 0);
+  assert.equal(bench.vy, 0);
+  assert.equal(bench.broken, false);
+  assert.equal(bench.hp, Number.POSITIVE_INFINITY);
+  assert.equal(world.projectiles.length, 0);
+});
+
+test('a moving prop can damage an enemy without creating a second kill reward', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 56, h: 56, kind: 'metal-box', propVariant: 'heavy-metal' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    618,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const primary = addEnemy(world, 'nightcrawler', 70, 0);
+  const nearby = addEnemy(world, 'nightcrawler', 30, 0);
+  primary.speed = 0;
+  nearby.speed = 0;
+  primary.hp = primary.maxHp = 500;
+  nearby.hp = nearby.maxHp = 500;
+  world.breakables[0]!.vx = 180;
+  world.breakables[0]!.impactIntensity = 5;
+
+  for (let i = 0; i < 3; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(nearby.hp < nearby.maxHp);
+  assert.equal(world.kills, 0);
+});
+
+test('a lethal impact burst damages nearby enemies once without duplicating rewards', () => {
+  const world = createWorld(
+    testArea({ x: 260, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    619,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const primary = addEnemy(world, 'nightcrawler', 28, 0);
+  const nearby = addEnemy(world, 'nightcrawler', 62, 0);
+  primary.speed = 0;
+  nearby.speed = 0;
+  primary.hp = primary.maxHp = 500;
+  nearby.hp = nearby.maxHp = 500;
+  addProjectile(world, 'block', 5);
+
+  for (let i = 0; i < 8; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(primary.hp < primary.maxHp);
+  assert.ok(nearby.hp < nearby.maxHp);
+  assert.equal(world.kills, 0);
+  assert.ok(world.effects.some((effect) => effect.kind === 'nova'));
 });
 
 test('a destroyed street lamp becomes a temporary electricity hazard', () => {
