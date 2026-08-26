@@ -23,6 +23,7 @@ import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
+import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,9 @@ function initialScreen(onboarded: boolean): Screen {
     const requested = params.get('screen');
     const areaId = params.get('area');
     if (requested === 'run' && areaId) return { name: 'run', areaId };
+    if (requested === 'summary' && params.get('fixture') === 'lokpet-archive') {
+      return { name: 'summary', result: createLokPetArchiveFixtureResult() };
+    }
     if (
       requested === 'hub' ||
       requested === 'roster' ||
