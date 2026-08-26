@@ -27,6 +27,10 @@ import {
   rollCrewActivities,
 } from '@/game/data/crewActivities';
 import {
+  normalizeActiveCrewRumor,
+  rollCrewRumor,
+} from '@/game/data/crewRumors';
+import {
   RECOVERY_FACILITIES,
   RECOVERY_FACILITIES_BY_ID,
   RECOVERY_HUTS,
@@ -124,6 +128,7 @@ export function createInitialMeta(): MetaState {
     vendorPurchases: {},
     crewActivityByAlly: {},
     crewActivitySeed: 0,
+    activeCrewRumor: null,
   };
 }
 
@@ -464,6 +469,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       ? parsed.selectedCharacterId
       : (unlockedCharacterIds[0] ?? defaults.selectedCharacterId);
   const rescuedAllyIds = idList(parsed.rescuedAllyIds, allyIds, []);
+  const crewActivityByAlly = normalizeCrewActivities(
+    parsed.crewActivityByAlly,
+    rescuedAllyIds,
+    crewActivitySeed,
+  );
 
   return {
     version: META_VERSION,
@@ -490,12 +500,14 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     facilityTier: tier,
     discoveredHutIds,
     vendorPurchases: normalizeVendorPurchases(parsed.vendorPurchases),
-    crewActivityByAlly: normalizeCrewActivities(
-      parsed.crewActivityByAlly,
+    crewActivityByAlly,
+    crewActivitySeed,
+    activeCrewRumor: normalizeActiveCrewRumor(
+      parsed.activeCrewRumor,
       rescuedAllyIds,
+      crewActivityByAlly,
       crewActivitySeed,
     ),
-    crewActivitySeed,
   };
 }
 
@@ -686,12 +698,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'enterHideout': {
       const crewActivitySeed = state.meta.crewActivitySeed + 1;
+      const crewActivityByAlly = rollCrewActivities(state.meta.rescuedAllyIds, crewActivitySeed);
       return {
         ...state,
         meta: {
           ...state.meta,
           crewActivitySeed,
-          crewActivityByAlly: rollCrewActivities(state.meta.rescuedAllyIds, crewActivitySeed),
+          crewActivityByAlly,
+          activeCrewRumor: state.meta.activeCrewRumor ?? rollCrewRumor(
+            state.meta.rescuedAllyIds,
+            crewActivityByAlly,
+            crewActivitySeed,
+          ),
         },
       };
     }
@@ -842,6 +860,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         discoveredHutIds: RECOVERY_HUTS.filter(
           (hut) => clearedAreaIds.includes(hut.areaId),
         ).map((hut) => hut.id),
+        activeCrewRumor: result.crewRumor ? null : prev.activeCrewRumor,
       };
 
       // Characters whose unlock rule just became true.

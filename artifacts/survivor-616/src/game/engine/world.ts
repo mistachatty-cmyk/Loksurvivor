@@ -19,7 +19,9 @@ import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { getCrewRumor } from '@/game/data/crewRumors';
 import type {
+  ActiveCrewRumor,
   AreaDef,
   BaseStats,
   ChallengeContractDef,
@@ -465,6 +467,16 @@ export interface World {
   physicsObjectClicksEnabled: boolean;
   /** Optional difficulty contracts selected before the run. */
   challenges: ChallengeContractDef[];
+  /** One bounded hideout rumor carried into this run. */
+  activeCrewRumor: ActiveCrewRumor | null;
+  /** Whether the carried rumor has fired its gameplay effect yet. */
+  rumorTriggered: boolean;
+  /** Human-readable outcome used by the run HUD and summary. */
+  rumorOutcome: string;
+  rumorSpeedUntil: number;
+  rumorPantryAvailable: boolean;
+  rumorBroadcastAvailable: boolean;
+  rumorMagnetNextAt: number;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -539,6 +551,7 @@ export function createWorld(
   challenges: ChallengeContractDef[] = [],
   startingWeaponLevel = 1,
   physicsObjectClicksEnabled = true,
+  activeCrewRumor: ActiveCrewRumor | null = null,
 ): World {
   const player: PlayerActor = {
     uid: 1,
@@ -628,6 +641,17 @@ export function createWorld(
     endless: undefined,
     physicsObjectClicksEnabled,
     challenges: [...challenges],
+    activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
+    rumorTriggered: activeCrewRumor?.rumorId === 'painted-shortcut',
+    rumorOutcome: activeCrewRumor?.rumorId === 'painted-shortcut'
+      ? 'Painted Shortcut boosted movement at run start.'
+      : activeCrewRumor
+        ? 'Rumor waiting for its first opening.'
+        : '',
+    rumorSpeedUntil: activeCrewRumor?.rumorId === 'painted-shortcut' ? 6500 : 0,
+    rumorPantryAvailable: activeCrewRumor?.rumorId === 'pantry-surge',
+    rumorBroadcastAvailable: activeCrewRumor?.rumorId === 'basement-broadcast',
+    rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     lootBoxesOpened: 0,
@@ -909,6 +933,17 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     fallStartedAt: 0,
   };
   w.enemies.push(enemy);
+
+  if (
+    w.activeCrewRumor?.rumorId === 'basement-broadcast' &&
+    w.rumorBroadcastAvailable &&
+    (def.family === 'Elite' || def.family === 'Boss')
+  ) {
+    w.rumorBroadcastAvailable = false;
+    w.rumorTriggered = true;
+    w.rumorOutcome = `Basement Broadcast warned about ${def.name} before the arrival.`;
+    pushAlert(w, `RUMOR — ${def.name} on the air`);
+  }
 
   if (def.family === 'Boss') {
     pushAlert(w, `${def.name} has arrived`);
@@ -1423,12 +1458,56 @@ function killEnemy(w: World, enemy: EnemyActor) {
   }
 }
 
-function damagePlayer(w: World, amount: number, fromX: number, fromY: number) {
+function triggerBellShock(w: World) {
+  if (w.activeCrewRumor?.rumorId !== 'bell-shock' || w.rumorTriggered) return;
+  w.rumorTriggered = true;
+  w.rumorOutcome = 'Bell Shock shoved nearby threats away on first contact.';
+  const radius = 132;
+  for (const enemy of w.enemies) {
+    if (enemy.dying) continue;
+    const dx = enemy.x - w.player.x;
+    const dy = enemy.y - w.player.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > radius + enemy.radius) continue;
+    const length = distance || 1;
+    const force = 260 * Math.max(0.35, 1 - distance / (radius + enemy.radius));
+    enemy.kx += (dx / length) * force;
+    enemy.ky += (dy / length) * force;
+  }
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: w.player.x,
+    y: w.player.y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 260,
+    color: '#fbbf24',
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, w.player.x, w.player.y, '#fbbf24', 16, 150);
+  w.shake = Math.max(w.shake, 9);
+  pushAlert(w, 'RUMOR — BELL SHOCK');
+}
+
+function damagePlayer(
+  w: World,
+  amount: number,
+  fromX: number,
+  fromY: number,
+  source: 'contact' | 'hazard' = 'hazard',
+) {
   const p = w.player;
   if (p.falling || w.outcome !== 'running') return;
   if (w.now < p.invulnUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
 
+  if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
   p.hp -= reduced;
   p.invulnUntil = w.now + 420;
@@ -2556,7 +2635,8 @@ function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
 
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
-  const speed = w.stats.speed * speedMult(w);
+  const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w);
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -2868,7 +2948,7 @@ function updateEnemies(w: World, dt: number) {
     const contact = enemy.radius + p.radius;
     if (enemy.ghostUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
-      damagePlayer(w, enemy.damage, enemy.x, enemy.y);
+      damagePlayer(w, enemy.damage, enemy.x, enemy.y, 'contact');
     }
     const elapsed = w.now - enemy.animStartedAt;
     if (enemy.anim === 'attack' && elapsed < 260) continue;
@@ -3043,6 +3123,64 @@ function updateEffects(w: World) {
 
     if (w.now > effect.expiresAt) w.effects.splice(i, 1);
   }
+}
+
+export function claimRumorEmergencyHeal(w: World): boolean {
+  if (w.activeCrewRumor?.rumorId !== 'pantry-surge' || !w.rumorPantryAvailable) return false;
+  w.rumorPantryAvailable = false;
+  w.rumorTriggered = true;
+  const amount = Math.max(12, Math.round(w.player.maxHp * 0.18));
+  w.player.hp = clamp(w.player.hp + amount, 0, w.player.maxHp);
+  w.rumorOutcome = `Pantry Surge restored ${amount} HP at the first level-up.`;
+  w.popups.push({
+    x: w.player.x,
+    y: w.player.y + 26,
+    text: `+${amount} EMERGENCY`,
+    color: '#86efac',
+    bornAt: w.now,
+    vy: 30,
+  });
+  pushAlert(w, 'RUMOR — PANTRY SURGE');
+  return true;
+}
+
+function updateRumorPulses(w: World) {
+  if (
+    w.activeCrewRumor?.rumorId !== 'magnet-parade' ||
+    w.now < w.rumorMagnetNextAt
+  ) return;
+
+  w.rumorTriggered = true;
+  w.rumorOutcome = 'Magnet Parade pulled experience and cred toward the operative.';
+  const radius = 280;
+  for (const pickup of w.pickups) {
+    if (pickup.kind !== 'xp' && pickup.kind !== 'cred') continue;
+    const dx = w.player.x - pickup.x;
+    const dy = w.player.y - pickup.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    if (distance > radius) continue;
+    pickup.vx += (dx / distance) * 520;
+    pickup.vy += (dy / distance) * 520;
+  }
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: w.player.x,
+    y: w.player.y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 300,
+    color: '#c4b5fd',
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, w.player.x, w.player.y, '#c4b5fd', 12, 110);
+  pushAlert(w, 'RUMOR — MAGNET PARADE');
+  w.rumorMagnetNextAt += 8500;
 }
 
 function updatePickups(w: World, dt: number) {
@@ -3743,6 +3881,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateProjectiles(w, dt);
   updateEffects(w);
   updatePotholes(w);
+  updateRumorPulses(w);
   updatePickups(w, dt);
   updateObjectives(w);
   updateParticles(w, dt);
@@ -3822,6 +3961,21 @@ export function hudSnapshot(w: World): HudSnapshot {
       color: STATUS_EFFECTS_BY_ID[id]?.color ?? '#fff',
       count,
     })),
+    crewRumor: w.activeCrewRumor
+      ? (() => {
+          const rumor = getCrewRumor(w.activeCrewRumor.rumorId);
+          if (!rumor) return undefined;
+          return {
+            rumorId: rumor.id,
+            name: rumor.name,
+            icon: rumor.icon,
+            effectLabel: rumor.effectLabel,
+            triggered: w.rumorTriggered,
+            ready: w.rumorPantryAvailable,
+            outcome: w.rumorOutcome,
+          };
+        })()
+      : undefined,
     objectives: w.objectives.map((o) => ({
       label: o.def.label,
       progress: Math.min(o.def.targetCount, Math.round(o.progress)),
@@ -3912,6 +4066,24 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     completedObjectives: [...w.completedObjectives],
+    crewRumor: w.activeCrewRumor
+      ? (() => {
+          const rumor = getCrewRumor(w.activeCrewRumor.rumorId);
+          return rumor
+            ? {
+                rumorId: rumor.id,
+                rumorName: rumor.name,
+                icon: rumor.icon,
+                allyId: w.activeCrewRumor.allyId,
+                effectLabel: rumor.effectLabel,
+                triggered: w.rumorTriggered,
+                outcome: w.rumorTriggered
+                  ? w.rumorOutcome
+                  : `${rumor.name} was carried through the run without firing.`,
+              }
+            : undefined;
+        })()
+      : undefined,
     challenges: w.challenges.map((challenge) => ({
       id: challenge.id,
       name: challenge.name,

@@ -11,6 +11,7 @@ import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
+  claimRumorEmergencyHeal,
   createWorld,
   dashPlayer,
   hudSnapshot,
@@ -133,6 +134,7 @@ export function RunScreen({
       challenges,
       initialWeaponLevel,
       physicsObjectClicksEnabled,
+      meta.activeCrewRumor,
     );
   }
 
@@ -422,6 +424,12 @@ export function RunScreen({
     [setPhaseBoth],
   );
 
+  const claimRumorHeal = useCallback(() => {
+    const world = worldRef.current;
+    if (!world || !claimRumorEmergencyHeal(world)) return;
+    setHud(hudSnapshot(world));
+  }, []);
+
   const triggerUltimate = useCallback(() => {
     ultRequestRef.current = true;
   }, []);
@@ -565,6 +573,15 @@ export function RunScreen({
           </div>
         ) : null}
 
+        {hud?.crewRumor ? (
+          <div className="mx-auto flex w-fit max-w-full items-center gap-2 border border-[#fbbf24]/45 bg-black/75 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-[#fbbf24]" data-testid="indicator-crew-rumor">
+            <span className="text-sm" aria-hidden="true">◆</span>
+            <span className="truncate">
+              Rumor · {hud.crewRumor.name} · {hud.crewRumor.triggered ? 'fired' : hud.crewRumor.effectLabel}
+            </span>
+          </div>
+        ) : null}
+
         {hud?.loadout ? (
           <div className="flex gap-1.5 overflow-hidden" data-testid="row-loadout">
             {hud.loadout.weapons.map((weapon) => (
@@ -704,6 +721,17 @@ export function RunScreen({
           <div className="w-full max-w-md space-y-3">
             <p className="text-center font-mono text-xs uppercase tracking-[0.4em] text-white/60">Level {hud?.level}</p>
             <h2 className="text-center text-2xl font-black uppercase text-white">Pick your edge</h2>
+            {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
+              <button
+                type="button"
+                onClick={claimRumorHeal}
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-4 text-left transition hover:bg-[#86efac]/20 active:scale-[0.99]"
+                data-testid="button-rumor-heal"
+              >
+                <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
+                <p className="mt-1 font-mono text-xs text-white/70">Use Pantry Surge once alongside your normal upgrade.</p>
+              </button>
+            ) : null}
             <div className="space-y-2">
               {choices.map((upgrade) => (
                 <button

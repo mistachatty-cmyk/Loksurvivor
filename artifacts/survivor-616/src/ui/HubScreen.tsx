@@ -5,12 +5,13 @@
 import { useMeta } from '@/game/state/metaStore';
 import { ALLIES, HUB_ROOMS_BY_ID } from '@/game/data/progression';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
+import { getCrewRumor } from '@/game/data/crewRumors';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { RigPortrait } from './RigPortrait';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck } from 'lucide-react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor' | 'settings';
@@ -51,12 +52,24 @@ const ACTIVITY_ICONS = {
   radio: Radio,
   sparkles: Sparkles,
 } satisfies Record<CrewActivityIcon, typeof Utensils>;
+const RUMOR_ICONS: Record<string, typeof Bell> = {
+  bell: Bell,
+  'spray-can': SprayCan,
+  utensils: Utensils,
+  radio: Radio,
+  magnet: Magnet,
+};
 
 export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
   const { unlockedRooms, rescuedAllies, selectedCharacter, meta, setDevModeAllUnlocks } = useMeta();
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
+  const activeRumor = meta.activeCrewRumor ? getCrewRumor(meta.activeCrewRumor.rumorId) : undefined;
+  const rumorAlly = meta.activeCrewRumor
+    ? rescuedAllies.find((ally) => ally.id === meta.activeCrewRumor?.allyId)
+    : undefined;
+  const RumorIcon = activeRumor ? (RUMOR_ICONS[activeRumor.icon] ?? Radio) : Radio;
   const scene = getHideoutScene(activeRoom?.id ?? roomId);
   const [isPageVisible, setIsPageVisible] = useState(true);
 
@@ -207,6 +220,48 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
              </div>
            </div>
         </header>
+
+        <section className="mb-8 border border-[#fbbf24]/45 bg-black/45 p-4 sm:p-5" data-testid="section-crew-rumor">
+          {activeRumor && meta.activeCrewRumor && rumorAlly ? (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div
+                className="grid h-20 w-20 shrink-0 place-items-center border-2 bg-black/60"
+                style={{ borderColor: activeRumor.accent, color: activeRumor.accent, boxShadow: `0 0 24px ${activeRumor.accent}33` }}
+              >
+                <RumorIcon className="h-10 w-10" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em]" style={{ color: activeRumor.accent }}>Rumor for the road</p>
+                  <span className="border border-[#fbbf24]/40 bg-[#fbbf24]/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-[#fbbf24]">Active next run</span>
+                </div>
+                <h2 className="mt-1 text-2xl font-black uppercase text-white">{activeRumor.name}</h2>
+                <p className="mt-1 font-mono text-xs uppercase tracking-widest text-white/60">Brought by {rumorAlly.name}</p>
+                <p className="mt-3 max-w-2xl text-sm italic leading-relaxed text-muted-foreground">“{activeRumor.story}”</p>
+                <div className="mt-3 border-l-2 pl-3" style={{ borderColor: activeRumor.accent }}>
+                  <p className="text-xs font-bold uppercase tracking-widest text-white">{activeRumor.effectLabel}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{activeRumor.effectDescription}</p>
+                </div>
+              </div>
+            </div>
+          ) : rescuedAllies.length === 0 ? (
+            <div className="flex items-center gap-3" data-testid="text-rumor-no-crew">
+              <Radio className="h-7 w-7 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">Rumor board quiet</p>
+                <p className="mt-1 text-sm text-muted-foreground">Rescue someone from the streets before the hideout can send a rumor ahead.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3" data-testid="text-rumor-quiet">
+              <Radio className="h-7 w-7 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">No rumor active</p>
+                <p className="mt-1 text-sm text-muted-foreground">The crew has nothing strange to report yet. The next return may change that.</p>
+              </div>
+            </div>
+          )}
+        </section>
 
         <section className="mb-10 flex-1">
           <div className="flex items-center gap-3 mb-6">

@@ -107,5 +107,14 @@ export function createLokPetArchiveFixtureResult(): RunResult {
     ],
     lootTokensGained: 0,
     completedObjectives: [],
+    crewRumor: {
+      rumorId: 'bell-shock',
+      rumorName: 'Bell Shock',
+      icon: 'bell',
+      allyId: 'vee',
+      effectLabel: 'First contact triggers a defensive knockback pulse.',
+      triggered: true,
+      outcome: 'Bell Shock shoved nearby threats away on first contact.',
+    },
   };
 }

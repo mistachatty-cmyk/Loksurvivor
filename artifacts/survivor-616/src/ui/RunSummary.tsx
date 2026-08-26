@@ -11,7 +11,7 @@ import type { LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
-import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles } from 'lucide-react';
+import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio } from 'lucide-react';
 
 export interface RunSummaryProps {
   result: RunResult;
@@ -26,6 +26,14 @@ function discoveryHeadline(discovery: LokPetRunDiscovery): string {
   return 'Repeat sighting';
 }
 
+const RUMOR_ICONS: Record<string, typeof Bell> = {
+  bell: Bell,
+  'spray-can': SprayCan,
+  utensils: Utensils,
+  radio: Radio,
+  magnet: Magnet,
+};
+
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: RunSummaryProps) {
   const area = getArea(result.areaId);
   const character = getCharacter(result.characterId);
@@ -34,6 +42,8 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
   const lokPets = result.lokPets ?? [];
   const lokPetDiscoveries = result.lokPetDiscoveries ?? [];
   const hasLokPetProgress = lokPets.length > 0;
+  const rumorAlly = result.crewRumor ? ALLIES_BY_ID[result.crewRumor.allyId] : undefined;
+  const RumorIcon = result.crewRumor ? (RUMOR_ICONS[result.crewRumor.icon] ?? Sparkles) : Sparkles;
 
   return (
     <ScreenLayout 
@@ -89,6 +99,36 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
               <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">{result.cred}</p>
             </div>
           </div>
+        </div>
+
+        <div className="border border-[#fbbf24]/45 bg-[#fbbf24]/5 p-5" data-testid="section-crew-rumor-result">
+          {result.crewRumor ? (
+            <div className="flex items-start gap-4">
+              <div className="grid h-14 w-14 shrink-0 place-items-center border-2 border-[#fbbf24]/60 bg-black/50 text-[#fbbf24]">
+                <RumorIcon className="h-7 w-7" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-[#fbbf24]">Crew rumor · {result.crewRumor.triggered ? 'triggered' : 'consumed without firing'}</p>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-white/45">One-run twist spent</span>
+                </div>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">{result.crewRumor.rumorName}</h2>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-white/55">
+                  Brought by {rumorAlly?.name ?? 'the crew'}
+                </p>
+                <p className="mt-3 text-sm font-bold text-white">{result.crewRumor.effectLabel}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{result.crewRumor.outcome}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Radio className="h-6 w-6 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">No crew rumor this run</p>
+                <p className="mt-1 text-sm text-muted-foreground">No one had a rumor ready for this expedition. Rescue more crew and return to the hideout to hear what comes next.</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Endless stats title */}

@@ -10,6 +10,7 @@ import {
   preferredActivitiesForAlly,
   rollCrewActivities,
 } from '@/game/data/crewActivities';
+import { getCrewRumor, rollCrewRumor } from '@/game/data/crewRumors';
 import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
@@ -17,6 +18,7 @@ import {
   createWorld,
   dashPlayer,
   buildResult,
+  claimRumorEmergencyHeal,
   hudSnapshot,
   primePhysicsObject,
   spawnLokPet,
@@ -1134,6 +1136,101 @@ test('crew activities stay autonomous, preferred, seeded, and safely normalized'
     entered.meta.crewActivityByAlly,
     rollCrewActivities(allies, 13),
   );
+});
+
+test('crew rumors roll once, survive reloads, and consume only on completed runs', () => {
+  const activities = { vee: 'fortify-doors' as const, nyx: 'scout-routes' as const };
+  const first = rollCrewRumor(['vee', 'nyx'], activities, 8);
+  const repeat = rollCrewRumor(['vee', 'nyx'], activities, 8);
+  assert.deepEqual(first, repeat);
+  assert.ok(first);
+  assert.ok(getCrewRumor(first.rumorId)?.activityAffinities.includes(activities[first.allyId as 'vee' | 'nyx']));
+  assert.equal(rollCrewRumor([], activities, 8), null);
+
+  let state = {
+    meta: {
+      ...createInitialMeta(),
+      rescuedAllyIds: ['vee', 'nyx'],
+      crewActivityByAlly: activities,
+      crewActivitySeed: 7,
+    },
+    lastRun: null,
+  };
+  state = reducer(state, { type: 'enterHideout' });
+  assert.ok(state.meta.activeCrewRumor);
+  const reloaded = normalizeMeta(state.meta);
+  assert.deepEqual(reloaded.activeCrewRumor, state.meta.activeCrewRumor);
+  assert.equal(
+    normalizeMeta({
+      ...state.meta,
+      activeCrewRumor: { rumorId: 'not-real', allyId: 'vee', generatedAtSeed: 8 },
+    }).activeCrewRumor,
+    null,
+  );
+
+  const rumor = state.meta.activeCrewRumor!;
+  const world = createWorld(
+    AREAS[0]!,
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    616,
+    [],
+    1,
+    true,
+    rumor,
+  );
+  const result = buildResult(world);
+  assert.equal(result.crewRumor?.rumorId, rumor.rumorId);
+  state = reducer(state, { type: 'completeRun', result });
+  assert.equal(state.meta.activeCrewRumor, null);
+});
+
+test('crew rumors apply bounded effects through existing run systems', () => {
+  const bellWorld = createWorld(
+    testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    616,
+    [],
+    1,
+    true,
+    { rumorId: 'bell-shock', allyId: 'vee', generatedAtSeed: 1 },
+  );
+  const bellEnemy = addEnemy(bellWorld, 'nightcrawler', 18, 0);
+  bellEnemy.ghostUntil = 0;
+  stepWorld(bellWorld, 1 / 30, neutralInput);
+  stepWorld(bellWorld, 1 / 30, neutralInput);
+  assert.equal(bellWorld.rumorTriggered, true);
+  assert.ok(bellWorld.effects.some((effect) => effect.color === '#fbbf24'));
+  assert.ok(Math.abs(bellEnemy.kx) + Math.abs(bellEnemy.ky) > 0);
+
+  const baseWorld = createWorld(testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  const shortcutWorld = createWorld(testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616, [], 1, true, { rumorId: 'painted-shortcut', allyId: 'nyx', generatedAtSeed: 1 });
+  stepWorld(baseWorld, 1 / 60, { moveX: 1, moveY: 0, ultimate: false });
+  stepWorld(shortcutWorld, 1 / 60, { moveX: 1, moveY: 0, ultimate: false });
+  assert.equal(shortcutWorld.player.vx - baseWorld.player.vx, 44);
+  assert.equal(shortcutWorld.rumorTriggered, true);
+
+  const pantryWorld = createWorld(testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616, [], 1, true, { rumorId: 'pantry-surge', allyId: 'vee', generatedAtSeed: 1 });
+  pantryWorld.player.hp = 1;
+  assert.equal(claimRumorEmergencyHeal(pantryWorld), true);
+  assert.ok(pantryWorld.player.hp > 1);
+  assert.equal(claimRumorEmergencyHeal(pantryWorld), false);
+
+  const magnetWorld = createWorld(testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616, [], 1, true, { rumorId: 'magnet-parade', allyId: 'nyx', generatedAtSeed: 1 });
+  magnetWorld.rumorMagnetNextAt = 0;
+  magnetWorld.pickups.push({ uid: 990, kind: 'xp', x: 200, y: 0, vx: 0, vy: 0, value: 4, bornAt: 0 });
+  stepWorld(magnetWorld, 1 / 60, neutralInput);
+  assert.equal(magnetWorld.rumorTriggered, true);
+  assert.ok(Math.abs(magnetWorld.pickups[0]?.vx ?? 0) > 0);
+
+  const broadcastWorld = createWorld(AREAS.find((area) => area.endless)!, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616, [], 1, true, { rumorId: 'basement-broadcast', allyId: 'sable', generatedAtSeed: 1 });
+  broadcastWorld.endless!.maxDistancePx = 4000;
+  broadcastWorld.time = 49.99;
+  broadcastWorld.now = 49_990;
+  stepWorld(broadcastWorld, 1 / 30, neutralInput);
+  assert.equal(broadcastWorld.rumorBroadcastAvailable, false);
+  assert.ok(broadcastWorld.alerts.some((alert) => alert.text.includes('RUMOR')));
 });
 
 test('vendor purchases spend cred exactly once and stop at the catalog cap', () => {

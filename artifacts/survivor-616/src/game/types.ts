@@ -702,6 +702,32 @@ export interface CrewActivityDef {
   effects: CrewActivityEffect[];
 }
 
+export type CrewRumorId =
+  | 'bell-shock'
+  | 'painted-shortcut'
+  | 'pantry-surge'
+  | 'basement-broadcast'
+  | 'magnet-parade';
+
+export type CrewRumorIcon = 'bell' | 'spray-can' | 'utensils' | 'radio' | 'magnet';
+
+export interface CrewRumorDef {
+  id: CrewRumorId;
+  name: string;
+  icon: CrewRumorIcon;
+  accent: string;
+  activityAffinities: CrewActivityId[];
+  story: string;
+  effectLabel: string;
+  effectDescription: string;
+}
+
+export interface ActiveCrewRumor {
+  rumorId: CrewRumorId;
+  allyId: string;
+  generatedAtSeed: number;
+}
+
 export interface AllyDef {
   id: string;
   name: string;
@@ -880,6 +906,8 @@ export interface MetaState {
   crewActivityByAlly: Record<string, CrewActivityId>;
   /** Persisted seed incremented whenever the player returns to the hideout. */
   crewActivitySeed: number;
+  /** One autonomous crew rumor held for the next completed run. */
+  activeCrewRumor: ActiveCrewRumor | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -937,6 +965,16 @@ export interface RunResult {
   fatigueAfterPct?: number;
   /** Objectives completed this run. */
   completedObjectives: CompletedObjective[];
+  /** The bounded hideout rumor carried into this run, if any. */
+  crewRumor?: {
+    rumorId: CrewRumorId;
+    rumorName: string;
+    icon: CrewRumorIcon;
+    allyId: string;
+    effectLabel: string;
+    triggered: boolean;
+    outcome: string;
+  };
   /** Optional difficulty contracts selected before this run. */
   challenges?: Array<{
     id: string;
@@ -995,6 +1033,16 @@ export interface HudSnapshot {
   }>;
   /** Effects currently active on the player's enemies, grouped for HUD display. */
   activeEffects: Array<{ id: string; name: string; color: string; count: number }>;
+  /** One-run hideout rumor currently carried by this run. */
+  crewRumor?: {
+    rumorId: CrewRumorId;
+    name: string;
+    icon: CrewRumorIcon;
+    effectLabel: string;
+    triggered: boolean;
+    ready: boolean;
+    outcome: string;
+  };
   objectives: Array<{
     label: string;
     progress: number;
