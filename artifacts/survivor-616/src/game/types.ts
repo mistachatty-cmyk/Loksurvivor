@@ -132,7 +132,13 @@ export type WeaponKind =
   | 'melee'
   | 'homing'
   | 'nova'
-  | 'sweep';
+  | 'sweep'
+  | 'wave'
+  | 'laser'
+  | 'hazard'
+  | 'teleport'
+  | 'convert'
+  | 'punch';
 
 export interface WeaponDef {
   id: string;
@@ -159,6 +165,8 @@ export interface WeaponDef {
   obstacleInteraction?: 'block' | 'reflect';
   /** Optional crowd-control effect applied by this weapon's hits. */
   statusEffectId?: string;
+  /** Optional staged field or conversion lifetime. */
+  durationMs?: number;
 }
 
 /** Designer-facing metadata for a combat status effect. */
@@ -179,6 +187,7 @@ export interface StatusEffectInstance {
   stacks: number;
   appliedAt: number;
   expiresAt: number;
+  nextTickAt?: number;
 }
 
 export interface RunWeapon {

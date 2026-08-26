@@ -45,3 +45,28 @@ reuse distinctive names, logos, or exact costume details. Use the references to
 choose a mood and motion vocabulary, then make a new Grand Rapids night
 character with its own story, palette relationships, combat role, and readable
 animation.
+
+## Next-generation roster
+
+The current expansion deliberately uses ten different gameplay silhouettes
+rather than ten costume swaps:
+
+| Survivor | Silhouette language | Signature model | Pacing / status |
+| --- | --- | --- | --- |
+| Triangle Saint | angular warning-sign body with a crown point | three delayed wedge waves | measured control; Slow |
+| Mile Marker | tall signpost courier with staff/ruler | straight lane laser | deliberate precision |
+| Emberback | broad quadruped furnace | persistent fire ring | slow, durable area denial; Burning |
+| The Horse You | oversized mascot with giant hands | comic-book punch impact | very slow wind-up, huge knockback |
+| Glass Eel | long translucent ribbon | blink strike | extremely fast reposition; Freeze |
+| Acid Botanist | river-green gardener with branching crest | corrosive planted garden | patient space control; Acid |
+| Allymaker | prismatic matchmaker | temporary enemy conversion beat | mobile support/control |
+| Orbit Whale | wide floating whale/blob | staged gravitational breach | slow, wide crowd shaping |
+| Blink Choir | spiral hood with multiple mask marks | repeated teleport attack | frantic hit-and-run; Slow |
+| Punchline | compact caped comedian | delayed punch detonation | burst timing and anticipation |
+
+All ten use original rectangle-built rigs and independent palettes. Their
+weapons are records in the shared catalog: `wave`, `laser`, `hazard`,
+`teleport`, `convert`, and `punch` are reusable behavior families, not
+character-specific branches. Fire and acid fields remain visible, expire, tick
+damage, and can hurt the survivor as well as enemies, making placement a real
+tradeoff.

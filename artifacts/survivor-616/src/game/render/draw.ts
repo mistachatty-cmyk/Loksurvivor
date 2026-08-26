@@ -784,6 +784,47 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.fill();
         break;
       }
+      case 'wave': {
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 5 * fade + 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * (0.45 + life * 0.55),
+          effect.angle - effect.spread, effect.angle + effect.spread);
+        ctx.stroke();
+        break;
+      }
+      case 'laser': {
+        ctx.strokeStyle = effect.color;
+        ctx.shadowColor = effect.color;
+        ctx.shadowBlur = 16;
+        ctx.lineWidth = 12 * fade + 3;
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        ctx.lineTo(effect.x + Math.cos(effect.angle) * effect.radius,
+          effect.y + Math.sin(effect.angle) * effect.radius);
+        ctx.stroke();
+        break;
+      }
+      case 'hazard': {
+        ctx.strokeStyle = effect.color;
+        ctx.fillStyle = effect.color;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * (0.92 + Math.sin(w.now / 150) * 0.04), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha *= 0.12;
+        ctx.fill();
+        break;
+      }
+      case 'teleport': {
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * (1 - fade) + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
     }
     ctx.restore();
   }

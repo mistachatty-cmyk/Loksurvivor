@@ -64,6 +64,8 @@ function addEnemy(world: ReturnType<typeof createWorld>, x = 28, y = 0): EnemyAc
     specialUntil: 0,
     specialRadius: 0,
     specialKind: null,
+    convertedUntil: 0,
+    convertedAttackReadyAt: 0,
     dying: false,
     deathAt: 0,
     activeEffects: [],
@@ -216,6 +218,38 @@ test('ordinary weapons damage enemies without applying Freeze', () => {
 
   assert.ok(enemy.hp < enemy.maxHp);
   assert.deepEqual(enemy.activeEffects, []);
+});
+
+test('persistent hazard fields tick enemies, apply Burning, and hurt the player', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('emberback'),
+    CHARACTERS[0]!.stats,
+    5,
+  );
+  const enemy = addEnemy(world, 34, 0);
+  world.weapons[0]!.readyAt = 0;
+  const hpBefore = enemy.hp;
+  for (let i = 0; i < 25; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(world.effects.some((effect) => effect.kind === 'hazard'));
+  assert.ok(enemy.hp < hpBefore);
+  assert.ok(enemy.activeEffects.some((effect) => effect.id === 'burning' || effect.id === 'acid'));
+  assert.ok(world.player.hp < world.player.maxHp);
+});
+
+test('teleport weapons blink near a target and damage on arrival', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('glass-eel'),
+    CHARACTERS[0]!.stats,
+    6,
+  );
+  const enemy = addEnemy(world, 120, 0);
+  world.weapons[0]!.readyAt = 0;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(Math.abs(world.player.x - enemy.x) < 45);
+  assert.ok(enemy.hp < enemy.maxHp);
+  assert.ok(world.effects.some((effect) => effect.kind === 'teleport'));
 });
 
 test('a breakable box blocks a shot, breaks, and drops a pickup', () => {

@@ -97,6 +97,8 @@ export interface EnemyActor extends Actor {
   specialUntil: number;
   specialRadius: number;
   specialKind: 'shockwave' | 'current' | null;
+  convertedUntil: number;
+  convertedAttackReadyAt: number;
   dying: boolean;
   deathAt: number;
   activeEffects: StatusEffectInstance[];
@@ -126,7 +128,7 @@ export interface Projectile {
   statusEffectId?: string;
 }
 
-export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring';
+export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport';
 
 export interface Effect {
   uid: number;
@@ -145,6 +147,8 @@ export interface Effect {
   knockback: number;
   hitUids: Set<number>;
   followPlayer: boolean;
+  nextTickAt?: number;
+  hurtsPlayer?: boolean;
 }
 
 export interface Orbiter {
@@ -633,6 +637,8 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
     specialUntil: 0,
     specialRadius: 0,
     specialKind: null,
+    convertedUntil: 0,
+    convertedAttackReadyAt: 0,
     dying: false,
     deathAt: 0,
     activeEffects: [],
@@ -740,6 +746,13 @@ function applyStatusEffect(w: World, enemy: EnemyActor, id: string) {
 
 function updateStatusEffects(w: World) {
   for (const enemy of w.enemies) {
+    for (const effect of enemy.activeEffects) {
+      if ((effect.id === 'burning' || effect.id === 'acid') && w.now >= (effect.nextTickAt ?? effect.appliedAt)) {
+        const tick = effect.id === 'burning' ? 2 : 1;
+        effect.nextTickAt = w.now + 520;
+        damageEnemy(w, enemy, tick * effect.stacks, 0, enemy.x, enemy.y);
+      }
+    }
     enemy.activeEffects = enemy.activeEffects.filter((effect) => effect.expiresAt > w.now);
   }
 }
@@ -959,6 +972,85 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
     case 'aura': {
       // The aura is permanent; each activation is a damage tick.
       novaDamage(w, p.x, p.y, reach, damage, 0.6);
+      break;
+    }
+
+    case 'wave': {
+      const count = Math.max(1, runWeapon.count);
+      const target = nearestEnemy(w, p.x, p.y, reach + 100);
+      const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      for (let i = 0; i < count; i += 1) {
+        w.effects.push({
+          uid: uid(w), kind: 'wave', x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
+          angle, spread: 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
+          color: weapon.color ?? palette.accent, damage, knockback: 4.5, hitUids: new Set(), followPlayer: false,
+        });
+      }
+      p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
+
+    case 'laser': {
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      w.effects.push({
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: 0.055,
+        bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
+        damage, knockback: 2, hitUids: new Set(), followPlayer: false,
+      });
+      p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
+
+    case 'hazard': {
+      w.effects.push({
+        uid: uid(w), kind: 'hazard', x: p.x, y: p.y, radius: reach, angle: 0, spread: Math.PI * 2,
+        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
+        damage, knockback: 0, hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+        hurtsPlayer: true,
+      });
+      pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+      break;
+    }
+
+    case 'teleport': {
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      if (target) {
+        const dx = target.x - p.x; const dy = target.y - p.y; const len = Math.hypot(dx, dy) || 1;
+        p.x = target.x - (dx / len) * (p.radius + target.radius + 8);
+        p.y = target.y - (dy / len) * (p.radius + target.radius + 8);
+        novaDamage(w, p.x, p.y, 42, damage, 3.5, weapon.statusEffectId);
+        w.effects.push({ uid: uid(w), kind: 'teleport', x: p.x, y: p.y, radius: 42, angle: 0, spread: 0,
+          bornAt: w.now, expiresAt: w.now + 420, color: weapon.color ?? palette.accent, damage: 0, knockback: 0,
+          hitUids: new Set(), followPlayer: false });
+      }
+      p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
+
+    case 'convert': {
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      if (target) {
+        // Conversion is represented by a brief ally flash and a harmless stun;
+        // enemy AI remains data-driven while the crowd-control feedback is visible.
+        applyStatusEffect(w, target, 'slow');
+        target.convertedUntil = w.now + (weapon.durationMs ?? 5000);
+        target.convertedAttackReadyAt = w.now;
+        target.activeEffects.push({ id: 'freeze', stacks: 1, appliedAt: w.now, expiresAt: target.convertedUntil });
+        damageEnemy(w, target, damage, 0, p.x, p.y, weapon.statusEffectId);
+        pushAlert(w, 'TEMPORARY ALLY');
+      }
+      break;
+    }
+
+    case 'punch': {
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      w.effects.push({ uid: uid(w), kind: 'slash', x: p.x, y: p.y, radius: reach, angle, spread: 0.7,
+        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 420), color: weapon.color ?? palette.accent,
+        damage, knockback: 12, hitUids: new Set(), followPlayer: false });
+      p.anim = 'attack'; p.animStartedAt = w.now; w.shake = Math.max(w.shake, 12);
+      pushAlert(w, 'POW!');
       break;
     }
 
@@ -1506,6 +1598,20 @@ function updateEnemies(w: World, dt: number) {
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
 
+    if (enemy.convertedUntil > w.now) {
+      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, new Set([enemy.uid]));
+      if (allyTarget && w.now >= enemy.convertedAttackReadyAt) {
+        enemy.convertedAttackReadyAt = w.now + 650;
+        damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8)), 2, enemy.x, enemy.y);
+        w.effects.push({
+          uid: uid(w), kind: 'spark', x: enemy.x, y: enemy.y, radius: 16, angle: 0, spread: 0,
+          bornAt: w.now, expiresAt: w.now + 180, color: '#f9a8d4', damage: 0, knockback: 0,
+          hitUids: new Set(), followPlayer: false,
+        });
+      }
+      continue;
+    }
+
     const dx = p.x - enemy.x;
     const dy = p.y - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
@@ -1811,7 +1917,8 @@ function updateEffects(w: World) {
       effect.y = p.y;
     }
 
-    if (effect.kind === 'slash' && effect.damage > 0) {
+    const active = w.now >= effect.bornAt;
+    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'laser') && effect.damage > 0) {
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
         if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
         const reach = effect.radius + enemy.radius;
@@ -1824,6 +1931,21 @@ function updateEffects(w: World) {
         damageEnemy(w, enemy, effect.damage, effect.knockback, effect.x, effect.y);
       });
       damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage);
+    }
+
+    if (active && effect.kind === 'hazard' && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
+      effect.nextTickAt = w.now + 520;
+      effect.hitUids.clear();
+      forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
+        if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
+        const reach = effect.radius + enemy.radius;
+        if (dist2(enemy.x, enemy.y, effect.x, effect.y) > reach * reach) return;
+        effect.hitUids.add(enemy.uid);
+        damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.color.includes('b8ff') ? 'acid' : 'burning');
+      });
+      if (effect.hurtsPlayer && dist2(p.x, p.y, effect.x, effect.y) <= (effect.radius + p.radius) ** 2) {
+        damagePlayer(w, Math.max(1, Math.round(effect.damage * 0.45)), effect.x, effect.y);
+      }
     }
 
     if (w.now > effect.expiresAt) w.effects.splice(i, 1);

@@ -365,3 +365,56 @@ export function blobRig(options: BlobOptions = {}): SpriteRig {
   };
   return { pixelHeight: height, parts, anims };
 }
+
+/** Angular, mask-like silhouettes for characters that should not read as human. */
+export function triangleRig(height = 21): SpriteRig {
+  const parts: SpritePart[] = [
+    { key: 'shadow', x: -7, y: 0, w: 14, h: 2, color: 'ink', z: 0 },
+    { key: 'torso', x: -8, y: 3, w: 16, h: 12, color: 'body', z: 2 },
+    { key: 'head', x: -5, y: 15, w: 10, h: 5, color: 'bodyDark', z: 3 },
+    { key: 'face', x: -3, y: 17, w: 6, h: 2, color: 'accentBright', z: 4 },
+    { key: 'crest', x: -2, y: 20, w: 4, h: 5, color: 'accent', z: 5 },
+    { key: 'legL', x: -6, y: 0, w: 3, h: 4, color: 'bodyDark', z: 1 },
+    { key: 'legR', x: 3, y: 0, w: 3, h: 4, color: 'bodyDark', z: 1 },
+  ];
+  const anims = baseAnims(false, 0.9);
+  anims.walk = { frameMs: 95, loop: true, frames: [
+    { torso: { dx: -1, dy: 1 }, crest: { dx: -1 }, legL: { dh: -1 } },
+    { torso: { dx: 1 }, crest: { dx: 1 }, legR: { dh: -1 } },
+  ] };
+  return { pixelHeight: height, parts, anims };
+}
+
+/** Long, translucent-feeling swimmers; the body moves as a single ribbon. */
+export function eelRig(height = 16): SpriteRig {
+  const parts: SpritePart[] = [
+    { key: 'shadow', x: -11, y: 0, w: 22, h: 2, color: 'ink', z: 0 },
+    { key: 'torso', x: -12, y: 4, w: 20, h: 6, color: 'body', z: 2 },
+    { key: 'head', x: 7, y: 5, w: 7, h: 7, color: 'bodyDark', z: 3 },
+    { key: 'face', x: 11, y: 8, w: 2, h: 2, color: 'accentBright', z: 4 },
+    { key: 'crest', x: -13, y: 6, w: 4, h: 4, color: 'accent', z: 1 },
+  ];
+  const anims = baseAnims(false, 0.75);
+  anims.walk = { frameMs: 100, loop: true, frames: [
+    { torso: { dy: 1 }, head: { dy: 2 }, crest: { dy: -1 } },
+    { torso: { dy: -1 }, head: { dy: -2 }, crest: { dy: 1 } },
+  ] };
+  return { pixelHeight: height, parts, anims };
+}
+
+/** Oversized mascot silhouette with a readable wind-up and impact pose. */
+export function giantRig(height = 28): SpriteRig {
+  const rig = humanoidRig({ height, width: 18, headColor: 'bodyDark', torsoColor: 'body' });
+  rig.parts.push(
+    { key: 'crest', x: -12, y: height - 2, w: 5, h: 5, color: 'accent', z: 8 },
+    { key: 'crest', x: 7, y: height - 2, w: 5, h: 5, color: 'accent', z: 8 },
+  );
+  rig.anims.attack = {
+    frameMs: 85, loop: false, frames: [
+      { armR: { dx: -5, dy: 2 }, torso: { dx: -2 } },
+      { armR: { dx: 8, dw: 8, dy: -2 }, torso: { dx: 3 }, head: { dx: 2 } },
+      { armR: { dx: 10, dw: 10 }, torso: { dx: 4 }, head: { dx: 3 } },
+    ],
+  };
+  return rig;
+}
