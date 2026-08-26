@@ -22,6 +22,11 @@ import { ENEMIES } from '@/game/data/enemies';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
 import {
+  crewActivityEffects,
+  normalizeCrewActivities,
+  rollCrewActivities,
+} from '@/game/data/crewActivities';
+import {
   RECOVERY_FACILITIES,
   RECOVERY_FACILITIES_BY_ID,
   RECOVERY_HUTS,
@@ -48,7 +53,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 4;
+const META_VERSION = 5;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -117,6 +122,8 @@ export function createInitialMeta(): MetaState {
     facilityTier: 'tub',
     discoveredHutIds: [],
     vendorPurchases: {},
+    crewActivityByAlly: {},
+    crewActivitySeed: 0,
   };
 }
 
@@ -434,6 +441,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     typeof parsed.facilityTier === 'string' && RECOVERY_FACILITIES_BY_ID[parsed.facilityTier]
       ? parsed.facilityTier as FacilityTier
       : 'tub';
+  const crewActivitySeed =
+    typeof parsed.crewActivitySeed === 'number' && Number.isFinite(parsed.crewActivitySeed)
+      ? Math.max(0, Math.floor(parsed.crewActivitySeed))
+      : 0;
 
   const bestiary: Record<string, number> = {};
   if (parsed.bestiary && typeof parsed.bestiary === 'object') {
@@ -452,6 +463,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     unlockedCharacterIds.includes(parsed.selectedCharacterId)
       ? parsed.selectedCharacterId
       : (unlockedCharacterIds[0] ?? defaults.selectedCharacterId);
+  const rescuedAllyIds = idList(parsed.rescuedAllyIds, allyIds, []);
 
   return {
     version: META_VERSION,
@@ -460,7 +472,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
-    rescuedAllyIds: idList(parsed.rescuedAllyIds, allyIds, []),
+    rescuedAllyIds,
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
     lokPetHistory: normalizeLokPetHistory(parsed.lokPetHistory),
@@ -478,6 +490,12 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     facilityTier: tier,
     discoveredHutIds,
     vendorPurchases: normalizeVendorPurchases(parsed.vendorPurchases),
+    crewActivityByAlly: normalizeCrewActivities(
+      parsed.crewActivityByAlly,
+      rescuedAllyIds,
+      crewActivitySeed,
+    ),
+    crewActivitySeed,
   };
 }
 
@@ -488,7 +506,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -568,6 +586,10 @@ export function effectiveStats(character: CharacterDef, meta: MetaState): BaseSt
   for (const [key, value] of Object.entries(boosts) as Array<[keyof BaseStats, number]>) {
     stats[key] = stats[key] + value;
   }
+  for (const effect of crewActivityEffects(meta)) {
+    if (effect.add) stats[effect.stat] += effect.add;
+    if (effect.mult) stats[effect.stat] *= effect.mult;
+  }
   for (const item of VENDOR_CATALOG) {
     const stacks = Math.min(item.maxStacks, Math.max(0, Math.floor(meta.vendorPurchases[item.id] ?? 0)));
     if (!stacks) continue;
@@ -638,6 +660,7 @@ interface StoreState {
 
 type Action =
   | { type: 'selectCharacter'; id: string }
+  | { type: 'enterHideout' }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'clearLastRun' }
   | { type: 'markOnboarded' }
@@ -660,6 +683,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
     case 'selectCharacter':
       return { ...state, meta: { ...state.meta, selectedCharacterId: action.id } };
+
+    case 'enterHideout': {
+      const crewActivitySeed = state.meta.crewActivitySeed + 1;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          crewActivitySeed,
+          crewActivityByAlly: rollCrewActivities(state.meta.rescuedAllyIds, crewActivitySeed),
+        },
+      };
+    }
 
     case 'markOnboarded':
       return { ...state, meta: { ...state.meta, onboarded: true } };
@@ -843,6 +878,7 @@ export interface MetaContextValue {
   lockedRooms: HubRoomDef[];
   rescuedAllies: AllyDef[];
   missingAllies: AllyDef[];
+  enterHideout: () => void;
   selectCharacter: (id: string) => void;
   completeRun: (result: RunResult) => void;
   clearLastRun: () => void;
@@ -871,6 +907,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   }, [state.meta]);
 
   const selectCharacter = useCallback((id: string) => dispatch({ type: 'selectCharacter', id }), []);
+  const enterHideout = useCallback(() => dispatch({ type: 'enterHideout' }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
@@ -917,6 +954,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       lockedRooms,
       rescuedAllies,
       missingAllies,
+      enterHideout,
       selectCharacter,
       completeRun,
       clearLastRun,
@@ -934,6 +972,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   }, [
     state,
     selectCharacter,
+    enterHideout,
     completeRun,
     clearLastRun,
     markOnboarded,

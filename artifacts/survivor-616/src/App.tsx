@@ -76,11 +76,14 @@ function initialScreen(onboarded: boolean): Screen {
 }
 
 function Game() {
-  const { meta, markOnboarded, selectedCharacter, completeRun, unlockedAreas } = useMeta();
+  const { meta, markOnboarded, selectedCharacter, completeRun, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
 
-  const goHub = useCallback(() => setScreen({ name: 'hub' }), []);
+  const goHub = useCallback(() => {
+    enterHideout();
+    setScreen({ name: 'hub' });
+  }, [enterHideout]);
 
   const openPanel = useCallback((panel: HubPanel) => {
     switch (panel) {

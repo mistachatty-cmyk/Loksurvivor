@@ -4,12 +4,14 @@
  */
 import { useMeta } from '@/game/state/metaStore';
 import { ALLIES, HUB_ROOMS_BY_ID } from '@/game/data/progression';
+import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { RigPortrait } from './RigPortrait';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees } from 'lucide-react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck } from 'lucide-react';
+import type { CrewActivityIcon } from '@/game/types';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor' | 'settings';
 
@@ -40,6 +42,15 @@ const HANGOUTS = [
 ];
 const ALLIES_INDEX = Object.fromEntries(ALLIES.map((ally, index) => [ally.id, index]));
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
+const ACTIVITY_ICONS = {
+  utensils: Utensils,
+  shield: ShieldCheck,
+  package: PackageCheck,
+  compass: Compass,
+  map: MapIcon,
+  radio: Radio,
+  sparkles: Sparkles,
+} satisfies Record<CrewActivityIcon, typeof Utensils>;
 
 export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
   const { unlockedRooms, rescuedAllies, selectedCharacter, meta, setDevModeAllUnlocks } = useMeta();
@@ -243,7 +254,76 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
           </div>
         </section>
 
-        {activeRoom.features.includes('allies') && (
+         {roomAllies.length > 0 && (
+           <section className="mb-8 border border-primary/30 bg-black/35 p-4 sm:p-5" data-testid="section-crew-activities">
+             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+               <div>
+                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Crew autonomy</p>
+                 <h2 className="text-2xl font-black uppercase text-white">They picked tonight’s work</h2>
+               </div>
+               <p className="max-w-md text-xs leading-relaxed text-muted-foreground sm:text-right">
+                 Nobody gets assigned. Each friend chooses from the things they like doing whenever you return to the hideout.
+               </p>
+             </div>
+             <div className="mt-4 grid gap-3 lg:grid-cols-2">
+               {roomAllies.map((ally) => {
+                 const activity = CREW_ACTIVITIES_BY_ID[meta.crewActivityByAlly[ally.id]];
+                 const preferences = preferredActivitiesForAlly(ally.id);
+                 const Icon = activity ? ACTIVITY_ICONS[activity.icon] : Users;
+                 return (
+                   <article key={ally.id} className="border border-border bg-card/70 p-3" data-testid={`crew-activity-${ally.id}`}>
+                     <div className="flex gap-3">
+                       <div className="grid h-16 w-16 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                         <Icon className="h-8 w-8" aria-hidden="true" />
+                       </div>
+                       <div className="min-w-0 flex-1">
+                         <div className="flex flex-wrap items-center justify-between gap-2">
+                           <p className="font-black uppercase tracking-wide text-white">{ally.name}</p>
+                           <span className="font-mono text-[10px] uppercase tracking-widest text-primary">Autonomous pick</span>
+                         </div>
+                         {activity ? (
+                           <>
+                             <h3 className="mt-1 text-lg font-black text-white">{activity.name}</h3>
+                             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{activity.description}</p>
+                             <p className="mt-2 font-mono text-xs font-bold uppercase tracking-wider text-emerald-300">{activity.benefitLabel}</p>
+                           </>
+                         ) : (
+                           <p className="mt-2 text-sm text-muted-foreground">They are still deciding what sounds good tonight.</p>
+                         )}
+                       </div>
+                     </div>
+                     {preferences.length > 1 && (
+                       <div className="mt-3 border-t border-border/60 pt-3">
+                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Things they enjoy</p>
+                         <div className="mt-2 flex flex-wrap gap-2">
+                           {preferences.map((preference) => {
+                             const PreferenceIcon = ACTIVITY_ICONS[preference.icon];
+                             const isPicked = preference.id === activity?.id;
+                             return (
+                               <div
+                                 key={preference.id}
+                                 className={`flex items-center gap-1.5 border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                                   isPicked ? 'border-primary/70 bg-primary/15 text-white' : 'border-border text-muted-foreground'
+                                 }`}
+                                 data-picked={isPicked}
+                               >
+                                 <PreferenceIcon className="h-3 w-3" aria-hidden="true" />
+                                 {preference.name}
+                                 {isPicked && <span className="font-mono text-primary">· now</span>}
+                               </div>
+                             );
+                           })}
+                         </div>
+                       </div>
+                     )}
+                   </article>
+                 );
+               })}
+             </div>
+           </section>
+         )}
+
+         {activeRoom.features.includes('allies') && (
           <section className="mt-auto">
             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">
               Crew in room ({roomAllies.length})
