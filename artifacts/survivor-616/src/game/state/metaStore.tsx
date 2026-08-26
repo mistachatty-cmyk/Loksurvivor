@@ -39,6 +39,7 @@ import {
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import type {
   AllyDef,
   AreaDef,
@@ -61,7 +62,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 7;
+const META_VERSION = 8;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -125,6 +126,7 @@ export function createInitialMeta(): MetaState {
     onboarded: false,
     endlessRecordDistancePx: 0,
     endlessRecordDepth: 0,
+    endlessDiscoveryIds: [],
     fatigueByCharacter: {},
     recovery: defaultRecovery(),
     facilityTier: 'tub',
@@ -148,6 +150,19 @@ function idList(value: unknown, allowed: Set<string>, fallback: string[]): strin
   }
   for (const entry of fallback) seen.add(entry);
   return [...seen];
+}
+
+function normalizeEndlessDiscoveries(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const validBands = new Set<string>(ENDLESS_BANDS.map((band) => band.id));
+  const discoveries = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    if (validBands.has(entry) || (entry.startsWith('beacon:') && validBands.has(entry.slice('beacon:'.length)))) {
+      discoveries.add(entry);
+    }
+  }
+  return [...discoveries];
 }
 
 function counter(value: unknown, fallback = 0): number {
@@ -501,6 +516,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     new Set(CITY_RELICS.map((relic) => relic.id)),
     [],
   );
+  const endlessDiscoveryIds = normalizeEndlessDiscoveries(parsed.endlessDiscoveryIds);
   const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
     const evolution = EVOLUTIONS_BY_ID[evolutionId];
     return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
@@ -530,6 +546,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     onboarded: parsed.onboarded === true,
     endlessRecordDistancePx: counter(parsed.endlessRecordDistancePx),
     endlessRecordDepth: counter(parsed.endlessRecordDepth),
+    endlessDiscoveryIds,
     fatigueByCharacter,
     recovery,
     facilityTier: tier,
@@ -557,7 +574,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -883,6 +900,13 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const knownRelicIds = discoveredRelic
         ? addUnique(prev.knownRelicIds, discoveredRelic.id)
         : prev.knownRelicIds;
+      const endlessDiscoveryIds = result.endless
+        ? [...new Set([
+            ...prev.endlessDiscoveryIds,
+            ...result.endless.discoveredBandIds,
+            ...result.endless.discoveredRouteEventIds,
+          ])]
+        : prev.endlessDiscoveryIds;
 
       const clearedAreaIds = result.cleared
         ? addUnique(prev.clearedAreaIds, result.areaId)
@@ -923,6 +947,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         endlessRecordDepth: result.endless
           ? Math.max(prev.endlessRecordDepth, result.endless.dungeonDepth)
           : prev.endlessRecordDepth,
+        endlessDiscoveryIds,
         fatigueByCharacter: {
           ...prev.fatigueByCharacter,
           [result.characterId]: Math.min(

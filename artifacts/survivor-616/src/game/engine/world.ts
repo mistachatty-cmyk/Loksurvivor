@@ -23,6 +23,7 @@ import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
+import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -748,6 +749,11 @@ export function createWorld(
   if (area.endless) {
     world.endless = {
       maxDistancePx: 0,
+      currentBandId: 'core',
+      discoveredBandIds: new Set(['core']),
+      discoveredRouteEventIds: new Set(),
+      routeEvent: null,
+      hazardNextAt: 0,
       dungeonDepth: 0,
       inDungeon: false,
       inBuilding: false,
@@ -3992,7 +3998,76 @@ function updateRescue(w: World, dt: number) {
 /* ------------------------------------------------------------------ */
 
 function endlessDiffTier(e: EndlessState): number {
-  return Math.floor(e.maxDistancePx / 800) + Math.floor(e.dungeonDepth / 2);
+  return Math.min(12, Math.floor(e.maxDistancePx / 800) + Math.floor(e.dungeonDepth / 2));
+}
+
+function updateEndlessRoute(w: World) {
+  const e = w.endless!;
+  if (e.inDungeon || e.inBuilding) return;
+
+  const distance = Math.hypot(w.player.x, w.player.y);
+  const band = getEndlessBand(distance);
+  if (band.id !== e.currentBandId) {
+    e.currentBandId = band.id;
+    const firstBandVisit = !e.discoveredBandIds.has(band.id);
+    if (firstBandVisit) {
+      e.discoveredBandIds.add(band.id);
+      pushAlert(w, `${band.label} — ${band.riskLabel}`);
+    }
+    const eventId = `beacon:${band.id}`;
+    if (firstBandVisit && band.id !== 'core' && !e.discoveredRouteEventIds.has(eventId)) {
+      e.routeEvent = {
+        id: eventId,
+        bandId: band.id,
+        title: band.eventTitle,
+        description: band.eventDescription,
+        x: w.player.x + 150,
+        y: w.player.y,
+        phase: 'available',
+        rewardCred: 35 + ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) * 15,
+        rewardTokens: 1 + Math.floor(ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) / 3),
+      };
+      pushAlert(w, `OPTIONAL ROUTE — ${band.eventTitle}`);
+    }
+  }
+
+  const event = e.routeEvent;
+  if (event?.phase === 'available' && Math.hypot(w.player.x - event.x, w.player.y - event.y) < 48) {
+    event.phase = 'claimed';
+    e.discoveredRouteEventIds.add(event.id);
+    w.cred += event.rewardCred;
+    w.lootTokensGained += event.rewardTokens;
+    pushAlert(w, `${event.title} secured +${event.rewardCred} cred`);
+    spawnParticles(w, event.x, event.y, band.accent, 26, 170);
+  }
+}
+
+function updateEndlessBandHazard(w: World) {
+  const e = w.endless!;
+  if (e.inBuilding || w.now < e.hazardNextAt) return;
+  if (e.inDungeon) {
+    if (e.dungeonDepth < 2) return;
+    const era = DUNGEON_ERAS[e.dungeonEraIndex];
+    e.hazardNextAt = w.now + 3600;
+    const hazardX = w.player.x + (e.dungeonRoom === 3 ? 0 : 76);
+    const hazardY = w.player.y + Math.sin(w.now / 900) * 96;
+    incursionEffect(w, hazardX, hazardY, 44, era?.ground.glow ?? '#b58cff', 520);
+    if (e.dungeonRoom === 3) damagePlayer(w, 2, hazardX, hazardY, 'hazard');
+    return;
+  }
+  const band = ENDLESS_BANDS_BY_ID[e.currentBandId];
+  if (!band || band.id === 'core') return;
+
+  e.hazardNextAt = w.now + (band.id === 'outer-threshold' ? 2400 : 3100);
+  const radius = band.id === 'floodwall' ? 70 : band.id === 'rail-shadow' ? 56 : 48;
+  const hazardX = w.player.x + (w.player.vx === 0 ? 80 : Math.sign(w.player.vx) * 90);
+  const hazardY = w.player.y + (w.player.vy === 0 ? -40 : Math.sign(w.player.vy) * 90);
+  incursionEffect(w, hazardX, hazardY, radius, band.accent, 520);
+  if (band.id === 'outer-threshold') {
+    damagePlayer(w, 3, hazardX, hazardY, 'hazard');
+  } else if (band.id === 'industrial-fringe' || band.id === 'rail-shadow') {
+    damagePlayer(w, 2, hazardX, hazardY, 'hazard');
+  }
 }
 
 function updateEndlessChunks(w: World) {
@@ -4072,6 +4147,8 @@ function updateEndlessChunks(w: World) {
       streetAxis: chunk.streetAxis,
       district: chunk.district,
       districtAccent: chunk.districtAccent,
+      band: chunk.band,
+      bandAccent: chunk.bandAccent,
       landmark: chunk.landmark,
     });
     for (const building of chunk.buildings) {
@@ -4222,7 +4299,8 @@ function enterDungeon(w: World) {
   e.dungeonRoom = 1;
   e.dungeonBossDefeated = false;
   e.dungeonChest = null;
-  e.dungeonEraIndex = (e.dungeonEraIndex + 1) % DUNGEON_ERAS.length;
+  const bandIndex = ENDLESS_BANDS.findIndex((band) => band.id === e.currentBandId);
+  e.dungeonEraIndex = (e.dungeonDepth - 1 + Math.max(0, bandIndex) * 2) % DUNGEON_ERAS.length;
   e.inDungeon = true;
   loadDungeonRoom(w, 1, 'enter');
 }
@@ -4388,7 +4466,10 @@ function updateEndlessDungeon(w: World) {
         w.openedPrizes.push(prize.label);
       }
       w.lootBoxesOpened += 1;
+      const depthBonus = 10 + e.dungeonDepth * 8;
+      w.cred += depthBonus;
       pushAlert(w, 'Chest opened — 3 rewards secured');
+      pushAlert(w, `Depth bonus +${depthBonus} cred`);
       spawnParticles(w, chest.x, chest.y, '#ffd166', 24, 150);
     }
   }
@@ -4413,7 +4494,10 @@ function updateEndlessSpawning(w: World, dt: number) {
   const spawnRate = Math.min(3.2, (0.8 + tier * 0.14) * contractSpawnMultiplier);
   const hpMult = Math.min(1.7, 1 + tier * 0.07);
 
-  const pool = ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
+  const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
+  const pool = bandPool?.length
+    ? bandPool
+    : ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
 
   e.spawnBudget += spawnRate * dt;
   while (e.spawnBudget >= 1) {
@@ -4465,6 +4549,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
+    updateEndlessRoute(w);
+    updateEndlessBandHazard(w);
     updateEndlessLandmarkCue(w);
     updateEndlessDungeon(w);
     updateEndlessSpawning(w, dt);
@@ -4652,6 +4738,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     endless: e
       ? {
           blocksWalked: Math.round(e.maxDistancePx / CHUNK_SIZE),
+          distancePx: Math.round(e.maxDistancePx),
           dungeonDepth: e.dungeonDepth,
           inDungeon: e.inDungeon,
           dungeonRoom: e.dungeonRoom,
@@ -4661,6 +4748,14 @@ export function hudSnapshot(w: World): HudSnapshot {
           dungeonEraName: e.dungeonEraIndex >= 0 && e.inDungeon
             ? (DUNGEON_ERAS[e.dungeonEraIndex]?.name ?? 'Unknown')
             : '',
+          currentBandId: e.currentBandId,
+          currentBandLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.label ?? 'Unknown edge',
+          currentBandAccent: ENDLESS_BANDS_BY_ID[e.currentBandId]?.accent ?? '#fff',
+          riskLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.riskLabel ?? '',
+          hazardLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.hazardLabel ?? '',
+          routeEvent: e.routeEvent
+            ? { ...e.routeEvent }
+            : undefined,
           currentBlock: e.cityBlocks.find((block) => block.key === chunkKey(
             worldToChunkCoords(w.player.x, w.player.y).cx,
             worldToChunkCoords(w.player.x, w.player.y).cy,
@@ -4673,8 +4768,8 @@ export function hudSnapshot(w: World): HudSnapshot {
           buildingLabel: e.buildingLabel,
           playerX: w.player.x,
           playerY: w.player.y,
-          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, landmark }) => ({
-            x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, landmark,
+          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, band, bandAccent, landmark }) => ({
+            x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, band, bandAccent, landmark,
           })),
           riverSegments: [...e.riverSegments],
           buildingEntrances: e.buildingEntrances.map(({ x, y, label, prefabId, doorSide }) => ({ x, y, label, prefabId, doorSide })),
@@ -4813,6 +4908,9 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
           maxDistancePx: e.maxDistancePx,
           dungeonDepth: e.dungeonDepth,
           blocksWalked: Math.round(e.maxDistancePx / CHUNK_SIZE),
+          currentBandId: e.currentBandId,
+          discoveredBandIds: [...e.discoveredBandIds],
+          discoveredRouteEventIds: [...e.discoveredRouteEventIds],
         }
       : undefined,
   };

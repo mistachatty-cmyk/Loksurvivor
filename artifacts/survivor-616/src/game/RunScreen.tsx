@@ -492,6 +492,7 @@ export function RunScreen({
   const xpPct = hud ? (hud.xp / Math.max(1, hud.xpToNext)) * 100 : 0;
   const timeLeft = hud && !area.endless ? Math.max(0, hud.durationSec - hud.elapsedSec) : 0;
   const blocksWalked = hud?.endless?.blocksWalked ?? 0;
+  const distancePx = hud?.endless?.distancePx ?? 0;
   const dungeonDepth = hud?.endless?.dungeonDepth ?? 0;
   const inDungeon = hud?.endless?.inDungeon ?? false;
   const dungeonEraName = hud?.endless?.dungeonEraName ?? '';
@@ -535,7 +536,7 @@ export function RunScreen({
                 {area.endless && hud?.endless
                   ? hud.endless.inBuilding
                     ? `Inside · ${hud.endless.buildingLabel}`
-                    : `${hud.endless.currentDistrict} · ${hud.endless.currentBlock}`
+                    : `${hud.endless.currentBandLabel} · ${hud.endless.currentDistrict}`
                   : area.name}
               </span>
             </div>
@@ -551,11 +552,25 @@ export function RunScreen({
                   ? `${dungeonEraName} · room ${hud.endless.dungeonRoom}/3`
                   : hud.endless.inBuilding
                     ? 'Interior route · find the lit door out'
-                    : dungeonDepth > 0
+                    : hud.endless.routeEvent?.phase === 'available'
+                      ? (
+                        <span className="flex max-w-[18rem] flex-col items-end gap-0.5 text-right">
+                          <span>Beacon ahead · {hud.endless.routeEvent.title}</span>
+                          <span className="text-[9px] normal-case tracking-normal text-white/60">
+                            {hud.endless.routeEvent.description} · +{hud.endless.routeEvent.rewardCred} cred · {hud.endless.routeEvent.rewardTokens} token{hud.endless.routeEvent.rewardTokens === 1 ? '' : 's'}
+                          </span>
+                        </span>
+                      )
+                      : dungeonDepth > 0
                       ? `Depth ${dungeonDepth}`
                       : 'Street grid · explore the block'}
               </div>
             )}
+            {area.endless && hud?.endless && !inDungeon && !hud.endless.inBuilding ? (
+              <div className="font-mono text-[9px] uppercase tracking-widest text-white/50">
+                {distancePx.toLocaleString()} units · {hud.endless.riskLabel}
+              </div>
+            ) : null}
             {phase === 'playing' || phase === 'paused' ? (
               <button
                 type="button"

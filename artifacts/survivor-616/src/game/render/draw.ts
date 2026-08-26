@@ -8,6 +8,7 @@
 
 import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
+import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type { ObstacleDef } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
@@ -266,11 +267,11 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 0.26;
-    ctx.strokeStyle = block.river ? '#4de1ff' : block.districtAccent;
+    ctx.strokeStyle = block.river ? '#4de1ff' : block.bandAccent ?? block.districtAccent;
     ctx.lineWidth = 3;
     ctx.strokeRect(block.x - block.w / 2 + sidewalk, block.y - block.h / 2 + sidewalk, block.w - sidewalk * 2, block.h - sidewalk * 2);
     ctx.globalAlpha = 0.74;
-    ctx.fillStyle = block.landmark?.accent ?? block.districtAccent;
+    ctx.fillStyle = block.landmark?.accent ?? block.bandAccent ?? block.districtAccent;
     ctx.font = 'bold 10px monospace';
     ctx.fillText(
       `${block.district.toUpperCase()} · ${block.landmark?.name.toUpperCase() ?? block.kind.toUpperCase()}`,
@@ -376,6 +377,40 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillText('ENTER', door.x - 18, door.y - 20);
     ctx.restore();
   }
+}
+
+function drawEndlessRouteEvent(ctx: CanvasRenderingContext2D, w: World) {
+  const event = w.endless?.routeEvent;
+  if (!event || event.phase !== 'available' || w.endless?.inDungeon || w.endless?.inBuilding) return;
+  const accent = ENDLESS_BANDS_BY_ID[event.bandId]?.accent ?? '#fff';
+  const pulse = 1 + Math.sin(w.now / 180) * 0.15;
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.fillStyle = `${accent}22`;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 22;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.arc(event.x, event.y, 28 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha = 0.95;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(event.x, event.y - 14);
+  ctx.lineTo(event.x, event.y + 14);
+  ctx.moveTo(event.x - 14, event.y);
+  ctx.lineTo(event.x + 14, event.y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(event.title.toUpperCase(), event.x, event.y - 40);
+  ctx.font = '9px monospace';
+  ctx.fillStyle = accent;
+  ctx.fillText(`RISK / REWARD · +${event.rewardCred} CRED`, event.x, event.y + 48);
+  ctx.restore();
 }
 
 function drawBuildingInterior(ctx: CanvasRenderingContext2D, w: World) {
@@ -530,6 +565,10 @@ function effectiveGround(w: World) {
   if (w.endless?.inDungeon) {
     const era = DUNGEON_ERAS[w.endless.dungeonEraIndex];
     if (era) return era.ground;
+  }
+  if (w.endless && !w.endless.inBuilding) {
+    const band = ENDLESS_BANDS_BY_ID[w.endless.currentBandId];
+    if (band) return band.ground;
   }
   return w.area.ground;
 }
@@ -1794,6 +1833,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.globalAlpha = 1;
   }
   drawCityMapFeatures(ctx, w);
+  drawEndlessRouteEvent(ctx, w);
   drawBuildingInterior(ctx, w);
   drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   drawLightPool(ctx, w);

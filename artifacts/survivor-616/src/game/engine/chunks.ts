@@ -10,6 +10,7 @@
  */
 
 import type { ObstacleDef } from '@/game/types';
+import { endlessBandForChunk } from '@/game/data/endlessBands';
 import { createRng } from './math';
 
 /* ------------------------------------------------------------------ */
@@ -88,6 +89,8 @@ export interface StreetChunk {
   buildings: ChunkBuilding[];
   district: string;
   districtAccent: string;
+  band: import('@/game/types').EndlessBandId;
+  bandAccent: string;
   landmark?: ChunkLandmark;
 }
 
@@ -275,13 +278,14 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   // Mix seed with position using primes so small deltas give big bit changes.
   const mixedSeed = (runSeed ^ (cx * 73856093)) ^ (cy * 19349663);
   const rng = createRng(mixedSeed >>> 0);
+  const band = endlessBandForChunk(cx, cy, CHUNK_SIZE);
 
   const variantIndex = Math.floor(rng() * VARIANTS.length);
   const variant = VARIANTS[variantIndex] ?? 'strip';
 
   // A river is a persistent horizontal band. Only every fourth block on the
   // band has a bridge; the other blocks are river edges and stay impassable.
-  const hasRiver = cy !== 0 && ((cy % 6) + 6) % 6 === 3;
+  const hasRiver = band.id !== 'outer-threshold' && cy !== 0 && ((cy % 6) + 6) % 6 === 3;
   const hasBridge = hasRiver && ((cx % 4) + 4) % 4 === 0;
   const riverCrossingX = hasBridge ? 0 : null;
   const blockKind = hasRiver
@@ -299,9 +303,15 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
           : undefined;
 
   const obstacles: ObstacleDef[] = [];
-  const districtInfo = hasRiver
+  const districtInfo = band.id === 'floodwall' || hasRiver
     ? DISTRICTS[2]!
-    : DISTRICTS[(Math.abs(cx * 3 + cy * 5) + variantIndex) % DISTRICTS.length]!;
+    : band.id === 'rail-shadow'
+      ? { name: 'Elevated Rail Shadows', accent: band.accent }
+      : band.id === 'industrial-fringe'
+        ? { name: 'Abandoned Industrial Fringe', accent: band.accent }
+        : band.id === 'outer-threshold'
+          ? { name: 'Outer-City Threshold', accent: band.accent }
+          : DISTRICTS[(Math.abs(cx * 3 + cy * 5) + variantIndex) % DISTRICTS.length]!;
 
   // Each block gets a different street spine. These are still ordinary
   // obstacles for collision, but the profiles make streamed blocks read as
@@ -322,7 +332,11 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     bridge: ['corner-store'],
     'river-edge': [],
   };
-  const prefabPool = prefabPools[blockKind];
+  const prefabPool = band.id === 'industrial-fringe'
+    ? ['warehouse', 'auto-shop'] as BuildingPrefabId[]
+    : band.id === 'outer-threshold'
+      ? [] as BuildingPrefabId[]
+      : prefabPools[blockKind];
   const anchors = streetAxis === 'horizontal'
     ? [
         { x: -198, y: -196, side: 'south' as const },
@@ -427,7 +441,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     plaza: [3, 6],
   };
   const [minProps, maxProps] = propCounts[variant];
-  const propCount = minProps + Math.floor(rng() * (maxProps - minProps + 1));
+  const bandPropBonus = band.id === 'industrial-fringe' || band.id === 'outer-threshold' ? 2 : 0;
+  const propCount = minProps + bandPropBonus + Math.floor(rng() * (maxProps - minProps + 1));
 
   const kindWeights: Record<ChunkVariant, number[]> = {
     // strip: lots of cars, some planters
@@ -459,7 +474,10 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
         break;
       }
     }
-    const kind = KINDS[kindIdx] ?? 'crate';
+    let kind = KINDS[kindIdx] ?? 'crate';
+    if (band.id === 'rail-shadow' && i % 3 === 0) kind = 'barrier';
+    if (band.id === 'industrial-fringe' && i % 3 === 0) kind = 'metal-box';
+    if (band.id === 'outer-threshold' && i % 2 === 0) kind = 'reflective-surface';
 
     // Sizes by kind.
     const sizes: Record<ObstacleDef['kind'], [number, number, number, number]> = {
@@ -503,7 +521,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     } while (attempts < 8 && (
       (spine === 0 && Math.abs(y) < 48) ||
       (spine === 1 && Math.abs(x) < 48) ||
-      (variant === 'rail' && Math.abs(y) > 78 && Math.abs(y) < 154)
+      (variant === 'rail' && Math.abs(y) > 78 && Math.abs(y) < 154) ||
+      (band.id === 'outer-threshold' && Math.abs(x) < 96 && Math.abs(y) < 96)
     ));
 
     const propVariant = kind === 'metal-box'
@@ -521,7 +540,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   // Potholes are rare, deterministic ground hazards. They are deliberately
   // generated separately from solid props so they never become collision
   // walls or projectile blockers.
-  if (!hasRiver && rng() > 0.78) {
+  if (!hasRiver && rng() > (band.id === 'industrial-fringe' ? 0.62 : 0.78)) {
     const trigger = rng() > 0.5 ? 'stomp' : 'ground-shock';
     const w = 64 + rng() * 18;
     const h = 48 + rng() * 18;
@@ -544,7 +563,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
 
   // Dungeon entrance: appears on roughly 1-in-8 chunks, never on the
   // starting (0,0) chunk.
-  const isDungeonChunk = (cx !== 0 || cy !== 0) && rng() > 0.875;
+  const isDungeonChunk = (cx !== 0 || cy !== 0) && rng() > (band.id === 'outer-threshold' ? 0.78 : 0.875);
   const entranceLocalX = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
   const entranceLocalY = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
   const buildingEntrances: ChunkBuildingEntrance[] = buildings.map((building) => ({
@@ -572,6 +591,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     buildings,
     district: districtInfo.name,
     districtAccent: districtInfo.accent,
+    band: band.id,
+    bandAccent: band.accent,
     landmark,
   };
 }

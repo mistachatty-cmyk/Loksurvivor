@@ -207,6 +207,10 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><TrendingDown className="w-3 h-3 text-primary" /> Depth</p>
                   <p className="text-2xl font-mono font-bold text-white">{result.endless.dungeonDepth}</p>
                 </div>
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-primary" /> Edge reached</p>
+                  <p className="text-sm font-mono font-bold text-white">{result.endless.currentBandId.replaceAll('-', ' ')}</p>
+                </div>
               </>
             ) : (
               <div>
@@ -228,6 +232,14 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
             </div>
           </div>
         </div>
+        {result.endless && (result.endless.discoveredBandIds.length > 1 || result.endless.discoveredRouteEventIds.length > 0) ? (
+          <section className="border border-violet-300/25 bg-violet-300/5 p-5" data-testid="section-endless-discoveries">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-violet-200">Outer-city knowledge recovered</p>
+            <p className="mt-2 text-sm leading-relaxed text-white/80">
+              {result.endless.discoveredBandIds.length} distance bands mapped · {result.endless.discoveredRouteEventIds.length} route beacon{result.endless.discoveredRouteEventIds.length === 1 ? '' : 's'} secured.
+            </p>
+          </section>
+        ) : null}
 
         <div className="border border-[#fbbf24]/45 bg-[#fbbf24]/5 p-5" data-testid="section-crew-rumor-result">
           {result.crewRumor ? (

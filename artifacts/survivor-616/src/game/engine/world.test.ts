@@ -19,6 +19,7 @@ import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/ven
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { DISTRICT_INCURSIONS, DISTRICT_INCURSIONS_BY_ID, chooseDistrictIncursion } from '@/game/data/incursions';
+import { ENDLESS_BANDS, getEndlessBand } from '@/game/data/endlessBands';
 import {
   createWorld,
   dashPlayer,
@@ -1098,7 +1099,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 7);
+    assert.equal(loaded.version, 8);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1697,6 +1698,49 @@ test('river rows reserve bridges and mark non-crossing edges', () => {
   assert.equal(riverEdge.obstacles.filter((obstacle) => obstacle.kind === 'river').length, 1);
 });
 
+test('endless distance bands are seeded, readable, and distinct', () => {
+  assert.deepEqual(ENDLESS_BANDS.map((band) => getEndlessBand(band.thresholdPx).id), ENDLESS_BANDS.map((band) => band.id));
+  const core = generateChunk(0, 0, 616);
+  const floodwall = generateChunk(0, 2, 616);
+  const railShadow = generateChunk(4, 0, 616);
+  const threshold = generateChunk(9, 0, 616);
+  assert.equal(core.band, 'core');
+  assert.equal(floodwall.band, 'floodwall');
+  assert.equal(railShadow.band, 'rail-shadow');
+  assert.equal(threshold.band, 'outer-threshold');
+  assert.notEqual(floodwall.bandAccent, core.bandAccent);
+  assert.deepEqual(threshold, generateChunk(9, 0, 616));
+  assert.ok(threshold.obstacles.some((obstacle) => obstacle.kind === 'reflective-surface'));
+});
+
+test('endless band discovery creates an optional beacon and pays it once', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  world.player.x = 950;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.endless?.currentBandId, 'floodwall');
+  assert.equal(world.endless?.routeEvent?.phase, 'available');
+  const event = world.endless!.routeEvent!;
+  world.player.x = event.x;
+  world.player.y = event.y;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.endless?.routeEvent?.phase, 'claimed');
+  const cred = world.cred;
+  const tokens = world.lootTokensGained;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.cred, cred);
+  assert.equal(world.lootTokensGained, tokens);
+  assert.ok(world.endless?.discoveredRouteEventIds.has('beacon:floodwall'));
+});
+
+test('endless discoveries survive save normalization and reject unknown entries', () => {
+  const meta = normalizeMeta({
+    version: 8,
+    endlessDiscoveryIds: ['core', 'floodwall', 'beacon:floodwall', 'not-a-band', 'beacon:made-up'],
+  });
+  assert.deepEqual(meta.endlessDiscoveryIds, ['core', 'floodwall', 'beacon:floodwall']);
+});
+
 test('endless snapshot exposes loaded blocks, river crossings, and doors', () => {
   const area = AREAS.find((entry) => entry.endless)!;
   const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
@@ -1706,6 +1750,8 @@ test('endless snapshot exposes loaded blocks, river crossings, and doors', () =>
   assert.ok(snapshot.endless.cityBlocks.length >= 9);
   assert.ok(snapshot.endless.buildingEntrances.length > 0);
   assert.equal(snapshot.endless.playerX, world.player.x);
+  assert.equal(snapshot.endless.currentBandId, 'core');
+  assert.ok(snapshot.endless.cityBlocks.some((block) => block.x === 0 && block.y === 0 && block.band === 'core'));
 });
 
 test('endless buildings expose distinct facades and enterable prefab interiors', () => {

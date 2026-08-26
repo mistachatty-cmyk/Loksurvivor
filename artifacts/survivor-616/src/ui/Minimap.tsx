@@ -22,8 +22,12 @@ export function Minimap({ map }: MinimapProps) {
     >
       <div className="border border-cyan-200/30 bg-[#050911]/85 p-1 shadow-[0_0_24px_rgba(34,211,238,.12)]">
         <div className="mb-1 flex items-center justify-between gap-2 px-1 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/75">
-          <span className="truncate">{map.currentDistrict}</span>
-          <span className="shrink-0 text-amber-200/80">{map.currentBlock}</span>
+          <span className="truncate" style={{ color: map.currentBandAccent }}>{map.currentBandLabel}</span>
+          <span className="shrink-0 text-amber-200/80">{map.blocksWalked} blk</span>
+        </div>
+        <div className="mb-1 flex items-center justify-between px-1 font-mono text-[8px] uppercase tracking-wider text-white/50">
+          <span className="truncate">{map.currentDistrict} · {map.currentBlock}</span>
+          <span className="shrink-0">{map.riskLabel}</span>
         </div>
         <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="h-auto w-full" role="img">
           <rect width={MAP_W} height={MAP_H} fill="#08111a" />
@@ -51,7 +55,7 @@ export function Minimap({ map }: MinimapProps) {
                   width="122"
                   height="122"
                   fill={blockColor}
-                  stroke={blockStroke}
+                  stroke={block.bandAccent ?? blockStroke}
                   strokeOpacity=".55"
                   strokeDasharray="4 4"
                 />
@@ -60,12 +64,21 @@ export function Minimap({ map }: MinimapProps) {
                 ) : block.landmark ? (
                   <path d={`M ${point.x} ${point.y - 12} l 12 12 -12 12 -12 -12 z`} fill={block.landmark.accent} opacity=".85" />
                 ) : null}
-                <text x={point.x - 56} y={point.y - 50} fill={block.landmark?.accent ?? '#cbd5e1'} opacity=".75" fontSize="5">
+                <text x={point.x - 56} y={point.y - 50} fill={block.bandAccent ?? block.landmark?.accent ?? '#cbd5e1'} opacity=".75" fontSize="5">
                   {block.landmark?.name ?? block.kind}
                 </text>
               </g>
             );
           })}
+          {map.routeEvent?.phase === 'available' ? (() => {
+            const point = toMap(map.routeEvent.x, map.routeEvent.y);
+            return (
+              <g>
+                <circle cx={point.x} cy={point.y} r="7" fill="none" stroke={map.currentBandAccent} strokeWidth="2" strokeDasharray="3 2" />
+                <path d={`M ${point.x} ${point.y - 5} v 10 M ${point.x - 5} ${point.y} h 10`} stroke="#fff" strokeWidth="1.5" />
+              </g>
+            );
+          })() : null}
           {map.riverSegments.map((river, index) => {
             const point = toMap(river.x, river.y);
             return (
@@ -107,13 +120,14 @@ export function Minimap({ map }: MinimapProps) {
         </svg>
         <div className="mt-1 flex items-center justify-between gap-2 px-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
           <span>● you</span>
-          <span>{map.inBuilding ? `inside · ${map.buildingLabel}` : map.inDungeon ? `room ${map.dungeonRoom}/3` : 'streets'}</span>
+          <span>{map.inBuilding ? `inside · ${map.buildingLabel}` : map.inDungeon ? `room ${map.dungeonRoom}/3` : map.hazardLabel}</span>
         </div>
         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 px-1 font-mono text-[7px] uppercase tracking-wide text-white/55">
           <span className="text-amber-300">■ bridge</span>
           <span className="text-rose-300">┄ river edge</span>
           <span className="text-amber-100">□ building</span>
           <span className="text-fuchsia-200">◆ landmark</span>
+          <span style={{ color: map.currentBandAccent }}>✦ beacon</span>
         </div>
       </div>
     </div>

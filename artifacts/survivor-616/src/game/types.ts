@@ -709,10 +709,44 @@ export interface DungeonEra {
   bounds: { w: number; h: number };
 }
 
+export type EndlessBandId = 'core' | 'floodwall' | 'rail-shadow' | 'industrial-fringe' | 'outer-threshold';
+
+export interface EndlessBandDef {
+  id: EndlessBandId;
+  label: string;
+  shortLabel: string;
+  thresholdPx: number;
+  accent: string;
+  ground: { base: string; tile: string; seam: string; glow: string };
+  riskLabel: string;
+  hazardLabel: string;
+  enemyPool: string[];
+  eventTitle: string;
+  eventDescription: string;
+}
+
+export interface EndlessRouteEventState {
+  id: string;
+  bandId: EndlessBandId;
+  title: string;
+  description: string;
+  x: number;
+  y: number;
+  phase: 'available' | 'claimed' | 'missed';
+  rewardCred: number;
+  rewardTokens: number;
+}
+
 /** Live state kept on the World while running in endless mode. */
 export interface EndlessState {
   /** World-space distance from origin — drives difficulty. */
   maxDistancePx: number;
+  currentBandId: EndlessBandId;
+  /** Bands identified during this run; copied into MetaState at run end. */
+  discoveredBandIds: Set<EndlessBandId>;
+  discoveredRouteEventIds: Set<string>;
+  routeEvent: EndlessRouteEventState | null;
+  hazardNextAt: number;
   /** Number of dungeon rooms the player has entered. */
   dungeonDepth: number;
   /** Whether the player is currently inside a dungeon room. */
@@ -780,6 +814,8 @@ export interface EndlessState {
     streetAxis: 'horizontal' | 'vertical';
     district: string;
     districtAccent: string;
+    band: EndlessBandId;
+    bandAccent: string;
     landmark?: { name: string; kind: string; accent: string };
   }>;
   /** River bands currently loaded around the player. */
@@ -1041,6 +1077,8 @@ export interface MetaState {
   endlessRecordDistancePx: number;
   /** Deepest dungeon depth ever reached in endless mode. */
   endlessRecordDepth: number;
+  /** Endless bands and route beacons found across all runs. */
+  endlessDiscoveryIds: string[];
   /** Character id -> current fatigue penalty percentage, capped at 5. */
   fatigueByCharacter: Record<string, number>;
   /** The active recovery session, if anyone is resting. */
@@ -1190,6 +1228,9 @@ export interface RunResult {
     dungeonDepth: number;
     /** "Blocks walked" — rounded distance in city-block units for display. */
     blocksWalked: number;
+    currentBandId: EndlessBandId;
+    discoveredBandIds: EndlessBandId[];
+    discoveredRouteEventIds: string[];
   };
 }
 
@@ -1290,9 +1331,25 @@ export interface HudSnapshot {
   /** Set when running in endless mode. */
   endless?: {
     blocksWalked: number;
+    distancePx: number;
     dungeonDepth: number;
     inDungeon: boolean;
     dungeonEraName: string;
+    currentBandId: EndlessBandId;
+    currentBandLabel: string;
+    currentBandAccent: string;
+    riskLabel: string;
+    hazardLabel: string;
+    routeEvent?: {
+      id: string;
+      title: string;
+      description: string;
+      phase: 'available' | 'claimed' | 'missed';
+      rewardCred: number;
+      rewardTokens: number;
+      x: number;
+      y: number;
+    };
     dungeonRoom: number;
     dungeonBossDefeated: boolean;
     dungeonChestUnlocked: boolean;
@@ -1314,6 +1371,8 @@ export interface HudSnapshot {
       streetAxis: 'horizontal' | 'vertical';
       district: string;
       districtAccent: string;
+      band: EndlessBandId;
+      bandAccent: string;
       landmark?: { name: string; kind: string; accent: string };
     }>;
     riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number | null }>;
