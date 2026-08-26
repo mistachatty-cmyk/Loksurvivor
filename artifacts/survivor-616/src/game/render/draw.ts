@@ -991,6 +991,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
 
   for (const enemy of sorted) {
     if (enemy.y > w.player.y) drawPlayer();
+    const converted = enemy.convertedUntil > w.now && !enemy.dying;
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;
       const radius = enemy.specialRadius || enemy.radius * 3;
@@ -1014,6 +1015,31 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     }
     const dissolve = enemy.dying ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : 0;
     const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
+    if (converted) {
+      const pulse = 0.72 + Math.sin(w.now / 130) * 0.18;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#65f6d1';
+      ctx.shadowColor = '#65f6d1';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 9 + Math.sin(w.now / 170) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      // A compact chevron above the enemy reads as "friendly" without
+      // obscuring the enemy sprite or the health bar.
+      ctx.fillStyle = '#65f6d1';
+      ctx.beginPath();
+      ctx.moveTo(enemy.x, enemy.y - enemy.radius * 2.25);
+      ctx.lineTo(enemy.x - 7, enemy.y - enemy.radius * 2.65);
+      ctx.lineTo(enemy.x - 2, enemy.y - enemy.radius * 2.65);
+      ctx.lineTo(enemy.x, enemy.y - enemy.radius * 2.42);
+      ctx.lineTo(enemy.x + 2, enemy.y - enemy.radius * 2.65);
+      ctx.lineTo(enemy.x + 7, enemy.y - enemy.radius * 2.65);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     if (freeze && !enemy.dying) {
       const freezeDef = STATUS_EFFECTS_BY_ID.freeze!;
       ctx.save();
@@ -1047,7 +1073,9 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss',
         dissolve,
-        tint: freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
+        tint: converted
+          ? { color: '#65f6d1', alpha: 0.42 }
+          : freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
       },
     );
     ctx.restore();
@@ -1058,7 +1086,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       const top = enemy.y - enemy.radius * 2.6;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.fillRect(enemy.x - width / 2, top, width, 4);
-      ctx.fillStyle = enemy.def.palette.accent;
+      ctx.fillStyle = converted ? '#65f6d1' : enemy.def.palette.accent;
       ctx.fillRect(enemy.x - width / 2, top, width * (enemy.hp / enemy.maxHp), 4);
     }
   }

@@ -1624,9 +1624,11 @@ function updateEnemies(w: World, dt: number) {
       if (allyTarget && w.now >= enemy.convertedAttackReadyAt) {
         enemy.convertedAttackReadyAt = w.now + 650;
         damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8)), 2, enemy.x, enemy.y);
+        const attackAngle = Math.atan2(allyTarget.y - enemy.y, allyTarget.x - enemy.x);
+        const attackDistance = Math.hypot(allyTarget.x - enemy.x, allyTarget.y - enemy.y);
         w.effects.push({
-          uid: uid(w), kind: 'spark', x: enemy.x, y: enemy.y, radius: 16, angle: 0, spread: 0,
-          bornAt: w.now, expiresAt: w.now + 180, color: '#f9a8d4', damage: 0, knockback: 0,
+          uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: attackDistance, angle: attackAngle, spread: 0,
+          bornAt: w.now, expiresAt: w.now + 180, color: '#65f6d1', damage: 0, knockback: 0,
           hitUids: new Set(), followPlayer: false,
         });
       }

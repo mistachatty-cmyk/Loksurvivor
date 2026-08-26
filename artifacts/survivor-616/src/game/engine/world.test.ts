@@ -309,6 +309,50 @@ test('teleport weapons blink near a target and damage on arrival', () => {
   assert.ok(world.effects.some((effect) => effect.kind === 'teleport'));
 });
 
+test('converted enemies attack nearby hostiles while conversion is active', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 24, h: 40, kind: 'cover' }),
+    testCharacter('allymaker'),
+    CHARACTERS[0].stats,
+    1,
+  );
+  const converted = addEnemy(world, 'nightcrawler', 40, 0);
+  const hostile = addEnemy(world, 'nightcrawler', 100, 0);
+  hostile.uid = 901;
+  converted.convertedUntil = 5_000;
+  converted.convertedAttackReadyAt = 0;
+
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.ok(hostile.hp < hostile.maxHp);
+  assert.equal(converted.hp, converted.maxHp);
+  assert.equal(world.effects.at(-1)?.kind, 'laser');
+  assert.equal(world.effects.at(-1)?.color, '#65f6d1');
+  assert.ok((world.effects.at(-1)?.radius ?? 0) > 0);
+});
+
+test('converted enemy stops attacking when conversion expires', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 24, h: 40, kind: 'cover' }),
+    testCharacter('allymaker'),
+    CHARACTERS[0].stats,
+    1,
+  );
+  const converted = addEnemy(world, 'nightcrawler', 40, 0);
+  const hostile = addEnemy(world, 'nightcrawler', 100, 0);
+  hostile.uid = 901;
+  converted.convertedUntil = 1;
+  converted.convertedAttackReadyAt = 0;
+
+  stepWorld(world, 1 / 30, neutralInput);
+  const hpAfterExpiry = hostile.hp;
+  const allyAttackEffectsAfterExpiry = world.effects.filter((effect) => effect.kind === 'laser').length;
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(hostile.hp, hpAfterExpiry);
+  assert.equal(world.effects.filter((effect) => effect.kind === 'laser').length, allyAttackEffectsAfterExpiry);
+});
+
 test('a breakable box blocks a shot, breaks, and drops a pickup', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 40, h: 40, kind: 'crate-breakable' }),
