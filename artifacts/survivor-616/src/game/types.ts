@@ -638,6 +638,40 @@ export interface EndlessState {
 /* Allies, hub rooms, discoveries, upgrades                            */
 /* ------------------------------------------------------------------ */
 
+export type CrewActivityId =
+  | 'field-rations'
+  | 'fortify-doors'
+  | 'sort-supplies'
+  | 'scout-routes'
+  | 'mark-approach-lanes'
+  | 'tune-the-rig'
+  | 'study-anomalies';
+
+export type CrewActivityIcon =
+  | 'utensils'
+  | 'shield'
+  | 'package'
+  | 'compass'
+  | 'map'
+  | 'radio'
+  | 'sparkles';
+
+export interface CrewActivityEffect {
+  stat: keyof BaseStats;
+  add?: number;
+  mult?: number;
+}
+
+export interface CrewActivityDef {
+  id: CrewActivityId;
+  roomId: string;
+  name: string;
+  description: string;
+  benefitLabel: string;
+  icon: CrewActivityIcon;
+  effects: CrewActivityEffect[];
+}
+
 export interface AllyDef {
   id: string;
   name: string;
@@ -648,6 +682,8 @@ export interface AllyDef {
   /** Permanent stat boost applied to every character. */
   boost: Partial<BaseStats>;
   boostLabel: string;
+  /** Room activities this ally enjoys choosing between autonomously. */
+  preferredActivityIds: CrewActivityId[];
   palette: SpritePalette;
 }
 
@@ -810,6 +846,10 @@ export interface MetaState {
   discoveredHutIds: string[];
   /** Hideout vendor purchases, keyed by curated catalog id. */
   vendorPurchases: Record<string, number>;
+  /** Current autonomous room activity chosen by each rescued ally. */
+  crewActivityByAlly: Record<string, CrewActivityId>;
+  /** Persisted seed incremented whenever the player returns to the hideout. */
+  crewActivitySeed: number;
 }
 
 /* ------------------------------------------------------------------ */
