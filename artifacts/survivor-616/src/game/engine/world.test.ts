@@ -585,6 +585,66 @@ test('enemy contact launches an impact chain and lethal hits accelerate the foll
   assert.equal(world.kills, 3, 'the chain should use one reward path per enemy');
 });
 
+test('dense chain contacts keep a readable hit cadence and resist duplicate launch beats', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    630,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  world.player.x = -350;
+  const prop = world.breakables[0]!;
+  prop.chainActive = true;
+  prop.chainVelocityBudget = 1800;
+  prop.impactIntensity = 3;
+  prop.vx = 420;
+  prop.nextImpactDamageAt = 0;
+  prop.nextEnemyImpactAt = Number.POSITIVE_INFINITY;
+
+  const enemies = [44, 160, 276].map((x, index) => {
+    const enemy = addEnemy(world, 'nightcrawler', x, 0);
+    enemy.uid = 1000 + index;
+    enemy.speed = 0;
+    enemy.hp = enemy.maxHp = 1;
+    return enemy;
+  });
+  const hitTimes: number[] = [];
+  for (let i = 0; i < 180 && hitTimes.length < enemies.length; i += 1) {
+    stepWorld(world, 1 / 60, neutralInput);
+    while (hitTimes.length < enemies.filter((enemy) => enemy.dying).length) hitTimes.push(world.now);
+  }
+
+  assert.equal(hitTimes.length, 3);
+  assert.ok(hitTimes[1]! - hitTimes[0]! >= 110, 'chain hits should have a readable minimum gap');
+  assert.ok(hitTimes[2]! - hitTimes[1]! >= 110, 'dense chains should not machine-gun contacts');
+  assert.equal(world.kills, 3);
+  assert.ok(prop.chainCycles >= 3);
+});
+
+test('heavy props remain a useful slow hazard without one-shotting elites', () => {
+  const world = createWorld(
+    testArea({ x: 0, y: 0, w: 56, h: 56, kind: 'metal-box', propVariant: 'heavy-metal' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    631,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  world.player.x = -350;
+  const prop = world.breakables[0]!;
+  const elite = addEnemy(world, 'crypt-bouncer', 30, 0);
+  elite.speed = 0;
+  elite.hp = elite.maxHp = 110;
+
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(prop.chainActive, true);
+  assert.ok(Math.hypot(prop.vx, prop.vy) > 0, 'heavy contact should launch a moving hazard');
+  assert.ok(elite.hp < elite.maxHp, 'the heavy hazard should still contribute damage');
+  assert.ok(elite.hp > elite.maxHp * 0.65, 'elite damage should stay below a burst-sized chunk');
+  assert.equal(world.kills, 0);
+});
+
 test('a landed three-cycle prop becomes a pulsing heat hazard that burns nearby enemies', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 56, h: 56, kind: 'car', propVariant: 'medium-movable' }),

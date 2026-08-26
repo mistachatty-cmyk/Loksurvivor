@@ -750,6 +750,28 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
     }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+    if (live?.chainActive && !live.landedHeatActive) {
+      ctx.save();
+      const speed = Math.hypot(live.vx, live.vy);
+      const pulse = 0.62 + Math.sin(w.now / 92) * 0.2;
+      ctx.globalAlpha = pulse;
+      ctx.shadowColor = '#ffb347';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 5]);
+      ctx.strokeRect(x - 4, y - height - 4, obstacle.w + 8, obstacle.h + 8);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffb347';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        live.chainCycles > 0 ? `CHAIN ${Math.min(3, live.chainCycles)}/3` : speed > 0 ? 'CHAIN LIVE' : 'CHAIN READY',
+        obstacle.x,
+        y - height - 9,
+      );
+      ctx.restore();
+    }
     if (live?.landedHeatActive) {
       ctx.save();
       const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
@@ -820,6 +842,23 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.chainActive || prop.landedHeatActive || (!prop.vx && !prop.vy)) continue;
+    const speed = Math.hypot(prop.vx, prop.vy);
+    const pulse = 0.4 + Math.sin(w.now / 92) * 0.12;
+    const radius = Math.max(prop.w, prop.h) * 0.62 + clamp(speed / 60, 0, 1) * 12;
+    const gradient = ctx.createRadialGradient(prop.x, prop.y, 3, prop.x, prop.y, radius);
+    gradient.addColorStop(0, '#ffb34738');
+    gradient.addColorStop(0.55, '#ff7a1820');
+    gradient.addColorStop(1, '#ff2d5500');
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(prop.x, prop.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   for (const prop of w.breakables) {
     if (prop.broken || !prop.landedHeatActive) continue;
     const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;

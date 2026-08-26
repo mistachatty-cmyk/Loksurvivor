@@ -283,6 +283,8 @@ export interface BreakableObstacle extends Aabb {
   chainCycles: number;
   chainVelocityBudget: number;
   chainBoostPending: boolean;
+  /** Enemies that have already provided the launch beat for this chain. */
+  chainContactUids: Set<number>;
   chainHitUids: Set<number>;
   nextEnemyImpactAt: number;
   landedHeatActive: boolean;
@@ -354,7 +356,11 @@ export const LANDED_HEAT_RADIUS = 116;
 const PROP_CHAIN_MIN_CYCLES = 3;
 const PROP_CHAIN_MAX_SPEED = 1800;
 const PROP_CHAIN_STOP_SPEED = 24;
-const PROP_HEAT_TICK_MS = 300;
+const PROP_CHAIN_CONTACT_COOLDOWN_MS = 180;
+const PROP_CHAIN_FIRST_HIT_DELAY_MS = 180;
+const PROP_CHAIN_HIT_COOLDOWN_MS = 120;
+const PROP_CHAIN_FRICTION = 0.975;
+const PROP_HEAT_TICK_MS = 360;
 const PROP_HEAT_DAMAGE = 11;
 
 /** Convert authored impact into travel speed after mass and resistance. */
@@ -701,6 +707,7 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     chainCycles: 0,
     chainVelocityBudget: 0,
     chainBoostPending: false,
+    chainContactUids: new Set(),
     chainHitUids: new Set(),
     nextEnemyImpactAt: 0,
     landedHeatActive: false,
@@ -2062,6 +2069,7 @@ function resetPropChain(prop: BreakableObstacle, active = false) {
   prop.chainCycles = 0;
   prop.chainVelocityBudget = active ? PROP_CHAIN_MAX_SPEED : 0;
   prop.chainBoostPending = false;
+  prop.chainContactUids.clear();
   prop.chainHitUids.clear();
   prop.landedHeatActive = false;
   prop.heatNextTickAt = 0;
@@ -2069,6 +2077,7 @@ function resetPropChain(prop: BreakableObstacle, active = false) {
 
 function startEnemyPropChain(w: World, prop: BreakableObstacle, enemy: EnemyActor) {
   if (prop.landedHeatActive) resetPropChain(prop);
+  if (prop.chainActive && prop.chainContactUids.has(enemy.uid)) return;
   if (!prop.chainActive) {
     resetPropChain(prop, true);
     w.popups.push({
@@ -2080,23 +2089,28 @@ function startEnemyPropChain(w: World, prop: BreakableObstacle, enemy: EnemyActo
       vy: 24,
     });
   }
+  prop.chainContactUids.add(enemy.uid);
 
   let dx = prop.x - enemy.x;
   let dy = prop.y - enemy.y;
   const length = Math.hypot(dx, dy) || 1;
   dx /= length;
   dy /= length;
-  const intensity = prop.propVariant === 'heavy-metal' ? 2 : 3;
+  const isHeavy = prop.propVariant === 'heavy-metal';
+  const intensity = isHeavy ? 4 : prop.propVariant === 'light-breakable' ? 2 : 3;
   const launchSpeed = resolveImpactTravel(
     intensity,
     prop.mass,
-    prop.propVariant === 'heavy-metal' ? 0.15 : 0,
+    isHeavy ? 0.15 : 0,
   );
   const enemyMomentum = Math.max(80, enemy.speed * 0.7) / Math.max(1, prop.mass);
-  prop.vx += dx * (launchSpeed * 0.78 + enemyMomentum);
-  prop.vy += dy * (launchSpeed * 0.78 + enemyMomentum);
+  // Heavy props need a slow, deliberate shove that still reaches the moving
+  // damage threshold; the other profiles keep their quick arcade response.
+  const launchScale = isHeavy ? 1.8 : 0.78;
+  prop.vx += dx * (launchSpeed * launchScale + enemyMomentum);
+  prop.vy += dy * (launchSpeed * launchScale + enemyMomentum);
   prop.impactIntensity = Math.max(prop.impactIntensity, intensity) as ImpactIntensity;
-  prop.nextEnemyImpactAt = w.now + 260;
+  prop.nextEnemyImpactAt = w.now + (prop.chainCycles === 0 ? PROP_CHAIN_FIRST_HIT_DELAY_MS : PROP_CHAIN_CONTACT_COOLDOWN_MS);
   spawnParticles(w, prop.x, prop.y, '#ffb347', 5, 80);
   w.shake = Math.max(w.shake, 3);
 }
@@ -2379,7 +2393,7 @@ function pointToSegmentDistanceSq(px: number, py: number, ax: number, ay: number
 function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle, previousX: number, previousY: number) {
   const speed = Math.hypot(prop.vx, prop.vy);
   if (speed < 52 || prop.impactIntensity < 2 || w.now < prop.nextImpactDamageAt) return;
-  prop.nextImpactDamageAt = w.now + (prop.chainActive ? 90 : 260);
+  prop.nextImpactDamageAt = w.now + (prop.chainActive ? PROP_CHAIN_HIT_COOLDOWN_MS : 260);
   forEachNearby(w, prop.x, prop.y, Math.max(prop.w, prop.h) + 40, (enemy) => {
     if (enemy.dying || (prop.chainActive && prop.chainHitUids.has(enemy.uid))) return;
     const hitRadius = Math.max(prop.w, prop.h) / 2 + enemy.radius;
@@ -2392,11 +2406,18 @@ function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle, previous
       4,
       Math.max(2, Math.round(trajectoryScale)) + (clickBoosted || chainBoosted ? 1 : 0),
     ) as ImpactIntensity;
+    const damageScale = clickBoosted ? 0.2 : chainBoosted ? 0.14 : prop.chainActive ? 0.1 : 0.08;
+    const rawDamage = speed * prop.impactIntensity * damageScale;
+    const eliteDamageCap = enemy.def.family === 'Boss'
+      ? enemy.maxHp * 0.22
+      : enemy.def.family === 'Elite'
+        ? enemy.maxHp * 0.35
+        : Number.POSITIVE_INFINITY;
     const wasDying = enemy.dying;
     damageEnemy(
       w,
       enemy,
-      Math.max(1, Math.round(speed * prop.impactIntensity * (clickBoosted ? 0.2 : chainBoosted ? 0.16 : 0.08))),
+      Math.max(1, Math.round(Math.min(rawDamage, eliteDamageCap))),
       impactIntensity,
       prop.x,
       prop.y,
@@ -2465,7 +2486,7 @@ function updateBreakables(w: World, dt: number) {
       b.x += b.vx * dt; b.y += b.vy * dt;
       resolveMovingPropCollisions(w, b);
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
-      const friction = b.chainActive ? Math.max(b.friction, 0.98) : b.friction;
+      const friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
       b.vx *= Math.pow(friction, dt * 60);
       b.vy *= Math.pow(friction, dt * 60);
       if (Math.hypot(b.vx, b.vy) < PROP_CHAIN_STOP_SPEED) {
