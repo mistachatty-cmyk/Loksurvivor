@@ -44,6 +44,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
   const hasLokPetProgress = lokPets.length > 0;
   const rumorAlly = result.crewRumor ? ALLIES_BY_ID[result.crewRumor.allyId] : undefined;
   const RumorIcon = result.crewRumor ? (RUMOR_ICONS[result.crewRumor.icon] ?? Sparkles) : Sparkles;
+  const firstNight = result.firstNight;
 
   return (
     <ScreenLayout 
@@ -53,6 +54,44 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
       className={result.cleared ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
     >
       <div className="max-w-4xl mx-auto w-full space-y-8 mt-4">
+
+        {firstNight ? (
+          <section className="border border-cyan-300/30 bg-cyan-950/10 p-5" data-testid="section-first-night-consequence">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">
+                  First Night · Chapter {firstNight.chapter}
+                </p>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">{firstNight.label}</h2>
+              </div>
+              <span className={`font-mono text-[10px] font-bold uppercase tracking-widest ${result.cleared ? 'text-primary' : 'text-amber-200'}`}>
+                {result.cleared ? 'Lead advanced' : 'Lead remains open'}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-white/85">
+              {result.cleared
+                ? firstNight.consequence
+                : `The crew could not close this lead tonight. The route is still open: ${firstNight.goal}`}
+            </p>
+            {(ally || discovery) ? (
+              <div className="mt-4 grid gap-2 border-t border-cyan-200/15 pt-3 sm:grid-cols-2">
+                {ally ? (
+                  <div className="border-l-2 border-primary/60 pl-3">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Rescue handoff</p>
+                    <p className="mt-1 text-xs text-white/75">{ally.name} is now part of the shared case.</p>
+                  </div>
+                ) : null}
+                {discovery ? (
+                  <div className="border-l-2 border-cyan-200/50 pl-3">
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-200">Discovery pinned</p>
+                    <p className="mt-1 text-xs text-white/75">{discovery.name} links this block to the city thread.</p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <p className="mt-4 border-t border-cyan-200/15 pt-3 text-xs italic leading-relaxed text-cyan-100/70">“{firstNight.thread}”</p>
+          </section>
+        ) : null}
         
         {/* Core Stats */}
         <div className="bg-card border border-border p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">

@@ -9,6 +9,7 @@ import { getCrewRumor } from '@/game/data/crewRumors';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { RigPortrait } from './RigPortrait';
+import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet } from 'lucide-react';
@@ -261,6 +262,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
               </div>
             </div>
           )}
+        </section>
+
+        <section className="mb-8">
+          <FirstNightBoard compact />
         </section>
 
         <section className="mb-10 flex-1">

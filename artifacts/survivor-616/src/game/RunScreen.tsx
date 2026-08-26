@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
@@ -113,6 +114,7 @@ export function RunScreen({
 
   const area = getArea(areaId);
   const character = getCharacter(characterId);
+  const firstNightChapter = getFirstNightChapter(areaId);
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
@@ -642,6 +644,15 @@ export function RunScreen({
           </div>
         ))}
 
+        {hud?.firstNightBeat ? (
+          <div className="mx-auto max-w-xl border border-cyan-200/40 bg-black/80 px-3 py-2 text-center" data-testid="story-beat">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">
+              First Night · {hud.firstNightBeat.title}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-white/80">{hud.firstNightBeat.text}</p>
+          </div>
+        ) : null}
+
         {/* Objective strip */}
         {hud && hud.objectives.length > 0 ? (
           <div className="flex flex-wrap gap-1.5" data-testid="row-objectives">
@@ -712,6 +723,15 @@ export function RunScreen({
               ? 'Follow the street grid. Enter marked buildings, find the way back out, and head home when you\'re done.'
               : `Survive ${Math.round(area.durationSec)} seconds. Drag anywhere to move.`}
           </p>
+          {firstNightChapter ? (
+            <div className="mt-5 max-w-sm border border-cyan-200/30 bg-cyan-950/20 px-4 py-3 text-left" data-testid="run-briefing">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200">
+                Chapter {firstNightChapter.chapter} · {firstNightChapter.worldVerb}
+              </p>
+              <p className="mt-1 text-sm font-bold text-white">{firstNightChapter.goal}</p>
+              <p className="mt-2 text-[10px] uppercase tracking-widest text-white/50">The lead: {firstNightChapter.thread}</p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

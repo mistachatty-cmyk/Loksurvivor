@@ -11,6 +11,7 @@ import {
   rollCrewActivities,
 } from '@/game/data/crewActivities';
 import { getCrewRumor, rollCrewRumor } from '@/game/data/crewRumors';
+import { FIRST_NIGHT_CHAPTERS, recommendedFirstNightChapter } from '@/game/data/firstNight';
 import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
@@ -1097,6 +1098,100 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     assert.equal(loaded.cred, 12);
     assert.equal(loaded.lokPetCatalog.length, 0);
   }
+});
+
+test('First Night recommendations follow authored ordering while preserving replay', () => {
+  assert.deepEqual(
+    FIRST_NIGHT_CHAPTERS.slice(0, 5).map((chapter) => chapter.areaId),
+    ['monroe-strip', 'back-alley', 'rooftops', 'crystal-cellar', 'bar-siege'],
+  );
+
+  const first = recommendedFirstNightChapter([], ['monroe-strip']);
+  assert.equal(first?.areaId, 'monroe-strip');
+
+  const afterMonroe = recommendedFirstNightChapter(
+    ['monroe-strip'],
+    ['monroe-strip', 'back-alley'],
+  );
+  assert.equal(afterMonroe?.areaId, 'back-alley');
+
+  const replayStillAvailable = recommendedFirstNightChapter(
+    ['monroe-strip', 'back-alley'],
+    ['monroe-strip', 'back-alley', 'rooftops'],
+  );
+  assert.equal(replayStillAvailable?.areaId, 'rooftops');
+
+  const skipsLockedLeads = recommendedFirstNightChapter(
+    ['monroe-strip'],
+    ['monroe-strip', 'crystal-cellar'],
+  );
+  assert.equal(skipsLockedLeads?.areaId, 'crystal-cellar');
+
+  assert.equal(
+    recommendedFirstNightChapter(
+      FIRST_NIGHT_CHAPTERS.map((chapter) => chapter.areaId),
+      FIRST_NIGHT_CHAPTERS.map((chapter) => chapter.areaId),
+    ),
+    undefined,
+  );
+});
+
+test('First Night cue hands off from the run engine into the result', () => {
+  const area = {
+    ...AREAS.find((candidate) => candidate.id === 'monroe-strip')!,
+    durationSec: 120,
+    waves: [],
+    rescueAllyId: undefined,
+  };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < 27 * 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.firstNightBeatTriggered, false);
+  assert.equal(hudSnapshot(world).firstNightBeat, undefined);
+
+  for (let i = 0; i < 3 * 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.firstNightBeatTriggered, true);
+  assert.equal(hudSnapshot(world).firstNightBeat?.title, 'The mural is a map');
+  assert.ok(world.alerts.some((alert) => alert.text.includes('The mural is a map')));
+
+  const result = buildResult(world);
+  assert.equal(result.firstNight?.chapter, 1);
+  assert.equal(result.firstNight?.beatTriggered, true);
+  assert.equal(result.firstNight?.goal.includes('Monroe'), true);
+});
+
+test('First Night rescue and discovery handoff stays attached to the shared thread', () => {
+  const area = AREAS.find((candidate) => candidate.id === 'monroe-strip')!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 617);
+  world.rescue.status = 'freed';
+  world.outcome = 'cleared';
+
+  const result = buildResult(world);
+  assert.equal(result.rescuedAllyId, area.rescueAllyId);
+  assert.equal(result.discoveryId, area.discoveryId);
+  assert.equal(result.firstNight?.label, 'The lights stay on');
+  assert.equal(result.firstNight?.consequence.includes('Vee'), true);
+
+  let state = { meta: createInitialMeta(), lastRun: null };
+  state = reducer(state, { type: 'completeRun', result });
+  assert.equal(state.meta.rescuedAllyIds.includes(area.rescueAllyId!), true);
+  assert.equal(state.meta.discoveryIds.includes(area.discoveryId!), true);
+  assert.equal(state.meta.clearedAreaIds.includes(area.id), true);
+});
+
+test('First Night data stays optional for older and malformed save-shaped state', () => {
+  const loaded = normalizeMeta({
+    version: 1,
+    clearedAreaIds: ['monroe-strip', 'not-an-area'],
+    discoveryIds: ['mural', 'not-a-discovery'],
+  });
+  assert.deepEqual(loaded.clearedAreaIds, ['monroe-strip']);
+  assert.deepEqual(loaded.discoveryIds, []);
+  assert.equal(
+    recommendedFirstNightChapter(loaded.clearedAreaIds, ['monroe-strip', 'back-alley'])?.areaId,
+    'back-alley',
+  );
 });
 
 test('crew activities stay autonomous, preferred, seeded, and safely normalized', () => {

@@ -20,6 +20,7 @@ import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { getCrewRumor } from '@/game/data/crewRumors';
+import { getFirstNightChapter } from '@/game/data/firstNight';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -477,6 +478,9 @@ export interface World {
   rumorPantryAvailable: boolean;
   rumorBroadcastAvailable: boolean;
   rumorMagnetNextAt: number;
+  /** Authored opening-campaign cue for this area, when one exists. */
+  firstNightChapter?: ReturnType<typeof getFirstNightChapter>;
+  firstNightBeatTriggered: boolean;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -652,6 +656,8 @@ export function createWorld(
     rumorPantryAvailable: activeCrewRumor?.rumorId === 'pantry-surge',
     rumorBroadcastAvailable: activeCrewRumor?.rumorId === 'basement-broadcast',
     rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
+    firstNightChapter: getFirstNightChapter(area.id),
+    firstNightBeatTriggered: false,
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     lootBoxesOpened: 0,
@@ -3849,6 +3855,15 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   w.time += dt;
   w.now += dt * 1000;
 
+  if (
+    w.firstNightChapter &&
+    !w.firstNightBeatTriggered &&
+    w.time >= w.firstNightChapter.beatAtSec
+  ) {
+    w.firstNightBeatTriggered = true;
+    pushAlert(w, `${w.firstNightChapter.beatTitle} — ${w.firstNightChapter.beatText}`);
+  }
+
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
@@ -3976,6 +3991,13 @@ export function hudSnapshot(w: World): HudSnapshot {
           };
         })()
       : undefined,
+    firstNightBeat: w.firstNightChapter && w.firstNightBeatTriggered
+      ? {
+          chapter: w.firstNightChapter.chapter,
+          title: w.firstNightChapter.beatTitle,
+          text: w.firstNightChapter.beatText,
+        }
+      : undefined,
     objectives: w.objectives.map((o) => ({
       label: o.def.label,
       progress: Math.min(o.def.targetCount, Math.round(o.progress)),
@@ -4083,6 +4105,17 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
               }
             : undefined;
         })()
+      : undefined,
+    firstNight: w.firstNightChapter
+      ? {
+          chapter: w.firstNightChapter.chapter,
+          label: w.firstNightChapter.label,
+          goal: w.firstNightChapter.goal,
+          consequence: w.firstNightChapter.consequence,
+          beatTitle: w.firstNightChapter.beatTitle,
+          beatTriggered: w.firstNightBeatTriggered,
+          thread: w.firstNightChapter.thread,
+        }
       : undefined,
     challenges: w.challenges.map((challenge) => ({
       id: challenge.id,

@@ -549,6 +549,22 @@ export interface AreaDef {
   endless?: true;
 }
 
+/** Authored story layer for the opening city thread. */
+export interface FirstNightChapter {
+  areaId: string;
+  chapter: number;
+  label: string;
+  goal: string;
+  worldVerb: string;
+  beatAtSec: number;
+  beatTitle: string;
+  beatText: string;
+  consequence: string;
+  thread: string;
+  nextAreaId?: string;
+  sireSignal?: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* Endless world                                                       */
 /* ------------------------------------------------------------------ */
@@ -975,6 +991,16 @@ export interface RunResult {
     triggered: boolean;
     outcome: string;
   };
+  /** Authored First Night chapter state for this run. */
+  firstNight?: {
+    chapter: number;
+    label: string;
+    goal: string;
+    consequence: string;
+    beatTitle: string;
+    beatTriggered: boolean;
+    thread: string;
+  };
   /** Optional difficulty contracts selected before this run. */
   challenges?: Array<{
     id: string;
@@ -1042,6 +1068,12 @@ export interface HudSnapshot {
     triggered: boolean;
     ready: boolean;
     outcome: string;
+  };
+  /** The current chapter cue once its mid-run beat has fired. */
+  firstNightBeat?: {
+    chapter: number;
+    title: string;
+    text: string;
   };
   objectives: Array<{
     label: string;

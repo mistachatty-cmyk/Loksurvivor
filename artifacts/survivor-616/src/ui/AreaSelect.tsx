@@ -4,7 +4,9 @@
  */
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
 import { availableChallengeContracts } from '@/game/data/vendor';
+import { getFirstNightChapter } from '@/game/data/firstNight';
 import { ScreenLayout } from './ScreenLayout';
+import { FirstNightBoard } from './FirstNightBoard';
 import { motion } from 'framer-motion';
 import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull } from 'lucide-react';
 import { useState } from 'react';
@@ -45,6 +47,10 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
         </div>
       }
     >
+      <div className="mb-6">
+        <FirstNightBoard />
+      </div>
+
       {challenges.length > 0 && (
         <section className="mb-6 border border-red-500/30 bg-red-950/10 p-4 sm:p-5" data-testid="section-run-contracts">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -131,6 +137,17 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                 <p className="text-xs text-muted-foreground line-clamp-2 mb-4 group-hover:text-gray-300 transition-colors">
                   {area.description}
                 </p>
+                {getFirstNightChapter(area.id) && (
+                  <div className="mb-3 border border-cyan-300/20 bg-cyan-950/10 p-2.5" data-testid={`first-night-goal-${area.id}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100/75">
+                        Chapter {getFirstNightChapter(area.id)?.chapter} · {getFirstNightChapter(area.id)?.worldVerb}
+                      </span>
+                      {isCleared && <span className="font-mono text-[9px] uppercase tracking-widest text-primary">Replay lead</span>}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-white/80">{getFirstNightChapter(area.id)?.goal}</p>
+                  </div>
+                )}
                 {area.landmark && (
                   <p className="mb-3 truncate border-l-2 border-primary/60 pl-2 text-[10px] font-bold uppercase tracking-widest text-primary/80">
                     Landmark: {area.landmark.name}
