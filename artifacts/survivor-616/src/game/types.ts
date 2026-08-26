@@ -634,6 +634,53 @@ export interface AreaDef {
   endless?: true;
 }
 
+export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
+export type DistrictIncursionPhase = 'pending' | 'warning' | 'active' | 'complete' | 'failed';
+
+/** A short, optional landmark encounter that interrupts a normal district run. */
+export interface DistrictIncursionDef {
+  id: string;
+  areaId: string;
+  kind: DistrictIncursionKind;
+  title: string;
+  landmark: string;
+  warningText: string;
+  activeText: string;
+  objectiveLabel: string;
+  completeText: string;
+  failureText: string;
+  triggerAtSec: number;
+  warningLeadSec: number;
+  durationSec: number;
+  target: number;
+  rewardCred: number;
+  rewardTokens: number;
+  accent: string;
+}
+
+export interface DistrictIncursionState {
+  id: string;
+  kind: DistrictIncursionKind;
+  title: string;
+  landmark: string;
+  objectiveLabel: string;
+  phase: DistrictIncursionPhase;
+  progress: number;
+  target: number;
+  accent: string;
+  startedAt: number;
+  endsAt: number;
+  cycle: number;
+  nextPulseAt: number;
+  nextHazardTickAt: number;
+  outsideSafeSince: number;
+  startingKills: number;
+  rewardCred: number;
+  rewardTokens: number;
+  rewardGranted: boolean;
+  propUids: number[];
+}
+
 /** Authored story layer for the opening city thread. */
 export interface FirstNightChapter {
   areaId: string;
