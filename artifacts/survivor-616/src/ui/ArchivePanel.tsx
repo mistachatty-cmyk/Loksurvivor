@@ -17,14 +17,24 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
 import { Trash2, Users, MapPin, User, Search, Sparkles } from 'lucide-react';
+import { useEffect } from 'react';
 
 export interface ArchivePanelProps {
   onBack: () => void;
+  focusVariantId?: string;
 }
 
-export function ArchivePanel({ onBack }: ArchivePanelProps) {
+export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   const { meta, resetProgress } = useMeta();
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
+
+  useEffect(() => {
+    if (!focusVariantId) return;
+    document.getElementById(`lokpet-${focusVariantId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }, [focusVariantId]);
 
   const sections = [
     {
@@ -146,7 +156,8 @@ export function ArchivePanel({ onBack }: ArchivePanelProps) {
               return (
                 <article
                   key={variant.id}
-                  className={`border border-l-4 p-4 ${found ? 'border-border border-l-pink-300 bg-card' : 'border-border/50 border-l-border/50 bg-card/30'}`}
+                  id={`lokpet-${variant.id}`}
+                  className={`border border-l-4 p-4 transition-shadow ${found ? 'border-border border-l-pink-300 bg-card' : 'border-border/50 border-l-border/50 bg-card/30'} ${focusVariantId === variant.id ? 'ring-2 ring-pink-200/80 ring-offset-2 ring-offset-background' : ''}`}
                   data-testid={`card-lokpet-${variant.id}`}
                 >
                   <div className="flex items-start gap-3">

@@ -173,6 +173,21 @@ export interface LokPetCatalogEntry {
   sightings: number;
 }
 
+/** Catalog progress made by one run, compared with the permanent catalog before it. */
+export interface LokPetRunDiscovery {
+  variantId: string;
+  /** Number of sightings of this variant in the run. */
+  sightings: number;
+  /** Total sightings after this run is recorded. */
+  totalSightings: number;
+  /** True only the first time this variant is seen across all runs. */
+  newVariant: boolean;
+  /** Rarities observed in this run that were not already catalogued. */
+  newRarities: LokPetRarity[];
+  /** Combat traits observed in this run that were not already catalogued. */
+  newTraits: LokPetCatalogTrait[];
+}
+
 /** A generated LokPet currently orbiting the player in a run. */
 export interface LokPetInstance extends LokPetRoll {
   uid: number;
@@ -761,6 +776,8 @@ export interface RunResult {
     range: number;
     ghosted: boolean;
   }>;
+  /** New catalog variants, rarities, and traits discovered during this run. */
+  lokPetDiscoveries?: LokPetRunDiscovery[];
   /** Loot tokens earned this run. */
   lootTokensGained: number;
   /** Fatigue applied to the operative after this run. */

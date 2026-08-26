@@ -3142,6 +3142,7 @@ export function buildResult(w: World): RunResult {
       range: pet.stats.range,
       ghosted: pet.ghost,
     })),
+    lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     completedObjectives: [...w.completedObjectives],
     endless: e

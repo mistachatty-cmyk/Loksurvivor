@@ -37,6 +37,7 @@ import type {
   LokPetCatalogTrait,
   LokPetElement,
   LokPetRarity,
+  LokPetRunDiscovery,
   MetaState,
   RunResult,
   FacilityTier,
@@ -171,6 +172,57 @@ function canonicalCatalogTrait(
     elementLabel,
     label: element === 'none' ? attackLabel : `${attackLabel} · ${elementLabel}`,
   };
+}
+
+function sameCatalogTrait(
+  left: Pick<LokPetCatalogTrait, 'attackKind' | 'element'>,
+  right: Pick<LokPetCatalogTrait, 'attackKind' | 'element'>,
+): boolean {
+  return catalogTraitKey(left) === catalogTraitKey(right);
+}
+
+/**
+ * Compare this run's generated companions with the catalog before the run.
+ * Keeping this calculation separate from the write means the summary can
+ * celebrate only genuinely new information while the reducer remains the
+ * source of truth for persistence.
+ */
+export function getLokPetDiscoveries(
+  existing: LokPetCatalogEntry[],
+  pets: RunResult['lokPets'],
+): LokPetRunDiscovery[] {
+  const previousByVariant = new Map(existing.map((entry) => [entry.variantId, entry]));
+  const discoveries = new Map<string, LokPetRunDiscovery>();
+
+  for (const pet of pets) {
+    const previous = previousByVariant.get(pet.variantId);
+    const discovery = discoveries.get(pet.variantId) ?? {
+      variantId: pet.variantId,
+      sightings: 0,
+      totalSightings: (previous?.sightings ?? 0),
+      newVariant: !previous,
+      newRarities: [],
+      newTraits: [],
+    };
+    discovery.sightings += 1;
+    discovery.totalSightings += 1;
+
+    // Include values learned earlier in this same run only once. This keeps
+    // a chest that rolls the same combination twice from making fake deltas.
+    const rarityAlreadyKnown =
+      previous?.rarities.includes(pet.rarity) || discovery.newRarities.includes(pet.rarity);
+    if (!rarityAlreadyKnown) discovery.newRarities.push(pet.rarity);
+
+    const trait = canonicalCatalogTrait(pet.attackKind, pet.element);
+    const traitAlreadyKnown =
+      previous?.traits.some((candidate) => sameCatalogTrait(candidate, trait)) ||
+      discovery.newTraits.some((candidate) => sameCatalogTrait(candidate, trait));
+    if (!traitAlreadyKnown) discovery.newTraits.push(trait);
+
+    discoveries.set(pet.variantId, discovery);
+  }
+
+  return [...discoveries.values()];
 }
 
 /**
@@ -574,6 +626,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ? addUnique(prev.clearedAreaIds, result.areaId)
         : prev.clearedAreaIds;
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
+      const lokPetDiscoveries = getLokPetDiscoveries(prev.lokPetCatalog, result.lokPets);
 
       const next: MetaState = {
         ...prev,
@@ -615,7 +668,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
       return {
         meta: next,
-        lastRun: { ...result, newlyUnlockedCharacterIds: newlyUnlocked },
+        lastRun: { ...result, lokPetDiscoveries, newlyUnlockedCharacterIds: newlyUnlocked },
       };
     }
 

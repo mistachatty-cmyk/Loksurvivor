@@ -6,24 +6,34 @@ import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
-import type { RunResult } from '@/game/types';
+import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
+import type { LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
-import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow } from 'lucide-react';
+import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles } from 'lucide-react';
 
 export interface RunSummaryProps {
   result: RunResult;
   onReturnToHub: () => void;
   onRetry: () => void;
+  onOpenArchive?: (variantId: string) => void;
 }
 
-export function RunSummary({ result, onReturnToHub, onRetry }: RunSummaryProps) {
+function discoveryHeadline(discovery: LokPetRunDiscovery): string {
+  if (discovery.newVariant) return 'New variant';
+  if (discovery.newRarities.length > 0 || discovery.newTraits.length > 0) return 'New catalog data';
+  return 'Repeat sighting';
+}
+
+export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: RunSummaryProps) {
   const area = getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
   const lokPets = result.lokPets ?? [];
+  const lokPetDiscoveries = result.lokPetDiscoveries ?? [];
+  const hasLokPetProgress = lokPets.length > 0;
 
   return (
     <ScreenLayout 
@@ -231,13 +241,26 @@ export function RunSummary({ result, onReturnToHub, onRetry }: RunSummaryProps) 
               </div>
             )}
 
-            {lokPets.length > 0 && (
-              <div className="border border-pink-400/30 bg-card p-5" data-testid="section-lokpets">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-lg text-pink-300">✦</span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    LokPets — {lokPets.length} generated
-                  </span>
+            {hasLokPetProgress && (
+              <div className="border border-pink-400/30 bg-card p-5 md:col-span-2" data-testid="section-lokpets">
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg text-pink-300">✦</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                      LokPets — {lokPets.length} generated
+                    </span>
+                  </div>
+                  {onOpenArchive && lokPetDiscoveries.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenArchive(lokPetDiscoveries[0]!.variantId)}
+                      className="inline-flex items-center gap-1.5 border border-pink-300/40 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-pink-200 transition-colors hover:border-pink-200 hover:bg-pink-300/10 sm:ml-auto"
+                      data-testid="button-open-lokpet-archive"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" />
+                      View LokPet Archive
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-2">
                   {lokPets.map((pet, i) => (
@@ -254,6 +277,89 @@ export function RunSummary({ result, onReturnToHub, onRetry }: RunSummaryProps) 
                     </div>
                   ))}
                 </div>
+
+                {lokPetDiscoveries.length > 0 && (
+                  <div className="mt-5 border-t border-pink-300/20 pt-4" data-testid="section-lokpet-discoveries">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-pink-300" />
+                      <span className="text-xs font-bold uppercase tracking-widest text-pink-200">
+                        Archive progress
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        — new intel from this run
+                      </span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {lokPetDiscoveries.map((discoveryDelta) => {
+                        const variant = LOKPET_VARIANTS_BY_ID[discoveryDelta.variantId];
+                        if (!variant) return null;
+                        const isRepeat = !discoveryDelta.newVariant &&
+                          discoveryDelta.newRarities.length === 0 &&
+                          discoveryDelta.newTraits.length === 0;
+                        return (
+                          <div
+                            key={discoveryDelta.variantId}
+                            className={`border px-3 py-2.5 ${isRepeat ? 'border-white/10 bg-black/20' : 'border-pink-300/30 bg-pink-300/5'}`}
+                            data-testid={`lokpet-progress-${discoveryDelta.variantId}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-black uppercase tracking-wide text-white">{variant.name}</p>
+                                <p className={`mt-0.5 text-[9px] font-bold uppercase tracking-widest ${isRepeat ? 'text-muted-foreground' : 'text-pink-200'}`}>
+                                  {discoveryHeadline(discoveryDelta)}
+                                </p>
+                              </div>
+                              <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                                {discoveryDelta.sightings} this run · {discoveryDelta.totalSightings} total
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {discoveryDelta.newVariant && (
+                                <span className="border border-pink-300/40 bg-pink-300/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-pink-100">
+                                  Variant logged
+                                </span>
+                              )}
+                              {discoveryDelta.newRarities.map((rarity) => (
+                                <span
+                                  key={rarity}
+                                  className="border border-white/10 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+                                  style={{ color: LOKPET_RARITY_COLORS[rarity] }}
+                                >
+                                  New rarity: {rarity}
+                                </span>
+                              ))}
+                              {discoveryDelta.newTraits.map((trait) => (
+                                <span
+                                  key={`${trait.attackKind}:${trait.element}`}
+                                  className="border border-white/10 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider"
+                                  style={{ color: LOKPET_ELEMENT_COLORS[trait.element] }}
+                                >
+                                  New trait: {trait.label}
+                                </span>
+                              ))}
+                              {isRepeat && (
+                                <span className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                                  Progress logged, no duplicate discovery
+                                </span>
+                              )}
+                            </div>
+                            {onOpenArchive && (
+                              <button
+                                type="button"
+                                onClick={() => onOpenArchive(discoveryDelta.variantId)}
+                                className="mt-2 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-pink-200 transition-colors hover:text-white"
+                                data-testid={`button-open-lokpet-${discoveryDelta.variantId}`}
+                              >
+                                <BookOpen className="h-3 w-3" />
+                                Open archive entry
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -18,6 +18,7 @@ import { generateChunk } from '@/game/engine/chunks';
 import { createRng } from '@/game/engine/math';
 import {
   createInitialMeta,
+  getLokPetDiscoveries,
   loadMeta,
   reducer,
 } from '@/game/state/metaStore';
@@ -132,6 +133,7 @@ function runResult(lokPets: RunResult['lokPets'], cleared: boolean): RunResult {
     lootBoxesOpened: lokPets.length,
     openedPrizes: lokPets.map((pet) => pet.name),
     lokPets,
+    lokPetDiscoveries: [],
     lootTokensGained: 0,
     completedObjectives: [],
   };
@@ -524,6 +526,7 @@ test('generated LokPets are recorded after both cleared and failed runs', () => 
     type: 'completeRun',
     result: runResult([runPet(roll)], true),
   });
+  assert.equal(state.lastRun?.lokPetDiscoveries?.[0]?.newVariant, true);
   state = reducer(state, {
     type: 'completeRun',
     result: runResult([runPet(roll)], false),
@@ -533,6 +536,7 @@ test('generated LokPets are recorded after both cleared and failed runs', () => 
   assert.equal(state.meta.lokPetCatalog.length, 1);
   assert.equal(state.meta.lokPetCatalog[0]?.variantId, roll.variantId);
   assert.equal(state.meta.lokPetCatalog[0]?.sightings, 2);
+  assert.equal(state.lastRun?.lokPetDiscoveries?.[0]?.newVariant, false);
 });
 
 test('repeated LokPet sightings merge rarities and distinct traits without duplicates', () => {
@@ -566,6 +570,36 @@ test('repeated LokPet sightings merge rarities and distinct traits without dupli
   );
   assert.equal(entry.traits[0]?.label, 'single shot');
   assert.equal(entry.traits[1]?.label, 'pulsating field · freeze');
+});
+
+test('LokPet run discoveries separate new intel from repeat progress', () => {
+  const roll = rollLokPet(createRng(44));
+  const first = runPet(roll, {
+    rarity: 'common',
+    attackKind: 'shot',
+    element: 'none',
+  });
+  const second = runPet(roll, {
+    rarity: 'mythic',
+    attackKind: 'pulse',
+    element: 'freeze',
+  });
+  const firstDelta = getLokPetDiscoveries([], [first, first]);
+  assert.equal(firstDelta.length, 1);
+  assert.equal(firstDelta[0]?.newVariant, true);
+  assert.deepEqual(firstDelta[0]?.newRarities, ['common']);
+  assert.deepEqual(firstDelta[0]?.newTraits.map(({ attackKind, element }) => `${attackKind}:${element}`), ['shot:none']);
+  assert.equal(firstDelta[0]?.sightings, 2);
+  assert.equal(firstDelta[0]?.totalSightings, 2);
+
+  let state = { meta: createInitialMeta(), lastRun: null };
+  state = reducer(state, { type: 'completeRun', result: runResult([first], false) });
+  const secondDelta = getLokPetDiscoveries(state.meta.lokPetCatalog, [second, second]);
+  assert.equal(secondDelta[0]?.newVariant, false);
+  assert.deepEqual(secondDelta[0]?.newRarities, ['mythic']);
+  assert.deepEqual(secondDelta[0]?.newTraits.map(({ attackKind, element }) => `${attackKind}:${element}`), ['pulse:freeze']);
+  assert.equal(secondDelta[0]?.sightings, 2);
+  assert.equal(secondDelta[0]?.totalSightings, 3);
 });
 
 test('version 1 and version 2 saves retain progression and initialize the catalog', () => {

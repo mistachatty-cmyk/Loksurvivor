@@ -5,7 +5,13 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
 import { RunScreen } from '@/game/RunScreen';
-import { FATIGUE_PER_RUN_PCT, MAX_FATIGUE_PCT, MetaProvider, useMeta } from '@/game/state/metaStore';
+import {
+  FATIGUE_PER_RUN_PCT,
+  getLokPetDiscoveries,
+  MAX_FATIGUE_PCT,
+  MetaProvider,
+  useMeta,
+} from '@/game/state/metaStore';
 import type { RunResult } from '@/game/types';
 import { ArchivePanel } from '@/ui/ArchivePanel';
 import { AreaSelect } from '@/ui/AreaSelect';
@@ -26,7 +32,7 @@ type Screen =
   | { name: 'roster' }
   | { name: 'areas' }
   | { name: 'bestiary' }
-  | { name: 'archive' }
+  | { name: 'archive'; variantId?: string }
   | { name: 'music' }
   | { name: 'recovery' }
   | { name: 'run'; areaId: string }
@@ -95,6 +101,7 @@ function Game() {
         ...result,
         fatigueAddedPct: fatigueAfter - fatigueBefore,
         fatigueAfterPct: fatigueAfter,
+        lokPetDiscoveries: getLokPetDiscoveries(meta.lokPetCatalog, result.lokPets),
       };
       completeRun(resultWithFatigue);
       setScreen({ name: 'summary', result: resultWithFatigue });
@@ -126,7 +133,7 @@ function Game() {
       return <BestiaryPanel onBack={goHub} />;
 
     case 'archive':
-      return <ArchivePanel onBack={goHub} />;
+      return <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} />;
 
     case 'music':
       return <MusicPanel onBack={goHub} />;
@@ -152,6 +159,7 @@ function Game() {
         <RunSummary
           result={screen.result}
           onReturnToHub={goHub}
+          onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
           onRetry={() =>
             canRetry ? setScreen({ name: 'run', areaId: screen.result.areaId }) : goHub()
           }
