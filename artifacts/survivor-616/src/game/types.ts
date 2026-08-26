@@ -352,7 +352,8 @@ export interface ObstacleDef {
   h: number;
   kind: 'dumpster' | 'car' | 'crate' | 'planter' | 'barrier' | 'ac-unit'
     | 'neon-sign' | 'barrel' | 'fuse-box' | 'street-lamp' | 'car-wreck'
-    | 'crate-breakable' | 'security-camera' | 'cover' | 'reflective-surface' | 'flora';
+    | 'crate-breakable' | 'security-camera' | 'cover' | 'reflective-surface' | 'flora'
+    | 'building' | 'river';
 }
 
 export interface AreaDef {
@@ -415,6 +416,17 @@ export interface EndlessState {
   dungeonDepth: number;
   /** Whether the player is currently inside a dungeon room. */
   inDungeon: boolean;
+  /** Whether the player is exploring an enterable city building. */
+  inBuilding: boolean;
+  buildingLabel: string;
+  buildingReturnX: number;
+  buildingReturnY: number;
+  /** Current room in the active dungeon visit (1–3). */
+  dungeonRoom: number;
+  /** Whether the final-room boss has been defeated for this visit. */
+  dungeonBossDefeated: boolean;
+  /** Whether the final-room multi-reward chest is available/opened. */
+  dungeonChest: { x: number; y: number; unlocked: boolean; opened: boolean } | null;
   /** Index into DUNGEON_ERAS for the current room. */
   dungeonEraIndex: number;
   /** Bounds used inside a dungeon room. */
@@ -439,6 +451,23 @@ export interface EndlessState {
   rngSeed: number;
   /** Pending transition the RunScreen should animate before resuming. */
   pendingTransition: 'enter' | 'exit' | null;
+  /** Deterministic block summaries used by rendering and the minimap. */
+  cityBlocks: Array<{
+    key: string;
+    cx: number;
+    cy: number;
+    kind: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    river: boolean;
+    crossing: boolean;
+  }>;
+  /** River bands currently loaded around the player. */
+  riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number }>;
+  /** Enterable building doors currently loaded around the player. */
+  buildingEntrances: Array<{ x: number; y: number; w: number; h: number; label: string; returnX: number; returnY: number }>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -660,6 +689,16 @@ export interface HudSnapshot {
     dungeonDepth: number;
     inDungeon: boolean;
     dungeonEraName: string;
+    dungeonRoom: number;
+    dungeonBossDefeated: boolean;
+    dungeonChestUnlocked: boolean;
+    dungeonChestOpened: boolean;
+    currentBlock: string;
+    playerX: number;
+    playerY: number;
+    cityBlocks: Array<{ x: number; y: number; w: number; h: number; kind: string; river: boolean; crossing: boolean }>;
+    riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number }>;
+    buildingEntrances: Array<{ x: number; y: number; label: string }>;
   };
 }
 

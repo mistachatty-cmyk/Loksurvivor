@@ -129,6 +129,59 @@ function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: numbe
   ctx.restore();
 }
 
+function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
+  const e = w.endless;
+  if (!e || e.inDungeon || e.inBuilding) return;
+
+  for (const block of e.cityBlocks) {
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = block.river ? '#4de1ff' : '#f6c453';
+    ctx.setLineDash([10, 12]);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(block.x - block.w / 2 + 8, block.y - block.h / 2 + 8, block.w - 16, block.h - 16);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#f6c453';
+    ctx.font = '10px monospace';
+    ctx.fillText(`${block.kind.toUpperCase()} · ${block.cx},${block.cy}`, block.x - block.w / 2 + 18, block.y - block.h / 2 + 22);
+    ctx.restore();
+  }
+
+  for (const river of e.riverSegments) {
+    ctx.save();
+    ctx.fillStyle = '#123b58';
+    ctx.globalAlpha = 0.82;
+    ctx.fillRect(river.x - river.w / 2, river.y - river.h / 2, river.w, river.h);
+    ctx.globalAlpha = 0.26;
+    ctx.strokeStyle = '#6ee7ff';
+    ctx.lineWidth = 2;
+    for (let x = river.x - river.w / 2 + 12; x < river.x + river.w / 2; x += 34) {
+      ctx.beginPath();
+      ctx.moveTo(x, river.y - 18);
+      ctx.lineTo(x + 16, river.y - 8);
+      ctx.lineTo(x, river.y + 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#f6c453';
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(river.crossingX - 28, river.y - river.h / 2, 56, river.h);
+    ctx.restore();
+  }
+
+  for (const door of e.buildingEntrances) {
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#f6c453';
+    ctx.fillRect(door.x - door.w / 2, door.y - door.h / 2, door.w, door.h);
+    ctx.fillStyle = '#fff3b0';
+    ctx.fillRect(door.x - 5, door.y - 8, 10, 16);
+    ctx.font = '9px monospace';
+    ctx.fillText(door.label.toUpperCase(), door.x - 35, door.y - 20);
+    ctx.restore();
+  }
+}
+
 function groundAccent(w: World): string {
   if (w.endless?.inDungeon) return effectiveGround(w).glow;
   return w.area.ground.glow;
@@ -363,6 +416,24 @@ function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
   ctx.restore();
 }
 
+function drawDungeonChest(ctx: CanvasRenderingContext2D, w: World) {
+  const chest = w.endless?.dungeonChest;
+  if (!chest || !w.endless?.inDungeon) return;
+  const pulse = 0.65 + Math.sin(w.now / 260) * 0.35;
+  ctx.save();
+  ctx.globalAlpha = chest.unlocked ? 0.85 + pulse * 0.15 : 0.55;
+  ctx.shadowColor = chest.unlocked ? '#ffd166' : '#64748b';
+  ctx.shadowBlur = chest.unlocked ? 20 * pulse : 6;
+  ctx.fillStyle = chest.unlocked ? '#a16207' : '#334155';
+  ctx.fillRect(chest.x - 20, chest.y - 16, 40, 28);
+  ctx.fillStyle = chest.unlocked ? '#fde68a' : '#94a3b8';
+  ctx.fillRect(chest.x - 20, chest.y - 16, 40, 7);
+  ctx.fillRect(chest.x - 3, chest.y - 5, 6, 10);
+  ctx.font = '9px monospace';
+  ctx.fillText(chest.opened ? 'SECURED' : chest.unlocked ? 'OPEN' : 'LOCKED', chest.x - 28, chest.y + 30);
+  ctx.restore();
+}
+
 /** Faint perimeter walls around a dungeon room so the player knows the boundary. */
 function drawDungeonRoomBorder(ctx: CanvasRenderingContext2D, w: World) {
   const e = w.endless;
@@ -406,6 +477,8 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   cover: { top: '#5f4b35', side: '#33281e', trim: '#fbbf24' },
   'reflective-surface': { top: '#263e5b', side: '#142438', trim: '#d8b4fe' },
   flora: { top: '#244b32', side: '#142a1d', trim: '#54b96e' },
+  building: { top: '#303344', side: '#171923', trim: '#70769a' },
+  river: { top: '#123b58', side: '#0a2030', trim: '#4de1ff' },
 };
 
 function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
@@ -1176,6 +1249,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
   }
+  drawCityMapFeatures(ctx, w);
   drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   drawLightPool(ctx, w);
   drawLandmark(ctx, w);
@@ -1187,6 +1261,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPickups(ctx, w);
   drawDungeonEntrances(ctx, w);
   drawDungeonExit(ctx, w);
+  drawDungeonChest(ctx, w);
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);

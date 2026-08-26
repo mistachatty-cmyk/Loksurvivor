@@ -23,6 +23,13 @@ export const CHUNK_SIZE = 640;
 /* ------------------------------------------------------------------ */
 
 export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot' | 'market' | 'rail' | 'plaza';
+export type BlockKind = 'storefronts' | 'residential' | 'parking' | 'industrial' | 'park' | 'bridge' | 'river-edge';
+
+export interface ChunkBuildingEntrance {
+  x: number;
+  y: number;
+  label: string;
+}
 
 export interface StreetChunk {
   cx: number;
@@ -37,6 +44,11 @@ export interface StreetChunk {
   hasDungeonEntrance: boolean;
   entranceLocalX: number;
   entranceLocalY: number;
+  blockKind: BlockKind;
+  streetAxis: 'horizontal' | 'vertical';
+  hasRiver: boolean;
+  riverCrossingX: number;
+  buildingEntrances: ChunkBuildingEntrance[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -44,6 +56,7 @@ export interface StreetChunk {
 /* ------------------------------------------------------------------ */
 
 const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot', 'market', 'rail', 'plaza'];
+const BLOCK_KINDS: BlockKind[] = ['storefronts', 'residential', 'parking', 'industrial', 'park', 'bridge', 'river-edge'];
 const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable', 'cover', 'reflective-surface', 'flora'];
 
 /**
@@ -57,6 +70,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
 
   const variantIndex = Math.floor(rng() * VARIANTS.length);
   const variant = VARIANTS[variantIndex] ?? 'strip';
+  const blockKind = BLOCK_KINDS[(variantIndex + Math.abs(cx) + Math.abs(cy)) % BLOCK_KINDS.length]!;
 
   const obstacles: ObstacleDef[] = [];
 
@@ -64,6 +78,36 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   // obstacles for collision, but the profiles make streamed blocks read as
   // streets, yards, and civic spaces instead of identical square rooms.
   const spine = Math.floor(rng() * 3);
+  const streetAxis: 'horizontal' | 'vertical' = spine === 1 ? 'vertical' : 'horizontal';
+  const hasRiver = cy !== 0 && ((cy % 6) + 6) % 6 === 3;
+  const riverCrossingX = 0;
+
+  // Four-block-corner footprints make every generated chunk read as a city
+  // block instead of an open arena. The central cross remains a safe route.
+  const buildingLayouts = streetAxis === 'horizontal'
+    ? [
+        { x: -210, y: -208, w: 150, h: 120 },
+        { x: 210, y: -208, w: 150, h: 120 },
+        { x: -210, y: 208, w: 150, h: 120 },
+        { x: 210, y: 208, w: 150, h: 120 },
+      ]
+    : [
+        { x: -208, y: -210, w: 120, h: 150 },
+        { x: -208, y: 210, w: 120, h: 150 },
+        { x: 208, y: -210, w: 120, h: 150 },
+        { x: 208, y: 210, w: 120, h: 150 },
+      ];
+  for (const building of buildingLayouts) {
+    obstacles.push({ ...building, kind: 'building' });
+  }
+
+  // A persistent river row runs horizontally through the city. Split banks
+  // around one bridge-sized opening so the same block coordinate is always a
+  // crossing, while every other point remains impassable terrain.
+  if (hasRiver) {
+    obstacles.push({ x: -220, y: 0, w: 400, h: 126, kind: 'river' });
+    obstacles.push({ x: 220, y: 0, w: 400, h: 126, kind: 'river' });
+  }
   if (variant === 'rail' || spine === 2) {
     for (const y of [-116, 116]) {
       obstacles.push({
@@ -165,6 +209,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       'reflective-surface': [42, 58, 42, 58],
       'security-camera': [36, 48, 36, 48],
       flora: [28, 60, 28, 60],
+      building: [120, 180, 100, 150],
+      river: [300, 400, 110, 126],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);
@@ -195,6 +241,13 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   const isDungeonChunk = (cx !== 0 || cy !== 0) && rng() > 0.875;
   const entranceLocalX = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
   const entranceLocalY = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
+  const buildingEntrances: ChunkBuildingEntrance[] = [];
+  if (blockKind !== 'bridge' && blockKind !== 'park') {
+    buildingEntrances.push(
+      { x: -135, y: streetAxis === 'horizontal' ? -142 : 0, label: blockKind === 'storefronts' ? 'Corner shop' : 'Front door' },
+      { x: 135, y: streetAxis === 'horizontal' ? 142 : 0, label: blockKind === 'industrial' ? 'Loading bay' : 'Side entrance' },
+    );
+  }
 
   return {
     cx,
@@ -204,6 +257,11 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     hasDungeonEntrance: isDungeonChunk,
     entranceLocalX,
     entranceLocalY,
+    blockKind,
+    streetAxis,
+    hasRiver,
+    riverCrossingX,
+    buildingEntrances,
   };
 }
 

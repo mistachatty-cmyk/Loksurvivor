@@ -20,6 +20,7 @@ import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { renderWorld } from '@/game/render/draw';
 import { effectiveStats, useMeta } from '@/game/state/metaStore';
 import type { HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import { Minimap } from '@/ui/Minimap';
 
 export interface RunScreenProps {
   areaId: string;
@@ -431,7 +432,7 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
             </div>
             {area.endless && dungeonDepth > 0 && (
               <div className="font-mono text-[10px] uppercase tracking-widest text-primary/80 bg-black/60 px-2 py-0.5 border border-primary/20">
-                {inDungeon ? `${dungeonEraName}` : `Depth ${dungeonDepth}`}
+                {inDungeon ? `${dungeonEraName} · room ${hud?.endless?.dungeonRoom ?? 1}/3` : `Depth ${dungeonDepth}`}
               </div>
             )}
             {phase === 'playing' || phase === 'paused' ? (
@@ -507,6 +508,8 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           </div>
         ) : null}
       </div>
+
+      {area.endless && hud?.endless ? <Minimap map={hud.endless} /> : null}
 
       {/* Ultimate */}
       <button

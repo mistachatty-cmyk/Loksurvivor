@@ -486,6 +486,13 @@ export function createWorld(
       maxDistancePx: 0,
       dungeonDepth: 0,
       inDungeon: false,
+      inBuilding: false,
+      buildingLabel: '',
+      buildingReturnX: 0,
+      buildingReturnY: 0,
+      dungeonRoom: 0,
+      dungeonBossDefeated: false,
+      dungeonChest: null,
       dungeonEraIndex: -1, // will be incremented to 0 on first entry
       dungeonBounds: { w: 560, h: 440 },
       streetReturnX: 0,
@@ -499,6 +506,9 @@ export function createWorld(
       spawnBudget: 0,
       rngSeed: seed,
       pendingTransition: null,
+      cityBlocks: [],
+      riverSegments: [],
+      buildingEntrances: [],
     };
     // The endless area bounds sentinel won't be used for clamping, but the
     // rescue system reads durationSec.  Keep rescue disabled in endless mode.
@@ -614,7 +624,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
       y = w.player.y + Math.sin(angle) * radius;
       if (dist2(x, y, w.player.x, w.player.y) > 220 * 220) break;
     }
-    if (w.endless?.inDungeon) {
+    if (w.endless?.inDungeon || w.endless?.inBuilding) {
       const e = w.endless;
       const hw = e.dungeonBounds.w / 2 - 30;
       const hh = e.dungeonBounds.h / 2 - 30;
@@ -942,6 +952,11 @@ function killEnemy(w: World, enemy: EnemyActor) {
   }
 
   if (enemy.def.family === 'Boss') {
+    if (w.endless?.inDungeon && w.endless.dungeonRoom === 3) {
+      w.endless.dungeonBossDefeated = true;
+      if (w.endless.dungeonChest) w.endless.dungeonChest.unlocked = true;
+      pushAlert(w, 'BOSS DOWN — multi-reward chest unlocked');
+    }
     pushAlert(w, `${enemy.def.name} is down`);
     w.shake = Math.max(w.shake, 20);
     for (let i = 0; i < 6; i += 1) {
@@ -1547,7 +1562,7 @@ function gainXp(w: World, amount: number) {
 
 function clampToArena(w: World, actor: Actor) {
   if (w.area.endless) {
-    if (w.endless?.inDungeon) {
+    if (w.endless?.inDungeon || w.endless?.inBuilding) {
       const e = w.endless;
       const hw = e.dungeonBounds.w / 2;
       const hh = e.dungeonBounds.h / 2;
@@ -2334,7 +2349,7 @@ function endlessDiffTier(e: EndlessState): number {
 
 function updateEndlessChunks(w: World) {
   const e = w.endless!;
-  if (e.inDungeon) return;
+  if (e.inDungeon || e.inBuilding) return;
 
   // Track farthest distance for difficulty.
   const px = w.player.x;
@@ -2359,6 +2374,16 @@ function updateEndlessChunks(w: World) {
     if (!needed.has(key)) {
       e.chunkObstacles.delete(key);
       e.dungeonEntrances = e.dungeonEntrances.filter((en) => en.chunkKey !== key);
+      e.cityBlocks = e.cityBlocks.filter((block) => block.key !== key);
+      e.riverSegments = e.riverSegments.filter((segment) => !(
+        Math.abs(segment.x - (parseInt(key.split(',')[0]!, 10) * CHUNK_SIZE)) < CHUNK_SIZE &&
+        Math.abs(segment.y - (parseInt(key.split(',')[1]!, 10) * CHUNK_SIZE)) < CHUNK_SIZE
+      ));
+      e.buildingEntrances = e.buildingEntrances.filter((door) => {
+        const cx = parseInt(key.split(',')[0]!, 10);
+        const cy = parseInt(key.split(',')[1]!, 10);
+        return Math.abs(door.x - cx * CHUNK_SIZE) >= CHUNK_SIZE || Math.abs(door.y - cy * CHUNK_SIZE) >= CHUNK_SIZE;
+      });
       changed = true;
     }
   }
@@ -2382,6 +2407,38 @@ function updateEndlessChunks(w: World) {
       kind: obs.kind,
     }));
     e.chunkObstacles.set(key, worldObs);
+    e.cityBlocks.push({
+      key,
+      cx,
+      cy,
+      kind: chunk.blockKind,
+      x: cwx,
+      y: cwy,
+      w: CHUNK_SIZE,
+      h: CHUNK_SIZE,
+      river: chunk.hasRiver,
+      crossing: chunk.hasRiver,
+    });
+    if (chunk.hasRiver) {
+      e.riverSegments.push({
+        x: cwx,
+        y: cwy,
+        w: CHUNK_SIZE,
+        h: 126,
+        crossingX: cwx + chunk.riverCrossingX,
+      });
+    }
+    for (const door of chunk.buildingEntrances) {
+      e.buildingEntrances.push({
+        x: cwx + door.x,
+        y: cwy + door.y,
+        w: 34,
+        h: 28,
+        label: door.label,
+        returnX: cwx + door.x,
+        returnY: cwy + door.y + 48,
+      });
+    }
 
     if (chunk.hasDungeonEntrance && !e.consumedEntranceChunks.has(key)) {
       e.dungeonEntrances.push({
@@ -2409,18 +2466,10 @@ function updateEndlessChunks(w: World) {
   }
 }
 
-function enterDungeon(w: World) {
+function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 'exit') {
   const e = w.endless!;
   const p = w.player;
-
-  e.streetReturnX = p.x;
-  e.streetReturnY = p.y;
-  e.dungeonCenterX = p.x;
-  e.dungeonCenterY = p.y;
-  e.dungeonDepth += 1;
-
-  // Cycle to the next era style.
-  e.dungeonEraIndex = (e.dungeonEraIndex + 1) % DUNGEON_ERAS.length;
+  e.dungeonRoom = room;
   const era = DUNGEON_ERAS[e.dungeonEraIndex]!;
   e.dungeonBounds = { ...era.bounds };
 
@@ -2444,19 +2493,91 @@ function enterDungeon(w: World) {
     h: 64,
   };
 
-  // Clear street entities; the room starts fresh.
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
   w.projectiles = [];
 
-  e.inDungeon = true;
-  e.pendingTransition = 'enter';
-  pushAlert(w, `${era.name} — find the exit`);
+  if (room === 3) {
+    const boss = getEnemy('the-sire');
+    spawnEnemy(w, boss, (1000 / boss.hp) * w.level, { x: p.x + 30, y: p.y });
+    e.dungeonChest = { x: p.x + era.bounds.w / 2 - 92, y: p.y, unlocked: false, opened: false };
+    pushAlert(w, `FINAL ROOM — ${boss.name} level ${w.level}`);
+  } else {
+    pushAlert(w, `${era.name} — room ${room} of 3`);
+  }
+  e.pendingTransition = transition;
   w.shake = Math.max(w.shake, 10);
+}
+
+function enterDungeon(w: World) {
+  const e = w.endless!;
+  e.streetReturnX = w.player.x;
+  e.streetReturnY = w.player.y;
+  e.dungeonCenterX = w.player.x;
+  e.dungeonCenterY = w.player.y;
+  e.dungeonDepth += 1;
+  e.dungeonRoom = 1;
+  e.dungeonBossDefeated = false;
+  e.dungeonChest = null;
+  e.dungeonEraIndex = (e.dungeonEraIndex + 1) % DUNGEON_ERAS.length;
+  e.inDungeon = true;
+  loadDungeonRoom(w, 1, 'enter');
+}
+
+function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]) {
+  const e = w.endless!;
+  e.buildingReturnX = door.returnX;
+  e.buildingReturnY = door.returnY;
+  e.dungeonCenterX = door.x;
+  e.dungeonCenterY = door.y;
+  e.buildingLabel = door.label;
+  e.inBuilding = true;
+  e.dungeonBounds = { w: 420, h: 320 };
+  e.exitZone = { x: door.x, y: door.y + 125, w: 52, h: 42 };
+  w.obstacles = [
+    { x: door.x - 140, y: door.y - 120, w: 28, h: 240 },
+    { x: door.x + 140, y: door.y - 120, w: 28, h: 240 },
+    { x: door.x, y: door.y - 145, w: 260, h: 28 },
+  ];
+  w.breakables = w.obstacles.map((obs) => ({
+    ...obs,
+    uid: uid(w),
+    kind: 'building' as const,
+    hp: 999999,
+    maxHp: 999999,
+    vx: 0,
+    vy: 0,
+    broken: false,
+    brokenAt: 0,
+    contacts: 0,
+  }));
+  w.enemies = w.enemies.filter((en) => en.dying);
+  w.pickups = [];
+  w.projectiles = [];
+  e.pendingTransition = 'enter';
+  pushAlert(w, `${door.label} — inside`);
 }
 
 function exitDungeon(w: World) {
   const e = w.endless!;
+
+  if (e.inBuilding) {
+    w.player.x = e.buildingReturnX;
+    w.player.y = e.buildingReturnY;
+    w.player.vx = 0;
+    w.player.vy = 0;
+    e.inBuilding = false;
+    e.exitZone = null;
+    restoreStreetObstacles(w);
+    e.pendingTransition = 'exit';
+    pushAlert(w, 'Back on the block');
+    return;
+  }
+
+  if (e.dungeonRoom < 3) {
+    loadDungeonRoom(w, e.dungeonRoom + 1);
+    return;
+  }
 
   // Return player to just past the entry point so they won't re-trigger.
   w.player.x = e.streetReturnX - 90;
@@ -2464,18 +2585,11 @@ function exitDungeon(w: World) {
   w.player.vx = 0;
   w.player.vy = 0;
 
-  // Restore street obstacles.
-   w.obstacles = [];
-   w.breakables = [];
-  for (const obsArr of e.chunkObstacles.values()) {
-     for (const o of obsArr) {
-       w.obstacles.push(o);
-       const hp = BREAKABLE_HP[o.kind ?? 'crate'] ?? 999999;
-       w.breakables.push({ ...o, uid: uid(w), kind: o.kind ?? 'crate', hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 });
-     }
-  }
+  restoreStreetObstacles(w);
 
   e.inDungeon = false;
+  e.dungeonRoom = 0;
+  e.dungeonChest = null;
   e.exitZone = null;
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
@@ -2485,11 +2599,44 @@ function exitDungeon(w: World) {
   w.shake = Math.max(w.shake, 8);
 }
 
+function restoreStreetObstacles(w: World) {
+  const e = w.endless!;
+  w.obstacles = [];
+  w.breakables = [];
+  for (const obsArr of e.chunkObstacles.values()) {
+    for (const o of obsArr) {
+      w.obstacles.push(o);
+      const hp = BREAKABLE_HP[o.kind ?? 'crate'] ?? 999999;
+      w.breakables.push({
+        ...o,
+        uid: uid(w),
+        kind: o.kind ?? 'crate',
+        hp,
+        maxHp: hp,
+        vx: 0,
+        vy: 0,
+        broken: false,
+        brokenAt: 0,
+        contacts: 0,
+      });
+    }
+  }
+}
+
 function updateEndlessDungeon(w: World) {
   const e = w.endless!;
   const p = w.player;
 
-  if (!e.inDungeon) {
+  if (!e.inDungeon && !e.inBuilding) {
+    for (const door of e.buildingEntrances) {
+      if (
+        Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
+        Math.abs(p.y - door.y) < door.h / 2 + p.radius
+      ) {
+        enterBuilding(w, door);
+        return;
+      }
+    }
     for (const entrance of e.dungeonEntrances) {
       const hw = entrance.w / 2;
       const hh = entrance.h / 2;
@@ -2513,7 +2660,21 @@ function updateEndlessDungeon(w: World) {
         Math.abs(p.y - exit.y) < hh + p.radius
       ) {
         exitDungeon(w);
+        return;
       }
+    }
+    const chest = e.dungeonChest;
+    if (e.inDungeon && chest?.unlocked && !chest.opened &&
+      Math.hypot(p.x - chest.x, p.y - chest.y) < 34 + p.radius) {
+      chest.opened = true;
+      for (let i = 0; i < 3; i += 1) {
+        const prize = rollPrize(w.rng);
+        applyLootPrize(w, prize);
+        w.openedPrizes.push(prize.label);
+      }
+      w.lootBoxesOpened += 1;
+      pushAlert(w, 'Chest opened — 3 rewards secured');
+      spawnParticles(w, chest.x, chest.y, '#ffd166', 24, 150);
     }
   }
 }
@@ -2673,9 +2834,24 @@ export function hudSnapshot(w: World): HudSnapshot {
           blocksWalked: Math.round(e.maxDistancePx / CHUNK_SIZE),
           dungeonDepth: e.dungeonDepth,
           inDungeon: e.inDungeon,
+          dungeonRoom: e.dungeonRoom,
+          dungeonBossDefeated: e.dungeonBossDefeated,
+          dungeonChestUnlocked: Boolean(e.dungeonChest?.unlocked),
+          dungeonChestOpened: Boolean(e.dungeonChest?.opened),
           dungeonEraName: e.dungeonEraIndex >= 0 && e.inDungeon
             ? (DUNGEON_ERAS[e.dungeonEraIndex]?.name ?? 'Unknown')
             : '',
+          currentBlock: e.cityBlocks.find((block) => block.key === chunkKey(
+            worldToChunkCoords(w.player.x, w.player.y).cx,
+            worldToChunkCoords(w.player.x, w.player.y).cy,
+          ))?.kind ?? 'street',
+          playerX: w.player.x,
+          playerY: w.player.y,
+          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing }) => ({
+            x, y, w: width, h: height, kind, river, crossing,
+          })),
+          riverSegments: [...e.riverSegments],
+          buildingEntrances: e.buildingEntrances.map(({ x, y, label }) => ({ x, y, label })),
         }
       : undefined,
   };
