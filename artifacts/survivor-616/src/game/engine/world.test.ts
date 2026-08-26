@@ -31,8 +31,13 @@ function testCharacter(weaponId: string): CharacterDef {
   return { ...CHARACTERS[0], weapon };
 }
 
-function addEnemy(world: ReturnType<typeof createWorld>, x = 28, y = 0): EnemyActor {
-  const def = getEnemy('nightcrawler');
+function addEnemy(
+  world: ReturnType<typeof createWorld>,
+  defId = 'nightcrawler',
+  x = 28,
+  y = 0,
+): EnemyActor {
+  const def = getEnemy(defId);
   const enemy: EnemyActor = {
     uid: 900,
     defId: def.id,
@@ -158,6 +163,58 @@ test('a reflective surface redirects a compatible projectile', () => {
   assert.ok(projectile.vx < 0);
   assert.ok(projectile.obstacleUids?.has(world.breakables[0]!.uid));
   assert.ok(world.alerts.some((alert) => alert.text === 'Ricochet'));
+});
+
+test('an enemy projectile is absorbed by heavy cover', () => {
+  const world = createWorld(
+    testArea({ x: 60, y: 0, w: 24, h: 40, kind: 'cover' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    7,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'crypt-spitter', 120);
+  enemy.fireReadyAt = 0;
+  const hpBefore = world.player.hp;
+
+  for (let i = 0; i < 30 && world.projectiles.length === 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+  assert.equal(world.projectiles.length, 1);
+
+  for (let i = 0; i < 30 && world.projectiles.length > 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.equal(world.projectiles.length, 0);
+  assert.equal(world.player.hp, hpBefore);
+  assert.equal(world.breakables[0]!.broken, false);
+});
+
+test('an enemy projectile is absorbed by a reflective surface instead of ricocheting', () => {
+  const world = createWorld(
+    testArea({ x: 60, y: 0, w: 24, h: 40, kind: 'reflective-surface' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    8,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'crypt-spitter', 120);
+  enemy.fireReadyAt = 0;
+  const hpBefore = world.player.hp;
+
+  for (let i = 0; i < 30 && world.projectiles.length === 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+  assert.equal(world.projectiles.length, 1);
+
+  for (let i = 0; i < 30 && world.projectiles.length > 0; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.equal(world.projectiles.length, 0);
+  assert.equal(world.player.hp, hpBefore);
+  assert.equal(world.alerts.some((alert) => alert.text === 'Ricochet'), false);
 });
 
 test('Freeze applies, refreshes, caps at three stacks, stops movement, and expires', () => {
