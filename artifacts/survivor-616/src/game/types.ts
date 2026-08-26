@@ -517,6 +517,8 @@ export interface EndlessState {
   /** World-space position the dungeon room is centred on. */
   dungeonCenterX: number;
   dungeonCenterY: number;
+  /** Last city block used for the one-shot landmark entry cue. */
+  lastLandmarkKey: string | null;
   /** Exit trigger zone in world coords. */
   exitZone: { x: number; y: number; w: number; h: number } | null;
   /** Active dungeon entrance markers (world-space). */
@@ -543,9 +545,10 @@ export interface EndlessState {
     h: number;
     river: boolean;
     crossing: boolean;
+    landmark?: { name: string; kind: string; accent: string };
   }>;
   /** River bands currently loaded around the player. */
-  riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number }>;
+  riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number | null }>;
   /** Enterable building doors currently loaded around the player. */
   buildingEntrances: Array<{ x: number; y: number; w: number; h: number; label: string; returnX: number; returnY: number }>;
 }
@@ -808,8 +811,17 @@ export interface HudSnapshot {
     currentBlock: string;
     playerX: number;
     playerY: number;
-    cityBlocks: Array<{ x: number; y: number; w: number; h: number; kind: string; river: boolean; crossing: boolean }>;
-    riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number }>;
+    cityBlocks: Array<{
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      kind: string;
+      river: boolean;
+      crossing: boolean;
+      landmark?: { name: string; kind: string; accent: string };
+    }>;
+    riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number | null }>;
     buildingEntrances: Array<{ x: number; y: number; label: string }>;
   };
 }

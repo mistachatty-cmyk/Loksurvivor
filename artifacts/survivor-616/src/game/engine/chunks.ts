@@ -24,6 +24,13 @@ export const CHUNK_SIZE = 640;
 
 export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot' | 'market' | 'rail' | 'plaza';
 export type BlockKind = 'storefronts' | 'residential' | 'parking' | 'industrial' | 'park' | 'bridge' | 'river-edge';
+export type ChunkLandmarkKind = 'bridge' | 'market' | 'rail-yard' | 'plaza';
+
+export interface ChunkLandmark {
+  name: string;
+  kind: ChunkLandmarkKind;
+  accent: string;
+}
 
 export interface ChunkBuildingEntrance {
   x: number;
@@ -47,8 +54,9 @@ export interface StreetChunk {
   blockKind: BlockKind;
   streetAxis: 'horizontal' | 'vertical';
   hasRiver: boolean;
-  riverCrossingX: number;
+  riverCrossingX: number | null;
   buildingEntrances: ChunkBuildingEntrance[];
+  landmark?: ChunkLandmark;
 }
 
 /* ------------------------------------------------------------------ */
@@ -70,7 +78,25 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
 
   const variantIndex = Math.floor(rng() * VARIANTS.length);
   const variant = VARIANTS[variantIndex] ?? 'strip';
-  const blockKind = BLOCK_KINDS[(variantIndex + Math.abs(cx) + Math.abs(cy)) % BLOCK_KINDS.length]!;
+
+  // A river is a persistent horizontal band. Only every fourth block on the
+  // band has a bridge; the other blocks are river edges and stay impassable.
+  const hasRiver = cy !== 0 && ((cy % 6) + 6) % 6 === 3;
+  const hasBridge = hasRiver && ((cx % 4) + 4) % 4 === 0;
+  const riverCrossingX = hasBridge ? 0 : null;
+  const blockKind = hasRiver
+    ? (hasBridge ? 'bridge' : 'river-edge')
+    : BLOCK_KINDS[(variantIndex + Math.abs(cx) + Math.abs(cy)) % BLOCK_KINDS.length]!;
+
+  const landmark: ChunkLandmark | undefined = hasBridge
+    ? { name: 'Northline Bridge', kind: 'bridge', accent: '#4de1ff' }
+    : !hasRiver && variant === 'market'
+      ? { name: 'Night Market', kind: 'market', accent: '#ff8bd8' }
+      : !hasRiver && variant === 'rail'
+        ? { name: 'East Yard', kind: 'rail-yard', accent: '#ffd166' }
+        : !hasRiver && (variant === 'plaza' || blockKind === 'park')
+          ? { name: 'Civic Plaza', kind: 'plaza', accent: '#a7f3d0' }
+          : undefined;
 
   const obstacles: ObstacleDef[] = [];
 
@@ -79,8 +105,6 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   // streets, yards, and civic spaces instead of identical square rooms.
   const spine = Math.floor(rng() * 3);
   const streetAxis: 'horizontal' | 'vertical' = spine === 1 ? 'vertical' : 'horizontal';
-  const hasRiver = cy !== 0 && ((cy % 6) + 6) % 6 === 3;
-  const riverCrossingX = 0;
 
   // Four-block-corner footprints make every generated chunk read as a city
   // block instead of an open arena. The central cross remains a safe route.
@@ -103,10 +127,14 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
 
   // A persistent river row runs horizontally through the city. Split banks
   // around one bridge-sized opening so the same block coordinate is always a
-  // crossing, while every other point remains impassable terrain.
+  // crossing, while river-edge blocks remain impassable terrain.
   if (hasRiver) {
-    obstacles.push({ x: -220, y: 0, w: 400, h: 126, kind: 'river' });
-    obstacles.push({ x: 220, y: 0, w: 400, h: 126, kind: 'river' });
+    if (hasBridge) {
+      obstacles.push({ x: -220, y: 0, w: 400, h: 126, kind: 'river' });
+      obstacles.push({ x: 220, y: 0, w: 400, h: 126, kind: 'river' });
+    } else {
+      obstacles.push({ x: 0, y: 0, w: CHUNK_SIZE, h: 126, kind: 'river' });
+    }
   }
   if (variant === 'rail' || spine === 2) {
     for (const y of [-116, 116]) {
@@ -242,10 +270,10 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   const entranceLocalX = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
   const entranceLocalY = isDungeonChunk ? (rng() - 0.5) * (CHUNK_SIZE * 0.4) : 0;
   const buildingEntrances: ChunkBuildingEntrance[] = [];
-  if (blockKind !== 'bridge' && blockKind !== 'park') {
+  if (blockKind !== 'park') {
     buildingEntrances.push(
-      { x: -135, y: streetAxis === 'horizontal' ? -142 : 0, label: blockKind === 'storefronts' ? 'Corner shop' : 'Front door' },
-      { x: 135, y: streetAxis === 'horizontal' ? 142 : 0, label: blockKind === 'industrial' ? 'Loading bay' : 'Side entrance' },
+      { x: -135, y: streetAxis === 'horizontal' ? -142 : 0, label: blockKind === 'bridge' ? 'Bridge kiosk' : blockKind === 'storefronts' ? 'Corner shop' : 'Front door' },
+      { x: 135, y: streetAxis === 'horizontal' ? 142 : 0, label: blockKind === 'bridge' ? 'Toll house' : blockKind === 'industrial' ? 'Loading bay' : 'Side entrance' },
     );
   }
 
@@ -262,6 +290,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     hasRiver,
     riverCrossingX,
     buildingEntrances,
+    landmark,
   };
 }
 

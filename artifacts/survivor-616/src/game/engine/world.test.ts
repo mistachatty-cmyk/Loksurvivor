@@ -525,6 +525,18 @@ test('city blocks are deterministic and keep a central crossing through river ro
   assert.ok(first.buildingEntrances.length > 0);
 });
 
+test('river rows reserve bridges and mark non-crossing edges', () => {
+  const bridge = generateChunk(4, 3, 616);
+  const riverEdge = generateChunk(5, 3, 616);
+
+  assert.equal(bridge.blockKind, 'bridge');
+  assert.equal(bridge.riverCrossingX, 0);
+  assert.equal(bridge.landmark?.kind, 'bridge');
+  assert.equal(riverEdge.blockKind, 'river-edge');
+  assert.equal(riverEdge.riverCrossingX, null);
+  assert.equal(riverEdge.obstacles.filter((obstacle) => obstacle.kind === 'river').length, 1);
+});
+
 test('endless snapshot exposes loaded blocks, river crossings, and doors', () => {
   const area = AREAS.find((entry) => entry.endless)!;
   const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
@@ -534,6 +546,21 @@ test('endless snapshot exposes loaded blocks, river crossings, and doors', () =>
   assert.ok(snapshot.endless.cityBlocks.length >= 9);
   assert.ok(snapshot.endless.buildingEntrances.length > 0);
   assert.equal(snapshot.endless.playerX, world.player.x);
+});
+
+test('entering a landmark block adds a non-blocking navigation cue', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  stepWorld(world, 1 / 60, neutralInput);
+
+  const landmark = world.endless!.cityBlocks.find((block) => block.landmark);
+  assert.ok(landmark);
+  world.player.x = landmark!.x;
+  world.player.y = landmark!.y;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.match(world.alerts.at(-1)?.text ?? '', /Entering|crossing ahead/);
+  assert.equal(world.outcome, 'running');
 });
 
 test('dungeon visits progress through three rooms and scale the final boss by level', () => {

@@ -510,6 +510,7 @@ export function createWorld(
       streetReturnY: 0,
       dungeonCenterX: 0,
       dungeonCenterY: 0,
+      lastLandmarkKey: null,
       exitZone: null,
       dungeonEntrances: [],
       consumedEntranceChunks: new Set(),
@@ -2621,7 +2622,8 @@ function updateEndlessChunks(w: World) {
       w: CHUNK_SIZE,
       h: CHUNK_SIZE,
       river: chunk.hasRiver,
-      crossing: chunk.hasRiver,
+      crossing: chunk.riverCrossingX !== null,
+      landmark: chunk.landmark,
     });
     if (chunk.hasRiver) {
       e.riverSegments.push({
@@ -2629,7 +2631,7 @@ function updateEndlessChunks(w: World) {
         y: cwy,
         w: CHUNK_SIZE,
         h: 126,
-        crossingX: cwx + chunk.riverCrossingX,
+        crossingX: chunk.riverCrossingX === null ? null : cwx + chunk.riverCrossingX,
       });
     }
     for (const door of chunk.buildingEntrances) {
@@ -2668,6 +2670,24 @@ function updateEndlessChunks(w: World) {
        }
      }
   }
+}
+
+function updateEndlessLandmarkCue(w: World) {
+  const e = w.endless!;
+  if (e.inDungeon || e.inBuilding) return;
+
+  const { cx, cy } = worldToChunkCoords(w.player.x, w.player.y);
+  const key = chunkKey(cx, cy);
+  const block = e.cityBlocks.find((candidate) => candidate.key === key);
+  if (e.lastLandmarkKey === key) return;
+
+  e.lastLandmarkKey = key;
+  if (!block?.landmark) return;
+
+  const cue = block.landmark.kind === 'bridge'
+    ? `${block.landmark.name} — crossing ahead`
+    : `Entering ${block.landmark.name}`;
+  pushAlert(w, cue);
 }
 
 function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 'exit') {
@@ -2943,6 +2963,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
+    updateEndlessLandmarkCue(w);
     updateEndlessDungeon(w);
     updateEndlessSpawning(w, dt);
   } else {
@@ -3070,8 +3091,8 @@ export function hudSnapshot(w: World): HudSnapshot {
           ))?.kind ?? 'street',
           playerX: w.player.x,
           playerY: w.player.y,
-          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing }) => ({
-            x, y, w: width, h: height, kind, river, crossing,
+          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing, landmark }) => ({
+            x, y, w: width, h: height, kind, river, crossing, landmark,
           })),
           riverSegments: [...e.riverSegments],
           buildingEntrances: e.buildingEntrances.map(({ x, y, label }) => ({ x, y, label })),

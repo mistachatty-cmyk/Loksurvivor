@@ -129,6 +129,114 @@ function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: numbe
   ctx.restore();
 }
 
+function drawChunkLandmark(
+  ctx: CanvasRenderingContext2D,
+  block: {
+    x: number;
+    y: number;
+    landmark?: { name: string; kind: string; accent: string };
+  },
+) {
+  const landmark = block.landmark;
+  if (!landmark) return;
+
+  const { x, y } = block;
+  ctx.save();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = landmark.accent;
+  ctx.fillStyle = `${landmark.accent}26`;
+  ctx.shadowColor = landmark.accent;
+  ctx.shadowBlur = 18;
+
+  if (landmark.kind === 'bridge') {
+    // The tall deck and paired towers are intentionally readable from a
+    // distance, while the chevrons point toward the only safe river gap.
+    ctx.fillStyle = '#1c3443';
+    ctx.fillRect(x - 32, y - 122, 64, 244);
+    ctx.strokeRect(x - 32, y - 122, 64, 244);
+    ctx.fillStyle = landmark.accent;
+    ctx.globalAlpha = 0.72;
+    for (let plankY = y - 104; plankY <= y + 104; plankY += 22) {
+      ctx.fillRect(x - 26, plankY, 52, 5);
+    }
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(x - 58, y - 128, 12, 40);
+    ctx.fillRect(x + 46, y - 128, 12, 40);
+    ctx.fillRect(x - 58, y + 88, 12, 40);
+    ctx.fillRect(x + 46, y + 88, 12, 40);
+
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#f6c453';
+    for (const markerY of [y - 172, y + 172]) {
+      ctx.beginPath();
+      if (markerY < y) {
+        ctx.moveTo(x - 18, markerY + 10);
+        ctx.lineTo(x, markerY - 8);
+        ctx.lineTo(x + 18, markerY + 10);
+      } else {
+        ctx.moveTo(x - 18, markerY - 10);
+        ctx.lineTo(x, markerY + 8);
+        ctx.lineTo(x + 18, markerY - 10);
+      }
+      ctx.stroke();
+    }
+  } else if (landmark.kind === 'market') {
+    ctx.fillRect(x - 116, y - 34, 232, 68);
+    ctx.strokeRect(x - 116, y - 34, 232, 68);
+    ctx.fillRect(x - 12, y - 86, 24, 52);
+    ctx.strokeRect(x - 12, y - 86, 24, 52);
+    ctx.fillStyle = landmark.accent;
+    ctx.globalAlpha = 0.75;
+    for (let awningX = x - 96; awningX <= x + 72; awningX += 28) {
+      ctx.beginPath();
+      ctx.moveTo(awningX, y - 29);
+      ctx.lineTo(awningX + 20, y - 29);
+      ctx.lineTo(awningX + 14, y - 8);
+      ctx.lineTo(awningX + 6, y - 8);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (landmark.kind === 'rail-yard') {
+    ctx.globalAlpha = 0.55;
+    for (const trackY of [y - 32, y + 32]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 126, trackY);
+      ctx.lineTo(x + 126, trackY);
+      ctx.stroke();
+      for (let trackX = x - 108; trackX <= x + 108; trackX += 24) {
+        ctx.fillRect(trackX - 2, trackY - 7, 4, 14);
+      }
+    }
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(x - 8, y - 92, 16, 160);
+    ctx.strokeRect(x - 26, y - 108, 52, 16);
+    ctx.fillRect(x - 34, y - 88, 68, 5);
+  } else {
+    // Four approach paths and a rotunda make the plaza a useful visual anchor.
+    ctx.globalAlpha = 0.42;
+    ctx.fillRect(x - 128, y - 7, 256, 14);
+    ctx.fillRect(x - 7, y - 128, 14, 256);
+    ctx.globalAlpha = 0.92;
+    ctx.beginPath();
+    ctx.arc(x, y, 48, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 22, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillRect(x - 4, y - 68, 8, 24);
+    ctx.fillRect(x - 4, y + 44, 8, 24);
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(landmark.name.toUpperCase(), x, y - 142);
+  ctx.restore();
+}
+
 function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
   const e = w.endless;
   if (!e || e.inDungeon || e.inBuilding) return;
@@ -142,9 +250,13 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     ctx.strokeRect(block.x - block.w / 2 + 8, block.y - block.h / 2 + 8, block.w - 16, block.h - 16);
     ctx.setLineDash([]);
     ctx.globalAlpha = 0.5;
-    ctx.fillStyle = '#f6c453';
+    ctx.fillStyle = block.landmark?.accent ?? (block.river ? '#6ee7ff' : '#f6c453');
     ctx.font = '10px monospace';
-    ctx.fillText(`${block.kind.toUpperCase()} · ${block.cx},${block.cy}`, block.x - block.w / 2 + 18, block.y - block.h / 2 + 22);
+    ctx.fillText(
+      `${block.landmark?.name.toUpperCase() ?? block.kind.toUpperCase()} · ${block.cx},${block.cy}`,
+      block.x - block.w / 2 + 18,
+      block.y - block.h / 2 + 22,
+    );
     ctx.restore();
   }
 
@@ -163,10 +275,29 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
       ctx.lineTo(x, river.y + 2);
       ctx.stroke();
     }
-    ctx.fillStyle = '#f6c453';
-    ctx.globalAlpha = 0.9;
-    ctx.fillRect(river.crossingX - 28, river.y - river.h / 2, 56, river.h);
+    if (river.crossingX !== null) {
+      ctx.fillStyle = '#f6c453';
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(river.crossingX - 28, river.y - river.h / 2, 56, river.h);
+    } else {
+      // Orange bank caps warn that this river edge is not a crossing.
+      ctx.strokeStyle = '#fb7185';
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 10]);
+      ctx.beginPath();
+      ctx.moveTo(river.x - river.w / 2 + 8, river.y - river.h / 2 + 5);
+      ctx.lineTo(river.x + river.w / 2 - 8, river.y - river.h / 2 + 5);
+      ctx.moveTo(river.x - river.w / 2 + 8, river.y + river.h / 2 - 5);
+      ctx.lineTo(river.x + river.w / 2 - 8, river.y + river.h / 2 - 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.restore();
+  }
+
+  for (const block of e.cityBlocks) {
+    drawChunkLandmark(ctx, block);
   }
 
   for (const door of e.buildingEntrances) {

@@ -29,6 +29,20 @@ export function Minimap({ map }: MinimapProps) {
           <rect width={MAP_W} height={MAP_H} fill="#08111a" />
           {map.cityBlocks.map((block, index) => {
             const point = toMap(block.x, block.y);
+            const isBridge = block.kind === 'bridge' && block.crossing;
+            const isRiverEdge = block.river && !block.crossing;
+            const blockColor = isBridge
+              ? '#164e63'
+              : isRiverEdge
+                ? '#10283a'
+                : block.landmark
+                  ? '#2a1e3d'
+                  : '#131c27';
+            const blockStroke = isBridge
+              ? '#fbbf24'
+              : isRiverEdge
+                ? '#fb7185'
+                : block.landmark?.accent ?? '#64748b';
             return (
               <g key={`${block.x}:${block.y}:${index}`}>
                 <rect
@@ -36,13 +50,18 @@ export function Minimap({ map }: MinimapProps) {
                   y={point.y - 61}
                   width="122"
                   height="122"
-                  fill={block.river ? '#0b2e48' : '#131c27'}
-                  stroke={block.river ? '#2dd4bf' : '#64748b'}
+                  fill={blockColor}
+                  stroke={blockStroke}
                   strokeOpacity=".55"
                   strokeDasharray="4 4"
                 />
-                <text x={point.x - 56} y={point.y - 50} fill="#cbd5e1" opacity=".55" fontSize="5">
-                  {block.kind}
+                {isBridge ? (
+                  <path d={`M ${point.x - 8} ${point.y - 27} h 16 M ${point.x - 8} ${point.y + 27} h 16 M ${point.x} ${point.y - 27} v 54`} stroke="#fbbf24" strokeWidth="4" opacity=".9" />
+                ) : block.landmark ? (
+                  <path d={`M ${point.x} ${point.y - 12} l 12 12 -12 12 -12 -12 z`} fill={block.landmark.accent} opacity=".85" />
+                ) : null}
+                <text x={point.x - 56} y={point.y - 50} fill={block.landmark?.accent ?? '#cbd5e1'} opacity=".75" fontSize="5">
+                  {block.landmark?.name ?? block.kind}
                 </text>
               </g>
             );
@@ -52,7 +71,11 @@ export function Minimap({ map }: MinimapProps) {
             return (
               <g key={`river:${index}`}>
                 <rect x={point.x - 61} y={point.y - 12} width="122" height="24" fill="#164e63" opacity=".9" />
-                <rect x={toMap(river.crossingX, river.y).x - 5} y={point.y - 12} width="10" height="24" fill="#f59e0b" />
+                {river.crossingX !== null ? (
+                  <rect x={toMap(river.crossingX, river.y).x - 5} y={point.y - 12} width="10" height="24" fill="#f59e0b" />
+                ) : (
+                  <path d={`M ${point.x - 55} ${point.y - 9} h 110 M ${point.x - 55} ${point.y + 9} h 110`} stroke="#fb7185" strokeWidth="2" strokeDasharray="4 4" opacity=".9" />
+                )}
               </g>
             );
           })}
@@ -63,9 +86,14 @@ export function Minimap({ map }: MinimapProps) {
           <circle cx={MAP_W / 2} cy={MAP_H / 2} r="4" fill="#f8fafc" stroke="#22d3ee" strokeWidth="2" />
           <path d={`M ${MAP_W / 2} 8 v 7 M ${MAP_W / 2} ${MAP_H - 8} v -7 M 8 ${MAP_H / 2} h 7 M ${MAP_W - 8} ${MAP_H / 2} h -7`} stroke="#e2e8f0" opacity=".4" />
         </svg>
-        <div className="mt-1 flex items-center justify-between px-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
+        <div className="mt-1 flex items-center justify-between gap-2 px-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
           <span>● you</span>
           <span>{map.inDungeon ? `room ${map.dungeonRoom}/3` : 'streets'}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 px-1 font-mono text-[7px] uppercase tracking-wide text-white/55">
+          <span className="text-amber-300">■ bridge</span>
+          <span className="text-rose-300">┄ river edge</span>
+          <span className="text-fuchsia-200">◆ landmark</span>
         </div>
       </div>
     </div>
