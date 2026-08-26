@@ -143,6 +143,7 @@ export function RunScreen({
       meta.activeCrewRumor,
       {
         unlockedEvolutionIds: meta.unlockedEvolutionIds,
+        knownRelicIds: meta.knownRelicIds,
         episode,
         episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
       },
@@ -670,6 +671,21 @@ export function RunScreen({
           >
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Signature · {hud.evolution.name}</span>
             <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.evolution.identity}</span>
+          </div>
+        ) : null}
+
+        {hud?.relicWorkshop.activeRecipe ? (
+          <div
+            className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
+            style={{ borderColor: `${hud.relicWorkshop.activeRecipe.color}88`, backgroundColor: `${hud.relicWorkshop.activeRecipe.color}18`, color: hud.relicWorkshop.activeRecipe.color }}
+            data-testid="text-relic-recipe"
+          >
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic · {hud.relicWorkshop.activeRecipe.name}</span>
+            <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.relicWorkshop.activeRecipe.identity}</span>
+          </div>
+        ) : hud?.relicWorkshop.readyRecipeIds.length ? (
+          <div className="mx-auto w-fit max-w-full border border-orange-300/35 bg-orange-300/10 px-3 py-1.5 text-center text-orange-100" data-testid="text-relic-ready">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic recipe ready · level the base weapon</span>
           </div>
         ) : null}
 

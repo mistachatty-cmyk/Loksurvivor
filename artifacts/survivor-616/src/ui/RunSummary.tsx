@@ -7,6 +7,7 @@ import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
+import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
 import type { LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
@@ -114,6 +115,34 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: Ru
             {result.evolution ? (
               <p className="mt-2 text-xs uppercase tracking-wider text-primary">Signature equipped · {result.evolution.name} — {result.evolution.identity}</p>
             ) : null}
+          </section>
+        ) : null}
+
+        {result.newlyDiscoveredRelicIds && result.newlyDiscoveredRelicIds.length > 0 ? (
+          <section className="border border-orange-300/40 bg-orange-300/5 p-5" data-testid="section-relic-discovery">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-orange-200">City relic recovered</p>
+            {result.newlyDiscoveredRelicIds.map((relicId) => {
+              const relic = CITY_RELICS_BY_ID[relicId];
+              if (!relic) return null;
+              return (
+                <div key={relic.id} className="mt-2">
+                  <h2 className="text-xl font-black uppercase text-white">{relic.name}</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-white/80">{relic.description}</p>
+                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-orange-200">
+                    Recipe knowledge added permanently · {RELIC_RECIPES.find((recipe) => recipe.relicId === relic.id)?.name ?? 'workshop recipe'}
+                  </p>
+                </div>
+              );
+            })}
+          </section>
+        ) : null}
+
+        {result.relicRecipe ? (
+          <section className="border border-orange-300/35 bg-orange-300/5 p-5" data-testid="section-relic-evolution">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-orange-200">Relic recipe applied</p>
+            <h2 className="mt-1 text-xl font-black uppercase text-white">{result.relicRecipe.name}</h2>
+            <p className="mt-2 text-sm uppercase tracking-wider text-orange-100">{result.relicRecipe.identity}</p>
+            <p className="mt-3 text-sm leading-relaxed text-white/80">This run earned the treatment through a level-up card. The recipe remains known for future runs.</p>
           </section>
         ) : null}
 

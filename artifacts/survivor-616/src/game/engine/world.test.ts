@@ -17,16 +17,19 @@ import { FIRST_NIGHT_CHAPTERS, recommendedFirstNightChapter } from '@/game/data/
 import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import {
   createWorld,
   dashPlayer,
   buildResult,
   claimRumorEmergencyHeal,
+  applyUpgrade,
   episodeSnapshot,
   hudSnapshot,
   primePhysicsObject,
   spawnLokPet,
   resolveImpactTravel,
+  relicRecipeEligibility,
   type EnemyActor,
   type Projectile,
   stepWorld,
@@ -1094,13 +1097,109 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 6);
+    assert.equal(loaded.version, 7);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
     assert.equal(loaded.cred, 12);
     assert.equal(loaded.lokPetCatalog.length, 0);
   }
+});
+
+test('relic knowledge normalizes safely and clears unlock the matching recipe forever', () => {
+  const normalized = normalizeMeta({
+    version: 6,
+    knownRelicIds: ['mural-pigment', 'not-a-relic', 'mural-pigment'],
+  });
+  assert.deepEqual(normalized.knownRelicIds, ['mural-pigment']);
+
+  const result = runResult([], true);
+  result.areaId = 'monroe-strip';
+  result.discoveryId = 'strip-mural';
+  const first = reducer({ meta: createInitialMeta(), lastRun: null }, { type: 'completeRun', result });
+  assert.deepEqual(first.meta.knownRelicIds, ['mural-pigment']);
+  assert.deepEqual(first.lastRun?.newlyDiscoveredRelicIds, ['mural-pigment']);
+
+  const repeat = reducer(first, { type: 'completeRun', result });
+  assert.deepEqual(repeat.meta.knownRelicIds, ['mural-pigment']);
+  assert.deepEqual(repeat.lastRun?.newlyDiscoveredRelicIds, []);
+});
+
+test('known relic recipes enter level-up eligibility, apply once, and keep the normal kill path', () => {
+  const recipe = RELIC_RECIPES_BY_ID['pigment-bloom']!;
+  const world = createWorld(
+    testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }),
+    testCharacter('spray-can'),
+    CHARACTERS[0]!.stats,
+    616,
+    [],
+    1,
+    true,
+    null,
+    { knownRelicIds: [recipe.relicId] },
+  );
+  world.weapons[0]!.level = recipe.minWeaponLevel;
+
+  assert.equal(relicRecipeEligibility(world, recipe).eligible, true);
+  const staleWorld = createWorld(
+    world.area,
+    testCharacter('spray-can'),
+    CHARACTERS[0]!.stats,
+    617,
+    [],
+    1,
+    true,
+    null,
+    { knownRelicIds: [recipe.relicId] },
+  );
+  assert.equal(relicRecipeEligibility(staleWorld, recipe).eligible, false);
+  assert.match(relicRecipeEligibility(staleWorld, recipe).reason, /Level the base weapon/);
+
+  const card = {
+    id: `relic-${recipe.id}`,
+    name: recipe.name,
+    description: recipe.description,
+    weight: 1,
+    maxStacks: 1,
+    effects: [],
+    cardKind: 'relic-evolution' as const,
+    relicRecipeId: recipe.id,
+  };
+  applyUpgrade(world, card);
+  assert.equal(world.weapons[0]!.def.id, recipe.result.id);
+  assert.equal(world.activeRelicRecipe?.id, recipe.id);
+  assert.equal(relicRecipeEligibility(world, recipe).eligible, false);
+
+  const snapshot = hudSnapshot(world);
+  assert.deepEqual(snapshot.relicWorkshop.readyRecipeIds, []);
+  assert.equal(snapshot.relicWorkshop.activeRecipe?.id, recipe.id);
+
+  const enemy = addEnemy(world, 'nightcrawler', 28, 0);
+  enemy.hp = 1;
+  world.now = 500;
+  stepWorld(world, 0.016, neutralInput);
+  assert.equal(world.kills, 1);
+  assert.equal(world.lootTokensGained, 0);
+});
+
+test('signature evolutions do not duplicate a relic recipe slot', () => {
+  const recipe = RELIC_RECIPES.find((candidate) => candidate.baseWeaponId === 'glacier-staff')!;
+  const signature = EVOLUTIONS_BY_ID['glacier-constellation']!;
+  const signatureCharacter = CHARACTERS.find((candidate) => candidate.id === 'glacierwarden')!;
+  const world = createWorld(
+    testArea({ x: 300, y: 300, w: 30, h: 30, kind: 'crate' }),
+    signatureCharacter,
+    signatureCharacter.stats,
+    618,
+    [],
+    1,
+    true,
+    null,
+    { knownRelicIds: [recipe.relicId], unlockedEvolutionIds: [signature.id] },
+  );
+  assert.equal(world.activeEvolution?.baseWeaponId, recipe.baseWeaponId);
+  assert.equal(relicRecipeEligibility(world, recipe).eligible, false);
+  assert.match(relicRecipeEligibility(world, recipe).reason, /signature evolution/i);
 });
 
 test('First Night recommendations follow authored ordering while preserving replay', () => {

@@ -284,6 +284,18 @@ export interface CharacterEpisodeDef {
   evolutionId: string;
 }
 
+export type RelicRecipeTrigger = 'level-up';
+
+export interface CityRelicDef {
+  id: string;
+  name: string;
+  description: string;
+  sourceAreaId: string;
+  sourceDiscoveryId: string;
+  sourceLabel: string;
+  color: string;
+}
+
 export type EvolutionBehaviorKind =
   | 'chain'
   | 'split'
@@ -416,6 +428,21 @@ export interface EvolutionDef {
   characterId?: string;
   episodeId?: string;
   identity: string;
+  color: string;
+  behavior?: EvolutionBehavior;
+  result: WeaponDef;
+}
+
+export interface RelicRecipeDef {
+  id: string;
+  name: string;
+  description: string;
+  identity: string;
+  relicId: string;
+  baseWeaponId: string;
+  minWeaponLevel: number;
+  trigger: RelicRecipeTrigger;
+  triggerLabel: string;
   color: string;
   behavior?: EvolutionBehavior;
   result: WeaponDef;
@@ -827,7 +854,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'settings'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar';
@@ -926,10 +953,11 @@ export interface UpgradeDef {
   /** Restrict this upgrade to specific weapon kinds. */
   weaponKinds?: WeaponKind[];
   /** Level-up cards can grant a new item or evolve an existing one. */
-  cardKind?: 'upgrade' | 'weapon' | 'passive' | 'evolution';
+  cardKind?: 'upgrade' | 'weapon' | 'passive' | 'evolution' | 'relic-evolution';
   weaponId?: string;
   passiveId?: string;
   evolutionId?: string;
+  relicRecipeId?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -988,6 +1016,8 @@ export interface MetaState {
   unlockedEvolutionIds: string[];
   /** Persisted progress toward each character episode objective. */
   episodeProgressById: Record<string, number>;
+  /** Permanent city relic knowledge found during cleared district runs. */
+  knownRelicIds: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -1057,6 +1087,14 @@ export interface RunResult {
   };
   /** Account-wide signature evolution active in this run, if any. */
   evolution?: {
+    id: string;
+    name: string;
+    identity: string;
+  };
+  /** City relic knowledge found by clearing a district for the first time. */
+  newlyDiscoveredRelicIds?: string[];
+  /** Relic recipe applied during the run, if one was chosen at level-up. */
+  relicRecipe?: {
     id: string;
     name: string;
     identity: string;
@@ -1162,6 +1200,11 @@ export interface HudSnapshot {
     progress: number;
     target: number;
     completed: boolean;
+  };
+  relicWorkshop: {
+    knownRelicIds: string[];
+    readyRecipeIds: string[];
+    activeRecipe?: { id: string; name: string; identity: string; color: string };
   };
   evolution?: {
     id: string;

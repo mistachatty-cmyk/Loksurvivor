@@ -15,6 +15,7 @@ import {
 } from '@/game/data/lokPets';
 import { ALLIES, DISCOVERIES } from '@/game/data/progression';
 import { STATUS_EFFECTS } from '@/game/data/statusEffects';
+import { WorkshopOverview } from './WorkshopPanel';
 import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { ScreenLayout } from './ScreenLayout';
@@ -167,6 +168,14 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
       }
     >
       <div className="space-y-12">
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-workshop"
+        >
+          <WorkshopOverview compact />
+        </motion.section>
+
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

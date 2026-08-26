@@ -20,6 +20,7 @@ import { AREAS, getArea } from '@/game/data/areas';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
+import { CITY_RELICS, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
@@ -60,7 +61,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 6;
+const META_VERSION = 7;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -135,6 +136,7 @@ export function createInitialMeta(): MetaState {
     completedEpisodeIds: [],
     unlockedEvolutionIds: [],
     episodeProgressById: {},
+    knownRelicIds: [],
   };
 }
 
@@ -494,6 +496,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       );
     }
   }
+  const knownRelicIds = idList(
+    parsed.knownRelicIds,
+    new Set(CITY_RELICS.map((relic) => relic.id)),
+    [],
+  );
   const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
     const evolution = EVOLUTIONS_BY_ID[evolutionId];
     return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
@@ -539,6 +546,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     completedEpisodeIds,
     unlockedEvolutionIds,
     episodeProgressById,
+    knownRelicIds,
   };
 }
 
@@ -549,7 +557,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -869,6 +877,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (result.cleared && result.discoveryId) {
         discoveryIds = addUnique(discoveryIds, result.discoveryId);
       }
+      const discoveredRelic = result.cleared && result.discoveryId
+        ? RELIC_BY_DISCOVERY_ID[result.discoveryId]
+        : undefined;
+      const knownRelicIds = discoveredRelic
+        ? addUnique(prev.knownRelicIds, discoveredRelic.id)
+        : prev.knownRelicIds;
 
       const clearedAreaIds = result.cleared
         ? addUnique(prev.clearedAreaIds, result.areaId)
@@ -923,6 +937,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         completedEpisodeIds: [...prev.completedEpisodeIds],
         unlockedEvolutionIds: [...prev.unlockedEvolutionIds],
         episodeProgressById: { ...prev.episodeProgressById },
+        knownRelicIds,
       };
 
       const episodeDefinition = validEpisodeResult(result);
@@ -947,7 +962,14 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
       return {
         meta: next,
-        lastRun: { ...result, lokPetDiscoveries, newlyUnlockedCharacterIds: newlyUnlocked },
+        lastRun: {
+          ...result,
+          lokPetDiscoveries,
+          newlyUnlockedCharacterIds: newlyUnlocked,
+          newlyDiscoveredRelicIds: discoveredRelic && !prev.knownRelicIds.includes(discoveredRelic.id)
+            ? [discoveredRelic.id]
+            : [],
+        },
       };
     }
 

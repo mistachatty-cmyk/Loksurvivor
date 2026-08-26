@@ -21,6 +21,7 @@ import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
+import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -49,6 +50,7 @@ import type {
   ImpactIntensity,
   PotholeTrigger,
   PropVariant,
+  RelicRecipeDef,
 } from '@/game/types';
 
 import {
@@ -422,6 +424,11 @@ export interface World {
   weapons: RunWeapon[];
   /** Account-wide signature evolution active for the selected character. */
   activeEvolution?: EvolutionDef;
+  /** Relic knowledge carried into this run; recipes are still earned in-run. */
+  knownRelicIds: string[];
+  /** One relic recipe can be applied per run through a level-up card. */
+  activeRelicRecipe?: RelicRecipeDef;
+  appliedRelicRecipeIds: Set<string>;
   passives: RunPassive[];
   pickups: Pickup[];
   popups: Popup[];
@@ -571,6 +578,7 @@ export function createWorld(
   activeCrewRumor: ActiveCrewRumor | null = null,
   setup: {
     unlockedEvolutionIds?: string[];
+    knownRelicIds?: string[];
     episode?: CharacterEpisodeDef;
     episodeProgress?: number;
   } = {},
@@ -623,6 +631,9 @@ export function createWorld(
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     activeEvolution: evolved,
+    knownRelicIds: [...new Set(setup.knownRelicIds ?? [])],
+    activeRelicRecipe: undefined,
+    appliedRelicRecipeIds: new Set(),
     passives: [],
     pickups: [],
     popups: [],
@@ -851,6 +862,12 @@ function weaponDamage(w: World): number {
 
 function runWeaponDamage(w: World, weapon: RunWeapon): number {
   return weapon.def.damage * (1 + (weapon.level - 1) * weapon.def.levelDamageScale) * damageMult(w);
+}
+
+function weaponEvolutionBehavior(w: World, weapon: WeaponDef): EvolutionBehavior | undefined {
+  if (w.activeEvolution?.result.id === weapon.id) return w.activeEvolution.behavior;
+  if (w.activeRelicRecipe?.result.id === weapon.id) return w.activeRelicRecipe.behavior;
+  return undefined;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1673,7 +1690,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
   const damage = runWeaponDamage(w, runWeapon);
   const reach = weapon.range * areaMult(w);
   const palette = w.character.palette;
-  const behavior = w.activeEvolution?.result.id === weapon.id ? w.activeEvolution.behavior : undefined;
+  const behavior = weaponEvolutionBehavior(w, weapon);
 
   switch (weapon.kind) {
     case 'follower': {
@@ -1916,7 +1933,7 @@ function updateOrbiters(w: World, dt: number) {
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
         damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy);
-        const behavior = w.activeEvolution?.result.id === weapon.id ? w.activeEvolution.behavior : undefined;
+        const behavior = weaponEvolutionBehavior(w, weapon);
         if (behavior?.kind === 'orbit-burst') {
           const burstRadius = behavior.radius ?? 56;
           novaDamage(w, ox, oy, burstRadius, damage * 0.35, 0, behavior.statusEffectId);
@@ -1979,6 +1996,32 @@ export function activateUltimate(w: World): boolean {
 /* Upgrades                                                            */
 /* ------------------------------------------------------------------ */
 
+export function relicRecipeEligibility(
+  w: Pick<World, 'knownRelicIds' | 'appliedRelicRecipeIds' | 'weapons' | 'activeEvolution'>,
+  recipe: RelicRecipeDef,
+): { eligible: boolean; reason: string } {
+  if (!w.knownRelicIds.includes(recipe.relicId)) {
+    return { eligible: false, reason: 'Find its city relic knowledge first.' };
+  }
+  if (w.appliedRelicRecipeIds.has(recipe.id)) {
+    return { eligible: false, reason: 'Already applied during this run.' };
+  }
+  const weapon = w.weapons.find((entry) => entry.def.id === recipe.baseWeaponId);
+  if (!weapon) {
+    if (w.activeEvolution?.baseWeaponId === recipe.baseWeaponId) {
+      return { eligible: false, reason: 'The signature evolution is active; this relic recipe stays separate.' };
+    }
+    return { eligible: false, reason: `Bring ${recipe.baseWeaponId} into the run first.` };
+  }
+  if (weapon.def.id === recipe.result.id) {
+    return { eligible: false, reason: 'This weapon already carries the relic treatment.' };
+  }
+  if (weapon.level < recipe.minWeaponLevel) {
+    return { eligible: false, reason: `Level the base weapon to Lv ${recipe.minWeaponLevel}.` };
+  }
+  return { eligible: true, reason: recipe.triggerLabel };
+}
+
 export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   const pool: UpgradeDef[] = UPGRADES.filter((u) => {
     if (u.weaponKinds && !w.weapons.some((weapon) => u.weaponKinds!.includes(weapon.def.kind))) return false;
@@ -2012,6 +2055,21 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
       pool.push({ id: `evolution-${evolution.id}`, name: evolution.name, description: evolution.description, weight: 14, maxStacks: 1, effects: [], cardKind: 'evolution', evolutionId: evolution.id });
     }
   }
+  for (const recipe of RELIC_RECIPES) {
+    const eligibility = relicRecipeEligibility(w, recipe);
+    if (eligibility.eligible) {
+      pool.push({
+        id: `relic-${recipe.id}`,
+        name: recipe.name,
+        description: recipe.description,
+        weight: 12,
+        maxStacks: 1,
+        effects: [],
+        cardKind: 'relic-evolution',
+        relicRecipeId: recipe.id,
+      });
+    }
+  }
 
   const picks: UpgradeDef[] = [];
   const available = [...pool];
@@ -2033,6 +2091,10 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
 }
 
 export function applyUpgrade(w: World, upgrade: UpgradeDef) {
+  if (upgrade.cardKind === 'relic-evolution' && upgrade.relicRecipeId) {
+    const recipe = RELIC_RECIPES_BY_ID[upgrade.relicRecipeId];
+    if (!recipe || !relicRecipeEligibility(w, recipe).eligible) return;
+  }
   w.upgradeStacks[upgrade.id] = (w.upgradeStacks[upgrade.id] ?? 0) + 1;
 
   if (upgrade.cardKind === 'weapon' && upgrade.weaponId) {
@@ -2068,6 +2130,27 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
       weapon.level = Math.min(8, weapon.level + 1);
       if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
       pushAlert(w, `${evolution.name} evolved`);
+    }
+  }
+  if (upgrade.cardKind === 'relic-evolution' && upgrade.relicRecipeId) {
+    const recipe = RELIC_RECIPES_BY_ID[upgrade.relicRecipeId];
+    const eligibility = recipe ? relicRecipeEligibility(w, recipe) : undefined;
+    const weapon = recipe && w.weapons.find((entry) => entry.def.id === recipe.baseWeaponId);
+    if (recipe && eligibility?.eligible && weapon) {
+      weapon.def = recipe.result;
+      weapon.level = Math.min(8, weapon.level + 1);
+      w.activeRelicRecipe = recipe;
+      w.appliedRelicRecipeIds.add(recipe.id);
+      if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
+      pushAlert(w, `${recipe.name} evolved · relic recipe`);
+      w.popups.push({
+        x: w.player.x,
+        y: w.player.y + 30,
+        text: `RELIC · ${recipe.name}`,
+        color: recipe.color,
+        bornAt: w.now,
+        vy: 30,
+      });
     }
   }
 
@@ -4223,6 +4306,20 @@ export function hudSnapshot(w: World): HudSnapshot {
           color: w.activeEvolution.color,
         }
       : undefined,
+    relicWorkshop: {
+      knownRelicIds: [...w.knownRelicIds],
+      readyRecipeIds: RELIC_RECIPES
+        .filter((recipe) => relicRecipeEligibility(w, recipe).eligible)
+        .map((recipe) => recipe.id),
+      activeRecipe: w.activeRelicRecipe
+        ? {
+            id: w.activeRelicRecipe.id,
+            name: w.activeRelicRecipe.name,
+            identity: w.activeRelicRecipe.identity,
+            color: w.activeRelicRecipe.color,
+          }
+        : undefined,
+    },
     crewRumor: w.activeCrewRumor
       ? (() => {
           const rumor = getCrewRumor(w.activeCrewRumor.rumorId);
@@ -4354,6 +4451,13 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
           id: w.activeEvolution.id,
           name: w.activeEvolution.name,
           identity: w.activeEvolution.identity,
+        }
+      : undefined,
+    relicRecipe: w.activeRelicRecipe
+      ? {
+          id: w.activeRelicRecipe.id,
+          name: w.activeRelicRecipe.name,
+          identity: w.activeRelicRecipe.identity,
         }
       : undefined,
     crewRumor: w.activeCrewRumor

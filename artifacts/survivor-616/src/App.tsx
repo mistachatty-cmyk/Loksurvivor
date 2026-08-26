@@ -25,9 +25,11 @@ import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { VendorPanel } from '@/ui/VendorPanel';
+import { WorkshopPanel } from '@/ui/WorkshopPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
+import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,7 @@ type Screen =
   | { name: 'music' }
   | { name: 'recovery' }
   | { name: 'vendor' }
+  | { name: 'workshop' }
   | { name: 'settings' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
   | { name: 'summary'; result: RunResult };
@@ -67,6 +70,7 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'music' ||
       requested === 'recovery' ||
       requested === 'vendor' ||
+      requested === 'workshop' ||
       requested === 'settings'
     ) {
       return { name: requested };
@@ -108,6 +112,9 @@ function Game() {
       case 'vendor':
         setScreen({ name: 'vendor' });
         break;
+      case 'workshop':
+        setScreen({ name: 'workshop' });
+        break;
       case 'settings':
         setScreen({ name: 'settings' });
         break;
@@ -123,11 +130,15 @@ function Game() {
         fatigueAddedPct: fatigueAfter - fatigueBefore,
         fatigueAfterPct: fatigueAfter,
         lokPetDiscoveries: getLokPetDiscoveries(meta.lokPetCatalog, result.lokPets),
+        newlyDiscoveredRelicIds: result.cleared && result.discoveryId && RELIC_BY_DISCOVERY_ID[result.discoveryId] &&
+          !meta.knownRelicIds.includes(RELIC_BY_DISCOVERY_ID[result.discoveryId]!.id)
+          ? [RELIC_BY_DISCOVERY_ID[result.discoveryId]!.id]
+          : [],
       };
       completeRun(resultWithFatigue);
       setScreen({ name: 'summary', result: resultWithFatigue });
     },
-    [completeRun, meta.fatigueByCharacter],
+    [completeRun, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
   switch (screen.name) {
@@ -170,6 +181,9 @@ function Game() {
 
     case 'vendor':
       return <VendorPanel onBack={goHub} />;
+
+    case 'workshop':
+      return <WorkshopPanel onBack={goHub} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} />;
