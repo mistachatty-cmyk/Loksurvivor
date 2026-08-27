@@ -634,6 +634,44 @@ export interface AreaDef {
   endless?: true;
 }
 
+export type CustomMapAssetCategory = 'ground' | 'structure' | 'hazard' | 'landmark' | 'enemy' | 'encounter';
+
+export interface CustomMapPlacement {
+  id: string;
+  assetId: string;
+  category: Exclude<CustomMapAssetCategory, 'ground'>;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface CustomMap {
+  id: string;
+  name: string;
+  bounds: { w: number; h: number };
+  groundAssetId: string;
+  landmarkAssetId: string | null;
+  placements: CustomMapPlacement[];
+  durationSec: number;
+  threat: AreaDef['threat'];
+  backdrop: string;
+  updatedAt: number;
+}
+
+export interface CustomMapAsset {
+  id: string;
+  category: CustomMapAssetCategory;
+  name: string;
+  description: string;
+  color: string;
+  w?: number;
+  h?: number;
+  areaId?: string;
+  enemyId?: string;
+  wave?: WaveDef;
+}
+
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
 export type DistrictIncursionPhase = 'pending' | 'warning' | 'active' | 'complete' | 'failed';
 
@@ -1111,6 +1149,8 @@ export interface MetaState {
   episodeProgressById: Record<string, number>;
   /** Permanent city relic knowledge found during cleared district runs. */
   knownRelicIds: string[];
+  /** Player-authored maps; these never modify the authored area catalog. */
+  customMaps: CustomMap[];
 }
 
 /* ------------------------------------------------------------------ */

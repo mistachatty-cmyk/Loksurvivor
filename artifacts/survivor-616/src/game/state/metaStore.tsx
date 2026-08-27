@@ -40,6 +40,7 @@ import {
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
+import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import type {
   AllyDef,
   AreaDef,
@@ -59,6 +60,7 @@ import type {
   FacilityTier,
   RecoverySession,
   UnlockRule,
+  CustomMap,
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
@@ -143,6 +145,7 @@ export function createInitialMeta(): MetaState {
     unlockedEvolutionIds: [],
     episodeProgressById: {},
     knownRelicIds: [],
+    customMaps: [],
   };
 }
 
@@ -531,6 +534,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     [],
   );
   const endlessDiscoveryIds = normalizeEndlessDiscoveries(parsed.endlessDiscoveryIds);
+  const customMaps = normalizeCustomMaps(parsed.customMaps);
   const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
     const evolution = EVOLUTIONS_BY_ID[evolutionId];
     return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
@@ -582,6 +586,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     unlockedEvolutionIds,
     episodeProgressById,
     knownRelicIds,
+    customMaps,
   };
 }
 
@@ -790,6 +795,10 @@ type Action =
   | { type: 'stopRecovery' }
   | { type: 'tickRecovery'; now: number }
   | { type: 'upgradeFacility' }
+  | { type: 'createCustomMap' }
+  | { type: 'saveCustomMap'; map: CustomMap }
+  | { type: 'duplicateCustomMap'; id: string }
+  | { type: 'deleteCustomMap'; id: string }
   | { type: 'reset' };
 
 function addUnique(list: string[], value?: string): string[] {
