@@ -23,15 +23,15 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
       subtitle="Mixtape"
       onBack={onBack}
     >
-      <div className="grid gap-8 lg:grid-cols-[1fr_350px]">
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_350px]">
         {/* Playlist Section */}
-        <div className="flex flex-col">
+        <div className="flex min-w-0 flex-col">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <p className="text-sm text-muted-foreground max-w-md">
-              Load tracks from this device. Nothing is uploaded — files stay in your browser.
+               The 616 mixtape is ready below. Add tracks from this device to extend it; nothing is uploaded.
             </p>
             <div className="flex gap-2 shrink-0">
-              <button 
+               <button
                 type="button" 
                 onClick={() => inputRef.current?.click()} 
                 className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 font-bold uppercase text-xs tracking-widest hover:bg-white transition-colors" 
@@ -44,9 +44,9 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 onClick={player.clearTracks} 
                 className="flex items-center gap-2 border border-border bg-card px-4 py-2 text-white font-bold uppercase text-xs tracking-widest hover:border-destructive hover:text-destructive transition-colors" 
                 data-testid="button-clear-tracks"
-                disabled={player.tracks.length === 0}
+                 disabled={!player.tracks.some((track) => track.source === 'local')}
               >
-                Clear
+                 Clear local
               </button>
             </div>
             <input
@@ -82,11 +82,11 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
           {player.tracks.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-border/50 text-muted-foreground p-12 text-center min-h-[300px]">
               <Music className="w-12 h-12 mb-4 opacity-20" />
-              <p className="font-bold uppercase tracking-widest mb-2 text-white">No tracks loaded</p>
-              <p className="text-sm max-w-sm">Add some local audio files to score your runs. MP3, WAV, FLAC supported.</p>
+               <p className="font-bold uppercase tracking-widest mb-2 text-white">No tracks loaded</p>
+               <p className="text-sm max-w-sm">The built-in mixtape is unavailable. Add local MP3, WAV, M4A, or FLAC files to score your runs.</p>
             </div>
           ) : (
-            <ul className="space-y-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            <ul className="max-h-[60vh] min-w-0 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
               {player.tracks.map((track, i) => {
                 const isPlaying = player.currentTrack?.id === track.id;
                 return (
@@ -95,7 +95,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.02 }}
-                    className={`group flex items-center justify-between border p-1 pr-3 transition-colors ${
+                     className={`group flex min-w-0 items-center justify-between border p-1 pr-3 transition-colors ${
                       isPlaying 
                         ? 'border-primary bg-primary/10' 
                         : 'border-border bg-card hover:border-primary/50'
@@ -104,28 +104,32 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                     <button 
                       type="button" 
                       onClick={() => player.playTrack(track.id)} 
-                      className="flex-1 flex items-center gap-3 text-left p-2" 
+                       className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left"
                       data-testid={`button-track-${track.id}`}
                     >
                       <div className={`w-8 h-8 flex items-center justify-center shrink-0 ${isPlaying ? 'bg-primary text-primary-foreground' : 'bg-black text-muted-foreground group-hover:text-white'}`}>
                         {isPlaying && player.isPlaying ? <Music className="w-4 h-4 animate-pulse" /> : <Play className="w-4 h-4 ml-0.5" />}
                       </div>
-                      <div className="truncate flex-1">
+                       <div className="min-w-0 flex-1 truncate">
                         <span className={`block font-bold text-sm truncate ${isPlaying ? 'text-primary' : 'text-white'}`}>
                           {track.title}
                         </span>
                       </div>
                       <span className="text-xs font-mono text-muted-foreground shrink-0">{formatTime(track.duration)}</span>
                     </button>
-                    <button 
-                      type="button" 
-                      onClick={() => player.removeTrack(track.id)} 
-                      className="text-muted-foreground hover:text-destructive p-2 opacity-0 group-hover:opacity-100 transition-all shrink-0" 
-                      data-testid={`button-remove-${track.id}`}
-                      aria-label="Remove track"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                     {track.source === 'local' ? (
+                       <button
+                         type="button"
+                         onClick={() => player.removeTrack(track.id)}
+                         className="text-muted-foreground hover:text-destructive p-2 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                         data-testid={`button-remove-${track.id}`}
+                         aria-label="Remove track"
+                       >
+                         <Trash2 className="w-4 h-4" />
+                       </button>
+                     ) : (
+                       <span className="px-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">616 Mixtape</span>
+                     )}
                   </motion.li>
                 );
               })}

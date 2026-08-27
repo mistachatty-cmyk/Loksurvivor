@@ -1,4 +1,5 @@
 import type { LootPrizeDef } from '@/game/types';
+import { rollLokPet } from './lokPets';
 
 /** Weighted prize pool for the loot box reel. */
 export interface PrizeEntry {
@@ -22,6 +23,8 @@ export const PRIZE_TABLE: PrizeEntry[] = [
   { weight: 5, prize: { kind: 'stat', stat: 'area', add: 0.12, label: '+12% Area' } },
   { weight: 5, prize: { kind: 'stat', stat: 'haste', add: -0.08, label: '-8% Cooldowns' } },
   { weight: 4, prize: { kind: 'stat', stat: 'speed', add: 12, label: '+12 Speed' } },
+  // Temporary companions — the chest generates the complete variant sheet.
+  { weight: 9, prize: { kind: 'lokpet', label: 'LokPet signal' } },
 ];
 
 /** Visual face shown on each reel strip panel. */
@@ -31,6 +34,7 @@ export const REEL_FACES = [
   { symbol: '+', color: '#7dffb2', label: 'Heal'  },
   { symbol: '^', color: '#6ee7ff', label: 'Stat'  },
   { symbol: 'W', color: '#a78bfa', label: 'Weapon' },
+  { symbol: 'P', color: '#ff7ab8', label: 'LokPet' },
 ];
 
 export function prizeToFaceIndex(prize: LootPrizeDef): number {
@@ -38,7 +42,8 @@ export function prizeToFaceIndex(prize: LootPrizeDef): number {
   if (prize.kind === 'token') return 1;
   if (prize.kind === 'heal') return 2;
   if (prize.kind === 'stat') return 3;
-  return 4; // weapon
+  if (prize.kind === 'weapon') return 4;
+  return 5; // LokPet
 }
 
 export function rollPrize(rng: () => number): LootPrizeDef {
@@ -46,7 +51,13 @@ export function rollPrize(rng: () => number): LootPrizeDef {
   let roll = rng() * totalWeight;
   for (const entry of PRIZE_TABLE) {
     roll -= entry.weight;
-    if (roll <= 0) return entry.prize;
+    if (roll <= 0) {
+      if (entry.prize.kind === 'lokpet') {
+        const lokPet = rollLokPet(rng);
+        return { ...entry.prize, label: `LokPet · ${lokPet.name}`, lokPet };
+      }
+      return entry.prize;
+    }
   }
   return PRIZE_TABLE[0]!.prize;
 }

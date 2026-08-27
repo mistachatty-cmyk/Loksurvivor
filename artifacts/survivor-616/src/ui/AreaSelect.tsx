@@ -3,13 +3,18 @@
  * and props stable.
  */
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { customMapToArea, customMapValidationIssues } from '@/game/data/customMaps';
+import { availableChallengeContracts } from '@/game/data/vendor';
+import { getFirstNightChapter } from '@/game/data/firstNight';
 import { ScreenLayout } from './ScreenLayout';
+import { FirstNightBoard } from './FirstNightBoard';
 import { motion } from 'framer-motion';
-import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity } from 'lucide-react';
+import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy } from 'lucide-react';
+import { useState } from 'react';
 
 export interface AreaSelectProps {
   onBack: () => void;
-  onLaunch: (areaId: string) => void;
+  onLaunch: (areaId: string, challengeIds: string[]) => void;
 }
 
 const THREAT_COLORS = {
@@ -21,6 +26,16 @@ const THREAT_COLORS = {
 
 export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const { unlockedAreas, lockedAreas, meta, selectedCharacter } = useMeta();
+  const customMaps = meta.customMaps;
+  const challenges = availableChallengeContracts(meta);
+  const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
+
+  const toggleChallenge = (id: string) => {
+    setSelectedChallengeIds((current) => {
+      if (current.includes(id)) return current.filter((challengeId) => challengeId !== id);
+      return current.length < 2 ? [...current, id] : current;
+    });
+  };
 
   return (
     <ScreenLayout 
@@ -34,7 +49,88 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
         </div>
       }
     >
+      <div className="mb-6">
+        <FirstNightBoard />
+      </div>
+
+      {challenges.length > 0 && (
+        <section className="mb-6 border border-red-500/30 bg-red-950/10 p-4 sm:p-5" data-testid="section-run-contracts">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-red-300">
+                <Skull className="h-4 w-4" />
+                <p className="text-xs font-bold uppercase tracking-[0.25em]">Optional contracts</p>
+              </div>
+              <h2 className="mt-1 text-2xl font-black uppercase text-white">Raise the stakes</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Owned contracts are selected before launch. Choose up to two for a larger cred payout.</p>
+            </div>
+            <span className="font-mono text-xs text-red-200/80">{selectedChallengeIds.length}/2 selected</span>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-3">
+            {challenges.map((challenge) => {
+              const selected = selectedChallengeIds.includes(challenge.id);
+              return (
+                <button
+                  key={challenge.id}
+                  type="button"
+                  onClick={() => toggleChallenge(challenge.id)}
+                  aria-pressed={selected}
+                  className={`border p-3 text-left transition-colors ${selected ? 'border-red-400 bg-red-500/15' : 'border-border bg-card hover:border-red-400/60'}`}
+                  data-testid={`button-toggle-challenge-${challenge.id}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold uppercase text-white">{challenge.name}</span>
+                    <span className="font-mono text-xs text-red-300">×{challenge.rewardMultiplier.toFixed(2)}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{challenge.description}</p>
+                  <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-red-200">{selected ? 'Selected for next run' : 'Available contract'}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {customMaps.map((map, i) => {
+          const area = customMapToArea(map);
+          const mapIssues = customMapValidationIssues(map);
+          const launchable = mapIssues.length === 0;
+          return (
+            <motion.button
+              key={map.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+              type="button"
+              onClick={() => launchable && onLaunch(map.id, selectedChallengeIds)}
+              disabled={!launchable}
+              className="group relative flex h-64 w-full flex-col overflow-hidden border border-cyan-200/30 bg-card text-left transition-colors hover:border-cyan-200"
+              data-testid={`button-custom-map-${map.id}`}
+            >
+              <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 z-10 bg-[#071116]/80 transition-colors group-hover:bg-[#071116]/60" />
+                <div className="absolute inset-0 z-10 bg-gradient-to-t from-background via-background/90 to-background/20" />
+                <img src={`${import.meta.env.BASE_URL}${area.backdrop}`} alt="" className="h-full w-full object-cover opacity-45 grayscale mix-blend-luminosity transition-transform duration-700 group-hover:scale-105" />
+              </div>
+              <div className="relative z-20 flex h-full flex-col p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-200"><PencilRuler className="h-3 w-3" /> Custom route</p>
+                    <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">{map.name}</h2>
+                  </div>
+                  <Copy className="h-4 w-4 text-cyan-200/70" />
+                </div>
+                <p className="mt-auto line-clamp-2 text-xs text-muted-foreground">{area.description}</p>
+                <div className="mt-4 flex items-center gap-2">
+                  <span className="border border-cyan-200/30 bg-cyan-200/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">{map.placements.length} objects</span>
+                  <span className="border border-border bg-black/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-white">{map.durationSec}s</span>
+                  <span className={`ml-auto font-mono text-[10px] font-bold uppercase tracking-widest ${launchable ? 'text-cyan-100' : 'text-amber-200'}`}>{launchable ? map.threat : 'needs enemy'}</span>
+                </div>
+              </div>
+            </motion.button>
+          );
+        })}
         {unlockedAreas.map((area, i) => {
           const isCleared = meta.clearedAreaIds.includes(area.id);
           const threatColor = THREAT_COLORS[area.threat];
@@ -46,7 +142,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: i * 0.05 }}
               type="button"
-              onClick={() => onLaunch(area.id)}
+              onClick={() => onLaunch(area.id, selectedChallengeIds)}
               className="group relative w-full text-left border border-border bg-card overflow-hidden flex flex-col hover:border-primary transition-colors h-64"
               data-testid={`button-area-${area.id}`}
             >
@@ -82,6 +178,22 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                 <p className="text-xs text-muted-foreground line-clamp-2 mb-4 group-hover:text-gray-300 transition-colors">
                   {area.description}
                 </p>
+                {getFirstNightChapter(area.id) && (
+                  <div className="mb-3 border border-cyan-300/20 bg-cyan-950/10 p-2.5" data-testid={`first-night-goal-${area.id}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100/75">
+                        Chapter {getFirstNightChapter(area.id)?.chapter} · {getFirstNightChapter(area.id)?.worldVerb}
+                      </span>
+                      {isCleared && <span className="font-mono text-[9px] uppercase tracking-widest text-primary">Replay lead</span>}
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-white/80">{getFirstNightChapter(area.id)?.goal}</p>
+                  </div>
+                )}
+                {area.landmark && (
+                  <p className="mb-3 truncate border-l-2 border-primary/60 pl-2 text-[10px] font-bold uppercase tracking-widest text-primary/80">
+                    Landmark: {area.landmark.name}
+                  </p>
+                )}
 
                 <div className="flex items-center gap-3">
                   <div className={`flex items-center gap-1.5 px-2 py-1 border ${threatColor}`}>
@@ -124,10 +236,16 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
             
             <div className="relative z-20 flex flex-col items-center justify-center h-full text-center">
               <Lock className="w-8 h-8 text-muted-foreground mb-3" />
-              <h2 className="text-xl font-black text-muted-foreground uppercase tracking-tight mb-2">Locked Zone</h2>
+              <h2 className="text-xl font-black text-white uppercase tracking-tight mb-1">{area.name}</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">{area.district}</p>
               <p className="text-xs text-primary font-bold uppercase tracking-wider max-w-[200px]">
                 {describeUnlock(area.unlock)}
               </p>
+              {area.landmark && (
+                <p className="mt-2 text-[10px] uppercase tracking-widest text-muted-foreground/80">
+                  Landmark: {area.landmark.name}
+                </p>
+              )}
             </div>
           </motion.div>
         ))}

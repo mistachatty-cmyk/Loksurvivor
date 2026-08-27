@@ -107,3 +107,76 @@
     @apply font-display tracking-tight uppercase;
   }
 }
+
+@keyframes hideout-drift-one {
+  from { transform: translate3d(-18vw, 0, 0); }
+  to { transform: translate3d(118vw, 0, 0); }
+}
+
+@keyframes hideout-drift-two {
+  from { transform: translate3d(112vw, 0, 0); }
+  to { transform: translate3d(-24vw, 0, 0); }
+}
+
+@keyframes hideout-fly {
+  0%, 100% { transform: translate3d(-8vw, 0, 0); opacity: 0; }
+  12%, 82% { opacity: .45; }
+  50% { transform: translate3d(54vw, -2vh, 0); }
+  92% { transform: translate3d(112vw, 1vh, 0); opacity: 0; }
+}
+
+@keyframes hideout-rain {
+  from { background-position: 0 0; }
+  to { background-position: -3rem 8rem; }
+}
+
+.hideout-ambient { color: var(--scene-accent); overflow: hidden; }
+.hideout-sky-glow {
+  position: absolute; inset: 0 0 35%; opacity: .22;
+  background: radial-gradient(ellipse at 70% 20%, var(--scene-accent), transparent 55%);
+}
+.hideout-cloud {
+  position: absolute; width: 28rem; height: 5rem; border-radius: 999px; opacity: .12;
+  background: var(--scene-sky); filter: blur(10px); animation: hideout-drift-one 44s linear infinite;
+}
+.hideout-cloud-one { top: 16%; left: 0; }
+.hideout-cloud-two { top: 29%; left: 35%; width: 18rem; opacity: .09; animation-name: hideout-drift-two; animation-duration: 58s; }
+.hideout-fliers { position: absolute; inset: 0; font-family: var(--app-font-mono); }
+.hideout-flier { position: absolute; animation: hideout-fly 24s linear infinite; }
+.flier-one { top: 22%; animation-delay: -4s; }
+.flier-two { top: 34%; animation-delay: -13s; animation-duration: 31s; font-size: .75rem; }
+.flier-three { top: 12%; animation-delay: -20s; animation-duration: 38s; }
+.hideout-weather-particles { position: absolute; inset: 0; opacity: .3; }
+.hideout-weather-rain .hideout-weather-particles {
+  background-image: repeating-linear-gradient(105deg, transparent 0 1.5rem, rgba(125, 211, 252, .28) 1.55rem 1.62rem, transparent 1.67rem 3.5rem);
+  background-size: 100% 8rem; animation: hideout-rain .8s linear infinite;
+}
+.hideout-weather-fog .hideout-weather-particles { background: linear-gradient(90deg, transparent, rgba(203, 213, 225, .16), transparent); animation: hideout-drift-two 22s linear infinite; }
+.hideout-weather-heat .hideout-weather-particles { background: radial-gradient(ellipse at 42% 70%, rgba(45, 212, 191, .18), transparent 34%); filter: blur(12px); }
+.hideout-weather-snow .hideout-weather-particles { background-image: radial-gradient(circle, rgba(255,255,255,.65) 0 1px, transparent 1.5px); background-size: 2.4rem 2.4rem; animation: hideout-rain 5s linear infinite; }
+.hideout-home-art { position: absolute; right: 6%; bottom: 13%; display: grid; place-items: center; color: var(--scene-accent); opacity: .65; }
+.hideout-window-grid { display: flex; gap: .5rem; padding: .8rem; border: 2px solid currentColor; box-shadow: 0 0 2rem color-mix(in srgb, var(--scene-accent) 35%, transparent); }
+.hideout-window-grid span { display: block; width: 1.2rem; height: 1.6rem; background: currentColor; opacity: .5; }
+
+.music-reactive-root {
+  --music-energy: 0;
+  min-height: 100%;
+}
+.music-reactive-root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  pointer-events: none;
+  opacity: calc(var(--music-energy) * .09);
+  box-shadow: inset 0 0 12rem hsl(var(--primary) / .65);
+  transition: opacity 160ms ease-out;
+}
+.music-reactive-root:has([data-testid="screen-run"])::before {
+  mix-blend-mode: screen;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hideout-ambient *, .hideout-ambient { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+  .music-reactive-root::before { opacity: 0 !important; }
+}

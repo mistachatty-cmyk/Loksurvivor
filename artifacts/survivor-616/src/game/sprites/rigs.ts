@@ -28,6 +28,8 @@ interface HumanoidOptions {
   puffs?: boolean;
   /** Adds a hood shape over the head. */
   hood?: boolean;
+  /** Adds a tall arcane staff silhouette to the fighter's right side. */
+  staff?: boolean;
   /** Adds wings behind the torso. */
   wings?: boolean;
   /** Head color override. */
@@ -38,6 +40,76 @@ interface HumanoidOptions {
   bulk?: boolean;
   /** Narrows the frame and drops the head low for a small, hunched silhouette. */
   hunched?: boolean;
+}
+
+export type ExpressiveStyle = 'prism' | 'flame' | 'spiral' | 'river' | 'astral';
+
+/**
+ * A deliberately exaggerated pixel language for new moodboard-inspired
+ * characters. It composes with the familiar humanoid rig so collision and
+ * animation contracts stay unchanged while the silhouette gets a signature.
+ */
+export function expressiveRig(style: ExpressiveStyle, height = 21): SpriteRig {
+  const rig = humanoidRig({
+    height,
+    width: style === 'flame' ? 10 : style === 'astral' ? 9 : 11,
+    hood: style === 'spiral',
+    halo: style === 'astral',
+    staff: style === 'prism' || style === 'astral',
+    headColor: style === 'spiral' ? 'bodyDark' : 'skin',
+    torsoColor: style === 'flame' ? 'bodyDark' : 'body',
+  });
+  const top = height + (style === 'astral' ? 5 : 1);
+  const signature: SpritePart[] = [];
+  if (style === 'prism') {
+    signature.push(
+      { key: 'aura', x: -9, y: top - 8, w: 3, h: 7, color: 'accent', z: 0 },
+      { key: 'aura', x: 6, y: top - 8, w: 3, h: 7, color: 'glow', z: 0 },
+      { key: 'crest', x: -3, y: top + 1, w: 2, h: 2, color: 'accentBright', z: 9 },
+      { key: 'crest', x: 1, y: top + 3, w: 2, h: 2, color: 'accent', z: 9 },
+    );
+  } else if (style === 'flame') {
+    signature.push(
+      { key: 'crest', x: -4, y: top, w: 3, h: 5, color: 'accent', z: 8 },
+      { key: 'crest', x: 0, y: top + 2, w: 3, h: 6, color: 'accentBright', z: 9 },
+      { key: 'aura', x: -7, y: 2, w: 2, h: 5, color: 'glow', z: 0 },
+      { key: 'aura', x: 5, y: 4, w: 2, h: 4, color: 'accent', z: 0 },
+    );
+  } else if (style === 'spiral') {
+    signature.push(
+      { key: 'face', x: -4, y: top - 5, w: 2, h: 2, color: 'glow', z: 8 },
+      { key: 'face', x: 2, y: top - 5, w: 2, h: 2, color: 'glow', z: 8 },
+      { key: 'aura', x: -8, y: 5, w: 2, h: 8, color: 'accent', z: 0 },
+      { key: 'aura', x: 6, y: 7, w: 2, h: 6, color: 'glow', z: 0 },
+    );
+  } else if (style === 'river') {
+    signature.push(
+      { key: 'crest', x: -6, y: top, w: 2, h: 6, color: 'accent', z: 8 },
+      { key: 'crest', x: 4, y: top + 1, w: 2, h: 5, color: 'accent', z: 8 },
+      { key: 'aura', x: -8, y: 1, w: 3, h: 6, color: 'glow', z: 0 },
+      { key: 'aura', x: 5, y: 2, w: 3, h: 5, color: 'accent', z: 0 },
+    );
+  } else {
+    signature.push(
+      { key: 'aura', x: -10, y: top - 4, w: 2, h: 2, color: 'accent', z: 0 },
+      { key: 'aura', x: 8, y: top - 1, w: 2, h: 2, color: 'glow', z: 0 },
+      { key: 'crest', x: -2, y: top + 4, w: 4, h: 1, color: 'accentBright', z: 9 },
+    );
+  }
+  rig.parts.push(...signature);
+  const offset = style === 'flame' ? 1 : style === 'river' ? 1.15 : 1;
+  rig.anims.idle = bobClip(style === 'river' ? 2 : 1, 150 * offset);
+  rig.anims.attack = {
+    frameMs: 64,
+    loop: false,
+    frames: [
+      { armR: { dx: -2, dy: -1 }, torso: { dx: -1 }, aura: { dx: -1 } },
+      { armR: { dx: 2, dy: 2, dw: 2 }, torso: { dx: 1 }, crest: { dy: 2 } },
+      { armR: { dx: 6, dy: 1, dw: 4 }, torso: { dx: 2 }, head: { dx: 2 }, aura: { dx: 3, dw: 2 } },
+      { armR: { dx: 2 }, torso: { dx: 1 }, head: { dx: 1 } },
+    ],
+  };
+  return rig;
 }
 
 function bobClip(amount: number, frameMs: number): AnimClip {
@@ -146,6 +218,7 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
     cap = false,
     puffs = false,
     hood = false,
+    staff = false,
     wings = false,
     headColor = 'skin',
     torsoColor = 'body',
@@ -195,6 +268,13 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
 
   if (hood) {
     parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 2, w: effectiveWidth, h: 3, color: 'bodyDark', z: 6 });
+  }
+  if (staff) {
+    parts.push(
+      { key: 'aura', x: half + 3, y: 0, w: 2, h: height + 5, color: 'bodyDark', z: 1 },
+      { key: 'crest', x: half + 1, y: height + 3, w: 6, h: 2, color: 'accent', z: 8 },
+      { key: 'crest', x: half + 3, y: height + 5, w: 2, h: 3, color: 'accentBright', z: 9 },
+    );
   }
   if (cap) {
     parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 1, w: effectiveWidth + 2, h: 2, color: 'accent', z: 7 });
@@ -300,4 +380,57 @@ export function blobRig(options: BlobOptions = {}): SpriteRig {
     ],
   };
   return { pixelHeight: height, parts, anims };
+}
+
+/** Angular, mask-like silhouettes for characters that should not read as human. */
+export function triangleRig(height = 21): SpriteRig {
+  const parts: SpritePart[] = [
+    { key: 'shadow', x: -7, y: 0, w: 14, h: 2, color: 'ink', z: 0 },
+    { key: 'torso', x: -8, y: 3, w: 16, h: 12, color: 'body', z: 2 },
+    { key: 'head', x: -5, y: 15, w: 10, h: 5, color: 'bodyDark', z: 3 },
+    { key: 'face', x: -3, y: 17, w: 6, h: 2, color: 'accentBright', z: 4 },
+    { key: 'crest', x: -2, y: 20, w: 4, h: 5, color: 'accent', z: 5 },
+    { key: 'legL', x: -6, y: 0, w: 3, h: 4, color: 'bodyDark', z: 1 },
+    { key: 'legR', x: 3, y: 0, w: 3, h: 4, color: 'bodyDark', z: 1 },
+  ];
+  const anims = baseAnims(false, 0.9);
+  anims.walk = { frameMs: 95, loop: true, frames: [
+    { torso: { dx: -1, dy: 1 }, crest: { dx: -1 }, legL: { dh: -1 } },
+    { torso: { dx: 1 }, crest: { dx: 1 }, legR: { dh: -1 } },
+  ] };
+  return { pixelHeight: height, parts, anims };
+}
+
+/** Long, translucent-feeling swimmers; the body moves as a single ribbon. */
+export function eelRig(height = 16): SpriteRig {
+  const parts: SpritePart[] = [
+    { key: 'shadow', x: -11, y: 0, w: 22, h: 2, color: 'ink', z: 0 },
+    { key: 'torso', x: -12, y: 4, w: 20, h: 6, color: 'body', z: 2 },
+    { key: 'head', x: 7, y: 5, w: 7, h: 7, color: 'bodyDark', z: 3 },
+    { key: 'face', x: 11, y: 8, w: 2, h: 2, color: 'accentBright', z: 4 },
+    { key: 'crest', x: -13, y: 6, w: 4, h: 4, color: 'accent', z: 1 },
+  ];
+  const anims = baseAnims(false, 0.75);
+  anims.walk = { frameMs: 100, loop: true, frames: [
+    { torso: { dy: 1 }, head: { dy: 2 }, crest: { dy: -1 } },
+    { torso: { dy: -1 }, head: { dy: -2 }, crest: { dy: 1 } },
+  ] };
+  return { pixelHeight: height, parts, anims };
+}
+
+/** Oversized mascot silhouette with a readable wind-up and impact pose. */
+export function giantRig(height = 28): SpriteRig {
+  const rig = humanoidRig({ height, width: 18, headColor: 'bodyDark', torsoColor: 'body' });
+  rig.parts.push(
+    { key: 'crest', x: -12, y: height - 2, w: 5, h: 5, color: 'accent', z: 8 },
+    { key: 'crest', x: 7, y: height - 2, w: 5, h: 5, color: 'accent', z: 8 },
+  );
+  rig.anims.attack = {
+    frameMs: 85, loop: false, frames: [
+      { armR: { dx: -5, dy: 2 }, torso: { dx: -2 } },
+      { armR: { dx: 8, dw: 8, dy: -2 }, torso: { dx: 3 }, head: { dx: 2 } },
+      { armR: { dx: 10, dw: 10 }, torso: { dx: 4 }, head: { dx: 3 } },
+    ],
+  };
+  return rig;
 }

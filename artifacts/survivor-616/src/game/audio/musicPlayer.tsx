@@ -15,8 +15,18 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
+import dontFly from '@assets/Don\'t_Fly_1787686881680.mp3?url';
+import fat from '@assets/F.A.T.$_2_1787686881680.m4a?url';
+import layback from '@assets/Layback_1787686881680.wav?url';
+import dodds from '@assets/Dodds_Ave_289-~Somethin_1787686881680.m4a?url';
+import rbm from '@assets/RBM_1787686881680.m4a?url';
+import neverMind from '@assets/NeverMind-Brkn-Part2_1787686881680.mp3?url';
+import demoTape from '@assets/That_One_Song-Demo_Tape_1787686881680.mp3?url';
+import goinLoco from '@assets/Goin_Loco_Mary_Sue_1787686881680.mp3?url';
+import dontFly2 from '@assets/Don\'t_Fly_2_1787686881680.mp3?url';
 
 export interface Track {
   id: string;
@@ -28,6 +38,7 @@ export interface Track {
   size: number;
   /** Seconds; filled in once metadata loads. */
   duration: number | null;
+  source: 'bundled' | 'local';
 }
 
 export type RepeatMode = 'off' | 'all' | 'one';
@@ -63,6 +74,18 @@ const MusicContext = createContext<MusicPlayerValue | null>(null);
 
 const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|webm|opus)$/i;
 
+const BUNDLED_TRACKS: Track[] = ([
+  { id: 'dont-fly', title: "Don't Fly", url: dontFly, source: 'bundled' },
+  { id: 'fat-2', title: 'F.A.T.$ 2', url: fat, source: 'bundled' },
+  { id: 'layback', title: 'Layback', url: layback, source: 'bundled' },
+  { id: 'dodds-ave-somethin', title: 'Dodds Ave ~ Somethin', url: dodds, source: 'bundled' },
+  { id: 'rbm', title: 'RBM', url: rbm, source: 'bundled' },
+  { id: 'never-mind-brkn-part-2', title: 'NeverMind — Brkn Part 2', url: neverMind, source: 'bundled' },
+  { id: 'that-one-song-demo-tape', title: 'That One Song — Demo Tape', url: demoTape, source: 'bundled' },
+  { id: 'goin-loco-mary-sue', title: 'Goin Loco — Mary Sue', url: goinLoco, source: 'bundled' },
+  { id: 'dont-fly-2', title: "Don't Fly 2", url: dontFly2, source: 'bundled' },
+] as const).map((track) => ({ ...track, size: 0, duration: null }));
+
 function titleFromFile(file: File): string {
   return file.name.replace(AUDIO_EXTENSIONS, '').replace(/[_-]+/g, ' ').trim() || file.name;
 }
@@ -70,8 +93,12 @@ function titleFromFile(file: File): string {
 export function MusicProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tracksRef = useRef<Track[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const energyFrameRef = useRef<number | null>(null);
 
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [tracks, setTracks] = useState<Track[]>(BUNDLED_TRACKS);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.7);
@@ -81,6 +108,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [progressSec, setProgressSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const reactiveRootRef = useRef<HTMLDivElement | null>(null);
 
   tracksRef.current = tracks;
 
@@ -91,6 +119,45 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }
 
   const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null;
+
+  const stopEnergyMeter = useCallback(() => {
+    if (energyFrameRef.current !== null) cancelAnimationFrame(energyFrameRef.current);
+    energyFrameRef.current = null;
+    reactiveRootRef.current?.style.setProperty('--music-energy', '0');
+  }, []);
+
+  const startEnergyMeter = useCallback(() => {
+    const analyser = analyserRef.current;
+    if (!analyser || energyFrameRef.current !== null) return;
+    const values = new Uint8Array(analyser.frequencyBinCount);
+    const sample = () => {
+      analyser.getByteFrequencyData(values);
+      const average = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
+      reactiveRootRef.current?.style.setProperty('--music-energy', String(Math.min(1, average / 150)));
+      energyFrameRef.current = requestAnimationFrame(sample);
+    };
+    energyFrameRef.current = requestAnimationFrame(sample);
+  }, []);
+
+  const connectAnalyser = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || typeof window === 'undefined') return;
+    const AudioContextConstructor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextConstructor) return;
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContextConstructor();
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 128;
+        sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audio);
+        sourceNodeRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(audioContextRef.current.destination);
+      }
+      if (audioContextRef.current.state === 'suspended') void audioContextRef.current.resume();
+    } catch {
+      // Playback still works if Web Audio analysis is unavailable.
+    }
+  }, []);
 
   const pickNextIndex = useCallback(
     (from: number, direction: 1 | -1): number => {
@@ -121,6 +188,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     void audio
       .play()
       .then(() => {
+        connectAnalyser();
+        startEnergyMeter();
         setIsPlaying(true);
         setError(null);
       })
@@ -128,7 +197,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         setIsPlaying(false);
         setError(`Could not play "${track.title}". The browser may not support this format.`);
       });
-  }, []);
+  }, [connectAnalyser, startEnergyMeter]);
 
   /* --------------------------------------------------------------- */
   /* Audio element wiring                                             */
@@ -141,7 +210,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const onTime = () => setProgressSec(audio.currentTime);
     const onMeta = () => setDurationSec(Number.isFinite(audio.duration) ? audio.duration : 0);
     const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onPause = () => {
+      setIsPlaying(false);
+      stopEnergyMeter();
+    };
     const onError = () => {
       setIsPlaying(false);
       const title = tracksRef.current[currentIndex]?.title;
@@ -175,7 +247,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener('error', onError);
       audio.removeEventListener('ended', onEnded);
     };
-  }, [currentIndex, pickNextIndex, playIndex, repeat]);
+  }, [currentIndex, pickNextIndex, playIndex, repeat, stopEnergyMeter]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -188,11 +260,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return () => {
       for (const track of tracksRef.current) {
-        URL.revokeObjectURL(track.url);
+        if (track.source === 'local') URL.revokeObjectURL(track.url);
       }
       audioRef.current?.pause();
+      stopEnergyMeter();
+      void audioContextRef.current?.close();
     };
-  }, []);
+  }, [stopEnergyMeter]);
 
   /* --------------------------------------------------------------- */
   /* Playlist management                                              */
@@ -215,6 +289,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         url: URL.createObjectURL(file),
         size: file.size,
         duration: null,
+        source: 'local',
       });
     }
 
@@ -254,7 +329,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       setTracks((prev) => {
         const index = prev.findIndex((t) => t.id === id);
         if (index === -1) return prev;
-        URL.revokeObjectURL(prev[index]!.url);
+        if (prev[index]!.source === 'bundled') return prev;
+        if (prev[index]!.source === 'local') URL.revokeObjectURL(prev[index]!.url);
         const next = prev.filter((t) => t.id !== id);
         tracksRef.current = next;
 
@@ -276,10 +352,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const clearTracks = useCallback(() => {
     audioRef.current?.pause();
     for (const track of tracksRef.current) {
-      URL.revokeObjectURL(track.url);
+      if (track.source === 'local') URL.revokeObjectURL(track.url);
     }
-    tracksRef.current = [];
-    setTracks([]);
+    tracksRef.current = BUNDLED_TRACKS;
+    setTracks(BUNDLED_TRACKS);
     setCurrentIndex(-1);
     setIsPlaying(false);
     setProgressSec(0);
@@ -398,7 +474,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  return <MusicContext.Provider value={value}>{children}</MusicContext.Provider>;
+  return (
+    <MusicContext.Provider value={value}>
+      <div
+        className="music-reactive-root"
+        ref={reactiveRootRef}
+        style={{ '--music-energy': 0 } as CSSProperties}
+      >
+        {children}
+      </div>
+    </MusicContext.Provider>
+  );
 }
 
 export function useMusicPlayer(): MusicPlayerValue {

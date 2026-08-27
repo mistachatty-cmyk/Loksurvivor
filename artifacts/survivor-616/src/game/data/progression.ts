@@ -23,6 +23,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { magnet: 18 },
     boostLabel: '+18 pickup range',
+    preferredActivityIds: ['sort-supplies', 'fortify-doors'],
     palette: {
       ink: '#1a1208', body: '#d97706', bodyDark: '#78350f', accent: '#fbbf24',
       accentBright: '#fef3c7', skin: '#b45309', glow: '#fbbf24',
@@ -37,6 +38,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { armor: 0.06, maxHp: 12 },
     boostLabel: '+6% armor, +12 max HP',
+    preferredActivityIds: ['fortify-doors', 'field-rations'],
     palette: {
       ink: '#0d1117', body: '#475569', bodyDark: '#1e293b', accent: '#94a3b8',
       accentBright: '#e2e8f0', skin: '#64748b', glow: '#cbd5e1',
@@ -51,6 +53,7 @@ export const ALLIES: AllyDef[] = [
     room: 'rooftop-perch',
     boost: { speed: 8 },
     boostLabel: '+8 move speed',
+    preferredActivityIds: ['scout-routes', 'mark-approach-lanes'],
     palette: {
       ink: '#1b0a1a', body: '#db2777', bodyDark: '#831843', accent: '#f9a8d4',
       accentBright: '#fce7f3', skin: '#9d174d', glow: '#f472b6',
@@ -65,6 +68,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-cellar',
     boost: { power: 0.08 },
     boostLabel: '+8% damage',
+    preferredActivityIds: ['tune-the-rig', 'study-anomalies'],
     palette: {
       ink: '#0a1410', body: '#0f766e', bodyDark: '#134e4a', accent: '#5eead4',
       accentBright: '#ccfbf1', skin: '#0d9488', glow: '#2dd4bf',
@@ -79,6 +83,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { maxHp: 25 },
     boostLabel: '+25 max HP',
+    preferredActivityIds: ['field-rations', 'sort-supplies'],
     palette: {
       ink: '#1a0f0a', body: '#b91c1c', bodyDark: '#7f1d1d', accent: '#fca5a5',
       accentBright: '#fee2e2', skin: '#92400e', glow: '#f87171',
@@ -103,18 +108,20 @@ export const HUB_ROOMS: HubRoomDef[] = [
     description:
       'A basement bar with the lights kept low on purpose. Everyone you have pulled off the street ends up here first.',
     backdrop: 'art/bar.jpeg',
+    biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'allies', 'music'],
+    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'settings'],
   },
   {
     id: 'rooftop-perch',
     name: 'The Perch',
-    subtitle: 'Rooftop above the bar',
+    subtitle: 'Rooftop recovery deck',
     description:
-      'Tar paper, a folding chair and the whole grid laid out below. Best place to read the city before a run.',
+      'Tar paper, warm steam, a folding chair and the whole grid laid out below. Best place to let the city wait.',
     backdrop: 'art/rooftops.jpeg',
+    biome: 'rooftop',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
-    features: ['runs', 'bestiary', 'unlocks'],
+    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings'],
   },
   {
     id: 'the-cellar',
@@ -123,8 +130,9 @@ export const HUB_ROOMS: HubRoomDef[] = [
     description:
       'Behind the walk-in cooler, down a hatch nobody mentions. Lantern light, glass growths, and a record wall.',
     backdrop: 'art/cellar.jpeg',
+    biome: 'cellar',
     unlock: { kind: 'discovery', discoveryId: 'lantern-shard' },
-    features: ['music', 'bestiary', 'allies', 'unlocks'],
+    features: ['music', 'bestiary', 'allies', 'unlocks', 'settings'],
   },
 ];
 
@@ -142,6 +150,10 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'skyline-tag', name: 'Skyline Tag', blurb: 'Nyx signed the water tower in paint that only shows under streetlight.' },
   { id: 'lantern-shard', name: 'Lantern Shard', blurb: 'A splinter of the cellar glass. Warm to the touch, hums faintly.' },
   { id: 'sire-ledger', name: "The Sire's Ledger", blurb: 'A book of names and dates. Half the block is in it. So are you.' },
+  { id: 'floodwall-mark', name: 'Floodwall Mark', blurb: 'A hand-painted arrow under the floodwall: east to the market, north to the rail cut.' },
+  { id: 'market-bell', name: 'The Market Bell', blurb: 'A brass bell from the old market hall. Vee says it rang once for every person who made it home.' },
+  { id: 'northline-switch', name: 'Northline Switch', blurb: 'A rail switch marked with the Sanctum symbol. Someone has been moving supplies under the city.' },
+  { id: 'civic-fountain', name: 'The Civic Fountain', blurb: 'The plaza fountain still runs red at midnight, carrying the Sire’s oldest route toward the river.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

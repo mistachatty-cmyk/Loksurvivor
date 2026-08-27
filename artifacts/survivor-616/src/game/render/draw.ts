@@ -6,12 +6,15 @@
  * reads as pixel art without needing image atlases.
  */
 
-import type { World } from '@/game/engine/world';
+import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
-import { getAmbientKind } from '@/game/data/ambient';
+import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
+import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import type { ObstacleDef } from '@/game/types';
+import { getBuildingPrefab } from '@/game/engine/chunks';
 
 import { drawRig, drawShadow } from './sprite';
+import { clamp } from '@/game/engine/math';
 
 /** World units of sprite height per rig pixel. */
 const SPRITE_SCALE = 2.05;
@@ -82,41 +85,371 @@ function drawGround(ctx: CanvasRenderingContext2D, w: World, left: number, top: 
   ctx.globalAlpha = 1;
 }
 
-/**
- * Color-graded time-of-day wash. `phase` is 0..1 (midnight -> pre-dawn ->
- * neutral -> dusk -> back to midnight). 0.5 resolves to fully transparent so
- * this is a no-op until something (the day/night clock) actually drives
- * `w.cycle.phase` -- today's baked-in night palette is untouched by default.
- */
-const TIME_OF_DAY_STOPS: Array<[number, [number, number, number, number]]> = [
-  [0, [10, 14, 40, 0.16]],
-  [0.25, [60, 24, 70, 0.12]],
-  [0.5, [0, 0, 0, 0]],
-  [0.75, [90, 46, 12, 0.1]],
-  [1, [10, 14, 40, 0.16]],
-];
+/** Small, deterministic bits of city dressing that sit between the combat props. */
+function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const endless = Boolean(w.area.endless);
+  const dungeon = Boolean(w.endless?.inDungeon);
+  const accent = groundAccent(w);
+  const step = 192;
+  const startX = Math.floor(left / step) * step;
+  const startY = Math.floor(top / step) * step;
 
-function timeOfDayTint(phase: number): string {
-  const clamped = Math.min(1, Math.max(0, phase));
-  let a = TIME_OF_DAY_STOPS[0]!;
-  let b = TIME_OF_DAY_STOPS[TIME_OF_DAY_STOPS.length - 1]!;
-  for (let i = 0; i < TIME_OF_DAY_STOPS.length - 1; i += 1) {
-    if (clamped >= TIME_OF_DAY_STOPS[i]![0] && clamped <= TIME_OF_DAY_STOPS[i + 1]![0]) {
-      a = TIME_OF_DAY_STOPS[i]!;
-      b = TIME_OF_DAY_STOPS[i + 1]!;
-      break;
+  ctx.save();
+  ctx.lineWidth = 2;
+  for (let x = startX; x < right; x += step) {
+    for (let y = startY; y < bottom; y += step) {
+      const n = hashCell(x / step, y / step);
+      // Broken curb segments and painted lane fragments stop the grid reading
+      // as a collection of square arenas while remaining purely cosmetic.
+      if (n > 0.42) {
+        ctx.globalAlpha = dungeon ? 0.12 : 0.2;
+        ctx.strokeStyle = dungeon ? w.area.ground.glow : w.area.ground.seam;
+        ctx.setLineDash(n > 0.72 ? [18, 12] : [5, 15]);
+        ctx.beginPath();
+        ctx.moveTo(x + 18, y + 34 + n * 18);
+        ctx.lineTo(x + 142, y + 34 + n * 18);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (!dungeon && n > 0.78) {
+        ctx.globalAlpha = 0.16;
+        ctx.strokeStyle = accent;
+        ctx.beginPath();
+        ctx.moveTo(x + 20, y + 150);
+        ctx.lineTo(x + 76, y + 132);
+        ctx.lineTo(x + 134, y + 150);
+        ctx.stroke();
+      }
+      if (endless && n < 0.16) {
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = '#101018';
+        ctx.beginPath();
+        ctx.ellipse(x + 96, y + 96, 38 + n * 30, 11 + n * 8, n * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
-  const span = b[0] - a[0] || 1;
-  const t = (clamped - a[0]) / span;
-  const lerp = (x: number, y: number) => x + (y - x) * t;
-  const [r1, g1, b1, alpha1] = a[1];
-  const [r2, g2, b2, alpha2] = b[1];
-  const r = Math.round(lerp(r1, r2));
-  const g = Math.round(lerp(g1, g2));
-  const bl = Math.round(lerp(b1, b2));
-  const alpha = lerp(alpha1, alpha2);
-  return `rgba(${r}, ${g}, ${bl}, ${alpha.toFixed(3)})`;
+  ctx.restore();
+}
+
+function drawChunkLandmark(
+  ctx: CanvasRenderingContext2D,
+  block: {
+    x: number;
+    y: number;
+    landmark?: { name: string; kind: string; accent: string };
+  },
+) {
+  const landmark = block.landmark;
+  if (!landmark) return;
+
+  const { x, y } = block;
+  ctx.save();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = landmark.accent;
+  ctx.fillStyle = `${landmark.accent}26`;
+  ctx.shadowColor = landmark.accent;
+  ctx.shadowBlur = 18;
+
+  if (landmark.kind === 'bridge') {
+    // The tall deck and paired towers are intentionally readable from a
+    // distance, while the chevrons point toward the only safe river gap.
+    ctx.fillStyle = '#1c3443';
+    ctx.fillRect(x - 32, y - 122, 64, 244);
+    ctx.strokeRect(x - 32, y - 122, 64, 244);
+    ctx.fillStyle = landmark.accent;
+    ctx.globalAlpha = 0.72;
+    for (let plankY = y - 104; plankY <= y + 104; plankY += 22) {
+      ctx.fillRect(x - 26, plankY, 52, 5);
+    }
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(x - 58, y - 128, 12, 40);
+    ctx.fillRect(x + 46, y - 128, 12, 40);
+    ctx.fillRect(x - 58, y + 88, 12, 40);
+    ctx.fillRect(x + 46, y + 88, 12, 40);
+
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#f6c453';
+    for (const markerY of [y - 172, y + 172]) {
+      ctx.beginPath();
+      if (markerY < y) {
+        ctx.moveTo(x - 18, markerY + 10);
+        ctx.lineTo(x, markerY - 8);
+        ctx.lineTo(x + 18, markerY + 10);
+      } else {
+        ctx.moveTo(x - 18, markerY - 10);
+        ctx.lineTo(x, markerY + 8);
+        ctx.lineTo(x + 18, markerY - 10);
+      }
+      ctx.stroke();
+    }
+  } else if (landmark.kind === 'market') {
+    ctx.fillRect(x - 116, y - 34, 232, 68);
+    ctx.strokeRect(x - 116, y - 34, 232, 68);
+    ctx.fillRect(x - 12, y - 86, 24, 52);
+    ctx.strokeRect(x - 12, y - 86, 24, 52);
+    ctx.fillStyle = landmark.accent;
+    ctx.globalAlpha = 0.75;
+    for (let awningX = x - 96; awningX <= x + 72; awningX += 28) {
+      ctx.beginPath();
+      ctx.moveTo(awningX, y - 29);
+      ctx.lineTo(awningX + 20, y - 29);
+      ctx.lineTo(awningX + 14, y - 8);
+      ctx.lineTo(awningX + 6, y - 8);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (landmark.kind === 'rail-yard') {
+    ctx.globalAlpha = 0.55;
+    for (const trackY of [y - 32, y + 32]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 126, trackY);
+      ctx.lineTo(x + 126, trackY);
+      ctx.stroke();
+      for (let trackX = x - 108; trackX <= x + 108; trackX += 24) {
+        ctx.fillRect(trackX - 2, trackY - 7, 4, 14);
+      }
+    }
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(x - 8, y - 92, 16, 160);
+    ctx.strokeRect(x - 26, y - 108, 52, 16);
+    ctx.fillRect(x - 34, y - 88, 68, 5);
+  } else {
+    // Four approach paths and a rotunda make the plaza a useful visual anchor.
+    ctx.globalAlpha = 0.42;
+    ctx.fillRect(x - 128, y - 7, 256, 14);
+    ctx.fillRect(x - 7, y - 128, 14, 256);
+    ctx.globalAlpha = 0.92;
+    ctx.beginPath();
+    ctx.arc(x, y, 48, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 22, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillRect(x - 4, y - 68, 8, 24);
+    ctx.fillRect(x - 4, y + 44, 8, 24);
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(landmark.name.toUpperCase(), x, y - 142);
+  ctx.restore();
+}
+
+function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
+  const e = w.endless;
+  if (!e || e.inDungeon || e.inBuilding) return;
+
+  for (const block of e.cityBlocks) {
+    ctx.save();
+    const roadWidth = 112;
+    const sidewalk = 12;
+    ctx.globalAlpha = 0.74;
+    ctx.fillStyle = '#0e1720';
+    ctx.fillRect(block.x - block.w / 2, block.y - roadWidth / 2, block.w, roadWidth);
+    ctx.fillRect(block.x - roadWidth / 2, block.y - block.h / 2, roadWidth, block.h);
+    ctx.globalAlpha = 0.48;
+    ctx.strokeStyle = block.districtAccent;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([22, 18]);
+    ctx.beginPath();
+    if (block.streetAxis === 'horizontal') {
+      ctx.moveTo(block.x - block.w / 2, block.y);
+      ctx.lineTo(block.x + block.w / 2, block.y);
+    } else {
+      ctx.moveTo(block.x, block.y - block.h / 2);
+      ctx.lineTo(block.x, block.y + block.h / 2);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.26;
+    ctx.strokeStyle = block.river ? '#4de1ff' : block.bandAccent ?? block.districtAccent;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(block.x - block.w / 2 + sidewalk, block.y - block.h / 2 + sidewalk, block.w - sidewalk * 2, block.h - sidewalk * 2);
+    ctx.globalAlpha = 0.74;
+    ctx.fillStyle = block.landmark?.accent ?? block.bandAccent ?? block.districtAccent;
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText(
+      `${block.district.toUpperCase()} · ${block.landmark?.name.toUpperCase() ?? block.kind.toUpperCase()}`,
+      block.x - block.w / 2 + 18,
+      block.y - block.h / 2 + 22,
+    );
+    ctx.restore();
+  }
+
+  for (const river of e.riverSegments) {
+    ctx.save();
+    ctx.fillStyle = '#123b58';
+    ctx.globalAlpha = 0.82;
+    ctx.fillRect(river.x - river.w / 2, river.y - river.h / 2, river.w, river.h);
+    ctx.globalAlpha = 0.26;
+    ctx.strokeStyle = '#6ee7ff';
+    ctx.lineWidth = 2;
+    for (let x = river.x - river.w / 2 + 12; x < river.x + river.w / 2; x += 34) {
+      ctx.beginPath();
+      ctx.moveTo(x, river.y - 18);
+      ctx.lineTo(x + 16, river.y - 8);
+      ctx.lineTo(x, river.y + 2);
+      ctx.stroke();
+    }
+    if (river.crossingX !== null) {
+      ctx.fillStyle = '#f6c453';
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(river.crossingX - 28, river.y - river.h / 2, 56, river.h);
+    } else {
+      // Orange bank caps warn that this river edge is not a crossing.
+      ctx.strokeStyle = '#fb7185';
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 10]);
+      ctx.beginPath();
+      ctx.moveTo(river.x - river.w / 2 + 8, river.y - river.h / 2 + 5);
+      ctx.lineTo(river.x + river.w / 2 - 8, river.y - river.h / 2 + 5);
+      ctx.moveTo(river.x - river.w / 2 + 8, river.y + river.h / 2 - 5);
+      ctx.lineTo(river.x + river.w / 2 - 8, river.y + river.h / 2 - 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  for (const block of e.cityBlocks) {
+    drawChunkLandmark(ctx, block);
+  }
+
+  for (const building of e.buildings) {
+    const left = building.x - building.w / 2;
+    const top = building.y - building.h / 2;
+    ctx.save();
+    ctx.fillStyle = '#131a25';
+    ctx.globalAlpha = 0.96;
+    ctx.fillRect(left, top, building.w, building.h);
+    ctx.fillStyle = `${building.accent}18`;
+    ctx.fillRect(left + 8, top + 8, building.w - 16, building.h - 16);
+    ctx.strokeStyle = building.accent;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(left, top, building.w, building.h);
+    ctx.globalAlpha = 0.5;
+    ctx.setLineDash([7, 7]);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(left + 7, top + 7, building.w - 14, building.h - 14);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = '#dbeafe';
+    const windowCount = Math.max(2, Math.floor((building.w - 36) / 34));
+    for (let index = 0; index < windowCount; index += 1) {
+      const wx = left + 18 + index * ((building.w - 36) / Math.max(1, windowCount - 1));
+      ctx.fillRect(wx - 5, top + 18, 10, 5);
+      ctx.fillRect(wx - 5, top + building.h - 23, 10, 5);
+    }
+    const isVerticalDoor = building.doorSide === 'east' || building.doorSide === 'west';
+    ctx.fillStyle = '#fff3b0';
+    if (isVerticalDoor) {
+      const dx = building.doorSide === 'west' ? left - 3 : left + building.w - 3;
+      ctx.fillRect(dx, building.y - 10, 6, 20);
+    } else {
+      const dy = building.doorSide === 'north' ? top - 3 : top + building.h - 3;
+      ctx.fillRect(building.x - 10, dy, 20, 6);
+    }
+    ctx.fillStyle = building.accent;
+    ctx.globalAlpha = 0.95;
+    ctx.fillRect(building.x - Math.min(58, building.sign.length * 4), building.y - 5, Math.min(116, building.sign.length * 8), 15);
+    ctx.fillStyle = '#08111a';
+    ctx.font = 'bold 7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(building.sign, building.x, building.y + 5);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
+  for (const door of e.buildingEntrances) {
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = '#f6c453';
+    ctx.fillRect(door.x - door.w / 2, door.y - door.h / 2, door.w, door.h);
+    ctx.fillStyle = '#fff3b0';
+    ctx.fillRect(door.x - 5, door.y - 8, 10, 16);
+    ctx.font = '9px monospace';
+    ctx.fillText('ENTER', door.x - 18, door.y - 20);
+    ctx.restore();
+  }
+}
+
+function drawEndlessRouteEvent(ctx: CanvasRenderingContext2D, w: World) {
+  const event = w.endless?.routeEvent;
+  if (!event || event.phase !== 'available' || w.endless?.inDungeon || w.endless?.inBuilding) return;
+  const accent = ENDLESS_BANDS_BY_ID[event.bandId]?.accent ?? '#fff';
+  const pulse = 1 + Math.sin(w.now / 180) * 0.15;
+  ctx.save();
+  ctx.strokeStyle = accent;
+  ctx.fillStyle = `${accent}22`;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 22;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.arc(event.x, event.y, 28 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha = 0.95;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(event.x, event.y - 14);
+  ctx.lineTo(event.x, event.y + 14);
+  ctx.moveTo(event.x - 14, event.y);
+  ctx.lineTo(event.x + 14, event.y);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(event.title.toUpperCase(), event.x, event.y - 40);
+  ctx.font = '9px monospace';
+  ctx.fillStyle = accent;
+  ctx.fillText(`RISK / REWARD · +${event.rewardCred} CRED`, event.x, event.y + 48);
+  ctx.restore();
+}
+
+function drawBuildingInterior(ctx: CanvasRenderingContext2D, w: World) {
+  const e = w.endless;
+  if (!e?.inBuilding || !e.buildingPrefabId) return;
+  const prefab = getBuildingPrefab(e.buildingPrefabId as Parameters<typeof getBuildingPrefab>[0]);
+  const { w: width, h: height } = e.dungeonBounds;
+  const left = e.buildingCenterX - width / 2;
+  const top = e.buildingCenterY - height / 2;
+
+  ctx.save();
+  ctx.fillStyle = '#0a1118';
+  ctx.globalAlpha = 0.98;
+  ctx.fillRect(left, top, width, height);
+  ctx.fillStyle = `${prefab.accent}12`;
+  ctx.fillRect(left + 12, top + 12, width - 24, height - 24);
+  ctx.strokeStyle = prefab.accent;
+  ctx.lineWidth = 5;
+  ctx.strokeRect(left, top, width, height);
+  ctx.globalAlpha = 0.45;
+  ctx.setLineDash([9, 7]);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(left + 10, top + 10, width - 20, height - 20);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(prefab.name.toUpperCase(), e.buildingCenterX, top - 16);
+  ctx.font = '9px monospace';
+  ctx.fillStyle = prefab.accent;
+  ctx.fillText('INTERIOR · FIND THE EXIT', e.buildingCenterX, top - 3);
+  ctx.textAlign = 'left';
+  ctx.restore();
+}
+
+function groundAccent(w: World): string {
+  if (w.endless?.inDungeon) return effectiveGround(w).glow;
+  return w.area.ground.glow;
 }
 
 /** A streetlight pool that keeps the middle of the fight readable. */
@@ -130,12 +463,186 @@ function drawLightPool(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillRect(w.player.x - radius, w.player.y - radius, radius * 2, radius * 2);
 }
 
+function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
+  const landmark = w.area.landmark;
+  if (!landmark) return;
+  const x = 0;
+  const y = -150;
+  ctx.save();
+  ctx.globalAlpha = 0.88;
+  ctx.strokeStyle = landmark.accent;
+  ctx.fillStyle = `${landmark.accent}22`;
+  ctx.shadowColor = landmark.accent;
+  ctx.shadowBlur = 16;
+
+  if (landmark.kind === 'market') {
+    // Long hall, repeated awnings, and a high bell tower.
+    ctx.fillRect(x - 142, y - 26, 284, 58);
+    ctx.strokeRect(x - 142, y - 26, 284, 58);
+    ctx.fillRect(x - 22, y - 76, 44, 50);
+    ctx.strokeRect(x - 22, y - 76, 44, 50);
+    ctx.fillStyle = landmark.accent;
+    for (let i = -3; i <= 3; i += 1) {
+      ctx.globalAlpha = i % 2 === 0 ? 0.85 : 0.32;
+      ctx.beginPath();
+      ctx.moveTo(x + i * 40 - 20, y - 42);
+      ctx.lineTo(x + i * 40 + 20, y - 42);
+      ctx.lineTo(x + i * 40 + 12, y - 20);
+      ctx.lineTo(x + i * 40 - 12, y - 20);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(x, y + 2, 14, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (landmark.kind === 'rail-yard') {
+    ctx.globalAlpha = 0.5;
+    for (const trackY of [-44, 44]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 190, y + trackY);
+      ctx.lineTo(x + 190, y + trackY);
+      ctx.stroke();
+      for (let trackX = -170; trackX <= 170; trackX += 34) {
+        ctx.fillRect(x + trackX - 2, y + trackY - 9, 4, 18);
+      }
+    }
+    ctx.globalAlpha = 0.85;
+    // Signal tower with a stepped cap, deliberately taller than nearby props.
+    ctx.fillRect(x - 9, y - 78, 18, 136);
+    ctx.strokeRect(x - 30, y - 94, 60, 18);
+    ctx.fillRect(x - 42, y - 76, 84, 5);
+    ctx.fillRect(x - 34, y - 58, 5, 116);
+    ctx.fillRect(x + 29, y - 58, 5, 116);
+    ctx.fillStyle = '#fff1d0';
+    ctx.fillRect(x - 4, y - 72, 8, 8);
+  } else if (landmark.kind === 'plaza') {
+    // Four approach paths make the rotunda readable even at mobile zoom.
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(x - 155, y - 8, 310, 16);
+    ctx.fillRect(x - 8, y - 155, 16, 310);
+    ctx.globalAlpha = 0.88;
+    ctx.beginPath();
+    ctx.arc(x, y, 58, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 28, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillRect(x - 4, y - 80, 8, 28);
+    ctx.fillRect(x - 4, y + 52, 8, 28);
+  } else {
+    // Floodgate: twin buttresses and a central gate face.
+    ctx.fillRect(x - 170, y - 38, 340, 76);
+    ctx.strokeRect(x - 170, y - 38, 340, 76);
+    ctx.fillRect(x - 190, y - 64, 26, 102);
+    ctx.fillRect(x + 164, y - 64, 26, 102);
+    ctx.strokeRect(x - 190, y - 64, 26, 102);
+    ctx.strokeRect(x + 164, y - 64, 26, 102);
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x - 130, y + 26);
+    ctx.lineTo(x - 60, y - 24);
+    ctx.lineTo(x + 15, y + 26);
+    ctx.lineTo(x + 90, y - 24);
+    ctx.lineTo(x + 150, y + 26);
+    ctx.stroke();
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = landmark.accent;
+    ctx.fillRect(x - 5, y - 30, 10, 60);
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(landmark.name.toUpperCase(), x, y - 92);
+  ctx.restore();
+}
+
 function effectiveGround(w: World) {
   if (w.endless?.inDungeon) {
     const era = DUNGEON_ERAS[w.endless.dungeonEraIndex];
     if (era) return era.ground;
   }
+  if (w.endless && !w.endless.inBuilding) {
+    const band = ENDLESS_BANDS_BY_ID[w.endless.currentBandId];
+    if (band) return band.ground;
+  }
   return w.area.ground;
+}
+
+function drawDistrictIncursion(ctx: CanvasRenderingContext2D, w: World) {
+  const state = w.districtIncursion;
+  if (!state || state.phase === 'pending') return;
+  const x = 0;
+  const y = -150;
+  const accent = state.accent;
+  ctx.save();
+  ctx.globalAlpha = state.phase === 'warning' ? 0.34 : state.phase === 'active' ? 0.56 : 0.22;
+  ctx.strokeStyle = accent;
+  ctx.fillStyle = `${accent}18`;
+  ctx.lineWidth = 3;
+  ctx.setLineDash(state.phase === 'warning' ? [10, 8] : []);
+
+  if (state.kind === 'flood-surge') {
+    const safeLane = ((state.cycle + 1) % 3 - 1) * 180;
+    for (const lane of [-180, 0, 180]) {
+      ctx.fillStyle = lane === safeLane ? `${accent}32` : '#147e8c18';
+      ctx.fillRect(lane - 48, y - 275, 96, 550);
+      ctx.strokeRect(lane - 48, y - 275, 96, 550);
+    }
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(state.phase === 'active' ? 'SAFE LANE' : 'LANES SHIFTING', safeLane, y - 286);
+  } else if (state.kind === 'market-bell') {
+    ctx.beginPath();
+    ctx.arc(x, y, 160, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 188, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.fillRect(x - 12, y - 24, 24, 24);
+    ctx.beginPath();
+    ctx.arc(x, y - 24, 17, Math.PI, 0);
+    ctx.stroke();
+  } else if (state.kind === 'freight-arrival') {
+    for (const trackY of [-72, 0, 72]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 300, y + trackY);
+      ctx.lineTo(x + 300, y + trackY);
+      ctx.stroke();
+      for (let trackX = -280; trackX <= 280; trackX += 42) {
+        ctx.fillRect(trackX - 2, y + trackY - 8, 4, 16);
+      }
+    }
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('MOVING COVER', x, y - 116);
+  } else if (state.kind === 'fountain-ritual') {
+    const safeAngle = Math.PI / 2 + (state.cycle % 4) * (Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, 260, safeAngle - 0.88, safeAngle + 0.88);
+    ctx.closePath();
+    ctx.fillStyle = `${accent}38`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 260, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 90, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.font = 'bold 11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SAFE QUARTER', x, y - 272);
+  }
+  ctx.restore();
 }
 
 function inferObstacleKind(obs: { w: number; h: number }): ObstacleDef['kind'] {
@@ -219,7 +726,7 @@ function drawDungeonEntrances(ctx: CanvasRenderingContext2D, w: World) {
 /** Exit zone marker shown inside dungeon rooms. */
 function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
   const e = w.endless;
-  if (!e || !e.inDungeon || !e.exitZone) return;
+  if (!e || (!e.inDungeon && !e.inBuilding) || !e.exitZone) return;
 
   const exit = e.exitZone;
   const x = exit.x - exit.w / 2;
@@ -235,7 +742,7 @@ function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
   ctx.lineWidth = 3;
   ctx.strokeRect(x + 2, y + 2, exit.w - 4, exit.h - 4);
 
-  // Arrow pointing right (the exit)
+  // Arrow points toward the outside of the active room.
   ctx.fillStyle = '#7ef0bd';
   ctx.globalAlpha = 0.55 * pulse;
   ctx.beginPath();
@@ -246,7 +753,30 @@ function drawDungeonExit(ctx: CanvasRenderingContext2D, w: World) {
   ctx.lineTo(mx - 8, my + 6);
   ctx.closePath();
   ctx.fill();
+  ctx.globalAlpha = 0.9;
+  ctx.font = 'bold 9px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(e.inBuilding ? 'OUT' : 'EXIT', exit.x, exit.y + 31);
+  ctx.textAlign = 'left';
 
+  ctx.restore();
+}
+
+function drawDungeonChest(ctx: CanvasRenderingContext2D, w: World) {
+  const chest = w.endless?.dungeonChest;
+  if (!chest || !w.endless?.inDungeon) return;
+  const pulse = 0.65 + Math.sin(w.now / 260) * 0.35;
+  ctx.save();
+  ctx.globalAlpha = chest.unlocked ? 0.85 + pulse * 0.15 : 0.55;
+  ctx.shadowColor = chest.unlocked ? '#ffd166' : '#64748b';
+  ctx.shadowBlur = chest.unlocked ? 20 * pulse : 6;
+  ctx.fillStyle = chest.unlocked ? '#a16207' : '#334155';
+  ctx.fillRect(chest.x - 20, chest.y - 16, 40, 28);
+  ctx.fillStyle = chest.unlocked ? '#fde68a' : '#94a3b8';
+  ctx.fillRect(chest.x - 20, chest.y - 16, 40, 7);
+  ctx.fillRect(chest.x - 3, chest.y - 5, 6, 10);
+  ctx.font = '9px monospace';
+  ctx.fillText(chest.opened ? 'SECURED' : chest.unlocked ? 'OPEN' : 'LOCKED', chest.x - 28, chest.y + 30);
   ctx.restore();
 }
 
@@ -290,18 +820,71 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'car-wreck': { top: '#493a4d', side: '#29232d', trim: '#a77aa8' },
   'crate-breakable': { top: '#6b4a2c', side: '#3f2b19', trim: '#d69b5d' },
   'security-camera': { top: '#3e4650', side: '#252a31', trim: '#ff7ab8' },
-  'vending-machine': { top: '#0f3d38', side: '#082420', trim: '#5eead4' },
+  cover: { top: '#5f4b35', side: '#33281e', trim: '#fbbf24' },
+  'reflective-surface': { top: '#263e5b', side: '#142438', trim: '#d8b4fe' },
+  flora: { top: '#244b32', side: '#142a1d', trim: '#54b96e' },
+  building: { top: '#303344', side: '#171923', trim: '#70769a' },
+  river: { top: '#123b58', side: '#0a2030', trim: '#4de1ff' },
+  'metal-box': { top: '#536273', side: '#2d3745', trim: '#cbd5e1' },
+  bench: { top: '#70543a', side: '#3b2c20', trim: '#c58b5d' },
+  pothole: { top: '#17131a', side: '#0a080d', trim: '#ef4444' },
 };
+
+function drawPotholes(ctx: CanvasRenderingContext2D, w: World) {
+  for (const pothole of w.potholes) {
+    const progress = pothole.state === 'opening'
+      ? clamp((w.now - pothole.openingStartedAt) / pothole.openingMs, 0, 1)
+      : pothole.state === 'open' || pothole.state === 'resolved' ? 1 : 0;
+    const pulse = 0.72 + Math.sin(w.now / 90) * 0.2;
+    const x = pothole.x;
+    const y = pothole.y;
+    ctx.save();
+    ctx.globalAlpha = pothole.state === 'dormant' ? 0.5 : 0.88;
+    ctx.fillStyle = pothole.state === 'open' ? '#050308' : '#17131a';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 6, pothole.w * (0.42 + progress * 0.08), pothole.h * (0.28 + progress * 0.08), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = pothole.state === 'dormant' ? '#5b4050' : '#ef4444';
+    ctx.lineWidth = pothole.state === 'opening' ? 3 : 2;
+    if (pothole.state === 'opening') {
+      ctx.globalAlpha = 0.6 + progress * 0.35;
+      ctx.setLineDash([8, 6]);
+      ctx.lineDashOffset = -w.now / 18;
+    }
+    ctx.beginPath();
+    ctx.ellipse(x, y + 5, pothole.w * (0.46 + progress * 0.1), pothole.h * (0.31 + progress * 0.09), 0, 0, Math.PI * 2);
+    ctx.stroke();
+    if (pothole.state === 'open') {
+      ctx.globalAlpha = pulse * 0.42;
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(x, y + 5, pothole.w * 0.58, pothole.h * 0.44, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#ff6b6b';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('KEEP CLEAR', x, y - pothole.h * 0.42);
+    } else if (pothole.state === 'opening') {
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#ffb347';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('MOVE', x, y - pothole.h * 0.42);
+    }
+    ctx.restore();
+  }
+}
 
 function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
   const height = 16;
-  // In endless mode obstacles come from the live chunk list (no kind stored),
-  // so we infer the visual kind from dimensions. In timed arenas use the
-  // static definitions which carry explicit kinds.
+  // Draw the live prop records so streamed chunks and moving props share the
+  // same authored silhouette and profile.
   const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> =
     w.area.endless
       ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
-      : w.area.obstacles;
+      : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
 
   for (const obstacle of obstacleList) {
     const colors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
@@ -321,7 +904,117 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y - height + 1, obstacle.w - 2, obstacle.h - 2);
 
+    // Combat props get a strong, readable symbol in addition to their silhouette.
+    if (obstacle.kind === 'cover') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.18, y - height + obstacle.h * 0.65);
+      ctx.lineTo(x + obstacle.w * 0.38, y - height + obstacle.h * 0.28);
+      ctx.lineTo(x + obstacle.w * 0.62, y - height + obstacle.h * 0.65);
+      ctx.lineTo(x + obstacle.w * 0.82, y - height + obstacle.h * 0.28);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'reflective-surface') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#f5e8ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
+      ctx.lineTo(x + obstacle.w * 0.5, y - height + obstacle.h * 0.2);
+      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'flora') {
+      ctx.save();
+      ctx.fillStyle = '#18321f';
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(obstacle.x - 3, y - height + obstacle.h * 0.55, 6, obstacle.h * 0.45);
+      ctx.fillStyle = '#4fbd68';
+      for (let i = 0; i < 5; i += 1) {
+        const leafX = obstacle.x + Math.sin(i * 2.7) * obstacle.w * 0.35;
+        const leafY = y - height + obstacle.h * (0.2 + i * 0.13);
+        ctx.beginPath();
+        ctx.ellipse(leafX, leafY, obstacle.w * 0.28, obstacle.h * 0.13, i % 2 ? 0.45 : -0.45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    } else if (obstacle.kind === 'barrier') {
+      // Add a curb and repeating reflectors so long cover reads as a street
+      // object instead of another arena wall.
+      ctx.save();
+      ctx.fillStyle = colors.trim;
+      ctx.globalAlpha = 0.75;
+      for (let marker = x + 12; marker < x + obstacle.w - 6; marker += 24) {
+        ctx.fillRect(marker, y - height + obstacle.h * 0.35, 8, 3);
+      }
+      ctx.restore();
+    } else if (obstacle.kind === 'car' || obstacle.kind === 'car-wreck') {
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#d8b4fe';
+      ctx.fillRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.22, obstacle.w * 0.64, 5);
+      ctx.fillStyle = '#11121a';
+      ctx.fillRect(x + obstacle.w * 0.16, y - height + obstacle.h * 0.7, 12, 5);
+      ctx.fillRect(x + obstacle.w * 0.72, y - height + obstacle.h * 0.7, 12, 5);
+      ctx.restore();
+    }
+
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+    if (live?.chainActive && !live.landedHeatActive) {
+      ctx.save();
+      const speed = Math.hypot(live.vx, live.vy);
+      const pulse = 0.62 + Math.sin(w.now / 92) * 0.2;
+      ctx.globalAlpha = pulse;
+      ctx.shadowColor = '#ffb347';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = '#ffb347';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 5]);
+      ctx.strokeRect(x - 4, y - height - 4, obstacle.w + 8, obstacle.h + 8);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffb347';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        live.chainCycles > 0 ? `CHAIN ${Math.min(3, live.chainCycles)}/3` : speed > 0 ? 'CHAIN LIVE' : 'CHAIN READY',
+        obstacle.x,
+        y - height - 9,
+      );
+      ctx.restore();
+    }
+    if (live?.landedHeatActive) {
+      ctx.save();
+      const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
+      ctx.globalAlpha = pulse;
+      ctx.shadowColor = '#ff4d5e';
+      ctx.shadowBlur = 18;
+      ctx.strokeStyle = '#ff4d5e';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
+      ctx.fillStyle = '#ff4d5e';
+      ctx.globalAlpha = 0.28 + pulse * 0.18;
+      ctx.fillRect(x, y - height, obstacle.w, obstacle.h);
+      ctx.restore();
+    }
+    if (live?.clickPrimed) {
+      ctx.save();
+      const pulse = 0.7 + Math.sin(w.now / 120) * 0.2;
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#7dd3fc';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(x - 5, y - height - 5, obstacle.w + 10, obstacle.h + 10);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = 'bold 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('NEXT HIT REVERSES', obstacle.x, y - height - 10);
+      ctx.restore();
+    }
     if (live && !live.broken && live.hp <= live.maxHp * 0.5) {
       ctx.save();
       ctx.strokeStyle = live.kind === 'barrel' ? '#ffb347' : '#f5d7a1';
@@ -333,11 +1026,95 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.lineTo(x + obstacle.w * 0.7, y - height + obstacle.h * 0.25);
       ctx.stroke();
       ctx.restore();
+    } else if (obstacle.kind === 'metal-box') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 7, y - height + 7, obstacle.w - 14, obstacle.h - 14);
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.2);
+      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.8);
+      ctx.moveTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.2);
+      ctx.lineTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.8);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'bench') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#e2b07a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + obstacle.w * 0.12, y - height + obstacle.h * 0.32);
+      ctx.lineTo(x + obstacle.w * 0.88, y - height + obstacle.h * 0.32);
+      ctx.moveTo(x + obstacle.w * 0.2, y - height + obstacle.h * 0.75);
+      ctx.lineTo(x + obstacle.w * 0.8, y - height + obstacle.h * 0.75);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 }
 
 function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.chainActive || prop.landedHeatActive || (!prop.vx && !prop.vy)) continue;
+    const speed = Math.hypot(prop.vx, prop.vy);
+    const pulse = 0.4 + Math.sin(w.now / 92) * 0.12;
+    const radius = Math.max(prop.w, prop.h) * 0.62 + clamp(speed / 60, 0, 1) * 12;
+    const gradient = ctx.createRadialGradient(prop.x, prop.y, 3, prop.x, prop.y, radius);
+    gradient.addColorStop(0, '#ffb34738');
+    gradient.addColorStop(0.55, '#ff7a1820');
+    gradient.addColorStop(1, '#ff2d5500');
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(prop.x, prop.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.landedHeatActive) continue;
+    const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
+    const radius = LANDED_HEAT_RADIUS + Math.sin(w.now / 72) * 10;
+    const gradient = ctx.createRadialGradient(prop.x, prop.y, 5, prop.x, prop.y, radius);
+    gradient.addColorStop(0, '#ff4d5e66');
+    gradient.addColorStop(0.48, '#ff7a1830');
+    gradient.addColorStop(1, '#ff2d5500');
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(prop.x, prop.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff4d5e';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 7]);
+    ctx.beginPath();
+    ctx.arc(prop.x, prop.y, radius * (0.78 + pulse * 0.12), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  for (const pole of w.breakables) {
+    if (pole.kind !== 'street-lamp' || !pole.broken || !pole.hazardUntil || pole.hazardUntil <= w.now) continue;
+    const radius = 92;
+    const pulse = 0.65 + Math.sin(w.now / 85) * 0.2;
+    const gradient = ctx.createRadialGradient(pole.x, pole.y, 4, pole.x, pole.y, radius);
+    gradient.addColorStop(0, '#ffe66d88');
+    gradient.addColorStop(0.55, '#8be9fd35');
+    gradient.addColorStop(1, '#8be9fd00');
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(pole.x, pole.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#d9f7ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 7]);
+    ctx.stroke();
+    ctx.restore();
+  }
   if (w.now < w.ultActiveUntil) {
     const radius = 160;
     const g = ctx.createRadialGradient(w.player.x, w.player.y, 8, w.player.x, w.player.y, radius);
@@ -356,14 +1133,12 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.save(); ctx.globalAlpha = Math.max(0, fade) * 0.32; ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'vending-machine'].includes(b.kind));
-  const neonDistrict = w.area.ground.glowStrategy === 'neon';
+  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
   let dynamicCount = 0;
-  let shaftCount = 0;
   for (const b of sources) {
     const isBarrel = b.kind === 'barrel';
-    const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : b.kind === 'vending-machine' ? 70 : 80;
-    const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'vending-machine' ? '#5eead4' : b.kind === 'fuse-box' ? '#7ef0bd' : '#ffd166';
+    const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : 80;
+    const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'fuse-box' ? '#7ef0bd' : '#ffd166';
     const pulse = b.kind === 'neon-sign' ? 0.8 + Math.sin(w.now / 420) * 0.15 : 1;
     const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
     gradient.addColorStop(0, `${color}55`);
@@ -379,41 +1154,6 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fillRect(b.x - b.w * 0.8, b.y + b.h / 2, b.w * 1.6, 10);
     }
     ctx.restore();
-
-    // Neon districts push their strong sources harder with a bright glow
-    // core (shadowBlur) on top of the plain radial gradient above -- only
-    // changes how the light source itself renders, never the rig.
-    if (neonDistrict && (b.kind === 'neon-sign' || b.kind === 'street-lamp')) {
-      ctx.save();
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 18 * pulse;
-      ctx.globalAlpha = 0.55 * pulse;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // Fake volumetric light shaft: a thin, low-alpha cone falling away from
-    // overhead street lamps. Capped to the first 3 so it can't scale with
-    // an unbounded breakable count.
-    if (b.kind === 'street-lamp' && shaftCount++ < 3) {
-      const shaftLen = 130;
-      const shaftGradient = ctx.createLinearGradient(b.x, b.y, b.x, b.y + shaftLen);
-      shaftGradient.addColorStop(0, `${color}30`);
-      shaftGradient.addColorStop(1, `${color}00`);
-      ctx.save();
-      ctx.fillStyle = shaftGradient;
-      ctx.beginPath();
-      ctx.moveTo(b.x - 10, b.y);
-      ctx.lineTo(b.x + 10, b.y);
-      ctx.lineTo(b.x + 34, b.y + shaftLen);
-      ctx.lineTo(b.x - 34, b.y + shaftLen);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
 
     if (dynamicCount++ < 3 && isBarrel) {
       for (const actor of [w.player, ...w.enemies].slice(0, 45)) {
@@ -433,7 +1173,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   // each nearby obstacle are projected away from the moving light source, so
   // shadows rotate, stretch, and vanish immediately when a breakable breaks.
   const shadowSources = sources.slice(0, 5);
-  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'vending-machine'].includes(b.kind));
+  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
   for (const source of shadowSources) {
     for (const object of shadowObjects) {
       const distance = Math.hypot(object.x - source.x, object.y - source.y);
@@ -450,19 +1190,9 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
         (b.x * awayX + b.y * awayY) - (a.x * awayX + a.y * awayY),
       ).slice(0, 2);
       const length = Math.min(180, Math.max(55, 300 - distance));
-      // Darker near the object, lighter at the projected far edge -- a
-      // cheap ambient-occlusion approximation using the same corners
-      // already computed for the flat shadow quad.
-      const nearMidX = (far[0]!.x + far[1]!.x) / 2;
-      const nearMidY = (far[0]!.y + far[1]!.y) / 2;
-      const shadowGradient = ctx.createLinearGradient(
-        nearMidX, nearMidY,
-        nearMidX + awayX * length, nearMidY + awayY * length,
-      );
-      shadowGradient.addColorStop(0, 'rgba(2,2,8,0.62)');
-      shadowGradient.addColorStop(1, 'rgba(2,2,8,0.14)');
       ctx.save();
-      ctx.fillStyle = shadowGradient;
+      ctx.globalAlpha = 0.56;
+      ctx.fillStyle = '#020208';
       ctx.beginPath();
       ctx.moveTo(far[0]!.x, far[0]!.y);
       ctx.lineTo(far[1]!.x, far[1]!.y);
@@ -496,18 +1226,16 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(angle); ctx.globalAlpha = 0.22;
     ctx.fillStyle = gradient; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 170, -0.18, 0.18); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-}
-
-/** Non-combat background life -- drawn like any other rig, never health-barred. */
-function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
-  for (const a of w.ambient) {
-    const kind = getAmbientKind(a.kindId);
+  for (const pole of w.breakables) {
+    if (pole.kind !== 'street-lamp' || !pole.broken || !pole.hazardUntil || pole.hazardUntil <= w.now) continue;
+    const angle = pole.fallAngle ?? Math.PI / 2;
     ctx.save();
-    ctx.globalAlpha = 0.9;
-    drawShadow(ctx, a.x, a.y + 1, kind.rig.pixelHeight * 0.16);
-    drawRig(ctx, kind.rig, kind.palette, a.anim, w.now - a.animStartedAt, a.x, a.y + 1, a.facing, SPRITE_SCALE * 0.85, {
-      outline: false,
-    });
+    ctx.translate(pole.x, pole.y);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#302614';
+    ctx.fillRect(-4, -pole.h, 8, pole.h);
+    ctx.fillStyle = '#ffd166';
+    ctx.fillRect(-10, -pole.h - 4, 20, 8);
     ctx.restore();
   }
 }
@@ -639,6 +1367,47 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.fill();
         break;
       }
+      case 'wave': {
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 5 * fade + 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * (0.45 + life * 0.55),
+          effect.angle - effect.spread, effect.angle + effect.spread);
+        ctx.stroke();
+        break;
+      }
+      case 'laser': {
+        ctx.strokeStyle = effect.color;
+        ctx.shadowColor = effect.color;
+        ctx.shadowBlur = 16;
+        ctx.lineWidth = 12 * fade + 3;
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        ctx.lineTo(effect.x + Math.cos(effect.angle) * effect.radius,
+          effect.y + Math.sin(effect.angle) * effect.radius);
+        ctx.stroke();
+        break;
+      }
+      case 'hazard': {
+        ctx.strokeStyle = effect.color;
+        ctx.fillStyle = effect.color;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * (0.92 + Math.sin(w.now / 150) * 0.04), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha *= 0.12;
+        ctx.fill();
+        break;
+      }
+      case 'teleport': {
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.radius * (1 - fade) + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
     }
     ctx.restore();
   }
@@ -749,6 +1518,76 @@ function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
 function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   const outlineEnemies = w.enemies.length < 70;
 
+  for (const pet of w.lokPets) {
+    const pulse = 0.86 + Math.sin(w.now / 115 + pet.uid) * 0.14;
+    const alpha = pet.ghost ? 0.3 + pulse * 0.08 : pulse;
+    const y = pet.y - 4;
+    ctx.save();
+    ctx.translate(pet.x, y);
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = pet.palette.glow;
+    ctx.shadowBlur = pet.ghost ? 13 : 9;
+    ctx.fillStyle = pet.palette.body;
+    ctx.strokeStyle = pet.palette.accent;
+    ctx.lineWidth = 2;
+    if (pet.ghost) ctx.setLineDash([3, 3]);
+
+    switch (pet.silhouette) {
+      case 'pouncer':
+        ctx.beginPath(); ctx.ellipse(0, 2, 10, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-7, -3); ctx.lineTo(-9, -12); ctx.lineTo(-2, -7); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(7, -3); ctx.lineTo(9, -12); ctx.lineTo(2, -7); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = pet.palette.glow; ctx.beginPath(); ctx.arc(10, 0, 7, -1.2, 0.75); ctx.stroke();
+        break;
+      case 'skull':
+        ctx.beginPath(); ctx.arc(0, 0, 9, Math.PI, 0); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-5, -1, 3, 4); ctx.fillRect(2, -1, 3, 4);
+        ctx.fillStyle = pet.palette.bodyDark; ctx.fillRect(-2, 4, 4, 3);
+        break;
+      case 'winglet':
+        ctx.beginPath(); ctx.moveTo(0, 3); ctx.lineTo(-15, -7); ctx.lineTo(-9, 7); ctx.lineTo(0, 4); ctx.lineTo(9, 7); ctx.lineTo(15, -7); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-2, -1, 4, 4);
+        break;
+      case 'spark':
+        ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(5, -3); ctx.lineTo(12, 0); ctx.lineTo(5, 4); ctx.lineTo(0, 12); ctx.lineTo(-5, 4); ctx.lineTo(-12, 0); ctx.lineTo(-5, -3); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-2, -2, 4, 4);
+        break;
+      case 'jelly':
+        ctx.beginPath(); ctx.moveTo(-11, 7); ctx.lineTo(-9, -2); ctx.quadraticCurveTo(-7, -11, 0, -9); ctx.quadraticCurveTo(7, -11, 9, -2); ctx.lineTo(11, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-5, -1, 3, 4); ctx.fillRect(2, -1, 3, 4);
+        break;
+      case 'clockwork':
+        ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = pet.palette.accent; ctx.fillRect(-3, -3, 6, 6);
+        ctx.strokeStyle = pet.palette.glow; ctx.beginPath(); ctx.moveTo(-13, -6); ctx.lineTo(-8, -3); ctx.moveTo(13, 5); ctx.lineTo(8, 2); ctx.stroke();
+        break;
+    }
+    if (!pet.ghost) {
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = pet.palette.glow;
+      ctx.beginPath(); ctx.ellipse(0, 10, 14, 4, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Followers stay just above the ground layer and use a compact mark so
+  // swarms remain readable on phones without needing a second sprite atlas.
+  for (const follower of w.followers) {
+    const pulse = 0.8 + Math.sin(w.now / 110 + follower.uid) * 0.2;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.shadowColor = follower.color;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = follower.color;
+    ctx.beginPath();
+    ctx.arc(follower.x, follower.y - follower.radius * 0.35, follower.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(follower.x - 2, follower.y - follower.radius * 0.65, 4, 3);
+    ctx.restore();
+  }
+
   // Painter's order: things further up the screen render first.
   const sorted = [...w.enemies].sort((a, b) => a.y - b.y);
   const playerDrawn = { done: false };
@@ -758,7 +1597,27 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     playerDrawn.done = true;
     const p = w.player;
     const scale = SPRITE_SCALE;
-    drawShadow(ctx, p.x, p.y + 2, p.radius);
+    const fallProgress = p.falling ? clamp((w.now - p.fallStartedAt) / 700, 0, 1) : 0;
+    drawShadow(ctx, p.x, p.y + 2, p.radius * (1 - fallProgress * 0.65));
+
+    if (p.dashUntil > w.now) {
+      const dashProgress = clamp((w.now - p.dashStartedAt) / 180, 0, 1);
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (let i = 4; i >= 1; i -= 1) {
+        ctx.globalAlpha = (1 - i / 5) * (1 - dashProgress * 0.35);
+        ctx.strokeStyle = w.character.palette.accentBright;
+        ctx.lineWidth = 3 + (5 - i);
+        ctx.beginPath();
+        ctx.moveTo(
+          p.x - p.dashDirectionX * (i * 13 + 12),
+          p.y - p.dashDirectionY * (i * 13 + 12),
+        );
+        ctx.lineTo(p.x - p.dashDirectionX * (i * 13), p.y - p.dashDirectionY * (i * 13));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // A faint accent ring keeps the player findable in a crowd.
     ctx.save();
@@ -787,14 +1646,14 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       p.anim,
       w.now - p.animStartedAt,
       p.x,
-      p.y + 2,
+      p.y + 2 + fallProgress * 12,
       p.facing,
-      scale,
+      scale * (1 - fallProgress * 0.72),
       {
         flash: w.now < p.hitFlashUntil,
         outline: true,
         alpha: blink ? 0.45 : 1,
-        dissolve: w.outcome === 'dead' ? Math.min(0.85, (w.now - p.animStartedAt) / 900) : 0,
+        dissolve: w.outcome === 'dead' && !p.falling ? Math.min(0.85, (w.now - p.animStartedAt) / 900) : fallProgress * 0.25,
         tint:
           w.now < w.ultActiveUntil
             ? { color: w.character.palette.glow, alpha: 0.28 }
@@ -805,6 +1664,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
 
   for (const enemy of sorted) {
     if (enemy.y > w.player.y) drawPlayer();
+    const converted = enemy.convertedUntil > w.now && !enemy.dying;
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;
       const radius = enemy.specialRadius || enemy.radius * 3;
@@ -826,13 +1686,54 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       }
       ctx.restore();
     }
-    const dissolve = enemy.dying ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : 0;
-    drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - dissolve * 0.6));
+    const fallProgress = enemy.falling ? clamp((w.now - enemy.fallStartedAt) / 620, 0, 1) : 0;
+    const dissolve = enemy.dying && !enemy.falling ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : fallProgress * 0.28;
+    const ghosting = enemy.ghostUntil > w.now && !enemy.dying;
+    const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
+    if (converted) {
+      const pulse = 0.72 + Math.sin(w.now / 130) * 0.18;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#65f6d1';
+      ctx.shadowColor = '#65f6d1';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 9 + Math.sin(w.now / 170) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      // A compact chevron above the enemy reads as "friendly" without
+      // obscuring the enemy sprite or the health bar.
+      ctx.fillStyle = '#65f6d1';
+      ctx.beginPath();
+      ctx.moveTo(enemy.x, enemy.y - enemy.radius * 2.25);
+      ctx.lineTo(enemy.x - 7, enemy.y - enemy.radius * 2.65);
+      ctx.lineTo(enemy.x - 2, enemy.y - enemy.radius * 2.65);
+      ctx.lineTo(enemy.x, enemy.y - enemy.radius * 2.42);
+      ctx.lineTo(enemy.x + 2, enemy.y - enemy.radius * 2.65);
+      ctx.lineTo(enemy.x + 7, enemy.y - enemy.radius * 2.65);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    if (freeze && !enemy.dying) {
+      const freezeDef = STATUS_EFFECTS_BY_ID.freeze!;
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.1 * Math.sin(w.now / 100);
+      ctx.strokeStyle = freezeDef.color;
+      ctx.shadowColor = freezeDef.color;
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - Math.max(dissolve, fallProgress) * 0.6));
     const shadowed = w.breakables.some((b) => !b.broken &&
       enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
     ctx.save();
-    ctx.globalAlpha = shadowed ? 0.4 : 1;
+    ctx.globalAlpha = ghosting ? 0.22 : shadowed ? 0.4 : 1;
     drawRig(
       ctx,
       enemy.def.rig,
@@ -840,13 +1741,16 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.anim,
       w.now - enemy.animStartedAt,
       enemy.x,
-      enemy.y + 2,
+      enemy.y + 2 + fallProgress * 10,
       enemy.facing,
-      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1),
+      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72),
       {
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss',
         dissolve,
+        tint: converted
+          ? { color: '#65f6d1', alpha: 0.42 }
+          : freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
       },
     );
     ctx.restore();
@@ -857,7 +1761,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       const top = enemy.y - enemy.radius * 2.6;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.fillRect(enemy.x - width / 2, top, width, 4);
-      ctx.fillStyle = enemy.def.palette.accent;
+      ctx.fillStyle = converted ? '#65f6d1' : enemy.def.palette.accent;
       ctx.fillRect(enemy.x - width / 2, top, width * (enemy.hp / enemy.maxHp), 4);
     }
   }
@@ -928,12 +1832,13 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
   }
-  const tint = timeOfDayTint(w.cycle.phase);
-  if (tint !== 'rgba(0, 0, 0, 0.000)') {
-    ctx.fillStyle = tint;
-    ctx.fillRect(left, top, right - left, bottom - top);
-  }
+  drawCityMapFeatures(ctx, w);
+  drawEndlessRouteEvent(ctx, w);
+  drawBuildingInterior(ctx, w);
+  drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   drawLightPool(ctx, w);
+  drawLandmark(ctx, w);
+  drawDistrictIncursion(ctx, w);
   drawObjectLighting(ctx, w);
   drawArenaEdges(ctx, w);
   drawDungeonRoomBorder(ctx, w);
@@ -942,8 +1847,9 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPickups(ctx, w);
   drawDungeonEntrances(ctx, w);
   drawDungeonExit(ctx, w);
+  drawDungeonChest(ctx, w);
+  drawPotholes(ctx, w);
   drawObstacles(ctx, w);
-  drawAmbient(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);
   drawOrbiters(ctx, w);
@@ -976,89 +1882,4 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1;
   }
-
-  drawMinimap(ctx, w, width, height);
-}
-
-/**
- * Screen-space overview panel, bottom-left (the ultimate dial already owns
- * bottom-right; the DOM timer/depth/pause stack already owns top-right).
- * Timed areas are origin-centered on the arena's own bounds; endless mode
- * is player-centered with a fixed radius since the world is unbounded and
- * chunk-streamed. Purely a read of existing World state -- no new fields,
- * no stepWorld changes.
- */
-function drawMinimap(ctx: CanvasRenderingContext2D, w: World, screenW: number, screenH: number) {
-  const size = 108;
-  const pad = 14;
-  const radius = size / 2;
-  const cx = pad + radius;
-  const cy = screenH - pad - radius;
-
-  const endless = w.area.endless;
-  const worldRadius = endless ? 900 : Math.max(w.bounds.w, w.bounds.h) / 2 + 40;
-  const originX = endless ? w.player.x : 0;
-  const originY = endless ? w.player.y : 0;
-  const scale = radius / worldRadius;
-  const toMap = (x: number, y: number) => ({
-    mx: cx + (x - originX) * scale,
-    my: cy + (y - originY) * scale,
-  });
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(6,6,12,0.72)';
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-  ctx.stroke();
-  ctx.clip();
-
-  for (const enemy of w.enemies) {
-    if (enemy.dying) continue;
-    const { mx, my } = toMap(enemy.x, enemy.y);
-    const big = enemy.def.family === 'Boss' || enemy.def.family === 'Elite';
-    ctx.fillStyle = '#ff5d6c';
-    ctx.beginPath();
-    ctx.arc(mx, my, big ? 3 : 1.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  if (w.rescue.status === 'available' || w.rescue.status === 'freeing') {
-    const { mx, my } = toMap(w.rescue.x, w.rescue.y);
-    ctx.fillStyle = '#ffe08a';
-    ctx.beginPath();
-    ctx.arc(mx, my, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  if (w.endless) {
-    ctx.fillStyle = '#c084fc';
-    for (const ent of w.endless.dungeonEntrances) {
-      const { mx, my } = toMap(ent.x, ent.y);
-      ctx.beginPath();
-      ctx.arc(mx, my, 2.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    if (w.endless.exitZone) {
-      const ez = w.endless.exitZone;
-      const { mx, my } = toMap(ez.x, ez.y);
-      ctx.fillStyle = '#4de1ff';
-      ctx.beginPath();
-      ctx.arc(mx, my, 3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  const p = toMap(w.player.x, w.player.y);
-  ctx.fillStyle = w.character.palette.glow;
-  ctx.beginPath();
-  ctx.arc(p.mx, p.my, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  ctx.restore();
 }

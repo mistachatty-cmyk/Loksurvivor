@@ -1,4 +1,4 @@
-import { blobRig, humanoidRig } from '@/game/sprites/rigs';
+import { blobRig, expressiveRig, humanoidRig } from '@/game/sprites/rigs';
 import type { EnemyDef } from '@/game/types';
 
 /**
@@ -307,14 +307,107 @@ export const ENEMIES: EnemyDef[] = [
     rig: humanoidRig({ height: 34, width: 18, hood: true, halo: true }),
     lore: 'The one who turned the rest. Owns half the block on paper.',
   },
+  {
+    id: 'spiral-moth',
+    name: 'Spiral Moth',
+    family: 'Shadow',
+    behavior: 'flanker',
+    hp: 18,
+    speed: 96,
+    damage: 7,
+    radius: 8,
+    xp: 4,
+    mass: 0.5,
+    palette: { ink: '#07050f', body: '#17132d', bodyDark: '#090718', accent: '#a78bfa', accentBright: '#f5f3ff', skin: '#312e81', glow: '#c4b5fd' },
+    rig: expressiveRig('spiral', 15),
+    faction: 'Afterimage Choir',
+    role: 'flanker',
+    traits: { teleportMs: 4200, ghostMs: 520 },
+    lore: 'A bad thought with wings. Its spiral eyes always appear at the edge of the screen first.',
+  },
+  {
+    id: 'neon-comet',
+    name: 'Neon Comet',
+    family: 'Cosmic',
+    behavior: 'drifter',
+    hp: 26,
+    speed: 82,
+    damage: 8,
+    radius: 9,
+    xp: 6,
+    mass: 0.7,
+    palette: { ink: '#06131d', body: '#12304a', bodyDark: '#071827', accent: '#22d3ee', accentBright: '#cffafe', skin: '#164e63', glow: '#67e8f9' },
+    rig: expressiveRig('astral', 16),
+    faction: 'Afterimage Choir',
+    role: 'disruptor',
+    traits: { ghostMs: 680, burstSpeed: 1.8 },
+    lore: 'A piece of sky that missed the river and learned to chase warm bodies.',
+  },
+  {
+    id: 'smoke-horn',
+    name: 'Smoke Horn',
+    family: 'Elite',
+    behavior: 'charger',
+    hp: 138,
+    speed: 39,
+    damage: 20,
+    radius: 16,
+    xp: 24,
+    mass: 3.8,
+    palette: { ink: '#18060d', body: '#7f1d4d', bodyDark: '#2b0a1d', accent: '#f43f5e', accentBright: '#fecdd3', skin: '#9f1239', glow: '#fb7185' },
+    rig: expressiveRig('flame', 28),
+    faction: 'Cinder Procession',
+    role: 'anchor',
+    traits: { shiftMs: 2600, shiftScale: 1.35, burstSpeed: 1.6 },
+    lore: 'An armored argument that exhales magenta smoke before it charges.',
+  },
+  {
+    id: 'current-stag',
+    name: 'Current Stag',
+    family: 'River',
+    behavior: 'current',
+    hp: 52,
+    speed: 64,
+    damage: 10,
+    radius: 11,
+    xp: 13,
+    mass: 0.8,
+    palette: { ink: '#03131a', body: '#115e59', bodyDark: '#042f2e', accent: '#2dd4bf', accentBright: '#ccfbf1', skin: '#164e63', glow: '#67e8f9' },
+    rig: expressiveRig('river', 20),
+    faction: 'River Antler Court',
+    role: 'carrier',
+    traits: { teleportMs: 5200, shiftMs: 3400, shiftScale: 1.25 },
+    lore: 'Branch-antlered water that runs sideways through the street grid.',
+  },
+  {
+    id: 'ring-scribe',
+    name: 'Ring Scribe',
+    family: 'Astral',
+    behavior: 'spitter',
+    hp: 42,
+    speed: 38,
+    damage: 7,
+    radius: 10,
+    xp: 12,
+    mass: 1.1,
+    palette: { ink: '#140d1c', body: '#7c5528', bodyDark: '#2e1b35', accent: '#c4b5fd', accentBright: '#fff1b8', skin: '#d6a85f', glow: '#facc15' },
+    rig: expressiveRig('astral', 18),
+    lore: 'Writes small gold orbits in the air and waits for something to step inside.',
+    ranged: { cooldownMs: 1900, projectileSpeed: 175, damage: 11 },
+    faction: 'River Antler Court',
+    role: 'sniper',
+    traits: { ghostMs: 420 },
+  },
 ];
 
 export const ENEMIES_BY_ID: Record<string, EnemyDef> = Object.fromEntries(
   ENEMIES.map((e) => [e.id, e]),
 );
 
-export function getEnemy(id: string): EnemyDef {
-  const found = ENEMIES_BY_ID[id];
+export function getEnemy(id: string | number): EnemyDef {
+  // Numeric coordinates are accepted for legacy test helpers that omit the
+  // optional enemy id; authored game data always uses string ids.
+  const found = ENEMIES_BY_ID[typeof id === 'number' ? 'nightcrawler' : id];
   if (!found) {
     throw new Error(`Unknown enemy id: ${id}`);
   }

@@ -7,26 +7,37 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
+import { getFirstNightChapter } from '@/game/data/firstNight';
+import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
+  claimRumorEmergencyHeal,
   createWorld,
+  dashPlayer,
   hudSnapshot,
+  primePhysicsObject,
   rollUpgradeChoices,
   stepWorld,
   type World,
 } from '@/game/engine/world';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
-import { WEAPONS_BY_ID } from '@/game/data/weapons';
-import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { renderWorld } from '@/game/render/draw';
-import { effectiveStats, useMeta } from '@/game/state/metaStore';
-import { WeaponIcon } from '@/ui/WeaponIcon';
-import type { HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef, WeaponDef } from '@/game/types';
+import { effectiveStats, rewardCredMultiplier, startingWeaponLevel, useMeta } from '@/game/state/metaStore';
+import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import { Minimap } from '@/ui/Minimap';
+import { SettingsPanel } from '@/ui/SettingsPanel';
 
 export interface RunScreenProps {
   areaId: string;
   characterId: string;
+  challengeIds?: string[];
+  startingWeaponLevel?: number;
+  utilityRewardMultiplier?: number;
+  physicsObjectClicksEnabled?: boolean;
+  episodeId?: string;
+  areaOverride?: AreaDef;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -38,6 +49,14 @@ interface StickState {
   originY: number;
   dx: number;
   dy: number;
+}
+
+type PointerMode = 'none' | 'stick' | 'object';
+
+interface TapRecord {
+  time: number;
+  x: number;
+  y: number;
 }
 
 type ReelPhase = 'spinning' | 'landed';
@@ -54,23 +73,6 @@ const FIXED_STEP = 1 / 60;
 /** Most catch-up steps allowed in one frame before time is dropped. */
 const MAX_SUBSTEPS = 6;
 
-/**
- * Resolves the WeaponDef a level-up card represents, so its pickup icon
- * matches the actual weapon -- a "level up X" card for an already-owned
- * signature weapon (not in the shared WEAPONS pool), a fresh pickup from
- * the shared pool, or an evolution's result weapon.
- */
-function resolveCardWeapon(upgrade: UpgradeDef, world: World | null): WeaponDef | undefined {
-  if (upgrade.cardKind === 'weapon' && upgrade.weaponId) {
-    const owned = world?.weapons.find((w) => w.def.id === upgrade.weaponId);
-    return owned?.def ?? WEAPONS_BY_ID[upgrade.weaponId];
-  }
-  if (upgrade.cardKind === 'evolution' && upgrade.evolutionId) {
-    return EVOLUTIONS_BY_ID[upgrade.evolutionId]?.result;
-  }
-  return undefined;
-}
-
 function formatClock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
   const m = Math.floor(total / 60);
@@ -78,8 +80,23 @@ function formatClock(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenProps) {
-  const { meta } = useMeta();
+export function RunScreen({
+  areaId,
+  characterId,
+  challengeIds = [],
+  startingWeaponLevel: startingWeaponLevelProp,
+  utilityRewardMultiplier: utilityRewardMultiplierProp,
+  physicsObjectClicksEnabled = true,
+  episodeId,
+  areaOverride,
+  onAbort,
+  onFinish,
+}: RunScreenProps) {
+  const {
+    meta,
+    setMinimapExpanded,
+    setMinimapPosition,
+  } = useMeta();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const phaseRef = useRef<RunPhase>('countdown');
@@ -94,6 +111,8 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
     dx: 0,
     dy: 0,
   });
+  const pointerModeRef = useRef<PointerMode>('none');
+  const lastTapRef = useRef<TapRecord | null>(null);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
@@ -101,10 +120,19 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
+  const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const reelTimerRef = useRef<number | null>(null);
+  const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
+  const levelUpPausesRef = useRef(meta.levelUpPausesEnabled);
+  levelUpPausesRef.current = meta.levelUpPausesEnabled;
 
-  const area = getArea(areaId);
+  const area = areaOverride ?? getArea(areaId);
   const character = getCharacter(characterId);
+  const firstNightChapter = getFirstNightChapter(areaId);
+  const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
+  const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
+  const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
+  const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
 
   const setPhaseBoth = useCallback((next: RunPhase) => {
     // Once a run is over it stays over -- nothing may steal the hand-off.
@@ -115,7 +143,22 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
 
   // Build the world once per mount.
   if (worldRef.current === null) {
-    worldRef.current = createWorld(area, character, effectiveStats(character, meta));
+    worldRef.current = createWorld(
+      area,
+      character,
+      effectiveStats(character, meta),
+      undefined,
+      challenges,
+      initialWeaponLevel,
+      physicsObjectClicksEnabled,
+      meta.activeCrewRumor,
+      {
+        unlockedEvolutionIds: meta.unlockedEvolutionIds,
+        knownRelicIds: meta.knownRelicIds,
+        episode,
+        episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
+      },
+    );
   }
 
   /* -------------------------------------------------------------- */
@@ -131,30 +174,84 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
       keysRef.current.add(key);
       if (key === ' ') ultRequestRef.current = true;
       if (key === 'escape' || key === 'p') {
-        if (phaseRef.current === 'playing') setPhaseBoth('paused');
+        if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
         else if (phaseRef.current === 'paused') setPhaseBoth('playing');
       }
     };
     const up = (event: KeyboardEvent) => keysRef.current.delete(event.key.toLowerCase());
-    const blur = () => {
+    const pauseWhenHidden = () => {
       keysRef.current.clear();
       if (phaseRef.current === 'playing') setPhaseBoth('paused');
+    };
+    const isTouchDevice =
+      navigator.maxTouchPoints > 0 ||
+      window.matchMedia('(pointer: coarse)').matches;
+    const blur = () => {
+      // Mobile browsers can emit window.blur while handling a touch gesture
+      // (for example when the browser chrome or an assistive overlay moves).
+      // Treating that as an app switch makes the game pause during normal
+      // joystick input. Visibility changes still pause when the player truly
+      // leaves the game.
+      if (!isTouchDevice) pauseWhenHidden();
+    };
+    const visibilityChange = () => {
+      if (document.visibilityState === 'hidden') pauseWhenHidden();
     };
 
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     window.addEventListener('blur', blur);
+    document.addEventListener('visibilitychange', visibilityChange);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
+      document.removeEventListener('visibilitychange', visibilityChange);
     };
   }, [setPhaseBoth]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'playing') return;
-    if (stickRef.current.active) return;
+    if (dungeonTransition) return;
+    if (stickRef.current.active || pointerModeRef.current !== 'none') return;
     (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+
+    const canvas = canvasRef.current;
+    const world = worldRef.current;
+    const now = performance.now();
+    const previousTap = lastTapRef.current;
+    if (canvas && world && previousTap &&
+      now - previousTap.time <= 300 &&
+      Math.hypot(event.clientX - previousTap.x, event.clientY - previousTap.y) <= 48) {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      dashPlayer(world, targetX - world.player.x, targetY - world.player.y);
+      lastTapRef.current = null;
+      pointerModeRef.current = 'none';
+      return;
+    }
+    lastTapRef.current = null;
+    if (physicsObjectClicksEnabled && canvas && world) {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const target = primePhysicsObject(
+        world,
+        (event.clientX - rect.left - width / 2) / zoom + world.camera.x,
+        (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y,
+      );
+      if (target) {
+        pointerModeRef.current = 'object';
+        return;
+      }
+    }
+
+    pointerModeRef.current = 'stick';
     const next: StickState = {
       active: true,
       pointerId: event.pointerId,
@@ -165,11 +262,11 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
     };
     stickRef.current = next;
     setStickVisual(next);
-  }, []);
+  }, [dungeonTransition, physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
-    if (!stick.active || stick.pointerId !== event.pointerId) return;
+    if (pointerModeRef.current !== 'stick' || !stick.active || stick.pointerId !== event.pointerId) return;
     let dx = event.clientX - stick.originX;
     let dy = event.clientY - stick.originY;
     const len = Math.hypot(dx, dy);
@@ -184,10 +281,24 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
 
   const endPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
+    if (pointerModeRef.current === 'object') {
+      pointerModeRef.current = 'none';
+      if (event.type !== 'pointercancel') {
+        lastTapRef.current = { time: performance.now(), x: event.clientX, y: event.clientY };
+      }
+      return;
+    }
     if (stick.pointerId !== event.pointerId) return;
+    const wasTap = Math.hypot(stick.dx, stick.dy) <= 12;
+    pointerModeRef.current = 'none';
     const next: StickState = { active: false, pointerId: null, originX: 0, originY: 0, dx: 0, dy: 0 };
     stickRef.current = next;
     setStickVisual(next);
+    if (event.type === 'pointercancel' || !wasTap) {
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = { time: performance.now(), x: event.clientX, y: event.clientY };
+    }
   }, []);
 
   /* -------------------------------------------------------------- */
@@ -265,7 +376,7 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           accumulator -= FIXED_STEP;
           stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate });
           ultimate = false;
-          if (world.pendingLevelUps > 0 || world.outcome !== 'running') break;
+          if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
         }
 
         // Detect dungeon room transitions and briefly flash the screen.
@@ -283,8 +394,14 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
         }
 
         if (world.pendingLevelUps > 0) {
-          setChoices(rollUpgradeChoices(world));
-          setPhaseBoth('levelup');
+          if (upgradeChoicesRef.current.length === 0) {
+            const nextChoices = rollUpgradeChoices(world);
+            upgradeChoicesRef.current = nextChoices;
+            setChoices(nextChoices);
+          }
+          if (levelUpPausesRef.current) {
+            setPhaseBoth('levelup');
+          }
         } else if (world.outcome !== 'running') {
           setPhaseBoth('over');
         }
@@ -316,10 +433,10 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
     const timer = window.setTimeout(() => {
       if (finishedRef.current) return;
       finishedRef.current = true;
-      onFinish(buildResult(world));
+       onFinish(buildResult(world, finalRewardMultiplier));
     }, 1100);
     return () => window.clearTimeout(timer);
-  }, [phase, onFinish]);
+  }, [finalRewardMultiplier, onFinish, phase]);
 
   const pickUpgrade = useCallback(
     (upgrade: UpgradeDef) => {
@@ -327,14 +444,23 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
       if (!world) return;
       applyUpgrade(world, upgrade);
       if (world.pendingLevelUps > 0) {
-        setChoices(rollUpgradeChoices(world));
+        const nextChoices = rollUpgradeChoices(world);
+        upgradeChoicesRef.current = nextChoices;
+        setChoices(nextChoices);
       } else {
+        upgradeChoicesRef.current = [];
         setChoices([]);
         setPhaseBoth(world.outcome === 'running' ? 'playing' : 'over');
       }
     },
     [setPhaseBoth],
   );
+
+  const claimRumorHeal = useCallback(() => {
+    const world = worldRef.current;
+    if (!world || !claimRumorEmergencyHeal(world)) return;
+    setHud(hudSnapshot(world));
+  }, []);
 
   const triggerUltimate = useCallback(() => {
     ultRequestRef.current = true;
@@ -370,7 +496,7 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
   /** End the run successfully ("head home"). Only available in endless mode. */
   const headHome = useCallback(() => {
     const world = worldRef.current;
-    if (!world || world.outcome !== 'running') return;
+    if (!world || world.outcome !== 'running' || world.player.falling) return;
     world.outcome = 'cleared';
     setPhaseBoth('over');
   }, [setPhaseBoth]);
@@ -386,6 +512,7 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
   const xpPct = hud ? (hud.xp / Math.max(1, hud.xpToNext)) * 100 : 0;
   const timeLeft = hud && !area.endless ? Math.max(0, hud.durationSec - hud.elapsedSec) : 0;
   const blocksWalked = hud?.endless?.blocksWalked ?? 0;
+  const distancePx = hud?.endless?.distancePx ?? 0;
   const dungeonDepth = hud?.endless?.dungeonDepth ?? 0;
   const inDungeon = hud?.endless?.inDungeon ?? false;
   const dungeonEraName = hud?.endless?.dungeonEraName ?? '';
@@ -405,7 +532,7 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
       />
 
       {/* Top HUD */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 p-3 space-y-2">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 space-y-2 p-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="h-3 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
@@ -425,7 +552,13 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
             <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-widest text-white/80">
               <span data-testid="text-level">Lv {hud?.level ?? 1}</span>
               <span data-testid="text-kills">{hud?.kills ?? 0} down</span>
-              <span>{area.name}</span>
+              <span>
+                {area.endless && hud?.endless
+                  ? hud.endless.inBuilding
+                    ? `Inside · ${hud.endless.buildingLabel}`
+                    : `${hud.endless.currentBandLabel} · ${hud.endless.currentDistrict}`
+                  : area.name}
+              </span>
             </div>
           </div>
 
@@ -433,11 +566,31 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
             <div className="rounded-sm border border-white/20 bg-black/70 px-2.5 py-1 font-mono text-lg font-bold text-white tabular-nums" data-testid="text-timer">
               {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
             </div>
-            {area.endless && dungeonDepth > 0 && (
+            {area.endless && hud?.endless && (
               <div className="font-mono text-[10px] uppercase tracking-widest text-primary/80 bg-black/60 px-2 py-0.5 border border-primary/20">
-                {inDungeon ? `${dungeonEraName}` : `Depth ${dungeonDepth}`}
+                {inDungeon
+                  ? `${dungeonEraName} · room ${hud.endless.dungeonRoom}/3`
+                  : hud.endless.inBuilding
+                    ? 'Interior route · find the lit door out'
+                    : hud.endless.routeEvent?.phase === 'available'
+                      ? (
+                        <span className="flex max-w-[18rem] flex-col items-end gap-0.5 text-right">
+                          <span>Beacon ahead · {hud.endless.routeEvent.title}</span>
+                          <span className="text-[9px] normal-case tracking-normal text-white/60">
+                            {hud.endless.routeEvent.description} · +{hud.endless.routeEvent.rewardCred} cred · {hud.endless.routeEvent.rewardTokens} token{hud.endless.routeEvent.rewardTokens === 1 ? '' : 's'}
+                          </span>
+                        </span>
+                      )
+                      : dungeonDepth > 0
+                      ? `Depth ${dungeonDepth}`
+                      : 'Street grid · explore the block'}
               </div>
             )}
+            {area.endless && hud?.endless && !inDungeon && !hud.endless.inBuilding ? (
+              <div className="font-mono text-[9px] uppercase tracking-widest text-white/50">
+                {distancePx.toLocaleString()} units · {hud.endless.riskLabel}
+              </div>
+            ) : null}
             {phase === 'playing' || phase === 'paused' ? (
               <button
                 type="button"
@@ -457,6 +610,25 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           </div>
         ) : null}
 
+        {challenges.length > 0 ? (
+          <div className="mx-auto flex w-fit flex-wrap justify-center gap-1.5" data-testid="row-active-contracts">
+            {challenges.map((challenge) => (
+              <span key={challenge.id} className="border border-red-400/45 bg-black/75 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-200">
+                Contract: {challenge.name}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        {hud?.crewRumor ? (
+          <div className="mx-auto flex w-fit max-w-full items-center gap-2 border border-[#fbbf24]/45 bg-black/75 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-[#fbbf24]" data-testid="indicator-crew-rumor">
+            <span className="text-sm" aria-hidden="true">◆</span>
+            <span className="truncate">
+              Rumor · {hud.crewRumor.name} · {hud.crewRumor.triggered ? 'fired' : hud.crewRumor.effectLabel}
+            </span>
+          </div>
+        ) : null}
+
         {hud?.loadout ? (
           <div className="flex gap-1.5 overflow-hidden" data-testid="row-loadout">
             {hud.loadout.weapons.map((weapon) => (
@@ -472,11 +644,129 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           </div>
         ) : null}
 
+        {hud?.lokPets && hud.lokPets.length > 0 ? (
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5" data-testid="row-lokpets">
+            {hud.lokPets.map((pet) => (
+              <div
+                key={pet.uid}
+                title={`${pet.name} · ${pet.traitLabel} · ${pet.expiresInSec}s remaining`}
+                className={`flex min-h-9 min-w-[148px] items-center gap-2 border bg-black/80 px-2 py-1 font-mono text-[9px] uppercase tracking-wide ${pet.ghost ? 'border-white/25' : 'border-pink-400/50'}`}
+                style={{ color: pet.color, opacity: pet.ghost ? 0.68 : 1 }}
+              >
+                <span className="h-3 w-3 shrink-0 rotate-45 border" style={{ borderColor: pet.color, backgroundColor: `${pet.color}55`, boxShadow: `0 0 8px ${pet.color}` }} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold text-white">{pet.name}</span>
+                  <span className="block truncate opacity-80">{pet.traitLabel} · {pet.damage} dmg / {pet.cooldownMs}ms</span>
+                </span>
+                <span className="shrink-0 text-right opacity-80">
+                  <span className="block">{pet.ghost ? 'ghost' : `${pet.expiresInSec}s`}</span>
+                  <span className="block text-[8px]">{pet.silhouette}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {hud?.activeEffects && hud.activeEffects.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5" data-testid="row-status-effects">
+            {hud.activeEffects.map((effect) => (
+              <div
+                key={effect.id}
+                title={`${effect.name}: affecting ${effect.count} enemies`}
+                className="flex items-center gap-1 border bg-black/75 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide"
+                style={{ borderColor: `${effect.color}99`, color: effect.color }}
+              >
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: effect.color, boxShadow: `0 0 7px ${effect.color}` }} />
+                {effect.name} <span className="opacity-70">×{effect.count}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {hud?.alerts.slice(-1).map((alert) => (
           <div key={alert} className="mx-auto w-fit font-mono text-sm uppercase tracking-[0.25em] text-white/90 drop-shadow">
             {alert}
           </div>
         ))}
+
+        {hud?.firstNightBeat ? (
+          <div className="mx-auto max-w-xl border border-cyan-200/40 bg-black/80 px-3 py-2 text-center" data-testid="story-beat">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">
+              First Night · {hud.firstNightBeat.title}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-white/80">{hud.firstNightBeat.text}</p>
+          </div>
+        ) : null}
+
+        {hud?.districtIncursion && hud.districtIncursion.phase !== 'pending' ? (
+          <div
+            className="mx-auto w-full max-w-xl border bg-black/80 px-3 py-2"
+            style={{ borderColor: `${hud.districtIncursion.accent}88` }}
+            data-testid="row-district-incursion"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: hud.districtIncursion.accent }}>
+                {hud.districtIncursion.title} · {hud.districtIncursion.landmark}
+              </span>
+              <span className="font-mono text-[10px] uppercase text-white/70">
+                {hud.districtIncursion.phase === 'active'
+                  ? `${hud.districtIncursion.progress}/${hud.districtIncursion.target} · ${hud.districtIncursion.remainingSec}s`
+                  : hud.districtIncursion.phase}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-white/80">{hud.districtIncursion.objectiveLabel}</p>
+            {hud.districtIncursion.phase === 'active' ? (
+              <div className="mt-2 h-1 overflow-hidden bg-white/10">
+                <div
+                  className="h-full transition-[width]"
+                  style={{
+                    width: `${Math.min(100, (hud.districtIncursion.progress / Math.max(1, hud.districtIncursion.target)) * 100)}%`,
+                    backgroundColor: hud.districtIncursion.accent,
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {hud?.evolution ? (
+          <div
+            className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
+            style={{ borderColor: `${hud.evolution.color}88`, backgroundColor: `${hud.evolution.color}18`, color: hud.evolution.color }}
+            data-testid="text-signature-evolution"
+          >
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Signature · {hud.evolution.name}</span>
+            <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.evolution.identity}</span>
+          </div>
+        ) : null}
+
+        {hud?.relicWorkshop.activeRecipe ? (
+          <div
+            className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
+            style={{ borderColor: `${hud.relicWorkshop.activeRecipe.color}88`, backgroundColor: `${hud.relicWorkshop.activeRecipe.color}18`, color: hud.relicWorkshop.activeRecipe.color }}
+            data-testid="text-relic-recipe"
+          >
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic · {hud.relicWorkshop.activeRecipe.name}</span>
+            <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.relicWorkshop.activeRecipe.identity}</span>
+          </div>
+        ) : hud?.relicWorkshop.readyRecipeIds.length ? (
+          <div className="mx-auto w-fit max-w-full border border-orange-300/35 bg-orange-300/10 px-3 py-1.5 text-center text-orange-100" data-testid="text-relic-ready">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic recipe ready · level the base weapon</span>
+          </div>
+        ) : null}
+
+        {hud?.episode ? (
+          <div className="mx-auto w-full max-w-xl border border-primary/35 bg-black/75 px-3 py-2" data-testid="row-character-episode">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Episode · {hud.episode.title}</span>
+              <span className="font-mono text-[10px] uppercase text-white/70">{hud.episode.progress}/{hud.episode.target}</span>
+            </div>
+            <p className="mt-1 text-xs text-white/80">{hud.episode.label}</p>
+            <div className="mt-2 h-1 overflow-hidden bg-white/10">
+              <div className="h-full bg-primary transition-[width]" style={{ width: `${(hud.episode.progress / Math.max(1, hud.episode.target)) * 100}%` }} />
+            </div>
+          </div>
+        ) : null}
 
         {/* Objective strip */}
         {hud && hud.objectives.length > 0 ? (
@@ -495,6 +785,16 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           </div>
         ) : null}
       </div>
+
+      {area.endless && hud?.endless && meta.minimapVisible ? (
+        <Minimap
+          map={hud.endless}
+          expanded={meta.minimapExpanded}
+          position={meta.minimapPosition}
+          onPositionChange={setMinimapPosition}
+          onToggleExpanded={() => setMinimapExpanded(!meta.minimapExpanded)}
+        />
+      ) : null}
 
       {/* Ultimate */}
       <button
@@ -543,46 +843,100 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
           <h2 className="mt-2 text-4xl font-black uppercase text-white">{area.name}</h2>
           <p className="mt-3 max-w-xs px-6 font-mono text-xs text-white/60">
             {area.endless
-              ? 'Walk. Find the stairs down. Head home when you\'re done.'
+              ? 'Follow the street grid. Enter marked buildings, find the way back out, and head home when you\'re done.'
               : `Survive ${Math.round(area.durationSec)} seconds. Drag anywhere to move.`}
           </p>
+          {firstNightChapter ? (
+            <div className="mt-5 max-w-sm border border-cyan-200/30 bg-cyan-950/20 px-4 py-3 text-left" data-testid="run-briefing">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200">
+                Chapter {firstNightChapter.chapter} · {firstNightChapter.worldVerb}
+              </p>
+              <p className="mt-1 text-sm font-bold text-white">{firstNightChapter.goal}</p>
+              <p className="mt-2 text-[10px] uppercase tracking-widest text-white/50">The lead: {firstNightChapter.thread}</p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
       {/* Level up */}
-      {phase === 'levelup' ? (
+      {phase === 'levelup' && meta.levelUpPausesEnabled ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-5" data-testid="overlay-levelup">
           <div className="w-full max-w-md space-y-3">
             <p className="text-center font-mono text-xs uppercase tracking-[0.4em] text-white/60">Level {hud?.level}</p>
             <h2 className="text-center text-2xl font-black uppercase text-white">Pick your edge</h2>
+            {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
+              <button
+                type="button"
+                onClick={claimRumorHeal}
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-4 text-left transition hover:bg-[#86efac]/20 active:scale-[0.99]"
+                data-testid="button-rumor-heal"
+              >
+                <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
+                <p className="mt-1 font-mono text-xs text-white/70">Use Pantry Surge once alongside your normal upgrade.</p>
+              </button>
+            ) : null}
             <div className="space-y-2">
-              {choices.map((upgrade) => {
-                const weaponDef = resolveCardWeapon(upgrade, worldRef.current);
-                return (
-                  <button
-                    key={upgrade.id}
-                    type="button"
-                    onClick={() => pickUpgrade(upgrade)}
-                    className="w-full rounded-sm border border-white/20 bg-white/5 p-4 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99] flex items-center gap-3"
-                    data-testid={`button-upgrade-${upgrade.id}`}
-                  >
-                    {weaponDef && (
-                      <WeaponIcon kind={weaponDef.kind} color={weaponDef.color} size={30} className="shrink-0" />
-                    )}
-                    <div>
-                      <p className="font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
-                      <p className="mt-1 font-mono text-xs text-white/70">{upgrade.description}</p>
-                    </div>
-                  </button>
-                );
-              })}
+              {choices.map((upgrade) => (
+                <button
+                  key={upgrade.id}
+                  type="button"
+                  onClick={() => pickUpgrade(upgrade)}
+                  className="w-full rounded-sm border border-white/20 bg-white/5 p-4 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                  data-testid={`button-upgrade-${upgrade.id}`}
+                >
+                  <p className="font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                  <p className="mt-1 font-mono text-xs text-white/70">{upgrade.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 ? (
+        <div
+          className="pointer-events-none absolute bottom-4 left-4 z-40 w-[min(88vw,330px)]"
+          data-testid="panel-continuous-levelup"
+        >
+          <div className="pointer-events-auto space-y-2 border border-primary/40 bg-black/85 p-3 shadow-[0_0_24px_rgba(251,191,36,.16)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">Level {hud?.level}</p>
+                <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
+              </div>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-white/45">Run continues</span>
+            </div>
+            {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
+              <button
+                type="button"
+                onClick={claimRumorHeal}
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-3 text-left transition hover:bg-[#86efac]/20"
+                data-testid="button-rumor-heal-continuous"
+              >
+                <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
+                <p className="mt-1 font-mono text-[10px] text-white/70">Use once alongside your upgrade.</p>
+              </button>
+            ) : null}
+            <div className="space-y-2">
+              {choices.map((upgrade) => (
+                <button
+                  key={upgrade.id}
+                  type="button"
+                  onClick={() => pickUpgrade(upgrade)}
+                  className="w-full rounded-sm border border-white/20 bg-white/5 p-3 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                  data-testid={`button-continuous-upgrade-${upgrade.id}`}
+                >
+                  <p className="text-sm font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                  <p className="mt-1 font-mono text-[10px] text-white/70">{upgrade.description}</p>
+                </button>
+              ))}
             </div>
           </div>
         </div>
       ) : null}
 
       {/* Pause */}
-      {phase === 'paused' ? (
+      {phase === 'paused' && !runSettingsOpen ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6" data-testid="overlay-paused">
           <div className="w-full max-w-xs space-y-3 text-center">
             <h2 className="text-2xl font-black uppercase text-white">Paused</h2>
@@ -596,6 +950,14 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
               data-testid="button-resume"
             >
               Resume
+            </button>
+            <button
+              type="button"
+              onClick={() => setRunSettingsOpen(true)}
+              className="w-full rounded-sm border border-cyan-200/40 bg-cyan-300/10 px-4 py-3 font-bold uppercase tracking-widest text-cyan-100"
+              data-testid="button-pause-settings"
+            >
+              Settings
             </button>
             {area.endless && (
               <button
@@ -616,6 +978,12 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
               Abandon run
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {phase === 'paused' && runSettingsOpen ? (
+        <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-run-settings">
+          <SettingsPanel onBack={() => setRunSettingsOpen(false)} />
         </div>
       ) : null}
 
@@ -664,6 +1032,19 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
               >
                 {reel.prize.label}
               </p>
+              {reel.prize.lokPet ? (
+                <div className="mt-3 border border-pink-400/30 bg-pink-400/5 px-4 py-3 text-left font-mono text-[11px] uppercase tracking-widest text-white/80">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-black text-pink-200">{reel.prize.lokPet.rarityLabel} {reel.prize.lokPet.family} signal</span>
+                    <span className="text-pink-300">{reel.prize.lokPet.elementLabel}</span>
+                  </div>
+                  <p className="mt-1 text-white">{reel.prize.lokPet.traitLabel}</p>
+                  <p className="mt-1 text-[9px] text-pink-100/70">
+                    {reel.prize.lokPet.stats.damage} dmg · {reel.prize.lokPet.stats.cooldownMs}ms cadence · {reel.prize.lokPet.stats.range} range · {Math.round(reel.prize.lokPet.stats.lifetimeMs / 1000)}s lifespan
+                  </p>
+                  <p className="mt-1 text-[9px] text-white/50">{reel.prize.lokPet.description}</p>
+                </div>
+              ) : null}
               <p className="mt-1 font-mono text-xs text-white/40">already applied — you keep it</p>
             </div>
           ) : (
@@ -694,7 +1075,11 @@ export function RunScreen({ areaId, characterId, onAbort, onFinish }: RunScreenP
       {phase === 'over' ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
           <h2 className="text-4xl font-black uppercase tracking-widest text-white drop-shadow" data-testid="text-outcome">
-            {worldRef.current?.outcome === 'cleared' ? 'Block cleared' : 'Down'}
+            {worldRef.current?.outcome === 'cleared'
+              ? 'Block cleared'
+              : worldRef.current?.deathCause === 'lethal-pothole'
+                ? 'FELL THROUGH'
+                : 'Down'}
           </h2>
         </div>
       ) : null}

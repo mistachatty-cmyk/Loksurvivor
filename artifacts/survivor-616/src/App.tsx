@@ -5,7 +5,15 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
 import { RunScreen } from '@/game/RunScreen';
-import { MetaProvider, useMeta } from '@/game/state/metaStore';
+import {
+  FATIGUE_PER_RUN_PCT,
+  getLokPetDiscoveries,
+  MAX_FATIGUE_PCT,
+  MetaProvider,
+  rewardCredMultiplier,
+  startingWeaponLevel,
+  useMeta,
+} from '@/game/state/metaStore';
 import type { RunResult } from '@/game/types';
 import { ArchivePanel } from '@/ui/ArchivePanel';
 import { AreaSelect } from '@/ui/AreaSelect';
@@ -15,6 +23,15 @@ import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
+import { RecoveryPanel } from '@/ui/RecoveryPanel';
+import { VendorPanel } from '@/ui/VendorPanel';
+import { WorkshopPanel } from '@/ui/WorkshopPanel';
+import { SettingsPanel } from '@/ui/SettingsPanel';
+import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
+import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
+import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
+import { customMapToArea } from '@/game/data/customMaps';
+import { MapBuilder } from '@/ui/MapBuilder';
 
 const queryClient = new QueryClient();
 
@@ -24,9 +41,14 @@ type Screen =
   | { name: 'roster' }
   | { name: 'areas' }
   | { name: 'bestiary' }
-  | { name: 'archive' }
+  | { name: 'archive'; variantId?: string }
   | { name: 'music' }
-  | { name: 'run'; areaId: string }
+  | { name: 'recovery' }
+  | { name: 'vendor' }
+  | { name: 'workshop' }
+  | { name: 'settings' }
+  | { name: 'map-editor' }
+  | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
   | { name: 'summary'; result: RunResult };
 
 /**
@@ -39,13 +61,20 @@ function initialScreen(onboarded: boolean): Screen {
     const requested = params.get('screen');
     const areaId = params.get('area');
     if (requested === 'run' && areaId) return { name: 'run', areaId };
+    if (requested === 'summary' && params.get('fixture') === 'lokpet-archive') {
+      return { name: 'summary', result: createLokPetArchiveFixtureResult() };
+    }
     if (
       requested === 'hub' ||
       requested === 'roster' ||
       requested === 'areas' ||
       requested === 'bestiary' ||
       requested === 'archive' ||
-      requested === 'music'
+      requested === 'music' ||
+      requested === 'recovery' ||
+      requested === 'vendor' ||
+      requested === 'workshop' ||
+      requested === 'settings'
     ) {
       return { name: requested };
     }
@@ -54,11 +83,14 @@ function initialScreen(onboarded: boolean): Screen {
 }
 
 function Game() {
-  const { meta, markOnboarded, selectedCharacter, completeRun, unlockedAreas } = useMeta();
+  const { meta, markOnboarded, selectedCharacter, completeRun, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
 
-  const goHub = useCallback(() => setScreen({ name: 'hub' }), []);
+  const goHub = useCallback(() => {
+    enterHideout();
+    setScreen({ name: 'hub' });
+  }, [enterHideout]);
 
   const openPanel = useCallback((panel: HubPanel) => {
     switch (panel) {
@@ -77,15 +109,39 @@ function Game() {
       case 'music':
         setScreen({ name: 'music' });
         break;
+      case 'recovery':
+        setScreen({ name: 'recovery' });
+        break;
+      case 'vendor':
+        setScreen({ name: 'vendor' });
+        break;
+      case 'workshop':
+        setScreen({ name: 'workshop' });
+        break;
+      case 'settings':
+        setScreen({ name: 'settings' });
+        break;
     }
   }, []);
 
   const handleFinish = useCallback(
     (result: RunResult) => {
-      completeRun(result);
-      setScreen({ name: 'summary', result });
+      const fatigueBefore = meta.fatigueByCharacter[result.characterId] ?? 0;
+      const fatigueAfter = Math.min(MAX_FATIGUE_PCT, fatigueBefore + FATIGUE_PER_RUN_PCT);
+      const resultWithFatigue = {
+        ...result,
+        fatigueAddedPct: fatigueAfter - fatigueBefore,
+        fatigueAfterPct: fatigueAfter,
+        lokPetDiscoveries: getLokPetDiscoveries(meta.lokPetCatalog, result.lokPets),
+        newlyDiscoveredRelicIds: result.cleared && result.discoveryId && RELIC_BY_DISCOVERY_ID[result.discoveryId] &&
+          !meta.knownRelicIds.includes(RELIC_BY_DISCOVERY_ID[result.discoveryId]!.id)
+          ? [RELIC_BY_DISCOVERY_ID[result.discoveryId]!.id]
+          : [],
+      };
+      completeRun(resultWithFatigue);
+      setScreen({ name: 'summary', result: resultWithFatigue });
     },
-    [completeRun],
+    [completeRun, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
   switch (screen.name) {
@@ -100,43 +156,86 @@ function Game() {
       );
 
     case 'hub':
-      return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} />;
+      return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} onOpenMapEditor={() => setScreen({ name: 'map-editor' })} />;
+
+    case 'map-editor':
+      return <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />;
 
     case 'roster':
-      return <CharacterSelect onBack={goHub} onConfirm={() => setScreen({ name: 'areas' })} />;
+      return (
+        <CharacterSelect
+          onBack={goHub}
+          onConfirm={() => setScreen({ name: 'areas' })}
+          onLaunchEpisode={(episodeId, areaId) => setScreen({ name: 'run', areaId, episodeId })}
+        />
+      );
 
     case 'areas':
-      return <AreaSelect onBack={goHub} onLaunch={(areaId) => setScreen({ name: 'run', areaId })} />;
+      return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
 
     case 'bestiary':
       return <BestiaryPanel onBack={goHub} />;
 
     case 'archive':
-      return <ArchivePanel onBack={goHub} />;
+      return <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} />;
 
     case 'music':
       return <MusicPanel onBack={goHub} />;
 
+    case 'recovery':
+      return <RecoveryPanel onBack={goHub} />;
+
+    case 'vendor':
+      return <VendorPanel onBack={goHub} />;
+
+    case 'workshop':
+      return <WorkshopPanel onBack={goHub} />;
+
+    case 'settings':
+      return <SettingsPanel onBack={goHub} />;
+
     case 'run':
-      return (
-        <RunScreen
-          key={`${screen.areaId}-${selectedCharacter.id}`}
-          areaId={screen.areaId}
-          characterId={selectedCharacter.id}
-          onAbort={goHub}
-          onFinish={handleFinish}
-        />
-      );
+      {
+        const customMap = meta.customMaps.find((map) => map.id === screen.areaId);
+        if (screen.areaId.startsWith('custom-') && !customMap) {
+          return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
+        }
+        return (
+          <RunScreen
+            key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
+            areaId={screen.areaId}
+            areaOverride={customMap ? customMapToArea(customMap) : undefined}
+            characterId={selectedCharacter.id}
+            challengeIds={screen.challengeIds}
+            episodeId={screen.episodeId}
+            startingWeaponLevel={startingWeaponLevel(meta)}
+            utilityRewardMultiplier={rewardCredMultiplier(meta)}
+            physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
+            onAbort={goHub}
+            onFinish={handleFinish}
+          />
+        );
+      }
 
     case 'summary': {
       // If the run unlocked the next district, retry should still work.
-      const canRetry = unlockedAreas.some((a) => a.id === screen.result.areaId);
+      const canRetry = unlockedAreas.some((a) => a.id === screen.result.areaId) ||
+        meta.customMaps.some((map) => map.id === screen.result.areaId);
       return (
         <RunSummary
           result={screen.result}
+          areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
           onReturnToHub={goHub}
+          onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
           onRetry={() =>
-            canRetry ? setScreen({ name: 'run', areaId: screen.result.areaId }) : goHub()
+            canRetry
+              ? setScreen({
+                  name: 'run',
+                  areaId: screen.result.areaId,
+                  episodeId: screen.result.episode?.id,
+                  challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
+                })
+              : goHub()
           }
         />
       );
@@ -151,7 +250,10 @@ function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <MetaProvider>
-        <MusicProvider>{children}</MusicProvider>
+        <MusicProvider>
+          {children}
+          <MusicNowPlaying />
+        </MusicProvider>
       </MetaProvider>
       <Toaster />
     </QueryClientProvider>
@@ -160,11 +262,11 @@ function Providers({ children }: { children: ReactNode }) {
 
 function App() {
   return (
-    <Providers>
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <Providers>
         <Game />
-      </ErrorBoundary>
-    </Providers>
+      </Providers>
+    </ErrorBoundary>
   );
 }
 

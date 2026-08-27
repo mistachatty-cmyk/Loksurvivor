@@ -10,36 +10,53 @@
  */
 
 import { getEnemy } from '@/game/data/enemies';
-import { getAmbientKind } from '@/game/data/ambient';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
 import { UPGRADES } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
+import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
+import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { getCrewRumor } from '@/game/data/crewRumors';
+import { getFirstNightChapter } from '@/game/data/firstNight';
+import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
+import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
+import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
 import type {
-  AmbientKind,
+  ActiveCrewRumor,
   AreaDef,
   BaseStats,
+  CharacterEpisodeDef,
+  ChallengeContractDef,
   CharacterDef,
   CompletedObjective,
+  DistrictIncursionState,
   EnemyDef,
   EndlessState,
+  EvolutionBehavior,
+  EvolutionDef,
   HudSnapshot,
   LootPrizeDef,
+  LokPetInstance,
+  LokPetRoll,
   ObjectiveDef,
   RunObjective,
   RunResult,
   RunPassive,
   RunWeapon,
+  StatusEffectInstance,
   UpgradeDef,
   WeaponDef,
   ObstacleDef,
+  ImpactIntensity,
+  PotholeTrigger,
+  PropVariant,
+  RelicRecipeDef,
 } from '@/game/types';
 
 import {
-  circleHitsBox,
   clamp,
   createRng,
   dist2,
@@ -47,7 +64,17 @@ import {
   resolveCircleBox,
   type Aabb,
 } from './math';
-import { CHUNK_SIZE, chunkKey, chunkOrigin, generateChunk, worldToChunkCoords } from './chunks';
+import {
+  BUILDING_PREFABS,
+  CHUNK_SIZE,
+  buildingWallObstacles,
+  chunkKey,
+  chunkOrigin,
+  generateChunk,
+  getBuildingPrefab,
+  worldToChunkCoords,
+  type BuildingPrefabId,
+} from './chunks';
 
 /* ------------------------------------------------------------------ */
 /* Entities                                                            */
@@ -71,11 +98,20 @@ export interface Actor {
   anim: AnimState;
   animStartedAt: number;
   hitFlashUntil: number;
+  /** Set for the readable fall beat before a lethal pothole resolves. */
+  falling: boolean;
+  fallStartedAt: number;
 }
 
 export interface PlayerActor extends Actor {
   invulnUntil: number;
   lastDamageAt: number;
+  dashDirectionX: number;
+  dashDirectionY: number;
+  dashUntil: number;
+  dashReadyAt: number;
+  dashStartedAt: number;
+  dashHitUids: Set<number>;
 }
 
 export interface EnemyActor extends Actor {
@@ -98,30 +134,14 @@ export interface EnemyActor extends Actor {
   specialUntil: number;
   specialRadius: number;
   specialKind: 'shockwave' | 'current' | null;
+  ghostUntil: number;
+  burstUntil: number;
+  baseRadius: number;
+  convertedUntil: number;
+  convertedAttackReadyAt: number;
   dying: boolean;
   deathAt: number;
-}
-
-/**
- * Non-combat background actor. No hp/mass/damage -- deliberately not an
- * `Actor` -- and never touched by resolveCircleBox or any hit-detection
- * code. Purely a cosmetic reaction to the player.
- */
-export interface AmbientActor {
-  uid: number;
-  kindId: string;
-  x: number;
-  y: number;
-  homeX: number;
-  homeY: number;
-  facing: 1 | -1;
-  anim: 'idle' | 'walk';
-  animStartedAt: number;
-  /** World time this actor is fleeing until; 0 when not fleeing. */
-  fleeUntil: number;
-  /** World time the next idle/wander decision is made. */
-  nextDecisionAt: number;
-  wanderAngle: number;
+  activeEffects: StatusEffectInstance[];
 }
 
 export interface Projectile {
@@ -132,7 +152,7 @@ export interface Projectile {
   vy: number;
   radius: number;
   damage: number;
-  knockback: number;
+  impactIntensity: ImpactIntensity;
   fromPlayer: boolean;
   expiresAt: number;
   /** Homing projectiles steer toward this enemy. */
@@ -142,9 +162,19 @@ export interface Projectile {
   trail: Array<{ x: number; y: number }>;
   pierce: number;
   hitUids: Set<number>;
+  /** Obstacles already reflected from, preventing a single frame from looping. */
+  obstacleUids?: Set<number>;
+  obstacleInteraction?: 'block' | 'reflect';
+  statusEffectId?: string;
+  /** Ground-impact tag forwarded to pothole activation. */
+  impactTrigger?: PotholeTrigger;
+  /** Pet shots can detonate into a second area hit on contact. */
+  explosionRadius?: number;
+  explosionDamage?: number;
+  evolutionBehavior?: EvolutionBehavior;
 }
 
-export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring';
+export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport';
 
 export interface Effect {
   uid: number;
@@ -160,9 +190,14 @@ export interface Effect {
   color: string;
   /** Effects that damage over their lifetime re-check on a cadence. */
   damage: number;
-  knockback: number;
+  impactIntensity: ImpactIntensity;
+  impactTrigger?: PotholeTrigger;
   hitUids: Set<number>;
   followPlayer: boolean;
+  nextTickAt?: number;
+  hurtsPlayer?: boolean;
+  statusEffectId?: string;
+  evolutionBehavior?: EvolutionBehavior;
 }
 
 export interface Orbiter {
@@ -206,6 +241,26 @@ export interface Particle {
   lifeMs: number;
 }
 
+export interface Follower {
+  uid: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  baseRadius: number;
+  damage: number;
+  bornAt: number;
+  expiresAt: number;
+  growAfterMs: number;
+  maxRadius: number;
+  orbitAngle: number;
+  orbitRadius: number;
+  color: string;
+  weaponId: string;
+  readyAt?: number;
+}
+
 export interface RescueState {
   status: 'pending' | 'available' | 'freeing' | 'freed';
   x: number;
@@ -226,30 +281,128 @@ export interface Alert {
 export interface BreakableObstacle extends Aabb {
   uid: number;
   kind: ObstacleDef['kind'];
+  propVariant: PropVariant | undefined;
   hp: number;
   maxHp: number;
   vx: number;
   vy: number;
+  mass: number;
+  friction: number;
+  breakable: boolean;
+  movable: boolean;
+  impactIntensity: ImpactIntensity;
+  nextImpactDamageAt: number;
   broken: boolean;
   brokenAt: number;
   contacts: number;
+  /** The most recent direction this prop was hit from by the player. */
+  lastPlayerImpactX: number;
+  lastPlayerImpactY: number;
+  /** A click primes the next player hit for a boosted reverse launch. */
+  clickPrimed: boolean;
+  clickPrimedAt: number;
+  impactVelocityMultiplier: number;
+  /** Enemy-prop impact chain state. */
+  chainActive: boolean;
+  chainCycles: number;
+  chainVelocityBudget: number;
+  chainBoostPending: boolean;
+  /** Enemies that have already provided the launch beat for this chain. */
+  chainContactUids: Set<number>;
+  chainHitUids: Set<number>;
+  nextEnemyImpactAt: number;
+  landedHeatActive: boolean;
+  heatNextTickAt: number;
+  /** Falling light-pole state. */
+  fallAngle?: number;
+  hazardUntil?: number;
+  hazardNextTickAt?: number;
+}
+
+export type PotholeState = 'dormant' | 'opening' | 'open' | 'resolved';
+
+export interface PotholeObstacle extends Aabb {
+  uid: number;
+  state: PotholeState;
+  trigger: PotholeTrigger;
+  warningMs: number;
+  openingMs: number;
+  lethalRadius: number;
+  openingStartedAt: number;
+  openedAt: number;
+  resolvedAt: number;
 }
 
 const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
   crate: 40, 'crate-breakable': 40, 'neon-sign': 60, barrel: 80,
   'fuse-box': 100, 'street-lamp': 55, dumpster: 90, 'car-wreck': 150, car: 120,
-  'vending-machine': 65,
+  cover: 180,
 };
+const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
+  'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
+]);
 
-/**
- * Kinds light enough to shove -- bumping one of these (as the player or an
- * enemy) gives it a shove away from whoever hit it, so it can be pushed into
- * a lane to block incoming shots. Heavier fixed street furniture (ac-unit,
- * fuse-box, street-lamp, neon-sign, barrier, security-camera, car) stays put.
- */
-const PUSHABLE_KINDS: ObstacleDef['kind'][] = [
-  'dumpster', 'car-wreck', 'crate', 'crate-breakable', 'barrel', 'planter', 'vending-machine',
-];
+interface PropPhysicsProfile {
+  variant: PropVariant;
+  mass: number;
+  friction: number;
+  breakable: boolean;
+  movable: boolean;
+}
+
+function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant'>): PropPhysicsProfile {
+  const variant = obstacle.propVariant
+    ?? (obstacle.kind === 'metal-box'
+      ? 'heavy-metal'
+      : obstacle.kind === 'bench'
+        ? 'fixed-bench'
+        : obstacle.kind === 'crate-breakable'
+          ? 'light-breakable'
+          : obstacle.kind === 'dumpster' || obstacle.kind === 'car-wreck' || obstacle.kind === 'cover' || obstacle.kind === 'car'
+            ? 'medium-movable'
+            : BREAKABLE_HP[obstacle.kind] !== undefined
+              ? 'light-breakable'
+              : 'fixed-bench');
+  if (variant === 'light-breakable') {
+    return { variant, mass: 0.8, friction: 0.82, breakable: BREAKABLE_HP[obstacle.kind] !== undefined, movable: true };
+  }
+  if (variant === 'medium-movable') {
+    return { variant, mass: 2.6, friction: 0.88, breakable: BREAKABLE_HP[obstacle.kind] !== undefined, movable: true };
+  }
+  if (variant === 'heavy-metal') {
+    return { variant, mass: 8, friction: 0.94, breakable: false, movable: true };
+  }
+  return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
+}
+
+export const LANDED_HEAT_RADIUS = 116;
+
+const PROP_CHAIN_MIN_CYCLES = 3;
+const PROP_CHAIN_MAX_SPEED = 1800;
+const PROP_CHAIN_STOP_SPEED = 24;
+const PROP_CHAIN_CONTACT_COOLDOWN_MS = 180;
+const PROP_CHAIN_FIRST_HIT_DELAY_MS = 180;
+const PROP_CHAIN_HIT_COOLDOWN_MS = 120;
+const PROP_CHAIN_FRICTION = 0.975;
+const PROP_HEAT_TICK_MS = 360;
+const PROP_HEAT_DAMAGE = 11;
+
+/** Convert authored impact into travel speed after mass and resistance. */
+export function resolveImpactTravel(intensity: number, mass: number, resistance = 0): number {
+  if (intensity <= 0 || !Number.isFinite(mass)) return 0;
+  const resistanceFactor = 1 + clamp(resistance, 0, 0.8);
+  return (intensity * 78) / Math.max(0.35, mass) / resistanceFactor;
+}
+
+function enemyImpactResistance(enemy: EnemyActor): number {
+  // Heavy enemies still feel hits when they omit authored resistance, but
+  // their mass provides a gentle fallback rather than a second mass penalty.
+  return enemy.def.impactResistance ?? clamp((enemy.mass - 1) * 0.06, 0, 0.32);
+}
+
+function weaponImpact(weapon: Pick<WeaponDef, 'impactIntensity'>): ImpactIntensity {
+  return weapon.impactIntensity ?? 1;
+}
 
 /* ------------------------------------------------------------------ */
 /* World                                                               */
@@ -265,27 +418,32 @@ export interface World {
   time: number;
   /** Milliseconds since the run started -- used for all timers. */
   now: number;
-  /**
-   * Day/night clock. `phase` is 0..1 and driven purely by `now` (no
-   * wall-clock) -- 0/1 is midnight, 0.5 is neutral daylight.
-   */
-  cycle: { phase: number; cycleMs: number };
 
   player: PlayerActor;
   enemies: EnemyActor[];
-  /** Non-combat background life; never touched by collision/damage code. */
-  ambient: AmbientActor[];
   projectiles: Projectile[];
   effects: Effect[];
   orbiters: Orbiter[];
   weapons: RunWeapon[];
+  /** Account-wide signature evolution active for the selected character. */
+  activeEvolution?: EvolutionDef;
+  /** Relic knowledge carried into this run; recipes are still earned in-run. */
+  knownRelicIds: string[];
+  /** One relic recipe can be applied per run through a level-up card. */
+  activeRelicRecipe?: RelicRecipeDef;
+  appliedRelicRecipeIds: Set<string>;
   passives: RunPassive[];
   pickups: Pickup[];
   popups: Popup[];
   particles: Particle[];
+  followers: Follower[];
+  lokPets: LokPetInstance[];
+  /** All LokPets generated this run, including companions that have expired. */
+  lokPetHistory: LokPetInstance[];
 
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
+  potholes: PotholeObstacle[];
   bounds: { w: number; h: number };
 
   camera: { x: number; y: number };
@@ -311,6 +469,7 @@ export interface World {
   rescue: RescueState;
   alerts: Alert[];
   outcome: RunOutcome;
+  deathCause?: RunResult['deathCause'];
 
   upgradeStacks: Record<string, number>;
   spawnCredit: number[];
@@ -323,6 +482,25 @@ export interface World {
   rngSeed: number;
   /** Present only when area.endless === true. */
   endless?: EndlessState;
+  /** Whether pointer clicks can prime movable props during this run. */
+  physicsObjectClicksEnabled: boolean;
+  /** Optional difficulty contracts selected before the run. */
+  challenges: ChallengeContractDef[];
+  /** One bounded hideout rumor carried into this run. */
+  activeCrewRumor: ActiveCrewRumor | null;
+  /** Whether the carried rumor has fired its gameplay effect yet. */
+  rumorTriggered: boolean;
+  /** Human-readable outcome used by the run HUD and summary. */
+  rumorOutcome: string;
+  rumorSpeedUntil: number;
+  rumorPantryAvailable: boolean;
+  rumorBroadcastAvailable: boolean;
+  rumorMagnetNextAt: number;
+  /** Authored opening-campaign cue for this area, when one exists. */
+  firstNightChapter?: ReturnType<typeof getFirstNightChapter>;
+  firstNightBeatTriggered: boolean;
+  /** Optional, short landmark encounter selected for this run. */
+  districtIncursion?: DistrictIncursionState;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -339,6 +517,11 @@ export interface World {
   /* ---- Objective system ---- */
   objectives: RunObjective[];
   completedObjectives: CompletedObjective[];
+  /** Active character episode and its persisted starting progress. */
+  episode?: {
+    def: CharacterEpisodeDef;
+    startingProgress: number;
+  };
 }
 
 const MAX_ENEMIES = 190;
@@ -394,6 +577,17 @@ export function createWorld(
   character: CharacterDef,
   stats: BaseStats,
   seed = Date.now() % 100000,
+  challenges: ChallengeContractDef[] = [],
+  startingWeaponLevel = 1,
+  physicsObjectClicksEnabled = true,
+  activeCrewRumor: ActiveCrewRumor | null = null,
+  setup: {
+    unlockedEvolutionIds?: string[];
+    knownRelicIds?: string[];
+    episode?: CharacterEpisodeDef;
+    episodeProgress?: number;
+    districtIncursionId?: string;
+  } = {},
 ): World {
   const player: PlayerActor = {
     uid: 1,
@@ -410,11 +604,26 @@ export function createWorld(
     anim: 'idle',
     animStartedAt: 0,
     hitFlashUntil: 0,
+    falling: false,
+    fallStartedAt: 0,
     invulnUntil: 0,
     lastDamageAt: -9999,
+    dashDirectionX: 0,
+    dashDirectionY: 0,
+    dashUntil: 0,
+    dashReadyAt: 0,
+    dashStartedAt: 0,
+    dashHitUids: new Set(),
   };
 
   const rng = createRng(seed);
+  const selectedIncursion = chooseDistrictIncursion(area.id, rng, setup.districtIncursionId);
+  const evolved = EVOLUTIONS.find((candidate) =>
+    candidate.characterId === character.id &&
+    candidate.baseWeaponId === character.weapon.id &&
+    setup.unlockedEvolutionIds?.includes(candidate.id),
+  );
+  const signatureWeapon = evolved?.result ?? character.weapon;
 
   const world: World = {
     area,
@@ -422,23 +631,28 @@ export function createWorld(
     stats: { ...stats },
     time: 0,
     now: 0,
-    // Start at the neutral midpoint so a fresh run looks like it always
-    // did; cycleMs (~7 real minutes) is long relative to a typical timed
-    // run, so most runs see at most one transition.
-    cycle: { phase: 0.5, cycleMs: 420000 },
     player,
     enemies: [],
-    ambient: [],
     projectiles: [],
     effects: [],
     orbiters: [],
-    weapons: [{ def: character.weapon, level: 1, count: character.weapon.count ?? 1, readyAt: 400 }],
+    weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
+    activeEvolution: evolved,
+    knownRelicIds: [...new Set(setup.knownRelicIds ?? [])],
+    activeRelicRecipe: undefined,
+    appliedRelicRecipeIds: new Set(),
     passives: [],
     pickups: [],
     popups: [],
     particles: [],
-    obstacles: area.obstacles.map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
+    followers: [],
+    lokPets: [],
+    lokPetHistory: [],
+    obstacles: area.obstacles
+      .filter((o) => o.kind !== 'pothole')
+      .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
+    potholes: [],
     bounds: area.bounds,
     camera: { x: 0, y: 0 },
     shake: 0,
@@ -446,8 +660,8 @@ export function createWorld(
     xp: 0,
     xpToNext: xpForLevel(1),
     pendingLevelUps: 0,
-    weaponLevel: 1,
-    weaponCount: character.weapon.count ?? 1,
+    weaponLevel: startingWeaponLevel,
+    weaponCount: signatureWeapon.count ?? 1,
     ultCooldownMult: 1,
     weaponReadyAt: 400,
     ultReadyAt: 4000,
@@ -472,6 +686,45 @@ export function createWorld(
     grid: new Map(),
     rngSeed: seed,
     endless: undefined,
+    physicsObjectClicksEnabled,
+    challenges: [...challenges],
+    activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
+    rumorTriggered: activeCrewRumor?.rumorId === 'painted-shortcut',
+    rumorOutcome: activeCrewRumor?.rumorId === 'painted-shortcut'
+      ? 'Painted Shortcut boosted movement at run start.'
+      : activeCrewRumor
+        ? 'Rumor waiting for its first opening.'
+        : '',
+    rumorSpeedUntil: activeCrewRumor?.rumorId === 'painted-shortcut' ? 6500 : 0,
+    rumorPantryAvailable: activeCrewRumor?.rumorId === 'pantry-surge',
+    rumorBroadcastAvailable: activeCrewRumor?.rumorId === 'basement-broadcast',
+    rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
+    firstNightChapter: getFirstNightChapter(area.id),
+    firstNightBeatTriggered: false,
+    districtIncursion: selectedIncursion
+      ? {
+          id: selectedIncursion.id,
+          kind: selectedIncursion.kind,
+          title: selectedIncursion.title,
+          landmark: selectedIncursion.landmark,
+          objectiveLabel: selectedIncursion.objectiveLabel,
+          phase: 'pending',
+          progress: 0,
+          target: selectedIncursion.target,
+          accent: selectedIncursion.accent,
+          startedAt: 0,
+          endsAt: 0,
+          cycle: -1,
+          nextPulseAt: 0,
+          nextHazardTickAt: 0,
+          outsideSafeSince: 0,
+          startingKills: 0,
+          rewardCred: selectedIncursion.rewardCred,
+          rewardTokens: selectedIncursion.rewardTokens,
+          rewardGranted: false,
+          propUids: [],
+        }
+      : undefined,
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     lootBoxesOpened: 0,
@@ -479,50 +732,47 @@ export function createWorld(
     lootTokensGained: 0,
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
+    episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
+      ? {
+          def: setup.episode,
+          startingProgress: Math.min(
+            setup.episode.objective.targetCount,
+            Math.max(0, Math.floor(setup.episodeProgress ?? 0)),
+          ),
+        }
+      : undefined,
   };
 
-  world.breakables = area.obstacles.map((o) => {
-    const hp = BREAKABLE_HP[o.kind] ?? 999999;
-    return { ...o, uid: uid(world), kind: o.kind, hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 };
-  });
-
-  // Scattered background life for timed districts. Endless mode streams
-  // its world in chunks with no fixed bounds, so ambient life is scoped
-  // out of it for now rather than reworking chunk generation for it.
-  if (!area.endless) {
-    const halfW = area.bounds.w / 2 - 40;
-    const halfH = area.bounds.h / 2 - 40;
-    const count = 4 + Math.floor(rng() * 3);
-    for (let i = 0; i < count; i += 1) {
-      const kindId: AmbientKind = rng() < 0.75 ? 'civilian' : 'cat';
-      const x = randRange(rng, -halfW, halfW);
-      const y = randRange(rng, -halfH, halfH);
-      world.ambient.push({
-        uid: uid(world),
-        kindId,
-        x, y,
-        homeX: x, homeY: y,
-        facing: rng() < 0.5 ? 1 : -1,
-        anim: 'idle',
-        animStartedAt: 0,
-        fleeUntil: 0,
-        nextDecisionAt: randRange(rng, 500, 3000),
-        wanderAngle: randRange(rng, 0, Math.PI * 2),
-      });
-    }
-  }
+  world.breakables = area.obstacles.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
+  world.potholes = area.obstacles.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
 
   if (area.endless) {
     world.endless = {
       maxDistancePx: 0,
+      currentBandId: 'core',
+      discoveredBandIds: new Set(['core']),
+      discoveredRouteEventIds: new Set(),
+      routeEvent: null,
+      hazardNextAt: 0,
       dungeonDepth: 0,
       inDungeon: false,
+      inBuilding: false,
+      buildingLabel: '',
+      buildingPrefabId: null,
+      buildingCenterX: 0,
+      buildingCenterY: 0,
+      buildingReturnX: 0,
+      buildingReturnY: 0,
+      dungeonRoom: 0,
+      dungeonBossDefeated: false,
+      dungeonChest: null,
       dungeonEraIndex: -1, // will be incremented to 0 on first entry
       dungeonBounds: { w: 560, h: 440 },
       streetReturnX: 0,
       streetReturnY: 0,
       dungeonCenterX: 0,
       dungeonCenterY: 0,
+      lastLandmarkKey: null,
       exitZone: null,
       dungeonEntrances: [],
       consumedEntranceChunks: new Set(),
@@ -530,21 +780,83 @@ export function createWorld(
       spawnBudget: 0,
       rngSeed: seed,
       pendingTransition: null,
+      cityBlocks: [],
+      riverSegments: [],
+      buildingEntrances: [],
+      buildings: [],
     };
     // The endless area bounds sentinel won't be used for clamping, but the
     // rescue system reads durationSec.  Keep rescue disabled in endless mode.
     world.rescue.status = 'freed';
   }
 
-  if (character.weapon.kind === 'orbit') {
+  if (signatureWeapon.kind === 'orbit') {
     rebuildOrbiters(world);
   }
+  if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
   return world;
 }
 
 function uid(w: World): number {
   w.nextUid += 1;
   return w.nextUid;
+}
+
+function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
+  const profile = propProfile(obstacle);
+  const hp = profile.breakable ? (BREAKABLE_HP[obstacle.kind] ?? 40) : Number.POSITIVE_INFINITY;
+  return {
+    ...obstacle,
+    uid: uid(w),
+    kind: obstacle.kind,
+    propVariant: profile.variant,
+    hp,
+    maxHp: hp,
+    vx: 0,
+    vy: 0,
+    mass: profile.mass,
+    friction: profile.friction,
+    breakable: profile.breakable,
+    movable: profile.movable,
+    impactIntensity: 0,
+    nextImpactDamageAt: 0,
+    broken: false,
+    brokenAt: 0,
+    contacts: 0,
+    lastPlayerImpactX: 0,
+    lastPlayerImpactY: 0,
+    clickPrimed: false,
+    clickPrimedAt: 0,
+    impactVelocityMultiplier: 1,
+    chainActive: false,
+    chainCycles: 0,
+    chainVelocityBudget: 0,
+    chainBoostPending: false,
+    chainContactUids: new Set(),
+    chainHitUids: new Set(),
+    nextEnemyImpactAt: 0,
+    landedHeatActive: false,
+    heatNextTickAt: 0,
+  };
+}
+
+function createPothole(w: World, obstacle: ObstacleDef): PotholeObstacle {
+  const config = obstacle.pothole;
+  return {
+    x: obstacle.x,
+    y: obstacle.y,
+    w: obstacle.w,
+    h: obstacle.h,
+    uid: uid(w),
+    state: 'dormant',
+    trigger: config?.trigger ?? 'stomp',
+    warningMs: config?.warningMs ?? 760,
+    openingMs: config?.openingMs ?? 520,
+    lethalRadius: config?.lethalRadius ?? Math.min(obstacle.w, obstacle.h) * 0.42,
+    openingStartedAt: 0,
+    openedAt: 0,
+    resolvedAt: 0,
+  };
 }
 
 function pushAlert(w: World, text: string) {
@@ -588,6 +900,12 @@ function runWeaponDamage(w: World, weapon: RunWeapon): number {
   return weapon.def.damage * (1 + (weapon.level - 1) * weapon.def.levelDamageScale) * damageMult(w);
 }
 
+function weaponEvolutionBehavior(w: World, weapon: WeaponDef): EvolutionBehavior | undefined {
+  if (w.activeEvolution?.result.id === weapon.id) return w.activeEvolution.behavior;
+  if (w.activeRelicRecipe?.result.id === weapon.id) return w.activeRelicRecipe.behavior;
+  return undefined;
+}
+
 /* ------------------------------------------------------------------ */
 /* Spatial grid                                                        */
 /* ------------------------------------------------------------------ */
@@ -626,13 +944,16 @@ function forEachNearby(w: World, x: number, y: number, radius: number, fn: (e: E
 /* Spawning                                                            */
 /* ------------------------------------------------------------------ */
 
-function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
+function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
   if (w.enemies.length >= MAX_ENEMIES) return;
 
   let x = 0;
   let y = 0;
 
-  if (w.area.endless) {
+  if (position) {
+    x = position.x;
+    y = position.y;
+  } else if (w.area.endless) {
     // No arena walls — spawn on a ring around the player, clamped only inside dungeon rooms.
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const angle = w.rng() * Math.PI * 2;
@@ -641,7 +962,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
       y = w.player.y + Math.sin(angle) * radius;
       if (dist2(x, y, w.player.x, w.player.y) > 220 * 220) break;
     }
-    if (w.endless?.inDungeon) {
+    if (w.endless?.inDungeon || w.endless?.inBuilding) {
       const e = w.endless;
       const hw = e.dungeonBounds.w / 2 - 30;
       const hh = e.dungeonBounds.h / 2 - 30;
@@ -661,7 +982,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
     }
   }
 
-  const hp = def.hp * hpMult;
+  const hp = def.hp * hpMult * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1);
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -680,7 +1001,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
     animStartedAt: w.now,
     hitFlashUntil: 0,
     speed: def.speed,
-    damage: def.damage,
+    damage: def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1),
     xp: def.xp,
     mass: def.mass,
     contactReadyAt: 0,
@@ -693,10 +1014,29 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
     specialUntil: 0,
     specialRadius: 0,
     specialKind: null,
+    ghostUntil: 0,
+    burstUntil: 0,
+    baseRadius: def.radius,
+    convertedUntil: 0,
+    convertedAttackReadyAt: 0,
     dying: false,
     deathAt: 0,
+    activeEffects: [],
+    falling: false,
+    fallStartedAt: 0,
   };
   w.enemies.push(enemy);
+
+  if (
+    w.activeCrewRumor?.rumorId === 'basement-broadcast' &&
+    w.rumorBroadcastAvailable &&
+    (def.family === 'Elite' || def.family === 'Boss')
+  ) {
+    w.rumorBroadcastAvailable = false;
+    w.rumorTriggered = true;
+    w.rumorOutcome = `Basement Broadcast warned about ${def.name} before the arrival.`;
+    pushAlert(w, `RUMOR — ${def.name} on the air`);
+  }
 
   if (def.family === 'Boss') {
     pushAlert(w, `${def.name} has arrived`);
@@ -704,19 +1044,314 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number) {
   }
 }
 
+function formationPositions(w: World, formation: NonNullable<import('@/game/types').WaveDef['formation']>, count: number) {
+  const positions: Array<{ x: number; y: number }> = [];
+  const angle = w.rng() * Math.PI * 2;
+  const distance = 300;
+  for (let i = 0; i < count; i += 1) {
+    const t = i / Math.max(1, count - 1);
+    let x = Math.cos(angle) * distance;
+    let y = Math.sin(angle) * distance;
+    if (formation === 'ring') {
+      const a = angle + (Math.PI * 2 * i) / count;
+      x = Math.cos(a) * distance;
+      y = Math.sin(a) * distance;
+    } else if (formation === 'wedge' || formation === 'pincer') {
+      const side = i % 2 === 0 ? -1 : 1;
+      const spread = (Math.floor(i / 2) + 1) * 34;
+      x += Math.cos(angle + side * 0.55) * spread;
+      y += Math.sin(angle + side * 0.55) * spread;
+    } else if (formation === 'wall') {
+      x += Math.cos(angle + Math.PI / 2) * ((t - 0.5) * 260);
+      y += Math.sin(angle + Math.PI / 2) * ((t - 0.5) * 260);
+    } else if (formation === 'file' || formation === 'escort') {
+      x += Math.cos(angle) * (i * 42);
+      y += Math.sin(angle) * (i * 42);
+    } else if (formation === 'bait') {
+      const bait = i === 0 ? 0.6 : 1;
+      x *= bait; y *= bait;
+    }
+    positions.push({ x: w.player.x + x, y: w.player.y + y });
+  }
+  return positions;
+}
+
 function updateSpawning(w: World, dt: number) {
   const waves = w.area.waves;
   for (let i = 0; i < waves.length; i += 1) {
     const wave = waves[i]!;
     if (w.time < wave.fromSec || w.time > wave.toSec) continue;
-    w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * dt;
+    const spawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+    w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
       const def = getEnemy(wave.enemyId);
+      const ids = [wave.enemyId, ...(wave.group ?? [])];
+      const total = wave.burst * ids.length;
+      const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
+      let positionIndex = 0;
       for (let b = 0; b < wave.burst; b += 1) {
-        spawnEnemy(w, def, wave.hpMult ?? 1);
+        spawnEnemy(w, def, wave.hpMult ?? 1, positions[positionIndex++]);
+        for (const groupEnemyId of wave.group ?? []) {
+          spawnEnemy(w, getEnemy(groupEnemyId), wave.hpMult ?? 1, positions[positionIndex++]);
+        }
       }
     }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* District setpiece incursions                                        */
+/* ------------------------------------------------------------------ */
+
+function incursionEffect(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+  lifetimeMs = 760,
+) {
+  w.effects.push({
+    uid: uid(w),
+    kind: 'hazard',
+    x,
+    y,
+    radius,
+    angle: 0,
+    spread: Math.PI,
+    bornAt: w.now,
+    expiresAt: w.now + lifetimeMs,
+    color,
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+}
+
+function incursionAnchor() {
+  return { x: 0, y: -150 };
+}
+
+function startDistrictIncursion(w: World, state: DistrictIncursionState) {
+  const def = DISTRICT_INCURSIONS_BY_ID[state.id];
+  if (!def || state.phase !== 'warning') return;
+
+  state.phase = 'active';
+  state.startedAt = w.now;
+  state.endsAt = w.now + def.durationSec * 1000;
+  state.startingKills = w.kills;
+  state.nextPulseAt = w.now;
+  state.nextHazardTickAt = w.now;
+  state.outsideSafeSince = 0;
+  state.cycle = -1;
+  pushAlert(w, `${def.title} — ${def.activeText}`);
+  spawnParticles(w, 0, -150, def.accent, 22, 150);
+  w.shake = Math.max(w.shake, 8);
+
+  const anchor = incursionAnchor();
+  if (state.kind === 'flood-surge') {
+    for (const offset of [-260, -120, 120, 260]) {
+      spawnEnemy(w, getEnemy('river-wraith'), 1.08, { x: anchor.x + offset, y: anchor.y + 40 });
+    }
+  } else if (state.kind === 'market-bell') {
+    const crowd = [
+      ['belfry-bat', -210, -50],
+      ['belfry-bat', -120, 40],
+      ['corner-cutter', -250, 90],
+      ['corner-cutter', 210, 90],
+      ['belfry-bat', 120, 40],
+      ['belfry-bat', 210, -50],
+      ['bloodhound', -70, 110],
+      ['bloodhound', 70, 110],
+    ] as const;
+    for (const [enemyId, x, y] of crowd) {
+      spawnEnemy(w, getEnemy(enemyId), 1.12, { x: anchor.x + x, y: anchor.y + y });
+    }
+  } else if (state.kind === 'freight-arrival') {
+    for (const [enemyId, x, y] of [
+      ['lightless-prowler', -250, -120],
+      ['bloodhound', 250, -120],
+      ['river-wraith', -260, 120],
+      ['crypt-bouncer', 250, 120],
+    ] as const) {
+      spawnEnemy(w, getEnemy(enemyId), enemyId === 'crypt-bouncer' ? 0.78 : 1.08, {
+        x: anchor.x + x,
+        y: anchor.y + y,
+      });
+    }
+    for (const [index, x] of [-230, 0, 230].entries()) {
+      const freight = createBreakable(w, {
+        x,
+        y: anchor.y + (index - 1) * 72,
+        w: 156,
+        h: 46,
+        kind: 'car-wreck',
+        propVariant: 'medium-movable',
+      });
+      freight.vx = index % 2 === 0 ? 130 : -130;
+      state.propUids.push(freight.uid);
+      w.breakables.push(freight);
+    }
+    syncObstacleAabbs(w);
+  } else if (state.kind === 'fountain-ritual') {
+    for (const [enemyId, x, y] of [
+      ['ring-scribe', -250, -80],
+      ['ring-scribe', 250, -80],
+      ['ash-wisp', -220, 120],
+      ['ash-wisp', 220, 120],
+      ['corner-cutter', 0, 190],
+    ] as const) {
+      spawnEnemy(w, getEnemy(enemyId), 1.1, { x: anchor.x + x, y: anchor.y + y });
+    }
+    // Reuse plaza planters as the ritual's rearranging cover. If an authored
+    // layout has fewer than four, supplement it with the same live prop type.
+    const existing = w.breakables.filter((prop) => prop.kind === 'planter').slice(0, 4);
+    state.propUids.push(...existing.map((prop) => prop.uid));
+    for (let i = existing.length; i < 4; i += 1) {
+      const planter = createBreakable(w, {
+        x: 0,
+        y: -150,
+        w: 52,
+        h: 52,
+        kind: 'planter',
+        propVariant: 'fixed-bench',
+      });
+      state.propUids.push(planter.uid);
+      w.breakables.push(planter);
+    }
+    syncObstacleAabbs(w);
+  }
+}
+
+function finishDistrictIncursion(w: World, completed: boolean) {
+  const state = w.districtIncursion;
+  if (!state || (state.phase !== 'active' && state.phase !== 'warning')) return;
+  const def = DISTRICT_INCURSIONS_BY_ID[state.id];
+  if (!def) return;
+
+  state.phase = completed ? 'complete' : 'failed';
+  if (completed && !state.rewardGranted) {
+    state.rewardGranted = true;
+    w.cred += state.rewardCred;
+    w.lootTokensGained += state.rewardTokens;
+    pushAlert(w, def.completeText);
+    spawnParticles(w, 0, -150, def.accent, 18, 120);
+  } else if (!completed) {
+    pushAlert(w, def.failureText);
+  }
+  if (state.kind === 'freight-arrival') {
+    for (const prop of w.breakables) {
+      if (state.propUids.includes(prop.uid)) {
+        prop.vx = 0;
+        prop.vy = 0;
+      }
+    }
+  }
+}
+
+function incursionSafeLane(state: DistrictIncursionState): number {
+  return ((state.cycle + 1) % 3 - 1) * 180;
+}
+
+function incursionSafeSector(state: DistrictIncursionState): number {
+  return Math.PI / 2 + (state.cycle % 4) * (Math.PI / 2);
+}
+
+function inSafeSector(w: World, state: DistrictIncursionState): boolean {
+  const anchor = incursionAnchor();
+  const dx = w.player.x - anchor.x;
+  const dy = w.player.y - anchor.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance > 330) return false;
+  const angle = Math.atan2(dy, dx);
+  let diff = angle - incursionSafeSector(state);
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return Math.abs(diff) <= 0.88;
+}
+
+function updateDistrictIncursion(w: World, dt: number) {
+  const state = w.districtIncursion;
+  if (!state) return;
+  const def = DISTRICT_INCURSIONS_BY_ID[state.id];
+  if (!def) return;
+
+  if (state.phase === 'pending' && w.time >= def.triggerAtSec - def.warningLeadSec) {
+    state.phase = 'warning';
+    pushAlert(w, `${def.title} — ${def.warningText}`);
+    spawnParticles(w, 0, -150, def.accent, 10, 80);
+  }
+  if (state.phase === 'warning' && w.time >= def.triggerAtSec) startDistrictIncursion(w, state);
+  if (state.phase !== 'active') return;
+
+  const elapsed = Math.max(0, (w.now - state.startedAt) / 1000);
+  state.cycle = Math.floor(elapsed / (state.kind === 'fountain-ritual' ? 3.6 : state.kind === 'flood-surge' ? 4 : 5));
+
+  if (state.kind === 'market-bell') {
+    state.progress = Math.min(state.target, Math.max(0, w.kills - state.startingKills));
+    if (w.now >= state.nextPulseAt) {
+      state.nextPulseAt = w.now + 3000;
+      const anchor = incursionAnchor();
+      incursionEffect(w, anchor.x, anchor.y, 160, state.accent, 580);
+      for (const enemy of w.enemies) {
+        if (enemy.dying) continue;
+        const dx = enemy.x - anchor.x;
+        const dy = enemy.y - anchor.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance > 220) continue;
+        const length = distance || 1;
+        const force = 180 * Math.max(0.25, 1 - distance / 220);
+        enemy.kx += (dx / length) * force;
+        enemy.ky += (dy / length) * force;
+      }
+      spawnParticles(w, anchor.x, anchor.y, state.accent, 8, 90);
+      pushAlert(w, 'BELL PULSE — crowd pushed back');
+    }
+  } else if (state.kind === 'freight-arrival') {
+    for (const [index, prop] of state.propUids.map((uid) => w.breakables.find((candidate) => candidate.uid === uid)).entries()) {
+      if (!prop || prop.broken) continue;
+      const direction = state.cycle % 2 === 0 ? 1 : -1;
+      prop.vx = direction * (120 + index * 18);
+      prop.vy = 0;
+      if (prop.x > w.bounds.w / 2 - 110 || prop.x < -w.bounds.w / 2 + 110) prop.vx *= -1;
+    }
+    const covered = state.propUids.some((propUid) => {
+      const prop = w.breakables.find((candidate) => candidate.uid === propUid);
+      return prop && !prop.broken && dist2(w.player.x, w.player.y, prop.x, prop.y) < 125 * 125;
+    });
+    if (covered) state.progress = Math.min(state.target, state.progress + dt);
+  } else {
+    const safe = state.kind === 'flood-surge'
+      ? Math.abs(w.player.x - incursionSafeLane(state)) <= 92
+      : inSafeSector(w, state);
+    if (safe) {
+      state.progress = Math.min(state.target, state.progress + dt);
+      state.outsideSafeSince = 0;
+    } else {
+      if (state.outsideSafeSince === 0) state.outsideSafeSince = w.now;
+      if (w.now >= state.nextHazardTickAt) {
+        state.nextHazardTickAt = w.now + 760;
+        damagePlayer(w, state.kind === 'flood-surge' ? 5 : 4, w.player.x + (w.player.x >= 0 ? 90 : -90), w.player.y);
+      }
+      if (w.now - state.outsideSafeSince > 4600) {
+        finishDistrictIncursion(w, false);
+        return;
+      }
+    }
+    if (w.now >= state.nextPulseAt) {
+      state.nextPulseAt = w.now + (state.kind === 'flood-surge' ? 4000 : 3600);
+      const anchor = incursionAnchor();
+      incursionEffect(w, state.kind === 'flood-surge' ? incursionSafeLane(state) : anchor.x, anchor.y, 125, state.accent, 900);
+      spawnParticles(w, anchor.x, anchor.y, state.accent, 7, 90);
+    }
+  }
+
+  if (state.progress >= state.target) {
+    finishDistrictIncursion(w, true);
+  } else if (w.now >= state.endsAt) {
+    finishDistrictIncursion(w, false);
   }
 }
 
@@ -742,29 +1377,304 @@ function spawnParticles(w: World, x: number, y: number, color: string, count: nu
   if (w.particles.length > 320) w.particles.splice(0, w.particles.length - 320);
 }
 
+function spawnFollower(w: World, weapon: WeaponDef, index: number) {
+  const spec = weapon.follower;
+  if (!spec || w.followers.length >= 18) return;
+  const angle = (Math.PI * 2 * index) / Math.max(1, spec.count) + w.rng() * 0.35;
+  const radius = spec.radius;
+  w.followers.push({
+    uid: uid(w),
+    x: w.player.x + Math.cos(angle) * (radius + 18),
+    y: w.player.y + Math.sin(angle) * (radius + 18),
+    vx: 0,
+    vy: 0,
+    radius: 7,
+    baseRadius: 7,
+    damage: weapon.damage,
+    bornAt: w.now,
+    expiresAt: spec.lifetimeMs ? w.now + spec.lifetimeMs : Number.POSITIVE_INFINITY,
+    growAfterMs: spec.growAfterMs ?? 0,
+    maxRadius: spec.maxRadius ?? 12,
+    orbitAngle: angle,
+    orbitRadius: radius,
+    color: weapon.color ?? w.character.palette.accent,
+    weaponId: weapon.id,
+  });
+}
+
+function spawnFollowers(w: World, weapon: WeaponDef) {
+  const spec = weapon.follower;
+  if (!spec) return;
+  for (let i = 0; i < spec.count; i += 1) spawnFollower(w, weapon, i);
+  spawnParticles(w, w.player.x, w.player.y, weapon.color ?? w.character.palette.accent, Math.min(10, spec.count * 2), 70);
+}
+
+const MAX_LOKPETS = 4;
+const LOKPET_GHOST_AFTER_MS = 60_000;
+
+function lokPetStatusId(pet: LokPetInstance): string | undefined {
+  if (pet.element === 'fire') return 'burning';
+  if (pet.element === 'freeze') return 'freeze';
+  if (pet.element === 'slow') return 'slow';
+  return undefined;
+}
+
+function lokPetDamage(w: World, pet: LokPetInstance): number {
+  const attackMultiplier = pet.attackKind === 'rapid-shot'
+    ? 0.55
+    : pet.attackKind === 'heavy-shot'
+      ? 1.8
+      : pet.attackKind === 'explosion'
+        ? 0.95
+        : 1;
+  return Math.max(1, pet.stats.damage * attackMultiplier * damageMult(w));
+}
+
+function showLokPetBurst(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  damage: number,
+  color: string,
+  statusEffectId?: string,
+  explosive = false,
+) {
+  novaDamage(w, x, y, radius, damage, explosive ? 4 : 2, statusEffectId);
+  damageBreakable(w, x, y, radius, damage, explosive ? 4 : 2, x, y);
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x,
+    y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 380,
+    color,
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, x, y, color, explosive ? 12 : 6, explosive ? 130 : 80);
+  if (explosive) w.shake = Math.max(w.shake, 5);
+}
+
+function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
+  const dx = target.x - pet.x;
+  const dy = target.y - pet.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const speed = pet.stats.projectileSpeed;
+  const explosion = pet.attackKind === 'explosion';
+  w.projectiles.push({
+    uid: uid(w),
+    x: pet.x,
+    y: pet.y,
+    vx: (dx / distance) * speed,
+    vy: (dy / distance) * speed,
+    radius: pet.attackKind === 'heavy-shot' ? 7 : 5,
+    damage: lokPetDamage(w, pet),
+    impactIntensity: pet.attackKind === 'heavy-shot' ? 4 : 1,
+    fromPlayer: true,
+    expiresAt: w.now + 1900,
+    targetUid: target.uid,
+    turnRate: pet.attackKind === 'rapid-shot' ? 5.5 : 3.8,
+    color: pet.palette.accent,
+    trail: [],
+    pierce: pet.attackKind === 'heavy-shot' ? 1 : 0,
+    hitUids: new Set(),
+    obstacleInteraction: 'block',
+    statusEffectId: lokPetStatusId(pet),
+    explosionRadius: explosion ? pet.stats.explosionRadius : undefined,
+    explosionDamage: explosion ? lokPetDamage(w, pet) : undefined,
+  });
+  spawnParticles(w, pet.x, pet.y, pet.palette.glow, 2, 40);
+}
+
+/** Spawn one generated chest companion, replacing the oldest at the mobile-safe cap. */
+export function spawnLokPet(w: World, roll: LokPetRoll): LokPetInstance {
+  if (w.lokPets.length >= MAX_LOKPETS) {
+    const oldest = w.lokPets.shift();
+    if (oldest) spawnParticles(w, oldest.x, oldest.y, oldest.palette.glow, 6, 65);
+    pushAlert(w, 'LokPet signal rotated');
+  }
+  const index = w.lokPets.length;
+  const orbitAngle = (Math.PI * 2 * index) / MAX_LOKPETS + w.rng() * 0.2;
+  const pet: LokPetInstance = {
+    ...roll,
+    uid: uid(w),
+    x: w.player.x + Math.cos(orbitAngle) * (40 + index * 6),
+    y: w.player.y + Math.sin(orbitAngle) * (40 + index * 6),
+    vx: 0,
+    vy: 0,
+    orbitAngle,
+    orbitRadius: 40 + index * 6,
+    bornAt: w.now,
+    ghostAt: w.now + LOKPET_GHOST_AFTER_MS,
+    expiresAt: w.now + roll.stats.lifetimeMs,
+    ghost: false,
+    readyAt: w.now + 500,
+    nextPulseAt: w.now + 500,
+    hp: roll.stats.health,
+    maxHp: roll.stats.health,
+  };
+  w.lokPets.push(pet);
+  w.lokPetHistory.push(pet);
+  spawnParticles(w, pet.x, pet.y, pet.palette.glow, 10, 85);
+  pushAlert(w, `${pet.name} joined the run`);
+  return pet;
+}
+
+function updateLokPets(w: World, dt: number) {
+  for (let i = w.lokPets.length - 1; i >= 0; i -= 1) {
+    const pet = w.lokPets[i]!;
+    if (w.now >= pet.expiresAt) {
+      spawnParticles(w, pet.x, pet.y, pet.palette.glow, 8, 55);
+      w.lokPets.splice(i, 1);
+      continue;
+    }
+
+    if (!pet.ghost && w.now >= pet.ghostAt) {
+      pet.ghost = true;
+      spawnParticles(w, pet.x, pet.y, '#dbeafe', 14, 95);
+      pushAlert(w, `${pet.name} crossed into ghost phase`);
+    }
+
+    pet.orbitAngle += dt * (pet.ghost ? 1.35 : 1.8);
+    const tx = w.player.x + Math.cos(pet.orbitAngle) * pet.orbitRadius;
+    const ty = w.player.y + Math.sin(pet.orbitAngle) * pet.orbitRadius;
+    const dx = tx - pet.x;
+    const dy = ty - pet.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const speed = pet.stats.moveSpeed * (Math.hypot(dx, dy) > 120 ? 1.35 : 1);
+    pet.vx += (dx / len * speed - pet.vx) * Math.min(1, dt * 7);
+    pet.vy += (dy / len * speed - pet.vy) * Math.min(1, dt * 7);
+    pet.x += pet.vx * dt;
+    pet.y += pet.vy * dt;
+
+    const target = nearestEnemy(w, pet.x, pet.y, pet.stats.range);
+    if (!target || w.now < pet.readyAt) continue;
+
+    if (pet.attackKind === 'pulse') {
+      showLokPetBurst(
+        w,
+        pet.x,
+        pet.y,
+        pet.stats.pulseRadius,
+        lokPetDamage(w, pet),
+        pet.palette.glow,
+        lokPetStatusId(pet),
+      );
+      pet.nextPulseAt = w.now + pet.stats.cooldownMs;
+      pet.readyAt = pet.nextPulseAt;
+    } else {
+      fireLokPetShot(w, pet, target);
+      pet.readyAt = w.now + pet.stats.cooldownMs;
+    }
+  }
+}
+
+function updateFollowers(w: World, dt: number) {
+  for (let i = w.followers.length - 1; i >= 0; i -= 1) {
+    const follower = w.followers[i]!;
+    if (w.now >= follower.expiresAt) {
+      spawnParticles(w, follower.x, follower.y, follower.color, 4, 45);
+      w.followers.splice(i, 1);
+      continue;
+    }
+    const age = w.now - follower.bornAt;
+    const growth = follower.growAfterMs > 0 ? clamp((age - follower.growAfterMs) / 900, 0, 1) : 1;
+    follower.radius = follower.baseRadius + (follower.maxRadius - follower.baseRadius) * growth;
+    follower.orbitAngle += dt * (follower.maxRadius > follower.baseRadius ? 1.7 : 3.2);
+    const target = nearestEnemy(w, follower.x, follower.y, 240);
+    const tx = target ? target.x : w.player.x + Math.cos(follower.orbitAngle) * follower.orbitRadius;
+    const ty = target ? target.y : w.player.y + Math.sin(follower.orbitAngle) * follower.orbitRadius;
+    const dx = tx - follower.x;
+    const dy = ty - follower.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const speed = target ? 145 : 95;
+    follower.vx += (dx / len * speed - follower.vx) * Math.min(1, dt * 7);
+    follower.vy += (dy / len * speed - follower.vy) * Math.min(1, dt * 7);
+    follower.x += follower.vx * dt;
+    follower.y += follower.vy * dt;
+    if (target && dist2(target.x, target.y, follower.x, follower.y) <= (target.radius + follower.radius) ** 2) {
+      const cooldown = follower.readyAt ?? 0;
+      if (w.now >= cooldown) {
+        follower.readyAt = w.now + 620;
+        damageEnemy(w, target, follower.damage * damageMult(w), WEAPONS_BY_ID[follower.weaponId]?.impactIntensity ?? 1, follower.x, follower.y);
+        spawnParticles(w, follower.x, follower.y, follower.color, 3, 55);
+      }
+    }
+  }
+}
+
+function emitEnemyImpactBurst(
+  w: World,
+  source: EnemyActor,
+  amount: number,
+  color: string,
+) {
+  const radius = 58;
+  const burstDamage = Math.max(1, Math.round(amount * 0.22));
+  forEachNearby(w, source.x, source.y, radius + 30, (enemy) => {
+    if (enemy === source || enemy.dying) return;
+    const reach = radius + enemy.radius;
+    if (dist2(enemy.x, enemy.y, source.x, source.y) > reach * reach) return;
+    // Secondary hits deliberately use a shove, not the burst threshold, so
+    // one impact cannot recursively duplicate its own reward chain.
+    damageEnemy(w, enemy, burstDamage, 1, source.x, source.y, undefined, 1);
+  });
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: source.x,
+    y: source.y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 240,
+    color,
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, source.x, source.y, color, 12, 150);
+  w.popups.push({
+    x: source.x,
+    y: source.y + source.radius + 14,
+    text: 'BURST',
+    color: '#fff1a8',
+    bornAt: w.now,
+    vy: 30,
+  });
+  w.shake = Math.max(w.shake, 6);
+}
+
 function damageEnemy(
   w: World,
   enemy: EnemyActor,
   amount: number,
-  knockback: number,
+  impactIntensity: ImpactIntensity,
   fromX: number,
   fromY: number,
+  statusEffectId?: string,
+  burstDepth = 0,
 ) {
   if (enemy.dying) return;
-  const isCrit = w.rng() < w.stats.crit;
-  const dealt = Math.max(1, Math.round(isCrit ? amount * 2 : amount));
+  if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
+  const dealt = Math.max(1, Math.round(amount));
   enemy.hp -= dealt;
   enemy.hitFlashUntil = w.now + 90;
 
-  if (w.stats.lifesteal > 0) {
-    w.player.hp = Math.min(w.player.maxHp, w.player.hp + dealt * w.stats.lifesteal);
-  }
-
-  if (knockback > 0) {
+  if (impactIntensity > 0) {
     const dx = enemy.x - fromX;
     const dy = enemy.y - fromY;
     const len = Math.hypot(dx, dy) || 1;
-    const impulse = (knockback * 60) / Math.max(0.35, enemy.mass);
+    const impulse = resolveImpactTravel(impactIntensity, enemy.mass, enemyImpactResistance(enemy));
     enemy.kx += (dx / len) * impulse;
     enemy.ky += (dy / len) * impulse;
   }
@@ -772,20 +1682,60 @@ function damageEnemy(
   w.popups.push({
     x: enemy.x + randRange(w.rng, -5, 5),
     y: enemy.y + enemy.radius + 10,
-    text: isCrit ? `${dealt}!` : String(dealt),
-    color: isCrit ? '#ffffff' : '#ffe8a3',
+    text: String(dealt),
+    color: '#ffe8a3',
     bornAt: w.now,
     vy: 26,
   });
   if (w.popups.length > 40) w.popups.shift();
+
+  if (impactIntensity >= 5 && burstDepth === 0) {
+    emitEnemyImpactBurst(w, enemy, dealt, '#fff1a8');
+  }
 
   if (enemy.hp <= 0) {
     killEnemy(w, enemy);
   }
 }
 
+/** Apply a metadata-defined effect, refreshing duration and stacking safely. */
+function applyStatusEffect(w: World, enemy: EnemyActor, id: string) {
+  const def = STATUS_EFFECTS_BY_ID[id];
+  if (!def) return;
+  const existing = enemy.activeEffects.find((effect) => effect.id === id);
+  if (existing) {
+    existing.expiresAt = Math.max(existing.expiresAt, w.now + def.durationMs);
+    existing.stacks = Math.min(def.maxStacks, existing.stacks + 1);
+    return;
+  }
+  enemy.activeEffects.push({ id, stacks: 1, appliedAt: w.now, expiresAt: w.now + def.durationMs });
+}
+
+function updateStatusEffects(w: World) {
+  for (const enemy of w.enemies) {
+    for (const effect of enemy.activeEffects) {
+      if ((effect.id === 'burning' || effect.id === 'acid') && w.now >= (effect.nextTickAt ?? effect.appliedAt)) {
+        const tick = effect.id === 'burning' ? 2 : 1;
+        effect.nextTickAt = w.now + 520;
+        damageEnemy(w, enemy, tick * effect.stacks, 0, enemy.x, enemy.y);
+      }
+    }
+    enemy.activeEffects = enemy.activeEffects.filter((effect) => effect.expiresAt > w.now);
+  }
+}
+
+function statusSpeedMultiplier(enemy: EnemyActor): number {
+  return enemy.activeEffects.reduce((multiplier, effect) => {
+    const def = STATUS_EFFECTS_BY_ID[effect.id];
+    return multiplier * (def?.speedMultiplier ?? 1);
+  }, 1);
+}
+
 function killEnemy(w: World, enemy: EnemyActor) {
+  if (enemy.dying) return;
   enemy.dying = true;
+  // Effects do not linger on a defeated actor or leak into later snapshots.
+  enemy.activeEffects = [];
   enemy.deathAt = w.now;
   enemy.anim = 'death';
   enemy.animStartedAt = w.now;
@@ -826,6 +1776,11 @@ function killEnemy(w: World, enemy: EnemyActor) {
   }
 
   if (enemy.def.family === 'Boss') {
+    if (w.endless?.inDungeon && w.endless.dungeonRoom === 3) {
+      w.endless.dungeonBossDefeated = true;
+      if (w.endless.dungeonChest) w.endless.dungeonChest.unlocked = true;
+      pushAlert(w, 'BOSS DOWN — multi-reward chest unlocked');
+    }
     pushAlert(w, `${enemy.def.name} is down`);
     w.shake = Math.max(w.shake, 20);
     for (let i = 0; i < 6; i += 1) {
@@ -851,11 +1806,56 @@ function killEnemy(w: World, enemy: EnemyActor) {
   }
 }
 
-function damagePlayer(w: World, amount: number, fromX: number, fromY: number) {
+function triggerBellShock(w: World) {
+  if (w.activeCrewRumor?.rumorId !== 'bell-shock' || w.rumorTriggered) return;
+  w.rumorTriggered = true;
+  w.rumorOutcome = 'Bell Shock shoved nearby threats away on first contact.';
+  const radius = 132;
+  for (const enemy of w.enemies) {
+    if (enemy.dying) continue;
+    const dx = enemy.x - w.player.x;
+    const dy = enemy.y - w.player.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > radius + enemy.radius) continue;
+    const length = distance || 1;
+    const force = 260 * Math.max(0.35, 1 - distance / (radius + enemy.radius));
+    enemy.kx += (dx / length) * force;
+    enemy.ky += (dy / length) * force;
+  }
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: w.player.x,
+    y: w.player.y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 260,
+    color: '#fbbf24',
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, w.player.x, w.player.y, '#fbbf24', 16, 150);
+  w.shake = Math.max(w.shake, 9);
+  pushAlert(w, 'RUMOR — BELL SHOCK');
+}
+
+function damagePlayer(
+  w: World,
+  amount: number,
+  fromX: number,
+  fromY: number,
+  source: 'contact' | 'hazard' = 'hazard',
+) {
   const p = w.player;
+  if (p.falling || w.outcome !== 'running') return;
   if (w.now < p.invulnUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
 
+  if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
   p.hp -= reduced;
   p.invulnUntil = w.now + 420;
@@ -876,18 +1876,19 @@ function damagePlayer(w: World, amount: number, fromX: number, fromY: number) {
   if (p.hp <= 0) {
     p.hp = 0;
     w.outcome = 'dead';
+    w.deathCause = 'ordinary-hazard';
     p.anim = 'death';
     p.animStartedAt = w.now;
   }
 }
 
 /** Damage every enemy inside a circle once. */
-function novaDamage(w: World, x: number, y: number, radius: number, damage: number, knockback: number) {
+function novaDamage(w: World, x: number, y: number, radius: number, damage: number, impactIntensity: ImpactIntensity, statusEffectId?: string) {
   forEachNearby(w, x, y, radius + 40, (enemy) => {
     if (enemy.dying) return;
     const reach = radius + enemy.radius;
     if (dist2(enemy.x, enemy.y, x, y) <= reach * reach) {
-      damageEnemy(w, enemy, damage, knockback, x, y);
+      damageEnemy(w, enemy, damage, impactIntensity, x, y, statusEffectId);
     }
   });
 }
@@ -929,14 +1930,66 @@ function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?
   return best;
 }
 
+function triggerEvolutionHit(
+  w: World,
+  behavior: EvolutionBehavior | undefined,
+  x: number,
+  y: number,
+  damage: number,
+  color: string,
+  impactIntensity: ImpactIntensity,
+  statusEffectId?: string,
+  excludeUid?: number,
+) {
+  if (!behavior) return;
+  const radius = behavior.radius ?? 64;
+  if (behavior.kind === 'chain') {
+    const target = nearestEnemy(w, x, y, radius + 90, excludeUid ? new Set([excludeUid]) : undefined);
+    if (target) {
+      damageEnemy(w, target, damage * 0.55, 0, x, y, statusEffectId);
+      spawnParticles(w, target.x, target.y, color, 4, 55);
+    }
+  } else if (behavior.kind === 'status-spread') {
+    novaDamage(w, x, y, radius, damage * 0.45, 0, behavior.statusEffectId ?? statusEffectId);
+  } else if (behavior.kind === 'field') {
+    w.effects.push({
+      uid: uid(w),
+      kind: 'hazard',
+      x,
+      y,
+      radius,
+      angle: 0,
+      spread: Math.PI * 2,
+      bornAt: w.now,
+      expiresAt: w.now + 1250,
+      color,
+      damage: damage * 0.42,
+      impactIntensity: Math.min(2, impactIntensity) as ImpactIntensity,
+      hitUids: new Set(),
+      followPlayer: false,
+      nextTickAt: w.now,
+      hurtsPlayer: false,
+      statusEffectId: behavior.statusEffectId ?? statusEffectId,
+    });
+    spawnParticles(w, x, y, color, 8, 70);
+  }
+}
+
 function fireWeapon(w: World, runWeapon: RunWeapon) {
   const weapon = runWeapon.def;
   const p = w.player;
   const damage = runWeaponDamage(w, runWeapon);
   const reach = weapon.range * areaMult(w);
   const palette = w.character.palette;
+  const behavior = weaponEvolutionBehavior(w, weapon);
 
   switch (weapon.kind) {
+    case 'follower': {
+      spawnFollowers(w, weapon);
+      p.anim = 'attack';
+      p.animStartedAt = w.now;
+      break;
+    }
     case 'melee': {
       const target = nearestEnemy(w, p.x, p.y, reach + 120);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.facing > 0 ? 0 : Math.PI;
@@ -953,9 +2006,11 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         expiresAt: w.now + 170,
         color: palette.accent,
         damage,
-        knockback: 3.4,
+        impactIntensity: weaponImpact(weapon),
+        impactTrigger: weapon.impactTrigger,
         hitUids: new Set(),
         followPlayer: true,
+        evolutionBehavior: behavior,
       });
       p.anim = 'attack';
       p.animStartedAt = w.now;
@@ -975,12 +2030,17 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         expiresAt: w.now + 280,
         color: palette.accent,
         damage,
-        knockback: 5.5,
+        impactIntensity: weaponImpact(weapon),
+        impactTrigger: weapon.impactTrigger,
         hitUids: new Set(),
         followPlayer: false,
+        evolutionBehavior: behavior,
       });
-      novaDamage(w, p.x, p.y, reach, damage, 5.5);
-      damageBreakable(w, p.x, p.y, reach, damage);
+      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
+      if (behavior?.kind === 'field') {
+        triggerEvolutionHit(w, behavior, p.x, p.y, damage, weapon.color ?? palette.accent, weaponImpact(weapon), weapon.statusEffectId);
+      }
+      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
       p.anim = 'attack';
       p.animStartedAt = w.now;
       w.shake = Math.max(w.shake, 3);
@@ -989,7 +2049,93 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
 
     case 'aura': {
       // The aura is permanent; each activation is a damage tick.
-      novaDamage(w, p.x, p.y, reach, damage, 0.6);
+      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon));
+      damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
+      break;
+    }
+
+    case 'wave': {
+      const count = Math.max(1, runWeapon.count);
+      const target = nearestEnemy(w, p.x, p.y, reach + 100);
+      const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      for (let i = 0; i < count; i += 1) {
+        w.effects.push({
+          uid: uid(w), kind: 'wave', x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
+          angle, spread: 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
+          color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
+          evolutionBehavior: behavior,
+        });
+      }
+      p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
+
+    case 'laser': {
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      w.effects.push({
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: 0.055,
+        bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
+         damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
+        evolutionBehavior: behavior,
+      });
+      p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
+
+    case 'hazard': {
+      w.effects.push({
+        uid: uid(w), kind: 'hazard', x: p.x, y: p.y, radius: reach, angle: 0, spread: Math.PI * 2,
+        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
+        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+        hurtsPlayer: true,
+        statusEffectId: weapon.statusEffectId,
+        evolutionBehavior: behavior,
+      });
+      pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+      break;
+    }
+
+    case 'teleport': {
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      if (target) {
+        const dx = target.x - p.x; const dy = target.y - p.y; const len = Math.hypot(dx, dy) || 1;
+        p.x = target.x - (dx / len) * (p.radius + target.radius + 8);
+        p.y = target.y - (dy / len) * (p.radius + target.radius + 8);
+        novaDamage(w, p.x, p.y, 42, damage, weaponImpact(weapon), weapon.statusEffectId);
+        damageBreakable(w, p.x, p.y, 42, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
+        w.effects.push({ uid: uid(w), kind: 'teleport', x: p.x, y: p.y, radius: 42, angle: 0, spread: 0,
+          bornAt: w.now, expiresAt: w.now + 420, color: weapon.color ?? palette.accent, damage: 0, impactIntensity: 0,
+          hitUids: new Set(), followPlayer: false });
+      }
+      p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
+
+    case 'convert': {
+      if (weapon.follower) spawnFollowers(w, weapon);
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      if (target) {
+        // Conversion is represented by a brief ally flash and a harmless stun;
+        // enemy AI remains data-driven while the crowd-control feedback is visible.
+        applyStatusEffect(w, target, 'slow');
+        target.convertedUntil = w.now + (weapon.durationMs ?? 5000);
+        target.convertedAttackReadyAt = w.now;
+        target.activeEffects.push({ id: 'freeze', stacks: 1, appliedAt: w.now, expiresAt: target.convertedUntil });
+        damageEnemy(w, target, damage, 0, p.x, p.y, weapon.statusEffectId);
+        pushAlert(w, 'TEMPORARY ALLY');
+      }
+      break;
+    }
+
+    case 'punch': {
+      const target = nearestEnemy(w, p.x, p.y, reach);
+      const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      w.effects.push({ uid: uid(w), kind: 'slash', x: p.x, y: p.y, radius: reach, angle, spread: 0.7,
+        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 420), color: weapon.color ?? palette.accent,
+        damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false });
+      p.anim = 'attack'; p.animStartedAt = w.now; w.shake = Math.max(w.shake, 12);
+      pushAlert(w, 'POW!');
       break;
     }
 
@@ -1012,7 +2158,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           vy: Math.sin(angle) * speed,
           radius: 6,
           damage,
-          knockback: 1.8,
+          impactIntensity: weaponImpact(weapon),
           fromPlayer: true,
           expiresAt: w.now + (weapon.lifetimeMs ?? 2000),
           targetUid: weapon.kind === 'homing' ? (target?.uid ?? null) : null,
@@ -1021,6 +2167,11 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           trail: [],
           pierce: 0,
           hitUids: new Set(),
+          obstacleUids: new Set(),
+          obstacleInteraction: weapon.obstacleInteraction ?? 'block',
+          statusEffectId: weapon.statusEffectId,
+          impactTrigger: weapon.impactTrigger,
+          evolutionBehavior: behavior,
         });
       }
       p.anim = 'attack';
@@ -1037,10 +2188,12 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       const y = w.player.y + randRange(w.rng, -reach * 0.55, reach * 0.55);
       const vx = fromLeft ? (weapon.speed ?? 480) : -(weapon.speed ?? 480);
       w.projectiles.push({
-        uid: uid(w), x, y, vx, vy: 0, radius: 24, damage, knockback: 7,
+        uid: uid(w), x, y, vx, vy: 0, radius: 24, damage, impactIntensity: weaponImpact(weapon),
         fromPlayer: true, expiresAt: w.now + (weapon.lifetimeMs ?? 1200), targetUid: null,
         turnRate: 0, color: weapon.color ?? palette.accent, trail: [], pierce: 999,
         hitUids: new Set(),
+        obstacleUids: new Set(),
+        impactTrigger: weapon.impactTrigger,
       });
       pushAlert(w, 'The Bus');
       w.shake = Math.max(w.shake, 5);
@@ -1070,7 +2223,28 @@ function updateOrbiters(w: World, dt: number) {
       const reach = 11 + enemy.radius;
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
-        damageEnemy(w, enemy, damage, 2.2, ox, oy);
+        damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy);
+        const behavior = weaponEvolutionBehavior(w, weapon);
+        if (behavior?.kind === 'orbit-burst') {
+          const burstRadius = behavior.radius ?? 56;
+          novaDamage(w, ox, oy, burstRadius, damage * 0.35, 0, behavior.statusEffectId);
+          w.effects.push({
+            uid: uid(w),
+            kind: 'ring',
+            x: ox,
+            y: oy,
+            radius: burstRadius,
+            angle: 0,
+            spread: 0,
+            bornAt: w.now,
+            expiresAt: w.now + 220,
+            color: weapon.color ?? w.character.palette.accent,
+            damage: 0,
+            impactIntensity: 0,
+            hitUids: new Set(),
+            followPlayer: false,
+          });
+        }
       }
     });
     }
@@ -1085,7 +2259,8 @@ export function activateUltimate(w: World): boolean {
 
   if (ult.effect.novaDamage && ult.effect.novaRadius) {
     const radius = ult.effect.novaRadius * areaMult(w);
-    novaDamage(w, w.player.x, w.player.y, radius, ult.effect.novaDamage * w.stats.power, 8);
+    novaDamage(w, w.player.x, w.player.y, radius, ult.effect.novaDamage * w.stats.power, 4);
+    damageBreakable(w, w.player.x, w.player.y, radius, ult.effect.novaDamage * w.stats.power, 4, w.player.x, w.player.y);
     w.effects.push({
       uid: uid(w),
       kind: 'ring',
@@ -1098,7 +2273,7 @@ export function activateUltimate(w: World): boolean {
       expiresAt: w.now + 520,
       color: w.character.palette.glow,
       damage: 0,
-      knockback: 0,
+      impactIntensity: 0,
       hitUids: new Set(),
       followPlayer: false,
     });
@@ -1111,6 +2286,32 @@ export function activateUltimate(w: World): boolean {
 /* ------------------------------------------------------------------ */
 /* Upgrades                                                            */
 /* ------------------------------------------------------------------ */
+
+export function relicRecipeEligibility(
+  w: Pick<World, 'knownRelicIds' | 'appliedRelicRecipeIds' | 'weapons' | 'activeEvolution'>,
+  recipe: RelicRecipeDef,
+): { eligible: boolean; reason: string } {
+  if (!w.knownRelicIds.includes(recipe.relicId)) {
+    return { eligible: false, reason: 'Find its city relic knowledge first.' };
+  }
+  if (w.appliedRelicRecipeIds.has(recipe.id)) {
+    return { eligible: false, reason: 'Already applied during this run.' };
+  }
+  const weapon = w.weapons.find((entry) => entry.def.id === recipe.baseWeaponId);
+  if (!weapon) {
+    if (w.activeEvolution?.baseWeaponId === recipe.baseWeaponId) {
+      return { eligible: false, reason: 'The signature evolution is active; this relic recipe stays separate.' };
+    }
+    return { eligible: false, reason: `Bring ${recipe.baseWeaponId} into the run first.` };
+  }
+  if (weapon.def.id === recipe.result.id) {
+    return { eligible: false, reason: 'This weapon already carries the relic treatment.' };
+  }
+  if (weapon.level < recipe.minWeaponLevel) {
+    return { eligible: false, reason: `Level the base weapon to Lv ${recipe.minWeaponLevel}.` };
+  }
+  return { eligible: true, reason: recipe.triggerLabel };
+}
 
 export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   const pool: UpgradeDef[] = UPGRADES.filter((u) => {
@@ -1145,6 +2346,21 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
       pool.push({ id: `evolution-${evolution.id}`, name: evolution.name, description: evolution.description, weight: 14, maxStacks: 1, effects: [], cardKind: 'evolution', evolutionId: evolution.id });
     }
   }
+  for (const recipe of RELIC_RECIPES) {
+    const eligibility = relicRecipeEligibility(w, recipe);
+    if (eligibility.eligible) {
+      pool.push({
+        id: `relic-${recipe.id}`,
+        name: recipe.name,
+        description: recipe.description,
+        weight: 12,
+        maxStacks: 1,
+        effects: [],
+        cardKind: 'relic-evolution',
+        relicRecipeId: recipe.id,
+      });
+    }
+  }
 
   const picks: UpgradeDef[] = [];
   const available = [...pool];
@@ -1166,6 +2382,10 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
 }
 
 export function applyUpgrade(w: World, upgrade: UpgradeDef) {
+  if (upgrade.cardKind === 'relic-evolution' && upgrade.relicRecipeId) {
+    const recipe = RELIC_RECIPES_BY_ID[upgrade.relicRecipeId];
+    if (!recipe || !relicRecipeEligibility(w, recipe).eligible) return;
+  }
   w.upgradeStacks[upgrade.id] = (w.upgradeStacks[upgrade.id] ?? 0) + 1;
 
   if (upgrade.cardKind === 'weapon' && upgrade.weaponId) {
@@ -1201,6 +2421,27 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
       weapon.level = Math.min(8, weapon.level + 1);
       if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
       pushAlert(w, `${evolution.name} evolved`);
+    }
+  }
+  if (upgrade.cardKind === 'relic-evolution' && upgrade.relicRecipeId) {
+    const recipe = RELIC_RECIPES_BY_ID[upgrade.relicRecipeId];
+    const eligibility = recipe ? relicRecipeEligibility(w, recipe) : undefined;
+    const weapon = recipe && w.weapons.find((entry) => entry.def.id === recipe.baseWeaponId);
+    if (recipe && eligibility?.eligible && weapon) {
+      weapon.def = recipe.result;
+      weapon.level = Math.min(8, weapon.level + 1);
+      w.activeRelicRecipe = recipe;
+      w.appliedRelicRecipeIds.add(recipe.id);
+      if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
+      pushAlert(w, `${recipe.name} evolved · relic recipe`);
+      w.popups.push({
+        x: w.player.x,
+        y: w.player.y + 30,
+        text: `RELIC · ${recipe.name}`,
+        color: recipe.color,
+        bornAt: w.now,
+        vy: 30,
+      });
     }
   }
 
@@ -1273,6 +2514,19 @@ function applyLootPrize(w: World, prize: LootPrizeDef) {
       }
       break;
     }
+    case 'lokpet': {
+      const pet = prize.lokPet ?? rollLokPet(w.rng);
+      spawnLokPet(w, pet);
+      w.popups.push({
+        x: w.player.x,
+        y: w.player.y + 30,
+        text: `+ ${pet.name}`,
+        color: LOKPET_ELEMENT_COLORS[pet.element],
+        bornAt: w.now,
+        vy: 28,
+      });
+      break;
+    }
   }
 }
 
@@ -1341,7 +2595,7 @@ function gainXp(w: World, amount: number) {
 
 function clampToArena(w: World, actor: Actor) {
   if (w.area.endless) {
-    if (w.endless?.inDungeon) {
+    if (w.endless?.inDungeon || w.endless?.inBuilding) {
       const e = w.endless;
       const hw = e.dungeonBounds.w / 2;
       const hh = e.dungeonBounds.h / 2;
@@ -1366,18 +2620,202 @@ function collideObstacles(w: World, actor: Actor) {
   }
 }
 
-function damageBreakable(w: World, x: number, y: number, radius: number, amount: number) {
+function activatePotholes(w: World, x: number, y: number, radius: number, trigger?: PotholeTrigger) {
+  if (!trigger) return;
+  for (const pothole of w.potholes) {
+    if (pothole.state !== 'dormant' || pothole.trigger !== trigger) continue;
+    if (Math.abs(x - pothole.x) > pothole.w / 2 + radius || Math.abs(y - pothole.y) > pothole.h / 2 + radius) continue;
+    pothole.state = 'opening';
+    pothole.openingStartedAt = w.now;
+    spawnParticles(w, pothole.x, pothole.y, '#f97316', 12, 100);
+    w.shake = Math.max(w.shake, 5);
+    pushAlert(w, 'GROUND BREAK — POTHOLE OPENING');
+    w.popups.push({ x: pothole.x, y: pothole.y - pothole.h / 2 - 12, text: 'MOVE', color: '#ffb347', bornAt: w.now, vy: 26 });
+  }
+}
+
+/** Prime the nearest movable prop for a single, boosted reverse launch. */
+export function primePhysicsObject(w: World, x: number, y: number): BreakableObstacle | null {
+  if (!w.physicsObjectClicksEnabled) return null;
+  const target = w.breakables
+    .filter((b) => !b.broken && b.movable)
+    .filter((b) => Math.abs(x - b.x) <= b.w / 2 + 12 && Math.abs(y - b.y) <= b.h / 2 + 12)
+    .sort((a, b) => (a.x - x) ** 2 + (a.y - y) ** 2 - ((b.x - x) ** 2 + (b.y - y) ** 2))[0];
+  if (!target) return null;
+  target.clickPrimed = true;
+  target.clickPrimedAt = w.now;
+  w.popups.push({ x: target.x, y: target.y - target.h / 2 - 14, text: 'NEXT HIT: REVERSE LAUNCH', color: '#7dd3fc', bornAt: w.now, vy: 20 });
+  return target;
+}
+
+function resetPropChain(prop: BreakableObstacle, active = false) {
+  prop.chainActive = active;
+  prop.chainCycles = 0;
+  prop.chainVelocityBudget = active ? PROP_CHAIN_MAX_SPEED : 0;
+  prop.chainBoostPending = false;
+  prop.chainContactUids.clear();
+  prop.chainHitUids.clear();
+  prop.landedHeatActive = false;
+  prop.heatNextTickAt = 0;
+}
+
+function startEnemyPropChain(w: World, prop: BreakableObstacle, enemy: EnemyActor) {
+  if (prop.landedHeatActive) resetPropChain(prop);
+  if (prop.chainActive && prop.chainContactUids.has(enemy.uid)) return;
+  if (!prop.chainActive) {
+    resetPropChain(prop, true);
+    w.popups.push({
+      x: prop.x,
+      y: prop.y - prop.h / 2 - 12,
+      text: 'IMPACT CHAIN',
+      color: '#ffb347',
+      bornAt: w.now,
+      vy: 24,
+    });
+  }
+  prop.chainContactUids.add(enemy.uid);
+
+  let dx = prop.x - enemy.x;
+  let dy = prop.y - enemy.y;
+  const length = Math.hypot(dx, dy) || 1;
+  dx /= length;
+  dy /= length;
+  const isHeavy = prop.propVariant === 'heavy-metal';
+  const intensity = isHeavy ? 4 : prop.propVariant === 'light-breakable' ? 2 : 3;
+  const launchSpeed = resolveImpactTravel(
+    intensity,
+    prop.mass,
+    isHeavy ? 0.15 : 0,
+  );
+  const enemyMomentum = Math.max(80, enemy.speed * 0.7) / Math.max(1, prop.mass);
+  // Heavy props need a slow, deliberate shove that still reaches the moving
+  // damage threshold; the other profiles keep their quick arcade response.
+  const launchScale = isHeavy ? 1.8 : 0.78;
+  prop.vx += dx * (launchSpeed * launchScale + enemyMomentum);
+  prop.vy += dy * (launchSpeed * launchScale + enemyMomentum);
+  prop.impactIntensity = Math.max(prop.impactIntensity, intensity) as ImpactIntensity;
+  prop.nextEnemyImpactAt = w.now + (prop.chainCycles === 0 ? PROP_CHAIN_FIRST_HIT_DELAY_MS : PROP_CHAIN_CONTACT_COOLDOWN_MS);
+  spawnParticles(w, prop.x, prop.y, '#ffb347', 5, 80);
+  w.shake = Math.max(w.shake, 3);
+}
+
+function activateLandedHeat(w: World, prop: BreakableObstacle) {
+  if (prop.landedHeatActive) return;
+  prop.vx = 0;
+  prop.vy = 0;
+  prop.landedHeatActive = true;
+  prop.heatNextTickAt = w.now;
+  w.popups.push({
+    x: prop.x,
+    y: prop.y - prop.h / 2 - 12,
+    text: 'SUPERHEATED',
+    color: '#ff4d5e',
+    bornAt: w.now,
+    vy: 22,
+  });
+  spawnParticles(w, prop.x, prop.y, '#ff4d5e', 12, 120);
+  w.shake = Math.max(w.shake, 4);
+}
+
+function updateLandedHeat(w: World, prop: BreakableObstacle) {
+  if (!prop.landedHeatActive || w.now < prop.heatNextTickAt) return;
+  prop.heatNextTickAt = w.now + PROP_HEAT_TICK_MS;
+  if (dist2(w.player.x, w.player.y, prop.x, prop.y) <= (LANDED_HEAT_RADIUS + w.player.radius) ** 2) {
+    damagePlayer(w, PROP_HEAT_DAMAGE, prop.x, prop.y);
+  }
+  for (const enemy of w.enemies) {
+    if (enemy.dying || dist2(enemy.x, enemy.y, prop.x, prop.y) > (LANDED_HEAT_RADIUS + enemy.radius) ** 2) continue;
+    damageEnemy(w, enemy, PROP_HEAT_DAMAGE * w.stats.power, 0, prop.x, prop.y, 'burning');
+  }
+  spawnParticles(w, prop.x, prop.y, '#ff4d5e', 3, 55);
+}
+
+function applyPropImpact(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  intensity: ImpactIntensity,
+  fromX = x,
+  fromY = y,
+  impactTrigger?: PotholeTrigger,
+  fromPlayer = true,
+) {
+  if (intensity <= 0) return;
+  activatePotholes(w, x, y, radius, impactTrigger);
+  for (const b of w.breakables) {
+    if (b.broken || !b.movable || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
+    const requiredIntensity = b.propVariant === 'heavy-metal' ? 4 : b.propVariant === 'medium-movable' ? 2 : 1;
+    let dx = b.x - fromX;
+    let dy = b.y - fromY;
+    let length = Math.hypot(dx, dy);
+    if (length < 0.01) {
+      dx = b.x - w.player.x;
+      dy = b.y - w.player.y;
+      length = Math.hypot(dx, dy);
+    }
+    if (length < 0.01) {
+      dx = 1;
+      dy = 0;
+      length = 1;
+    }
+    dx /= length;
+    dy /= length;
+    if (fromPlayer) {
+      b.lastPlayerImpactX = dx;
+      b.lastPlayerImpactY = dy;
+    }
+    if (intensity < requiredIntensity) continue;
+    if (b.landedHeatActive) resetPropChain(b);
+    const reverseLaunch = fromPlayer && b.clickPrimed;
+    const launchDirectionX = reverseLaunch ? -b.lastPlayerImpactX : dx;
+    const launchDirectionY = reverseLaunch ? -b.lastPlayerImpactY : dy;
+    const velocityMultiplier = reverseLaunch ? 4 : 1;
+    if (reverseLaunch) b.clickPrimed = false;
+    b.impactVelocityMultiplier = velocityMultiplier;
+    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier;
+    const pushScale = b.propVariant === 'heavy-metal' ? 0.62 : 0.78;
+    b.vx += launchDirectionX * launchSpeed * pushScale;
+    b.vy += launchDirectionY * launchSpeed * pushScale;
+    b.impactIntensity = intensity > b.impactIntensity ? intensity : b.impactIntensity;
+    if (intensity >= 3) {
+      spawnParticles(w, b.x, b.y, b.propVariant === 'heavy-metal' ? '#cbd5e1' : '#ffd166', 4, 65);
+      w.shake = Math.max(w.shake, intensity >= 4 ? 4 : 2);
+    }
+  }
+}
+
+function syncObstacleAabbs(w: World) {
+  w.obstacles = w.breakables
+    .filter((b) => !b.broken)
+    .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+}
+
+function damageBreakable(
+  w: World,
+  x: number,
+  y: number,
+  radius: number,
+  amount: number,
+  impactIntensity: ImpactIntensity = 0,
+  fromX = x,
+  fromY = y,
+  impactTrigger?: PotholeTrigger,
+  fromPlayer = true,
+) {
+  applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY, impactTrigger, fromPlayer);
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
+    if (!b.breakable) continue;
     b.hp -= Math.max(1, amount);
     if (b.hp > 0) {
-      if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : b.kind === 'vending-machine' ? '#5eead4' : '#ffe08a', 2, 35);
+      if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
       continue;
     }
     b.broken = true;
     b.brokenAt = w.now;
-    const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : b.kind === 'vending-machine' ? 12 : 10;
-    spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : b.kind === 'vending-machine' ? '#5eead4' : '#c99055', count, 130);
+    const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : 10;
+    spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : '#c99055', count, 130);
     if (b.kind === 'barrel') {
       forEachNearby(w, b.x, b.y, 100, (enemy) => {
         if (dist2(enemy.x, enemy.y, b.x, b.y) <= (80 + enemy.radius) ** 2) {
@@ -1385,78 +2823,275 @@ function damageBreakable(w: World, x: number, y: number, radius: number, amount:
         }
       });
     }
-    if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel' || b.kind === 'vending-machine') {
-      w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : b.kind === 'vending-machine' ? 9 : 6, bornAt: w.now });
+    if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel') {
+      w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : 6, bornAt: w.now });
+      if (b.kind === 'crate-breakable' && w.rng() > 0.45) {
+        w.pickups.push({
+          uid: uid(w),
+          kind: w.rng() > 0.5 ? 'cred' : 'health',
+          x: b.x + randRange(w.rng, -10, 10),
+          y: b.y + randRange(w.rng, -10, 10),
+          vx: 0,
+          vy: 0,
+          value: w.rng() > 0.5 ? 8 : 10,
+          bornAt: w.now,
+        });
+      }
+    }
+    if (b.kind === 'street-lamp') {
+      b.hazardUntil = w.now + 5200;
+      b.hazardNextTickAt = w.now;
+      b.fallAngle = (w.rng() > 0.5 ? 1 : -1) * (Math.PI / 2);
+      pushAlert(w, 'LIVE WIRE — KEEP CLEAR');
     }
   }
-  w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x: bx, y: by, w: bw, h: bh }) => ({ x: bx, y: by, w: bw, h: bh }));
+  syncObstacleAabbs(w);
+}
+
+function potholeContains(pothole: PotholeObstacle, actor: Actor): boolean {
+  const dx = Math.max(Math.abs(actor.x - pothole.x) - pothole.w / 2, 0);
+  const dy = Math.max(Math.abs(actor.y - pothole.y) - pothole.h / 2, 0);
+  return dx * dx + dy * dy <= actor.radius * actor.radius + pothole.lethalRadius * pothole.lethalRadius * 0.35;
+}
+
+function startPotholeFall(w: World, actor: Actor, pothole: PotholeObstacle) {
+  if (actor.falling) return;
+  actor.falling = true;
+  actor.fallStartedAt = w.now;
+  actor.kx = 0;
+  actor.ky = 0;
+  actor.vx = 0;
+  actor.vy = 0;
+  actor.anim = 'death';
+  actor.animStartedAt = w.now;
+  spawnParticles(w, actor.x, actor.y + actor.radius, '#2a1720', 8, 70);
+  w.shake = Math.max(w.shake, actor === w.player ? 12 : 4);
+  if (actor === w.player) {
+    w.player.hp = 0;
+    w.player.invulnUntil = Number.POSITIVE_INFINITY;
+    w.player.lastDamageAt = w.now;
+    w.deathCause = 'lethal-pothole';
+    w.outcome = 'dead';
+    pushAlert(w, 'LETHAL POTHOLE — OPERATIVE LOST');
+    w.popups.push({ x: actor.x, y: actor.y - actor.radius - 16, text: 'FELL THROUGH', color: '#ff6b6b', bornAt: w.now, vy: 24 });
+  } else {
+    killEnemy(w, actor as EnemyActor);
+  }
+  pothole.resolvedAt = w.now;
+}
+
+function updatePotholes(w: World) {
+  for (const pothole of w.potholes) {
+    if (pothole.state === 'opening' && w.now - pothole.openingStartedAt >= pothole.openingMs) {
+      pothole.state = 'open';
+      pothole.openedAt = w.now;
+      spawnParticles(w, pothole.x, pothole.y, '#ef4444', 16, 120);
+      w.shake = Math.max(w.shake, 7);
+      pushAlert(w, 'POTHOLE OPEN — KEEP CLEAR');
+    }
+    if (pothole.state !== 'open') continue;
+
+    if (!w.player.falling && potholeContains(pothole, w.player)) {
+      startPotholeFall(w, w.player, pothole);
+    }
+    for (const enemy of w.enemies) {
+      if (!enemy.dying && !enemy.falling && potholeContains(pothole, enemy)) {
+        startPotholeFall(w, enemy, pothole);
+      }
+    }
+  }
+}
+
+function resolvePotholes(w: World) {
+  for (const pothole of w.potholes) {
+    pothole.state = 'resolved';
+    pothole.resolvedAt = w.now;
+  }
+}
+
+/** Resolve a projectile against the two combat-specific obstacle types. */
+function collideProjectileObstacle(w: World, proj: Projectile): boolean {
+  for (const b of w.breakables) {
+    if (b.broken || !PROJECTILE_BLOCKING_KINDS.has(b.kind)) continue;
+    if (proj.obstacleUids?.has(b.uid)) continue;
+    if (Math.abs(proj.x - b.x) > b.w / 2 + proj.radius || Math.abs(proj.y - b.y) > b.h / 2 + proj.radius) continue;
+
+    const dx = proj.x - b.x;
+    const dy = proj.y - b.y;
+    const horizontal = Math.abs(dx) / (b.w / 2 + proj.radius);
+    const vertical = Math.abs(dy) / (b.h / 2 + proj.radius);
+    const hitX = horizontal > vertical;
+    const nx = hitX ? (dx < 0 ? -1 : 1) : 0;
+    const ny = hitX ? 0 : (dy < 0 ? -1 : 1);
+    if (b.kind === 'reflective-surface' && proj.fromPlayer && proj.obstacleInteraction === 'reflect') {
+      (proj.obstacleUids ??= new Set()).add(b.uid);
+      if (hitX) proj.vx *= -1;
+      else proj.vy *= -1;
+      // Move clear of the face so a reflected shot cannot immediately collide again.
+      proj.x = b.x + nx * (b.w / 2 + proj.radius + 1);
+      proj.y = b.y + ny * (b.h / 2 + proj.radius + 1);
+      spawnParticles(w, proj.x, proj.y, '#d8b4fe', 5, 70);
+      pushAlert(w, 'Ricochet');
+      continue;
+    }
+    if (b.kind === 'reflective-surface') {
+      spawnParticles(w, proj.x, proj.y, '#d8b4fe', 3, 45);
+      return true;
+    }
+    if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp' || b.kind === 'metal-box' || b.kind === 'bench') {
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
+      spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
+      return true;
+    }
+  }
+  return false;
+}
+
+function resolveMovingPropCollisions(w: World, prop: BreakableObstacle) {
+  for (const other of w.breakables) {
+    if (other === prop || other.broken) continue;
+    const overlapX = prop.w / 2 + other.w / 2 - Math.abs(prop.x - other.x);
+    const overlapY = prop.h / 2 + other.h / 2 - Math.abs(prop.y - other.y);
+    if (overlapX <= 0 || overlapY <= 0) continue;
+    if (overlapX < overlapY) {
+      prop.x += (prop.x >= other.x ? overlapX : -overlapX);
+      prop.vx *= -0.28;
+    } else {
+      prop.y += (prop.y >= other.y ? overlapY : -overlapY);
+      prop.vy *= -0.28;
+    }
+  }
+}
+
+function pointToSegmentDistanceSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq < 0.0001) return (px - ax) ** 2 + (py - ay) ** 2;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / lengthSq, 0, 1);
+  const closestX = ax + dx * t;
+  const closestY = ay + dy * t;
+  return (px - closestX) ** 2 + (py - closestY) ** 2;
+}
+
+function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle, previousX: number, previousY: number) {
+  const speed = Math.hypot(prop.vx, prop.vy);
+  if (speed < 52 || prop.impactIntensity < 2 || w.now < prop.nextImpactDamageAt) return;
+  prop.nextImpactDamageAt = w.now + (prop.chainActive ? PROP_CHAIN_HIT_COOLDOWN_MS : 260);
+  forEachNearby(w, prop.x, prop.y, Math.max(prop.w, prop.h) + 40, (enemy) => {
+    if (enemy.dying || (prop.chainActive && prop.chainHitUids.has(enemy.uid))) return;
+    const hitRadius = Math.max(prop.w, prop.h) / 2 + enemy.radius;
+    if (pointToSegmentDistanceSq(enemy.x, enemy.y, previousX, previousY, prop.x, prop.y) > hitRadius * hitRadius) return;
+    const clickBoosted = prop.impactVelocityMultiplier > 1;
+    const chainBoosted = prop.chainBoostPending;
+    if (prop.chainActive) prop.chainHitUids.add(enemy.uid);
+    const trajectoryScale = clamp(speed / 180, 0.65, 3);
+    const impactIntensity = Math.min(
+      4,
+      Math.max(2, Math.round(trajectoryScale)) + (clickBoosted || chainBoosted ? 1 : 0),
+    ) as ImpactIntensity;
+    const damageScale = clickBoosted ? 0.2 : chainBoosted ? 0.14 : prop.chainActive ? 0.1 : 0.08;
+    const rawDamage = speed * prop.impactIntensity * damageScale;
+    const eliteDamageCap = enemy.def.family === 'Boss'
+      ? enemy.maxHp * 0.22
+      : enemy.def.family === 'Elite'
+        ? enemy.maxHp * 0.35
+        : Number.POSITIVE_INFINITY;
+    const wasDying = enemy.dying;
+    damageEnemy(
+      w,
+      enemy,
+      Math.max(1, Math.round(Math.min(rawDamage, eliteDamageCap))),
+      impactIntensity,
+      prop.x,
+      prop.y,
+    );
+    if (prop.chainActive) {
+      prop.chainCycles = Math.min(999, prop.chainCycles + 1);
+      prop.chainBoostPending = false;
+      if (!wasDying && enemy.dying) {
+        const speedBeforeBoost = Math.hypot(prop.vx, prop.vy);
+        const directionLength = speedBeforeBoost || 1;
+        prop.chainVelocityBudget = Math.max(0, prop.chainVelocityBudget * 0.9);
+        const nextSpeed = Math.min(
+          PROP_CHAIN_MAX_SPEED,
+          speedBeforeBoost * 2,
+          prop.chainVelocityBudget,
+        );
+        if (nextSpeed >= PROP_CHAIN_STOP_SPEED) {
+          prop.vx = (prop.vx / directionLength) * nextSpeed;
+          prop.vy = (prop.vy / directionLength) * nextSpeed;
+          prop.chainBoostPending = true;
+        } else {
+          prop.vx = 0;
+          prop.vy = 0;
+        }
+        w.popups.push({
+          x: enemy.x,
+          y: enemy.y - enemy.radius - 10,
+          text: 'CHAIN x2',
+          color: '#ff4d5e',
+          bornAt: w.now,
+          vy: 28,
+        });
+        spawnParticles(w, enemy.x, enemy.y, '#ff4d5e', 10, 150);
+        w.shake = Math.max(w.shake, 7);
+      }
+    }
+    spawnParticles(w, enemy.x, enemy.y, '#ffd166', 3, 55);
+  });
 }
 
 function updateBreakables(w: World, dt: number) {
   for (const b of w.breakables) {
-    if (b.broken) continue;
+    if (b.broken) {
+      if (b.kind === 'street-lamp' && b.hazardUntil && w.now < b.hazardUntil && w.now >= (b.hazardNextTickAt ?? 0)) {
+        b.hazardNextTickAt = w.now + 260;
+        const radius = 92;
+        if (dist2(w.player.x, w.player.y, b.x, b.y) <= (radius + w.player.radius) ** 2) {
+          damagePlayer(w, 9, b.x, b.y);
+        }
+        for (const enemy of w.enemies) {
+          if (!enemy.dying && dist2(enemy.x, enemy.y, b.x, b.y) <= (radius + enemy.radius) ** 2) {
+            damageEnemy(w, enemy, 14 * w.stats.power, 1, b.x, b.y);
+          }
+        }
+      }
+      continue;
+    }
+    if (b.landedHeatActive) {
+      updateLandedHeat(w, b);
+      continue;
+    }
     if (b.vx || b.vy) {
+      const previousX = b.x;
+      const previousY = b.y;
+      const speedBeforeMove = Math.hypot(b.vx, b.vy);
       b.x += b.vx * dt; b.y += b.vy * dt;
-      b.vx *= Math.pow(0.88, dt * 60); b.vy *= Math.pow(0.88, dt * 60);
-      collideObstacles(w, { ...w.player, x: b.x, y: b.y, radius: Math.max(b.w, b.h) / 2 });
+      resolveMovingPropCollisions(w, b);
+      damageEnemiesFromMovingProp(w, b, previousX, previousY);
+      const friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
+      b.vx *= Math.pow(friction, dt * 60);
+      b.vy *= Math.pow(friction, dt * 60);
+      if (Math.hypot(b.vx, b.vy) < PROP_CHAIN_STOP_SPEED) {
+        b.vx = 0;
+        b.vy = 0;
+        if (b.chainActive && b.chainCycles >= PROP_CHAIN_MIN_CYCLES) {
+          activateLandedHeat(w, b);
+        } else if (b.chainActive) {
+          resetPropChain(b);
+        }
+      } else if (speedBeforeMove > PROP_CHAIN_STOP_SPEED && b.chainActive && b.chainVelocityBudget <= 0) {
+        b.vx = 0;
+        b.vy = 0;
+      }
+    } else if (b.chainActive) {
+      if (b.chainCycles >= PROP_CHAIN_MIN_CYCLES) activateLandedHeat(w, b);
+      else resetPropChain(b);
     }
   }
   // Project live positions to the collision list, preserving all props.
-  w.obstacles = w.breakables.filter((b) => !b.broken).map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
-}
-
-/**
- * Steps background life: slow wander near a home point, or a brisk flee
- * when the player gets close. No HP, no collision, no interaction with any
- * combat system -- this is the entire extent of what "living world"
- * touches in the simulation loop (one new call from stepWorld, not new
- * branches threaded through enemy/collision code).
- */
-function stepAmbient(w: World, dt: number) {
-  for (const a of w.ambient) {
-    const kind = getAmbientKind(a.kindId);
-    const distToPlayer = Math.hypot(a.x - w.player.x, a.y - w.player.y);
-
-    if (distToPlayer < kind.fleeRadius) {
-      a.fleeUntil = w.now + 900;
-    }
-
-    const fleeing = w.now < a.fleeUntil;
-    let vx = 0;
-    let vy = 0;
-
-    if (fleeing) {
-      const dx = a.x - w.player.x;
-      const dy = a.y - w.player.y;
-      const len = Math.hypot(dx, dy) || 1;
-      vx = (dx / len) * kind.speed * kind.fleeSpeedMult;
-      vy = (dy / len) * kind.speed * kind.fleeSpeedMult;
-    } else {
-      if (w.now >= a.nextDecisionAt) {
-        a.wanderAngle += randRange(w.rng, -1.2, 1.2);
-        a.nextDecisionAt = w.now + randRange(w.rng, 1500, 4000);
-      }
-      // Gentle pull back toward home so wandering stays local, plus a
-      // slow drift in the current wander direction.
-      const homeDx = a.homeX - a.x;
-      const homeDy = a.homeY - a.y;
-      const homeDist = Math.hypot(homeDx, homeDy);
-      const pullback = homeDist > 60 ? 0.6 : 0;
-      vx = Math.cos(a.wanderAngle) * kind.speed * (1 - pullback) + (homeDist > 0 ? (homeDx / homeDist) * kind.speed * pullback : 0);
-      vy = Math.sin(a.wanderAngle) * kind.speed * (1 - pullback) + (homeDist > 0 ? (homeDy / homeDist) * kind.speed * pullback : 0);
-    }
-
-    a.x += vx * dt;
-    a.y += vy * dt;
-    if (Math.abs(vx) > 1) a.facing = vx >= 0 ? 1 : -1;
-
-    const moving = Math.hypot(vx, vy) > 4;
-    const nextAnim = moving ? 'walk' : 'idle';
-    if (nextAnim !== a.anim) {
-      a.anim = nextAnim;
-      a.animStartedAt = w.now;
-    }
-  }
+  syncObstacleAabbs(w);
 }
 
 function applyKnockback(actor: Actor, dt: number) {
@@ -1469,32 +3104,66 @@ function applyKnockback(actor: Actor, dt: number) {
   if (Math.abs(actor.ky) < 1) actor.ky = 0;
 }
 
+function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
+  const p = w.player;
+  for (const enemy of w.enemies) {
+    if (enemy.dying || p.dashHitUids.has(enemy.uid)) continue;
+    const hitRadius = p.radius + enemy.radius + 8;
+    if (pointToSegmentDistanceSq(enemy.x, enemy.y, previousX, previousY, p.x, p.y) > hitRadius * hitRadius) continue;
+    p.dashHitUids.add(enemy.uid);
+    const resistance = enemyImpactResistance(enemy);
+    const impulse = resolveImpactTravel(5, enemy.mass, resistance) * DASH_KNOCKBACK_MULTIPLIER;
+    enemy.kx += p.dashDirectionX * impulse;
+    enemy.ky += p.dashDirectionY * impulse;
+    enemy.hitFlashUntil = Math.max(enemy.hitFlashUntil, w.now + 140);
+    if (enemy.anim !== 'death') {
+      enemy.anim = 'hurt';
+      enemy.animStartedAt = w.now;
+    }
+    spawnParticles(w, enemy.x, enemy.y, '#fef08a', 5, 80);
+  }
+}
+
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
-  const speed = w.stats.speed * speedMult(w);
+  const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w);
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
 
-  p.vx = nx * speed;
-  p.vy = ny * speed;
+  const dashing = p.dashUntil > w.now;
+  if (dashing) {
+    p.vx = p.dashDirectionX * DASH_SPEED;
+    p.vy = p.dashDirectionY * DASH_SPEED;
+  } else {
+    p.vx = nx * speed;
+    p.vy = ny * speed;
+  }
+  const previousX = p.x;
+  const previousY = p.y;
   p.x += p.vx * dt;
   p.y += p.vy * dt;
-  applyKnockback(p, dt);
+  if (!dashing) applyKnockback(p, dt);
 
-  if (Math.abs(nx) > 0.05) p.facing = nx > 0 ? 1 : -1;
+  if (dashing) {
+    p.facing = p.dashDirectionX < -0.05 ? -1 : p.dashDirectionX > 0.05 ? 1 : p.facing;
+  } else if (Math.abs(nx) > 0.05) {
+    p.facing = nx > 0 ? 1 : -1;
+  }
 
   collideObstacles(w, p);
   clampToArena(w, p);
+  if (dashing) knockEnemiesAlongDash(w, previousX, previousY);
   for (const b of w.breakables) {
-    if (b.broken || !PUSHABLE_KINDS.includes(b.kind)) continue;
+    if (b.broken || !b.movable) continue;
     if (Math.abs(p.x - b.x) < b.w / 2 + p.radius && Math.abs(p.y - b.y) < b.h / 2 + p.radius) {
       b.contacts += 1;
       if (b.kind === 'car-wreck' && b.contacts < 3) continue;
       const dx = b.x - p.x; const dy = b.y - p.y; const len = Math.hypot(dx, dy) || 1;
-      const force = b.kind === 'car-wreck' ? 24 : 42;
-      b.vx += (dx / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
-      b.vy += (dy / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
+      const force = b.propVariant === 'heavy-metal' ? 8 : b.propVariant === 'medium-movable' ? 24 : 42;
+      b.vx += (dx / len) * force / Math.max(1, b.mass);
+      b.vy += (dy / len) * force / Math.max(1, b.mass);
     }
   }
 
@@ -1511,11 +3180,87 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   }
 }
 
+const DASH_SPEED = 760;
+const DASH_DURATION_MS = 180;
+const DASH_COOLDOWN_MS = 820;
+const DASH_KNOCKBACK_MULTIPLIER = 1.8;
+
+export function dashPlayer(w: World, directionX: number, directionY: number): boolean {
+  if (
+    w.outcome !== 'running' ||
+    w.player.falling ||
+    w.endless?.pendingTransition ||
+    w.now < w.player.dashReadyAt ||
+    w.player.dashUntil > w.now
+  ) {
+    return false;
+  }
+  const length = Math.hypot(directionX, directionY);
+  if (length < 0.15) return false;
+
+  w.player.dashDirectionX = directionX / length;
+  w.player.dashDirectionY = directionY / length;
+  w.player.dashUntil = w.now + DASH_DURATION_MS;
+  w.player.dashReadyAt = w.now + DASH_COOLDOWN_MS;
+  w.player.dashStartedAt = w.now;
+  w.player.dashHitUids.clear();
+  w.player.vx = w.player.dashDirectionX * DASH_SPEED;
+  w.player.vy = w.player.dashDirectionY * DASH_SPEED;
+  w.shake = Math.max(w.shake, 9);
+  spawnParticles(w, w.player.x, w.player.y, w.character.palette.accentBright, 12, 150);
+  w.popups.push({
+    x: w.player.x,
+    y: w.player.y - 28,
+    text: 'DASH!',
+    color: w.character.palette.accentBright,
+    bornAt: w.now,
+    vy: 34,
+  });
+  return true;
+}
+
 function updateEnemies(w: World, dt: number) {
   const p = w.player;
 
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
+
+    if (enemy.convertedUntil > w.now) {
+      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, new Set([enemy.uid]));
+      if (allyTarget && w.now >= enemy.convertedAttackReadyAt) {
+        enemy.convertedAttackReadyAt = w.now + 650;
+        damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8)), 2, enemy.x, enemy.y);
+        const attackAngle = Math.atan2(allyTarget.y - enemy.y, allyTarget.x - enemy.x);
+        const attackDistance = Math.hypot(allyTarget.x - enemy.x, allyTarget.y - enemy.y);
+        w.effects.push({
+          uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: attackDistance, angle: attackAngle, spread: 0,
+          bornAt: w.now, expiresAt: w.now + 180, color: '#65f6d1', damage: 0, impactIntensity: 0,
+          hitUids: new Set(), followPlayer: false,
+        });
+      }
+      continue;
+    }
+
+    const traits = enemy.def.traits;
+    if (traits?.teleportMs && w.now >= enemy.specialReadyAt) {
+      const side = w.rng() > 0.5 ? 1 : -1;
+      enemy.x = p.x - (p.x - enemy.x) * 0.35 + side * 180;
+      enemy.y = p.y - (p.y - enemy.y) * 0.35 - side * 120;
+      enemy.specialReadyAt = w.now + traits.teleportMs;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 8, 80);
+    }
+    if (traits?.ghostMs && w.now >= enemy.specialReadyAt) {
+      enemy.ghostUntil = w.now + traits.ghostMs;
+      enemy.specialReadyAt = w.now + traits.ghostMs + 1800;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 5, 45);
+    }
+    if (traits?.shiftMs && w.now >= enemy.fireReadyAt) {
+      enemy.fireReadyAt = w.now + traits.shiftMs;
+      enemy.radius = enemy.radius === enemy.baseRadius
+        ? enemy.baseRadius * (traits.shiftScale ?? 1.45)
+        : enemy.baseRadius;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
+    }
 
     const dx = p.x - enemy.x;
     const dy = p.y - enemy.y;
@@ -1524,7 +3269,12 @@ function updateEnemies(w: World, dt: number) {
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
 
-    let speed = enemy.speed;
+    let speed = enemy.speed * statusSpeedMultiplier(enemy);
+    if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
+    if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
+      enemy.burstUntil = w.now + 360;
+      enemy.chargeReadyAt = w.now + 2200;
+    }
 
     switch (enemy.def.behavior) {
       case 'charger': {
@@ -1554,7 +3304,7 @@ function updateEnemies(w: World, dt: number) {
               vy: dirY * ranged.projectileSpeed,
               radius: 7,
               damage: ranged.damage,
-              knockback: 0,
+          impactIntensity: 0,
               fromPlayer: false,
               expiresAt: w.now + 3200,
               targetUid: null,
@@ -1598,7 +3348,7 @@ function updateEnemies(w: World, dt: number) {
             w.projectiles.push({
               uid: uid(w), x: enemy.x, y: enemy.y + 8,
               vx: dirX * ranged.projectileSpeed, vy: dirY * ranged.projectileSpeed,
-              radius: 7, damage: ranged.damage, knockback: 0, fromPlayer: false,
+              radius: 7, damage: ranged.damage, impactIntensity: 0, fromPlayer: false,
               expiresAt: w.now + 3200, targetUid: null, turnRate: 0,
               color: enemy.def.palette.accent, trail: [], pierce: 0, hitUids: new Set(),
             });
@@ -1636,7 +3386,7 @@ function updateEnemies(w: World, dt: number) {
           w.effects.push({
             uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius,
             angle: 0, spread: Math.PI * 2, bornAt: w.now, expiresAt: w.now + 360,
-            color: enemy.def.palette.accent, damage: 0, knockback: 0,
+            color: enemy.def.palette.accent, damage: 0, impactIntensity: 0,
             hitUids: new Set(), followPlayer: false,
           });
         }
@@ -1674,27 +3424,23 @@ function updateEnemies(w: World, dt: number) {
     enemy.x += moveX * speed * dt;
     enemy.y += moveY * speed * dt;
     applyKnockback(enemy, dt);
+    for (const b of w.breakables) {
+      if (b.broken || !b.movable || w.now < b.nextEnemyImpactAt) continue;
+      if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
+        b.contacts += 1;
+        if (b.kind === 'car-wreck' && b.contacts < 3) continue;
+        startEnemyPropChain(w, b, enemy);
+      }
+    }
     collideObstacles(w, enemy);
     clampToArena(w, enemy);
 
     // Contact damage.
     const contact = enemy.radius + p.radius;
-    if (distance <= contact && w.now >= enemy.contactReadyAt) {
+    if (enemy.ghostUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
-      damagePlayer(w, enemy.damage, enemy.x, enemy.y);
+      damagePlayer(w, enemy.damage, enemy.x, enemy.y, 'contact');
     }
-    for (const b of w.breakables) {
-      if (b.broken || !PUSHABLE_KINDS.includes(b.kind)) continue;
-      if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
-        b.contacts += 1;
-        if (b.kind === 'car-wreck' && b.contacts < 3) continue;
-        const dx = b.x - enemy.x; const dy = b.y - enemy.y; const len = Math.hypot(dx, dy) || 1;
-        const force = b.kind === 'car-wreck' ? 18 : 30;
-        b.vx += (dx / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
-        b.vy += (dy / len) * force / (b.kind === 'car-wreck' ? 3 : 1);
-      }
-    }
-
     const elapsed = w.now - enemy.animStartedAt;
     if (enemy.anim === 'attack' && elapsed < 260) continue;
     if (enemy.anim !== 'walk') {
@@ -1772,6 +3518,10 @@ function updateProjectiles(w: World, dt: number) {
 
     let remove = w.now > proj.expiresAt;
 
+    // Cover absorbs shots; reflective surfaces redirect player projectiles.
+    // This runs before actor hits so a wall cannot be shot through.
+    if (!remove && collideProjectileObstacle(w, proj)) remove = true;
+
     if (!remove) {
       if (w.area.endless) {
         // In endless mode, cull by distance from player rather than fixed arena walls.
@@ -1783,28 +3533,69 @@ function updateProjectiles(w: World, dt: number) {
       }
     }
 
-    // Solid scenery blocks any shot, player or enemy -- the same obstacle
-    // list actors already collide against (`collideObstacles`), so a crate
-    // shoved into a doorway is real cover, not just a walking obstruction.
-    if (!remove) {
-      for (const box of w.obstacles) {
-        if (circleHitsBox(proj.x, proj.y, proj.radius, box)) {
-          remove = true;
-          damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage);
-          spawnParticles(w, proj.x, proj.y, proj.color, 4, 70);
-          break;
-        }
-      }
-    }
-
     if (!remove && proj.fromPlayer) {
       forEachNearby(w, proj.x, proj.y, 30, (enemy) => {
         if (remove || enemy.dying || proj.hitUids.has(enemy.uid)) return;
         const reach = proj.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
           proj.hitUids.add(enemy.uid);
-          damageEnemy(w, enemy, proj.damage, proj.knockback, proj.x, proj.y);
-          damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage);
+          if (proj.explosionRadius) {
+            showLokPetBurst(
+              w,
+              proj.x,
+              proj.y,
+              proj.explosionRadius,
+              proj.explosionDamage ?? proj.damage,
+              proj.color,
+              proj.statusEffectId,
+              true,
+            );
+          } else {
+            damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
+          }
+          triggerEvolutionHit(
+            w,
+            proj.evolutionBehavior,
+            proj.x,
+            proj.y,
+            proj.damage,
+            proj.color,
+            proj.impactIntensity,
+            proj.statusEffectId,
+            enemy.uid,
+          );
+          if (proj.evolutionBehavior?.kind === 'split') {
+            const baseAngle = Math.atan2(proj.vy, proj.vx);
+            const splitCount = Math.max(2, proj.evolutionBehavior.count ?? 2);
+            for (let splitIndex = 0; splitIndex < splitCount; splitIndex += 1) {
+              const offset = (splitIndex - (splitCount - 1) / 2) * 0.34;
+              const splitAngle = baseAngle + offset;
+              w.projectiles.push({
+                uid: uid(w),
+                x: proj.x,
+                y: proj.y,
+                vx: Math.cos(splitAngle) * Math.max(150, Math.hypot(proj.vx, proj.vy) * 0.82),
+                vy: Math.sin(splitAngle) * Math.max(150, Math.hypot(proj.vx, proj.vy) * 0.82),
+                radius: 4,
+                damage: proj.damage * 0.42,
+                impactIntensity: Math.min(2, proj.impactIntensity) as ImpactIntensity,
+                fromPlayer: true,
+                expiresAt: w.now + 560,
+                targetUid: null,
+                turnRate: 0,
+                color: proj.color,
+                trail: [],
+                pierce: 0,
+                hitUids: new Set([enemy.uid]),
+                obstacleUids: new Set(),
+                obstacleInteraction: proj.obstacleInteraction,
+                statusEffectId: proj.statusEffectId,
+              });
+            }
+            proj.evolutionBehavior = undefined;
+            pushAlert(w, 'SIGNATURE SPLIT');
+          }
+            damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
           if (proj.pierce > 0) proj.pierce -= 1;
           else remove = true;
@@ -1832,7 +3623,8 @@ function updateEffects(w: World) {
       effect.y = p.y;
     }
 
-    if (effect.kind === 'slash' && effect.damage > 0) {
+    const active = w.now >= effect.bornAt;
+    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'laser') && effect.damage > 0) {
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
         if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
         const reach = effect.radius + enemy.radius;
@@ -1842,13 +3634,121 @@ function updateEffects(w: World) {
         while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
         if (diff > effect.spread) return;
         effect.hitUids.add(enemy.uid);
-        damageEnemy(w, enemy, effect.damage, effect.knockback, effect.x, effect.y);
+        damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId);
+        triggerEvolutionHit(
+          w,
+          effect.evolutionBehavior,
+          enemy.x,
+          enemy.y,
+          effect.damage,
+          effect.color,
+          effect.impactIntensity,
+          effect.statusEffectId,
+          enemy.uid,
+        );
       });
-      damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage);
+        damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
     }
 
-    if (w.now > effect.expiresAt) w.effects.splice(i, 1);
+    if (active && effect.kind === 'hazard' && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
+      effect.nextTickAt = w.now + 520;
+      effect.hitUids.clear();
+      forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
+        if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
+        const reach = effect.radius + enemy.radius;
+        if (dist2(enemy.x, enemy.y, effect.x, effect.y) > reach * reach) return;
+        effect.hitUids.add(enemy.uid);
+        damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.statusEffectId ?? (effect.color.includes('b8ff') ? 'acid' : 'burning'));
+      });
+      if (effect.hurtsPlayer && dist2(p.x, p.y, effect.x, effect.y) <= (effect.radius + p.radius) ** 2) {
+        damagePlayer(w, Math.max(1, Math.round(effect.damage * 0.45)), effect.x, effect.y);
+      }
+    }
+
+    if (w.now > effect.expiresAt) {
+      if (effect.evolutionBehavior?.kind === 'delayed-burst') {
+        const burstRadius = effect.radius * (effect.evolutionBehavior.radius ?? 0.82);
+        const burstDamage = effect.damage * 0.55;
+        novaDamage(w, effect.x, effect.y, burstRadius, burstDamage, 0, effect.evolutionBehavior.statusEffectId ?? effect.statusEffectId);
+        w.effects.push({
+          uid: uid(w),
+          kind: 'ring',
+          x: effect.x,
+          y: effect.y,
+          radius: burstRadius,
+          angle: 0,
+          spread: 0,
+          bornAt: w.now,
+          expiresAt: w.now + 260,
+          color: effect.color,
+          damage: 0,
+          impactIntensity: 0,
+          hitUids: new Set(),
+          followPlayer: false,
+        });
+        spawnParticles(w, effect.x, effect.y, effect.color, 8, 85);
+      }
+      w.effects.splice(i, 1);
+    }
   }
+}
+
+export function claimRumorEmergencyHeal(w: World): boolean {
+  if (w.activeCrewRumor?.rumorId !== 'pantry-surge' || !w.rumorPantryAvailable) return false;
+  w.rumorPantryAvailable = false;
+  w.rumorTriggered = true;
+  const amount = Math.max(12, Math.round(w.player.maxHp * 0.18));
+  w.player.hp = clamp(w.player.hp + amount, 0, w.player.maxHp);
+  w.rumorOutcome = `Pantry Surge restored ${amount} HP at the first level-up.`;
+  w.popups.push({
+    x: w.player.x,
+    y: w.player.y + 26,
+    text: `+${amount} EMERGENCY`,
+    color: '#86efac',
+    bornAt: w.now,
+    vy: 30,
+  });
+  pushAlert(w, 'RUMOR — PANTRY SURGE');
+  return true;
+}
+
+function updateRumorPulses(w: World) {
+  if (
+    w.activeCrewRumor?.rumorId !== 'magnet-parade' ||
+    w.now < w.rumorMagnetNextAt
+  ) return;
+
+  w.rumorTriggered = true;
+  w.rumorOutcome = 'Magnet Parade pulled experience and cred toward the operative.';
+  const radius = 280;
+  for (const pickup of w.pickups) {
+    if (pickup.kind !== 'xp' && pickup.kind !== 'cred') continue;
+    const dx = w.player.x - pickup.x;
+    const dy = w.player.y - pickup.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    if (distance > radius) continue;
+    pickup.vx += (dx / distance) * 520;
+    pickup.vy += (dy / distance) * 520;
+  }
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: w.player.x,
+    y: w.player.y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 300,
+    color: '#c4b5fd',
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  spawnParticles(w, w.player.x, w.player.y, '#c4b5fd', 12, 110);
+  pushAlert(w, 'RUMOR — MAGNET PARADE');
+  w.rumorMagnetNextAt += 8500;
 }
 
 function updatePickups(w: World, dt: number) {
@@ -1901,11 +3801,12 @@ function updatePickups(w: World, dt: number) {
         }
         case 'sweep': {
           // A street sweep: everything on screen takes a hit.
-          novaDamage(w, p.x, p.y, 320 * areaMult(w), 45 * w.stats.power, 6);
+          novaDamage(w, p.x, p.y, 320 * areaMult(w), 45 * w.stats.power, 5);
+          damageBreakable(w, p.x, p.y, 320 * areaMult(w), 45 * w.stats.power, 5, p.x, p.y);
           w.effects.push({
             uid: uid(w), kind: 'ring', x: p.x, y: p.y, radius: 320 * areaMult(w),
             angle: 0, spread: 0, bornAt: w.now, expiresAt: w.now + 480,
-            color: '#ffffff', damage: 0, knockback: 0, hitUids: new Set(), followPlayer: false,
+            color: '#ffffff', damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
           });
           w.shake = Math.max(w.shake, 10);
           pushAlert(w, 'Street sweep');
@@ -1988,6 +3889,44 @@ function updateObjectives(w: World) {
   }
 }
 
+export function episodeSnapshot(w: World): NonNullable<HudSnapshot['episode']> | undefined {
+  if (!w.episode) return undefined;
+  const { def, startingProgress } = w.episode;
+  let progress = startingProgress;
+  switch (def.objective.kind) {
+    case 'kill-any':
+      progress += w.kills;
+      break;
+    case 'kill-enemy':
+      progress += w.killsByEnemy[def.objective.enemyId ?? ''] ?? 0;
+      break;
+    case 'survive-sec':
+      progress += w.time;
+      break;
+    case 'walk-blocks':
+      progress += w.endless ? Math.round(w.endless.maxDistancePx / CHUNK_SIZE) : 0;
+      break;
+    case 'rescue-ally':
+      if (w.rescue.status === 'freed' && w.rescue.allyId === def.objective.allyId) progress += 1;
+      break;
+    case 'discover':
+      if (w.outcome === 'cleared' && w.area.discoveryId === def.objective.discoveryId) progress += 1;
+      break;
+    case 'clear-area':
+      if (w.outcome === 'cleared' && w.area.id === (def.objective.areaId ?? def.areaId)) progress += 1;
+      break;
+  }
+  const target = def.objective.targetCount;
+  return {
+    id: def.id,
+    title: def.title,
+    label: def.objective.label,
+    progress: Math.min(target, Math.max(0, Math.floor(progress))),
+    target,
+    completed: progress >= target,
+  };
+}
+
 function updateParticles(w: World, dt: number) {
   for (let i = w.particles.length - 1; i >= 0; i -= 1) {
     const particle = w.particles[i]!;
@@ -2059,12 +3998,81 @@ function updateRescue(w: World, dt: number) {
 /* ------------------------------------------------------------------ */
 
 function endlessDiffTier(e: EndlessState): number {
-  return Math.floor(e.maxDistancePx / 800) + Math.floor(e.dungeonDepth / 2);
+  return Math.min(12, Math.floor(e.maxDistancePx / 800) + Math.floor(e.dungeonDepth / 2));
+}
+
+function updateEndlessRoute(w: World) {
+  const e = w.endless!;
+  if (e.inDungeon || e.inBuilding) return;
+
+  const distance = Math.hypot(w.player.x, w.player.y);
+  const band = getEndlessBand(distance);
+  if (band.id !== e.currentBandId) {
+    e.currentBandId = band.id;
+    const firstBandVisit = !e.discoveredBandIds.has(band.id);
+    if (firstBandVisit) {
+      e.discoveredBandIds.add(band.id);
+      pushAlert(w, `${band.label} — ${band.riskLabel}`);
+    }
+    const eventId = `beacon:${band.id}`;
+    if (firstBandVisit && band.id !== 'core' && !e.discoveredRouteEventIds.has(eventId)) {
+      e.routeEvent = {
+        id: eventId,
+        bandId: band.id,
+        title: band.eventTitle,
+        description: band.eventDescription,
+        x: w.player.x + 150,
+        y: w.player.y,
+        phase: 'available',
+        rewardCred: 35 + ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) * 15,
+        rewardTokens: 1 + Math.floor(ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) / 3),
+      };
+      pushAlert(w, `OPTIONAL ROUTE — ${band.eventTitle}`);
+    }
+  }
+
+  const event = e.routeEvent;
+  if (event?.phase === 'available' && Math.hypot(w.player.x - event.x, w.player.y - event.y) < 48) {
+    event.phase = 'claimed';
+    e.discoveredRouteEventIds.add(event.id);
+    w.cred += event.rewardCred;
+    w.lootTokensGained += event.rewardTokens;
+    pushAlert(w, `${event.title} secured +${event.rewardCred} cred`);
+    spawnParticles(w, event.x, event.y, band.accent, 26, 170);
+  }
+}
+
+function updateEndlessBandHazard(w: World) {
+  const e = w.endless!;
+  if (e.inBuilding || w.now < e.hazardNextAt) return;
+  if (e.inDungeon) {
+    if (e.dungeonDepth < 2) return;
+    const era = DUNGEON_ERAS[e.dungeonEraIndex];
+    e.hazardNextAt = w.now + 3600;
+    const hazardX = w.player.x + (e.dungeonRoom === 3 ? 0 : 76);
+    const hazardY = w.player.y + Math.sin(w.now / 900) * 96;
+    incursionEffect(w, hazardX, hazardY, 44, era?.ground.glow ?? '#b58cff', 520);
+    if (e.dungeonRoom === 3) damagePlayer(w, 2, hazardX, hazardY, 'hazard');
+    return;
+  }
+  const band = ENDLESS_BANDS_BY_ID[e.currentBandId];
+  if (!band || band.id === 'core') return;
+
+  e.hazardNextAt = w.now + (band.id === 'outer-threshold' ? 2400 : 3100);
+  const radius = band.id === 'floodwall' ? 70 : band.id === 'rail-shadow' ? 56 : 48;
+  const hazardX = w.player.x + (w.player.vx === 0 ? 80 : Math.sign(w.player.vx) * 90);
+  const hazardY = w.player.y + (w.player.vy === 0 ? -40 : Math.sign(w.player.vy) * 90);
+  incursionEffect(w, hazardX, hazardY, radius, band.accent, 520);
+  if (band.id === 'outer-threshold') {
+    damagePlayer(w, 3, hazardX, hazardY, 'hazard');
+  } else if (band.id === 'industrial-fringe' || band.id === 'rail-shadow') {
+    damagePlayer(w, 2, hazardX, hazardY, 'hazard');
+  }
 }
 
 function updateEndlessChunks(w: World) {
   const e = w.endless!;
-  if (e.inDungeon) return;
+  if (e.inDungeon || e.inBuilding) return;
 
   // Track farthest distance for difficulty.
   const px = w.player.x;
@@ -2089,6 +4097,17 @@ function updateEndlessChunks(w: World) {
     if (!needed.has(key)) {
       e.chunkObstacles.delete(key);
       e.dungeonEntrances = e.dungeonEntrances.filter((en) => en.chunkKey !== key);
+      e.cityBlocks = e.cityBlocks.filter((block) => block.key !== key);
+      e.buildings = e.buildings.filter((building) => !building.id.startsWith(`${key}:`));
+      e.riverSegments = e.riverSegments.filter((segment) => !(
+        Math.abs(segment.x - (parseInt(key.split(',')[0]!, 10) * CHUNK_SIZE)) < CHUNK_SIZE &&
+        Math.abs(segment.y - (parseInt(key.split(',')[1]!, 10) * CHUNK_SIZE)) < CHUNK_SIZE
+      ));
+      e.buildingEntrances = e.buildingEntrances.filter((door) => {
+        const cx = parseInt(key.split(',')[0]!, 10);
+        const cy = parseInt(key.split(',')[1]!, 10);
+        return Math.abs(door.x - cx * CHUNK_SIZE) >= CHUNK_SIZE || Math.abs(door.y - cy * CHUNK_SIZE) >= CHUNK_SIZE;
+      });
       changed = true;
     }
   }
@@ -2110,8 +4129,67 @@ function updateEndlessChunks(w: World) {
       w: obs.w,
       h: obs.h,
       kind: obs.kind,
+      propVariant: obs.propVariant,
+        pothole: obs.pothole,
     }));
     e.chunkObstacles.set(key, worldObs);
+    e.cityBlocks.push({
+      key,
+      cx,
+      cy,
+      kind: chunk.blockKind,
+      x: cwx,
+      y: cwy,
+      w: CHUNK_SIZE,
+      h: CHUNK_SIZE,
+      river: chunk.hasRiver,
+      crossing: chunk.riverCrossingX !== null,
+      streetAxis: chunk.streetAxis,
+      district: chunk.district,
+      districtAccent: chunk.districtAccent,
+      band: chunk.band,
+      bandAccent: chunk.bandAccent,
+      landmark: chunk.landmark,
+    });
+    for (const building of chunk.buildings) {
+      e.buildings.push({
+        id: building.id,
+        prefabId: building.prefabId,
+        name: building.name,
+        sign: building.sign,
+        accent: building.accent,
+        x: cwx + building.x,
+        y: cwy + building.y,
+        w: building.w,
+        h: building.h,
+        doorSide: building.doorSide,
+      });
+    }
+    if (chunk.hasRiver) {
+      e.riverSegments.push({
+        x: cwx,
+        y: cwy,
+        w: CHUNK_SIZE,
+        h: 126,
+        crossingX: chunk.riverCrossingX === null ? null : cwx + chunk.riverCrossingX,
+      });
+    }
+    for (const door of chunk.buildingEntrances) {
+      const building = chunk.buildings.find((candidate) => candidate.id === door.buildingId);
+      if (!building) continue;
+      e.buildingEntrances.push({
+        x: cwx + door.x,
+        y: cwy + door.y,
+        w: 34,
+        h: 28,
+        label: door.label,
+        returnX: cwx + door.x + (door.doorSide === 'west' ? -48 : door.doorSide === 'east' ? 48 : 0),
+        returnY: cwy + door.y + (door.doorSide === 'north' ? -48 : door.doorSide === 'south' ? 48 : 0),
+        buildingId: door.buildingId,
+        prefabId: door.prefabId,
+        doorSide: door.doorSide,
+      });
+    }
 
     if (chunk.hasDungeonEntrance && !e.consumedEntranceChunks.has(key)) {
       e.dungeonEntrances.push({
@@ -2126,45 +4204,66 @@ function updateEndlessChunks(w: World) {
   }
 
   if (changed) {
+    resolvePotholes(w);
     w.obstacles = [];
-     w.obstacles = [];
-     w.breakables = [];
-     for (const obsArr of e.chunkObstacles.values()) {
-       for (const o of obsArr) {
-         w.obstacles.push(o);
-         const hp = BREAKABLE_HP[o.kind ?? 'crate'] ?? 999999;
-         w.breakables.push({ ...o, uid: uid(w), kind: o.kind ?? 'crate', hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 });
-       }
-     }
+    w.breakables = [];
+    w.potholes = [];
+    for (const obsArr of e.chunkObstacles.values()) {
+      for (const o of obsArr) {
+        if (o.kind === 'pothole') {
+          w.potholes.push(createPothole(w, { ...o, kind: 'pothole' }));
+        } else {
+          w.obstacles.push(o);
+          w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
+        }
+      }
+    }
   }
 }
 
-function enterDungeon(w: World) {
+function updateEndlessLandmarkCue(w: World) {
+  const e = w.endless!;
+  if (e.inDungeon || e.inBuilding) return;
+
+  const { cx, cy } = worldToChunkCoords(w.player.x, w.player.y);
+  const key = chunkKey(cx, cy);
+  const block = e.cityBlocks.find((candidate) => candidate.key === key);
+  if (e.lastLandmarkKey === key) return;
+
+  e.lastLandmarkKey = key;
+  if (!block?.landmark) return;
+
+  const cue = block.landmark.kind === 'bridge'
+    ? `${block.landmark.name} — crossing ahead`
+    : `Entering ${block.landmark.name}`;
+  pushAlert(w, cue);
+}
+
+function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 'exit') {
   const e = w.endless!;
   const p = w.player;
-
-  e.streetReturnX = p.x;
-  e.streetReturnY = p.y;
-  e.dungeonCenterX = p.x;
-  e.dungeonCenterY = p.y;
-  e.dungeonDepth += 1;
-
-  // Cycle to the next era style.
-  e.dungeonEraIndex = (e.dungeonEraIndex + 1) % DUNGEON_ERAS.length;
+  resolvePotholes(w);
+  e.dungeonRoom = room;
   const era = DUNGEON_ERAS[e.dungeonEraIndex]!;
   e.dungeonBounds = { ...era.bounds };
 
   // Place dungeon obstacles in world space, centred on the entry point.
-   w.obstacles = era.obstacles.map((obs) => ({
+   w.obstacles = era.obstacles.filter((obs) => obs.kind !== 'pothole').map((obs) => ({
     x: p.x + obs.x,
     y: p.y + obs.y,
     w: obs.w,
     h: obs.h,
   }));
-  w.breakables = era.obstacles.map((obs) => {
-    const hp = BREAKABLE_HP[obs.kind] ?? 999999;
-    return { x: p.x + obs.x, y: p.y + obs.y, w: obs.w, h: obs.h, uid: uid(w), kind: obs.kind, hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 };
-  });
+   w.breakables = era.obstacles.filter((obs) => obs.kind !== 'pothole').map((obs) => createBreakable(w, {
+    ...obs,
+    x: p.x + obs.x,
+    y: p.y + obs.y,
+   }));
+   w.potholes = era.obstacles.filter((obs) => obs.kind === 'pothole').map((obs) => createPothole(w, {
+     ...obs,
+     x: p.x + obs.x,
+     y: p.y + obs.y,
+   }));
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -2174,19 +4273,111 @@ function enterDungeon(w: World) {
     h: 64,
   };
 
-  // Clear street entities; the room starts fresh.
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
   w.projectiles = [];
 
-  e.inDungeon = true;
-  e.pendingTransition = 'enter';
-  pushAlert(w, `${era.name} — find the exit`);
+  if (room === 3) {
+    const boss = getEnemy('the-sire');
+    spawnEnemy(w, boss, (1000 / boss.hp) * w.level, { x: p.x + 30, y: p.y });
+    e.dungeonChest = { x: p.x + era.bounds.w / 2 - 92, y: p.y, unlocked: false, opened: false };
+    pushAlert(w, `FINAL ROOM — ${boss.name} level ${w.level}`);
+  } else {
+    pushAlert(w, `${era.name} — room ${room} of 3`);
+  }
+  e.pendingTransition = transition;
   w.shake = Math.max(w.shake, 10);
+}
+
+function enterDungeon(w: World) {
+  const e = w.endless!;
+  e.streetReturnX = w.player.x;
+  e.streetReturnY = w.player.y;
+  e.dungeonCenterX = w.player.x;
+  e.dungeonCenterY = w.player.y;
+  e.dungeonDepth += 1;
+  e.dungeonRoom = 1;
+  e.dungeonBossDefeated = false;
+  e.dungeonChest = null;
+  const bandIndex = ENDLESS_BANDS.findIndex((band) => band.id === e.currentBandId);
+  e.dungeonEraIndex = (e.dungeonDepth - 1 + Math.max(0, bandIndex) * 2) % DUNGEON_ERAS.length;
+  e.inDungeon = true;
+  loadDungeonRoom(w, 1, 'enter');
+}
+
+function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]) {
+  const e = w.endless!;
+  const building = e.buildings.find((candidate) => candidate.id === door.buildingId);
+  const prefab = getBuildingPrefab(door.prefabId as BuildingPrefabId);
+  if (!building) return;
+
+  resolvePotholes(w);
+  e.buildingReturnX = door.returnX;
+  e.buildingReturnY = door.returnY;
+  e.buildingCenterX = building.x;
+  e.buildingCenterY = building.y;
+  e.dungeonCenterX = building.x;
+  e.dungeonCenterY = building.y;
+  e.buildingLabel = prefab.name;
+  e.buildingPrefabId = prefab.id;
+  e.inBuilding = true;
+  e.dungeonBounds = { ...prefab.interiorBounds };
+
+  const exitOffset = Math.max(22, Math.min(prefab.interiorBounds.w, prefab.interiorBounds.h) / 2 - 24);
+  const exitX = building.x + (door.doorSide === 'west' ? -exitOffset : door.doorSide === 'east' ? exitOffset : 0);
+  const exitY = building.y + (door.doorSide === 'north' ? -exitOffset : door.doorSide === 'south' ? exitOffset : 0);
+  e.exitZone = { x: exitX, y: exitY, w: 52, h: 42 };
+
+  const interiorShell = buildingWallObstacles({
+    x: building.x,
+    y: building.y,
+    w: prefab.interiorBounds.w,
+    h: prefab.interiorBounds.h,
+    doorX: building.x,
+    doorY: building.y,
+    doorSide: door.doorSide,
+  });
+  const interiorProps = prefab.interiorProps.map((obs) => ({
+    ...obs,
+    x: building.x + obs.x,
+    y: building.y + obs.y,
+  }));
+  w.obstacles = [...interiorShell, ...interiorProps];
+  w.breakables = [...interiorShell, ...interiorProps].map((obs) => createBreakable(w, { ...obs, kind: obs.kind }));
+  w.potholes = [];
+  w.enemies = w.enemies.filter((en) => en.dying);
+  w.pickups = [];
+  w.projectiles = [];
+  w.player.x = exitX + (door.doorSide === 'west' ? 28 : door.doorSide === 'east' ? -28 : 0);
+  w.player.y = exitY + (door.doorSide === 'north' ? 28 : door.doorSide === 'south' ? -28 : 0);
+  w.player.vx = 0;
+  w.player.vy = 0;
+  e.pendingTransition = 'enter';
+  pushAlert(w, `${prefab.name} — inside`);
 }
 
 function exitDungeon(w: World) {
   const e = w.endless!;
+
+  if (e.inBuilding) {
+    w.player.x = e.buildingReturnX;
+    w.player.y = e.buildingReturnY;
+    w.player.vx = 0;
+    w.player.vy = 0;
+    e.inBuilding = false;
+    e.buildingPrefabId = null;
+    e.buildingLabel = '';
+    e.exitZone = null;
+    restoreStreetObstacles(w);
+    e.pendingTransition = 'exit';
+    pushAlert(w, 'Back on the block');
+    return;
+  }
+
+  if (e.dungeonRoom < 3) {
+    loadDungeonRoom(w, e.dungeonRoom + 1);
+    return;
+  }
 
   // Return player to just past the entry point so they won't re-trigger.
   w.player.x = e.streetReturnX - 90;
@@ -2194,18 +4385,11 @@ function exitDungeon(w: World) {
   w.player.vx = 0;
   w.player.vy = 0;
 
-  // Restore street obstacles.
-   w.obstacles = [];
-   w.breakables = [];
-  for (const obsArr of e.chunkObstacles.values()) {
-     for (const o of obsArr) {
-       w.obstacles.push(o);
-       const hp = BREAKABLE_HP[o.kind ?? 'crate'] ?? 999999;
-       w.breakables.push({ ...o, uid: uid(w), kind: o.kind ?? 'crate', hp, maxHp: hp, vx: 0, vy: 0, broken: false, brokenAt: 0, contacts: 0 });
-     }
-  }
+  restoreStreetObstacles(w);
 
   e.inDungeon = false;
+  e.dungeonRoom = 0;
+  e.dungeonChest = null;
   e.exitZone = null;
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
@@ -2215,11 +4399,37 @@ function exitDungeon(w: World) {
   w.shake = Math.max(w.shake, 8);
 }
 
+function restoreStreetObstacles(w: World) {
+  const e = w.endless!;
+  resolvePotholes(w);
+  w.obstacles = [];
+  w.breakables = [];
+  w.potholes = [];
+  for (const obsArr of e.chunkObstacles.values()) {
+    for (const o of obsArr) {
+      if (o.kind === 'pothole') w.potholes.push(createPothole(w, { ...o, kind: 'pothole' }));
+      else {
+        w.obstacles.push(o);
+        w.breakables.push(createBreakable(w, { ...o, kind: o.kind ?? 'crate' }));
+      }
+    }
+  }
+}
+
 function updateEndlessDungeon(w: World) {
   const e = w.endless!;
   const p = w.player;
 
-  if (!e.inDungeon) {
+  if (!e.inDungeon && !e.inBuilding) {
+    for (const door of e.buildingEntrances) {
+      if (
+        Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
+        Math.abs(p.y - door.y) < door.h / 2 + p.radius
+      ) {
+        enterBuilding(w, door);
+        return;
+      }
+    }
     for (const entrance of e.dungeonEntrances) {
       const hw = entrance.w / 2;
       const hh = entrance.h / 2;
@@ -2243,7 +4453,24 @@ function updateEndlessDungeon(w: World) {
         Math.abs(p.y - exit.y) < hh + p.radius
       ) {
         exitDungeon(w);
+        return;
       }
+    }
+    const chest = e.dungeonChest;
+    if (e.inDungeon && chest?.unlocked && !chest.opened &&
+      Math.hypot(p.x - chest.x, p.y - chest.y) < 34 + p.radius) {
+      chest.opened = true;
+      for (let i = 0; i < 3; i += 1) {
+        const prize = rollPrize(w.rng);
+        applyLootPrize(w, prize);
+        w.openedPrizes.push(prize.label);
+      }
+      w.lootBoxesOpened += 1;
+      const depthBonus = 10 + e.dungeonDepth * 8;
+      w.cred += depthBonus;
+      pushAlert(w, 'Chest opened — 3 rewards secured');
+      pushAlert(w, `Depth bonus +${depthBonus} cred`);
+      spawnParticles(w, chest.x, chest.y, '#ffd166', 24, 150);
     }
   }
 }
@@ -2260,27 +4487,17 @@ const ENDLESS_ENEMY_POOLS: string[][] = [
   ['bass-bruiser', 'bridge-lookout', 'river-wraith', 'lightless-prowler'],
 ];
 
-/**
- * Deep night pushes endless-mode difficulty up slightly. Distance-from-
- * midnight on the 0..1 cycle (0/1 = midnight, 0.5 = neutral), so this is
- * 1.0 in daylight and rises to a hard 1.15 ceiling at true midnight --
- * multiplied *inside* updateEndlessSpawning's existing Math.min() caps
- * below, never stacked on top of them.
- */
-function nightDifficultyMult(cyclePhase: number): number {
-  const distFromMidnight = Math.min(cyclePhase, 1 - cyclePhase);
-  const nightIntensity = clamp(1 - distFromMidnight / 0.5, 0, 1);
-  return 1 + nightIntensity * 0.15;
-}
-
 function updateEndlessSpawning(w: World, dt: number) {
   const e = w.endless!;
   const tier = endlessDiffTier(e);
-  const nightMult = nightDifficultyMult(w.cycle.phase);
-  const spawnRate = Math.min(3.2, (0.8 + tier * 0.14) * nightMult);
-  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
+  const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+  const spawnRate = Math.min(3.2, (0.8 + tier * 0.14) * contractSpawnMultiplier);
+  const hpMult = Math.min(1.7, 1 + tier * 0.07);
 
-  const pool = ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
+  const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
+  const pool = bandPool?.length
+    ? bandPool
+    : ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
 
   e.spawnBudget += spawnRate * dt;
   while (e.spawnBudget >= 1) {
@@ -2315,23 +4532,37 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   const dt = Math.min(dtSeconds, 1 / 30);
   w.time += dt;
   w.now += dt * 1000;
-  w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
+
+  if (
+    w.firstNightChapter &&
+    !w.firstNightBeatTriggered &&
+    w.time >= w.firstNightChapter.beatAtSec
+  ) {
+    w.firstNightBeatTriggered = true;
+    pushAlert(w, `${w.firstNightChapter.beatTitle} — ${w.firstNightChapter.beatText}`);
+  }
 
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  updateDistrictIncursion(w, dt);
 
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
+    updateEndlessRoute(w);
+    updateEndlessBandHazard(w);
+    updateEndlessLandmarkCue(w);
     updateEndlessDungeon(w);
     updateEndlessSpawning(w, dt);
   } else {
     updateSpawning(w, dt);
   }
 
+  updateStatusEffects(w);
+  updateLokPets(w, dt);
+  updateFollowers(w, dt);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
-  stepAmbient(w, dt);
 
   // Weapon cadence.
   updateOrbiters(w, dt);
@@ -2345,6 +4576,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   updateProjectiles(w, dt);
   updateEffects(w);
+  updatePotholes(w);
+  updateRumorPulses(w);
   updatePickups(w, dt);
   updateObjectives(w);
   updateParticles(w, dt);
@@ -2373,6 +4606,12 @@ export function hudSnapshot(w: World): HudSnapshot {
   const ultRemaining = Math.max(0, w.ultReadyAt - w.now);
   const ultTotal = w.character.ultimate.cooldownMs * w.ultCooldownMult;
   const e = w.endless;
+  const effectCounts = new Map<string, number>();
+  for (const enemy of w.enemies) {
+    for (const effect of enemy.activeEffects) {
+      effectCounts.set(effect.id, (effectCounts.get(effect.id) ?? 0) + 1);
+    }
+  }
   return {
     hp: Math.max(0, Math.round(w.player.hp)),
     maxHp: Math.round(w.player.maxHp),
@@ -2394,6 +4633,102 @@ export function hudSnapshot(w: World): HudSnapshot {
     rescueAvailable: w.rescue.status === 'available' || w.rescue.status === 'freeing',
     rescueProgressPct: Math.round(w.rescue.progress * 100),
     lootBoxesOpened: w.lootBoxesOpened,
+    lokPets: w.lokPets.map((pet) => ({
+      uid: pet.uid,
+      name: pet.name,
+      family: pet.family,
+      silhouette: pet.silhouette,
+      rarity: pet.rarity,
+      attackKind: pet.attackKind,
+      element: pet.element,
+      traitLabel: pet.traitLabel,
+      health: pet.stats.health,
+      damage: Math.round(pet.stats.damage),
+      cooldownMs: pet.stats.cooldownMs,
+      range: pet.stats.range,
+      ghost: pet.ghost,
+      ghostPct: pet.ghost ? 100 : clamp((w.now - pet.bornAt) / Math.max(1, pet.ghostAt - pet.bornAt) * 100, 0, 100),
+      expiresInSec: Math.max(0, Math.ceil((pet.expiresAt - w.now) / 1000)),
+      color: LOKPET_ELEMENT_COLORS[pet.element],
+    })),
+    activeEffects: [...effectCounts.entries()].map(([id, count]) => ({
+      id,
+      name: STATUS_EFFECTS_BY_ID[id]?.name ?? id,
+      color: STATUS_EFFECTS_BY_ID[id]?.color ?? '#fff',
+      count,
+    })),
+    episode: (() => {
+      const snapshot = episodeSnapshot(w);
+      return snapshot
+        ? {
+            id: snapshot.id,
+            title: snapshot.title,
+            label: snapshot.label,
+            progress: snapshot.progress,
+            target: snapshot.target,
+            completed: snapshot.completed,
+          }
+        : undefined;
+    })(),
+    evolution: w.activeEvolution
+      ? {
+          id: w.activeEvolution.id,
+          name: w.activeEvolution.name,
+          identity: w.activeEvolution.identity,
+          color: w.activeEvolution.color,
+        }
+      : undefined,
+    relicWorkshop: {
+      knownRelicIds: [...w.knownRelicIds],
+      readyRecipeIds: RELIC_RECIPES
+        .filter((recipe) => relicRecipeEligibility(w, recipe).eligible)
+        .map((recipe) => recipe.id),
+      activeRecipe: w.activeRelicRecipe
+        ? {
+            id: w.activeRelicRecipe.id,
+            name: w.activeRelicRecipe.name,
+            identity: w.activeRelicRecipe.identity,
+            color: w.activeRelicRecipe.color,
+          }
+        : undefined,
+    },
+    crewRumor: w.activeCrewRumor
+      ? (() => {
+          const rumor = getCrewRumor(w.activeCrewRumor.rumorId);
+          if (!rumor) return undefined;
+          return {
+            rumorId: rumor.id,
+            name: rumor.name,
+            icon: rumor.icon,
+            effectLabel: rumor.effectLabel,
+            triggered: w.rumorTriggered,
+            ready: w.rumorPantryAvailable,
+            outcome: w.rumorOutcome,
+          };
+        })()
+      : undefined,
+    firstNightBeat: w.firstNightChapter && w.firstNightBeatTriggered
+      ? {
+          chapter: w.firstNightChapter.chapter,
+          title: w.firstNightChapter.beatTitle,
+          text: w.firstNightChapter.beatText,
+        }
+      : undefined,
+    districtIncursion: w.districtIncursion
+      ? {
+          id: w.districtIncursion.id,
+          title: w.districtIncursion.title,
+          landmark: w.districtIncursion.landmark,
+          objectiveLabel: w.districtIncursion.objectiveLabel,
+          phase: w.districtIncursion.phase,
+          progress: Math.min(w.districtIncursion.target, Math.floor(w.districtIncursion.progress)),
+          target: w.districtIncursion.target,
+          accent: w.districtIncursion.accent,
+          remainingSec: w.districtIncursion.phase === 'active'
+            ? Math.max(0, Math.ceil((w.districtIncursion.endsAt - w.now) / 1000))
+            : 0,
+        }
+      : undefined,
     objectives: w.objectives.map((o) => ({
       label: o.def.label,
       progress: Math.min(o.def.targetCount, Math.round(o.progress)),
@@ -2403,21 +4738,57 @@ export function hudSnapshot(w: World): HudSnapshot {
     endless: e
       ? {
           blocksWalked: Math.round(e.maxDistancePx / CHUNK_SIZE),
+          distancePx: Math.round(e.maxDistancePx),
           dungeonDepth: e.dungeonDepth,
           inDungeon: e.inDungeon,
+          dungeonRoom: e.dungeonRoom,
+          dungeonBossDefeated: e.dungeonBossDefeated,
+          dungeonChestUnlocked: Boolean(e.dungeonChest?.unlocked),
+          dungeonChestOpened: Boolean(e.dungeonChest?.opened),
           dungeonEraName: e.dungeonEraIndex >= 0 && e.inDungeon
             ? (DUNGEON_ERAS[e.dungeonEraIndex]?.name ?? 'Unknown')
             : '',
+          currentBandId: e.currentBandId,
+          currentBandLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.label ?? 'Unknown edge',
+          currentBandAccent: ENDLESS_BANDS_BY_ID[e.currentBandId]?.accent ?? '#fff',
+          riskLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.riskLabel ?? '',
+          hazardLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.hazardLabel ?? '',
+          routeEvent: e.routeEvent
+            ? { ...e.routeEvent }
+            : undefined,
+          currentBlock: e.cityBlocks.find((block) => block.key === chunkKey(
+            worldToChunkCoords(w.player.x, w.player.y).cx,
+            worldToChunkCoords(w.player.x, w.player.y).cy,
+          ))?.kind ?? 'street',
+          currentDistrict: e.cityBlocks.find((block) => block.key === chunkKey(
+            worldToChunkCoords(w.player.x, w.player.y).cx,
+            worldToChunkCoords(w.player.x, w.player.y).cy,
+          ))?.district ?? 'Unmapped district',
+          inBuilding: e.inBuilding,
+          buildingLabel: e.buildingLabel,
+          playerX: w.player.x,
+          playerY: w.player.y,
+          cityBlocks: e.cityBlocks.map(({ x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, band, bandAccent, landmark }) => ({
+            x, y, w: width, h: height, kind, river, crossing, streetAxis, district, districtAccent, band, bandAccent, landmark,
+          })),
+          riverSegments: [...e.riverSegments],
+          buildingEntrances: e.buildingEntrances.map(({ x, y, label, prefabId, doorSide }) => ({ x, y, label, prefabId, doorSide })),
+          buildings: e.buildings.map(({ id, prefabId, name, sign, accent, x, y, w: width, h: height, doorSide }) => ({
+            id, prefabId, name, sign, accent, x, y, w: width, h: height, doorSide,
+          })),
         }
       : undefined,
   };
 }
 
-export function buildResult(w: World): RunResult {
+export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
   const cleared = w.outcome === 'cleared';
   const survival = w.area.endless ? w.time : Math.min(w.time, w.area.durationSec);
   const bonus = cleared ? 120 : 0;
   const e = w.endless;
+  const baseCred = w.cred + bonus + Math.floor(survival / 4);
+  const challengeMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.rewardMultiplier, 1);
+  const finalCred = Math.floor(baseCred * challengeMultiplier * utilityRewardMultiplier);
   return {
     areaId: w.area.id,
     characterId: w.character.id,
@@ -2425,7 +4796,7 @@ export function buildResult(w: World): RunResult {
     survivedSec: survival,
     kills: w.kills,
     level: w.level,
-    cred: w.cred + bonus + Math.floor(survival / 4),
+    cred: finalCred,
     killsByEnemy: { ...w.killsByEnemy },
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
@@ -2436,13 +4807,110 @@ export function buildResult(w: World): RunResult {
     },
     lootBoxesOpened: w.lootBoxesOpened,
     openedPrizes: [...w.openedPrizes],
+    lokPets: w.lokPetHistory.map((pet) => ({
+      name: pet.name,
+      variantId: pet.variantId,
+      family: pet.family,
+      silhouette: pet.silhouette,
+      palette: pet.palette,
+      rarity: pet.rarity,
+      rarityLabel: pet.rarityLabel,
+      attackKind: pet.attackKind,
+      element: pet.element,
+      elementLabel: pet.elementLabel,
+      traitLabel: pet.traitLabel,
+      health: pet.stats.health,
+      damage: Math.round(pet.stats.damage),
+      cooldownMs: pet.stats.cooldownMs,
+      range: pet.stats.range,
+      ghosted: pet.ghost,
+    })),
+    lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     completedObjectives: [...w.completedObjectives],
+    episode: (() => {
+      const snapshot = episodeSnapshot(w);
+      return snapshot
+        ? {
+            id: snapshot.id,
+            title: snapshot.title,
+            objectiveLabel: snapshot.label,
+            progress: snapshot.progress,
+            target: snapshot.target,
+            completed: snapshot.completed,
+            completedThisRun: snapshot.completed && (w.episode?.startingProgress ?? 0) < snapshot.target,
+          }
+        : undefined;
+    })(),
+    evolution: w.activeEvolution
+      ? {
+          id: w.activeEvolution.id,
+          name: w.activeEvolution.name,
+          identity: w.activeEvolution.identity,
+        }
+      : undefined,
+    relicRecipe: w.activeRelicRecipe
+      ? {
+          id: w.activeRelicRecipe.id,
+          name: w.activeRelicRecipe.name,
+          identity: w.activeRelicRecipe.identity,
+        }
+      : undefined,
+    crewRumor: w.activeCrewRumor
+      ? (() => {
+          const rumor = getCrewRumor(w.activeCrewRumor.rumorId);
+          return rumor
+            ? {
+                rumorId: rumor.id,
+                rumorName: rumor.name,
+                icon: rumor.icon,
+                allyId: w.activeCrewRumor.allyId,
+                effectLabel: rumor.effectLabel,
+                triggered: w.rumorTriggered,
+                outcome: w.rumorTriggered
+                  ? w.rumorOutcome
+                  : `${rumor.name} was carried through the run without firing.`,
+              }
+            : undefined;
+        })()
+      : undefined,
+    firstNight: w.firstNightChapter
+      ? {
+          chapter: w.firstNightChapter.chapter,
+          label: w.firstNightChapter.label,
+          goal: w.firstNightChapter.goal,
+          consequence: w.firstNightChapter.consequence,
+          beatTitle: w.firstNightChapter.beatTitle,
+          beatTriggered: w.firstNightBeatTriggered,
+          thread: w.firstNightChapter.thread,
+        }
+      : undefined,
+    districtIncursion: w.districtIncursion
+      ? {
+          id: w.districtIncursion.id,
+          title: w.districtIncursion.title,
+          landmark: w.districtIncursion.landmark,
+          phase: w.districtIncursion.phase,
+          progress: Math.min(w.districtIncursion.target, Math.floor(w.districtIncursion.progress)),
+          target: w.districtIncursion.target,
+          rewardCred: w.districtIncursion.rewardCred,
+          rewardTokens: w.districtIncursion.rewardTokens,
+        }
+      : undefined,
+    challenges: w.challenges.map((challenge) => ({
+      id: challenge.id,
+      name: challenge.name,
+      rewardMultiplier: challenge.rewardMultiplier,
+      bonusCred: Math.max(0, Math.floor(baseCred * challengeMultiplier) - baseCred),
+    })),
     endless: e
       ? {
           maxDistancePx: e.maxDistancePx,
           dungeonDepth: e.dungeonDepth,
           blocksWalked: Math.round(e.maxDistancePx / CHUNK_SIZE),
+          currentBandId: e.currentBandId,
+          discoveredBandIds: [...e.discoveredBandIds],
+          discoveredRouteEventIds: [...e.discoveredRouteEventIds],
         }
       : undefined,
   };

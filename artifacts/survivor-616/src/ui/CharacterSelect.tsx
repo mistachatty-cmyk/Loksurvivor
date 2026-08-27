@@ -2,19 +2,24 @@
  * Roster / character picker. Owned by the design pass -- keep the export
  * name and props stable.
  */
-import { describeUnlock, effectiveStats, useMeta } from '@/game/state/metaStore';
+import { describeUnlock, effectiveStats, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
+import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
-import { Shield, Zap, Swords } from 'lucide-react';
+import { Shield, Zap, Swords, BookOpen } from 'lucide-react';
+import { CharacterAbilityVisualizer } from './CharacterAbilityVisualizer';
+import { LokPetVariantSheet } from './LokPetVariantSheet';
 
 export interface CharacterSelectProps {
   onBack: () => void;
   /** Called after the player commits to a character. */
   onConfirm: () => void;
+  /** Opens the selected character's replayable signature episode. */
+  onLaunchEpisode?: (episodeId: string, areaId: string) => void;
 }
 
-export function CharacterSelect({ onBack, onConfirm }: CharacterSelectProps) {
+export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: CharacterSelectProps) {
   const { unlockedCharacters, lockedCharacters, selectedCharacter, selectCharacter, meta } = useMeta();
 
   return (
@@ -33,19 +38,28 @@ export function CharacterSelect({ onBack, onConfirm }: CharacterSelectProps) {
         </button>
       }
     >
+      <CharacterAbilityVisualizer character={selectedCharacter} />
+      <LokPetVariantSheet />
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {unlockedCharacters.map((character, i) => {
           const stats = effectiveStats(character, meta);
           const isSelected = character.id === selectedCharacter.id;
+          const episode = CHARACTER_EPISODE_BY_CHARACTER_ID[character.id];
+          const status = episode ? episodeStatus(episode.id, meta) : 'locked';
+          const progress = episode ? episodeProgress(episode.id, meta) : 0;
           
           return (
-            <motion.button
+            <motion.div
               key={character.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => selectCharacter(character.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') selectCharacter(character.id);
+              }}
               className={`group relative w-full text-left border flex flex-col overflow-hidden transition-all duration-300 ${
                 isSelected 
                   ? 'border-primary ring-1 ring-primary bg-card/80' 
@@ -117,6 +131,35 @@ export function CharacterSelect({ onBack, onConfirm }: CharacterSelectProps) {
                 </div>
 
                 <div className="mt-auto space-y-3">
+                  {episode ? (
+                    <div className="border-t border-primary/20 pt-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <BookOpen className="h-3 w-3 shrink-0 text-primary" />
+                          <span className="truncate text-[10px] font-bold uppercase tracking-widest text-primary">
+                            Episode · {episode.title}
+                          </span>
+                        </div>
+                        <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
+                          {status === 'completed' ? 'Complete' : status === 'locked' ? 'Locked' : `${progress}/${episode.objective.targetCount}`}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{status === 'completed' ? episode.completionText : episode.teaser}</p>
+                      {onLaunchEpisode && status !== 'locked' ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onLaunchEpisode(episode.id, episode.areaId);
+                          }}
+                          className="mt-2 w-full border border-primary/40 bg-primary/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground"
+                          data-testid={`button-episode-${episode.id}`}
+                        >
+                          {status === 'completed' ? 'Replay episode' : status === 'in-progress' ? 'Continue episode' : 'Play episode'}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <Swords className="w-3 h-3 text-primary" />
@@ -133,7 +176,7 @@ export function CharacterSelect({ onBack, onConfirm }: CharacterSelectProps) {
                   </div>
                 </div>
               </div>
-            </motion.button>
+            </motion.div>
           );
         })}
 
