@@ -1,35 +1,143 @@
+import { Maximize2, Minimize2, Move } from 'lucide-react';
+import { useEffect, useRef, type PointerEvent } from 'react';
+
 import type { HudSnapshot } from '@/game/types';
 
 interface MinimapProps {
   map: NonNullable<HudSnapshot['endless']>;
+  expanded: boolean;
+  position: { x: number; y: number };
+  onPositionChange: (position: { x: number; y: number }) => void;
+  onToggleExpanded: () => void;
 }
 
 const MAP_W = 220;
 const MAP_H = 140;
 const SCALE = 0.19;
 
-export function Minimap({ map }: MinimapProps) {
+export function Minimap({
+  map,
+  expanded,
+  position,
+  onPositionChange,
+  onToggleExpanded,
+}: MinimapProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
   const toMap = (x: number, y: number) => ({
     x: MAP_W / 2 + (x - map.playerX) * SCALE,
     y: MAP_H / 2 + (y - map.playerY) * SCALE,
   });
 
+  const handleDragStart = (event: PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.parentElement?.parentElement?.getBoundingClientRect();
+    if (!rect) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDragMove = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const widget = event.currentTarget.parentElement?.parentElement;
+    if (!widget || width <= 0 || height <= 0) return;
+    const rect = widget.getBoundingClientRect();
+    const nextX = (event.clientX - drag.offsetX) / width;
+    const nextY = (event.clientY - drag.offsetY) / height;
+    const maxX = Math.max(0, (width - rect.width) / width);
+    const maxY = Math.max(0, (height - rect.height) / height);
+    onPositionChange({
+      x: Math.min(maxX, Math.max(0, nextX)),
+      y: Math.min(maxY, Math.max(0, nextY)),
+    });
+  };
+
+  const handleDragEnd = (event: PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    dragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  const stopInteraction = (event: PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+  };
+
+  useEffect(() => {
+    const clampToViewport = () => {
+      const element = rootRef.current;
+      if (!element || window.innerWidth <= 0 || window.innerHeight <= 0) return;
+      const rect = element.getBoundingClientRect();
+      const maxX = Math.max(0, (window.innerWidth - rect.width) / window.innerWidth);
+      const maxY = Math.max(0, (window.innerHeight - rect.height) / window.innerHeight);
+      const next = {
+        x: Math.min(maxX, Math.max(0, position.x)),
+        y: Math.min(maxY, Math.max(0, position.y)),
+      };
+      if (next.x !== position.x || next.y !== position.y) onPositionChange(next);
+    };
+
+    clampToViewport();
+    window.addEventListener('resize', clampToViewport);
+    return () => window.removeEventListener('resize', clampToViewport);
+  }, [onPositionChange, position.x, position.y, expanded]);
+
   return (
     <div
-      className="pointer-events-none absolute right-3 top-[150px] block w-[42vw] min-w-[158px] max-w-[220px] sm:top-3"
+      ref={rootRef}
+      className={`pointer-events-auto absolute z-30 block ${
+        expanded ? 'w-[min(86vw,360px)]' : 'w-[min(62vw,220px)]'
+      }`}
+      style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
       data-testid="minimap"
       aria-label={`City minimap, current block ${map.currentBlock}`}
     >
       <div className="border border-cyan-200/30 bg-[#050911]/85 p-1 shadow-[0_0_24px_rgba(34,211,238,.12)]">
-        <div className="mb-1 flex items-center justify-between gap-2 px-1 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/75">
-          <span className="truncate" style={{ color: map.currentBandAccent }}>{map.currentBandLabel}</span>
-          <span className="shrink-0 text-amber-200/80">{map.blocksWalked} blk</span>
+        <div
+          className="mb-1 flex cursor-grab touch-none items-center justify-between gap-2 px-1 font-mono text-[9px] uppercase tracking-[0.18em] text-cyan-100/75 active:cursor-grabbing"
+          onPointerDown={handleDragStart}
+          onPointerMove={handleDragMove}
+          onPointerUp={handleDragEnd}
+          onPointerCancel={handleDragEnd}
+          data-testid="minimap-drag-handle"
+          title="Drag to move minimap"
+        >
+          <span className="flex min-w-0 items-center gap-1 truncate" style={{ color: map.currentBandAccent }}>
+            <Move className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">{map.currentBandLabel}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1 text-amber-200/80">
+            {map.blocksWalked} blk
+            <button
+              type="button"
+              onPointerDown={stopInteraction}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleExpanded();
+              }}
+              className="pointer-events-auto border border-cyan-200/30 p-1 text-cyan-100 hover:border-cyan-100/70"
+              aria-label={expanded ? 'Minimize minimap' : 'Expand minimap'}
+              data-testid="button-toggle-minimap-size"
+            >
+              {expanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            </button>
+          </span>
         </div>
-        <div className="mb-1 flex items-center justify-between px-1 font-mono text-[8px] uppercase tracking-wider text-white/50">
-          <span className="truncate">{map.currentDistrict} · {map.currentBlock}</span>
-          <span className="shrink-0">{map.riskLabel}</span>
-        </div>
-        <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="h-auto w-full" role="img">
+        {expanded ? (
+          <>
+            <div className="mb-1 flex items-center justify-between px-1 font-mono text-[8px] uppercase tracking-wider text-white/50">
+              <span className="truncate">{map.currentDistrict} · {map.currentBlock}</span>
+              <span className="shrink-0">{map.riskLabel}</span>
+            </div>
+            <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="h-auto w-full" role="img">
           <rect width={MAP_W} height={MAP_H} fill="#08111a" />
           {map.cityBlocks.map((block, index) => {
             const point = toMap(block.x, block.y);
@@ -117,18 +225,24 @@ export function Minimap({ map }: MinimapProps) {
           })}
           <circle cx={MAP_W / 2} cy={MAP_H / 2} r="4" fill="#f8fafc" stroke="#22d3ee" strokeWidth="2" />
           <path d={`M ${MAP_W / 2} 8 v 7 M ${MAP_W / 2} ${MAP_H - 8} v -7 M 8 ${MAP_H / 2} h 7 M ${MAP_W - 8} ${MAP_H / 2} h -7`} stroke="#e2e8f0" opacity=".4" />
-        </svg>
-        <div className="mt-1 flex items-center justify-between gap-2 px-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
-          <span>● you</span>
-          <span>{map.inBuilding ? `inside · ${map.buildingLabel}` : map.inDungeon ? `room ${map.dungeonRoom}/3` : map.hazardLabel}</span>
-        </div>
-        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 px-1 font-mono text-[7px] uppercase tracking-wide text-white/55">
-          <span className="text-amber-300">■ bridge</span>
-          <span className="text-rose-300">┄ river edge</span>
-          <span className="text-amber-100">□ building</span>
-          <span className="text-fuchsia-200">◆ landmark</span>
-          <span style={{ color: map.currentBandAccent }}>✦ beacon</span>
-        </div>
+            </svg>
+            <div className="mt-1 flex items-center justify-between gap-2 px-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
+              <span>● you</span>
+              <span>{map.inBuilding ? `inside · ${map.buildingLabel}` : map.inDungeon ? `room ${map.dungeonRoom}/3` : map.hazardLabel}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 px-1 font-mono text-[7px] uppercase tracking-wide text-white/55">
+              <span className="text-amber-300">■ bridge</span>
+              <span className="text-rose-300">┄ river edge</span>
+              <span className="text-amber-100">□ building</span>
+              <span className="text-fuchsia-200">◆ landmark</span>
+              <span style={{ color: map.currentBandAccent }}>✦ beacon</span>
+            </div>
+          </>
+        ) : (
+          <p className="px-1 pb-1 font-mono text-[8px] uppercase tracking-wider text-white/45">
+            Map minimized · drag header to move
+          </p>
+        )}
       </div>
     </div>
   );

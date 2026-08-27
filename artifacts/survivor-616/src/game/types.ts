@@ -1053,6 +1053,14 @@ export interface MetaState {
   devModeAllUnlocks: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
+  /** When true, level-up choices pause the run; when false, the run keeps moving. */
+  levelUpPausesEnabled: boolean;
+  /** Whether the endless minimap is rendered during a run. */
+  minimapVisible: boolean;
+  /** Whether the endless minimap shows its full map details. */
+  minimapExpanded: boolean;
+  /** Normalized top-left position of the endless minimap within the viewport. */
+  minimapPosition: { x: number; y: number };
   selectedCharacterId: string;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];

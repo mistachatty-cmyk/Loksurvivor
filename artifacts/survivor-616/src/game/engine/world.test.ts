@@ -1108,6 +1108,36 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
   }
 });
 
+test('run-control preferences normalize safely and reducer updates persistable settings', () => {
+  const normalized = normalizeMeta({
+    version: 8,
+    levelUpPausesEnabled: false,
+    minimapVisible: false,
+    minimapExpanded: false,
+    minimapPosition: { x: 4, y: -2 },
+  });
+  assert.equal(normalized.levelUpPausesEnabled, false);
+  assert.equal(normalized.minimapVisible, false);
+  assert.equal(normalized.minimapExpanded, false);
+  assert.deepEqual(normalized.minimapPosition, { x: 1, y: 0 });
+
+  const store = { meta: createInitialMeta(), lastRun: null };
+  const updated = reducer(
+    reducer(
+      reducer(
+        reducer(store, { type: 'setLevelUpPauses', enabled: false }),
+        { type: 'setMinimapVisible', enabled: false },
+      ),
+      { type: 'setMinimapExpanded', enabled: false },
+    ),
+    { type: 'setMinimapPosition', position: { x: 0.4, y: 0.6 } },
+  );
+  assert.equal(updated.meta.levelUpPausesEnabled, false);
+  assert.equal(updated.meta.minimapVisible, false);
+  assert.equal(updated.meta.minimapExpanded, false);
+  assert.deepEqual(updated.meta.minimapPosition, { x: 0.4, y: 0.6 });
+});
+
 test('relic knowledge normalizes safely and clears unlock the matching recipe forever', () => {
   const normalized = normalizeMeta({
     version: 6,

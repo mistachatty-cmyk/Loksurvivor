@@ -110,6 +110,10 @@ export function createInitialMeta(): MetaState {
     version: META_VERSION,
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
+    levelUpPausesEnabled: true,
+    minimapVisible: true,
+    minimapExpanded: true,
+    minimapPosition: { x: 0.82, y: 0.18 },
     selectedCharacterId: 'shade',
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
@@ -169,6 +173,16 @@ function counter(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : fallback;
+}
+
+function normalizedPosition(value: unknown, fallback: { x: number; y: number }): { x: number; y: number } {
+  if (!isRecord(value)) return { ...fallback };
+  const x = typeof value.x === 'number' && Number.isFinite(value.x) ? value.x : fallback.x;
+  const y = typeof value.y === 'number' && Number.isFinite(value.y) ? value.y : fallback.y;
+  return {
+    x: Math.min(1, Math.max(0, x)),
+    y: Math.min(1, Math.max(0, y)),
+  };
 }
 
 function normalizeVendorPurchases(value: unknown): Record<string, number> {
@@ -530,6 +544,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     version: META_VERSION,
     devModeAllUnlocks: Boolean(import.meta.env?.DEV) && parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
+    levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
+    minimapVisible: parsed.minimapVisible !== false,
+    minimapExpanded: parsed.minimapExpanded !== false,
+    minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -764,6 +782,10 @@ type Action =
   | { type: 'buyVendorItem'; id: string }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
+  | { type: 'setLevelUpPauses'; enabled: boolean }
+  | { type: 'setMinimapVisible'; enabled: boolean }
+  | { type: 'setMinimapExpanded'; enabled: boolean }
+  | { type: 'setMinimapPosition'; position: { x: number; y: number } }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
   | { type: 'tickRecovery'; now: number }
@@ -838,6 +860,33 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, physicsObjectClicksEnabled: action.enabled },
+      };
+
+    case 'setLevelUpPauses':
+      return {
+        ...state,
+        meta: { ...state.meta, levelUpPausesEnabled: action.enabled },
+      };
+
+    case 'setMinimapVisible':
+      return {
+        ...state,
+        meta: { ...state.meta, minimapVisible: action.enabled },
+      };
+
+    case 'setMinimapExpanded':
+      return {
+        ...state,
+        meta: { ...state.meta, minimapExpanded: action.enabled },
+      };
+
+    case 'setMinimapPosition':
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          minimapPosition: normalizedPosition(action.position, state.meta.minimapPosition),
+        },
       };
 
     case 'tickRecovery':
@@ -1028,6 +1077,10 @@ export interface MetaContextValue {
   buyVendorItem: (id: string) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
+  setLevelUpPauses: (enabled: boolean) => void;
+  setMinimapVisible: (enabled: boolean) => void;
+  setMinimapExpanded: (enabled: boolean) => void;
+  setMinimapPosition: (position: { x: number; y: number }) => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
   tickRecovery: () => void;
@@ -1060,6 +1113,22 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setPhysicsObjectClicks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setPhysicsObjectClicks', enabled }),
+    [],
+  );
+  const setLevelUpPauses = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setLevelUpPauses', enabled }),
+    [],
+  );
+  const setMinimapVisible = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setMinimapVisible', enabled }),
+    [],
+  );
+  const setMinimapExpanded = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setMinimapExpanded', enabled }),
+    [],
+  );
+  const setMinimapPosition = useCallback(
+    (position: { x: number; y: number }) => dispatch({ type: 'setMinimapPosition', position }),
     [],
   );
   const startRecovery = useCallback((characterId: string, locationId?: string) => dispatch({ type: 'startRecovery', characterId, locationId }), []);
@@ -1104,6 +1173,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyVendorItem,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
+      setLevelUpPauses,
+      setMinimapVisible,
+      setMinimapExpanded,
+      setMinimapPosition,
       resetProgress,
       startRecovery,
       stopRecovery,
@@ -1121,6 +1194,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyVendorItem,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
+    setLevelUpPauses,
+    setMinimapVisible,
+    setMinimapExpanded,
+    setMinimapPosition,
     resetProgress,
     startRecovery,
     stopRecovery,

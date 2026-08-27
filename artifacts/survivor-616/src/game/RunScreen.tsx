@@ -27,6 +27,7 @@ import { renderWorld } from '@/game/render/draw';
 import { effectiveStats, rewardCredMultiplier, startingWeaponLevel, useMeta } from '@/game/state/metaStore';
 import type { HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { Minimap } from '@/ui/Minimap';
+import { SettingsPanel } from '@/ui/SettingsPanel';
 
 export interface RunScreenProps {
   areaId: string;
@@ -89,7 +90,11 @@ export function RunScreen({
   onAbort,
   onFinish,
 }: RunScreenProps) {
-  const { meta } = useMeta();
+  const {
+    meta,
+    setMinimapExpanded,
+    setMinimapPosition,
+  } = useMeta();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const phaseRef = useRef<RunPhase>('countdown');
@@ -113,7 +118,11 @@ export function RunScreen({
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
+  const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const reelTimerRef = useRef<number | null>(null);
+  const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
+  const levelUpPausesRef = useRef(meta.levelUpPausesEnabled);
+  levelUpPausesRef.current = meta.levelUpPausesEnabled;
 
   const area = getArea(areaId);
   const character = getCharacter(characterId);
@@ -365,7 +374,7 @@ export function RunScreen({
           accumulator -= FIXED_STEP;
           stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate });
           ultimate = false;
-          if (world.pendingLevelUps > 0 || world.outcome !== 'running') break;
+          if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
         }
 
         // Detect dungeon room transitions and briefly flash the screen.
@@ -383,8 +392,14 @@ export function RunScreen({
         }
 
         if (world.pendingLevelUps > 0) {
-          setChoices(rollUpgradeChoices(world));
-          setPhaseBoth('levelup');
+          if (upgradeChoicesRef.current.length === 0) {
+            const nextChoices = rollUpgradeChoices(world);
+            upgradeChoicesRef.current = nextChoices;
+            setChoices(nextChoices);
+          }
+          if (levelUpPausesRef.current) {
+            setPhaseBoth('levelup');
+          }
         } else if (world.outcome !== 'running') {
           setPhaseBoth('over');
         }
@@ -427,8 +442,11 @@ export function RunScreen({
       if (!world) return;
       applyUpgrade(world, upgrade);
       if (world.pendingLevelUps > 0) {
-        setChoices(rollUpgradeChoices(world));
+        const nextChoices = rollUpgradeChoices(world);
+        upgradeChoicesRef.current = nextChoices;
+        setChoices(nextChoices);
       } else {
+        upgradeChoicesRef.current = [];
         setChoices([]);
         setPhaseBoth(world.outcome === 'running' ? 'playing' : 'over');
       }
@@ -512,7 +530,7 @@ export function RunScreen({
       />
 
       {/* Top HUD */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 p-3 space-y-2">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 space-y-2 p-3">
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="h-3 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
@@ -766,7 +784,15 @@ export function RunScreen({
         ) : null}
       </div>
 
-      {area.endless && hud?.endless ? <Minimap map={hud.endless} /> : null}
+      {area.endless && hud?.endless && meta.minimapVisible ? (
+        <Minimap
+          map={hud.endless}
+          expanded={meta.minimapExpanded}
+          position={meta.minimapPosition}
+          onPositionChange={setMinimapPosition}
+          onToggleExpanded={() => setMinimapExpanded(!meta.minimapExpanded)}
+        />
+      ) : null}
 
       {/* Ultimate */}
       <button
@@ -831,7 +857,7 @@ export function RunScreen({
       ) : null}
 
       {/* Level up */}
-      {phase === 'levelup' ? (
+      {phase === 'levelup' && meta.levelUpPausesEnabled ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-5" data-testid="overlay-levelup">
           <div className="w-full max-w-md space-y-3">
             <p className="text-center font-mono text-xs uppercase tracking-[0.4em] text-white/60">Level {hud?.level}</p>
@@ -865,8 +891,50 @@ export function RunScreen({
         </div>
       ) : null}
 
+      {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 ? (
+        <div
+          className="pointer-events-none absolute bottom-4 left-4 z-40 w-[min(88vw,330px)]"
+          data-testid="panel-continuous-levelup"
+        >
+          <div className="pointer-events-auto space-y-2 border border-primary/40 bg-black/85 p-3 shadow-[0_0_24px_rgba(251,191,36,.16)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">Level {hud?.level}</p>
+                <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
+              </div>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-white/45">Run continues</span>
+            </div>
+            {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
+              <button
+                type="button"
+                onClick={claimRumorHeal}
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-3 text-left transition hover:bg-[#86efac]/20"
+                data-testid="button-rumor-heal-continuous"
+              >
+                <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
+                <p className="mt-1 font-mono text-[10px] text-white/70">Use once alongside your upgrade.</p>
+              </button>
+            ) : null}
+            <div className="space-y-2">
+              {choices.map((upgrade) => (
+                <button
+                  key={upgrade.id}
+                  type="button"
+                  onClick={() => pickUpgrade(upgrade)}
+                  className="w-full rounded-sm border border-white/20 bg-white/5 p-3 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                  data-testid={`button-continuous-upgrade-${upgrade.id}`}
+                >
+                  <p className="text-sm font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                  <p className="mt-1 font-mono text-[10px] text-white/70">{upgrade.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Pause */}
-      {phase === 'paused' ? (
+      {phase === 'paused' && !runSettingsOpen ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6" data-testid="overlay-paused">
           <div className="w-full max-w-xs space-y-3 text-center">
             <h2 className="text-2xl font-black uppercase text-white">Paused</h2>
@@ -880,6 +948,14 @@ export function RunScreen({
               data-testid="button-resume"
             >
               Resume
+            </button>
+            <button
+              type="button"
+              onClick={() => setRunSettingsOpen(true)}
+              className="w-full rounded-sm border border-cyan-200/40 bg-cyan-300/10 px-4 py-3 font-bold uppercase tracking-widest text-cyan-100"
+              data-testid="button-pause-settings"
+            >
+              Settings
             </button>
             {area.endless && (
               <button
@@ -900,6 +976,12 @@ export function RunScreen({
               Abandon run
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {phase === 'paused' && runSettingsOpen ? (
+        <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-run-settings">
+          <SettingsPanel onBack={() => setRunSettingsOpen(false)} />
         </div>
       ) : null}
 
