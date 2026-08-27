@@ -30,6 +30,8 @@ import { SettingsPanel } from '@/ui/SettingsPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
+import { customMapToArea } from '@/game/data/customMaps';
+import { MapBuilder } from '@/ui/MapBuilder';
 
 const queryClient = new QueryClient();
 
@@ -45,6 +47,7 @@ type Screen =
   | { name: 'vendor' }
   | { name: 'workshop' }
   | { name: 'settings' }
+  | { name: 'map-editor' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
   | { name: 'summary'; result: RunResult };
 
@@ -153,7 +156,10 @@ function Game() {
       );
 
     case 'hub':
-      return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} />;
+      return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} onOpenMapEditor={() => setScreen({ name: 'map-editor' })} />;
+
+    case 'map-editor':
+      return <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />;
 
     case 'roster':
       return (
@@ -189,27 +195,36 @@ function Game() {
       return <SettingsPanel onBack={goHub} />;
 
     case 'run':
-      return (
-        <RunScreen
-          key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
-          areaId={screen.areaId}
-          characterId={selectedCharacter.id}
-          challengeIds={screen.challengeIds}
-          episodeId={screen.episodeId}
-          startingWeaponLevel={startingWeaponLevel(meta)}
-          utilityRewardMultiplier={rewardCredMultiplier(meta)}
-          physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
-          onAbort={goHub}
-          onFinish={handleFinish}
-        />
-      );
+      {
+        const customMap = meta.customMaps.find((map) => map.id === screen.areaId);
+        if (screen.areaId.startsWith('custom-') && !customMap) {
+          return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
+        }
+        return (
+          <RunScreen
+            key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
+            areaId={screen.areaId}
+            areaOverride={customMap ? customMapToArea(customMap) : undefined}
+            characterId={selectedCharacter.id}
+            challengeIds={screen.challengeIds}
+            episodeId={screen.episodeId}
+            startingWeaponLevel={startingWeaponLevel(meta)}
+            utilityRewardMultiplier={rewardCredMultiplier(meta)}
+            physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
+            onAbort={goHub}
+            onFinish={handleFinish}
+          />
+        );
+      }
 
     case 'summary': {
       // If the run unlocked the next district, retry should still work.
-      const canRetry = unlockedAreas.some((a) => a.id === screen.result.areaId);
+      const canRetry = unlockedAreas.some((a) => a.id === screen.result.areaId) ||
+        meta.customMaps.some((map) => map.id === screen.result.areaId);
       return (
         <RunSummary
           result={screen.result}
+          areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
           onReturnToHub={goHub}
           onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
           onRetry={() =>

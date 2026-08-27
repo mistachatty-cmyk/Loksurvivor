@@ -8,7 +8,7 @@ import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
-import type { LokPetRunDiscovery, RunResult } from '@/game/types';
+import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
@@ -19,6 +19,7 @@ export interface RunSummaryProps {
   onReturnToHub: () => void;
   onRetry: () => void;
   onOpenArchive?: (variantId: string) => void;
+  areaOverride?: AreaDef;
 }
 
 function discoveryHeadline(discovery: LokPetRunDiscovery): string {
@@ -35,8 +36,8 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive }: RunSummaryProps) {
-  const area = getArea(result.areaId);
+export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, areaOverride }: RunSummaryProps) {
+  const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;

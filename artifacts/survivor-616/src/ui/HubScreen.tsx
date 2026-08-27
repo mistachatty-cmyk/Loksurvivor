@@ -12,7 +12,7 @@ import { RigPortrait } from './RigPortrait';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer } from 'lucide-react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
@@ -22,6 +22,7 @@ export interface HubScreenProps {
   roomId: string;
   onChangeRoom: (roomId: string) => void;
   onOpen: (panel: HubPanel) => void;
+  onOpenMapEditor: () => void;
 }
 
 const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string; description: string }> = {
@@ -62,7 +63,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
   const { unlockedRooms, rescuedAllies, selectedCharacter, meta, setDevModeAllUnlocks } = useMeta();
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
@@ -202,7 +203,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
             <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
             <p className="text-sm text-muted-foreground">{activeRoom.description}</p>
           </div>
-           <div className="mt-3 grid gap-3 border border-primary/30 bg-black/35 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center" data-testid="hideout-scene">
+            <div className="mt-3 grid gap-3 border border-primary/30 bg-black/35 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center" data-testid="hideout-scene">
              <div className="flex items-center gap-3">
                <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
                  {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
@@ -213,13 +214,30 @@ export function HubScreen({ roomId, onChangeRoom, onOpen }: HubScreenProps) {
                </div>
              </div>
              <div className="hidden h-px bg-border sm:block" />
-             <div className="flex items-center gap-2 text-right">
-               <Building2 className="hidden h-4 w-4 text-primary sm:block" />
-               <div>
-                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
-                 <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
-               </div>
-             </div>
+              <div className="flex flex-col gap-3 text-right sm:items-end">
+                <div className="flex items-center gap-2">
+                  <Building2 className="hidden h-4 w-4 text-primary sm:block" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
+                    <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
+                  </div>
+                </div>
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenMapEditor}
+                    data-testid="button-hideout-computer"
+                    className="group flex items-center gap-3 border border-cyan-200/35 bg-cyan-950/30 px-3 py-2 text-left transition hover:border-cyan-200/80 hover:bg-cyan-950/60"
+                  >
+                    <MonitorDot className="h-5 w-5 text-cyan-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">Sanctum computer</span>
+                      <span className="block text-[10px] text-cyan-100/60">Open map builder</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-cyan-200/70" />
+                  </button>
+                )}
+              </div>
            </div>
         </header>
 

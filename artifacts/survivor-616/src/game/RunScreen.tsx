@@ -25,7 +25,7 @@ import {
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { renderWorld } from '@/game/render/draw';
 import { effectiveStats, rewardCredMultiplier, startingWeaponLevel, useMeta } from '@/game/state/metaStore';
-import type { HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 
@@ -37,6 +37,7 @@ export interface RunScreenProps {
   utilityRewardMultiplier?: number;
   physicsObjectClicksEnabled?: boolean;
   episodeId?: string;
+  areaOverride?: AreaDef;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -87,6 +88,7 @@ export function RunScreen({
   utilityRewardMultiplier: utilityRewardMultiplierProp,
   physicsObjectClicksEnabled = true,
   episodeId,
+  areaOverride,
   onAbort,
   onFinish,
 }: RunScreenProps) {
@@ -124,7 +126,7 @@ export function RunScreen({
   const levelUpPausesRef = useRef(meta.levelUpPausesEnabled);
   levelUpPausesRef.current = meta.levelUpPausesEnabled;
 
-  const area = getArea(areaId);
+  const area = areaOverride ?? getArea(areaId);
   const character = getCharacter(characterId);
   const firstNightChapter = getFirstNightChapter(areaId);
   const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;

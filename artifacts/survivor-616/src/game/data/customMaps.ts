@@ -265,6 +265,18 @@ export function normalizeCustomMaps(value: unknown): CustomMap[] {
   return maps.sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
+export function customMapValidationIssues(map: CustomMap): string[] {
+  const issues: string[] = [];
+  if (!map.name.trim()) issues.push('Route needs a name.');
+  if (!map.placements.some((placement) => placement.category === 'enemy' || placement.category === 'encounter')) {
+    issues.push('Route needs at least one enemy or encounter.');
+  }
+  if (map.placements.length > MAX_CUSTOM_MAP_PLACEMENTS) {
+    issues.push(`Route exceeds the ${MAX_CUSTOM_MAP_PLACEMENTS}-placement limit.`);
+  }
+  return issues;
+}
+
 function obstacleFromPlacement(placement: CustomMapPlacement, asset: CustomMapAsset): ObstacleDef | null {
   if (placement.category === 'hazard') {
     return {

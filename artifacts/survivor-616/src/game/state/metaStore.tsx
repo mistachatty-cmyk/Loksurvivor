@@ -934,6 +934,48 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'createCustomMap': {
+      if (state.meta.customMaps.length >= MAX_CUSTOM_MAPS) return state;
+      const id = `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      const map = normalizeCustomMap({ id, name: `Night route ${state.meta.customMaps.length + 1}` }, id);
+      return map
+        ? { ...state, meta: { ...state.meta, customMaps: [map, ...state.meta.customMaps] } }
+        : state;
+    }
+
+    case 'saveCustomMap': {
+      const map = normalizeCustomMap({ ...action.map, updatedAt: Date.now() }, action.map.id);
+      if (!map) return state;
+      const index = state.meta.customMaps.findIndex((candidate) => candidate.id === map.id);
+      if (index < 0 && state.meta.customMaps.length >= MAX_CUSTOM_MAPS) return state;
+      const customMaps = index < 0
+        ? [map, ...state.meta.customMaps]
+        : state.meta.customMaps.map((candidate, candidateIndex) => candidateIndex === index ? map : candidate);
+      return { ...state, meta: { ...state.meta, customMaps } };
+    }
+
+    case 'duplicateCustomMap': {
+      if (state.meta.customMaps.length >= MAX_CUSTOM_MAPS) return state;
+      const source = state.meta.customMaps.find((map) => map.id === action.id);
+      if (!source) return state;
+      const id = `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      const copy = normalizeCustomMap({
+        ...source,
+        id,
+        name: `${source.name} copy`,
+        placements: source.placements.map((placement) => ({ ...placement, id: `${placement.id}-copy` })),
+      }, id);
+      return copy
+        ? { ...state, meta: { ...state.meta, customMaps: [copy, ...state.meta.customMaps] } }
+        : state;
+    }
+
+    case 'deleteCustomMap':
+      return {
+        ...state,
+        meta: { ...state.meta, customMaps: state.meta.customMaps.filter((map) => map.id !== action.id) },
+      };
+
     case 'completeRun': {
       const result = action.result;
       const prev = state.meta;
@@ -1094,6 +1136,10 @@ export interface MetaContextValue {
   stopRecovery: () => void;
   tickRecovery: () => void;
   upgradeFacility: () => void;
+  createCustomMap: () => void;
+  saveCustomMap: (map: CustomMap) => void;
+  duplicateCustomMap: (id: string) => void;
+  deleteCustomMap: (id: string) => void;
   resetProgress: () => void;
 }
 
@@ -1144,6 +1190,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const stopRecovery = useCallback(() => dispatch({ type: 'stopRecovery' }), []);
   const tickRecovery = useCallback(() => dispatch({ type: 'tickRecovery', now: Date.now() }), []);
   const upgradeFacility = useCallback(() => dispatch({ type: 'upgradeFacility' }), []);
+  const createCustomMap = useCallback(() => dispatch({ type: 'createCustomMap' }), []);
+  const saveCustomMap = useCallback((map: CustomMap) => dispatch({ type: 'saveCustomMap', map }), []);
+  const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
+  const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -1191,6 +1241,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       stopRecovery,
       tickRecovery,
       upgradeFacility,
+      createCustomMap,
+      saveCustomMap,
+      duplicateCustomMap,
+      deleteCustomMap,
     };
   }, [
     state,
@@ -1212,6 +1266,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     stopRecovery,
     tickRecovery,
     upgradeFacility,
+    createCustomMap,
+    saveCustomMap,
+    duplicateCustomMap,
+    deleteCustomMap,
   ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;

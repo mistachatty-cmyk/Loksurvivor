@@ -3,12 +3,13 @@
  * and props stable.
  */
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { customMapToArea, customMapValidationIssues } from '@/game/data/customMaps';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { ScreenLayout } from './ScreenLayout';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion } from 'framer-motion';
-import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull } from 'lucide-react';
+import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy } from 'lucide-react';
 import { useState } from 'react';
 
 export interface AreaSelectProps {
@@ -25,6 +26,7 @@ const THREAT_COLORS = {
 
 export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const { unlockedAreas, lockedAreas, meta, selectedCharacter } = useMeta();
+  const customMaps = meta.customMaps;
   const challenges = availableChallengeContracts(meta);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
 
@@ -90,6 +92,45 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {customMaps.map((map, i) => {
+          const area = customMapToArea(map);
+          const mapIssues = customMapValidationIssues(map);
+          const launchable = mapIssues.length === 0;
+          return (
+            <motion.button
+              key={map.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: i * 0.05 }}
+              type="button"
+              onClick={() => launchable && onLaunch(map.id, selectedChallengeIds)}
+              disabled={!launchable}
+              className="group relative flex h-64 w-full flex-col overflow-hidden border border-cyan-200/30 bg-card text-left transition-colors hover:border-cyan-200"
+              data-testid={`button-custom-map-${map.id}`}
+            >
+              <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 z-10 bg-[#071116]/80 transition-colors group-hover:bg-[#071116]/60" />
+                <div className="absolute inset-0 z-10 bg-gradient-to-t from-background via-background/90 to-background/20" />
+                <img src={`${import.meta.env.BASE_URL}${area.backdrop}`} alt="" className="h-full w-full object-cover opacity-45 grayscale mix-blend-luminosity transition-transform duration-700 group-hover:scale-105" />
+              </div>
+              <div className="relative z-20 flex h-full flex-col p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-200"><PencilRuler className="h-3 w-3" /> Custom route</p>
+                    <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">{map.name}</h2>
+                  </div>
+                  <Copy className="h-4 w-4 text-cyan-200/70" />
+                </div>
+                <p className="mt-auto line-clamp-2 text-xs text-muted-foreground">{area.description}</p>
+                <div className="mt-4 flex items-center gap-2">
+                  <span className="border border-cyan-200/30 bg-cyan-200/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">{map.placements.length} objects</span>
+                  <span className="border border-border bg-black/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-white">{map.durationSec}s</span>
+                  <span className={`ml-auto font-mono text-[10px] font-bold uppercase tracking-widest ${launchable ? 'text-cyan-100' : 'text-amber-200'}`}>{launchable ? map.threat : 'needs enemy'}</span>
+                </div>
+              </div>
+            </motion.button>
+          );
+        })}
         {unlockedAreas.map((area, i) => {
           const isCleared = meta.clearedAreaIds.includes(area.id);
           const threatColor = THREAT_COLORS[area.threat];
