@@ -111,3 +111,54 @@ test.describe('hideout custom map builder', () => {
     await expect(page.getByTestId('screen-run')).toBeVisible();
   });
 });
+
+
+test.describe('mobile hideout regression', () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1',
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'survivor616.meta.v1',
+        JSON.stringify({
+          ...JSON.parse(localStorage.getItem('survivor616.meta.v1') ?? '{}'),
+          version: 8,
+          onboarded: true,
+          discoveryIds: ['alley-hatch', 'lantern-shard'],
+        }),
+      );
+    });
+  });
+
+  test('loads, switches rooms, and keeps computer access on the main floor', async ({ page }) => {
+    const runtimeErrors: string[] = [];
+    page.on('pageerror', (error) => runtimeErrors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error') runtimeErrors.push(message.text());
+    });
+
+    await page.goto('/?screen=hub');
+    await expect(page.getByTestId('hideout-scene')).toBeVisible();
+    await expect(page.getByTestId('button-hideout-computer')).toBeVisible();
+
+    await page.getByTestId('button-room-rooftop-perch').click();
+    await expect(page.getByTestId('hideout-scene')).toContainText('River fog');
+    await expect(page.getByTestId('button-hideout-computer')).toHaveCount(0);
+
+    await page.getByTestId('button-room-the-cellar').click();
+    await expect(page.getByTestId('hideout-scene')).toContainText('Glass heat');
+    await expect(page.getByTestId('button-hideout-computer')).toHaveCount(0);
+
+    await page.getByTestId('button-room-main-floor').click();
+    await expect(page.getByTestId('button-hideout-computer')).toBeVisible();
+    await page.getByTestId('button-hideout-computer').click();
+    await expect(page.getByText('616 / map builder')).toBeVisible();
+    expect(runtimeErrors).toEqual([]);
+  });
+});

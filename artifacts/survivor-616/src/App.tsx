@@ -262,11 +262,11 @@ function Providers({ children }: { children: ReactNode }) {
 
 function App() {
   return (
-    <Providers>
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <Providers>
         <Game />
-      </ErrorBoundary>
-    </Providers>
+      </Providers>
+    </ErrorBoundary>
   );
 }
 
