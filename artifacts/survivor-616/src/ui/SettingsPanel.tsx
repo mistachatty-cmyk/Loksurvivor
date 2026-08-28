@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Activity, AlertTriangle, Compass, LayoutDashboard, Map, Maximize2, MousePointer2, PauseCircle, Plug, Settings2, Smartphone, FlaskConical } from 'lucide-react';
 
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
+import { TiltReadout } from './TiltReadout';
 import { useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
 
@@ -258,6 +259,14 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <Smartphone className="h-4 w-4 text-emerald-200" />
                 <span>However you are holding the device when a run starts becomes the neutral position.</span>
               </p>
+
+              {/* Tilt cannot be verified from a desk, so the numbers go on
+                  screen and the player checks it on their own device. */}
+              <TiltReadout
+                enabled={meta.gyroEnabled}
+                sensitivity={meta.gyroSensitivity}
+                invertY={meta.gyroInvertY}
+              />
             </div>
           </div>
         </section>
