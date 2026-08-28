@@ -3,7 +3,7 @@
   "framework": "vite",
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm --filter @workspace/survivor-616 run build",
-  "outputDirectory": "artifacts/survivor-616/dist/public",
+  "outputDirectory": "./artifacts/survivor-616/dist/public",
   "rewrites": [
     {
       "source": "/(.*)",
