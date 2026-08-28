@@ -9,5 +9,5 @@
 - [District setpiece contract](district-setpieces.md) — landmark incursions are optional seeded interruptions with shared simulation, bounded one-time rewards, and normal run recovery.
 - [Ambiance contract](sky-ambiance.md) — clouds/shadows, birds, fireflies, litter, steam and lightning are pure render-layer decoration, while civilian/cat actors are simulated but combat-inert on their own rng stream; ground-level effects must clip to the arena bounds or `drawArenaEdges` silently paints over them.
 - [Music reactivity contract](music-reactivity.md) — one beat bus arbitrates detected vs authored tempo; reactions are records, and visual ones never touch the simulation.
-- [Tilt steering contract](tilt-steering.md) — orientation-aware gravity-vector mapping; frame-synchronized gyro curve.
+- [Tilt steering](tilt-steering.md) — map tilt through the gravity vector rotated by screen angle, never raw Euler axes; the two silent failures are a non-secure origin and ungranted permission.
 - [Studio engine contract](studio-engine.md) — one `AudioContext` per app, one music path from studio through soundtrack to game; plain-data project model reconciled into a Tone graph whose inserts are never hard-wired, so plugins drop in; plugins stay opt-in because they run off-device code.
