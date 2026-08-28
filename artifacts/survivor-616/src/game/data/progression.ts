@@ -1,4 +1,3 @@
-import { humanoidRig } from '@/game/sprites/rigs';
 import type {
   AllyDef,
   DiscoveryDef,
@@ -28,7 +27,6 @@ export const ALLIES: AllyDef[] = [
       ink: '#1a1208', body: '#d97706', bodyDark: '#78350f', accent: '#fbbf24',
       accentBright: '#fef3c7', skin: '#b45309', glow: '#fbbf24',
     },
-    rig: humanoidRig({ height: 18, width: 10, cap: true }),
   },
   {
     id: 'deacon',
@@ -43,7 +41,6 @@ export const ALLIES: AllyDef[] = [
       ink: '#0d1117', body: '#475569', bodyDark: '#1e293b', accent: '#94a3b8',
       accentBright: '#e2e8f0', skin: '#64748b', glow: '#cbd5e1',
     },
-    rig: humanoidRig({ height: 21, width: 12, bulk: true, hood: true }),
   },
   {
     id: 'nyx',
@@ -58,7 +55,6 @@ export const ALLIES: AllyDef[] = [
       ink: '#1b0a1a', body: '#db2777', bodyDark: '#831843', accent: '#f9a8d4',
       accentBright: '#fce7f3', skin: '#9d174d', glow: '#f472b6',
     },
-    rig: humanoidRig({ height: 17, width: 9, hunched: true }),
   },
   {
     id: 'sable',
@@ -73,7 +69,6 @@ export const ALLIES: AllyDef[] = [
       ink: '#0a1410', body: '#0f766e', bodyDark: '#134e4a', accent: '#5eead4',
       accentBright: '#ccfbf1', skin: '#0d9488', glow: '#2dd4bf',
     },
-    rig: humanoidRig({ height: 19, width: 10, puffs: true }),
   },
   {
     id: 'mamajo',
@@ -88,7 +83,6 @@ export const ALLIES: AllyDef[] = [
       ink: '#1a0f0a', body: '#b91c1c', bodyDark: '#7f1d1d', accent: '#fca5a5',
       accentBright: '#fee2e2', skin: '#92400e', glow: '#f87171',
     },
-    rig: humanoidRig({ height: 18, width: 12, seated: true }),
   },
 ];
 
@@ -205,6 +199,22 @@ export const UPGRADES: UpgradeDef[] = [
     weight: 10,
     maxStacks: 6,
     effects: [{ kind: 'stat', stat: 'power', mult: 1.14 }],
+  },
+  {
+    id: 'lucky-strike',
+    name: 'Lucky Strike',
+    description: '+8% critical hit chance. Crits deal double damage.',
+    weight: 8,
+    maxStacks: 6,
+    effects: [{ kind: 'stat', stat: 'crit', add: 0.08 }],
+  },
+  {
+    id: 'vampiric',
+    name: 'Vampiric',
+    description: 'Heal for 6% of all damage dealt.',
+    weight: 7,
+    maxStacks: 5,
+    effects: [{ kind: 'stat', stat: 'lifesteal', add: 0.06 }],
   },
   {
     id: 'track-shoes',

@@ -479,6 +479,10 @@ export interface BaseStats {
   magnet: number;
   /** Contact damage resistance, 0..0.6 */
   armor: number;
+  /** Chance (0..1) that a hit is a critical, dealing 2x damage. */
+  crit: number;
+  /** Fraction (0..1) of damage dealt returned to the player as healing. */
+  lifesteal: number;
 }
 
 export type UnlockRule =
@@ -963,6 +967,20 @@ export interface AllyDef {
   /** Room activities this ally enjoys choosing between autonomously. */
   preferredActivityIds: CrewActivityId[];
   palette: SpritePalette;
+}
+
+/** Non-combat background life (civilians, cats) -- cosmetic, never touched by collision/damage code. */
+export interface AmbientKindDef {
+  id: string;
+  name: string;
+  palette: SpritePalette;
+  rig: SpriteRig;
+  /** World units per second, idle wander speed. */
+  speed: number;
+  /** Speed multiplier while fleeing the player. */
+  fleeSpeedMult: number;
+  /** Distance from the player at which this actor starts fleeing. */
+  fleeRadius: number;
 }
 
 export interface HubRoomDef {

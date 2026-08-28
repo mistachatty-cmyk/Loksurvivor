@@ -1666,9 +1666,14 @@ function damageEnemy(
 ) {
   if (enemy.dying) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
-  const dealt = Math.max(1, Math.round(amount));
+  const isCrit = burstDepth === 0 && w.rng() < w.stats.crit;
+  const dealt = Math.max(1, Math.round(isCrit ? amount * 2 : amount));
   enemy.hp -= dealt;
   enemy.hitFlashUntil = w.now + 90;
+
+  if (w.stats.lifesteal > 0 && burstDepth === 0) {
+    w.player.hp = clamp(w.player.hp + dealt * w.stats.lifesteal, 0, w.player.maxHp);
+  }
 
   if (impactIntensity > 0) {
     const dx = enemy.x - fromX;
@@ -1682,10 +1687,10 @@ function damageEnemy(
   w.popups.push({
     x: enemy.x + randRange(w.rng, -5, 5),
     y: enemy.y + enemy.radius + 10,
-    text: String(dealt),
-    color: '#ffe8a3',
+    text: isCrit ? `${dealt}!` : String(dealt),
+    color: isCrit ? '#ff5c5c' : '#ffe8a3',
     bornAt: w.now,
-    vy: 26,
+    vy: isCrit ? 34 : 26,
   });
   if (w.popups.length > 40) w.popups.shift();
 
