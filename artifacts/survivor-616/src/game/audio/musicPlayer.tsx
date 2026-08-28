@@ -18,6 +18,8 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { MusicAnalyser } from './analysis';
+import { beatBus } from './beatBus';
 import dontFly from '@assets/Don\'t_Fly_1787686881680.mp3?url';
 import fat from '@assets/F.A.T.$_2_1787686881680.m4a?url';
 import layback from '@assets/Layback_1787686881680.wav?url';
@@ -68,6 +70,12 @@ export interface MusicPlayerValue {
   toggleShuffle: () => void;
   cycleRepeat: () => void;
   dismissError: () => void;
+  /**
+   * The one `AudioContext` the app owns, or null before playback has unlocked
+   * it. The studio adopts this rather than creating a second context -- two
+   * contexts fight over the output device and iOS suspends one of them.
+   */
+  getAudioContext: () => AudioContext | null;
 }
 
 const MusicContext = createContext<MusicPlayerValue | null>(null);
@@ -96,7 +104,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const energyFrameRef = useRef<number | null>(null);
+  const analysisRef = useRef<MusicAnalyser | null>(null);
 
   const [tracks, setTracks] = useState<Track[]>(BUNDLED_TRACKS);
   const [currentIndex, setCurrentIndex] = useState(-1);
@@ -121,22 +129,26 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null;
 
   const stopEnergyMeter = useCallback(() => {
-    if (energyFrameRef.current !== null) cancelAnimationFrame(energyFrameRef.current);
-    energyFrameRef.current = null;
+    analysisRef.current?.stop();
     reactiveRootRef.current?.style.setProperty('--music-energy', '0');
   }, []);
 
+  /**
+   * Starts tempo/onset analysis of the playing track. The analyser owns the
+   * only animation-frame loop here and publishes to `beatBus`; the CSS variable
+   * this used to write directly is now just one consumer of that feed.
+   */
   const startEnergyMeter = useCallback(() => {
     const analyser = analyserRef.current;
-    if (!analyser || energyFrameRef.current !== null) return;
-    const values = new Uint8Array(analyser.frequencyBinCount);
-    const sample = () => {
-      analyser.getByteFrequencyData(values);
-      const average = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
-      reactiveRootRef.current?.style.setProperty('--music-energy', String(Math.min(1, average / 150)));
-      energyFrameRef.current = requestAnimationFrame(sample);
-    };
-    energyFrameRef.current = requestAnimationFrame(sample);
+    if (!analyser) return;
+    if (!analysisRef.current) {
+      analysisRef.current = new MusicAnalyser(analyser, {
+        onEnergy: (energy) => {
+          reactiveRootRef.current?.style.setProperty('--music-energy', String(energy));
+        },
+      });
+    }
+    analysisRef.current.start();
   }, []);
 
   const connectAnalyser = useCallback(() => {
@@ -148,7 +160,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContextConstructor();
         analyserRef.current = audioContextRef.current.createAnalyser();
-        analyserRef.current.fftSize = 128;
+        analyserRef.current.fftSize = 1024;
         sourceNodeRef.current = audioContextRef.current.createMediaElementSource(audio);
         sourceNodeRef.current.connect(analyserRef.current);
         analyserRef.current.connect(audioContextRef.current.destination);
@@ -189,6 +201,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       .play()
       .then(() => {
         connectAnalyser();
+        // A new track has a new tempo -- drop the old grid rather than easing
+        // toward the new one from a stale estimate.
+        analysisRef.current?.reset();
         startEnergyMeter();
         setIsPlaying(true);
         setError(null);
@@ -264,6 +279,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
       audioRef.current?.pause();
       stopEnergyMeter();
+      analysisRef.current = null;
+      beatBus.reset();
       void audioContextRef.current?.close();
     };
   }, [stopEnergyMeter]);
@@ -438,6 +455,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [],
   );
   const dismissError = useCallback(() => setError(null), []);
+  const getAudioContext = useCallback(() => audioContextRef.current, []);
 
   const value = useMemo<MusicPlayerValue>(
     () => ({
@@ -465,12 +483,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       toggleShuffle,
       cycleRepeat,
       dismissError,
+      getAudioContext,
     }),
     [
       tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
       progressSec, durationSec, error, addFiles, removeTrack, clearTracks, playTrack,
       togglePlay, next, previous, seek, setVolume, toggleMute, toggleShuffle,
-      cycleRepeat, dismissError,
+      cycleRepeat, dismissError, getAudioContext,
     ],
   );
 

@@ -1,6 +1,9 @@
+import { useCallback, useState } from 'react';
 import {
+  Activity,
   Bird,
   Check,
+  Compass,
   FlaskConical,
   LayoutDashboard,
   LayoutList,
@@ -15,6 +18,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 
+import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES } from '@/game/data/uiThemes';
 import { ScreenLayout } from './ScreenLayout';
@@ -37,8 +41,33 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     equipUiTheme,
     selectUiThemeSwatch,
     setDevModeAllUnlocks,
+    setMusicReactive,
+    setGyroEnabled,
+    setGyroSensitivity,
+    setGyroInvertY,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
+
+  const [gyroDenied, setGyroDenied] = useState(false);
+  const tiltAvailable = gyroSupported();
+
+  /**
+   * iOS only hands out orientation from inside a user gesture, so the request
+   * has to live in this click handler rather than in an effect.
+   */
+  const toggleGyro = useCallback(async () => {
+    if (meta.gyroEnabled) {
+      setGyroEnabled(false);
+      return;
+    }
+    if (gyroNeedsPermission()) {
+      const granted = await requestGyroPermission();
+      setGyroDenied(!granted);
+      if (!granted) return;
+    }
+    setGyroDenied(false);
+    setGyroEnabled(true);
+  }, [meta.gyroEnabled, setGyroEnabled]);
 
   return (
     <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
@@ -82,6 +111,130 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <span>Continuous mode keeps enemies, hazards, and movement active.</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-music-reactive-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-400/10 text-fuchsia-200">
+              <Activity className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-200">Soundtrack</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">React to the music</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    The game listens to whatever track is playing and locks onto its tempo. Enemies move on the beat,
+                    the streetlight pool breathes with the low end, and hits landed on the beat do extra damage.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMusicReactive(!meta.musicReactiveEnabled)}
+                  aria-pressed={meta.musicReactiveEnabled}
+                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.musicReactiveEnabled
+                      ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                      : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                  }`}
+                  data-testid="button-toggle-music-reactive"
+                >
+                  {meta.musicReactiveEnabled ? 'On' : 'Off'}
+                </button>
+              </div>
+              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                  <Activity className="h-4 w-4 text-fuchsia-200" />
+                  <span>Tempo is detected in your browser -- your audio files never leave the device.</span>
+                </div>
+                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                  <Settings2 className="h-4 w-4 text-fuchsia-200" />
+                  <span>Turn this off and the run plays exactly as it does in silence.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-gyro-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
+              <Compass className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Motion controls</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Steer by tilt</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    {tiltAvailable
+                      ? 'Tilt your device to move. The on-screen stick still overrides tilt whenever you touch it, so you can take back manual control at any time.'
+                      : 'This device does not report orientation, so tilt steering is unavailable here. Try it on a phone or tablet.'}
+                  </p>
+                  {gyroDenied ? (
+                    <p className="mt-2 text-sm text-amber-300" data-testid="text-gyro-denied">
+                      Motion access was declined. Allow it in your browser settings, then try again.
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void toggleGyro()}
+                  disabled={!tiltAvailable}
+                  aria-pressed={meta.gyroEnabled}
+                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    meta.gyroEnabled
+                      ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
+                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                  }`}
+                  data-testid="button-toggle-gyro"
+                >
+                  {meta.gyroEnabled ? 'On' : 'Off'}
+                </button>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Sensitivity
+                </span>
+                {([['Gentle', 0.7], ['Normal', 1], ['Twitchy', 1.5]] as const).map(([label, value]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setGyroSensitivity(value)}
+                    disabled={!meta.gyroEnabled}
+                    aria-pressed={meta.gyroSensitivity === value}
+                    className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                      meta.gyroSensitivity === value
+                        ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                    }`}
+                    data-testid={`button-gyro-sensitivity-${label.toLowerCase()}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setGyroInvertY(!meta.gyroInvertY)}
+                  disabled={!meta.gyroEnabled}
+                  aria-pressed={meta.gyroInvertY}
+                  className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                    meta.gyroInvertY
+                      ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
+                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                  }`}
+                  data-testid="button-toggle-gyro-invert"
+                >
+                  {meta.gyroInvertY ? 'Inverted Y' : 'Normal Y'}
+                </button>
+              </div>
+              <p className="mt-4 flex items-center gap-2 border border-border/70 bg-background/50 p-3 text-xs text-muted-foreground">
+                <Smartphone className="h-4 w-4 text-emerald-200" />
+                <span>However you are holding the device when a run starts becomes the neutral position.</span>
+              </p>
             </div>
           </div>
         </section>

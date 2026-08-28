@@ -17,6 +17,7 @@ import type { AreaSky, ObstacleDef } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
 
 import { drawRig, drawShadow } from './sprite';
+import { reactionMultiplier } from '@/game/data/reactivity';
 import { clamp } from '@/game/engine/math';
 
 /** World units of sprite height per rig pixel. */
@@ -1058,8 +1059,24 @@ function groundAccent(w: World): string {
 }
 
 /** A streetlight pool that keeps the middle of the fight readable. */
+/**
+ * Visual-only music reaction. The renderer owns `scale`/`glow`/`lightRadius`
+ * so a beat can never perturb the simulation -- two clients watching the same
+ * run with different tracks still see identical gameplay.
+ */
+function musicVisual(w: World, reactions: Parameters<typeof reactionMultiplier>[0], target: 'scale' | 'glow' | 'lightRadius'): number {
+  if (w.audio.source === 'none') return 1;
+  return reactionMultiplier(reactions, target, w.audio, {
+    beat: w.beatPulse,
+    downbeat: w.downbeatPulse,
+    onset: w.onsetPulse,
+  });
+}
+
 function drawLightPool(ctx: CanvasRenderingContext2D, w: World) {
-  const radius = 340;
+  // The player's pool of light breathes with the low end -- the most legible
+  // beat cue on screen, because it moves the whole frame rather than a sprite.
+  const radius = 340 * (w.audio.source === 'none' ? 1 : 1 + 0.16 * w.audio.bands.sub + 0.1 * w.beatPulse);
   const gradient = ctx.createRadialGradient(w.player.x, w.player.y, 20, w.player.x, w.player.y, radius);
   gradient.addColorStop(0, 'rgba(255,255,255,0.075)');
   gradient.addColorStop(0.55, 'rgba(255,255,255,0.03)');
@@ -2373,7 +2390,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       p.x,
       p.y + 2 + fallProgress * 12,
       p.facing,
-      scale * (1 - fallProgress * 0.72),
+      scale * (1 - fallProgress * 0.72) * musicVisual(w, w.character.react, 'scale'),
       {
         flash: w.now < p.hitFlashUntil,
         outline: true,
@@ -2468,7 +2485,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.x,
       enemy.y + 2 + fallProgress * 10,
       enemy.facing,
-      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72),
+      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
       {
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss',

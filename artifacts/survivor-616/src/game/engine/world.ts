@@ -25,6 +25,8 @@ import { getFirstNightChapter } from '@/game/data/firstNight';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
 import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
+import { SILENT_FRAME, msFromNearestBeat, type AudioFrame } from '@/game/audio/beatBus';
+import { reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -492,6 +494,22 @@ export interface World {
   camera: { x: number; y: number };
   shake: number;
 
+  /**
+   * What the music is doing this frame. Set once at the top of `stepWorld`
+   * from the value the run loop read off `beatBus`; never read the bus from
+   * inside the simulation, or catch-up substeps would each see a different
+   * frame and double-trigger beat reactions.
+   */
+  audio: AudioFrame;
+  /** 1 -> 0 envelopes retriggered on each beat / downbeat / transient. */
+  beatPulse: number;
+  downbeatPulse: number;
+  onsetPulse: number;
+  /** Last integer beat the world has already reacted to. */
+  lastBeatIndex: number;
+  /** Hits landed inside the on-beat window this run, for the summary screen. */
+  onBeatHits: number;
+
   level: number;
   xp: number;
   xpToNext: number;
@@ -708,6 +726,12 @@ export function createWorld(
     bounds: area.bounds,
     camera: { x: 0, y: 0 },
     shake: 0,
+    audio: SILENT_FRAME,
+    beatPulse: 0,
+    downbeatPulse: 0,
+    onsetPulse: 0,
+    lastBeatIndex: 0,
+    onBeatHits: 0,
     level: 1,
     xp: 0,
     xpToNext: xpForLevel(1),
@@ -1872,7 +1896,11 @@ function damageEnemy(
   if (enemy.dying) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
   const isCrit = burstDepth === 0 && w.rng() < w.stats.crit;
-  const dealt = Math.max(1, Math.round(isCrit ? amount * 2 : amount));
+  // Landing a hit on the beat is its own bonus, stacking with a rolled crit.
+  const onBeat = burstDepth === 0 && isOnBeat(w);
+  const beatBonus = onBeat ? ON_BEAT_CRIT_MULT : 1;
+  const dealt = Math.max(1, Math.round((isCrit ? amount * 2 : amount) * beatBonus));
+  if (onBeat) w.onBeatHits += 1;
   enemy.hp -= dealt;
   enemy.hitFlashUntil = w.now + 90;
 
@@ -3524,6 +3552,7 @@ function updateEnemies(w: World, dt: number) {
     enemy.facing = dirX >= 0 ? 1 : -1;
 
     let speed = enemy.speed * statusSpeedMultiplier(enemy);
+    speed *= musicMultiplier(w, enemy.def.react, 'speed');
     if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;
@@ -4773,6 +4802,71 @@ function updateEndlessSpawning(w: World, dt: number) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Music reactivity                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Below this confidence the detected grid is too shaky to drive gameplay. */
+export const BEAT_TRUST_THRESHOLD = 0.35;
+/** Half-width of the on-beat crit window, in milliseconds. */
+export const ON_BEAT_WINDOW_MS = 90;
+/** Damage multiplier granted for landing a hit on the beat. */
+export const ON_BEAT_CRIT_MULT = 1.5;
+
+/**
+ * Advances the decaying envelopes the reaction system reads. Edge-triggered
+ * sources retrigger here, once per rendered frame, so a frame that runs
+ * several fixed substeps still only fires one pulse.
+ */
+function updateAudioState(w: World, frame: AudioFrame, dt: number) {
+  w.audio = frame;
+
+  if (frame.beatIndex > w.lastBeatIndex) {
+    w.beatPulse = 1;
+    if (frame.downbeat) w.downbeatPulse = 1;
+    w.lastBeatIndex = frame.beatIndex;
+  } else if (frame.beatIndex < w.lastBeatIndex) {
+    // The source restarted (new track, transport rewind).
+    w.lastBeatIndex = frame.beatIndex;
+  }
+  if (frame.onset) w.onsetPulse = 1;
+
+  // ~200ms to fall away; fast enough to read as a hit, slow enough to see.
+  const decay = Math.exp(-dt / 0.2);
+  w.beatPulse *= decay;
+  w.downbeatPulse *= decay;
+  w.onsetPulse *= decay;
+}
+
+/** The envelope bundle the reaction helpers take. */
+function audioPulses(w: World) {
+  return { beat: w.beatPulse, downbeat: w.downbeatPulse, onset: w.onsetPulse };
+}
+
+/**
+ * Multiplier a def's `react` list applies to one target right now. Content
+ * declares the reaction; this is the only place the loop consults it.
+ */
+export function musicMultiplier(
+  w: World,
+  reactions: readonly BeatReaction[] | undefined,
+  target: ReactionTarget,
+): number {
+  if (!reactions || w.audio.source === 'none') return 1;
+  return reactionMultiplier(reactions, target, w.audio, audioPulses(w));
+}
+
+/**
+ * True when the world clock sits inside the on-beat window. Used for the crit
+ * bonus. When the tempo estimate is not trustworthy this returns false and the
+ * caller falls back to the normal crit roll, so a badly analysed track never
+ * silently penalises the player.
+ */
+export function isOnBeat(w: World): boolean {
+  if (w.audio.source === 'none' || w.audio.confidence < BEAT_TRUST_THRESHOLD) return false;
+  return msFromNearestBeat(w.audio) <= ON_BEAT_WINDOW_MS;
+}
+
+/* ------------------------------------------------------------------ */
 /* Main step                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -4780,6 +4874,11 @@ export interface StepInput {
   moveX: number;
   moveY: number;
   ultimate: boolean;
+  /**
+   * The music frame for this rendered frame. Optional so tests and any caller
+   * that does not care about audio can omit it and get silence.
+   */
+  audio?: AudioFrame;
 }
 
 export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
@@ -4788,6 +4887,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   const dt = Math.min(dtSeconds, 1 / 30);
   w.time += dt;
   w.now += dt * 1000;
+
+  updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
 
   if (
     w.firstNightChapter &&
