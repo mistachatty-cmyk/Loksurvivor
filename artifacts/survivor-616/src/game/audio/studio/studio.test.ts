@@ -14,15 +14,19 @@ import { encodeWav } from './exporter';
 import { estimateBufferBpm, clipLengthInBeats } from './importer';
 import {
   addClip,
+  addNote,
   addTrack,
   clampBpm,
   createProject,
   moveClip,
+  moveNote,
   parseProject,
   projectLengthBeats,
   removeClip,
+  removeNote,
   removeTrack,
   serializeProject,
+  setTrackInstrument,
   toggleSolo,
   trackAudible,
   updateTrack,
@@ -165,6 +169,96 @@ test('removing a clip finds it on whichever track holds it', () => {
   const clipId = project.tracks[1]!.clips[0]!.id;
   project = removeClip(project, clipId);
   assert.equal(project.tracks[1]!.clips.length, 0);
+});
+
+/* --- instrument tracks -------------------------------------------------- */
+
+test('a track becomes an instrument track and back again', () => {
+  let project = createProject();
+  const id = project.tracks[0]!.id;
+  assert.equal(project.tracks[0]!.instrumentId, undefined);
+
+  project = setTrackInstrument(project, id, 'neon-keys');
+  assert.equal(project.tracks[0]!.instrumentId, 'neon-keys');
+
+  project = setTrackInstrument(project, id, undefined);
+  assert.equal(project.tracks[0]!.instrumentId, undefined);
+});
+
+test('an instrument track round-trips with its notes', () => {
+  let project = setTrackInstrument(createProject('Beat'), createProject().tracks[0]!.id, 'block-kit');
+  project = addNote(project, project.tracks[0]!.id, {
+    pitch: 60,
+    startBeat: 2,
+    lengthBeats: 0.5,
+    velocity: 0.7,
+  });
+  const restored = parseProject(JSON.parse(serializeProject(project)) as unknown);
+  assert.deepEqual(restored.tracks, project.tracks);
+});
+
+test('notes snap to the grid and cannot start before zero', () => {
+  let project = setTrackInstrument(createProject(), createProject().tracks[0]!.id, 'neon-keys');
+  const trackId = project.tracks[0]!.id;
+  project = addNote(project, trackId, { pitch: 60, startBeat: 0, lengthBeats: 1, velocity: 0.8 });
+  const noteId = project.tracks[0]!.notes[0]!.id;
+
+  project = moveNote(project, trackId, noteId, 64, 1.31);
+  const moved = project.tracks[0]!.notes[0]!;
+  assert.equal(moved.pitch, 64);
+  assert.equal(moved.startBeat, 1.25, 'snapped to the nearest sixteenth');
+
+  project = moveNote(project, trackId, noteId, 64, -5);
+  assert.equal(project.tracks[0]!.notes[0]!.startBeat, 0);
+});
+
+test('a note is clamped to the MIDI range rather than wrapping', () => {
+  let project = setTrackInstrument(createProject(), createProject().tracks[0]!.id, 'neon-keys');
+  const trackId = project.tracks[0]!.id;
+  project = addNote(project, trackId, { pitch: 60, startBeat: 0, lengthBeats: 1, velocity: 0.8 });
+  const noteId = project.tracks[0]!.notes[0]!.id;
+  project = moveNote(project, trackId, noteId, 999, 0);
+  assert.equal(project.tracks[0]!.notes[0]!.pitch, 127);
+});
+
+test('a corrupt note is dropped without taking the track with it', () => {
+  const repaired = parseProject({
+    tracks: [
+      {
+        name: 'Keys',
+        instrumentId: 'neon-keys',
+        notes: [{ pitch: 'high' }, { pitch: 62, startBeat: 1, lengthBeats: 1, velocity: 0.5 }],
+      },
+    ],
+  });
+  assert.equal(repaired.tracks[0]!.notes.length, 1);
+  assert.equal(repaired.tracks[0]!.notes[0]!.pitch, 62);
+});
+
+test('project length accounts for notes as well as clips', () => {
+  let project = setTrackInstrument(createProject(), createProject().tracks[0]!.id, 'neon-keys');
+  project = addNote(project, project.tracks[0]!.id, {
+    pitch: 60,
+    startBeat: 9,
+    lengthBeats: 1,
+    velocity: 0.8,
+  });
+  // A note ending at beat 10 must not be cut off by a grid that stops at 8.
+  assert.equal(projectLengthBeats(project), 12);
+});
+
+test('removing a note leaves the others alone', () => {
+  let project = setTrackInstrument(createProject(), createProject().tracks[0]!.id, 'neon-keys');
+  const trackId = project.tracks[0]!.id;
+  for (const pitch of [60, 62, 64]) {
+    project = addNote(project, trackId, { pitch, startBeat: 0, lengthBeats: 1, velocity: 0.8 });
+  }
+  const target = project.tracks[0]!.notes[1]!.id;
+  project = removeNote(project, trackId, target);
+  assert.deepEqual(
+    project.tracks[0]!.notes.map((note) => note.pitch),
+    [60, 64],
+  );
 });
 
 /* --- WAV encoding ------------------------------------------------------ */

@@ -17,6 +17,7 @@ import * as Tone from 'tone';
 
 import { findEffect } from './effects';
 import { getBuffer } from './importer';
+import { findInstrument, triggerInstrument, type InstrumentDef } from './instruments';
 import { secondsPerBeat, trackAudible, type StudioProject, type StudioTrack } from './project';
 
 /** Anything that can sit in an insert slot: a Tone effect or a WAM plugin. */
@@ -47,6 +48,10 @@ interface TrackNodes {
   effectIds: string[];
   /** One player per clip, keyed by clip id. */
   players: Map<string, Tone.Player>;
+  /** The synth voice, when this is an instrument track. */
+  voice: ReturnType<InstrumentDef['create']> | null;
+  /** Which instrument `voice` was built from, so a change rebuilds it. */
+  voiceId: string | null;
   /** Transport event ids, so a re-schedule can cancel exactly its own events. */
   scheduled: number[];
 }
@@ -74,6 +79,7 @@ export class TrackGraph {
       seen.add(track.id);
       const nodes = this.tracks.get(track.id) ?? this.createTrack(track.id);
       this.syncClips(nodes, track);
+      this.syncVoice(nodes, track);
       this.syncEffects(nodes, track);
       this.applyMix(nodes, project, track);
     }
@@ -95,6 +101,8 @@ export class TrackGraph {
       inserts: [],
       effectIds: [],
       players: new Map(),
+      voice: null,
+      voiceId: null,
       scheduled: [],
     };
     this.tracks.set(id, nodes);
@@ -109,6 +117,7 @@ export class TrackGraph {
    */
   private rewire(nodes: TrackNodes): void {
     for (const player of nodes.players.values()) player.disconnect();
+    nodes.voice?.disconnect();
     for (const insert of nodes.inserts) insert.disconnect();
     nodes.gain.disconnect();
     nodes.panner.disconnect();
@@ -118,6 +127,7 @@ export class TrackGraph {
     // Tone.connect rather than node.connect: it accepts a Tone node or a raw
     // AudioNode on either end, so a plugin slot needs no special case.
     for (const player of nodes.players.values()) Tone.connect(player, head);
+    if (nodes.voice) Tone.connect(nodes.voice, head);
     for (let i = 0; i < chain.length - 1; i += 1) Tone.connect(chain[i]!, chain[i + 1]!);
     nodes.panner.connect(this.master);
   }
@@ -164,6 +174,24 @@ export class TrackGraph {
     }
 
     if (added) this.rewire(nodes);
+  }
+
+  /**
+   * Builds or drops the synth voice for an instrument track.
+   *
+   * Rebuilt only when the chosen instrument actually changes -- disposing and
+   * recreating a PolySynth cuts every note currently sounding.
+   */
+  private syncVoice(nodes: TrackNodes, track: StudioTrack): void {
+    if (nodes.voiceId === (track.instrumentId ?? null)) return;
+
+    nodes.voice?.disconnect();
+    nodes.voice?.dispose();
+    nodes.voice = null;
+    nodes.voiceId = track.instrumentId ?? null;
+
+    if (track.instrumentId) nodes.voice = findInstrument(track.instrumentId).create();
+    this.rewire(nodes);
   }
 
   /**
@@ -237,6 +265,21 @@ export class TrackGraph {
     for (const track of project.tracks) {
       const nodes = this.tracks.get(track.id);
       if (!nodes) continue;
+
+      // Notes on an instrument track.
+      const voice = nodes.voice;
+      const instrument = track.instrumentId ? findInstrument(track.instrumentId) : null;
+      if (voice && instrument) {
+        for (const note of track.notes) {
+          const at = note.startBeat * beatSeconds;
+          const duration = note.lengthBeats * beatSeconds;
+          const id = transport.schedule((time) => {
+            triggerInstrument(voice, Tone.Frequency(note.pitch, 'midi').toNote(), duration, time);
+          }, at);
+          nodes.scheduled.push(id);
+        }
+      }
+
       for (const clip of track.clips) {
         const player = nodes.players.get(clip.id);
         if (!player) continue;
@@ -261,6 +304,8 @@ export class TrackGraph {
       for (const player of nodes.players.values()) {
         if (player.state === 'started') player.stop();
       }
+      // Cut anything still ringing, or a held pad sustains past stop.
+      if (nodes.voice && 'releaseAll' in nodes.voice) nodes.voice.releaseAll();
     }
   }
 
@@ -268,6 +313,7 @@ export class TrackGraph {
     const transport = Tone.getTransport();
     for (const id of nodes.scheduled) transport.clear(id);
     for (const player of nodes.players.values()) player.dispose();
+    nodes.voice?.dispose();
     for (const insert of nodes.inserts) {
       insert.disconnect();
       if ('dispose' in insert) insert.dispose();

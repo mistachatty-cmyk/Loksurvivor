@@ -73,6 +73,24 @@ This is not tidiness — it is what lets a WAM plugin, which is a raw
 `AudioNode` and never will be a Tone node, take an insert slot with no change
 to playback code.
 
+## Instrument tracks are ordinary tracks
+
+A track plays a synth instead of audio clips when `instrumentId` is set, and
+that is the *only* difference. One mixer, one insert chain, one solo rule and
+one export path cover both, and the piano roll simply appears for tracks that
+have an instrument.
+
+Two details that bite:
+- `syncVoice()` rebuilds the voice only when the instrument actually changes.
+  Disposing and recreating a PolySynth cuts every note currently sounding.
+- The sanitiser must not write `instrumentId: undefined`. `JSON.stringify`
+  drops an undefined key, so a track carrying one is not equal to itself after
+  a save and load — which a round-trip test catches and a user would not.
+
+Note pitch is a MIDI number, not a name, so transposing and drawing are
+arithmetic. Notes snap to sixteenths; a piano roll that lets a note land
+between semitones is not a piano roll.
+
 ## Export renders offline, and rebuilds the graph
 
 `Tone.Offline` rather than `MediaRecorder`: deterministic, faster than

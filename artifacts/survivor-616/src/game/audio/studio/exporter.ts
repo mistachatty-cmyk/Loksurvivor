@@ -15,7 +15,9 @@ import * as Tone from 'tone';
 
 import { findEffect } from './effects';
 import { getBuffer } from './importer';
+import { findInstrument, triggerInstrument } from './instruments';
 import {
+  parseProject,
   projectLengthBeats,
   secondsPerBeat,
   serializeProject,
@@ -65,6 +67,20 @@ export async function renderProjectToWav(project: StudioProject): Promise<Blob> 
           }
           node.connect(head);
           head = node;
+        }
+
+        // Instrument notes, rendered through the same chain as audio clips.
+        if (track.instrumentId) {
+          const instrument = findInstrument(track.instrumentId);
+          const voice = instrument.create();
+          voice.connect(head);
+          for (const note of track.notes) {
+            const at = note.startBeat * beatSeconds;
+            const duration = note.lengthBeats * beatSeconds;
+            transport.schedule((time) => {
+              triggerInstrument(voice, Tone.Frequency(note.pitch, 'midi').toNote(), duration, time);
+            }, at);
+          }
         }
 
         for (const clip of track.clips) {
@@ -148,7 +164,6 @@ export function exportProjectFile(project: StudioProject): Blob {
 }
 
 export async function readProjectFile(file: File): Promise<StudioProject> {
-  const { parseProject } = await import('./project');
   try {
     return parseProject(JSON.parse(await file.text()) as unknown);
   } catch {

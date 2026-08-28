@@ -13,7 +13,7 @@ import * as Tone from 'tone';
 
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { findEffect } from '@/game/audio/studio/effects';
-import { getStudioEngine } from '@/game/audio/studio/engine';
+import { getStudioEngine, unlockStudioAudio } from '@/game/audio/studio/engine';
 import type { TrackGraph } from '@/game/audio/studio/tracks';
 import {
   startStudioClock,
@@ -30,18 +30,23 @@ import {
 import {
   addClip,
   addEffect,
+  addNote,
   addTrack,
   clampBpm,
   loadStoredProject,
   moveClip,
   projectLengthBeats,
+  moveNote,
   removeClip,
   removeEffect,
+  removeNote,
   removeTrack,
   setEffectParam,
+  setTrackInstrument,
   storeProject,
   toggleSolo,
   updateTrack,
+  type StudioNote,
   type StudioProject,
   type StudioTrack,
 } from '@/game/audio/studio/project';
@@ -84,6 +89,10 @@ export interface StudioController {
   graph: TrackGraph;
   solo: (trackId: string) => void;
   newTrack: () => void;
+  setInstrument: (trackId: string, instrumentId: string | undefined) => void;
+  placeNote: (trackId: string, note: Omit<StudioNote, 'id'>) => void;
+  relocateNote: (trackId: string, noteId: string, pitch: number, startBeat: number) => void;
+  dropNote: (trackId: string, noteId: string) => void;
   dropTrack: (trackId: string) => void;
 
   exportWav: () => Promise<void>;
@@ -165,7 +174,6 @@ export function useStudio(): StudioController {
       // Must precede any scheduling: browsers hand back a suspended context
       // until a gesture unlocks it, and a suspended transport silently never
       // fires the events we just queued.
-      const { unlockStudioAudio } = await import('@/game/audio/studio/engine');
       await unlockStudioAudio();
 
       const current = projectRef.current;
@@ -237,9 +245,11 @@ export function useStudio(): StudioController {
 
   const exportWav = useCallback(async () => {
     const current = projectRef.current;
-    const hasAudio = current.tracks.some((track) => track.clips.length > 0);
+    const hasAudio = current.tracks.some(
+      (track) => track.clips.length > 0 || (track.instrumentId && track.notes.length > 0),
+    );
     if (!hasAudio) {
-      setError('Nothing to export yet -- add a clip to a track first.');
+      setError('Nothing to export yet -- add a clip or write some notes first.');
       return;
     }
     setBusy('Rendering...');
@@ -305,6 +315,16 @@ export function useStudio(): StudioController {
     graph: engineInstance.graph,
     solo: useCallback((trackId) => setProject((c) => toggleSolo(c, trackId)), []),
     newTrack: useCallback(() => setProject((c) => addTrack(c)), []),
+    setInstrument: useCallback(
+      (trackId, instrumentId) => setProject((c) => setTrackInstrument(c, trackId, instrumentId)),
+      [],
+    ),
+    placeNote: useCallback((trackId, note) => setProject((c) => addNote(c, trackId, note)), []),
+    relocateNote: useCallback(
+      (trackId, noteId, pitch, startBeat) => setProject((c) => moveNote(c, trackId, noteId, pitch, startBeat)),
+      [],
+    ),
+    dropNote: useCallback((trackId, noteId) => setProject((c) => removeNote(c, trackId, noteId)), []),
     dropTrack: useCallback((trackId) => setProject((c) => removeTrack(c, trackId)), []),
 
     exportWav,

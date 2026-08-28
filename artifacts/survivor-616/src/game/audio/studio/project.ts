@@ -38,6 +38,22 @@ export interface StudioEffect {
   params: Record<string, number>;
 }
 
+/**
+ * One note on an instrument track.
+ *
+ * Pitch is a MIDI number rather than a name so transposing and drawing are
+ * arithmetic; names are for display only.
+ */
+export interface StudioNote {
+  id: string;
+  /** MIDI note number. 60 is middle C. */
+  pitch: number;
+  startBeat: number;
+  lengthBeats: number;
+  /** 0..1. */
+  velocity: number;
+}
+
 export interface StudioTrack {
   id: string;
   name: string;
@@ -50,6 +66,14 @@ export interface StudioTrack {
   clips: StudioClip[];
   /** Ordered insert chain. Order is the signal path.  */
   effects: StudioEffect[];
+  /**
+   * Set when this track plays a synth rather than audio clips. An audio track
+   * and an instrument track differ only by this field being present, so one
+   * mixer, one insert chain and one solo rule cover both.
+   */
+  instrumentId?: string;
+  /** Notes, when this is an instrument track. */
+  notes: StudioNote[];
 }
 
 export interface StudioProject {
@@ -77,7 +101,17 @@ export function studioId(prefix: string): string {
 }
 
 export function createTrack(name: string): StudioTrack {
-  return { id: studioId('track'), name, gain: 0.8, pan: 0, muted: false, soloed: false, clips: [], effects: [] };
+  return {
+    id: studioId('track'),
+    name,
+    gain: 0.8,
+    pan: 0,
+    muted: false,
+    soloed: false,
+    clips: [],
+    effects: [],
+    notes: [],
+  };
 }
 
 export function createProject(name = 'Untitled'): StudioProject {
@@ -103,6 +137,7 @@ export function projectLengthBeats(project: StudioProject): number {
   let end = 0;
   for (const track of project.tracks) {
     for (const clip of track.clips) end = Math.max(end, clip.startBeat + clip.lengthBeats);
+    for (const note of track.notes) end = Math.max(end, note.startBeat + note.lengthBeats);
   }
   return Math.max(project.beatsPerBar, Math.ceil(end / project.beatsPerBar) * project.beatsPerBar);
 }
@@ -157,6 +192,32 @@ function sanitizeEffect(raw: unknown): StudioEffect | null {
   };
 }
 
+/** MIDI's full range; anything outside it is a corrupt value, not a low note. */
+const MIN_PITCH = 0;
+const MAX_PITCH = 127;
+
+function sanitizeNote(raw: unknown): StudioNote | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const note = raw as Partial<StudioNote>;
+  if (typeof note.pitch !== 'number' || !Number.isFinite(note.pitch)) return null;
+  return {
+    id: typeof note.id === 'string' && note.id ? note.id : studioId('note'),
+    pitch: Math.round(clamp(note.pitch, MIN_PITCH, MAX_PITCH)),
+    startBeat:
+      typeof note.startBeat === 'number' && Number.isFinite(note.startBeat)
+        ? Math.max(0, note.startBeat)
+        : 0,
+    lengthBeats:
+      typeof note.lengthBeats === 'number' && Number.isFinite(note.lengthBeats) && note.lengthBeats > 0
+        ? note.lengthBeats
+        : 1,
+    velocity:
+      typeof note.velocity === 'number' && Number.isFinite(note.velocity)
+        ? clamp(note.velocity, 0, 1)
+        : 0.8,
+  };
+}
+
 function sanitizeTrack(raw: unknown): StudioTrack | null {
   if (!raw || typeof raw !== 'object') return null;
   const track = raw as Partial<StudioTrack>;
@@ -172,6 +233,15 @@ function sanitizeTrack(raw: unknown): StudioTrack | null {
       : [],
     effects: Array.isArray(track.effects)
       ? track.effects.map(sanitizeEffect).filter((effect): effect is StudioEffect => effect !== null)
+      : [],
+    // Spread rather than assigning undefined: an explicit `undefined` key is
+    // dropped by JSON.stringify, so a track carrying one is not identical to
+    // itself after a save and load.
+    ...(typeof track.instrumentId === 'string' && track.instrumentId
+      ? { instrumentId: track.instrumentId }
+      : {}),
+    notes: Array.isArray(track.notes)
+      ? track.notes.map(sanitizeNote).filter((note): note is StudioNote => note !== null)
       : [],
   };
 }
@@ -363,6 +433,72 @@ export function setEffectParam(
               effect.id === effectInstanceId
                 ? { ...effect, params: { ...effect.params, [paramId]: clamp(value, 0, 1) } }
                 : effect,
+            ),
+          },
+    ),
+  };
+}
+
+/* --- instrument tracks ------------------------------------------------ */
+
+/** Turns a track into an instrument track, or back into an audio track. */
+export function setTrackInstrument(
+  project: StudioProject,
+  trackId: string,
+  instrumentId: string | undefined,
+): StudioProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) => (track.id === trackId ? { ...track, instrumentId } : track)),
+  };
+}
+
+export function addNote(project: StudioProject, trackId: string, note: Omit<StudioNote, 'id'>): StudioProject {
+  const withId: StudioNote = { ...note, id: studioId('note') };
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === trackId ? { ...track, notes: [...track.notes, withId] } : track,
+    ),
+  };
+}
+
+export function removeNote(project: StudioProject, trackId: string, noteId: string): StudioProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === trackId ? { ...track, notes: track.notes.filter((note) => note.id !== noteId) } : track,
+    ),
+  };
+}
+
+/**
+ * Moves a note. Pitch snaps to a semitone and start to the given grid, because
+ * a piano roll that lets a note land between semitones is not a piano roll.
+ */
+export function moveNote(
+  project: StudioProject,
+  trackId: string,
+  noteId: string,
+  pitch: number,
+  startBeat: number,
+  snapBeats = 0.25,
+): StudioProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id !== trackId
+        ? track
+        : {
+            ...track,
+            notes: track.notes.map((note) =>
+              note.id !== noteId
+                ? note
+                : {
+                    ...note,
+                    pitch: Math.round(clamp(pitch, 0, 127)),
+                    startBeat: Math.max(0, Math.round(startBeat / snapBeats) * snapBeats),
+                  },
             ),
           },
     ),

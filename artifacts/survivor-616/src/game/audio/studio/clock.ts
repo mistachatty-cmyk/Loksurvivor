@@ -29,6 +29,13 @@ const NO_BANDS = Object.freeze({ sub: 0, bass: 0, lowMid: 0, mid: 0, high: 0 });
 
 let repeatId: number | null = null;
 let beatsPerBarSetting = 4;
+/**
+ * Bumped on every stop. A `Tone.Draw` callback queued before the stop can still
+ * run after it, and because `'studio'` outranks everything, that late publish
+ * would silently take the bus back from live detection. Each callback captures
+ * the generation it was scheduled in and declines to publish if it is stale.
+ */
+let generation = 0;
 
 /** Whether the studio currently drives the bus. */
 export function studioClockRunning(): boolean {
@@ -46,6 +53,7 @@ export function startStudioClock(beatsPerBar = 4): void {
   beatsPerBarSetting = beatsPerBar;
 
   const transport = Tone.getTransport();
+  const startedIn = generation;
 
   repeatId = transport.scheduleRepeat((time) => {
     // Resolve position at the scheduled audio time, not at draw time.
@@ -54,6 +62,7 @@ export function startStudioClock(beatsPerBar = 4): void {
     const bpm = transport.bpm.getValueAtTime(time);
 
     Tone.getDraw().schedule(() => {
+      if (generation !== startedIn) return;
       beatBus.publish(
         {
           bpm,
@@ -115,8 +124,10 @@ export function stopStudioClock(): void {
     Tone.getTransport().clear(repeatId);
     repeatId = null;
   }
-  // Drop anything Draw is still holding, or a queued beat would publish after
-  // the release and strand the bus with a stale studio frame.
-  Tone.getDraw().cancel();
+  // Invalidate anything already queued. `Draw.cancel()` alone is not enough:
+  // a callback can be mid-flight, and it would republish as 'studio' after the
+  // release below -- re-taking a bus that live detection had just got back.
+  generation += 1;
+  Tone.getDraw().cancel(0);
   beatBus.release('studio');
 }
