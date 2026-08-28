@@ -333,10 +333,37 @@ export interface PotholeObstacle extends Aabb {
   resolvedAt: number;
 }
 
-const BREAKABLE_HP: Partial<Record<ObstacleDef['kind'], number>> = {
-  crate: 40, 'crate-breakable': 40, 'neon-sign': 60, barrel: 80,
-  'fuse-box': 100, 'street-lamp': 55, dumpster: 90, 'car-wreck': 150, car: 120,
-  cover: 180,
+interface ObstacleWeightProfile {
+  /** Physics bucket -- also drives mass/friction/movability in propProfile(). */
+  variant: PropVariant;
+  /** Hit points before the obstacle breaks; omitted means indestructible. */
+  hp?: number;
+}
+
+/**
+ * Single source of truth for how tough an obstacle kind is and how heavy it
+ * is once pushed or launched. HP and mass used to live in two separate
+ * lookups (a flat HP table plus an ad hoc kind-matching chain for physics
+ * variant) that could disagree -- e.g. `cover` had the highest HP of any
+ * breakable but the same mass as a `car`. Heavier variants (higher mass)
+ * already travel less/slower per hit via resolveImpactTravel(); HP values
+ * here are scaled up from the original table so props survive more hits
+ * and more being thrown around, while keeping the same relative toughness
+ * order (crate breaks fastest, cover/car-wreck are toughest).
+ */
+const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeightProfile>> = {
+  crate: { variant: 'light-breakable', hp: 60 },
+  'crate-breakable': { variant: 'light-breakable', hp: 60 },
+  'street-lamp': { variant: 'light-breakable', hp: 85 },
+  'neon-sign': { variant: 'light-breakable', hp: 90 },
+  barrel: { variant: 'light-breakable', hp: 120 },
+  'fuse-box': { variant: 'light-breakable', hp: 150 },
+  dumpster: { variant: 'medium-movable', hp: 135 },
+  car: { variant: 'medium-movable', hp: 180 },
+  'car-wreck': { variant: 'medium-movable', hp: 225 },
+  cover: { variant: 'medium-movable', hp: 270 },
+  'metal-box': { variant: 'heavy-metal' },
+  bench: { variant: 'fixed-bench' },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
@@ -351,26 +378,17 @@ interface PropPhysicsProfile {
 }
 
 function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant'>): PropPhysicsProfile {
-  const variant = obstacle.propVariant
-    ?? (obstacle.kind === 'metal-box'
-      ? 'heavy-metal'
-      : obstacle.kind === 'bench'
-        ? 'fixed-bench'
-        : obstacle.kind === 'crate-breakable'
-          ? 'light-breakable'
-          : obstacle.kind === 'dumpster' || obstacle.kind === 'car-wreck' || obstacle.kind === 'cover' || obstacle.kind === 'car'
-            ? 'medium-movable'
-            : BREAKABLE_HP[obstacle.kind] !== undefined
-              ? 'light-breakable'
-              : 'fixed-bench');
+  const entry = OBSTACLE_WEIGHT_PROFILES[obstacle.kind];
+  const variant = obstacle.propVariant ?? entry?.variant ?? 'fixed-bench';
+  const breakable = entry?.hp !== undefined;
   if (variant === 'light-breakable') {
-    return { variant, mass: 0.8, friction: 0.82, breakable: BREAKABLE_HP[obstacle.kind] !== undefined, movable: true };
+    return { variant, mass: 0.8, friction: 0.82, breakable, movable: true };
   }
   if (variant === 'medium-movable') {
-    return { variant, mass: 2.6, friction: 0.88, breakable: BREAKABLE_HP[obstacle.kind] !== undefined, movable: true };
+    return { variant, mass: 2.6, friction: 0.88, breakable, movable: true };
   }
   if (variant === 'heavy-metal') {
-    return { variant, mass: 8, friction: 0.94, breakable: false, movable: true };
+    return { variant, mass: 8, friction: 0.94, breakable, movable: true };
   }
   return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
 }
@@ -804,7 +822,7 @@ function uid(w: World): number {
 
 function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
   const profile = propProfile(obstacle);
-  const hp = profile.breakable ? (BREAKABLE_HP[obstacle.kind] ?? 40) : Number.POSITIVE_INFINITY;
+  const hp = profile.breakable ? (OBSTACLE_WEIGHT_PROFILES[obstacle.kind]?.hp ?? 60) : Number.POSITIVE_INFINITY;
   return {
     ...obstacle,
     uid: uid(w),

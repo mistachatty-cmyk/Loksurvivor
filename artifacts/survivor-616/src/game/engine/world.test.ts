@@ -244,7 +244,7 @@ test('a projectile is absorbed by heavy cover', () => {
 
   assert.equal(world.projectiles.length, 0);
   assert.equal(world.breakables[0]!.broken, false);
-  assert.equal(world.breakables[0]!.hp, 173);
+  assert.equal(world.breakables[0]!.hp, 263);
 });
 
 test('a grouped wave releases its mixed formation together', () => {
