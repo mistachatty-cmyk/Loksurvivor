@@ -14,6 +14,7 @@ import {
   Download,
   FileAudio,
   FileJson,
+  ListMusic,
   Music4,
   Pause,
   Play,
@@ -108,6 +109,17 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           />
 
           <div className="flex shrink-0 gap-2">
+            {/* The main way a finished beat leaves the studio: it becomes an
+                ordinary soundtrack track, and the game reacts to it from there. */}
+            <button
+              type="button"
+              onClick={() => void studio.sendToSoundtrack()}
+              disabled={studio.busy !== null}
+              className="flex items-center gap-2 bg-primary px-3 py-2 text-xs font-bold uppercase tracking-widest text-primary-foreground transition-colors hover:bg-white disabled:opacity-50"
+              data-testid="button-studio-to-soundtrack"
+            >
+              <ListMusic className="h-4 w-4" /> To Soundtrack
+            </button>
             <button
               type="button"
               onClick={() => audioInputRef.current?.click()}
@@ -172,6 +184,17 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           <p className="text-xs uppercase tracking-widest text-primary" data-testid="text-studio-busy">
             {studio.busy}
           </p>
+        )}
+        {studio.notice && (
+          <div
+            className="flex items-start justify-between gap-4 border border-primary/50 bg-primary/10 p-3 text-sm text-primary"
+            data-testid="text-studio-notice"
+          >
+            <p className="whitespace-pre-line">{studio.notice}</p>
+            <button type="button" onClick={studio.dismissNotice} aria-label="Dismiss">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         )}
         {studio.error && (
           <div

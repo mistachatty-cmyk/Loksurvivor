@@ -66,7 +66,10 @@ export interface StudioController {
   playheadRef: React.RefObject<number>;
   busy: string | null;
   error: string | null;
+  /** Confirmation of something that worked, as distinct from a failure. */
+  notice: string | null;
   dismissError: () => void;
+  dismissNotice: () => void;
 
   togglePlay: () => void;
   stop: () => void;
@@ -96,17 +99,19 @@ export interface StudioController {
   dropTrack: (trackId: string) => void;
 
   exportWav: () => Promise<void>;
+  sendToSoundtrack: () => Promise<void>;
   exportProject: () => void;
   openProject: (file: File) => Promise<void>;
 }
 
 export function useStudio(): StudioController {
-  const { getAudioContext } = useMusicPlayer();
+  const { getAudioContext, addFiles } = useMusicPlayer();
   const [project, setProject] = useState<StudioProject>(loadStoredProject);
   const [clips, setClips] = useState<ImportedBuffer[]>([]);
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const playheadRef = useRef(0);
 
   // Built eagerly, adopting the soundtrack player's context when it has one.
@@ -243,25 +248,59 @@ export function useStudio(): StudioController {
     releaseBuffer(bufferId);
   }, []);
 
-  const exportWav = useCallback(async () => {
+  /**
+   * Renders the project, or explains why there is nothing to render. Shared by
+   * every path that turns the arrangement into audio.
+   */
+  const renderCurrent = useCallback(async (busyLabel: string): Promise<Blob | null> => {
     const current = projectRef.current;
     const hasAudio = current.tracks.some(
       (track) => track.clips.length > 0 || (track.instrumentId && track.notes.length > 0),
     );
     if (!hasAudio) {
-      setError('Nothing to export yet -- add a clip or write some notes first.');
-      return;
+      setError('Nothing to render yet -- add a clip or write some notes first.');
+      return null;
     }
-    setBusy('Rendering...');
+    setBusy(busyLabel);
+    setNotice(null);
     try {
-      const blob = await renderProjectToWav(current);
-      downloadBlob(blob, exportFilename(current, 'wav'));
+      return await renderProjectToWav(current);
     } catch {
-      setError('Render failed. Try again, or export the project file instead.');
+      setError('Render failed. Try again, or save the project file instead.');
+      return null;
     } finally {
       setBusy(null);
     }
   }, []);
+
+  const exportWav = useCallback(async () => {
+    const blob = await renderCurrent('Rendering...');
+    if (blob) downloadBlob(blob, exportFilename(projectRef.current, 'wav'));
+  }, [renderCurrent]);
+
+  /**
+   * Pours the finished beat into the soundtrack.
+   *
+   * This is the only route from the studio into the rest of the game, and it is
+   * deliberately the same route an imported mp3 takes: render to audio, hand it
+   * to the player's existing `addFiles`, and let it be an ordinary track. The
+   * game then reacts to it through the one detection path that already exists,
+   * rather than the studio needing a second, privileged channel into the run.
+   */
+  const sendToSoundtrack = useCallback(async () => {
+    const blob = await renderCurrent('Rendering for the soundtrack...');
+    if (!blob) return;
+    const current = projectRef.current;
+    const filename = exportFilename(current, 'wav');
+    // `addFiles` takes Files, so the render is wrapped as one -- no new player
+    // API, and the track behaves exactly like anything else the player added.
+    const added = addFiles([new File([blob], filename, { type: 'audio/wav' })]);
+    setNotice(
+      added > 0
+        ? `Added to your soundtrack. Play it from the Soundtrack panel and the game will move to it. It lives in this session only — use WAV to keep a copy.`
+        : 'The soundtrack would not accept that render.',
+    );
+  }, [addFiles, renderCurrent]);
 
   const openProject = useCallback(async (file: File) => {
     try {
@@ -269,7 +308,7 @@ export function useStudio(): StudioController {
       setProject(loaded);
       // Clips reference buffers by id, and ids are per-session -- a project
       // opened in a fresh session needs its audio re-imported to be heard.
-      setError('Project loaded. Re-import its audio files to hear the clips.');
+      setNotice('Project loaded. Re-import its audio files to hear the clips.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not open that project.');
     }
@@ -282,7 +321,9 @@ export function useStudio(): StudioController {
     playheadRef,
     busy,
     error,
+    notice,
     dismissError: useCallback(() => setError(null), []),
+    dismissNotice: useCallback(() => setNotice(null), []),
 
     togglePlay,
     stop,
@@ -328,6 +369,7 @@ export function useStudio(): StudioController {
     dropTrack: useCallback((trackId) => setProject((c) => removeTrack(c, trackId)), []),
 
     exportWav,
+    sendToSoundtrack,
     exportProject: useCallback(() => {
       const current = projectRef.current;
       downloadBlob(exportProjectFile(current), exportFilename(current, '616song'));
