@@ -1131,6 +1131,12 @@ export interface MetaState {
   gyroSensitivity: number;
   /** Flips the forward/back tilt axis. */
   gyroInvertY: boolean;
+  /**
+   * Whether the studio may load third-party audio plugins. Off by default:
+   * a plugin runs code fetched from another origin, which nothing else in the
+   * game does, so it is enabled deliberately or not at all.
+   */
+  studioPluginsEnabled: boolean;
   selectedCharacterId: string;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];

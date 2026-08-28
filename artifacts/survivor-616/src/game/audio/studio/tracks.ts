@@ -19,12 +19,30 @@ import { findEffect } from './effects';
 import { getBuffer } from './importer';
 import { secondsPerBeat, trackAudible, type StudioProject, type StudioTrack } from './project';
 
+/** Anything that can sit in an insert slot: a Tone effect or a WAM plugin. */
+export type InsertNode = Tone.ToneAudioNode | AudioNode;
+
+/**
+ * Effect *records* always build Tone nodes; only plugins are raw. Parameter
+ * application is meaningful for the former alone, so it narrows through here
+ * rather than assuming the slot's origin.
+ */
+function isToneNode(node: InsertNode): node is Tone.ToneAudioNode {
+  return node instanceof Tone.ToneAudioNode;
+}
+
 /** Live nodes for one track. Created on demand, disposed with the graph. */
 interface TrackNodes {
   gain: Tone.Gain;
   panner: Tone.Panner;
-  /** Ordered effect slots between the players and the fader. */
-  inserts: Tone.ToneAudioNode[];
+  /**
+   * Ordered effect slots between the players and the fader.
+   *
+   * Typed to include a raw `AudioNode` because a WAM plugin is one: it is not
+   * a Tone node and never will be. `Tone.connect` bridges both directions,
+   * which is the entire reason this chain is rebuilt through one function.
+   */
+  inserts: InsertNode[];
   /** Effect instance ids, parallel to `inserts`. */
   effectIds: string[];
   /** One player per clip, keyed by clip id. */
@@ -95,22 +113,24 @@ export class TrackGraph {
     nodes.gain.disconnect();
     nodes.panner.disconnect();
 
-    const chain: Tone.ToneAudioNode[] = [...nodes.inserts, nodes.gain, nodes.panner];
+    const chain: InsertNode[] = [...nodes.inserts, nodes.gain, nodes.panner];
     const head = chain[0]!;
-    for (const player of nodes.players.values()) player.connect(head);
-    for (let i = 0; i < chain.length - 1; i += 1) chain[i]!.connect(chain[i + 1]!);
+    // Tone.connect rather than node.connect: it accepts a Tone node or a raw
+    // AudioNode on either end, so a plugin slot needs no special case.
+    for (const player of nodes.players.values()) Tone.connect(player, head);
+    for (let i = 0; i < chain.length - 1; i += 1) Tone.connect(chain[i]!, chain[i + 1]!);
     nodes.panner.connect(this.master);
   }
 
-  /** Adds an effect (or any raw node Tone can wrap) at the end of the chain. */
-  addInsert(trackId: string, node: Tone.ToneAudioNode): void {
+  /** Adds an effect or plugin node at the end of the chain. */
+  addInsert(trackId: string, node: InsertNode): void {
     const nodes = this.tracks.get(trackId);
     if (!nodes) return;
     nodes.inserts.push(node);
     this.rewire(nodes);
   }
 
-  removeInsert(trackId: string, node: Tone.ToneAudioNode): void {
+  removeInsert(trackId: string, node: InsertNode): void {
     const nodes = this.tracks.get(trackId);
     if (!nodes) return;
     const index = nodes.inserts.indexOf(node);
@@ -163,7 +183,8 @@ export class TrackGraph {
     if (changed) {
       for (const node of nodes.inserts) {
         node.disconnect();
-        node.dispose();
+        // A raw AudioNode (a plugin) has no dispose; its host owns it.
+        if ('dispose' in node) node.dispose();
       }
       nodes.inserts = [];
       nodes.effectIds = [];
@@ -186,7 +207,7 @@ export class TrackGraph {
       if (index === -1) return;
       const def = findEffect(effect.effectId);
       const node = nodes.inserts[index];
-      if (!def || !node) return;
+      if (!def || !node || !isToneNode(node)) return;
       for (const param of def.params) {
         param.set(node, effect.params[param.id] ?? param.defaultValue);
       }
@@ -247,7 +268,10 @@ export class TrackGraph {
     const transport = Tone.getTransport();
     for (const id of nodes.scheduled) transport.clear(id);
     for (const player of nodes.players.values()) player.dispose();
-    for (const insert of nodes.inserts) insert.dispose();
+    for (const insert of nodes.inserts) {
+      insert.disconnect();
+      if ('dispose' in insert) insert.dispose();
+    }
     nodes.gain.dispose();
     nodes.panner.dispose();
   }

@@ -27,8 +27,10 @@ import {
 import { ScreenLayout } from './ScreenLayout';
 import { ArrangeView } from './studio/ArrangeView';
 import { PadGrid } from './studio/PadGrid';
+import { PluginRack } from './studio/PluginRack';
 import { useStudio } from './studio/useStudio';
 import { EFFECTS, findEffect } from '@/game/audio/studio/effects';
+import { useMeta } from '@/game/state/metaStore';
 import { MAX_BPM, MIN_BPM } from '@/game/audio/studio/project';
 
 export interface StudioScreenProps {
@@ -37,6 +39,7 @@ export interface StudioScreenProps {
 
 export function StudioScreen({ onBack }: StudioScreenProps) {
   const studio = useStudio();
+  const { meta } = useMeta();
   const audioInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
@@ -404,6 +407,10 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
                       </option>
                     ))}
                   </select>
+
+                  {meta.studioPluginsEnabled && (
+                    <PluginRack trackId={track.id} trackName={track.name} graph={studio.graph} />
+                  )}
                 </div>
               ))}
             </div>

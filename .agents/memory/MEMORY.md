@@ -8,3 +8,4 @@
 - [Pothole impact contract](potholes.md) — pits activate only from explicit stomp/ground-shock tags and remain separate from solid collision props.
 - [District setpiece contract](district-setpieces.md) — landmark incursions are optional seeded interruptions with shared simulation, bounded one-time rewards, and normal run recovery.
 - [Music reactivity contract](music-reactivity.md) — one beat bus arbitrates detected vs authored tempo; reactions are records, and visual ones never touch the simulation.
+- [In-game studio engine](studio-engine.md) — one AudioContext shared with the soundtrack player; plain-data project model reconciled into a Tone graph whose inserts are never hard-wired, so plugins drop in; plugins stay opt-in because they run off-device code.
