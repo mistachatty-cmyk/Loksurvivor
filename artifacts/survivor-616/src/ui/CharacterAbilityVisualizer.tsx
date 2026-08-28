@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Crosshair, Footprints, Sparkles, Target } from 'lucide-react';
-import type { CharacterDef } from '@/game/types';
+import type { CharacterDef, WeaponKind } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
 
 interface CharacterAbilityVisualizerProps {
@@ -30,6 +30,172 @@ function DemoBox({ title, icon, color, children, description }: {
   );
 }
 
+/** A star-burst shape used by the punch/melee preview, matching WeaponIcon's impact glyph. */
+const STAR_CLIP = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+
+/**
+ * Per-kind mini-animation for the weapon preview. Mirrors the shape language
+ * WeaponIcon.tsx and render/draw.ts already use per WeaponKind, so the field
+ * preview actually resembles what the weapon looks like mid-run instead of
+ * one generic sliding pill for every kind.
+ */
+function WeaponPatternDemo({ kind, color, count }: { kind: WeaponKind; color: string; count?: number }) {
+  switch (kind) {
+    case 'orbit':
+    case 'follower': {
+      const blades = Math.max(1, Math.min(count ?? (kind === 'orbit' ? 2 : 1), 3));
+      return (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: kind === 'follower' ? 2.6 : 1.8, repeat: Infinity, ease: 'linear' }}
+            className="absolute h-16 w-16"
+          >
+            {Array.from({ length: blades }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute left-1/2 top-0 h-3 w-2 -translate-x-1/2 rounded-sm"
+                style={{
+                  background: color,
+                  boxShadow: `0 0 8px ${color}`,
+                  transform: `translateX(-50%) rotate(${(360 / blades) * i}deg) translateY(0)`,
+                  transformOrigin: '50% 32px',
+                }}
+              />
+            ))}
+          </motion.div>
+        </div>
+      );
+    }
+    case 'projectile':
+    case 'homing':
+      return (
+        <motion.div
+          animate={
+            kind === 'homing'
+              ? { x: [-64, 0, 64], y: [8, -10, 8], rotate: [8, -8, 8], opacity: [0.2, 1, 0.2] }
+              : { x: [-64, 64], opacity: [0.2, 1, 0.2] }
+          }
+          transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute left-1/2 top-1/2 h-1.5 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: color, boxShadow: `0 0 10px ${color}` }}
+        />
+      );
+    case 'sweep':
+      return (
+        <motion.div
+          animate={{ rotate: [-32, 32, -32] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute left-3 top-1/2 h-1.5 w-20 origin-left rounded-full"
+          style={{ background: color, boxShadow: `0 0 10px ${color}` }}
+        />
+      );
+    case 'aura':
+    case 'hazard':
+      return (
+        <motion.div
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+          style={{ borderColor: color }}
+          animate={{ width: [22, 64, 22], height: [22, 64, 22], opacity: [0.75, 0.15, 0.75] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      );
+    case 'laser':
+      return (
+        <>
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
+            <motion.div
+              className="h-0.5 w-full"
+              style={{ background: color }}
+              animate={{ opacity: [0.35, 1, 0.35] }}
+              transition={{ duration: 0.6, repeat: Infinity }}
+            />
+          </div>
+          <motion.div
+            className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ background: color, boxShadow: `0 0 14px ${color}` }}
+            animate={{ opacity: [1, 0.4, 1] }}
+            transition={{ duration: 0.6, repeat: Infinity }}
+          />
+        </>
+      );
+    case 'nova':
+      return (
+        <>
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+              style={{ borderColor: color }}
+              animate={{ width: [8, 76], height: [8, 76], opacity: [0.85, 0] }}
+              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.4, ease: 'easeOut' }}
+            />
+          ))}
+        </>
+      );
+    case 'wave':
+      return (
+        <>
+          {[0, 1].map((i) => (
+            <motion.div
+              key={i}
+              className="absolute left-6 top-1/2 -translate-y-1/2 rounded-full border-2"
+              style={{ borderColor: color }}
+              animate={{ x: [-8, 92], width: [10, 52], height: [10, 52], opacity: [0.9, 0] }}
+              transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.4, ease: 'easeOut' }}
+            />
+          ))}
+        </>
+      );
+    case 'punch':
+    case 'melee':
+      return (
+        <motion.div
+          className="absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2"
+          style={{ background: color, clipPath: STAR_CLIP }}
+          animate={{ scale: [0, 1.1, 0.9], opacity: [0, 1, 0] }}
+          transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 0.4, ease: 'easeOut' }}
+        />
+      );
+    case 'teleport':
+      return (
+        <motion.div
+          className="absolute top-1/2 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed"
+          style={{ borderColor: color }}
+          animate={{ left: ['33%', '33%', '33%', '66%', '66%', '66%'], opacity: [1, 1, 0, 0, 1, 1] }}
+          transition={{ duration: 2, repeat: Infinity, times: [0, 0.35, 0.42, 0.48, 0.55, 1] }}
+        />
+      );
+    case 'convert':
+      return (
+        <div className="absolute inset-0 flex items-center justify-center gap-1">
+          <motion.div
+            className="h-9 w-9 rounded-full border-2"
+            style={{ borderColor: color }}
+            animate={{ scale: [1, 1.18, 1] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="-ml-4 h-9 w-9 rounded-full border-2"
+            style={{ borderColor: color }}
+            animate={{ scale: [1.18, 1, 1.18] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
+      );
+    default:
+      return (
+        <motion.div
+          animate={{ x: [-64, 64], opacity: [0.2, 1, 0.2] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute left-1/2 top-1/2 h-1.5 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: color, boxShadow: `0 0 10px ${color}` }}
+        />
+      );
+  }
+}
+
 export function CharacterAbilityVisualizer({ character }: CharacterAbilityVisualizerProps) {
   const accent = character.palette.accent;
   return (
@@ -57,21 +223,7 @@ export function CharacterAbilityVisualizer({ character }: CharacterAbilityVisual
           </div>
         </div>
         <DemoBox title={character.weapon.name} icon={<Target className="h-3.5 w-3.5" />} color={accent} description={character.weapon.description}>
-          <motion.div
-            animate={{ x: [34, 86, 122, 86, 34], opacity: [0.2, 1, 0.9, 1, 0.2] }}
-            transition={{ duration: 1.7, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute bottom-8 left-0 h-1.5 w-24 rounded-full"
-            style={{ backgroundColor: accent, boxShadow: `0 0 18px ${accent}` }}
-          />
-          {[0, 1, 2].map((i) => (
-            <motion.div
-              key={i}
-              animate={{ x: [164, 138, 164], scale: [0.7, 1.15, 0.7], opacity: [0.2, 1, 0.2] }}
-              transition={{ duration: 1.1, delay: i * 0.22, repeat: Infinity }}
-              className="absolute bottom-[42px] h-5 w-5 border-2"
-              style={{ borderColor: accent, backgroundColor: `${accent}22` }}
-            />
-          ))}
+          <WeaponPatternDemo kind={character.weapon.kind} color={accent} count={character.weapon.count} />
           <div className="absolute bottom-3 left-3 text-[9px] uppercase tracking-widest text-white/50">{character.weapon.kind} pattern</div>
         </DemoBox>
         <DemoBox title={character.ultimate.name} icon={<Sparkles className="h-3.5 w-3.5" />} color={character.palette.glow} description={character.ultimate.description}>
