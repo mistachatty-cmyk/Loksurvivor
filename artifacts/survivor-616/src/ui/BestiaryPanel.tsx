@@ -16,6 +16,7 @@ export interface BestiaryPanelProps {
 
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
+  const isListView = meta.uiDensity === 'list';
   const discovered = ENEMIES.filter((e) => (meta.bestiary[e.id] ?? 0) > 0).length;
   const unlockedIds = new Set(unlockedCharacters.map((character) => character.id));
 
@@ -39,7 +40,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
           </div>
           <p className="text-xs text-muted-foreground font-mono">{unlockedCharacters.length} / {CHARACTERS.length} available</p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
           {CHARACTERS.map((character, i) => {
             const unlocked = unlockedIds.has(character.id);
             return (
@@ -110,7 +111,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         <h2 className="text-xl font-black uppercase tracking-tight text-white">Known threats</h2>
         <div className="h-px flex-1 bg-border" />
       </div>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
         {ENEMIES.map((enemy, i) => {
           const kills = meta.bestiary[enemy.id] ?? 0;
           const known = kills > 0;

@@ -268,6 +268,7 @@ function VendorCard({
 
 export function VendorPanel({ onBack }: VendorPanelProps) {
   const { meta, buyVendorItem } = useMeta();
+  const isListView = meta.uiDensity === 'list';
   const totalOwned = VENDOR_CATALOG.reduce((total, item) => total + ownedStacks(item, meta.vendorPurchases), 0);
   const maxStacks = VENDOR_CATALOG.reduce((total, item) => total + item.maxStacks, 0);
   const maxedCount = VENDOR_CATALOG.filter((item) => ownedStacks(item, meta.vendorPurchases) >= item.maxStacks).length;
@@ -340,7 +341,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
                   </div>
                   <p className="max-w-md text-xs leading-5 text-white/40 sm:text-right">{category.description}</p>
                 </div>
-                <div className={`grid gap-3 ${category.key === 'stat' ? 'sm:grid-cols-2 xl:grid-cols-3' : category.key === 'utility' ? 'md:grid-cols-2' : 'lg:grid-cols-3'}`}>
+                <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : category.key === 'stat' ? 'sm:grid-cols-2 xl:grid-cols-3' : category.key === 'utility' ? 'md:grid-cols-2' : 'lg:grid-cols-3'}`}>
                   {items.map((item, index) => (
                     <VendorCard key={item.id} item={item} cred={meta.cred} purchases={meta.vendorPurchases} onPurchase={buyVendorItem} index={index} />
                   ))}

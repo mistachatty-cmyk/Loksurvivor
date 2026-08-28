@@ -20,7 +20,7 @@ import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/
 import { LokPetIcon } from './LokPetVariantSheet';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -30,6 +30,7 @@ export interface ArchivePanelProps {
 
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   const { meta, resetProgress } = useMeta();
+  const isListView = meta.uiDensity === 'list';
   const [showHistory, setShowHistory] = useState(false);
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
   const formatHistoryDate = (timestamp: number) => {
@@ -37,13 +38,22 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     return new Date(timestamp).toLocaleDateString();
   };
 
+  // The archive used to stack all 8 chapters in one continuous scroll --
+  // a tab strip shows one chapter at a time instead, so most of what's
+  // here is reachable without scrolling for days.
+  const [activeChapter, setActiveChapter] = useState<string>('workshop');
+
   useEffect(() => {
-    if (!focusVariantId) return;
+    if (focusVariantId) setActiveChapter('lokpets');
+  }, [focusVariantId]);
+
+  useEffect(() => {
+    if (!focusVariantId || activeChapter !== 'lokpets') return;
     document.getElementById(`lokpet-${focusVariantId}`)?.scrollIntoView({
       behavior: 'smooth',
       block: 'center',
     });
-  }, [focusVariantId]);
+  }, [focusVariantId, activeChapter]);
 
   const sections = [
     {
@@ -150,6 +160,13 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     }
   ];
 
+  const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
+    { key: 'workshop', label: 'Workshop', icon: Hammer },
+    { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
+    { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
+    ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
+  ];
+
   return (
     <ScreenLayout 
       title="Archive" 
@@ -167,7 +184,33 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
         </button>
       }
     >
-      <div className="space-y-12">
+      <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4" data-testid="archive-chapter-tabs">
+        {chapters.map((chapter) => {
+          const Icon = chapter.icon;
+          const active = chapter.key === activeChapter;
+          return (
+            <button
+              key={chapter.key}
+              type="button"
+              onClick={() => setActiveChapter(chapter.key)}
+              className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+                active
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+              }`}
+              data-testid={`button-archive-tab-${chapter.key}`}
+            >
+              <Icon className="h-4 w-4" />
+              {chapter.label}
+              {chapter.total !== undefined && (
+                <span className="font-mono text-[10px] opacity-75">{chapter.count} / {chapter.total}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeChapter === 'workshop' && (
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -175,7 +218,9 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
         >
           <WorkshopOverview compact />
         </motion.section>
+      )}
 
+      {activeChapter === 'lokpets' && (
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -191,7 +236,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               {catalogByVariant.size} / {LOKPET_VARIANTS.length}
             </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-3'}`}>
             {LOKPET_VARIANTS.map((variant) => {
               const entry = catalogByVariant.get(variant.id);
               const found = Boolean(entry);
@@ -270,7 +315,9 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
             })}
           </div>
         </motion.section>
+      )}
 
+      {activeChapter === 'history' && (
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -370,46 +417,46 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
             </div>
           )}
         </motion.section>
+      )}
 
-        {sections.map((section, sIdx) => {
-          const Icon = section.icon;
-          return (
-            <motion.section 
-              key={section.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: sIdx * 0.1 }}
-            >
-              <div className="flex items-center gap-3 mb-6 border-b border-border pb-2">
-                <Icon className="w-5 h-5 text-primary" />
-                <h2 className="text-2xl font-black uppercase tracking-tight text-white">{section.title}</h2>
-                <span className="ml-auto font-mono text-sm text-muted-foreground font-bold">
-                  {section.count} / {section.total}
-                </span>
-              </div>
-              
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {section.items.map(item => (
-                  <li 
-                    key={item.id} 
-                    className={`p-4 border border-l-4 ${
-                      item.found 
-                        ? 'border-border border-l-primary bg-card text-white' 
-                        : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
-                    }`}
-                    data-testid={item.testId}
-                  >
-                    <p className="font-bold uppercase tracking-wide text-sm mb-1">{item.name}</p>
-                    <p className={`text-xs ${item.found ? 'text-muted-foreground' : 'opacity-70'}`}>
-                      {item.desc}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </motion.section>
-          );
-        })}
-      </div>
+      {sections.map((section) => {
+        if (activeChapter !== section.title) return null;
+        const Icon = section.icon;
+        return (
+          <motion.section
+            key={section.title}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center gap-3 mb-6 border-b border-border pb-2">
+              <Icon className="w-5 h-5 text-primary" />
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">{section.title}</h2>
+              <span className="ml-auto font-mono text-sm text-muted-foreground font-bold">
+                {section.count} / {section.total}
+              </span>
+            </div>
+
+            <ul className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+              {section.items.map(item => (
+                <li
+                  key={item.id}
+                  className={`p-4 border border-l-4 ${
+                    item.found
+                      ? 'border-border border-l-primary bg-card text-white'
+                      : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
+                  }`}
+                  data-testid={item.testId}
+                >
+                  <p className="font-bold uppercase tracking-wide text-sm mb-1">{item.name}</p>
+                  <p className={`text-xs ${item.found ? 'text-muted-foreground' : 'opacity-70'}`}>
+                    {item.desc}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </motion.section>
+        );
+      })}
     </ScreenLayout>
   );
 }

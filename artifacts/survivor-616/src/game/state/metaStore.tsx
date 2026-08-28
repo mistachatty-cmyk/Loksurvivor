@@ -116,6 +116,7 @@ export function createInitialMeta(): MetaState {
     minimapVisible: true,
     minimapExpanded: true,
     minimapPosition: { x: 0.82, y: 0.18 },
+    uiDensity: 'grid',
     selectedCharacterId: 'shade',
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
@@ -552,6 +553,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
+    uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -791,6 +793,7 @@ type Action =
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
+  | { type: 'setUiDensity'; density: 'grid' | 'list' }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
   | { type: 'tickRecovery'; now: number }
@@ -896,6 +899,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
           ...state.meta,
           minimapPosition: normalizedPosition(action.position, state.meta.minimapPosition),
         },
+      };
+
+    case 'setUiDensity':
+      return {
+        ...state,
+        meta: { ...state.meta, uiDensity: action.density },
       };
 
     case 'tickRecovery':
@@ -1132,6 +1141,7 @@ export interface MetaContextValue {
   setMinimapVisible: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
   setMinimapPosition: (position: { x: number; y: number }) => void;
+  setUiDensity: (density: 'grid' | 'list') => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
   tickRecovery: () => void;
@@ -1186,6 +1196,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (position: { x: number; y: number }) => dispatch({ type: 'setMinimapPosition', position }),
     [],
   );
+  const setUiDensity = useCallback(
+    (density: 'grid' | 'list') => dispatch({ type: 'setUiDensity', density }),
+    [],
+  );
   const startRecovery = useCallback((characterId: string, locationId?: string) => dispatch({ type: 'startRecovery', characterId, locationId }), []);
   const stopRecovery = useCallback(() => dispatch({ type: 'stopRecovery' }), []);
   const tickRecovery = useCallback(() => dispatch({ type: 'tickRecovery', now: Date.now() }), []);
@@ -1236,6 +1250,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMinimapVisible,
       setMinimapExpanded,
       setMinimapPosition,
+      setUiDensity,
       resetProgress,
       startRecovery,
       stopRecovery,
@@ -1261,6 +1276,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMinimapVisible,
     setMinimapExpanded,
     setMinimapPosition,
+    setUiDensity,
     resetProgress,
     startRecovery,
     stopRecovery,

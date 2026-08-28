@@ -1,4 +1,4 @@
-import { LayoutDashboard, Map, Maximize2, MousePointer2, PauseCircle, Settings2, Smartphone, FlaskConical } from 'lucide-react';
+import { LayoutDashboard, LayoutList, Map, Maximize2, MousePointer2, PauseCircle, Settings2, Smartphone, FlaskConical } from 'lucide-react';
 
 import { useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
@@ -14,12 +14,13 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setLevelUpPauses,
     setMinimapVisible,
     setMinimapExpanded,
+    setUiDensity,
     setDevModeAllUnlocks,
   } = useMeta();
 
   return (
     <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
         <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
@@ -169,8 +170,59 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
           </div>
         </section>
 
+        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-300/10 text-emerald-200">
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Hub panel layout</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Card grid or legacy list</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    The Quartermaster, Relic Workshop, Archive, and Bestiary show multi-column card grids by default so
+                    you can see most of what's there without scrolling. Switch back to the original single-column list
+                    any time.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUiDensity('grid')}
+                  aria-pressed={meta.uiDensity === 'grid'}
+                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.uiDensity === 'grid'
+                      ? 'border-emerald-300/60 bg-emerald-300/15 text-emerald-100'
+                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                  }`}
+                  data-testid="button-ui-density-grid"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Card grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUiDensity('list')}
+                  aria-pressed={meta.uiDensity === 'list'}
+                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.uiDensity === 'list'
+                      ? 'border-emerald-300/60 bg-emerald-300/15 text-emerald-100'
+                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                  }`}
+                  data-testid="button-ui-density-list"
+                >
+                  <LayoutList className="h-4 w-4" />
+                  Legacy list
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {import.meta.env.DEV && (
-          <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6" data-testid="dev-mode-panel">
+          <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
                 <FlaskConical className="h-5 w-5" />

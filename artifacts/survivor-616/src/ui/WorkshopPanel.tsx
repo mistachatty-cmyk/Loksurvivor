@@ -9,6 +9,7 @@ export interface WorkshopOverviewProps {
 
 export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
   const { meta } = useMeta();
+  const isListView = meta.uiDensity === 'list';
   const knownRelicIds = new Set(meta.knownRelicIds);
   const knownRecipeCount = RELIC_RECIPES.filter((recipe) => knownRelicIds.has(recipe.relicId)).length;
 
@@ -33,7 +34,7 @@ export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
           <Sparkles className="h-4 w-4 text-orange-300" />
           <h3 className="text-sm font-black uppercase tracking-widest text-white">Relic knowledge</h3>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
           {CITY_RELICS.map((relic) => {
             const found = knownRelicIds.has(relic.id);
             return (
@@ -70,7 +71,7 @@ export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
           <Hammer className="h-4 w-4 text-orange-300" />
           <h3 className="text-sm font-black uppercase tracking-widest text-white">Recipe board</h3>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2'}`}>
           {RELIC_RECIPES.map((recipe) => {
             const known = knownRelicIds.has(recipe.relicId);
             return (

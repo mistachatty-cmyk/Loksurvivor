@@ -1117,6 +1117,8 @@ export interface MetaState {
   minimapExpanded: boolean;
   /** Normalized top-left position of the endless minimap within the viewport. */
   minimapPosition: { x: number; y: number };
+  /** 'grid' shows list-heavy hub panels as multi-column card grids; 'list' is the original single-column layout. */
+  uiDensity: 'grid' | 'list';
   selectedCharacterId: string;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];
