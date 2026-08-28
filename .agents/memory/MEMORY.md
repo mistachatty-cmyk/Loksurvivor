@@ -7,3 +7,4 @@
 - [Impact physics contract](impact-physics.md) — authored force stays separate from damage, and lethal bursts must reuse the single kill/reward path.
 - [Pothole impact contract](potholes.md) — pits activate only from explicit stomp/ground-shock tags and remain separate from solid collision props.
 - [District setpiece contract](district-setpieces.md) — landmark incursions are optional seeded interruptions with shared simulation, bounded one-time rewards, and normal run recovery.
+- [Sky ambiance contract](sky-ambiance.md) — drifting clouds/shadows, birds, and road fireflies are pure render-layer, time-driven decoration; ground-level ones must clip to the arena bounds or `drawArenaEdges` silently paints over them.

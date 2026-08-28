@@ -136,6 +136,178 @@ function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: numbe
   ctx.restore();
 }
 
+/* ------------------------------------------------------------------ */
+/* Sky ambiance -- drifting clouds, their ground shadows, birds, and    */
+/* firefly-lit stretches of road. Purely decorative: derived each frame */
+/* from world position + w.now, never touching engine/simulation state. */
+/* ------------------------------------------------------------------ */
+
+/** Roofed spaces shouldn't show sky effects overhead. */
+function isIndoor(w: World): boolean {
+  return Boolean(w.endless?.inDungeon || w.endless?.inBuilding);
+}
+
+/**
+ * Bounded (non-endless) arenas are walled off well inside the padded camera
+ * view, and the void beyond those walls is painted over later by
+ * drawArenaEdges -- so ground-level ambiance has to stay inside the actual
+ * arena bounds or it silently disappears under that overpaint.
+ */
+function clipToArena(w: World, left: number, top: number, right: number, bottom: number) {
+  if (w.area.endless) return { left, top, right, bottom };
+  const halfW = w.bounds.w / 2;
+  const halfH = w.bounds.h / 2;
+  return {
+    left: Math.max(left, -halfW),
+    top: Math.max(top, -halfH),
+    right: Math.min(right, halfW),
+    bottom: Math.min(bottom, halfH),
+  };
+}
+
+interface CloudPuff { x: number; y: number; rx: number; ry: number; density: number; }
+
+const CLOUD_CELL = 300;
+
+/** One drifting cloud silhouette per sparse grid cell in view, wrapped seamlessly along its lane. */
+function computeCloudPuffs(w: World, left: number, top: number, right: number, bottom: number): CloudPuff[] {
+  const clip = clipToArena(w, left, top, right, bottom);
+  const puffs: CloudPuff[] = [];
+  const startX = Math.floor(clip.left / CLOUD_CELL) * CLOUD_CELL - CLOUD_CELL;
+  const startY = Math.floor(clip.top / CLOUD_CELL) * CLOUD_CELL - CLOUD_CELL;
+  for (let x = startX; x < clip.right + CLOUD_CELL; x += CLOUD_CELL) {
+    for (let y = startY; y < clip.bottom + CLOUD_CELL; y += CLOUD_CELL) {
+      const gx = x / CLOUD_CELL;
+      const gy = y / CLOUD_CELL;
+      const n = hashCell(gx, gy);
+      if (n > 0.45) continue;
+      const laneSpeed = 0.006 + hashCell(gx + 31, gy) * 0.008;
+      const phase = hashCell(gx + 71, gy - 17) * CLOUD_CELL;
+      const driftX = (w.now * laneSpeed + phase) % CLOUD_CELL;
+      const cx = x + driftX;
+      const cy = y + CLOUD_CELL * 0.5 + Math.sin(w.now / 6000 + gy * 3.1) * 30;
+      puffs.push({ x: cx, y: cy, rx: 60 + n * 90, ry: 26 + n * 34, density: n });
+    }
+  }
+  return puffs;
+}
+
+/** Soft dark patches on the ground directly under each cloud. */
+function drawCloudShadows(ctx: CanvasRenderingContext2D, puffs: CloudPuff[]) {
+  if (puffs.length === 0) return;
+  ctx.save();
+  ctx.fillStyle = '#05050a';
+  for (const p of puffs) {
+    ctx.globalAlpha = 0.08 + p.density * 0.1;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x + p.rx * 0.5, p.y - p.ry * 0.2, p.rx * 0.6, p.ry * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** The clouds themselves, floating above the action a beat ahead of their shadow. */
+function drawClouds(ctx: CanvasRenderingContext2D, puffs: CloudPuff[]) {
+  if (puffs.length === 0) return;
+  ctx.save();
+  ctx.fillStyle = '#f4f6ff';
+  for (const p of puffs) {
+    const x = p.x - 26;
+    const y = p.y - 48;
+    ctx.globalAlpha = 0.05 + p.density * 0.06;
+    ctx.beginPath();
+    ctx.ellipse(x, y, p.rx * 0.9, p.ry * 0.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + p.rx * 0.5, y - p.ry * 0.25, p.rx * 0.55, p.ry * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+const BIRD_CELL = 420;
+
+/** Loose flocks of small birds wheeling across the sky in slow, wrapped passes. */
+function drawBirds(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const startX = Math.floor(left / BIRD_CELL) * BIRD_CELL - BIRD_CELL;
+  const startY = Math.floor(top / BIRD_CELL) * BIRD_CELL - BIRD_CELL;
+  ctx.save();
+  ctx.strokeStyle = '#1c1c22';
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.5;
+  for (let x = startX; x < right + BIRD_CELL; x += BIRD_CELL) {
+    for (let y = startY; y < bottom + BIRD_CELL; y += BIRD_CELL) {
+      const gx = x / BIRD_CELL;
+      const gy = y / BIRD_CELL;
+      const n = hashCell(gx + 500, gy + 500);
+      if (n > 0.16) continue;
+      const angle = hashCell(gx, gy + 200) * Math.PI * 2;
+      const speed = 0.03 + hashCell(gx + 9, gy) * 0.018;
+      const phase = hashCell(gx - 9, gy + 9) * BIRD_CELL;
+      const drift = ((w.now * speed + phase) % BIRD_CELL) - BIRD_CELL / 2;
+      const leaderX = x + BIRD_CELL / 2 + Math.cos(angle) * drift;
+      const leaderY = y + BIRD_CELL / 2 + Math.sin(angle) * drift;
+      const count = 3 + Math.floor(hashCell(gx + 3, gy - 3) * 3);
+      for (let i = 0; i < count; i += 1) {
+        const back = i * 16;
+        const lateral = (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 10;
+        const bx = leaderX - Math.cos(angle) * back - Math.sin(angle) * lateral;
+        const by = leaderY - Math.sin(angle) * back + Math.cos(angle) * lateral;
+        const flap = 0.55 + Math.sin(w.now / 110 + i * 1.7 + n * 6) * 0.55;
+        const wing = 5 + flap * 4;
+        ctx.beginPath();
+        ctx.moveTo(bx - wing, by + wing * 0.5);
+        ctx.lineTo(bx, by - 1);
+        ctx.lineTo(bx + wing, by + wing * 0.5);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+const FIREFLY_CELL = 260;
+
+/** A handful of road stretches glow with small clusters of hovering light bugs. */
+function drawRoadFireflies(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const clip = clipToArena(w, left, top, right, bottom);
+  const startX = Math.floor(clip.left / FIREFLY_CELL) * FIREFLY_CELL;
+  const startY = Math.floor(clip.top / FIREFLY_CELL) * FIREFLY_CELL;
+  ctx.save();
+  for (let x = startX; x < clip.right; x += FIREFLY_CELL) {
+    for (let y = startY; y < clip.bottom; y += FIREFLY_CELL) {
+      const gx = x / FIREFLY_CELL;
+      const gy = y / FIREFLY_CELL;
+      const n = hashCell(gx + 900, gy + 900);
+      if (n > 0.16) continue;
+      const cx = x + FIREFLY_CELL * (0.25 + 0.5 * hashCell(gx + 900, gy));
+      const cy = y + FIREFLY_CELL * (0.25 + 0.5 * hashCell(gx, gy + 900));
+      const count = 3 + Math.floor(hashCell(gx - 4, gy + 4) * 4);
+      for (let i = 0; i < count; i += 1) {
+        const seed = hashCell(gx + i * 7.3, gy - i * 3.1);
+        const orbitR = 14 + seed * 30;
+        const orbitSpeed = i % 2 === 0 ? 1 : -1;
+        const angle = w.now / (700 + seed * 500) * orbitSpeed + seed * Math.PI * 2;
+        const fx = cx + Math.cos(angle) * orbitR;
+        const fy = cy + Math.sin(angle * 1.3) * orbitR * 0.6;
+        const glow = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(w.now / (240 + seed * 200) + seed * 10));
+        const r = 10 + glow * 6;
+        const gradient = ctx.createRadialGradient(fx, fy, 0, fx, fy, r);
+        gradient.addColorStop(0, `rgba(214, 245, 140, ${0.55 * glow})`);
+        gradient.addColorStop(1, 'rgba(214, 245, 140, 0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(fx, fy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255, 255, 220, ${0.7 * glow})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
 function drawChunkLandmark(
   ctx: CanvasRenderingContext2D,
   block: {
@@ -1920,6 +2092,8 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
 
   // Use the era's ground palette when inside a dungeon room.
   const ground = effectiveGround(w);
+  const outdoor = !isIndoor(w);
+  const cloudPuffs = outdoor ? computeCloudPuffs(w, left, top, right, bottom) : [];
   drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   if (w.endless?.inDungeon) {
     ctx.fillStyle = '#000';
@@ -1927,6 +2101,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
   }
+  drawCloudShadows(ctx, cloudPuffs);
   drawCityMapFeatures(ctx, w);
   drawEndlessRouteEvent(ctx, w);
   drawBuildingInterior(ctx, w);
@@ -1935,6 +2110,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawLandmark(ctx, w);
   drawDistrictIncursion(ctx, w);
   drawObjectLighting(ctx, w);
+  if (outdoor) drawRoadFireflies(ctx, w, left, top, right, bottom);
   drawArenaEdges(ctx, w);
   drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
@@ -1952,6 +2128,10 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawProjectiles(ctx, w);
   drawParticles(ctx, w);
   drawPopups(ctx, w);
+  if (outdoor) {
+    drawBirds(ctx, w, left, top, right, bottom);
+    drawClouds(ctx, cloudPuffs);
+  }
 
   ctx.restore();
 
