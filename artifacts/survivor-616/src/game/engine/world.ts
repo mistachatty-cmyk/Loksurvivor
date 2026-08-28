@@ -2989,6 +2989,46 @@ function resolveMovingPropCollisions(w: World, prop: BreakableObstacle) {
   }
 }
 
+/**
+ * Same bounded-space test clampToArena uses for the player/enemies -- a
+ * walled story arena, or a dungeon/building room while in endless mode.
+ * Open endless streets have no walls at all.
+ */
+function arenaWallBounds(w: World): { halfW: number; halfH: number; centerX: number; centerY: number } | null {
+  if (w.area.endless) {
+    if (w.endless?.inDungeon || w.endless?.inBuilding) {
+      const e = w.endless;
+      return { halfW: e.dungeonBounds.w / 2, halfH: e.dungeonBounds.h / 2, centerX: e.dungeonCenterX, centerY: e.dungeonCenterY };
+    }
+    return null;
+  }
+  return { halfW: w.bounds.w / 2, halfH: w.bounds.h / 2, centerX: 0, centerY: 0 };
+}
+
+/** Launched props bounce off the arena walls instead of flying through them. */
+function resolvePropArenaWalls(w: World, prop: BreakableObstacle) {
+  const bounds = arenaWallBounds(w);
+  if (!bounds) return;
+  const minX = bounds.centerX - bounds.halfW + prop.w / 2;
+  const maxX = bounds.centerX + bounds.halfW - prop.w / 2;
+  const minY = bounds.centerY - bounds.halfH + prop.h / 2;
+  const maxY = bounds.centerY + bounds.halfH - prop.h / 2;
+  if (prop.x < minX) {
+    prop.x = minX;
+    prop.vx *= -0.28;
+  } else if (prop.x > maxX) {
+    prop.x = maxX;
+    prop.vx *= -0.28;
+  }
+  if (prop.y < minY) {
+    prop.y = minY;
+    prop.vy *= -0.28;
+  } else if (prop.y > maxY) {
+    prop.y = maxY;
+    prop.vy *= -0.28;
+  }
+}
+
 function pointToSegmentDistanceSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
   const dy = by - ay;
@@ -3095,6 +3135,7 @@ function updateBreakables(w: World, dt: number) {
       const speedBeforeMove = Math.hypot(b.vx, b.vy);
       b.x += b.vx * dt; b.y += b.vy * dt;
       resolveMovingPropCollisions(w, b);
+      resolvePropArenaWalls(w, b);
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
       const friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
       b.vx *= Math.pow(friction, dt * 60);

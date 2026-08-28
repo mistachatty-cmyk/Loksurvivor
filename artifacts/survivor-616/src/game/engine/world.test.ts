@@ -517,6 +517,28 @@ test('a heavy metal box absorbs a hit, moves under strong impact, and never brea
   assert.ok(box.x > xBefore);
 });
 
+test('a launched prop bounces off the arena wall instead of flying through it', () => {
+  const halfW = AREAS[0]!.bounds.w / 2;
+  const world = createWorld(
+    testArea({ x: halfW - 60, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    701,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const prop = world.breakables[0]!;
+  prop.vx = 2000;
+
+  const maxX = halfW - prop.w / 2;
+  let sawNegativeVx = false;
+  for (let i = 0; i < 60; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+    assert.ok(prop.x <= maxX + 0.01, `prop crossed the wall at step ${i}: x=${prop.x}, wall=${maxX}`);
+    if (prop.vx < 0) sawNegativeVx = true;
+  }
+  assert.ok(sawNegativeVx, 'the wall should bounce the prop back with reversed velocity');
+});
+
 test('clicking a movable prop primes one reverse launch and gives it a damaging path', () => {
   const world = createWorld(
     testArea({ x: 80, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),

@@ -192,13 +192,13 @@ function computeCloudPuffs(w: World, left: number, top: number, right: number, b
   return puffs;
 }
 
-/** Soft dark patches on the ground directly under each cloud. */
+/** Cool indigo patches on the ground directly under each cloud -- reads as shade, not a flat black smear. */
 function drawCloudShadows(ctx: CanvasRenderingContext2D, puffs: CloudPuff[]) {
   if (puffs.length === 0) return;
   ctx.save();
-  ctx.fillStyle = '#05050a';
+  ctx.fillStyle = '#151c3d';
   for (const p of puffs) {
-    ctx.globalAlpha = 0.08 + p.density * 0.1;
+    ctx.globalAlpha = 0.24 + p.density * 0.2;
     ctx.beginPath();
     ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
     ctx.ellipse(p.x + p.rx * 0.5, p.y - p.ry * 0.2, p.rx * 0.6, p.ry * 0.7, 0, 0, Math.PI * 2);
@@ -211,14 +211,21 @@ function drawCloudShadows(ctx: CanvasRenderingContext2D, puffs: CloudPuff[]) {
 function drawClouds(ctx: CanvasRenderingContext2D, puffs: CloudPuff[]) {
   if (puffs.length === 0) return;
   ctx.save();
-  ctx.fillStyle = '#f4f6ff';
   for (const p of puffs) {
     const x = p.x - 26;
     const y = p.y - 48;
-    ctx.globalAlpha = 0.05 + p.density * 0.06;
+    // Cool underside body plus a warmer sunlit highlight so the shape reads
+    // as a cloud, not a flat blob the same tone as the sky behind it.
+    ctx.fillStyle = '#cbd6ef';
+    ctx.globalAlpha = 0.22 + p.density * 0.16;
     ctx.beginPath();
     ctx.ellipse(x, y, p.rx * 0.9, p.ry * 0.8, 0, 0, Math.PI * 2);
     ctx.ellipse(x + p.rx * 0.5, y - p.ry * 0.25, p.rx * 0.55, p.ry * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff8e8';
+    ctx.globalAlpha = 0.16 + p.density * 0.12;
+    ctx.beginPath();
+    ctx.ellipse(x - p.rx * 0.15, y - p.ry * 0.35, p.rx * 0.55, p.ry * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
