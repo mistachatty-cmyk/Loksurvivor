@@ -3,7 +3,6 @@
  * Owned by the design pass -- keep the export name and props stable.
  */
 import { useMeta } from '@/game/state/metaStore';
-import { ALLIES, HUB_ROOMS_BY_ID } from '@/game/data/progression';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
@@ -12,7 +11,7 @@ import { RigPortrait } from './RigPortrait';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, Coffee, Headphones, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot } from 'lucide-react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
@@ -37,14 +36,6 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
 };
 
-const HANGOUTS = [
-  { activity: 'working the room', detail: 'keeps one eye on the door and one hand on the till', icon: Coffee },
-  { activity: 'ringing the hour', detail: 'tests the hideout alarm for anyone still asleep', icon: Waves },
-  { activity: 'painting the skyline', detail: 'adds a fresh mark to the edge of the city', icon: SprayCan },
-  { activity: 'running the sound system', detail: 'finds a bassline that makes the pipes hum', icon: Headphones },
-  { activity: 'feeding the crew', detail: 'has already put something warm on the stove', icon: Utensils },
-];
-const ALLIES_INDEX = Object.fromEntries(ALLIES.map((ally, index) => [ally.id, index]));
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
 const ACTIVITY_ICONS = {
   utensils: Utensils,
@@ -64,7 +55,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
-  const { unlockedRooms, rescuedAllies, selectedCharacter, meta, setDevModeAllUnlocks } = useMeta();
+  const { unlockedRooms, rescuedAllies, selectedCharacter, meta } = useMeta();
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
@@ -127,6 +118,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
                {scene.biome === 'sanctum' && <div className="hideout-window-grid"><span /><span /><span /></div>}
                {scene.biome === 'rooftop' && <RadioTower className="h-20 w-20 opacity-40" />}
                {scene.biome === 'cellar' && <Trees className="h-20 w-20 opacity-35" />}
+               {scene.biome === 'alley' && <Lamp className="h-20 w-20 opacity-40" />}
+               {scene.biome === 'archive' && <BookOpen className="h-20 w-20 opacity-35" />}
              </div>
            </div>
         </motion.div>
@@ -151,31 +144,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
               )}
             </div>
           </div>
-
-          {import.meta.env.DEV && (
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-dashed border-primary/60 bg-primary/5 px-4 py-3" data-testid="dev-mode-panel">
-              <div className="flex items-center gap-3">
-                <Settings2 className="h-4 w-4 text-primary" />
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Developer mode</p>
-                  <p className="text-xs text-muted-foreground">Expose every unlockable character, area, and room.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDevModeAllUnlocks(!meta.devModeAllUnlocks)}
-                className={`border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                  meta.devModeAllUnlocks
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-muted-foreground hover:border-primary hover:text-white'
-                }`}
-                aria-pressed={meta.devModeAllUnlocks}
-                data-testid="button-toggle-dev-unlocks"
-              >
-                All unlocks: {meta.devModeAllUnlocks ? 'On' : 'Off'}
-              </button>
-            </div>
-          )}
 
           <nav className="flex flex-wrap gap-2 mb-6">
             {unlockedRooms.map((room) => {
@@ -333,75 +301,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
           </div>
         </section>
 
-         {roomAllies.length > 0 && (
-           <section className="mb-8 border border-primary/30 bg-black/35 p-4 sm:p-5" data-testid="section-crew-activities">
-             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-               <div>
-                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Crew autonomy</p>
-                 <h2 className="text-2xl font-black uppercase text-white">They picked tonight’s work</h2>
-               </div>
-               <p className="max-w-md text-xs leading-relaxed text-muted-foreground sm:text-right">
-                 Nobody gets assigned. Each friend chooses from the things they like doing whenever you return to the hideout.
-               </p>
-             </div>
-             <div className="mt-4 grid gap-3 lg:grid-cols-2">
-               {roomAllies.map((ally) => {
-                 const activity = CREW_ACTIVITIES_BY_ID[meta.crewActivityByAlly[ally.id]];
-                 const preferences = preferredActivitiesForAlly(ally.id);
-                 const Icon = activity ? ACTIVITY_ICONS[activity.icon] : Users;
-                 return (
-                   <article key={ally.id} className="border border-border bg-card/70 p-3" data-testid={`crew-activity-${ally.id}`}>
-                     <div className="flex gap-3">
-                       <div className="grid h-16 w-16 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-                         <Icon className="h-8 w-8" aria-hidden="true" />
-                       </div>
-                       <div className="min-w-0 flex-1">
-                         <div className="flex flex-wrap items-center justify-between gap-2">
-                           <p className="font-black uppercase tracking-wide text-white">{ally.name}</p>
-                           <span className="font-mono text-[10px] uppercase tracking-widest text-primary">Autonomous pick</span>
-                         </div>
-                         {activity ? (
-                           <>
-                             <h3 className="mt-1 text-lg font-black text-white">{activity.name}</h3>
-                             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{activity.description}</p>
-                             <p className="mt-2 font-mono text-xs font-bold uppercase tracking-wider text-emerald-300">{activity.benefitLabel}</p>
-                           </>
-                         ) : (
-                           <p className="mt-2 text-sm text-muted-foreground">They are still deciding what sounds good tonight.</p>
-                         )}
-                       </div>
-                     </div>
-                     {preferences.length > 1 && (
-                       <div className="mt-3 border-t border-border/60 pt-3">
-                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Things they enjoy</p>
-                         <div className="mt-2 flex flex-wrap gap-2">
-                           {preferences.map((preference) => {
-                             const PreferenceIcon = ACTIVITY_ICONS[preference.icon];
-                             const isPicked = preference.id === activity?.id;
-                             return (
-                               <div
-                                 key={preference.id}
-                                 className={`flex items-center gap-1.5 border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                                   isPicked ? 'border-primary/70 bg-primary/15 text-white' : 'border-border text-muted-foreground'
-                                 }`}
-                                 data-picked={isPicked}
-                               >
-                                 <PreferenceIcon className="h-3 w-3" aria-hidden="true" />
-                                 {preference.name}
-                                 {isPicked && <span className="font-mono text-primary">· now</span>}
-                               </div>
-                             );
-                           })}
-                         </div>
-                       </div>
-                     )}
-                   </article>
-                 );
-               })}
-             </div>
-           </section>
-         )}
-
          {activeRoom.features.includes('allies') && (
           <section className="mt-auto">
             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">
@@ -415,36 +314,60 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
             ) : (
                <>
                <p className="mb-3 border-l-2 border-primary/60 pl-3 text-xs italic text-muted-foreground" data-testid="crew-moment">{crewMoment}</p>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {roomAllies.map((ally) => (
-                  <li key={ally.id} className="relative flex min-h-[148px] flex-col justify-end overflow-hidden border border-border bg-card/60 p-3">
-                    <div className="absolute inset-x-0 top-0 flex h-24 items-end justify-center bg-gradient-to-b from-primary/10 to-transparent">
-                      <RigPortrait
-                        rig={humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' })}
-                        palette={ally.palette}
-                        anim="idle"
-                        size={96}
-                      />
-                    </div>
-                    <div className="relative z-10 mt-20">
-                       {(() => {
-                         const hangout = HANGOUTS[((ALLIES_INDEX[ally.id] ?? 0) + scene.weather.length + activeRoom.id.length) % HANGOUTS.length];
-                         const Icon = hangout.icon;
-                         return (
-                           <>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold text-white text-sm uppercase tracking-wide">{ally.name}</span>
-                         <Icon className="h-3.5 w-3.5 text-primary" />
+              <ul className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {roomAllies.map((ally) => {
+                  const activity = CREW_ACTIVITIES_BY_ID[meta.crewActivityByAlly[ally.id]];
+                  const preferences = preferredActivitiesForAlly(ally.id);
+                  const ActivityIcon = activity ? ACTIVITY_ICONS[activity.icon] : Users;
+                  return (
+                    <li key={ally.id} className="flex gap-3 border border-border bg-card/60 p-3" data-testid={`crew-activity-${ally.id}`}>
+                      <div className="grid h-20 w-20 shrink-0 place-items-center border border-primary/40 bg-primary/10">
+                        <RigPortrait
+                          rig={humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' })}
+                          palette={ally.palette}
+                          anim="idle"
+                          size={72}
+                        />
                       </div>
-                       <span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-primary">{hangout.activity}</span>
-                       <span className="mt-1 block text-xs text-muted-foreground">{hangout.detail}.</span>
-                      <span className="mt-2 block border-t border-border/50 pt-2 text-[10px] text-muted-foreground">{ally.boostLabel}</span>
-                           </>
-                         );
-                       })()}
-                    </div>
-                  </li>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-black uppercase tracking-wide text-white text-sm">{ally.name}</span>
+                          <ActivityIcon className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
+                        </div>
+                        {activity ? (
+                          <>
+                            <p className="mt-1 text-xs font-bold uppercase tracking-widest text-primary">{activity.name}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{activity.description}</p>
+                            <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-300">{activity.benefitLabel}</p>
+                          </>
+                        ) : (
+                          <p className="mt-1 text-xs italic text-muted-foreground">Still deciding what sounds good tonight.</p>
+                        )}
+                        <span className="mt-2 block border-t border-border/50 pt-2 text-[10px] text-muted-foreground">{ally.boostLabel}</span>
+                        {preferences.length > 1 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {preferences.map((preference) => {
+                              const PreferenceIcon = ACTIVITY_ICONS[preference.icon];
+                              const isPicked = preference.id === activity?.id;
+                              return (
+                                <div
+                                  key={preference.id}
+                                  className={`flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                                    isPicked ? 'border-primary/70 bg-primary/15 text-white' : 'border-border text-muted-foreground'
+                                  }`}
+                                  data-picked={isPicked}
+                                >
+                                  <PreferenceIcon className="h-2.5 w-2.5" aria-hidden="true" />
+                                  {preference.name}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
                </>
             )}

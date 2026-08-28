@@ -128,6 +128,28 @@ export const HUB_ROOMS: HubRoomDef[] = [
     unlock: { kind: 'discovery', discoveryId: 'lantern-shard' },
     features: ['music', 'bestiary', 'allies', 'unlocks', 'settings'],
   },
+  {
+    id: 'the-alley',
+    name: 'The Alley Annex',
+    subtitle: 'Back-door workshop',
+    description:
+      'A fire-escape and a propped-open service door. Crates of salvage, a workbench, and a lamp that never quite goes out.',
+    backdrop: 'art/alley.jpeg',
+    biome: 'alley',
+    unlock: { kind: 'discovery', discoveryId: 'floodwall-mark' },
+    features: ['vendor', 'workshop', 'allies', 'settings'],
+  },
+  {
+    id: 'the-storefront',
+    name: 'The Storefront',
+    subtitle: 'Street-level records room',
+    description:
+      'A shuttered storefront with the old ledger books still on the counter. Every name in the neighborhood ends up here eventually.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    unlock: { kind: 'discovery', discoveryId: 'sire-ledger' },
+    features: ['bestiary', 'unlocks', 'allies', 'settings'],
+  },
 ];
 
 export const HUB_ROOMS_BY_ID: Record<string, HubRoomDef> = Object.fromEntries(

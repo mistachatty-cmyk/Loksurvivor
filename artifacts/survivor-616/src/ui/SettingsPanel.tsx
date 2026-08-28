@@ -1,4 +1,4 @@
-import { LayoutDashboard, Map, Maximize2, MousePointer2, PauseCircle, Settings2, Smartphone } from 'lucide-react';
+import { LayoutDashboard, Map, Maximize2, MousePointer2, PauseCircle, Settings2, Smartphone, FlaskConical } from 'lucide-react';
 
 import { useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
@@ -14,6 +14,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setLevelUpPauses,
     setMinimapVisible,
     setMinimapExpanded,
+    setDevModeAllUnlocks,
   } = useMeta();
 
   return (
@@ -167,6 +168,40 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
             </div>
           </div>
         </section>
+
+        {import.meta.env.DEV && (
+          <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6" data-testid="dev-mode-panel">
+            <div className="flex items-start gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                <FlaskConical className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Developer mode</p>
+                    <h2 className="mt-1 text-xl font-black uppercase text-white">All unlocks</h2>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Expose every unlockable character, area, and hideout room, regardless of progress. Dev builds only.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDevModeAllUnlocks(!meta.devModeAllUnlocks)}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.devModeAllUnlocks
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                    }`}
+                    aria-pressed={meta.devModeAllUnlocks}
+                    data-testid="button-toggle-dev-unlocks"
+                  >
+                    All unlocks: {meta.devModeAllUnlocks ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
       </div>
     </ScreenLayout>
   );

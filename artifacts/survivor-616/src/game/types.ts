@@ -996,7 +996,7 @@ export interface HubRoomDef {
   features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings'>;
 }
 
-export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar';
+export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
 
 export type HideoutWeather = 'clear' | 'rain' | 'fog' | 'snow' | 'heat';
 

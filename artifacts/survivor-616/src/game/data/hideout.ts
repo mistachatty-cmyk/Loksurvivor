@@ -53,6 +53,38 @@ export const HIDEOUT_SCENES: Record<string, HideoutSceneDef> = {
       'The pipes hum a note nobody remembers teaching them.',
     ],
   },
+  'the-alley': {
+    biome: 'alley',
+    weather: 'clear',
+    weatherLabel: 'Quiet night',
+    weatherDescription: 'The service lamp holds a steady circle of light over the crates.',
+    homeName: 'The fire-escape bench',
+    homeDescription: 'A workbench built from salvage, close enough to the door to hear the street.',
+    homeAccent: '#fb923c',
+    skyAccent: '#1c1917',
+    motionKind: 'motes',
+    flavorLines: [
+      'Someone is still sorting the night\'s salvage by lamp light.',
+      'The propped door lets the street noise in, low and familiar.',
+      'A crate gets restacked for the third time. Nobody minds.',
+    ],
+  },
+  'the-storefront': {
+    biome: 'archive',
+    weather: 'fog',
+    weatherLabel: 'Streetlight haze',
+    weatherDescription: 'Fog off the river blurs the shuttered windows into soft light.',
+    homeName: 'The ledger counter',
+    homeDescription: 'A front counter stacked with record books, every name in the block written down somewhere.',
+    homeAccent: '#a78bfa',
+    skyAccent: '#1e1b3a',
+    motionKind: 'drones',
+    flavorLines: [
+      'Someone is cross-referencing a name against the old ledger again.',
+      'The shutters rattle once and settle. Just the wind off the river.',
+      'A new page gets added to the book. Nobody reads it out loud.',
+    ],
+  },
 };
 
 export const DEFAULT_HIDEOUT_SCENE: HideoutSceneDef = HIDEOUT_SCENES['main-floor'];
