@@ -27,9 +27,11 @@ import {
 import { ScreenLayout } from './ScreenLayout';
 import { ArrangeView } from './studio/ArrangeView';
 import { PadGrid } from './studio/PadGrid';
+import { PianoRoll } from './studio/PianoRoll';
 import { PluginRack } from './studio/PluginRack';
 import { useStudio } from './studio/useStudio';
 import { EFFECTS, findEffect } from '@/game/audio/studio/effects';
+import { INSTRUMENTS } from '@/game/audio/studio/instruments';
 import { useMeta } from '@/game/state/metaStore';
 import { MAX_BPM, MIN_BPM } from '@/game/audio/studio/project';
 
@@ -320,6 +322,23 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
                     />
                   </label>
 
+                  {/* An instrument track and an audio track differ only by
+                      this field, so the mixer above applies to both. */}
+                  <select
+                    value={track.instrumentId ?? ''}
+                    onChange={(event) => studio.setInstrument(track.id, event.target.value || undefined)}
+                    className="border border-border bg-background px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground"
+                    aria-label={`Instrument for ${track.name}`}
+                    data-testid={`select-instrument-${track.id}`}
+                  >
+                    <option value="">Audio clips</option>
+                    {INSTRUMENTS.map((instrument) => (
+                      <option key={instrument.id} value={instrument.id}>
+                        {instrument.label}
+                      </option>
+                    ))}
+                  </select>
+
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -414,6 +433,23 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
                 </div>
               ))}
             </div>
+
+            {studio.project.tracks
+              .filter((track) => track.instrumentId)
+              .map((track) => (
+                <PianoRoll
+                  key={track.id}
+                  track={track}
+                  beatsPerBar={studio.project.beatsPerBar}
+                  playheadRef={studio.playheadRef}
+                  playing={studio.playing}
+                  onAddNote={(note) => studio.placeNote(track.id, note)}
+                  onMoveNote={(noteId, pitch, startBeat) =>
+                    studio.relocateNote(track.id, noteId, pitch, startBeat)
+                  }
+                  onRemoveNote={(noteId) => studio.dropNote(track.id, noteId)}
+                />
+              ))}
 
             <PadGrid destination={studio.master} />
           </section>
