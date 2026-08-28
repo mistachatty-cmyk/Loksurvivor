@@ -29,6 +29,15 @@ export interface StudioClip {
   lengthBeats: number;
 }
 
+/** One effect in a track's insert chain. */
+export interface StudioEffect {
+  id: string;
+  /** Which `EffectDef` this is an instance of. */
+  effectId: string;
+  /** Normalised 0..1 values, keyed by `EffectParam.id`. */
+  params: Record<string, number>;
+}
+
 export interface StudioTrack {
   id: string;
   name: string;
@@ -39,6 +48,8 @@ export interface StudioTrack {
   muted: boolean;
   soloed: boolean;
   clips: StudioClip[];
+  /** Ordered insert chain. Order is the signal path.  */
+  effects: StudioEffect[];
 }
 
 export interface StudioProject {
@@ -66,7 +77,7 @@ export function studioId(prefix: string): string {
 }
 
 export function createTrack(name: string): StudioTrack {
-  return { id: studioId('track'), name, gain: 0.8, pan: 0, muted: false, soloed: false, clips: [] };
+  return { id: studioId('track'), name, gain: 0.8, pan: 0, muted: false, soloed: false, clips: [], effects: [] };
 }
 
 export function createProject(name = 'Untitled'): StudioProject {
@@ -129,6 +140,23 @@ function sanitizeClip(raw: unknown): StudioClip | null {
   };
 }
 
+function sanitizeEffect(raw: unknown): StudioEffect | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const effect = raw as Partial<StudioEffect>;
+  if (typeof effect.effectId !== 'string' || effect.effectId === '') return null;
+  const params: Record<string, number> = {};
+  if (effect.params && typeof effect.params === 'object') {
+    for (const [key, value] of Object.entries(effect.params)) {
+      if (typeof value === 'number' && Number.isFinite(value)) params[key] = clamp(value, 0, 1);
+    }
+  }
+  return {
+    id: typeof effect.id === 'string' && effect.id ? effect.id : studioId('effect'),
+    effectId: effect.effectId,
+    params,
+  };
+}
+
 function sanitizeTrack(raw: unknown): StudioTrack | null {
   if (!raw || typeof raw !== 'object') return null;
   const track = raw as Partial<StudioTrack>;
@@ -141,6 +169,9 @@ function sanitizeTrack(raw: unknown): StudioTrack | null {
     soloed: track.soloed === true,
     clips: Array.isArray(track.clips)
       ? track.clips.map(sanitizeClip).filter((clip): clip is StudioClip => clip !== null)
+      : [],
+    effects: Array.isArray(track.effects)
+      ? track.effects.map(sanitizeEffect).filter((effect): effect is StudioEffect => effect !== null)
       : [],
   };
 }
@@ -290,5 +321,50 @@ export function toggleSolo(project: StudioProject, trackId: string): StudioProje
   return {
     ...project,
     tracks: project.tracks.map((track) => ({ ...track, soloed: track.id === trackId ? next : false })),
+  };
+}
+
+export function addEffect(project: StudioProject, trackId: string, effectId: string, params: Record<string, number>): StudioProject {
+  const effect: StudioEffect = { id: studioId('effect'), effectId, params };
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === trackId ? { ...track, effects: [...track.effects, effect] } : track,
+    ),
+  };
+}
+
+export function removeEffect(project: StudioProject, trackId: string, effectInstanceId: string): StudioProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === trackId
+        ? { ...track, effects: track.effects.filter((effect) => effect.id !== effectInstanceId) }
+        : track,
+    ),
+  };
+}
+
+export function setEffectParam(
+  project: StudioProject,
+  trackId: string,
+  effectInstanceId: string,
+  paramId: string,
+  value: number,
+): StudioProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id !== trackId
+        ? track
+        : {
+            ...track,
+            effects: track.effects.map((effect) =>
+              effect.id === effectInstanceId
+                ? { ...effect, params: { ...effect.params, [paramId]: clamp(value, 0, 1) } }
+                : effect,
+            ),
+          },
+    ),
   };
 }

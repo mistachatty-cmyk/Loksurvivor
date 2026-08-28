@@ -15,6 +15,7 @@
 
 import * as Tone from 'tone';
 
+import { findEffect } from './effects';
 import { getBuffer } from './importer';
 import { secondsPerBeat, trackAudible, type StudioProject, type StudioTrack } from './project';
 
@@ -24,6 +25,8 @@ interface TrackNodes {
   panner: Tone.Panner;
   /** Ordered effect slots between the players and the fader. */
   inserts: Tone.ToneAudioNode[];
+  /** Effect instance ids, parallel to `inserts`. */
+  effectIds: string[];
   /** One player per clip, keyed by clip id. */
   players: Map<string, Tone.Player>;
   /** Transport event ids, so a re-schedule can cancel exactly its own events. */
@@ -53,6 +56,7 @@ export class TrackGraph {
       seen.add(track.id);
       const nodes = this.tracks.get(track.id) ?? this.createTrack(track.id);
       this.syncClips(nodes, track);
+      this.syncEffects(nodes, track);
       this.applyMix(nodes, project, track);
     }
 
@@ -67,7 +71,14 @@ export class TrackGraph {
   private createTrack(id: string): TrackNodes {
     const gain = new Tone.Gain(0.8);
     const panner = new Tone.Panner(0);
-    const nodes: TrackNodes = { gain, panner, inserts: [], players: new Map(), scheduled: [] };
+    const nodes: TrackNodes = {
+      gain,
+      panner,
+      inserts: [],
+      effectIds: [],
+      players: new Map(),
+      scheduled: [],
+    };
     this.tracks.set(id, nodes);
     this.rewire(nodes);
     return nodes;
@@ -133,6 +144,53 @@ export class TrackGraph {
     }
 
     if (added) this.rewire(nodes);
+  }
+
+  /**
+   * Reconciles the insert chain with the model.
+   *
+   * Nodes are keyed by the effect *instance* id, so two reverbs on one track
+   * stay distinct and reordering does not rebuild either of them. Only a
+   * changed set of instances triggers a rewire; a parameter move does not,
+   * because re-connecting the graph on every slider frame would click.
+   */
+  private syncEffects(nodes: TrackNodes, track: StudioTrack): void {
+    const desired = track.effects.map((effect) => effect.id);
+    const current = [...nodes.effectIds];
+    const changed =
+      desired.length !== current.length || desired.some((id, index) => id !== current[index]);
+
+    if (changed) {
+      for (const node of nodes.inserts) {
+        node.disconnect();
+        node.dispose();
+      }
+      nodes.inserts = [];
+      nodes.effectIds = [];
+
+      for (const effect of track.effects) {
+        const def = findEffect(effect.effectId);
+        // An unknown effect id means a project from a newer build; skipping it
+        // keeps the rest of the chain working rather than failing the track.
+        if (!def) continue;
+        nodes.inserts.push(def.create());
+        nodes.effectIds.push(effect.id);
+      }
+      this.rewire(nodes);
+    }
+
+    // Parameters are applied every sync, changed chain or not -- this is the
+    // path a slider move takes.
+    track.effects.forEach((effect) => {
+      const index = nodes.effectIds.indexOf(effect.id);
+      if (index === -1) return;
+      const def = findEffect(effect.effectId);
+      const node = nodes.inserts[index];
+      if (!def || !node) return;
+      for (const param of def.params) {
+        param.set(node, effect.params[param.id] ?? param.defaultValue);
+      }
+    });
   }
 
   private applyMix(nodes: TrackNodes, project: StudioProject, track: StudioTrack): void {

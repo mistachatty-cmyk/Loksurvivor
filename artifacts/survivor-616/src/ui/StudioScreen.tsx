@@ -26,7 +26,9 @@ import {
 
 import { ScreenLayout } from './ScreenLayout';
 import { ArrangeView } from './studio/ArrangeView';
+import { PadGrid } from './studio/PadGrid';
 import { useStudio } from './studio/useStudio';
+import { EFFECTS, findEffect } from '@/game/audio/studio/effects';
 import { MAX_BPM, MIN_BPM } from '@/game/audio/studio/project';
 
 export interface StudioScreenProps {
@@ -341,9 +343,72 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
                       Solo
                     </button>
                   </div>
+
+                  {/* insert chain -- order here is the signal path */}
+                  {track.effects.map((effect) => {
+                    const def = findEffect(effect.effectId);
+                    if (!def) return null;
+                    return (
+                      <div key={effect.id} className="border border-border/60 bg-background/40 p-2">
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                            {def.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => studio.dropEffect(track.id, effect.id)}
+                            className="text-muted-foreground transition-colors hover:text-destructive"
+                            aria-label={`Remove ${def.label} from ${track.name}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                        {def.params.map((param) => (
+                          <label
+                            key={param.id}
+                            className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground"
+                          >
+                            <span className="w-14 shrink-0">{param.label}</span>
+                            <input
+                              type="range"
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              value={effect.params[param.id] ?? param.defaultValue}
+                              onChange={(event) =>
+                                studio.tweakEffect(track.id, effect.id, param.id, Number(event.target.value))
+                              }
+                              className="min-w-0 flex-1"
+                              aria-label={`${def.label} ${param.label} on ${track.name}`}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    );
+                  })}
+
+                  <select
+                    value=""
+                    onChange={(event) => {
+                      if (event.target.value) studio.insertEffect(track.id, event.target.value);
+                      event.target.value = '';
+                    }}
+                    className="border border-border bg-background px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground"
+                    aria-label={`Add an effect to ${track.name}`}
+                    data-testid={`select-effect-${track.id}`}
+                  >
+                    <option value="">+ Effect</option>
+                    {EFFECTS.map((effect) => (
+                      <option key={effect.id} value={effect.id}>
+                        {effect.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>
+
+            <PadGrid destination={studio.master} />
           </section>
         </div>
       </div>
