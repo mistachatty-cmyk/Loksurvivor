@@ -191,3 +191,104 @@ export function storeProject(project: StudioProject): void {
     // A full or disabled store must not interrupt playback.
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Edits                                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Every edit is a pure function returning a new project.
+ *
+ * The UI therefore never hand-rolls a spread over nested arrays -- which is
+ * where "I moved a fader and it wiped my clips" bugs come from -- and each edit
+ * is testable without React or an audio context.
+ */
+
+export function updateTrack(
+  project: StudioProject,
+  trackId: string,
+  patch: Partial<Omit<StudioTrack, 'id' | 'clips'>>,
+): StudioProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) => (track.id === trackId ? { ...track, ...patch } : track)),
+  };
+}
+
+export function addTrack(project: StudioProject, name?: string): StudioProject {
+  return {
+    ...project,
+    tracks: [...project.tracks, createTrack(name ?? `Track ${project.tracks.length + 1}`)],
+  };
+}
+
+/** Removing the last track is refused: a project with no tracks has no UI. */
+export function removeTrack(project: StudioProject, trackId: string): StudioProject {
+  if (project.tracks.length <= 1) return project;
+  return { ...project, tracks: project.tracks.filter((track) => track.id !== trackId) };
+}
+
+export function addClip(
+  project: StudioProject,
+  trackId: string,
+  clip: Omit<StudioClip, 'id'>,
+): StudioProject {
+  const withId: StudioClip = { ...clip, id: studioId('clip') };
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === trackId ? { ...track, clips: [...track.clips, withId] } : track,
+    ),
+  };
+}
+
+export function removeClip(project: StudioProject, clipId: string): StudioProject {
+  return {
+    ...project,
+    tracks: project.tracks.map((track) => ({
+      ...track,
+      clips: track.clips.filter((clip) => clip.id !== clipId),
+    })),
+  };
+}
+
+/**
+ * Moves a clip, optionally to a different track.
+ *
+ * `startBeat` is snapped to whole beats and floored at zero: a clip dragged
+ * before the start of the song would otherwise schedule at a negative time,
+ * which the transport silently never fires.
+ */
+export function moveClip(
+  project: StudioProject,
+  clipId: string,
+  startBeat: number,
+  toTrackId?: string,
+): StudioProject {
+  let moving: StudioClip | undefined;
+  const without = project.tracks.map((track) => {
+    const found = track.clips.find((clip) => clip.id === clipId);
+    if (!found) return track;
+    moving = { ...found, startBeat: Math.max(0, Math.round(startBeat)) };
+    return { ...track, clips: track.clips.filter((clip) => clip.id !== clipId) };
+  });
+  if (!moving) return project;
+
+  const targetId = toTrackId ?? project.tracks.find((t) => t.clips.some((c) => c.id === clipId))?.id;
+  return {
+    ...project,
+    tracks: without.map((track) =>
+      track.id === targetId ? { ...track, clips: [...track.clips, moving!] } : track,
+    ),
+  };
+}
+
+/** Solo is exclusive-toggle: soloing a track clears any other. */
+export function toggleSolo(project: StudioProject, trackId: string): StudioProject {
+  const target = project.tracks.find((track) => track.id === trackId);
+  const next = !(target?.soloed ?? false);
+  return {
+    ...project,
+    tracks: project.tracks.map((track) => ({ ...track, soloed: track.id === trackId ? next : false })),
+  };
+}

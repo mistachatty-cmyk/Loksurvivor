@@ -1,206 +1,352 @@
 /**
- * In-game music studio.
+ * The studio: import stems, arrange them on a grid, mix, and export.
  *
- * Minimal but real: transport controls, clip library, track mixer, timeline.
- * Built with touch-first interaction: no routing through React state for audio events,
- * Pointer Events for multi-touch, `touch-action: none` on interactive elements.
+ * Also the game's most accurate music source -- while the transport runs it
+ * publishes an exact beat grid, so anything on screen that reacts to music is
+ * reacting to ground truth rather than to a tempo estimate.
+ *
+ * Owned by the design pass -- keep the export name and props stable, and keep
+ * every control wired.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import * as Tone from 'tone';
-import { getStudioEngine, unlockStudioAudio } from '@/game/audio/studio/engine';
-import { startStudioClock, stopStudioClock } from '@/game/audio/studio/clock';
-import { importAudioFile, getBuffer, releaseBuffer } from '@/game/audio/studio/importer';
+import { useRef, useState } from 'react';
 import {
-  createProject,
-  loadStoredProject,
-  storeProject,
-  createTrack,
-  clampBpm,
-  type StudioProject,
-} from '@/game/audio/studio/project';
-import styles from './StudioScreen.module.css';
+  Download,
+  FileAudio,
+  FileJson,
+  Music4,
+  Pause,
+  Play,
+  Plus,
+  Square,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 
-export function StudioScreen() {
-  const [project, setProject] = useState<StudioProject>(() => loadStoredProject());
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [bpm, setBpm] = useState(project.bpm);
-  const engineRef = useRef(getStudioEngine());
-  const fileInputRef = useRef<HTMLInputElement>(null);
+import { ScreenLayout } from './ScreenLayout';
+import { ArrangeView } from './studio/ArrangeView';
+import { useStudio } from './studio/useStudio';
+import { MAX_BPM, MIN_BPM } from '@/game/audio/studio/project';
 
-  // Persist project on changes
-  useEffect(() => {
-    storeProject(project);
-  }, [project]);
+export interface StudioScreenProps {
+  onBack: () => void;
+}
 
-  const handlePlay = async () => {
-    if (isPlaying) {
-      Tone.Transport.stop();
-      stopStudioClock();
-      setIsPlaying(false);
-      return;
-    }
+export function StudioScreen({ onBack }: StudioScreenProps) {
+  const studio = useStudio();
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const projectInputRef = useRef<HTMLInputElement>(null);
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
-    await unlockStudioAudio();
-    Tone.Transport.bpm.value = bpm;
-    startStudioClock(bpm, project.beatsPerBar);
-    Tone.Transport.start();
-    setIsPlaying(true);
-  };
-
-  const handleBpmChange = (value: number) => {
-    const newBpm = clampBpm(value);
-    setBpm(newBpm);
-    setProject((p) => ({ ...p, bpm: newBpm }));
-    if (Tone.Transport.state === 'started') {
-      Tone.Transport.bpm.value = newBpm;
-    }
-  };
-
-  const handleAddTrack = () => {
-    setProject((p) => ({
-      ...p,
-      tracks: [...p.tracks, createTrack(`Track ${p.tracks.length + 1}`)],
-    }));
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.currentTarget.files?.[0];
-    if (!file) return;
-
-    try {
-      const imported = await importAudioFile(file);
-      // TODO: add clip to a track
-      console.log('Imported:', imported.name, 'BPM:', imported.estimatedBpm);
-    } catch (err) {
-      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-
-    e.currentTarget.value = '';
-  };
+  const targetTrackId = studio.project.tracks[0]?.id;
 
   return (
-    <div className={styles.container}>
-      {/* Transport Bar */}
-      <div className={styles.transport}>
-        <button
-          className={styles.playButton}
-          onClick={handlePlay}
-          title={isPlaying ? 'Stop' : 'Play'}
-        >
-          {isPlaying ? '⏸' : '▶'}
-        </button>
+    <ScreenLayout title="Studio" subtitle="616 Records" onBack={onBack}>
+      <div
+        className="flex min-w-0 flex-col gap-6"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          // Dropping anywhere but a lane imports without placing; the lane's own
+          // handler stops propagation of drops it consumes.
+          if (event.dataTransfer.files.length === 0) return;
+          event.preventDefault();
+          void studio.importFiles(event.dataTransfer.files);
+        }}
+      >
+        {/* ---- transport ---- */}
+        <div className="flex flex-wrap items-center gap-3 border border-border bg-card/60 p-4">
+          <button
+            type="button"
+            onClick={studio.togglePlay}
+            className="flex h-11 w-11 items-center justify-center bg-primary text-primary-foreground transition-colors hover:bg-white"
+            style={{ touchAction: 'none' }}
+            data-testid="button-studio-play"
+            aria-label={studio.playing ? 'Pause' : 'Play'}
+          >
+            {studio.playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          </button>
+          <button
+            type="button"
+            onClick={studio.stop}
+            className="flex h-11 w-11 items-center justify-center border border-border bg-card text-white transition-colors hover:border-primary hover:text-primary"
+            style={{ touchAction: 'none' }}
+            data-testid="button-studio-stop"
+            aria-label="Stop"
+          >
+            <Square className="h-4 w-4" />
+          </button>
 
-        <div className={styles.bpmControl}>
-          <label htmlFor="bpm-input">BPM</label>
-          <input
-            id="bpm-input"
-            type="number"
-            min="40"
-            max="240"
-            value={Math.round(bpm)}
-            onChange={(e) => handleBpmChange(Number(e.currentTarget.value))}
-            disabled={isPlaying}
-          />
-        </div>
+          <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            BPM
+            <input
+              type="number"
+              min={MIN_BPM}
+              max={MAX_BPM}
+              value={studio.project.bpm}
+              onChange={(event) => studio.setBpm(Number(event.target.value))}
+              className="w-20 border border-border bg-background px-2 py-1 text-base font-bold text-white"
+              data-testid="input-studio-bpm"
+            />
+          </label>
 
-        <div className={styles.projectName}>
           <input
             type="text"
-            value={project.name}
-            onChange={(e) => setProject((p) => ({ ...p, name: e.currentTarget.value }))}
+            value={studio.project.name}
+            onChange={(event) => studio.rename(event.target.value)}
             placeholder="Untitled"
+            aria-label="Project name"
+            className="min-w-0 flex-1 border border-border bg-background px-3 py-2 text-sm text-white"
+            data-testid="input-studio-name"
           />
-        </div>
-      </div>
 
-      {/* Clip Library & Mixer */}
-      <div className={styles.content}>
-        {/* Import Zone */}
-        <div
-          className={styles.importZone}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files?.[0];
-            if (file) {
-              const input = fileInputRef.current;
-              if (input) {
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                input.files = dt.files;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-              }
-            }
-          }}
-        >
-          <p>Drop audio file or <button onClick={() => fileInputRef.current?.click()}>browse</button></p>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => audioInputRef.current?.click()}
+              className="flex items-center gap-2 border border-border bg-card px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-primary hover:text-primary"
+              data-testid="button-studio-import"
+            >
+              <Upload className="h-4 w-4" /> Import
+            </button>
+            <button
+              type="button"
+              onClick={() => void studio.exportWav()}
+              className="flex items-center gap-2 border border-border bg-card px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-primary hover:text-primary"
+              data-testid="button-studio-export-wav"
+            >
+              <FileAudio className="h-4 w-4" /> WAV
+            </button>
+            <button
+              type="button"
+              onClick={studio.exportProject}
+              className="flex items-center gap-2 border border-border bg-card px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-primary hover:text-primary"
+              data-testid="button-studio-export-project"
+            >
+              <FileJson className="h-4 w-4" /> Save
+            </button>
+            <button
+              type="button"
+              onClick={() => projectInputRef.current?.click()}
+              className="flex items-center gap-2 border border-border bg-card px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-primary hover:text-primary"
+              data-testid="button-studio-open-project"
+            >
+              <Download className="h-4 w-4" /> Open
+            </button>
+          </div>
+
           <input
-            ref={fileInputRef}
+            ref={audioInputRef}
             type="file"
             accept="audio/*"
-            onChange={handleImportFile}
-            style={{ display: 'none' }}
+            multiple
+            className="hidden"
+            data-testid="input-studio-audio"
+            onChange={(event) => {
+              if (event.target.files) void studio.importFiles(event.target.files);
+              event.target.value = '';
+            }}
+          />
+          <input
+            ref={projectInputRef}
+            type="file"
+            accept=".616song,application/json"
+            className="hidden"
+            data-testid="input-studio-project"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void studio.openProject(file);
+              event.target.value = '';
+            }}
           />
         </div>
 
-        {/* Mixer */}
-        <div className={styles.mixer}>
-          {project.tracks.map((track, i) => (
-            <div key={track.id} className={styles.trackFader}>
-              <div className={styles.trackHeader}>
-                <span className={styles.trackName}>{track.name}</span>
-              </div>
-              <div className={styles.trackControls}>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={track.gain}
-                  onChange={(e) => {
-                    setProject((p) => {
-                      const newTracks = [...p.tracks];
-                      newTracks[i]!.gain = Number(e.currentTarget.value);
-                      return { ...p, tracks: newTracks };
-                    });
-                  }}
-                  title="Gain"
-                />
-                <button
-                  onClick={() => {
-                    setProject((p) => {
-                      const newTracks = [...p.tracks];
-                      newTracks[i]!.muted = !newTracks[i]!.muted;
-                      return { ...p, tracks: newTracks };
-                    });
-                  }}
-                  title={track.muted ? 'Unmute' : 'Mute'}
-                  className={track.muted ? styles.active : ''}
-                >
-                  {track.muted ? '🔇' : '🔊'}
-                </button>
-                <button
-                  onClick={() => {
-                    setProject((p) => {
-                      const newTracks = [...p.tracks];
-                      newTracks[i]!.soloed = !newTracks[i]!.soloed;
-                      return { ...p, tracks: newTracks };
-                    });
-                  }}
-                  title={track.soloed ? 'Unsolo' : 'Solo'}
-                  className={track.soloed ? styles.active : ''}
-                >
-                  S
-                </button>
-              </div>
+        {studio.busy && (
+          <p className="text-xs uppercase tracking-widest text-primary" data-testid="text-studio-busy">
+            {studio.busy}
+          </p>
+        )}
+        {studio.error && (
+          <div
+            className="flex items-start justify-between gap-4 border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive"
+            data-testid="text-studio-error"
+          >
+            <p className="whitespace-pre-line">{studio.error}</p>
+            <button type="button" onClick={studio.dismissError} aria-label="Dismiss">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+          {/* ---- clip library ---- */}
+          <section className="min-w-0">
+            <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">Clips</h2>
+            {studio.clips.length === 0 ? (
+              <p className="border border-dashed border-border p-4 text-xs text-muted-foreground">
+                Drop stems here, or use Import. Everything stays on this device.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2" data-testid="list-studio-clips">
+                {studio.clips.map((clip) => (
+                  <li
+                    key={clip.id}
+                    draggable
+                    onDragStart={(event) => event.dataTransfer.setData('text/studio-buffer', clip.id)}
+                    className="flex items-center gap-2 border border-border bg-card/60 p-2 text-xs text-white"
+                  >
+                    <Music4 className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {clip.name}
+                      <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {/* A low-confidence estimate is shown as a guess rather
+                            than as a number the player might trust. */}
+                        {clip.bpmConfidence > 0.35 ? `~${clip.estimatedBpm} bpm` : 'tempo unclear'}
+                      </span>
+                    </span>
+                    {targetTrackId && (
+                      <button
+                        type="button"
+                        onClick={() => studio.placeClip(clip.id, targetTrackId, 0)}
+                        className="shrink-0 text-muted-foreground transition-colors hover:text-primary"
+                        aria-label={`Add ${clip.name} to first track`}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => studio.discardImport(clip.id)}
+                      className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                      aria-label={`Remove ${clip.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* ---- arrangement + mixer ---- */}
+          <section className="flex min-w-0 flex-col gap-6">
+            <div className="min-w-0 overflow-x-auto">
+              <ArrangeView
+                project={studio.project}
+                playheadRef={studio.playheadRef}
+                playing={studio.playing}
+                selectedClipId={selectedClipId}
+                onSelectClip={setSelectedClipId}
+                onMoveClip={studio.relocateClip}
+                onDropBuffer={studio.placeClip}
+              />
             </div>
-          ))}
-          <button onClick={handleAddTrack} className={styles.addTrack}>
-            + Add Track
-          </button>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={studio.newTrack}
+                className="flex items-center gap-2 border border-border bg-card px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-primary hover:text-primary"
+                data-testid="button-studio-add-track"
+              >
+                <Plus className="h-4 w-4" /> Track
+              </button>
+              {selectedClipId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    studio.dropClip(selectedClipId);
+                    setSelectedClipId(null);
+                  }}
+                  className="flex items-center gap-2 border border-border bg-card px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-destructive hover:text-destructive"
+                  data-testid="button-studio-delete-clip"
+                >
+                  <Trash2 className="h-4 w-4" /> Clip
+                </button>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="list-studio-tracks">
+              {studio.project.tracks.map((track) => (
+                <div key={track.id} className="flex flex-col gap-2 border border-border bg-card/60 p-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={track.name}
+                      onChange={(event) => studio.patchTrack(track.id, { name: event.target.value })}
+                      aria-label="Track name"
+                      className="min-w-0 flex-1 bg-transparent text-xs font-bold uppercase tracking-widest text-white outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => studio.dropTrack(track.id)}
+                      disabled={studio.project.tracks.length <= 1}
+                      className="text-muted-foreground transition-colors hover:text-destructive disabled:opacity-30"
+                      aria-label={`Remove ${track.name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Vol
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={track.gain}
+                      onChange={(event) => studio.patchTrack(track.id, { gain: Number(event.target.value) })}
+                      className="min-w-0 flex-1"
+                      aria-label={`${track.name} volume`}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Pan
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.01}
+                      value={track.pan}
+                      onChange={(event) => studio.patchTrack(track.id, { pan: Number(event.target.value) })}
+                      className="min-w-0 flex-1"
+                      aria-label={`${track.name} pan`}
+                    />
+                  </label>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => studio.patchTrack(track.id, { muted: !track.muted })}
+                      className={`flex-1 border px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                        track.muted
+                          ? 'border-destructive bg-destructive/20 text-destructive'
+                          : 'border-border text-muted-foreground hover:text-white'
+                      }`}
+                      data-testid={`button-mute-${track.id}`}
+                    >
+                      Mute
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => studio.solo(track.id)}
+                      className={`flex-1 border px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                        track.soloed
+                          ? 'border-primary bg-primary/20 text-primary'
+                          : 'border-border text-muted-foreground hover:text-white'
+                      }`}
+                      data-testid={`button-solo-${track.id}`}
+                    >
+                      Solo
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
-    </div>
+    </ScreenLayout>
   );
 }

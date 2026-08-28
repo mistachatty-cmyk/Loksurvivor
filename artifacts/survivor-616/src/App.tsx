@@ -193,7 +193,7 @@ function Game() {
     case 'studio':
       return (
         <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading studio...</div>}>
-          <StudioScreen />
+          <StudioScreen onBack={goHub} />
         </Suspense>
       );
 

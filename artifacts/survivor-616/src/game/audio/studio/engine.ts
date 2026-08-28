@@ -15,6 +15,8 @@
 
 import * as Tone from 'tone';
 
+import { TrackGraph } from './tracks';
+
 /** Master output level, before the analyser tap. */
 const DEFAULT_MASTER_GAIN = 0.85;
 /**
@@ -29,6 +31,8 @@ export interface StudioEngine {
   readonly master: Tone.Gain;
   /** Tap for visualisers and for the shared beat analysis. */
   readonly analyser: AnalyserNode;
+  /** Owns the live nodes behind the project model. */
+  readonly graph: TrackGraph;
   dispose(): void;
 }
 
@@ -59,11 +63,15 @@ export function getStudioEngine(existing?: AudioContext | null): StudioEngine {
   master.connect(Tone.getDestination());
   Tone.connect(master, analyser);
 
+  const graph = new TrackGraph(master);
+
   engine = {
     context,
     master,
     analyser,
+    graph,
     dispose() {
+      graph.dispose();
       master.dispose();
       analyser.disconnect();
       engine = null;

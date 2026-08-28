@@ -1,149 +1,168 @@
 /**
- * Exports from the studio: rendered audio as WAV, and projects as .616song JSON.
+ * Getting a song back out of the studio: as audio, or as a project file.
  *
- * WAV rendering uses Tone.Offline for deterministic, sample-accurate output
- * (faster than realtime, no codec surprises). Hand-rolled RIFF encoder
- * avoids a dependency.
+ * Audio export renders offline rather than recording the live output. An
+ * offline render is deterministic, finishes faster than the song is long, and
+ * cannot pick up a glitch from the machine being busy -- `MediaRecorder` fails
+ * all three, and additionally re-encodes through whichever codec the browser
+ * happens to prefer.
  *
- * Projects export as .616song (plain JSON) for shareable remixes.
+ * The WAV writer is hand-rolled because RIFF is about forty lines of header and
+ * a dependency would be larger than the code it replaced.
  */
 
 import * as Tone from 'tone';
-import type { StudioProject } from './project';
-import { serializeProject } from './project';
 
-/**
- * Render the current studio graph over the given duration and export as WAV.
- * `durationSeconds` should be derived from `projectLengthBeats(project)` and tempo.
- */
-export async function renderStudioToWav(durationSeconds: number): Promise<Blob> {
-  const context = new OfflineAudioContext(2, durationSeconds * 44100, 44100);
+import { getBuffer } from './importer';
+import {
+  projectLengthBeats,
+  secondsPerBeat,
+  serializeProject,
+  trackAudible,
+  type StudioProject,
+} from './project';
 
-  // Tone must render into the offline context
-  const prevContext = Tone.getContext();
-  Tone.setContext(new Tone.Context({ context }));
+/** Tail so a reverb or a clip's final transient is not clipped off the end. */
+const RENDER_TAIL_SECONDS = 2;
+const EXPORT_SAMPLE_RATE = 44_100;
+const EXPORT_CHANNELS = 2;
 
-  try {
-    // Render the transport state
-    Tone.Transport.start(0);
-    const renderedBuffer = await context.startRendering();
-    const wav = encodeWav(renderedBuffer);
-    return new Blob([wav], { type: 'audio/wav' });
-  } finally {
-    Tone.setContext(prevContext);
-  }
+/** How long the rendered file will be, including the tail. */
+export function projectDurationSeconds(project: StudioProject): number {
+  return projectLengthBeats(project) * secondsPerBeat(project.bpm) + RENDER_TAIL_SECONDS;
 }
 
 /**
- * Encodes an AudioBuffer as 16-bit PCM RIFF WAV.
- * ~60 lines, no external codec — suitable for offline render.
+ * Renders the arrangement to audio.
+ *
+ * The graph is rebuilt inside the offline callback rather than reusing the live
+ * `TrackGraph`: nodes belong to the context they were created in, so the live
+ * ones cannot render here, and rebuilding also means an export is unaffected by
+ * whatever is currently soloed, playing, or half-scheduled.
  */
-function encodeWav(buffer: AudioBuffer): ArrayBuffer {
-  const sampleRate = buffer.sampleRate;
-  const channelCount = buffer.numberOfChannels;
-  const sampleCount = buffer.length;
-  const bytesPerSample = 2; // 16-bit
+export async function renderProjectToWav(project: StudioProject): Promise<Blob> {
+  const beatSeconds = secondsPerBeat(project.bpm);
+  const duration = projectDurationSeconds(project);
 
-  // Extract and interleave channels, clamping to 16-bit range
-  const pcmData = new Int16Array(sampleCount * channelCount);
-  let pcmIndex = 0;
-  for (let i = 0; i < sampleCount; i += 1) {
-    for (let ch = 0; ch < channelCount; ch += 1) {
-      const sample = buffer.getChannelData(ch)[i] ?? 0;
-      const clamped = Math.max(-1, Math.min(1, sample));
-      pcmData[pcmIndex] = clamped < 0 ? clamped * 32768 : clamped * 32767;
-      pcmIndex += 1;
+  const rendered = await Tone.Offline(
+    ({ transport }) => {
+      for (const track of project.tracks) {
+        if (!trackAudible(project, track)) continue;
+
+        const gain = new Tone.Gain(track.gain).toDestination();
+        const panner = new Tone.Panner(track.pan).connect(gain);
+
+        for (const clip of track.clips) {
+          const buffer = getBuffer(clip.bufferId);
+          if (!buffer) continue;
+          const player = new Tone.Player(buffer).connect(panner);
+          const at = clip.startBeat * beatSeconds;
+          const length = Math.min(clip.lengthBeats * beatSeconds, buffer.duration);
+          transport.schedule((time) => player.start(time, 0, length), at);
+        }
+      }
+      transport.start(0);
+    },
+    duration,
+    EXPORT_CHANNELS,
+    EXPORT_SAMPLE_RATE,
+  );
+
+  return new Blob([encodeWav(rendered.get() as AudioBuffer)], { type: 'audio/wav' });
+}
+
+/**
+ * Encodes an `AudioBuffer` as 16-bit PCM RIFF/WAVE.
+ *
+ * Exported at 16-bit because that is what every DAW, phone and browser reads
+ * without negotiation; the studio's own float precision is not worth an export
+ * some tools refuse to open.
+ */
+export function encodeWav(buffer: AudioBuffer): ArrayBuffer {
+  const channels = buffer.numberOfChannels;
+  const frames = buffer.length;
+  const bytesPerSample = 2;
+  const blockAlign = channels * bytesPerSample;
+  const dataSize = frames * blockAlign;
+
+  const out = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(out);
+
+  const writeAscii = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(8, 'WAVE');
+
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true); // PCM header length
+  view.setUint16(20, 1, true); // format: uncompressed PCM
+  view.setUint16(22, channels, true);
+  view.setUint32(24, buffer.sampleRate, true);
+  view.setUint32(28, buffer.sampleRate * blockAlign, true); // byte rate
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 8 * bytesPerSample, true);
+
+  writeAscii(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  // Interleave. Reading each channel once and striding the writes is markedly
+  // faster than calling getChannelData per frame.
+  let offset = 44;
+  const data = Array.from({ length: channels }, (_, channel) => buffer.getChannelData(channel));
+  for (let frame = 0; frame < frames; frame += 1) {
+    for (let channel = 0; channel < channels; channel += 1) {
+      const sample = Math.max(-1, Math.min(1, data[channel]![frame] ?? 0));
+      // Asymmetric on purpose: -1 and +1 map to the true endpoints of the
+      // signed range, so a full-scale signal does not wrap.
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += bytesPerSample;
     }
   }
 
-  const pcmBytes = new Uint8Array(pcmData.buffer);
-  const dataSize = pcmBytes.length;
-  const riffSize = 36 + dataSize;
+  return out;
+}
 
-  // Build RIFF header
-  const header = new ArrayBuffer(44);
-  const view = new DataView(header);
+/* --- project files --------------------------------------------------- */
 
-  // "RIFF"
-  view.setUint8(0, 0x52); // R
-  view.setUint8(1, 0x49); // I
-  view.setUint8(2, 0x46); // F
-  view.setUint8(3, 0x46); // F
-  // File size - 8
-  view.setUint32(4, riffSize, true);
-  // "WAVE"
-  view.setUint8(8, 0x57); // W
-  view.setUint8(9, 0x41); // A
-  view.setUint8(10, 0x56); // V
-  view.setUint8(11, 0x45); // E
+/** A project as a `.616song` file: the arrangement, not the audio. */
+export function exportProjectFile(project: StudioProject): Blob {
+  return new Blob([serializeProject(project)], { type: 'application/json' });
+}
 
-  // "fmt " subchunk
-  view.setUint8(12, 0x66); // f
-  view.setUint8(13, 0x6d); // m
-  view.setUint8(14, 0x74); // t
-  view.setUint8(15, 0x20); // (space)
-  // Subchunk1Size (16 for PCM)
-  view.setUint32(16, 16, true);
-  // AudioFormat (1 for PCM)
-  view.setUint16(20, 1, true);
-  // NumChannels
-  view.setUint16(22, channelCount, true);
-  // SampleRate
-  view.setUint32(24, sampleRate, true);
-  // ByteRate
-  view.setUint32(28, sampleRate * channelCount * bytesPerSample, true);
-  // BlockAlign
-  view.setUint16(32, channelCount * bytesPerSample, true);
-  // BitsPerSample (16)
-  view.setUint16(34, 16, true);
+export async function readProjectFile(file: File): Promise<StudioProject> {
+  const { parseProject } = await import('./project');
+  try {
+    return parseProject(JSON.parse(await file.text()) as unknown);
+  } catch {
+    // `parseProject` repairs a readable-but-wrong project; this is the case
+    // where the text was not JSON at all.
+    throw new Error(`${file.name} is not a readable .616song file.`);
+  }
+}
 
-  // "data" subchunk
-  view.setUint8(36, 0x64); // d
-  view.setUint8(37, 0x61); // a
-  view.setUint8(38, 0x74); // t
-  view.setUint8(39, 0x61); // a
-  // Subchunk2Size
-  view.setUint32(40, dataSize, true);
-
-  // Concatenate header + PCM data
-  const result = new Uint8Array(header.byteLength + pcmBytes.length);
-  result.set(new Uint8Array(header), 0);
-  result.set(pcmBytes, header.byteLength);
-
-  return result.buffer;
+/** Filename-safe version of a project name, for downloads. */
+export function exportFilename(project: StudioProject, extension: string): string {
+  const base = project.name.trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'untitled';
+  return `${base.toLowerCase()}.${extension}`;
 }
 
 /**
- * Export a project as .616song JSON.
- * Suitable for upload to cloud storage or direct sharing.
- */
-export function exportProject(project: StudioProject): Blob {
-  const json = serializeProject(project);
-  return new Blob([json], { type: 'application/json' });
-}
-
-/**
- * Trigger a browser download of a Blob with the given filename.
- * Works in all browsers; the user selects a save location or uses defaults.
+ * Hands a rendered file to the browser's download flow.
+ *
+ * The object URL is revoked on a timeout rather than immediately: Safari reads
+ * the blob asynchronously after the click and revoking in the same tick gives
+ * it an empty file.
  */
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Import a .616song JSON file and parse it back into a StudioProject.
- * Uses the same sanitization as loadStoredProject so it handles untrusted data.
- */
-export async function importProjectFile(file: File): Promise<StudioProject> {
-  const { parseProject } = await import('./project');
-  const json = await file.text();
-  const data = JSON.parse(json) as unknown;
-  return parseProject(data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
