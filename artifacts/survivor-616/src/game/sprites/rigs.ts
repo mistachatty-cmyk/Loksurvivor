@@ -343,11 +343,13 @@ interface BlobOptions {
   spikes?: boolean;
   /** Adds trailing tendrils below the body. */
   tendrils?: boolean;
+  /** Adds a pair of side wings, for small fliers. */
+  wings?: boolean;
 }
 
 /** Drifting, legless silhouettes -- wisps, leeches and swarms. */
 export function blobRig(options: BlobOptions = {}): SpriteRig {
-  const { height = 12, width = 10, spikes = false, tendrils = false } = options;
+  const { height = 12, width = 10, spikes = false, tendrils = false, wings = false } = options;
   const half = Math.floor(width / 2);
   const parts: SpritePart[] = [
     { key: 'torso', x: -half, y: 2, w: width, h: height - 4, color: 'body', z: 2 },
@@ -364,6 +366,12 @@ export function blobRig(options: BlobOptions = {}): SpriteRig {
     parts.push(
       { key: 'legL', x: -half + 1, y: 0, w: 2, h: 3, color: 'bodyDark', z: 1 },
       { key: 'legR', x: half - 3, y: 0, w: 2, h: 3, color: 'bodyDark', z: 1 },
+    );
+  }
+  if (wings) {
+    parts.push(
+      { key: 'armL', x: -half - 4, y: height - 6, w: 4, h: 4, color: 'accent', z: 1 },
+      { key: 'armR', x: half, y: height - 6, w: 4, h: 4, color: 'accent', z: 1 },
     );
   }
 

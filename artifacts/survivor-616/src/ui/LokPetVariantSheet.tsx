@@ -1,35 +1,31 @@
-import { LOKPET_VARIANTS } from '@/game/data/lokPets';
+import { LOKPET_VARIANTS, lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import type { LokPetPalette, LokPetSilhouette } from '@/game/types';
-
-export const LOKPET_SHAPE_CLIPS: Record<LokPetSilhouette, string> = {
-  pouncer: 'polygon(12% 30%, 28% 38%, 34% 8%, 48% 25%, 52% 25%, 66% 8%, 72% 38%, 88% 30%, 92% 68%, 76% 88%, 24% 88%, 8% 68%)',
-  skull: 'polygon(18% 22%, 82% 22%, 92% 52%, 76% 86%, 24% 86%, 8% 52%)',
-  winglet: 'polygon(50% 28%, 8% 8%, 22% 72%, 50% 58%, 78% 72%, 92% 8%)',
-  spark: 'polygon(50% 0%, 64% 31%, 100% 50%, 64% 69%, 50% 100%, 36% 69%, 0% 50%, 36% 31%)',
-  jelly: 'polygon(10% 78%, 14% 38%, 28% 18%, 50% 12%, 72% 18%, 86% 38%, 90% 78%)',
-  clockwork: 'polygon(22% 6%, 78% 6%, 94% 22%, 94% 78%, 78% 94%, 22% 94%, 6% 78%, 6% 22%)',
-};
+import { RigPortrait } from './RigPortrait';
 
 export function LokPetIcon({
   silhouette,
   palette,
-  className = 'h-9 w-9',
+  size = 36,
+  className = '',
 }: {
   silhouette: LokPetSilhouette;
   palette: LokPetPalette;
+  size?: number;
   className?: string;
 }) {
   return (
     <div
       className={`shrink-0 border ${className}`}
       style={{
-        backgroundColor: palette.body,
+        width: size,
+        height: size,
         borderColor: palette.accent,
-        clipPath: LOKPET_SHAPE_CLIPS[silhouette],
         boxShadow: `0 0 12px ${palette.glow}66`,
       }}
       aria-hidden="true"
-    />
+    >
+      <RigPortrait rig={lokPetRig(silhouette)} palette={lokPetSpritePalette(palette)} anim="idle" size={size} />
+    </div>
   );
 }
 

@@ -7,7 +7,10 @@ import type {
   LokPetSilhouette,
   LokPetStatSheet,
   LokPetVariantDef,
+  SpritePalette,
+  SpriteRig,
 } from '@/game/types';
+import { blobRig } from '@/game/sprites/rigs';
 
 /** Original silhouette and palette sheets for the temporary LokPet family. */
 export const LOKPET_VARIANTS: LokPetVariantDef[] = [
@@ -142,3 +145,37 @@ export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
   jelly: 'Blob',
   clockwork: 'Clockwork',
 };
+
+/**
+ * Real procedural rigs for each LokPet silhouette, reusing blobRig instead of
+ * the one-off ctx.beginPath shapes the renderer and UI used to draw by hand.
+ * Each family gets a distinct flag combination so they read apart even
+ * before palette is applied: pouncer (legs), skull (spiked ridge), winglet
+ * (wings), spark (smallest, plain), jelly (biggest, plain), clockwork
+ * (spiked + legged).
+ */
+const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
+  pouncer: blobRig({ height: 15, width: 12, tendrils: true }),
+  skull: blobRig({ height: 14, width: 11, spikes: true }),
+  winglet: blobRig({ height: 13, width: 12, wings: true }),
+  spark: blobRig({ height: 10, width: 9 }),
+  jelly: blobRig({ height: 17, width: 15 }),
+  clockwork: blobRig({ height: 14, width: 12, spikes: true, tendrils: true }),
+};
+
+export function lokPetRig(silhouette: LokPetSilhouette): SpriteRig {
+  return LOKPET_RIGS[silhouette];
+}
+
+/** Adapts a LokPet's compact 5-color palette to the rig renderer's shape. */
+export function lokPetSpritePalette(palette: LokPetPalette): SpritePalette {
+  return {
+    ink: palette.bodyDark,
+    body: palette.body,
+    bodyDark: palette.bodyDark,
+    accent: palette.accent,
+    accentBright: palette.glow,
+    skin: palette.eye,
+    glow: palette.glow,
+  };
+}

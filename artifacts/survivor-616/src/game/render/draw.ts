@@ -10,6 +10,7 @@ import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import type { ObstacleDef } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
 
@@ -18,6 +19,8 @@ import { clamp } from '@/game/engine/math';
 
 /** World units of sprite height per rig pixel. */
 const SPRITE_SCALE = 2.05;
+/** LokPets read as small companions, a notch below full enemy scale. */
+const LOKPET_SPRITE_SCALE = SPRITE_SCALE * 0.82;
 
 export interface Viewport {
   width: number;
@@ -1638,51 +1641,20 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   for (const pet of w.lokPets) {
     const pulse = 0.86 + Math.sin(w.now / 115 + pet.uid) * 0.14;
     const alpha = pet.ghost ? 0.3 + pulse * 0.08 : pulse;
-    const y = pet.y - 4;
+    const facing: 1 | -1 = pet.vx < -4 ? -1 : 1;
+    const rig = lokPetRig(pet.silhouette);
+    const palette = lokPetSpritePalette(pet.palette);
     ctx.save();
-    ctx.translate(pet.x, y);
     ctx.globalAlpha = alpha;
     ctx.shadowColor = pet.palette.glow;
     ctx.shadowBlur = pet.ghost ? 13 : 9;
-    ctx.fillStyle = pet.palette.body;
-    ctx.strokeStyle = pet.palette.accent;
-    ctx.lineWidth = 2;
-    if (pet.ghost) ctx.setLineDash([3, 3]);
-
-    switch (pet.silhouette) {
-      case 'pouncer':
-        ctx.beginPath(); ctx.ellipse(0, 2, 10, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-7, -3); ctx.lineTo(-9, -12); ctx.lineTo(-2, -7); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(7, -3); ctx.lineTo(9, -12); ctx.lineTo(2, -7); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.strokeStyle = pet.palette.glow; ctx.beginPath(); ctx.arc(10, 0, 7, -1.2, 0.75); ctx.stroke();
-        break;
-      case 'skull':
-        ctx.beginPath(); ctx.arc(0, 0, 9, Math.PI, 0); ctx.lineTo(7, 8); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-5, -1, 3, 4); ctx.fillRect(2, -1, 3, 4);
-        ctx.fillStyle = pet.palette.bodyDark; ctx.fillRect(-2, 4, 4, 3);
-        break;
-      case 'winglet':
-        ctx.beginPath(); ctx.moveTo(0, 3); ctx.lineTo(-15, -7); ctx.lineTo(-9, 7); ctx.lineTo(0, 4); ctx.lineTo(9, 7); ctx.lineTo(15, -7); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-2, -1, 4, 4);
-        break;
-      case 'spark':
-        ctx.beginPath(); ctx.moveTo(0, -12); ctx.lineTo(5, -3); ctx.lineTo(12, 0); ctx.lineTo(5, 4); ctx.lineTo(0, 12); ctx.lineTo(-5, 4); ctx.lineTo(-12, 0); ctx.lineTo(-5, -3); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-2, -2, 4, 4);
-        break;
-      case 'jelly':
-        ctx.beginPath(); ctx.moveTo(-11, 7); ctx.lineTo(-9, -2); ctx.quadraticCurveTo(-7, -11, 0, -9); ctx.quadraticCurveTo(7, -11, 9, -2); ctx.lineTo(11, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = pet.palette.eye; ctx.fillRect(-5, -1, 3, 4); ctx.fillRect(2, -1, 3, 4);
-        break;
-      case 'clockwork':
-        ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = pet.palette.accent; ctx.fillRect(-3, -3, 6, 6);
-        ctx.strokeStyle = pet.palette.glow; ctx.beginPath(); ctx.moveTo(-13, -6); ctx.lineTo(-8, -3); ctx.moveTo(13, 5); ctx.lineTo(8, 2); ctx.stroke();
-        break;
-    }
+    drawRig(ctx, rig, palette, 'idle', w.now - pet.bornAt, pet.x, pet.y, facing, LOKPET_SPRITE_SCALE * (0.9 + pulse * 0.1), {
+      outline: !pet.ghost,
+    });
     if (!pet.ghost) {
       ctx.globalAlpha = 0.4;
       ctx.strokeStyle = pet.palette.glow;
-      ctx.beginPath(); ctx.ellipse(0, 10, 14, 4, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(pet.x, pet.y + 3, 14, 4, 0, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
   }
