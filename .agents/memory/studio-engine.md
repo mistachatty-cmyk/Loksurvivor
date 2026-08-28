@@ -91,6 +91,24 @@ Note pitch is a MIDI number, not a name, so transposing and drawing are
 arithmetic. Notes snap to sixteenths; a piano roll that lets a note land
 between semitones is not a piano roll.
 
+## The studio reaches the game through the soundtrack, not directly
+
+A finished beat leaves the studio by being rendered and handed to the music
+player's `addFiles`, becoming an ordinary local track. The game then reacts to it
+through the one detection path that already exists.
+
+It was tempting to let the studio transport keep running into a run and drive the
+bus with its exact grid. Don't. That is a second music system — two things that
+can be playing, two ways the game can be getting a tempo, two lifecycles to
+reason about. One path is worth more than the exactness.
+
+The cost, which is real and should not be papered over: tempo is re-detected from
+the audio rather than handed over. A beat authored at 128 comes back as anything
+from 122 to 130, and on sparse material can lock to a half-time octave. The game
+still moves to it. If that jitter ever matters, the contained fix is a bpm hint
+carried on the track record and used to seed the estimator — not reviving a
+direct studio-to-run channel.
+
 ## Export renders offline, and rebuilds the graph
 
 `Tone.Offline` rather than `MediaRecorder`: deterministic, faster than
