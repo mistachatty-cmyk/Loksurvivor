@@ -1349,14 +1349,57 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
       }
       case 'nova':
       case 'ring': {
-        ctx.strokeStyle = effect.color;
-        ctx.lineWidth = effect.kind === 'ring' ? 6 * fade + 2 : 8 * fade + 2;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.radius * (0.25 + life * 0.85), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = Math.max(0, fade * 0.14);
+        const ringCount = effect.kind === 'nova' ? 3 : 1;
+        for (let ring = 0; ring < ringCount; ring += 1) {
+          const ringLife = clamp(life - ring * 0.14, 0, 1);
+          if (ringLife <= 0) continue;
+          ctx.globalAlpha = Math.max(0, (1 - ringLife) * fade);
+          ctx.strokeStyle = effect.color;
+          ctx.lineWidth = effect.kind === 'ring' ? 6 * fade + 2 : 7 * (1 - ringLife * 0.5) + 2;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.radius * (0.2 + ringLife * 0.9), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        if (effect.kind === 'nova') {
+          const core = ctx.createRadialGradient(effect.x, effect.y, 0, effect.x, effect.y, effect.radius * 0.4);
+          core.addColorStop(0, effect.color);
+          core.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.globalAlpha = Math.max(0, fade * 0.5);
+          ctx.fillStyle = core;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.radius * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.globalAlpha = Math.max(0, fade * 0.14);
+          ctx.fillStyle = effect.color;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.radius * (0.25 + life * 0.85), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'impact': {
+        // Comic-book impact star: jagged spikes radiating from the punch point.
+        const spikes = 8;
+        const outer = effect.radius * (0.35 + life * 0.65);
+        const inner = outer * 0.42;
         ctx.fillStyle = effect.color;
+        ctx.globalAlpha = Math.max(0, fade * 0.85);
+        ctx.beginPath();
+        for (let i = 0; i < spikes * 2; i += 1) {
+          const r = i % 2 === 0 ? outer : inner;
+          const a = (Math.PI * i) / spikes + w.now / 900;
+          const px = effect.x + Math.cos(a) * r;
+          const py = effect.y + Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
         ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#fffdf0';
+        ctx.globalAlpha = Math.max(0, fade * 0.6);
+        ctx.stroke();
         break;
       }
       case 'aura':
@@ -1377,14 +1420,26 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         break;
       }
       case 'laser': {
+        const endX = effect.x + Math.cos(effect.angle) * effect.radius;
+        const endY = effect.y + Math.sin(effect.angle) * effect.radius;
         ctx.strokeStyle = effect.color;
         ctx.shadowColor = effect.color;
-        ctx.shadowBlur = 16;
-        ctx.lineWidth = 12 * fade + 3;
+        ctx.shadowBlur = 20;
+        ctx.lineCap = 'round';
+        // Segmented, pulsing beam: a bright core plus a wider, flickering outer glow.
+        const pulse = 0.7 + Math.sin(w.now / 55) * 0.3;
+        ctx.globalAlpha = Math.max(0, fade * 0.35);
+        ctx.lineWidth = (18 + 6 * Math.sin(w.now / 40)) * pulse;
         ctx.beginPath();
         ctx.moveTo(effect.x, effect.y);
-        ctx.lineTo(effect.x + Math.cos(effect.angle) * effect.radius,
-          effect.y + Math.sin(effect.angle) * effect.radius);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.globalAlpha = Math.max(0, fade);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3 * fade + 2;
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        ctx.lineTo(endX, endY);
         ctx.stroke();
         break;
       }
@@ -1441,14 +1496,34 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
     const color = weapon?.def.color ?? w.character.palette.glow;
     ctx.shadowColor = color;
     ctx.shadowBlur = 12;
-    ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x) - 5, Math.round(y) - 4, 10, 8);
-    ctx.fillStyle = w.character.palette.ink;
-    ctx.fillRect(Math.round(x) - 2, Math.round(y) - 4, 2, 8);
-    ctx.fillRect(Math.round(x) + 2, Math.round(y) - 4, 2, 8);
-    ctx.globalAlpha = 0.55;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(Math.round(x) - 6, Math.round(y) - 8, 5, 3);
+
+    if (weapon?.def.id === 'orbit-rings') {
+      // A thin gold-violet annulus rather than a blade -- reads as a ring, not a rectangle.
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      // Default: a spinning vinyl-blade silhouette, angled along its orbit direction.
+      const spinAngle = orb.angle + Math.PI / 2;
+      ctx.translate(Math.round(x), Math.round(y));
+      ctx.rotate(spinAngle);
+      ctx.fillStyle = color;
+      ctx.fillRect(-5, -4, 10, 8);
+      ctx.fillStyle = w.character.palette.ink;
+      ctx.fillRect(-2, -4, 2, 8);
+      ctx.fillRect(2, -4, 2, 8);
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-6, -8, 5, 3);
+    }
     ctx.restore();
   }
 }
@@ -1470,10 +1545,52 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
     ctx.globalAlpha = 1;
     ctx.shadowColor = proj.color;
     ctx.shadowBlur = 12;
-    ctx.fillStyle = proj.fromPlayer ? proj.color : '#ff7a7a';
-    ctx.beginPath();
-    ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
-    ctx.fill();
+    const heading = Math.atan2(proj.vy, proj.vx);
+    const bodyColor = proj.fromPlayer ? proj.color : '#ff7a7a';
+
+    if (proj.radius >= 20) {
+      // "The Bus" and similarly huge sweep shots: an elongated vehicle silhouette, not a dot.
+      ctx.translate(proj.x, proj.y);
+      ctx.rotate(heading);
+      ctx.fillStyle = bodyColor;
+      ctx.fillRect(-proj.radius * 1.6, -proj.radius * 0.55, proj.radius * 3.2, proj.radius * 1.1);
+      ctx.fillStyle = '#0d1117';
+      for (let wx = -proj.radius * 1.1; wx <= proj.radius * 1.1; wx += proj.radius * 0.7) {
+        ctx.fillRect(wx, -proj.radius * 0.15, proj.radius * 0.4, proj.radius * 0.5);
+      }
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-proj.radius * 1.5, -proj.radius * 0.55, proj.radius * 3, proj.radius * 0.22);
+    } else if (proj.targetUid !== null) {
+      // Homing shots: a chevron oriented toward its target, with a faint tracking pulse.
+      ctx.translate(proj.x, proj.y);
+      ctx.rotate(heading);
+      const r = proj.radius * 1.8;
+      ctx.fillStyle = bodyColor;
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(-r * 0.7, r * 0.7);
+      ctx.lineTo(-r * 0.25, 0);
+      ctx.lineTo(-r * 0.7, -r * 0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 0.35 + Math.sin(w.now / 90) * 0.15;
+      ctx.strokeStyle = bodyColor;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = bodyColor;
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, proj.radius * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 }

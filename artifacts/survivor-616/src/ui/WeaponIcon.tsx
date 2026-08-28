@@ -95,6 +95,87 @@ function drawGlyph(ctx: CanvasRenderingContext2D, kind: WeaponKind, color: strin
       ctx.stroke();
       break;
     }
+    case 'wave': {
+      // Two stacked forward ripples.
+      ctx.beginPath();
+      ctx.arc(c - s * 0.08, c, s * 0.16, -Math.PI * 0.45, Math.PI * 0.45);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(c - s * 0.08, c, s * 0.3, -Math.PI * 0.45, Math.PI * 0.45);
+      ctx.stroke();
+      break;
+    }
+    case 'laser': {
+      // A straight beam with a bright tip.
+      ctx.beginPath();
+      ctx.moveTo(c - s * 0.3, c);
+      ctx.lineTo(c + s * 0.3, c);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(c + s * 0.3, c, s * 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'hazard': {
+      // A warning triangle.
+      ctx.beginPath();
+      ctx.moveTo(c, c - s * 0.3);
+      ctx.lineTo(c + s * 0.28, c + s * 0.2);
+      ctx.lineTo(c - s * 0.28, c + s * 0.2);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(c, c + s * 0.1, s * 0.03, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'teleport': {
+      // A broken/dashed portal ring.
+      ctx.setLineDash([s * 0.09, s * 0.07]);
+      ctx.beginPath();
+      ctx.arc(c, c, s * 0.28, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      break;
+    }
+    case 'convert': {
+      // Two interlocking rings.
+      ctx.beginPath();
+      ctx.arc(c - s * 0.1, c, s * 0.18, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(c + s * 0.1, c, s * 0.18, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case 'punch': {
+      // A small comic-book impact star.
+      const spikes = 6;
+      ctx.beginPath();
+      for (let i = 0; i < spikes * 2; i += 1) {
+        const r = i % 2 === 0 ? s * 0.32 : s * 0.14;
+        const a = (Math.PI * i) / spikes;
+        const px = c + Math.cos(a) * r;
+        const py = c + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'follower': {
+      // A lead dot with a trailing satellite.
+      ctx.beginPath();
+      ctx.arc(c + s * 0.1, c - s * 0.05, s * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(c - s * 0.16, c + s * 0.14, s * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
     default:
       ctx.beginPath();
       ctx.arc(c, c, s * 0.2, 0, Math.PI * 2);

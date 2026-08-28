@@ -174,7 +174,7 @@ export interface Projectile {
   evolutionBehavior?: EvolutionBehavior;
 }
 
-export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport';
+export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact';
 
 export interface Effect {
   uid: number;
@@ -2136,9 +2136,12 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
     case 'punch': {
       const target = nearestEnemy(w, p.x, p.y, reach);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
-      w.effects.push({ uid: uid(w), kind: 'slash', x: p.x, y: p.y, radius: reach, angle, spread: 0.7,
+      const ix = target ? target.x : p.x + Math.cos(angle) * reach * 0.6;
+      const iy = target ? target.y : p.y + Math.sin(angle) * reach * 0.6;
+      w.effects.push({ uid: uid(w), kind: 'impact', x: ix, y: iy, radius: reach, angle, spread: Math.PI,
         bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 420), color: weapon.color ?? palette.accent,
         damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false });
+      spawnParticles(w, ix, iy, weapon.color ?? palette.accent, 14, 130);
       p.anim = 'attack'; p.animStartedAt = w.now; w.shake = Math.max(w.shake, 12);
       pushAlert(w, 'POW!');
       break;
@@ -3629,7 +3632,7 @@ function updateEffects(w: World) {
     }
 
     const active = w.now >= effect.bornAt;
-    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'laser') && effect.damage > 0) {
+    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'laser' || effect.kind === 'impact') && effect.damage > 0) {
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
         if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
         const reach = effect.radius + enemy.radius;

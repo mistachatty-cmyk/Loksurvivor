@@ -23,11 +23,19 @@ import {
   type World,
 } from '@/game/engine/world';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
+import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld } from '@/game/render/draw';
 import { effectiveStats, rewardCredMultiplier, startingWeaponLevel, useMeta } from '@/game/state/metaStore';
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
+import { WeaponIcon } from '@/ui/WeaponIcon';
+
+/** Resolve the weapon a level-up card represents, if any, for its icon. */
+function resolveCardWeapon(upgrade: UpgradeDef) {
+  if (upgrade.weaponId) return WEAPONS_BY_ID[upgrade.weaponId];
+  return undefined;
+}
 
 export interface RunScreenProps {
   areaId: string;
@@ -630,12 +638,16 @@ export function RunScreen({
         ) : null}
 
         {hud?.loadout ? (
-          <div className="flex gap-1.5 overflow-hidden" data-testid="row-loadout">
-            {hud.loadout.weapons.map((weapon) => (
-              <div key={weapon.id} title={weapon.name} className="flex h-8 min-w-8 items-center justify-center border border-white/25 bg-black/75 px-1.5 font-mono text-[10px] font-bold text-white" style={{ borderColor: weapon.color ?? 'rgba(255,255,255,.25)' }}>
-                {weapon.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5 text-primary">{weapon.level}</sup>
-              </div>
-            ))}
+          <div className="flex gap-1.5 overflow-x-auto" data-testid="row-loadout">
+            {hud.loadout.weapons.map((weapon) => {
+              const kind = WEAPONS_BY_ID[weapon.id]?.kind;
+              return (
+                <div key={weapon.id} title={weapon.name} className="flex h-8 min-w-8 items-center gap-1 justify-center border border-white/25 bg-black/75 px-1.5 font-mono text-[10px] font-bold text-white" style={{ borderColor: weapon.color ?? 'rgba(255,255,255,.25)' }}>
+                  {kind ? <WeaponIcon kind={kind} color={weapon.color} size={16} className="shrink-0" /> : null}
+                  {weapon.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5 text-primary">{weapon.level}</sup>
+                </div>
+              );
+            })}
             {hud.loadout.passives.map((passive) => (
               <div key={passive.id} title={passive.name} className="flex h-8 min-w-8 items-center justify-center border border-primary/35 bg-primary/10 px-1.5 font-mono text-[10px] font-bold text-primary">
                 {passive.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5">{passive.stacks}</sup>
@@ -876,18 +888,26 @@ export function RunScreen({
               </button>
             ) : null}
             <div className="space-y-2">
-              {choices.map((upgrade) => (
-                <button
-                  key={upgrade.id}
-                  type="button"
-                  onClick={() => pickUpgrade(upgrade)}
-                  className="w-full rounded-sm border border-white/20 bg-white/5 p-4 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
-                  data-testid={`button-upgrade-${upgrade.id}`}
-                >
-                  <p className="font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
-                  <p className="mt-1 font-mono text-xs text-white/70">{upgrade.description}</p>
-                </button>
-              ))}
+              {choices.map((upgrade) => {
+                const cardWeapon = resolveCardWeapon(upgrade);
+                return (
+                  <button
+                    key={upgrade.id}
+                    type="button"
+                    onClick={() => pickUpgrade(upgrade)}
+                    className="flex w-full items-center gap-3 rounded-sm border border-white/20 bg-white/5 p-4 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                    data-testid={`button-upgrade-${upgrade.id}`}
+                  >
+                    {cardWeapon ? (
+                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={32} className="shrink-0" />
+                    ) : null}
+                    <span>
+                      <p className="font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                      <p className="mt-1 font-mono text-xs text-white/70">{upgrade.description}</p>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -918,18 +938,26 @@ export function RunScreen({
               </button>
             ) : null}
             <div className="space-y-2">
-              {choices.map((upgrade) => (
-                <button
-                  key={upgrade.id}
-                  type="button"
-                  onClick={() => pickUpgrade(upgrade)}
-                  className="w-full rounded-sm border border-white/20 bg-white/5 p-3 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
-                  data-testid={`button-continuous-upgrade-${upgrade.id}`}
-                >
-                  <p className="text-sm font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
-                  <p className="mt-1 font-mono text-[10px] text-white/70">{upgrade.description}</p>
-                </button>
-              ))}
+              {choices.map((upgrade) => {
+                const cardWeapon = resolveCardWeapon(upgrade);
+                return (
+                  <button
+                    key={upgrade.id}
+                    type="button"
+                    onClick={() => pickUpgrade(upgrade)}
+                    className="flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-3 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                    data-testid={`button-continuous-upgrade-${upgrade.id}`}
+                  >
+                    {cardWeapon ? (
+                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={24} className="shrink-0" />
+                    ) : null}
+                    <span>
+                      <p className="text-sm font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                      <p className="mt-1 font-mono text-[10px] text-white/70">{upgrade.description}</p>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
