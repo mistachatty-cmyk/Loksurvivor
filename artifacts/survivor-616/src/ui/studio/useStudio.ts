@@ -14,6 +14,7 @@ import * as Tone from 'tone';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { findEffect } from '@/game/audio/studio/effects';
 import { getStudioEngine } from '@/game/audio/studio/engine';
+import type { TrackGraph } from '@/game/audio/studio/tracks';
 import {
   startStudioClock,
   stopStudioClock,
@@ -79,6 +80,8 @@ export interface StudioController {
   tweakEffect: (trackId: string, effectInstanceId: string, paramId: string, value: number) => void;
   /** Where a live instrument sends its output. */
   master: Tone.Gain;
+  /** The live node graph, for insert slots the project model does not own. */
+  graph: TrackGraph;
   solo: (trackId: string) => void;
   newTrack: () => void;
   dropTrack: (trackId: string) => void;
@@ -299,6 +302,7 @@ export function useStudio(): StudioController {
       [],
     ),
     master: engineInstance.master,
+    graph: engineInstance.graph,
     solo: useCallback((trackId) => setProject((c) => toggleSolo(c, trackId)), []),
     newTrack: useCallback(() => setProject((c) => addTrack(c)), []),
     dropTrack: useCallback((trackId) => setProject((c) => removeTrack(c, trackId)), []),

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   Activity,
+  AlertTriangle,
   Bird,
   Check,
   Compass,
@@ -14,6 +15,7 @@ import {
   Palette,
   PanelRight,
   PauseCircle,
+  Plug,
   Settings2,
   Smartphone,
 } from 'lucide-react';
@@ -45,6 +47,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,
+    setStudioPlugins,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
 
@@ -109,6 +112,53 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
                   <LayoutDashboard className="h-4 w-4 text-primary" />
                   <span>Continuous mode keeps enemies, hazards, and movement active.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Studio plugins -- off unless deliberately enabled, because this is
+            the one feature that runs code from off the device. */}
+        <section className="border border-border bg-card/60 p-6">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-400/10 text-amber-200">
+              <Plug className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-200">Studio</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Third-party plugins</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Lets the studio load Web Audio Modules -- the browser's answer to VST effects -- from an
+                    address you provide. Leave this off unless you want it.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStudioPlugins(!meta.studioPluginsEnabled)}
+                  aria-pressed={meta.studioPluginsEnabled}
+                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.studioPluginsEnabled
+                      ? 'border-amber-300/60 bg-amber-400/15 text-amber-100'
+                      : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'
+                  }`}
+                  data-testid="button-toggle-studio-plugins"
+                >
+                  {meta.studioPluginsEnabled ? 'On' : 'Off'}
+                </button>
+              </div>
+              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                <div className="flex items-center gap-2 border border-amber-300/30 bg-amber-400/5 p-3">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
+                  <span>
+                    A plugin runs code fetched from its address. Nothing else in 616 leaves your device.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                  <Settings2 className="h-4 w-4 text-amber-200" />
+                  <span>Nothing is bundled and no plugin loads until you paste one in.</span>
                 </div>
               </div>
             </div>

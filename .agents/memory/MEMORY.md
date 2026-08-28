@@ -10,4 +10,4 @@
 - [Ambiance contract](sky-ambiance.md) — clouds/shadows, birds, fireflies, litter, steam and lightning are pure render-layer decoration, while civilian/cat actors are simulated but combat-inert on their own rng stream; ground-level effects must clip to the arena bounds or `drawArenaEdges` silently paints over them.
 - [Music reactivity contract](music-reactivity.md) — one beat bus arbitrates detected vs authored tempo; reactions are records, and visual ones never touch the simulation.
 - [Tilt steering contract](tilt-steering.md) — orientation-aware gravity-vector mapping; frame-synchronized gyro curve.
-- [Studio engine contract](studio-engine.md) — one `AudioContext` per app, one music path from studio through soundtrack to game.
+- [Studio engine contract](studio-engine.md) — one `AudioContext` per app, one music path from studio through soundtrack to game; plain-data project model reconciled into a Tone graph whose inserts are never hard-wired, so plugins drop in; plugins stay opt-in because they run off-device code.

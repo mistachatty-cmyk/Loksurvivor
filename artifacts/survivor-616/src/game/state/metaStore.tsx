@@ -128,6 +128,7 @@ export function createInitialMeta(): MetaState {
     uiDensity: 'grid',
     musicReactiveEnabled: true,
     gyroEnabled: false,
+    studioPluginsEnabled: false,
     gyroSensitivity: 1,
     gyroInvertY: false,
     selectedCharacterId: 'shade',
@@ -602,6 +603,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
     gyroEnabled: parsed.gyroEnabled === true,
+    // Defaults to false on every load, including projects saved before this
+    // existed -- remote code is never enabled by an upgrade.
+    studioPluginsEnabled: parsed.studioPluginsEnabled === true,
     gyroSensitivity: clampGyroSensitivity(parsed.gyroSensitivity),
     gyroInvertY: parsed.gyroInvertY === true,
     selectedCharacterId,
@@ -854,6 +858,7 @@ type Action =
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
+  | { type: 'setStudioPlugins'; enabled: boolean }
   | { type: 'setGyroSensitivity'; value: number }
   | { type: 'setGyroInvertY'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
@@ -1020,6 +1025,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setGyroEnabled':
       return { ...state, meta: { ...state.meta, gyroEnabled: action.enabled } };
+
+    case 'setStudioPlugins':
+      return { ...state, meta: { ...state.meta, studioPluginsEnabled: action.enabled } };
 
     case 'setGyroSensitivity':
       return {
@@ -1298,6 +1306,7 @@ export interface MetaContextValue {
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
+  setStudioPlugins: (enabled: boolean) => void;
   setGyroSensitivity: (value: number) => void;
   setGyroInvertY: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
@@ -1360,6 +1369,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setMusicReactive = useCallback(
     (enabled: boolean) => dispatch({ type: 'setMusicReactive', enabled }),
+    [],
+  );
+  const setStudioPlugins = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setStudioPlugins', enabled }),
     [],
   );
   const setGyroEnabled = useCallback(
@@ -1447,6 +1460,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMinimapVisible,
       setMusicReactive,
       setGyroEnabled,
+      setStudioPlugins,
       setGyroSensitivity,
       setGyroInvertY,
       setMinimapExpanded,
