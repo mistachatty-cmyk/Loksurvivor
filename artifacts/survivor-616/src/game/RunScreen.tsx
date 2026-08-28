@@ -614,7 +614,7 @@ export function RunScreen({
 
         {hud?.rescueAvailable ? (
           <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
-            Someone is caged — stand with them {hud.rescueProgressPct > 0 ? `(${hud.rescueProgressPct}%)` : ''}
+            {hud.rescueAllyName ? `${hud.rescueAllyName} is caged` : 'Someone is caged'} — stand with them {hud.rescueProgressPct > 0 ? `(${hud.rescueProgressPct}%)` : ''}
           </div>
         ) : null}
 

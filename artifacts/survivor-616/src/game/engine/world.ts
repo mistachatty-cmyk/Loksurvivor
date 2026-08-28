@@ -13,7 +13,7 @@ import { getEnemy } from '@/game/data/enemies';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
-import { UPGRADES } from '@/game/data/progression';
+import { UPGRADES, ALLIES_BY_ID } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
@@ -3999,7 +3999,8 @@ function updateRescue(w: World, dt: number) {
       }
     }
     rescue.status = 'available';
-    pushAlert(w, 'Someone is trapped nearby');
+    const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
+    pushAlert(w, ally ? `${ally.name} is trapped nearby` : 'Someone is trapped nearby');
     return;
   }
 
@@ -4009,8 +4010,9 @@ function updateRescue(w: World, dt: number) {
     rescue.progress = clamp(rescue.progress + dt / 2.4, 0, 1);
     if (rescue.progress >= 1) {
       rescue.status = 'freed';
-      pushAlert(w, 'Rescued — get them home');
-      spawnParticles(w, rescue.x, rescue.y + 12, '#ffe08a', 22, 130);
+      const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
+      pushAlert(w, ally ? `${ally.name} is rescued — get them home` : 'Rescued — get them home');
+      spawnParticles(w, rescue.x, rescue.y + 12, ally?.palette.glow ?? '#ffe08a', 22, 130);
       w.cred += 25;
     }
   } else {
@@ -4658,6 +4660,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     alerts: w.alerts.map((a) => a.text),
     rescueAvailable: w.rescue.status === 'available' || w.rescue.status === 'freeing',
     rescueProgressPct: Math.round(w.rescue.progress * 100),
+    rescueAllyName: w.rescue.allyId ? ALLIES_BY_ID[w.rescue.allyId]?.name : undefined,
     lootBoxesOpened: w.lootBoxesOpened,
     lokPets: w.lokPets.map((pet) => ({
       uid: pet.uid,

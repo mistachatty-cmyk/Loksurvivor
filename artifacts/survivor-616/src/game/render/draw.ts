@@ -11,6 +11,7 @@ import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
+import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { ObstacleDef } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
 
@@ -1602,10 +1603,14 @@ function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
   const rescue = w.rescue;
   if (rescue.status === 'pending' || rescue.status === 'freed') return;
 
+  const ally = rescue.allyId ? ALLIES_BY_ID[rescue.allyId] : undefined;
+  const ringColor = ally?.palette.glow ?? '#ffe08a';
+  const bodyColor = ally?.palette.accent ?? '#c9a26a';
+
   const pulse = 0.5 + Math.sin(w.now / 240) * 0.3;
   ctx.save();
   ctx.globalAlpha = 0.25 + pulse * 0.2;
-  ctx.strokeStyle = '#ffe08a';
+  ctx.strokeStyle = ringColor;
   ctx.lineWidth = 3;
   ctx.setLineDash([10, 8]);
   ctx.lineDashOffset = -w.now / 40;
@@ -1615,10 +1620,11 @@ function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
 
-  // A hunched figure behind bars.
-  ctx.fillStyle = '#141018';
+  // A hunched figure behind bars, tinted with the actual ally's palette so
+  // different allies visibly read as different people mid-rescue.
+  ctx.fillStyle = ally?.palette.bodyDark ?? '#141018';
   ctx.fillRect(rescue.x - 14, rescue.y - 26, 28, 30);
-  ctx.fillStyle = '#c9a26a';
+  ctx.fillStyle = bodyColor;
   ctx.fillRect(rescue.x - 7, rescue.y - 18, 14, 16);
   ctx.fillStyle = '#8a8f9c';
   for (let i = -12; i <= 12; i += 6) {
@@ -1629,7 +1635,7 @@ function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
   if (rescue.progress > 0) {
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
     ctx.fillRect(rescue.x - 24, rescue.y + 12, 48, 6);
-    ctx.fillStyle = '#ffe08a';
+    ctx.fillStyle = ringColor;
     ctx.fillRect(rescue.x - 23, rescue.y + 13, 46 * rescue.progress, 4);
   }
   ctx.restore();

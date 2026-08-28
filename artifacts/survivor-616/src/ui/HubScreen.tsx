@@ -8,11 +8,17 @@ import { getCrewRumor } from '@/game/data/crewRumors';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { RigPortrait } from './RigPortrait';
+import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen } from 'lucide-react';
-import type { CrewActivityIcon } from '@/game/types';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper } from 'lucide-react';
+import type { AllyDef, CrewActivityIcon } from '@/game/types';
+
+/** Small rig built on the fly for a rescued ally -- matches the crew-card portrait's params. */
+function allyRig(ally: AllyDef) {
+  return humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' });
+}
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
 
@@ -55,10 +61,13 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
-  const { unlockedRooms, rescuedAllies, selectedCharacter, meta } = useMeta();
+  const { unlockedRooms, rescuedAllies, selectedCharacter, meta, lastRun } = useMeta();
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
+  const newlyRescuedAlly = lastRun?.rescuedAllyId
+    ? roomAllies.find((ally) => ally.id === lastRun.rescuedAllyId)
+    : undefined;
   const activeRumor = meta.activeCrewRumor ? getCrewRumor(meta.activeCrewRumor.rumorId) : undefined;
   const rumorAlly = meta.activeCrewRumor
     ? rescuedAllies.find((ally) => ally.id === meta.activeCrewRumor?.allyId)
@@ -301,6 +310,26 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
           </div>
         </section>
 
+         {newlyRescuedAlly && (
+           <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
+             <div className="mb-3 flex items-center gap-2">
+               <PartyPopper className="h-5 w-5 text-emerald-300" />
+               <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Welcome home</p>
+             </div>
+             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+               <HideoutVignette
+                 left={{ name: selectedCharacter.name, rig: selectedCharacter.rig, palette: selectedCharacter.palette }}
+                 right={{ name: newlyRescuedAlly.name, rig: allyRig(newlyRescuedAlly), palette: newlyRescuedAlly.palette }}
+                 size={110}
+               />
+               <p className="text-sm text-white/80">
+                 <span className="font-black uppercase text-white">{newlyRescuedAlly.name}</span> made it back with {selectedCharacter.name}.
+                 {' '}{newlyRescuedAlly.boostLabel}
+               </p>
+             </div>
+           </section>
+         )}
+
          {activeRoom.features.includes('allies') && (
           <section className="mt-auto">
             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">
@@ -323,7 +352,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
                     <li key={ally.id} className="flex gap-3 border border-border bg-card/60 p-3" data-testid={`crew-activity-${ally.id}`}>
                       <div className="grid h-20 w-20 shrink-0 place-items-center border border-primary/40 bg-primary/10">
                         <RigPortrait
-                          rig={humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' })}
+                          rig={allyRig(ally)}
                           palette={ally.palette}
                           anim="idle"
                           size={72}

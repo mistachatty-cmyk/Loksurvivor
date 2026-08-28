@@ -1322,6 +1322,8 @@ export interface HudSnapshot {
   alerts: string[];
   rescueAvailable: boolean;
   rescueProgressPct: number;
+  /** The trapped ally's name, when known, so the HUD banner can name them. */
+  rescueAllyName?: string;
   lootBoxesOpened: number;
   /** Generated companions currently following the player. */
   lokPets: Array<{
