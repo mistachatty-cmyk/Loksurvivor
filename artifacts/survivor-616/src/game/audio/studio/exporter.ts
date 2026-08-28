@@ -13,6 +13,7 @@
 
 import * as Tone from 'tone';
 
+import { findEffect } from './effects';
 import { getBuffer } from './importer';
 import {
   projectLengthBeats,
@@ -52,10 +53,24 @@ export async function renderProjectToWav(project: StudioProject): Promise<Blob> 
         const gain = new Tone.Gain(track.gain).toDestination();
         const panner = new Tone.Panner(track.pan).connect(gain);
 
+        // Rebuild the insert chain in the same order the live graph uses, or
+        // the export would not be the mix the player just heard.
+        let head: Tone.ToneAudioNode = panner;
+        for (const effect of [...track.effects].reverse()) {
+          const def = findEffect(effect.effectId);
+          if (!def) continue;
+          const node = def.create();
+          for (const param of def.params) {
+            param.set(node, effect.params[param.id] ?? param.defaultValue);
+          }
+          node.connect(head);
+          head = node;
+        }
+
         for (const clip of track.clips) {
           const buffer = getBuffer(clip.bufferId);
           if (!buffer) continue;
-          const player = new Tone.Player(buffer).connect(panner);
+          const player = new Tone.Player(buffer).connect(head);
           const at = clip.startBeat * beatSeconds;
           const length = Math.min(clip.lengthBeats * beatSeconds, buffer.duration);
           transport.schedule((time) => player.start(time, 0, length), at);

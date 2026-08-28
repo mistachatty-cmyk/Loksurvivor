@@ -52,7 +52,6 @@ export function ArrangeView({
   const dragPositionRef = useRef<{ beat: number; laneIndex: number } | null>(null);
 
   const laneCount = project.tracks.length;
-  const totalBeats = Math.max(32, Math.ceil((playheadRef.current ?? 0) / 4) * 4 + 32);
 
   const laneAt = useCallback(
     (y: number) => {
@@ -191,7 +190,13 @@ export function ArrangeView({
     dragRef.current = { clipId: hit.id, grabOffsetBeats: beat - hit.startBeat, trackId: track.id };
     dragPositionRef.current = { beat: hit.startBeat, laneIndex };
     // Capture so a fast drag that leaves the canvas still delivers moves.
-    event.currentTarget.setPointerCapture(event.pointerId);
+    // Best-effort: the browser rejects capture for a pointer it no longer
+    // considers active, and throwing here would abort the drag entirely.
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // The drag still works while the pointer stays over the canvas.
+    }
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -210,8 +215,12 @@ export function ArrangeView({
     const position = dragPositionRef.current;
     dragRef.current = null;
     dragPositionRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Already released.
     }
     if (!drag || !position) return;
     const target = position.laneIndex >= 0 ? project.tracks[position.laneIndex]! : null;

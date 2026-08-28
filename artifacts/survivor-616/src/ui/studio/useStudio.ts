@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Tone from 'tone';
 
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
+import { findEffect } from '@/game/audio/studio/effects';
 import { getStudioEngine } from '@/game/audio/studio/engine';
 import {
   startStudioClock,
@@ -27,13 +28,16 @@ import {
 } from '@/game/audio/studio/importer';
 import {
   addClip,
+  addEffect,
   addTrack,
   clampBpm,
   loadStoredProject,
   moveClip,
   projectLengthBeats,
   removeClip,
+  removeEffect,
   removeTrack,
+  setEffectParam,
   storeProject,
   toggleSolo,
   updateTrack,
@@ -69,7 +73,12 @@ export interface StudioController {
   relocateClip: (clipId: string, startBeat: number, trackId?: string) => void;
   discardImport: (bufferId: string) => void;
 
-  patchTrack: (trackId: string, patch: Partial<Omit<StudioTrack, 'id' | 'clips'>>) => void;
+  patchTrack: (trackId: string, patch: Partial<Omit<StudioTrack, 'id' | 'clips' | 'effects'>>) => void;
+  insertEffect: (trackId: string, effectId: string) => void;
+  dropEffect: (trackId: string, effectInstanceId: string) => void;
+  tweakEffect: (trackId: string, effectInstanceId: string, paramId: string, value: number) => void;
+  /** Where a live instrument sends its output. */
+  master: Tone.Gain;
   solo: (trackId: string) => void;
   newTrack: () => void;
   dropTrack: (trackId: string) => void;
@@ -88,9 +97,12 @@ export function useStudio(): StudioController {
   const [error, setError] = useState<string | null>(null);
   const playheadRef = useRef(0);
 
-  // Built once, adopting the soundtrack player's context when it has one.
-  const engineRef = useRef<ReturnType<typeof getStudioEngine> | null>(null);
-  const engine = () => (engineRef.current ??= getStudioEngine(getAudioContext()));
+  // Built eagerly, adopting the soundtrack player's context when it has one.
+  // Eager rather than lazy so `master` is a real node on the first render --
+  // the pads bind to it once and would otherwise stay silent forever. Creating
+  // a context here is safe: it starts suspended and a gesture unlocks it.
+  const [engineInstance] = useState(() => getStudioEngine(getAudioContext()));
+  const engine = () => engineInstance;
 
   /** Latest project, for callbacks that must not re-bind on every edit. */
   const projectRef = useRef(project);
@@ -110,10 +122,10 @@ export function useStudio(): StudioController {
     return () => {
       Tone.getTransport().stop();
       Tone.getTransport().position = 0;
-      engineRef.current?.graph.clearSchedule();
+      engineInstance.graph.clearSchedule();
       stopStudioClock();
     };
-  }, []);
+  }, [engineInstance]);
 
   // Interpolates `phase` between the transport's quarter-note callbacks and
   // moves the playhead. One loop for the whole screen.
@@ -274,6 +286,19 @@ export function useStudio(): StudioController {
     discardImport,
 
     patchTrack: useCallback((trackId, patch) => setProject((c) => updateTrack(c, trackId, patch)), []),
+    insertEffect: useCallback((trackId, effectId) => {
+      const def = findEffect(effectId);
+      if (!def) return;
+      const params = Object.fromEntries(def.params.map((param) => [param.id, param.defaultValue]));
+      setProject((c) => addEffect(c, trackId, effectId, params));
+    }, []),
+    dropEffect: useCallback((trackId, instanceId) => setProject((c) => removeEffect(c, trackId, instanceId)), []),
+    tweakEffect: useCallback(
+      (trackId, instanceId, paramId, value) =>
+        setProject((c) => setEffectParam(c, trackId, instanceId, paramId, value)),
+      [],
+    ),
+    master: engineInstance.master,
     solo: useCallback((trackId) => setProject((c) => toggleSolo(c, trackId)), []),
     newTrack: useCallback(() => setProject((c) => addTrack(c)), []),
     dropTrack: useCallback((trackId) => setProject((c) => removeTrack(c, trackId)), []),
