@@ -1,5 +1,6 @@
 import { blobRig, eelRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, triangleRig } from '@/game/sprites/rigs';
 import type { CharacterDef } from '@/game/types';
+import { REACTION_PRESETS } from './reactivity';
 
 /**
  * The playable roster. Each entry is fully data-driven: silhouette, palette,
@@ -8,6 +9,7 @@ import type { CharacterDef } from '@/game/types';
 export const CHARACTERS: CharacterDef[] = [
   {
     id: 'shade',
+    react: REACTION_PRESETS.playerBob,
     name: 'Shade',
     handle: 'Haloed Swagger',
     tagline: 'Walks into the dark first, on purpose.',
@@ -48,6 +50,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'queenbee',
+    react: REACTION_PRESETS.playerBob,
     name: 'Queen Bee',
     handle: 'Hive Mother',
     tagline: 'Never travels alone.',
@@ -90,6 +93,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'lilstinger',
+    react: REACTION_PRESETS.playerBob,
     name: 'Lil Stinger',
     handle: 'Pink Hoodie',
     tagline: 'Small kid, enormous bee.',
@@ -131,6 +135,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'masky',
+    react: REACTION_PRESETS.playerBob,
     name: 'Masky',
     handle: 'Float Fighter',
     tagline: 'Sits down. Still wins.',
@@ -170,6 +175,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'llamaste',
+    react: REACTION_PRESETS.playerBob,
     name: 'Llamasté',
     handle: 'Cellar Monk',
     tagline: 'Breathes in. The room clears out.',
@@ -209,6 +215,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'glacierwarden',
+    react: REACTION_PRESETS.playerBob,
     name: 'Glacier Warden',
     handle: 'Blue Hour',
     tagline: 'The cold keeps better company than the dark.',
@@ -252,6 +259,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'riftwitch',
+    react: REACTION_PRESETS.playerBob,
     name: 'Rift Witch',
     handle: 'Pink Static',
     tagline: 'Small spell. Big problem.',
@@ -295,6 +303,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'prismrunner',
+    react: REACTION_PRESETS.playerBob,
     name: 'Prism Runner',
     handle: 'Seven-Color Getaway',
     tagline: 'Never takes the same shortcut twice.',
@@ -309,6 +318,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'cinderhalo',
+    react: REACTION_PRESETS.playerBob,
     name: 'Cinder Halo',
     handle: 'Last Match',
     tagline: 'The smoke is part of the outfit.',
@@ -323,6 +333,7 @@ export const CHARACTERS: CharacterDef[] = [
   },
   {
     id: 'orbitanchor',
+    react: REACTION_PRESETS.playerBob,
     name: 'Orbit Anchor',
     handle: 'Gravity With Manners',
     tagline: 'Everything comes around eventually.',

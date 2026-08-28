@@ -35,7 +35,10 @@ import {
   type EnemyActor,
   type Projectile,
   stepWorld,
+  isOnBeat,
+  musicMultiplier,
 } from '@/game/engine/world';
+import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
 import { generateChunk } from '@/game/engine/chunks';
 import { createRng } from '@/game/engine/math';
 import {
@@ -2032,4 +2035,74 @@ test('completed or dead outcomes do not advance a pending district incursion', (
   world.now = world.time * 1000;
   stepWorld(world, 1, neutralInput);
   assert.equal(world.districtIncursion?.phase, 'pending');
+});
+/* ------------------------------------------------------------------ */
+/* Music reactivity                                                    */
+/* ------------------------------------------------------------------ */
+
+/** A synthetic music frame, so the audio path is testable without a browser. */
+function audioFrame(overrides: Partial<AudioFrame> = {}): AudioFrame {
+  return { ...SILENT_FRAME, source: 'studio', bpm: 120, confidence: 1, ...overrides };
+}
+
+test('a run with no music behaves exactly as before', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.audio.source, 'none');
+  assert.equal(world.beatPulse, 0);
+  assert.equal(world.onBeatHits, 0);
+  assert.equal(musicMultiplier(world, getEnemy('bass-bruiser').react, 'speed'), 1);
+});
+
+test('crossing into a new beat retriggers the pulse, which then decays', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 1, phase: 0 }) });
+  const struck = world.beatPulse;
+  assert.ok(struck > 0.8, `expected a fresh pulse, got ${struck}`);
+
+  // Same beat index on later frames must not retrigger, only decay.
+  for (let i = 0; i < 5; i += 1) {
+    stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 1, phase: 0.5 }) });
+  }
+  assert.ok(world.beatPulse < struck, 'pulse should decay while the beat index holds');
+});
+
+test('a rewound source resets the beat index instead of firing every beat between', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 64 }) });
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 0 }) });
+  assert.equal(world.lastBeatIndex, 0);
+});
+
+test('the on-beat window opens near a beat and only when tempo is trusted', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+
+  // 120bpm => a 500ms beat, so the +-90ms window is phase <= 0.18.
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.02 }) });
+  assert.equal(isOnBeat(world), true);
+
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.5 }) });
+  assert.equal(isOnBeat(world), false, 'halfway between beats is off-beat');
+
+  // Just off the grid but still inside the window on the trailing side.
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.98 }) });
+  assert.equal(isOnBeat(world), true, 'just before the next beat still counts');
+
+  // A shaky tempo estimate must never gate damage.
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.01, confidence: 0.1 }) });
+  assert.equal(isOnBeat(world), false, 'low confidence disables the bonus entirely');
+});
+
+test('reaction records drive multipliers without touching enemies that declare none', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 1, downbeat: true, bands: { ...SILENT_FRAME.bands, sub: 1 } }) });
+
+  // 'crypt-bouncer' declares downbeatLunge, so its speed rises on a downbeat.
+  assert.ok(musicMultiplier(world, getEnemy('crypt-bouncer').react, 'speed') > 1);
+  // 'ash-wisp' declares nothing and must be untouched.
+  assert.equal(musicMultiplier(world, getEnemy('ash-wisp').react, 'speed'), 1);
+  // A declared reaction only drives the target it names.
+  assert.equal(musicMultiplier(world, getEnemy('bass-bruiser').react, 'speed'), 1);
 });

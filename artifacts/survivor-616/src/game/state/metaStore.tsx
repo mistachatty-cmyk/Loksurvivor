@@ -107,6 +107,12 @@ function settleRecovery(meta: MetaState, now = Date.now()): MetaState {
   };
 }
 
+/** Keeps a persisted or dispatched tilt sensitivity inside a usable range. */
+function clampGyroSensitivity(value: unknown): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 1;
+  return Math.max(0.5, Math.min(2, numeric));
+}
+
 export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
@@ -116,6 +122,10 @@ export function createInitialMeta(): MetaState {
     minimapVisible: true,
     minimapExpanded: true,
     minimapPosition: { x: 0.82, y: 0.18 },
+    musicReactiveEnabled: true,
+    gyroEnabled: false,
+    gyroSensitivity: 1,
+    gyroInvertY: false,
     selectedCharacterId: 'shade',
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
@@ -552,6 +562,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
+    musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
+    gyroEnabled: parsed.gyroEnabled === true,
+    gyroSensitivity: clampGyroSensitivity(parsed.gyroSensitivity),
+    gyroInvertY: parsed.gyroInvertY === true,
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -789,6 +803,10 @@ type Action =
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
+  | { type: 'setMusicReactive'; enabled: boolean }
+  | { type: 'setGyroEnabled'; enabled: boolean }
+  | { type: 'setGyroSensitivity'; value: number }
+  | { type: 'setGyroInvertY'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
@@ -876,6 +894,21 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ...state,
         meta: { ...state.meta, levelUpPausesEnabled: action.enabled },
       };
+
+    case 'setMusicReactive':
+      return { ...state, meta: { ...state.meta, musicReactiveEnabled: action.enabled } };
+
+    case 'setGyroEnabled':
+      return { ...state, meta: { ...state.meta, gyroEnabled: action.enabled } };
+
+    case 'setGyroSensitivity':
+      return {
+        ...state,
+        meta: { ...state.meta, gyroSensitivity: clampGyroSensitivity(action.value) },
+      };
+
+    case 'setGyroInvertY':
+      return { ...state, meta: { ...state.meta, gyroInvertY: action.enabled } };
 
     case 'setMinimapVisible':
       return {
@@ -1130,6 +1163,10 @@ export interface MetaContextValue {
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
+  setMusicReactive: (enabled: boolean) => void;
+  setGyroEnabled: (enabled: boolean) => void;
+  setGyroSensitivity: (value: number) => void;
+  setGyroInvertY: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
   setMinimapPosition: (position: { x: number; y: number }) => void;
   startRecovery: (characterId: string, locationId?: string) => void;
@@ -1172,6 +1209,22 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setLevelUpPauses = useCallback(
     (enabled: boolean) => dispatch({ type: 'setLevelUpPauses', enabled }),
+    [],
+  );
+  const setMusicReactive = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setMusicReactive', enabled }),
+    [],
+  );
+  const setGyroEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setGyroEnabled', enabled }),
+    [],
+  );
+  const setGyroSensitivity = useCallback(
+    (value: number) => dispatch({ type: 'setGyroSensitivity', value }),
+    [],
+  );
+  const setGyroInvertY = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setGyroInvertY', enabled }),
     [],
   );
   const setMinimapVisible = useCallback(
@@ -1234,6 +1287,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setPhysicsObjectClicks,
       setLevelUpPauses,
       setMinimapVisible,
+      setMusicReactive,
+      setGyroEnabled,
+      setGyroSensitivity,
+      setGyroInvertY,
       setMinimapExpanded,
       setMinimapPosition,
       resetProgress,
@@ -1259,6 +1316,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setPhysicsObjectClicks,
     setLevelUpPauses,
     setMinimapVisible,
+    setMusicReactive,
+    setGyroEnabled,
+    setGyroSensitivity,
+    setGyroInvertY,
     setMinimapExpanded,
     setMinimapPosition,
     resetProgress,

@@ -6,6 +6,8 @@
  * never editing the simulation loop.
  */
 
+import type { BeatReaction } from '@/game/data/reactivity';
+
 export interface Vec2 {
   x: number;
   y: number;
@@ -506,6 +508,8 @@ export interface CharacterDef {
   unlock: UnlockRule;
   /** Path to the reference art the rig was built from, if any. */
   referenceArt?: string;
+  /** How this character moves to the music. See `data/reactivity.ts`. */
+  react?: BeatReaction[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -552,6 +556,8 @@ export interface EnemyDef {
   faction?: string;
   role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor';
   traits?: { teleportMs?: number; ghostMs?: number; shiftMs?: number; shiftScale?: number; burstSpeed?: number };
+  /** How this enemy moves to the music. See `data/reactivity.ts`. */
+  react?: BeatReaction[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -1117,6 +1123,14 @@ export interface MetaState {
   minimapExpanded: boolean;
   /** Normalized top-left position of the endless minimap within the viewport. */
   minimapPosition: { x: number; y: number };
+  /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
+  musicReactiveEnabled: boolean;
+  /** Whether device tilt steers the player on supported hardware. */
+  gyroEnabled: boolean;
+  /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */
+  gyroSensitivity: number;
+  /** Flips the forward/back tilt axis. */
+  gyroInvertY: boolean;
   selectedCharacterId: string;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];

@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
@@ -22,6 +23,7 @@ import {
   stepWorld,
   type World,
 } from '@/game/engine/world';
+import { useGyroInput } from '@/game/input/gyro';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld } from '@/game/render/draw';
@@ -133,6 +135,16 @@ export function RunScreen({
   const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
   const levelUpPausesRef = useRef(meta.levelUpPausesEnabled);
   levelUpPausesRef.current = meta.levelUpPausesEnabled;
+  const musicReactiveRef = useRef(meta.musicReactiveEnabled);
+  musicReactiveRef.current = meta.musicReactiveEnabled;
+
+  // Tilt steering. The hook is inert unless the setting is on, and the ref is
+  // read straight from the loop so orientation events never re-render.
+  const { readingRef: gyroRef } = useGyroInput({
+    enabled: meta.gyroEnabled,
+    sensitivity: meta.gyroSensitivity,
+    invertY: meta.gyroInvertY,
+  });
 
   const area = areaOverride ?? getArea(areaId);
   const character = getCharacter(characterId);
@@ -368,6 +380,14 @@ export function RunScreen({
         if (keys.has('w') || keys.has('arrowup')) moveY -= 1;
         if (keys.has('s') || keys.has('arrowdown')) moveY += 1;
 
+        // Tilt fills in when the player is not touching the stick, so picking
+        // up the joystick always wins without having to disable the setting.
+        const gyro = gyroRef.current;
+        if (gyro.active && (gyro.x !== 0 || gyro.y !== 0)) {
+          moveX = gyro.x;
+          moveY = gyro.y;
+        }
+
         const stick = stickRef.current;
         if (stick.active && (stick.dx !== 0 || stick.dy !== 0)) {
           moveX = stick.dx / STICK_RADIUS;
@@ -377,12 +397,17 @@ export function RunScreen({
         let ultimate = ultRequestRef.current;
         ultRequestRef.current = false;
 
+        // Read the beat once per rendered frame and hold it across every
+        // catch-up substep -- re-reading inside the loop would let one beat
+        // retrigger several times on a slow frame.
+        const audio = musicReactiveRef.current ? beatBus.read() : SILENT_FRAME;
+
         // Fixed-step catch-up: a dropped frame must not slow the run down,
         // but a long stall must not stampede the simulation either.
         accumulator = Math.min(accumulator + dt, FIXED_STEP * MAX_SUBSTEPS);
         while (accumulator >= FIXED_STEP) {
           accumulator -= FIXED_STEP;
-          stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate });
+          stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate, audio });
           ultimate = false;
           if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
         }
