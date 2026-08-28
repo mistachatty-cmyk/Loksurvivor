@@ -404,6 +404,10 @@ importers:
         version: 3.25.76
 
   artifacts/survivor-616:
+    dependencies:
+      tone:
+        specifier: ^15.1.22
+        version: 15.1.22
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -1729,6 +1733,10 @@ packages:
     resolution: {integrity: sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ==}
     engines: {node: '>=8.0.0'}
 
+  automation-events@7.1.19:
+    resolution: {integrity: sha512-cD+TLhJTI0q4AI3ktd353lrGZiVa9AchowSDzQzzGjSoYe22js4vlS32VUtWuaulghi1Yq0KYNWKk9wWuGymPA==}
+    engines: {node: '>=18.2.0'}
+
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
@@ -2891,6 +2899,9 @@ packages:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
 
+  standardized-audio-context@25.3.77:
+    resolution: {integrity: sha512-Ki9zNz6pKcC5Pi+QPjPyVsD9GwJIJWgryji0XL9cAJXMGyn+dPOf6Qik1AHei0+UNVcc4BOCa0hWLBzlwqsW/A==}
+
   statuses@2.0.2:
     resolution: {integrity: sha512-DvEy55V3DB7uknRo+4iOGT5fP1slR8wQohVdknigZPMpMstaKJQWhwiYBACJE3Ul2pTnATihhBYnRhZQHGBiRw==}
     engines: {node: '>= 0.8'}
@@ -2939,6 +2950,9 @@ packages:
   toidentifier@1.0.1:
     resolution: {integrity: sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==}
     engines: {node: '>=0.6'}
+
+  tone@15.1.22:
+    resolution: {integrity: sha512-TCScAGD4sLsama5DjvTUXlLDXSqPealhL64nsdV1hhr6frPWve0DeSo63AKnSJwgfg55fhvxj0iPPRwPN5o0ag==}
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
@@ -4373,6 +4387,11 @@ snapshots:
 
   atomic-sleep@1.0.0: {}
 
+  automation-events@7.1.19:
+    dependencies:
+      '@babel/runtime': 7.29.7
+      tslib: 2.8.1
+
   balanced-match@4.0.4: {}
 
   baseline-browser-mapping@2.11.3: {}
@@ -5427,6 +5446,12 @@ snapshots:
 
   split2@4.2.0: {}
 
+  standardized-audio-context@25.3.77:
+    dependencies:
+      '@babel/runtime': 7.29.7
+      automation-events: 7.1.19
+      tslib: 2.8.1
+
   statuses@2.0.2: {}
 
   string-argv@0.3.2: {}
@@ -5461,6 +5486,11 @@ snapshots:
       is-number: 7.0.0
 
   toidentifier@1.0.1: {}
+
+  tone@15.1.22:
+    dependencies:
+      standardized-audio-context: 25.3.77
+      tslib: 2.8.1
 
   tslib@2.8.1: {}
 
