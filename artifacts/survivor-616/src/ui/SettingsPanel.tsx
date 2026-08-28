@@ -23,6 +23,7 @@ import {
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES } from '@/game/data/uiThemes';
+import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 
 export interface SettingsPanelProps {
@@ -285,6 +286,14 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <Smartphone className="h-4 w-4 text-emerald-200" />
                 <span>However you are holding the device when a run starts becomes the neutral position.</span>
               </p>
+
+              {/* Tilt cannot be verified from a desk, so the numbers go on
+                  screen and the player checks it on their own device. */}
+              <TiltReadout
+                enabled={meta.gyroEnabled}
+                sensitivity={meta.gyroSensitivity}
+                invertY={meta.gyroInvertY}
+              />
             </div>
           </div>
         </section>
