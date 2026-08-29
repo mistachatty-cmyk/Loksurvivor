@@ -10,6 +10,7 @@ import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { ObstacleDef } from '@/game/types';
@@ -313,6 +314,121 @@ function drawRoadFireflies(ctx: CanvasRenderingContext2D, w: World, left: number
     }
   }
   ctx.restore();
+}
+
+const LITTER_CELL = 340;
+
+/** Paper scraps and leaves tumbling along the same wind lanes the clouds ride. */
+function drawWindLitter(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const clip = clipToArena(w, left, top, right, bottom);
+  const startX = Math.floor(clip.left / LITTER_CELL) * LITTER_CELL - LITTER_CELL;
+  const startY = Math.floor(clip.top / LITTER_CELL) * LITTER_CELL;
+  ctx.save();
+  for (let x = startX; x < clip.right + LITTER_CELL; x += LITTER_CELL) {
+    for (let y = startY; y < clip.bottom; y += LITTER_CELL) {
+      const gx = x / LITTER_CELL;
+      const gy = y / LITTER_CELL;
+      const n = hashCell(gx + 210, gy - 210);
+      if (n > 0.34) continue;
+      const speed = 0.05 + n * 0.09;
+      const phase = hashCell(gx + 5, gy + 5) * LITTER_CELL;
+      const sx = x + ((w.now * speed + phase) % (LITTER_CELL * 2));
+      const sy = y + LITTER_CELL * hashCell(gx - 5, gy - 5) + Math.sin(w.now / 320 + gx * 2.3) * 14;
+      // A scrap that has blown past the arena edge would be painted over by
+      // drawArenaEdges anyway -- skip it rather than draw into the void.
+      if (sx < clip.left || sx > clip.right || sy < clip.top || sy > clip.bottom) continue;
+      const size = 3 + n * 5;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(w.now / 180 + n * 9);
+      ctx.globalAlpha = 0.3 + n * 0.4;
+      ctx.fillStyle = n > 0.2 ? '#8a7f6a' : '#6f7a5c';
+      ctx.fillRect(-size / 2, -size / 3, size, size * 0.66);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+const VENT_CELL = 420;
+
+/** Street grates breathing steam -- a grate plate plus a few rising puffs. */
+function drawSteamVents(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const clip = clipToArena(w, left, top, right, bottom);
+  const startX = Math.floor(clip.left / VENT_CELL) * VENT_CELL;
+  const startY = Math.floor(clip.top / VENT_CELL) * VENT_CELL;
+  ctx.save();
+  for (let x = startX; x < clip.right; x += VENT_CELL) {
+    for (let y = startY; y < clip.bottom; y += VENT_CELL) {
+      const gx = x / VENT_CELL;
+      const gy = y / VENT_CELL;
+      const n = hashCell(gx - 330, gy + 330);
+      if (n > 0.16) continue;
+      const vx = x + VENT_CELL * (0.2 + 0.6 * hashCell(gx - 330, gy));
+      const vy = y + VENT_CELL * (0.2 + 0.6 * hashCell(gx, gy + 330));
+      if (vx < clip.left || vx > clip.right) continue;
+
+      // Grate plate so the steam reads as coming from somewhere.
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#0c0f14';
+      ctx.fillRect(vx - 14, vy - 7, 28, 14);
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = '#2b3440';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = -9; i <= 9; i += 6) {
+        ctx.moveTo(vx + i, vy - 6);
+        ctx.lineTo(vx + i, vy + 6);
+      }
+      ctx.stroke();
+
+      for (let i = 0; i < 3; i += 1) {
+        const t = ((w.now / 2600) + i / 3 + n * 4) % 1;
+        const rise = t * 52;
+        const radius = 7 + t * 20;
+        const alpha = Math.sin(t * Math.PI) * 0.42;
+        if (alpha <= 0.005) continue;
+        const puffX = vx + Math.sin(w.now / 900 + i * 2 + n * 6) * 8 * t;
+        const puffY = vy - rise;
+        const gradient = ctx.createRadialGradient(puffX, puffY, 0, puffX, puffY, radius);
+        gradient.addColorStop(0, `rgba(206, 220, 235, ${alpha})`);
+        gradient.addColorStop(1, 'rgba(206, 220, 235, 0)');
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(puffX, puffY, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Neon doesn't breathe evenly -- it holds, then stutters. A per-sign hash on a
+ * coarse time slot gives each sign its own arrhythmic brownouts.
+ */
+function neonFlicker(now: number, uid: number): number {
+  const base = 0.82 + Math.sin(now / 420 + uid) * 0.12;
+  const n = hashCell(Math.floor(now / 90), uid);
+  if (n > 0.955) return base * 0.34;
+  if (n > 0.9) return base * 0.68;
+  return base;
+}
+
+/**
+ * Distant lightning: most windows stay quiet, and a live one fires two quick
+ * strokes. Capped low so it never washes out the fight.
+ */
+function lightningIntensity(now: number): number {
+  const period = 17000;
+  if (hashCell(Math.floor(now / period), 77) > 0.45) return 0;
+  const t = (now % period) / period;
+  const stroke = (offset: number, width: number) => {
+    const d = t - offset;
+    return d >= 0 && d < width ? 1 - d / width : 0;
+  };
+  return Math.min(1, stroke(0.01, 0.012) * 0.9 + stroke(0.035, 0.02) * 0.6);
 }
 
 function drawChunkLandmark(
@@ -1322,7 +1438,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     const isBarrel = b.kind === 'barrel';
     const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : 80;
     const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'fuse-box' ? '#7ef0bd' : '#ffd166';
-    const pulse = b.kind === 'neon-sign' ? 0.8 + Math.sin(w.now / 420) * 0.15 : 1;
+    const pulse = b.kind === 'neon-sign' ? neonFlicker(w.now, b.uid) : 1;
     const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
     gradient.addColorStop(0, `${color}55`);
     gradient.addColorStop(0.45, `${color}20`);
@@ -1820,6 +1936,35 @@ function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
   ctx.restore();
 }
 
+/**
+ * Civilians and cats. Drawn before the props so scenery occludes them --
+ * they read as background life moving behind the cars rather than as
+ * combatants, and it hides the fact that they never collide with anything.
+ */
+function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
+  if (w.endless?.inDungeon || w.endless?.inBuilding) return;
+  for (const actor of w.ambient) {
+    const kind = AMBIENT_KINDS_BY_ID[actor.kindId];
+    if (!kind) continue;
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    drawShadow(ctx, actor.x, actor.y + 2, 11);
+    drawRig(
+      ctx,
+      kind.rig,
+      kind.palette,
+      actor.anim,
+      w.now - actor.animStartedAt,
+      actor.x,
+      actor.y,
+      actor.facing,
+      SPRITE_SCALE * 0.78,
+      { outline: false },
+    );
+    ctx.restore();
+  }
+}
+
 function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   const outlineEnemies = w.enemies.length < 70;
 
@@ -2117,7 +2262,11 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawLandmark(ctx, w);
   drawDistrictIncursion(ctx, w);
   drawObjectLighting(ctx, w);
-  if (outdoor) drawRoadFireflies(ctx, w, left, top, right, bottom);
+  if (outdoor) {
+    drawSteamVents(ctx, w, left, top, right, bottom);
+    drawRoadFireflies(ctx, w, left, top, right, bottom);
+    drawWindLitter(ctx, w, left, top, right, bottom);
+  }
   drawArenaEdges(ctx, w);
   drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
@@ -2127,6 +2276,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawDungeonExit(ctx, w);
   drawDungeonChest(ctx, w);
   drawPotholes(ctx, w);
+  drawAmbient(ctx, w);
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);
@@ -2155,6 +2305,15 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
+
+  // Distant lightning, under the damage flash so a hit still reads as red.
+  const bolt = outdoor ? lightningIntensity(w.now) : 0;
+  if (bolt > 0) {
+    ctx.globalAlpha = bolt * 0.16;
+    ctx.fillStyle = '#cfe0ff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1;
+  }
 
   // Damage flash.
   const sinceHit = w.now - w.player.lastDamageAt;

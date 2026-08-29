@@ -1,21 +1,45 @@
 ---
-name: Sky ambiance contract
-description: Durable rules for the drifting clouds/shadows, birds, and road fireflies in render/draw.ts.
+name: Ambiance contract
+description: Durable rules for the render-layer ambiance (clouds/shadows, birds, fireflies, litter, steam, lightning) and the simulated ambient civilian/cat actors.
 ---
 
-Cloud puffs, their ground shadows, bird flocks, and firefly clusters
-(`render/draw.ts`, "Sky ambiance" section) are computed purely from world
-position + `w.now` each frame -- no engine/simulation state, no `AmbientKindDef`
-actors. They're gated off entirely (`isIndoor`) inside dungeon rooms and
-building interiors.
+Ambiance in this game splits into two kinds, and the split is the load-bearing
+part:
+
+**Render-layer ambiance** -- cloud puffs, their ground shadows, bird flocks,
+firefly clusters, wind-blown litter, steam vents, neon flicker, and lightning
+(all in `render/draw.ts`) -- is computed purely from world position + `w.now`
+each frame. No `World` fields, nothing stepped in `stepWorld`. Gated off
+(`isIndoor`) inside dungeon rooms and building interiors.
+
+**Simulated ambient actors** -- `data/ambient.ts`'s civilians and cats -- do
+need state (a wander target, a flee reaction), so they live on `World.ambient`
+and are stepped by `updateAmbient` in `stepWorld`. They are still cosmetic:
+never added to the enemy list or spatial grid, never collided with, never
+damaged, and structurally incapable of it (`AmbientActor` has no `hp`).
+
+**Why:** decoration should not be able to change a run. Anything that can be
+derived per-frame stays in the renderer where it cannot touch the sim at all;
+only the things that genuinely need memory get `World` state, and those get
+kept out of every combat path by construction rather than by discipline.
+
+`updateAmbient` draws from `World.ambientRng`, a stream separate from
+`World.rng`.
 
 **Why:**
-These are decoration only, never touched by collision/damage code, so there
-was no reason to add World fields or step them in `stepWorld` -- the same
-reasoning `data/ambient.ts`'s civilian/cat actors were meant to follow (that
-system is defined but currently unwired: never spawned or referenced by
-`world.ts`, `RunScreen.tsx`, or `draw.ts`. Wiring it up is still open ambiance
-work.)
+`rng` drives waves, objectives, loot, and incursions, and runs are seeded --
+so consuming from it for background life would shift gameplay rolls for a
+given seed and break seeded tests. Tuning or adding ambient life must never
+have that reach. There is a regression test asserting a drained `ambientRng`
+leaves `rng` and the rolled objectives identical.
+
+Ambient actors are drawn (`drawAmbient`) *before* `drawObstacles`, so props
+occlude them.
+
+**Why:**
+It reads as background life moving behind the parked cars, and it hides the
+fact that they pass through scenery -- they deliberately have no collision, so
+occlusion is doing the work a physics pass would otherwise have to.
 
 Ground-level effects (cloud shadows, fireflies) MUST clip their placement
 grid to the actual arena via `clipToArena()` before iterating, not to the

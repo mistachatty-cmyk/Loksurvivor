@@ -517,6 +517,55 @@ test('a heavy metal box absorbs a hit, moves under strong impact, and never brea
   assert.ok(box.x > xBefore);
 });
 
+test('ambient street life flees the player, stays in the arena, and never joins combat', () => {
+  const world = createWorld(
+    testArea({ x: 300, y: 200, w: 40, h: 40, kind: 'crate' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    4242,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(world.ambient.length > 0, 'a run should populate background life');
+  assert.equal(world.enemies.length, 0, 'ambient actors must never enter the enemy list');
+
+  // Park one on top of the player: it should bolt away, not drift closer.
+  const startled = world.ambient[0]!;
+  startled.x = world.player.x + 20;
+  startled.y = world.player.y;
+  const before = Math.hypot(startled.x - world.player.x, startled.y - world.player.y);
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  const after = Math.hypot(startled.x - world.player.x, startled.y - world.player.y);
+  assert.ok(after > before, 'a startled civilian should put distance between itself and the player');
+
+  const halfW = world.bounds.w / 2;
+  const halfH = world.bounds.h / 2;
+  for (let i = 0; i < 600; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.enemies.length, 0);
+  for (const actor of world.ambient) {
+    assert.ok(Math.abs(actor.x) <= halfW, `ambient actor left the arena on x: ${actor.x}`);
+    assert.ok(Math.abs(actor.y) <= halfH, `ambient actor left the arena on y: ${actor.y}`);
+  }
+});
+
+test('ambient life uses its own rng stream so it cannot shift gameplay rolls', () => {
+  // Same seed, but one world burns a pile of ambient rolls first. Wave and
+  // objective rolls come off `rng` and must be identical either way.
+  const build = () => createWorld(AREAS[0]!, testCharacter('the-bus'), CHARACTERS[0].stats, 8080);
+  const plain = build();
+  const drained = build();
+  for (let i = 0; i < 500; i += 1) drained.ambientRng();
+
+  assert.deepEqual(
+    drained.objectives.map((o) => o.def.id),
+    plain.objectives.map((o) => o.def.id),
+  );
+  for (let i = 0; i < 200; i += 1) {
+    assert.equal(drained.rng(), plain.rng());
+  }
+});
+
 test('a launched prop bounces off the arena wall instead of flying through it', () => {
   const halfW = AREAS[0]!.bounds.w / 2;
   const world = createWorld(
