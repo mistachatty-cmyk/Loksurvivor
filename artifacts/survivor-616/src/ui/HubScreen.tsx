@@ -2,7 +2,7 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { useMeta } from '@/game/state/metaStore';
+import { useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
@@ -12,7 +12,7 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
 import type { AllyDef, CrewActivityIcon } from '@/game/types';
 
 /** Small rig built on the fly for a rescued ally -- matches the crew-card portrait's params. */
@@ -20,7 +20,7 @@ function allyRig(ally: AllyDef) {
   return humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' });
 }
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -36,6 +36,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   bestiary: { label: 'Bestiary', icon: Skull, testId: 'button-open-bestiary', description: 'Known threats' },
   unlocks: { label: 'Archive', icon: Unlock, testId: 'button-open-unlocks', description: 'Progress & secrets' },
   music: { label: 'Soundtrack', icon: Music, testId: 'button-open-music', description: 'Set the mood' },
+  studio: { label: 'Studio', icon: RadioTower, testId: 'button-open-studio', description: 'Remix & record' },
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
@@ -61,7 +62,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
-  const { unlockedRooms, rescuedAllies, selectedCharacter, meta, lastRun } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun } = useMeta();
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
@@ -180,7 +181,29 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
               );
             })}
           </nav>
-          
+
+          {lockedRooms.length > 0 && (
+            <div
+              className="mb-6 flex flex-wrap gap-2"
+              data-testid="hideout-locked-rooms"
+            >
+              {lockedRooms.map((room) => (
+                <div
+                  key={room.id}
+                  className="flex items-center gap-2 border border-dashed border-border px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground/70"
+                  title={describeUnlock(room.unlock)}
+                  data-testid={`locked-room-${room.id}`}
+                >
+                  <Lock className="h-3 w-3" />
+                  <span>{room.name}</span>
+                  <span className="hidden font-normal normal-case tracking-normal text-muted-foreground/60 sm:inline">
+                    — {describeUnlock(room.unlock)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="p-4 bg-card border border-border">
             <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
             <p className="text-sm text-muted-foreground">{activeRoom.description}</p>

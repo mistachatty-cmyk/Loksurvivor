@@ -14,6 +14,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/street.jpeg',
     bounds: { w: 900, h: 620 },
     ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848' },
+    sky: 'clear',
     obstacles: [
       { x: -320, y: -180, w: 120, h: 60, kind: 'car' },
       { x: 250, y: -220, w: 70, h: 50, kind: 'dumpster' },
@@ -61,6 +62,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/alley.jpeg',
     bounds: { w: 620, h: 780 },
     ground: { base: '#12131c', tile: '#1a1b26', seam: '#090a10', glow: '#4de1ff' },
+    sky: 'overcast',
     obstacles: [
       { x: -220, y: -260, w: 70, h: 70, kind: 'crate' },
       { x: 210, y: -160, w: 70, h: 60, kind: 'dumpster' },
@@ -101,6 +103,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/rooftops.jpeg',
     bounds: { w: 1000, h: 560 },
     ground: { base: '#0f1119', tile: '#171a25', seam: '#080910', glow: '#ff7ab8' },
+    sky: 'clear',
     obstacles: [
       { x: -380, y: 120, w: 60, h: 60, kind: 'ac-unit' },
       { x: -140, y: -140, w: 60, h: 60, kind: 'ac-unit' },
@@ -136,6 +139,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/cellar.jpeg',
     bounds: { w: 700, h: 700 },
     ground: { base: '#151208', tile: '#1e1a0e', seam: '#0b0904', glow: '#7ef0bd' },
+    sky: 'roofed',
     obstacles: [
       { x: -180, y: -180, w: 80, h: 80, kind: 'crate' },
       { x: 200, y: -120, w: 70, h: 90, kind: 'crate' },
@@ -168,6 +172,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/bar.jpeg',
     bounds: { w: 760, h: 620 },
     ground: { base: '#160f12', tile: '#20161a', seam: '#0c080a', glow: '#ffd45e' },
+    sky: 'overcast',
     obstacles: [
       { x: -240, y: -140, w: 160, h: 46, kind: 'barrier' },
       { x: 230, y: -160, w: 60, h: 60, kind: 'crate' },
@@ -204,6 +209,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/street.jpeg',
     bounds: { w: 1040, h: 660 },
     ground: { base: '#0c1820', tile: '#10242b', seam: '#071116', glow: '#35d0bb' },
+    sky: 'rain',
     obstacles: [
       { x: -380, y: -210, w: 240, h: 34, kind: 'barrier' },
       { x: 380, y: -210, w: 240, h: 34, kind: 'barrier' },
@@ -246,6 +252,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/street.jpeg',
     bounds: { w: 920, h: 680 },
     ground: { base: '#1b1410', tile: '#2a1b13', seam: '#100b08', glow: '#f4b942' },
+    sky: 'overcast',
     obstacles: [
       { x: -330, y: -210, w: 150, h: 42, kind: 'barrier' },
       { x: -120, y: -210, w: 150, h: 42, kind: 'barrier' },
@@ -290,6 +297,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/alley.jpeg',
     bounds: { w: 1080, h: 620 },
     ground: { base: '#101820', tile: '#172632', seam: '#080d12', glow: '#f26b5e' },
+    sky: 'fog',
     obstacles: [
       { x: -420, y: -175, w: 250, h: 24, kind: 'barrier' },
       { x: -120, y: -175, w: 250, h: 24, kind: 'barrier' },
@@ -332,6 +340,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/rooftops.jpeg',
     bounds: { w: 820, h: 820 },
     ground: { base: '#17141e', tile: '#24202d', seam: '#0b0a10', glow: '#b58cff' },
+    sky: 'clear',
     obstacles: [
       { x: -280, y: -280, w: 120, h: 44, kind: 'barrier' },
       { x: 160, y: -280, w: 120, h: 44, kind: 'barrier' },
@@ -377,6 +386,7 @@ export const AREAS: AreaDef[] = [
     backdrop: 'art/street.jpeg',
     bounds: { w: 99999, h: 99999 }, // not used directly -- world is unbounded
     ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848' },
+    sky: 'clear',
      obstacles: [{ x: -140, y: 90, w: 100, h: 24, kind: 'cover' }, { x: 140, y: -90, w: 52, h: 52, kind: 'reflective-surface' }],
     durationSec: 0, // endless -- win condition is "head home", loss is death
     threat: 'rising',

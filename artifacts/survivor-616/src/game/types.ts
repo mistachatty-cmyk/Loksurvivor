@@ -6,6 +6,8 @@
  * never editing the simulation loop.
  */
 
+import type { BeatReaction } from '@/game/data/reactivity';
+
 export interface Vec2 {
   x: number;
   y: number;
@@ -508,6 +510,8 @@ export interface CharacterDef {
   unlock: UnlockRule;
   /** Path to the reference art the rig was built from, if any. */
   referenceArt?: string;
+  /** How this character moves to the music. See `data/reactivity.ts`. */
+  react?: BeatReaction[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -554,6 +558,8 @@ export interface EnemyDef {
   faction?: string;
   role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor';
   traits?: { teleportMs?: number; ghostMs?: number; shiftMs?: number; shiftScale?: number; burstSpeed?: number };
+  /** How this enemy moves to the music. See `data/reactivity.ts`. */
+  react?: BeatReaction[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -601,6 +607,13 @@ export interface ObstacleDef {
 
 export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench';
 
+/**
+ * Overhead conditions for an area. Drives clouds, rain, fog and lightning.
+ * `roofed` means there is no sky at all (cellars, interiors) -- every sky
+ * effect is suppressed rather than dimmed.
+ */
+export type AreaSky = 'clear' | 'overcast' | 'rain' | 'fog' | 'roofed';
+
 export interface AreaDef {
   id: string;
   name: string;
@@ -616,6 +629,8 @@ export interface AreaDef {
     seam: string;
     glow: string;
   };
+  /** Overhead conditions; defaults to 'clear' when omitted. */
+  sky?: AreaSky;
   obstacles: ObstacleDef[];
   /** A readable set piece drawn into the arena as a visual story cue. */
   landmark?: {
@@ -1079,6 +1094,26 @@ export interface ChallengeContractDef {
   enemyDamageMultiplier: number;
 }
 
+/** Whether a detail panel (shop item, character) sits fixed beside its grid or expands under the selected row. */
+export type UIPanelLayout = 'rail' | 'slideout';
+
+export interface UIThemeSwatchDef {
+  id: string;
+  name: string;
+  /** HSL triplet in the same "H S% L%" format as the --primary custom property, e.g. "156 100% 62%". */
+  primaryHsl: string;
+}
+
+export interface UIThemeDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Cred cost to unlock. 0 = always owned. */
+  cost: number;
+  /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
+  swatches?: UIThemeSwatchDef[];
+}
+
 export type UpgradeEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number }
   | { kind: 'weaponLevel'; amount: number }
@@ -1110,12 +1145,14 @@ export interface UpgradeDef {
 
 export interface MetaState {
   version: number;
-  /** Development-only switch for exposing every unlockable surface. */
+  /** Settings toggle for exposing every unlockable surface regardless of progress. */
   devModeAllUnlocks: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */
   levelUpPausesEnabled: boolean;
+  /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
+  wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */
   minimapVisible: boolean;
   /** Whether the endless minimap shows its full map details. */
@@ -1124,6 +1161,20 @@ export interface MetaState {
   minimapPosition: { x: number; y: number };
   /** 'grid' shows list-heavy hub panels as multi-column card grids; 'list' is the original single-column layout. */
   uiDensity: 'grid' | 'list';
+  /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
+  musicReactiveEnabled: boolean;
+  /** Whether device tilt steers the player on supported hardware. */
+  gyroEnabled: boolean;
+  /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */
+  gyroSensitivity: number;
+  /** Flips the forward/back tilt axis. */
+  gyroInvertY: boolean;
+  /**
+   * Whether the studio may load third-party audio plugins. Off by default:
+   * a plugin runs code fetched from another origin, which nothing else in the
+   * game does, so it is enabled deliberately or not at all.
+   */
+  studioPluginsEnabled: boolean;
   selectedCharacterId: string;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];
@@ -1178,6 +1229,14 @@ export interface MetaState {
   knownRelicIds: string[];
   /** Player-authored maps; these never modify the authored area catalog. */
   customMaps: CustomMap[];
+  /** Whether the Quartermaster and Roster detail panel sits in a fixed rail or slides out under the selected row. */
+  uiPanelLayout: UIPanelLayout;
+  /** Purchased UI theme ids. The free 'house' theme is always included. */
+  ownedUiThemeIds: string[];
+  /** Currently equipped UI theme id. */
+  uiTheme: string;
+  /** Selected accent swatch id per theme, for themes that offer swatches. */
+  uiThemeSwatchByTheme: Record<string, string>;
 }
 
 /* ------------------------------------------------------------------ */

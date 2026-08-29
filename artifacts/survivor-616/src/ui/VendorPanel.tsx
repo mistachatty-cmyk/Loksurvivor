@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { Fragment, useState } from 'react';
 import {
   ArrowUpRight,
   BadgeDollarSign,
@@ -12,6 +11,7 @@ import {
   KeyRound,
   LockKeyhole,
   PackageCheck,
+  RotateCcw,
   Shield,
   Skull,
   Sparkles,
@@ -93,22 +93,12 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'masters-cut': Gauge,
 };
 
-const categoryTint: Record<VendorItemCategory, string> = {
-  stat: 'border-amber-500/30 bg-amber-500/[0.045]',
-  utility: 'border-orange-500/30 bg-orange-500/[0.045]',
-  challenge: 'border-red-500/30 bg-red-500/[0.045]',
-  relic: 'border-sky-500/30 bg-sky-500/[0.045]',
-};
-
-const categoryText: Record<VendorItemCategory, string> = {
-  stat: 'text-amber-300',
-  utility: 'text-orange-300',
-  challenge: 'text-red-300',
-  relic: 'text-sky-300',
-};
-
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
   return Math.min(item.maxStacks, Math.max(0, Math.floor(purchases[item.id] ?? 0)));
+}
+
+function currencyInfo(item: VendorItemDef, meta: { cred: number; skeletonKeys: number }): { balance: number; label: string } {
+  return item.currency === 'skeletonKeys' ? { balance: meta.skeletonKeys, label: 'keys' } : { balance: meta.cred, label: 'cred' };
 }
 
 function effectLabel(item: VendorItemDef): string {
@@ -116,284 +106,337 @@ function effectLabel(item: VendorItemDef): string {
   if (!effect) {
     return item.category === 'challenge' ? 'Contract modifier' : 'Permanent field benefit';
   }
-
   if (effect.kind === 'stat') {
     const amount = effect.add ?? 0;
     const isPercent = effect.stat === 'power' || effect.stat === 'armor';
     const displayAmount = isPercent ? `${Math.round(amount * 100)}%` : `${amount}`;
     return `+${displayAmount} ${STAT_LABELS[effect.stat] ?? effect.stat} / stack`;
   }
-
   if (effect.utility === 'starting-weapon-level') {
     return `+${effect.amount} signature level / stack`;
   }
-
   return `+${Math.round(effect.amount * 100)}% final cred / stack`;
 }
 
-function ItemMark({ item }: { item: VendorItemDef }) {
+function ItemIcon({ item, size = 'md' }: { item: VendorItemDef; size?: 'md' | 'lg' }) {
   const Icon = ITEM_ICONS[item.id] ?? Box;
+  const tone = item.category === 'challenge' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-primary/40 bg-primary/10 text-primary';
+  const dims = size === 'lg' ? 'h-14 w-14' : 'h-10 w-10';
   return (
-    <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-500/35 bg-amber-500/10 text-amber-300 shadow-[3px_3px_0_rgba(245,158,11,0.11)]">
-      <Icon className="h-5 w-5" strokeWidth={1.7} />
+    <div className={`terminal-frame grid ${dims} shrink-0 place-items-center border ${tone}`}>
+      <Icon className={size === 'lg' ? 'h-6 w-6' : 'h-5 w-5'} strokeWidth={1.7} />
     </div>
   );
 }
 
-function StackMeter({ owned, cap, category }: { owned: number; cap: number; category: VendorItemCategory }) {
+function PipMeter({ owned, cap, category }: { owned: number; cap: number; category: VendorItemCategory }) {
+  const fill = category === 'challenge' ? 'bg-destructive' : 'bg-primary';
   return (
     <div className="flex items-center gap-2" aria-label={`${owned} of ${cap} stacks owned`}>
-      <div className="flex gap-1" aria-hidden="true">
+      <div className="flex flex-1 gap-1" aria-hidden="true">
         {Array.from({ length: cap }).map((_, index) => (
-          <span
-            key={index}
-            className={`h-1.5 w-3.5 sm:w-5 ${index < owned ? (category === 'challenge' ? 'bg-red-400' : category === 'relic' ? 'bg-sky-400' : 'bg-amber-400') : 'bg-white/10'}`}
-          />
+          <span key={index} className={`h-1.5 flex-1 ${index < owned ? fill : 'bg-white/10'}`} />
         ))}
       </div>
-      <span className="font-mono text-[10px] font-bold tracking-wider text-white/55">{owned}/{cap}</span>
+      <span className="shrink-0 font-mono text-[10px] font-bold tracking-wider text-muted-foreground">
+        {owned}/{cap}
+      </span>
     </div>
   );
 }
 
-function PurchaseButton({
+function ItemTile({
   item,
-  owned,
-  balance,
-  currencyLabel,
-  onPurchase,
-}: {
-  item: VendorItemDef;
-  owned: number;
-  balance: number;
-  currencyLabel: string;
-  onPurchase: (id: string) => void;
-}) {
-  const isMaxed = owned >= item.maxStacks;
-  const isShort = balance < item.cost;
-  const disabled = isMaxed || isShort;
-  const [isConfirming, setIsConfirming] = useState(false);
-
-  const handlePurchase = () => {
-    if (disabled) return;
-    onPurchase(item.id);
-    setIsConfirming(true);
-    window.setTimeout(() => setIsConfirming(false), 900);
-  };
-
-  const buttonLabel = isMaxed
-    ? 'Capacity reached'
-    : isShort
-      ? `Need ${item.cost - balance} more ${currencyLabel}`
-      : `Issue for ${item.cost} ${currencyLabel}`;
-
-  return (
-    <div className="relative mt-5">
-      <motion.button
-        type="button"
-        disabled={disabled}
-        onClick={handlePurchase}
-        whileTap={disabled ? undefined : { scale: 0.985 }}
-        className={`group flex min-h-11 w-full items-center justify-between gap-3 border px-3 py-2.5 text-left transition-colors ${
-          isMaxed
-            ? 'cursor-not-allowed border-emerald-500/20 bg-emerald-500/[0.035] text-emerald-300/70'
-            : isShort
-              ? 'cursor-not-allowed border-white/10 bg-black/15 text-white/35'
-              : 'border-amber-500/60 bg-amber-500/10 text-amber-100 hover:border-amber-300 hover:bg-amber-400 hover:text-[#17120b]'
-        }`}
-        data-testid={`button-buy-vendor-item-${item.id}`}
-        aria-label={`${item.name}: ${buttonLabel}`}
-        title={isMaxed ? `Maxed at ${item.maxStacks} stacks` : isShort ? `Insufficient funds: ${item.cost - balance} more ${currencyLabel} needed` : `Purchase ${item.name}`}
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          {isMaxed ? <Check className="h-4 w-4 shrink-0" /> : <ArrowUpRight className="h-4 w-4 shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />}
-          <span className="truncate text-[10px] font-black uppercase tracking-[0.14em]">{buttonLabel}</span>
-        </span>
-        {!isMaxed && !isShort && <span className="font-mono text-[10px] font-bold text-amber-300/75">CONFIRM</span>}
-      </motion.button>
-      <AnimatePresence>
-        {isConfirming && (
-          <motion.span
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className="pointer-events-none absolute -top-5 right-0 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-amber-300"
-          >
-            Added to kit
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function VendorCard({
-  item,
-  balance,
-  currencyLabel,
   purchases,
-  onPurchase,
-  index,
+  meta,
+  selected,
+  onSelect,
 }: {
   item: VendorItemDef;
-  balance: number;
-  currencyLabel: string;
   purchases: Record<string, number>;
-  onPurchase: (id: string) => void;
-  index: number;
+  meta: { cred: number; skeletonKeys: number };
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const owned = ownedStacks(item, purchases);
-  const isMaxed = owned >= item.maxStacks;
-  const isShort = balance < item.cost;
+  const maxed = owned >= item.maxStacks;
+  const { label: currencyLabel } = currencyInfo(item, meta);
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`terminal-frame flex flex-col gap-2 border p-3 text-left transition-colors ${
+        selected ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
+      }`}
+      data-testid={`button-vendor-tile-${item.id}`}
+    >
+      <ItemIcon item={item} />
+      <span className="text-[11px] font-black uppercase leading-tight tracking-wide text-white">{item.name}</span>
+      <PipMeter owned={owned} cap={item.maxStacks} category={item.category} />
+      <span className={`font-mono text-[10px] font-bold ${maxed ? 'text-emerald-300' : 'text-muted-foreground'}`}>
+        {maxed ? 'Maxed' : `${item.cost} ${currencyLabel}`}
+      </span>
+    </button>
+  );
+}
+
+function ItemDetail({
+  item,
+  meta,
+  purchases,
+  onBuy,
+  onRefund,
+  inline = false,
+}: {
+  item: VendorItemDef;
+  meta: { cred: number; skeletonKeys: number };
+  purchases: Record<string, number>;
+  onBuy: (id: string) => void;
+  onRefund: (id: string) => void;
+  inline?: boolean;
+}) {
+  const owned = ownedStacks(item, purchases);
+  const maxed = owned >= item.maxStacks;
+  const { balance, label: currencyLabel } = currencyInfo(item, meta);
+  const short = balance < item.cost;
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, delay: index * 0.035 }}
-      className={`group relative flex h-full flex-col border p-4 transition-colors hover:border-amber-500/55 ${categoryTint[item.category]}`}
-      data-testid={`vendor-item-${item.id}`}
+    <div
+      className={`terminal-frame border border-border bg-card p-4 ${inline ? 'flex flex-wrap items-center gap-4' : 'flex flex-col gap-3'}`}
+      data-testid={`section-vendor-detail-${item.id}`}
     >
-      <div className="absolute right-0 top-0 h-5 w-5 border-l border-b border-amber-500/25" aria-hidden="true" />
-      <div className="flex items-start gap-3">
-        <ItemMark item={item} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
-            <h3 className="text-lg font-black leading-none text-white">{item.name}</h3>
-            {isMaxed && <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-emerald-300/80">Maxed</span>}
-          </div>
-          <p className={`mt-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] ${categoryText[item.category]}`}>{effectLabel(item)}</p>
+      <ItemIcon item={item} size="lg" />
+      <div className={inline ? 'min-w-[12rem] flex-1' : ''}>
+        <h3 className="terminal-glow text-base font-black uppercase text-white">{item.name}</h3>
+        <p
+          className={`mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] ${
+            item.category === 'challenge' ? 'text-destructive' : 'text-primary'
+          }`}
+        >
+          {effectLabel(item)}
+        </p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.description}</p>
+        <div className="mt-3 max-w-xs">
+          <PipMeter owned={owned} cap={item.maxStacks} category={item.category} />
         </div>
       </div>
-
-      <p className="mt-4 min-h-[3.5rem] text-sm leading-6 text-white/55">{item.description}</p>
-
-      <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
-        <div>
-          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Owned / cap</p>
-          <StackMeter owned={owned} cap={item.maxStacks} category={item.category} />
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Unit price</p>
-          <p className={`font-mono text-sm font-bold ${isShort && !isMaxed ? 'text-red-300' : 'text-amber-300'}`}>{item.cost} {currencyLabel}</p>
-        </div>
+      <div className={`flex gap-2 ${inline ? 'shrink-0' : 'flex-col'}`}>
+        <button
+          type="button"
+          disabled={maxed || short}
+          onClick={() => onBuy(item.id)}
+          className={`flex items-center justify-between gap-2 whitespace-nowrap border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+            maxed || short
+              ? 'cursor-not-allowed border-border text-muted-foreground/50'
+              : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
+          }`}
+          data-testid={`button-buy-vendor-item-${item.id}`}
+        >
+          {maxed ? <Check className="h-4 w-4 shrink-0" /> : <ArrowUpRight className="h-4 w-4 shrink-0" />}
+          <span>{maxed ? 'Capacity reached' : short ? `Need ${item.cost - balance} more ${currencyLabel}` : `Buy for ${item.cost} ${currencyLabel}`}</span>
+          {!maxed && !short && <kbd className="border border-current px-1 text-[9px]">E</kbd>}
+        </button>
+        <button
+          type="button"
+          disabled={owned <= 0}
+          onClick={() => onRefund(item.id)}
+          className={`flex items-center justify-center gap-2 whitespace-nowrap border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+            owned <= 0
+              ? 'cursor-not-allowed border-border text-muted-foreground/50'
+              : 'border-border text-muted-foreground hover:border-destructive hover:text-destructive'
+          }`}
+          data-testid={`button-refund-vendor-item-${item.id}`}
+        >
+          <RotateCcw className="h-4 w-4 shrink-0" />
+          <span>Refund</span>
+          <kbd className="border border-current px-1 text-[9px]">R</kbd>
+        </button>
       </div>
-
-      <PurchaseButton item={item} owned={owned} balance={balance} currencyLabel={currencyLabel} onPurchase={onPurchase} />
-    </motion.article>
+    </div>
   );
 }
 
 export function VendorPanel({ onBack }: VendorPanelProps) {
-  const { meta, buyVendorItem } = useMeta();
-  const isListView = meta.uiDensity === 'list';
+  const { meta, buyVendorItem, refundVendorItem, refundAllVendorItems } = useMeta();
+  const [activeCategory, setActiveCategory] = useState<VendorItemCategory>('stat');
+  const [selectedId, setSelectedId] = useState<string>(
+    VENDOR_CATALOG.find((item) => item.category === 'stat')?.id ?? VENDOR_CATALOG[0].id,
+  );
+
+  const itemsInCategory = VENDOR_CATALOG.filter((item) => item.category === activeCategory);
+  const selectedItem = itemsInCategory.find((item) => item.id === selectedId) ?? itemsInCategory[0];
+
   const totalOwned = VENDOR_CATALOG.reduce((total, item) => total + ownedStacks(item, meta.vendorPurchases), 0);
   const maxStacks = VENDOR_CATALOG.reduce((total, item) => total + item.maxStacks, 0);
   const maxedCount = VENDOR_CATALOG.filter((item) => ownedStacks(item, meta.vendorPurchases) >= item.maxStacks).length;
+
+  const layout = meta.uiPanelLayout;
+
+  function selectCategory(category: VendorItemCategory) {
+    setActiveCategory(category);
+    const firstItem = VENDOR_CATALOG.find((item) => item.category === category);
+    if (firstItem) setSelectedId(firstItem.id);
+  }
 
   return (
     <ScreenLayout
       title="Quartermaster"
       subtitle="The back room / Grand Rapids"
       onBack={onBack}
-      className="bg-[#100e0b]"
       action={
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-3 border border-amber-500/50 bg-amber-500/10 px-4 py-3 shadow-[4px_4px_0_rgba(245,158,11,0.12)]" data-testid="vendor-cred-balance">
-            <BadgeDollarSign className="h-5 w-5 text-amber-300" />
+          <button
+            type="button"
+            onClick={refundAllVendorItems}
+            disabled={totalOwned === 0}
+            className={`border px-3 py-3 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              totalOwned === 0
+                ? 'cursor-not-allowed border-border text-muted-foreground/40'
+                : 'border-border text-muted-foreground hover:border-destructive hover:text-destructive'
+            }`}
+            data-testid="button-refund-all-vendor-items"
+          >
+            Refund all
+          </button>
+          <div className="terminal-frame flex items-center gap-3 border border-primary/50 bg-primary/10 px-4 py-3" data-testid="vendor-cred-balance">
+            <BadgeDollarSign className="h-5 w-5 text-primary" />
             <div>
-              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-amber-200/60">On hand</p>
-              <p className="font-mono text-xl font-bold leading-none text-amber-200">{meta.cred.toLocaleString()} <span className="text-xs text-amber-300/60">cred</span></p>
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-primary/70">On hand</p>
+              <p className="terminal-glow font-mono text-xl font-bold leading-none text-primary">
+                {meta.cred.toLocaleString()} <span className="text-xs text-primary/60">cred</span>
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 border border-sky-500/50 bg-sky-500/10 px-4 py-3 shadow-[4px_4px_0_rgba(14,165,233,0.12)]" data-testid="vendor-skeleton-keys-balance">
+          <div className="terminal-frame flex items-center gap-3 border border-sky-500/50 bg-sky-500/10 px-4 py-3" data-testid="vendor-skeleton-keys-balance">
             <KeyRound className="h-5 w-5 text-sky-300" />
             <div>
-              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-sky-200/60">Keys</p>
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-sky-200/70">Keys</p>
               <p className="font-mono text-xl font-bold leading-none text-sky-200">{meta.skeletonKeys.toLocaleString()}</p>
             </div>
           </div>
         </div>
       }
     >
-      <div className="mx-auto w-full max-w-6xl space-y-7">
-        <motion.section
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden border border-amber-500/25 bg-[#18130d] p-5 sm:p-6"
-          data-testid="section-vendor-ledger"
-        >
-          <div className="pointer-events-none absolute -right-8 -top-14 font-display text-[11rem] font-black leading-none text-amber-300/[0.035]" aria-hidden="true">616</div>
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <section className="terminal-frame terminal-scanlines relative overflow-hidden border border-border bg-card p-5 sm:p-6" data-testid="section-vendor-ledger">
+          <div className="pointer-events-none absolute -right-8 -top-14 font-display text-[11rem] font-black leading-none text-primary/[0.05]" aria-hidden="true">
+            616
+          </div>
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <div className="mb-3 flex items-center gap-2 text-amber-300">
+              <div className="mb-3 flex items-center gap-2 text-primary">
                 <Sparkles className="h-4 w-4" />
                 <span className="font-mono text-[10px] font-bold uppercase tracking-[0.28em]">No middleman. No markup story.</span>
               </div>
               <h2 className="max-w-xl text-3xl font-black leading-[0.95] text-white sm:text-4xl">Gear that remembers who paid for it.</h2>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-white/55">
-                The quartermaster trades in cred and favors. Every purchase is permanent, every stack is visible, and the house never rotates stock.
+              <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+                Pick a category, pick an upgrade, and watch the pips fill in. Refund a stack any time the build changes.
               </p>
             </div>
-            <div className="grid grid-cols-3 border-t border-amber-500/20 pt-4 sm:min-w-[22rem] sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <div className="grid grid-cols-3 border-t border-border pt-4 sm:min-w-[22rem] sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
               <div className="pr-3">
-                <p className="font-mono text-[9px] uppercase tracking-widest text-white/35">Stacks in kit</p>
-                <p className="mt-1 font-mono text-xl font-bold text-white">{totalOwned}<span className="text-sm text-white/35">/{maxStacks}</span></p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Stacks in kit</p>
+                <p className="mt-1 font-mono text-xl font-bold text-white">
+                  {totalOwned}
+                  <span className="text-sm text-muted-foreground">/{maxStacks}</span>
+                </p>
               </div>
-              <div className="border-l border-white/10 px-3">
-                <p className="font-mono text-[9px] uppercase tracking-widest text-white/35">Catalog</p>
-                <p className="mt-1 font-mono text-xl font-bold text-white">{VENDOR_CATALOG.length}<span className="text-sm text-white/35"> lines</span></p>
+              <div className="border-l border-border px-3">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Catalog</p>
+                <p className="mt-1 font-mono text-xl font-bold text-white">
+                  {VENDOR_CATALOG.length}
+                  <span className="text-sm text-muted-foreground"> lines</span>
+                </p>
               </div>
-              <div className="border-l border-white/10 pl-3">
-                <p className="font-mono text-[9px] uppercase tracking-widest text-white/35">Capped out</p>
-                <p className="mt-1 font-mono text-xl font-bold text-emerald-300">{maxedCount}<span className="text-sm text-white/35">/{VENDOR_CATALOG.length}</span></p>
+              <div className="border-l border-border pl-3">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Capped out</p>
+                <p className="mt-1 font-mono text-xl font-bold text-emerald-300">
+                  {maxedCount}
+                  <span className="text-sm text-muted-foreground">/{VENDOR_CATALOG.length}</span>
+                </p>
               </div>
             </div>
           </div>
-        </motion.section>
+        </section>
 
-        <div className="space-y-10">
+        <div className="flex flex-wrap gap-2" data-testid="section-vendor-categories">
           {CATEGORY_CONFIG.map((category) => {
-            const items = VENDOR_CATALOG.filter((item) => item.category === category.key);
             const CategoryIcon = category.icon;
+            const active = category.key === activeCategory;
             return (
-              <section key={category.key} data-testid={`section-vendor-${category.key}`}>
-                <div className="mb-4 flex flex-col gap-2 border-b border-white/10 pb-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <CategoryIcon className={`mt-0.5 h-5 w-5 ${categoryText[category.key]}`} strokeWidth={1.7} />
-                    <div>
-                      <p className={`font-mono text-[10px] font-bold uppercase tracking-[0.25em] ${categoryText[category.key]}`}>{category.eyebrow}</p>
-                      <h2 className="mt-1 text-2xl font-black text-white">{category.title}</h2>
-                    </div>
-                  </div>
-                  <p className="max-w-md text-xs leading-5 text-white/40 sm:text-right">{category.description}</p>
-                </div>
-                <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : category.key === 'stat' ? 'sm:grid-cols-2 xl:grid-cols-3' : category.key === 'utility' || category.key === 'relic' ? 'md:grid-cols-2' : 'lg:grid-cols-3'}`}>
-                  {items.map((item, index) => {
-                    const currency = item.currency ?? 'cred';
-                    const balance = currency === 'skeletonKeys' ? meta.skeletonKeys : meta.cred;
-                    const currencyLabel = currency === 'skeletonKeys' ? 'keys' : 'cred';
-                    return (
-                      <VendorCard
-                        key={item.id}
-                        item={item}
-                        balance={balance}
-                        currencyLabel={currencyLabel}
-                        purchases={meta.vendorPurchases}
-                        onPurchase={buyVendorItem}
-                        index={index}
-                      />
-                    );
-                  })}
-                </div>
-              </section>
+              <button
+                key={category.key}
+                type="button"
+                onClick={() => selectCategory(category.key)}
+                aria-pressed={active}
+                className={`flex items-center gap-2 border px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  active
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+                }`}
+                data-testid={`button-vendor-category-${category.key}`}
+              >
+                <CategoryIcon className="h-4 w-4" strokeWidth={1.7} />
+                {category.title}
+              </button>
             );
           })}
         </div>
 
-        <div className="flex items-start gap-3 border-l-2 border-amber-500/45 bg-amber-500/[0.045] px-4 py-3 text-xs leading-5 text-white/45">
-          <Box className="mt-0.5 h-4 w-4 shrink-0 text-amber-300/75" />
-          <p><span className="font-bold uppercase tracking-widest text-amber-200/80">Quartermaster note:</span> Contracts stay active once bought. Cred comes back from runs, not refunds.</p>
+        <section data-testid={`section-vendor-${activeCategory}`}>
+          {selectedItem &&
+            (layout === 'rail' ? (
+              <div className="grid gap-4 lg:grid-cols-[16rem_1fr]" data-testid="section-vendor-grid">
+                <ItemDetail item={selectedItem} meta={meta} purchases={meta.vendorPurchases} onBuy={buyVendorItem} onRefund={refundVendorItem} />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {itemsInCategory.map((item) => (
+                    <ItemTile
+                      key={item.id}
+                      item={item}
+                      purchases={meta.vendorPurchases}
+                      meta={meta}
+                      selected={item.id === selectedItem.id}
+                      onSelect={() => setSelectedId(item.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [grid-auto-flow:dense]" data-testid="section-vendor-grid">
+                {itemsInCategory.map((item) => (
+                  <Fragment key={item.id}>
+                    <ItemTile
+                      item={item}
+                      purchases={meta.vendorPurchases}
+                      meta={meta}
+                      selected={item.id === selectedItem.id}
+                      onSelect={() => setSelectedId(item.id)}
+                    />
+                    {item.id === selectedItem.id && (
+                      <div className="col-span-full">
+                        <ItemDetail
+                          item={selectedItem}
+                          meta={meta}
+                          purchases={meta.vendorPurchases}
+                          onBuy={buyVendorItem}
+                          onRefund={refundVendorItem}
+                          inline
+                        />
+                      </div>
+                    )}
+                  </Fragment>
+                ))}
+              </div>
+            ))}
+        </section>
+
+        <div className="flex items-start gap-3 border-l-2 border-primary/45 bg-primary/[0.05] px-4 py-3 text-xs leading-5 text-muted-foreground">
+          <Box className="mt-0.5 h-4 w-4 shrink-0 text-primary/75" />
+          <p>
+            <span className="font-bold uppercase tracking-widest text-primary/80">Quartermaster note:</span> Contracts stay active once
+            bought &mdash; refund the base kit any time your build changes.
+          </p>
         </div>
       </div>
     </ScreenLayout>

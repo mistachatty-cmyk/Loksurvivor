@@ -37,8 +37,8 @@ Run from the repo root unless noted:
 
 For the game itself, run from `artifacts/survivor-616/`:
 - `PORT=5173 BASE_PATH=/ pnpm dev` — Vite dev server. `PORT` and `BASE_PATH`
-  are **required** env vars (the config throws without them); pick any free
-  port and `BASE_PATH=/` for local work.
+  fall back to `5173` and `/` when unset (which is why the Vercel build, whose
+  build command passes neither, works); set them explicitly to pick a free port.
 - `PORT=5173 BASE_PATH=/ pnpm build` — production build (`dist/public/`).
 - `pnpm typecheck` — just this package.
 

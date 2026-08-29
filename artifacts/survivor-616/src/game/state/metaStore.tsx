@@ -39,6 +39,7 @@ import {
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import type {
@@ -61,6 +62,7 @@ import type {
   RecoverySession,
   UnlockRule,
   CustomMap,
+  UIPanelLayout,
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
@@ -107,16 +109,28 @@ function settleRecovery(meta: MetaState, now = Date.now()): MetaState {
   };
 }
 
+/** Keeps a persisted or dispatched tilt sensitivity inside a usable range. */
+function clampGyroSensitivity(value: unknown): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 1;
+  return Math.max(0.5, Math.min(2, numeric));
+}
+
 export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
+    wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
     minimapPosition: { x: 0.82, y: 0.18 },
     uiDensity: 'grid',
+    musicReactiveEnabled: true,
+    gyroEnabled: false,
+    studioPluginsEnabled: false,
+    gyroSensitivity: 1,
+    gyroInvertY: false,
     selectedCharacterId: 'shade',
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
@@ -148,6 +162,10 @@ export function createInitialMeta(): MetaState {
     episodeProgressById: {},
     knownRelicIds: [],
     customMaps: [],
+    uiPanelLayout: 'rail',
+    ownedUiThemeIds: [DEFAULT_UI_THEME_ID],
+    uiTheme: DEFAULT_UI_THEME_ID,
+    uiThemeSwatchByTheme: {},
   };
 }
 
@@ -200,6 +218,33 @@ function normalizeVendorPurchases(value: unknown): Record<string, number> {
     if (count > 0) purchases[id] = Math.min(item.maxStacks, count);
   }
   return purchases;
+}
+
+function normalizeOwnedUiThemeIds(value: unknown): string[] {
+  const owned = new Set<string>([DEFAULT_UI_THEME_ID]);
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === 'string' && UI_THEMES_BY_ID[entry]) owned.add(entry);
+    }
+  }
+  return [...owned];
+}
+
+function normalizeUiTheme(value: unknown, ownedUiThemeIds: string[]): string {
+  return typeof value === 'string' && ownedUiThemeIds.includes(value) ? value : DEFAULT_UI_THEME_ID;
+}
+
+function normalizeUiThemeSwatchByTheme(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const swatches: Record<string, string> = {};
+  for (const [themeId, rawSwatchId] of Object.entries(value)) {
+    const theme = UI_THEMES_BY_ID[themeId];
+    if (!theme?.swatches) continue;
+    if (typeof rawSwatchId === 'string' && theme.swatches.some((swatch) => swatch.id === rawSwatchId)) {
+      swatches[themeId] = rawSwatchId;
+    }
+  }
+  return swatches;
 }
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
@@ -537,6 +582,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   );
   const endlessDiscoveryIds = normalizeEndlessDiscoveries(parsed.endlessDiscoveryIds);
   const customMaps = normalizeCustomMaps(parsed.customMaps);
+  const ownedUiThemeIds = normalizeOwnedUiThemeIds(parsed.ownedUiThemeIds);
   const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
     const evolution = EVOLUTIONS_BY_ID[evolutionId];
     return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
@@ -548,13 +594,21 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
 
   return {
     version: META_VERSION,
-    devModeAllUnlocks: Boolean(import.meta.env?.DEV) && parsed.devModeAllUnlocks === true,
+    devModeAllUnlocks: parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
+    wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
+    musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
+    gyroEnabled: parsed.gyroEnabled === true,
+    // Defaults to false on every load, including projects saved before this
+    // existed -- remote code is never enabled by an upgrade.
+    studioPluginsEnabled: parsed.studioPluginsEnabled === true,
+    gyroSensitivity: clampGyroSensitivity(parsed.gyroSensitivity),
+    gyroInvertY: parsed.gyroInvertY === true,
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -591,6 +645,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     episodeProgressById,
     knownRelicIds,
     customMaps,
+    uiPanelLayout: parsed.uiPanelLayout === 'slideout' ? 'slideout' : 'rail',
+    ownedUiThemeIds,
+    uiTheme: normalizeUiTheme(parsed.uiTheme, ownedUiThemeIds),
+    uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
   };
 }
 
@@ -625,7 +683,7 @@ function saveMeta(meta: MetaState) {
 /* ------------------------------------------------------------------ */
 
 export function isUnlocked(rule: UnlockRule, meta: MetaState): boolean {
-  if (import.meta.env?.DEV && meta.devModeAllUnlocks) return true;
+  if (meta.devModeAllUnlocks) return true;
 
   switch (rule.kind) {
     case 'default':
@@ -666,9 +724,7 @@ export function episodeStatus(episodeId: string, meta: MetaState): EpisodeStatus
   const episode = CHARACTER_EPISODES_BY_ID[episodeId];
   if (!episode) return 'locked';
   if (meta.completedEpisodeIds.includes(episode.id)) return 'completed';
-  const characterUnlocked = meta.unlockedCharacterIds.includes(episode.characterId) || (
-    import.meta.env?.DEV && meta.devModeAllUnlocks
-  );
+  const characterUnlocked = meta.unlockedCharacterIds.includes(episode.characterId) || meta.devModeAllUnlocks;
   if (!characterUnlocked || !isUnlocked(episode.unlock, meta)) return 'locked';
   return (meta.episodeProgressById[episode.id] ?? 0) > 0 ? 'in-progress' : 'available';
 }
@@ -789,10 +845,22 @@ type Action =
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
   | { type: 'buyVendorItem'; id: string }
+  | { type: 'refundVendorItem'; id: string }
+  | { type: 'refundAllVendorItems' }
+  | { type: 'setUiPanelLayout'; layout: UIPanelLayout }
+  | { type: 'buyUiTheme'; id: string }
+  | { type: 'equipUiTheme'; id: string }
+  | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
+  | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
+  | { type: 'setMusicReactive'; enabled: boolean }
+  | { type: 'setGyroEnabled'; enabled: boolean }
+  | { type: 'setStudioPlugins'; enabled: boolean }
+  | { type: 'setGyroSensitivity'; value: number }
+  | { type: 'setGyroInvertY'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
@@ -866,6 +934,78 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'refundVendorItem': {
+      const item = VENDOR_CATALOG_BY_ID[action.id];
+      if (!item) return state;
+      const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
+      if (owned <= 0) return state;
+      const nextOwned = owned - 1;
+      const vendorPurchases = { ...state.meta.vendorPurchases };
+      if (nextOwned > 0) vendorPurchases[item.id] = nextOwned;
+      else delete vendorPurchases[item.id];
+      const currency = item.currency ?? 'cred';
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          [currency]: state.meta[currency] + item.cost,
+          vendorPurchases,
+        },
+      };
+    }
+
+    case 'refundAllVendorItems': {
+      const refundByCurrency: Partial<Record<'cred' | 'skeletonKeys', number>> = {};
+      for (const item of VENDOR_CATALOG) {
+        const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
+        if (owned <= 0) continue;
+        const currency = item.currency ?? 'cred';
+        refundByCurrency[currency] = (refundByCurrency[currency] ?? 0) + owned * item.cost;
+      }
+      if (Object.keys(refundByCurrency).length === 0) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred + (refundByCurrency.cred ?? 0),
+          skeletonKeys: state.meta.skeletonKeys + (refundByCurrency.skeletonKeys ?? 0),
+          vendorPurchases: {},
+        },
+      };
+    }
+
+    case 'setUiPanelLayout':
+      return { ...state, meta: { ...state.meta, uiPanelLayout: action.layout } };
+
+    case 'buyUiTheme': {
+      const theme = UI_THEMES_BY_ID[action.id];
+      if (!theme || state.meta.ownedUiThemeIds.includes(theme.id) || state.meta.cred < theme.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - theme.cost,
+          ownedUiThemeIds: [...state.meta.ownedUiThemeIds, theme.id],
+        },
+      };
+    }
+
+    case 'equipUiTheme':
+      if (!state.meta.ownedUiThemeIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, uiTheme: action.id } };
+
+    case 'selectUiThemeSwatch': {
+      const theme = UI_THEMES_BY_ID[action.themeId];
+      if (!theme?.swatches?.some((swatch) => swatch.id === action.swatchId)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          uiThemeSwatchByTheme: { ...state.meta.uiThemeSwatchByTheme, [action.themeId]: action.swatchId },
+        },
+      };
+    }
+
     case 'setDevModeAllUnlocks':
       return {
         ...state,
@@ -883,6 +1023,30 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ...state,
         meta: { ...state.meta, levelUpPausesEnabled: action.enabled },
       };
+
+    case 'setWildlifeSheltersInRain':
+      return {
+        ...state,
+        meta: { ...state.meta, wildlifeSheltersInRain: action.enabled },
+      };
+
+    case 'setMusicReactive':
+      return { ...state, meta: { ...state.meta, musicReactiveEnabled: action.enabled } };
+
+    case 'setGyroEnabled':
+      return { ...state, meta: { ...state.meta, gyroEnabled: action.enabled } };
+
+    case 'setStudioPlugins':
+      return { ...state, meta: { ...state.meta, studioPluginsEnabled: action.enabled } };
+
+    case 'setGyroSensitivity':
+      return {
+        ...state,
+        meta: { ...state.meta, gyroSensitivity: clampGyroSensitivity(action.value) },
+      };
+
+    case 'setGyroInvertY':
+      return { ...state, meta: { ...state.meta, gyroInvertY: action.enabled } };
 
     case 'setMinimapVisible':
       return {
@@ -1140,10 +1304,22 @@ export interface MetaContextValue {
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
   buyVendorItem: (id: string) => void;
+  refundVendorItem: (id: string) => void;
+  refundAllVendorItems: () => void;
+  setUiPanelLayout: (layout: UIPanelLayout) => void;
+  buyUiTheme: (id: string) => void;
+  equipUiTheme: (id: string) => void;
+  selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
+  setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
+  setMusicReactive: (enabled: boolean) => void;
+  setGyroEnabled: (enabled: boolean) => void;
+  setStudioPlugins: (enabled: boolean) => void;
+  setGyroSensitivity: (value: number) => void;
+  setGyroInvertY: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
   setMinimapPosition: (position: { x: number; y: number }) => void;
   setUiDensity: (density: 'grid' | 'list') => void;
@@ -1177,6 +1353,15 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
   const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
+  const refundVendorItem = useCallback((id: string) => dispatch({ type: 'refundVendorItem', id }), []);
+  const refundAllVendorItems = useCallback(() => dispatch({ type: 'refundAllVendorItems' }), []);
+  const setUiPanelLayout = useCallback((layout: UIPanelLayout) => dispatch({ type: 'setUiPanelLayout', layout }), []);
+  const buyUiTheme = useCallback((id: string) => dispatch({ type: 'buyUiTheme', id }), []);
+  const equipUiTheme = useCallback((id: string) => dispatch({ type: 'equipUiTheme', id }), []);
+  const selectUiThemeSwatch = useCallback(
+    (themeId: string, swatchId: string) => dispatch({ type: 'selectUiThemeSwatch', themeId, swatchId }),
+    [],
+  );
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -1187,6 +1372,30 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setLevelUpPauses = useCallback(
     (enabled: boolean) => dispatch({ type: 'setLevelUpPauses', enabled }),
+    [],
+  );
+  const setWildlifeSheltersInRain = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
+    [],
+  );
+  const setMusicReactive = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setMusicReactive', enabled }),
+    [],
+  );
+  const setStudioPlugins = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setStudioPlugins', enabled }),
+    [],
+  );
+  const setGyroEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setGyroEnabled', enabled }),
+    [],
+  );
+  const setGyroSensitivity = useCallback(
+    (value: number) => dispatch({ type: 'setGyroSensitivity', value }),
+    [],
+  );
+  const setGyroInvertY = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setGyroInvertY', enabled }),
     [],
   );
   const setMinimapVisible = useCallback(
@@ -1249,10 +1458,22 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       markOnboarded,
       spendTokens,
       buyVendorItem,
+      refundVendorItem,
+      refundAllVendorItems,
+      setUiPanelLayout,
+      buyUiTheme,
+      equipUiTheme,
+      selectUiThemeSwatch,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
+      setWildlifeSheltersInRain,
       setMinimapVisible,
+      setMusicReactive,
+      setGyroEnabled,
+      setStudioPlugins,
+      setGyroSensitivity,
+      setGyroInvertY,
       setMinimapExpanded,
       setMinimapPosition,
       setUiDensity,
@@ -1275,10 +1496,21 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     markOnboarded,
     spendTokens,
     buyVendorItem,
+    refundVendorItem,
+    refundAllVendorItems,
+    setUiPanelLayout,
+    buyUiTheme,
+    equipUiTheme,
+    selectUiThemeSwatch,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,
+    setWildlifeSheltersInRain,
     setMinimapVisible,
+    setMusicReactive,
+    setGyroEnabled,
+    setGyroSensitivity,
+    setGyroInvertY,
     setMinimapExpanded,
     setMinimapPosition,
     setUiDensity,
@@ -1302,6 +1534,11 @@ export function useMeta(): MetaContextValue {
     throw new Error('useMeta must be used inside <MetaProvider>');
   }
   return ctx;
+}
+
+/** The accent swatch id currently in effect for the player's equipped UI theme, if it offers any. */
+export function activeUiThemeSwatchId(meta: MetaState): string | undefined {
+  return meta.uiThemeSwatchByTheme[meta.uiTheme] ?? defaultSwatchId(meta.uiTheme);
 }
 
 /** Convenience for menus that need the area record plus its lock state. */

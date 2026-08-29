@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
+import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+
 interface Props {
   title: string;
   subtitle?: string;
@@ -13,10 +15,14 @@ interface Props {
 }
 
 export function ScreenLayout({ title, subtitle, onBack, children, action, backdrop, className = '' }: Props) {
+  const { meta } = useMeta();
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      data-ui-theme={meta.uiTheme}
+      data-ui-swatch={activeUiThemeSwatchId(meta)}
       className={`min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden ${className}`}
     >
       {backdrop && (
