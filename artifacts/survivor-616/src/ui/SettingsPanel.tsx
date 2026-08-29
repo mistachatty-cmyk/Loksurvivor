@@ -1,6 +1,21 @@
-import { LayoutDashboard, LayoutList, Map, Maximize2, MousePointer2, PauseCircle, Settings2, Smartphone, FlaskConical } from 'lucide-react';
+import {
+  Check,
+  FlaskConical,
+  LayoutDashboard,
+  LayoutList,
+  Lock,
+  Map,
+  Maximize2,
+  MousePointer2,
+  Palette,
+  PanelRight,
+  PauseCircle,
+  Settings2,
+  Smartphone,
+} from 'lucide-react';
 
-import { useMeta } from '@/game/state/metaStore';
+import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { UI_THEMES } from '@/game/data/uiThemes';
 import { ScreenLayout } from './ScreenLayout';
 
 export interface SettingsPanelProps {
@@ -15,8 +30,13 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setMinimapVisible,
     setMinimapExpanded,
     setUiDensity,
+    setUiPanelLayout,
+    buyUiTheme,
+    equipUiTheme,
+    selectUiThemeSwatch,
     setDevModeAllUnlocks,
   } = useMeta();
+  const activeSwatchId = activeUiThemeSwatchId(meta);
 
   return (
     <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
@@ -181,9 +201,8 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Hub panel layout</p>
                   <h2 className="mt-1 text-xl font-black uppercase text-white">Card grid or legacy list</h2>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    The Quartermaster, Relic Workshop, Archive, and Bestiary show multi-column card grids by default so
-                    you can see most of what's there without scrolling. Switch back to the original single-column list
-                    any time.
+                    The Relic Workshop, Archive, and Bestiary show multi-column card grids by default so you can see
+                    most of what's there without scrolling. Switch back to the original single-column list any time.
                   </p>
                 </div>
               </div>
@@ -216,6 +235,136 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <LayoutList className="h-4 w-4" />
                   Legacy list
                 </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              <PanelRight className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Quartermaster & Roster</p>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">Detail panel layout</h2>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  Choose whether the buy/stats panel sits in a fixed rail beside the grid, or slides open under
+                  whichever item or character you select.
+                </p>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUiPanelLayout('rail')}
+                  aria-pressed={meta.uiPanelLayout === 'rail'}
+                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.uiPanelLayout === 'rail'
+                      ? 'border-primary bg-primary/15 text-primary'
+                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                  }`}
+                  data-testid="button-panel-layout-rail"
+                >
+                  <PanelRight className="h-4 w-4" />
+                  Side rail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUiPanelLayout('slideout')}
+                  aria-pressed={meta.uiPanelLayout === 'slideout'}
+                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.uiPanelLayout === 'slideout'
+                      ? 'border-primary bg-primary/15 text-primary'
+                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                  }`}
+                  data-testid="button-panel-layout-slideout"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Slide-out
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-ui-theme-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              <Palette className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Hideout customization</p>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">UI theme</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                Spend cred on a new look for every menu screen. Arcade Cabinet is the first theme with its own
+                accent swatches &mdash; more themes and swatches are on the way.
+              </p>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {UI_THEMES.map((theme) => {
+                  const owned = meta.ownedUiThemeIds.includes(theme.id);
+                  const equipped = meta.uiTheme === theme.id;
+                  const affordable = meta.cred >= theme.cost;
+                  return (
+                    <div key={theme.id} className={`border p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`} data-testid={`card-ui-theme-${theme.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="text-sm font-black uppercase tracking-wide text-white">{theme.name}</h3>
+                        {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{theme.description}</p>
+
+                      {owned ? (
+                        <button
+                          type="button"
+                          onClick={() => equipUiTheme(theme.id)}
+                          disabled={equipped}
+                          className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                            equipped
+                              ? 'cursor-default border-primary/40 text-primary/70'
+                              : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
+                          }`}
+                          data-testid={`button-equip-ui-theme-${theme.id}`}
+                        >
+                          {equipped ? 'Equipped' : 'Equip'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => buyUiTheme(theme.id)}
+                          disabled={!affordable}
+                          className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                            affordable
+                              ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
+                              : 'cursor-not-allowed border-border text-muted-foreground/50'
+                          }`}
+                          data-testid={`button-buy-ui-theme-${theme.id}`}
+                        >
+                          {!affordable ? <Lock className="h-3 w-3" /> : null}
+                          {affordable ? `Buy for ${theme.cost} cred` : `Need ${theme.cost} cred`}
+                        </button>
+                      )}
+
+                      {owned && equipped && theme.swatches ? (
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+                          {theme.swatches.map((swatch) => (
+                            <button
+                              key={swatch.id}
+                              type="button"
+                              onClick={() => selectUiThemeSwatch(theme.id, swatch.id)}
+                              aria-pressed={activeSwatchId === swatch.id}
+                              title={swatch.name}
+                              className={`h-7 w-7 border-2 transition-transform ${
+                                activeSwatchId === swatch.id ? 'scale-110 border-white' : 'border-white/20 hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
+                              data-testid={`button-ui-theme-swatch-${theme.id}-${swatch.id}`}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

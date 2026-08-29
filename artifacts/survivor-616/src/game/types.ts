@@ -1074,6 +1074,26 @@ export interface ChallengeContractDef {
   enemyDamageMultiplier: number;
 }
 
+/** Whether a detail panel (shop item, character) sits fixed beside its grid or expands under the selected row. */
+export type UIPanelLayout = 'rail' | 'slideout';
+
+export interface UIThemeSwatchDef {
+  id: string;
+  name: string;
+  /** HSL triplet in the same "H S% L%" format as the --primary custom property, e.g. "156 100% 62%". */
+  primaryHsl: string;
+}
+
+export interface UIThemeDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Cred cost to unlock. 0 = always owned. */
+  cost: number;
+  /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
+  swatches?: UIThemeSwatchDef[];
+}
+
 export type UpgradeEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number }
   | { kind: 'weaponLevel'; amount: number }
@@ -1171,6 +1191,14 @@ export interface MetaState {
   knownRelicIds: string[];
   /** Player-authored maps; these never modify the authored area catalog. */
   customMaps: CustomMap[];
+  /** Whether the Quartermaster and Roster detail panel sits in a fixed rail or slides out under the selected row. */
+  uiPanelLayout: UIPanelLayout;
+  /** Purchased UI theme ids. The free 'house' theme is always included. */
+  ownedUiThemeIds: string[];
+  /** Currently equipped UI theme id. */
+  uiTheme: string;
+  /** Selected accent swatch id per theme, for themes that offer swatches. */
+  uiThemeSwatchByTheme: Record<string, string>;
 }
 
 /* ------------------------------------------------------------------ */

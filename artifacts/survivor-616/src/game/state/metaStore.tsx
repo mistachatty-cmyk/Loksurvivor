@@ -39,6 +39,7 @@ import {
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import type {
@@ -61,6 +62,7 @@ import type {
   RecoverySession,
   UnlockRule,
   CustomMap,
+  UIPanelLayout,
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
@@ -147,6 +149,10 @@ export function createInitialMeta(): MetaState {
     episodeProgressById: {},
     knownRelicIds: [],
     customMaps: [],
+    uiPanelLayout: 'rail',
+    ownedUiThemeIds: [DEFAULT_UI_THEME_ID],
+    uiTheme: DEFAULT_UI_THEME_ID,
+    uiThemeSwatchByTheme: {},
   };
 }
 
@@ -199,6 +205,33 @@ function normalizeVendorPurchases(value: unknown): Record<string, number> {
     if (count > 0) purchases[id] = Math.min(item.maxStacks, count);
   }
   return purchases;
+}
+
+function normalizeOwnedUiThemeIds(value: unknown): string[] {
+  const owned = new Set<string>([DEFAULT_UI_THEME_ID]);
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === 'string' && UI_THEMES_BY_ID[entry]) owned.add(entry);
+    }
+  }
+  return [...owned];
+}
+
+function normalizeUiTheme(value: unknown, ownedUiThemeIds: string[]): string {
+  return typeof value === 'string' && ownedUiThemeIds.includes(value) ? value : DEFAULT_UI_THEME_ID;
+}
+
+function normalizeUiThemeSwatchByTheme(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const swatches: Record<string, string> = {};
+  for (const [themeId, rawSwatchId] of Object.entries(value)) {
+    const theme = UI_THEMES_BY_ID[themeId];
+    if (!theme?.swatches) continue;
+    if (typeof rawSwatchId === 'string' && theme.swatches.some((swatch) => swatch.id === rawSwatchId)) {
+      swatches[themeId] = rawSwatchId;
+    }
+  }
+  return swatches;
 }
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
@@ -536,6 +569,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   );
   const endlessDiscoveryIds = normalizeEndlessDiscoveries(parsed.endlessDiscoveryIds);
   const customMaps = normalizeCustomMaps(parsed.customMaps);
+  const ownedUiThemeIds = normalizeOwnedUiThemeIds(parsed.ownedUiThemeIds);
   const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
     const evolution = EVOLUTIONS_BY_ID[evolutionId];
     return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
@@ -589,6 +623,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     episodeProgressById,
     knownRelicIds,
     customMaps,
+    uiPanelLayout: parsed.uiPanelLayout === 'slideout' ? 'slideout' : 'rail',
+    ownedUiThemeIds,
+    uiTheme: normalizeUiTheme(parsed.uiTheme, ownedUiThemeIds),
+    uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
   };
 }
 
@@ -787,6 +825,12 @@ type Action =
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
   | { type: 'buyVendorItem'; id: string }
+  | { type: 'refundVendorItem'; id: string }
+  | { type: 'refundAllVendorItems' }
+  | { type: 'setUiPanelLayout'; layout: UIPanelLayout }
+  | { type: 'buyUiTheme'; id: string }
+  | { type: 'equipUiTheme'; id: string }
+  | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
@@ -858,6 +902,70 @@ export function reducer(state: StoreState, action: Action): StoreState {
           ...state.meta,
           cred: state.meta.cred - item.cost,
           vendorPurchases: { ...state.meta.vendorPurchases, [item.id]: owned + 1 },
+        },
+      };
+    }
+
+    case 'refundVendorItem': {
+      const item = VENDOR_CATALOG_BY_ID[action.id];
+      if (!item) return state;
+      const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
+      if (owned <= 0) return state;
+      const nextOwned = owned - 1;
+      const vendorPurchases = { ...state.meta.vendorPurchases };
+      if (nextOwned > 0) vendorPurchases[item.id] = nextOwned;
+      else delete vendorPurchases[item.id];
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred + item.cost,
+          vendorPurchases,
+        },
+      };
+    }
+
+    case 'refundAllVendorItems': {
+      let refund = 0;
+      for (const item of VENDOR_CATALOG) {
+        const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
+        refund += owned * item.cost;
+      }
+      if (refund <= 0) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, cred: state.meta.cred + refund, vendorPurchases: {} },
+      };
+    }
+
+    case 'setUiPanelLayout':
+      return { ...state, meta: { ...state.meta, uiPanelLayout: action.layout } };
+
+    case 'buyUiTheme': {
+      const theme = UI_THEMES_BY_ID[action.id];
+      if (!theme || state.meta.ownedUiThemeIds.includes(theme.id) || state.meta.cred < theme.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - theme.cost,
+          ownedUiThemeIds: [...state.meta.ownedUiThemeIds, theme.id],
+        },
+      };
+    }
+
+    case 'equipUiTheme':
+      if (!state.meta.ownedUiThemeIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, uiTheme: action.id } };
+
+    case 'selectUiThemeSwatch': {
+      const theme = UI_THEMES_BY_ID[action.themeId];
+      if (!theme?.swatches?.some((swatch) => swatch.id === action.swatchId)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          uiThemeSwatchByTheme: { ...state.meta.uiThemeSwatchByTheme, [action.themeId]: action.swatchId },
         },
       };
     }
@@ -1135,6 +1243,12 @@ export interface MetaContextValue {
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
   buyVendorItem: (id: string) => void;
+  refundVendorItem: (id: string) => void;
+  refundAllVendorItems: () => void;
+  setUiPanelLayout: (layout: UIPanelLayout) => void;
+  buyUiTheme: (id: string) => void;
+  equipUiTheme: (id: string) => void;
+  selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
@@ -1172,6 +1286,15 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
   const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
+  const refundVendorItem = useCallback((id: string) => dispatch({ type: 'refundVendorItem', id }), []);
+  const refundAllVendorItems = useCallback(() => dispatch({ type: 'refundAllVendorItems' }), []);
+  const setUiPanelLayout = useCallback((layout: UIPanelLayout) => dispatch({ type: 'setUiPanelLayout', layout }), []);
+  const buyUiTheme = useCallback((id: string) => dispatch({ type: 'buyUiTheme', id }), []);
+  const equipUiTheme = useCallback((id: string) => dispatch({ type: 'equipUiTheme', id }), []);
+  const selectUiThemeSwatch = useCallback(
+    (themeId: string, swatchId: string) => dispatch({ type: 'selectUiThemeSwatch', themeId, swatchId }),
+    [],
+  );
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -1244,6 +1367,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       markOnboarded,
       spendTokens,
       buyVendorItem,
+      refundVendorItem,
+      refundAllVendorItems,
+      setUiPanelLayout,
+      buyUiTheme,
+      equipUiTheme,
+      selectUiThemeSwatch,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
@@ -1270,6 +1399,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     markOnboarded,
     spendTokens,
     buyVendorItem,
+    refundVendorItem,
+    refundAllVendorItems,
+    setUiPanelLayout,
+    buyUiTheme,
+    equipUiTheme,
+    selectUiThemeSwatch,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,
@@ -1297,6 +1432,11 @@ export function useMeta(): MetaContextValue {
     throw new Error('useMeta must be used inside <MetaProvider>');
   }
   return ctx;
+}
+
+/** The accent swatch id currently in effect for the player's equipped UI theme, if it offers any. */
+export function activeUiThemeSwatchId(meta: MetaState): string | undefined {
+  return meta.uiThemeSwatchByTheme[meta.uiTheme] ?? defaultSwatchId(meta.uiTheme);
 }
 
 /** Convenience for menus that need the area record plus its lock state. */
