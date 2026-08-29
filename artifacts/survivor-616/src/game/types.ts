@@ -1125,7 +1125,7 @@ export interface UpgradeDef {
 
 export interface MetaState {
   version: number;
-  /** Development-only switch for exposing every unlockable surface. */
+  /** Settings toggle for exposing every unlockable surface regardless of progress. */
   devModeAllUnlocks: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;

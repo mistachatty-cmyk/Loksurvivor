@@ -581,7 +581,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
 
   return {
     version: META_VERSION,
-    devModeAllUnlocks: Boolean(import.meta.env?.DEV) && parsed.devModeAllUnlocks === true,
+    devModeAllUnlocks: parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
     minimapVisible: parsed.minimapVisible !== false,
@@ -661,7 +661,7 @@ function saveMeta(meta: MetaState) {
 /* ------------------------------------------------------------------ */
 
 export function isUnlocked(rule: UnlockRule, meta: MetaState): boolean {
-  if (import.meta.env?.DEV && meta.devModeAllUnlocks) return true;
+  if (meta.devModeAllUnlocks) return true;
 
   switch (rule.kind) {
     case 'default':
@@ -702,9 +702,7 @@ export function episodeStatus(episodeId: string, meta: MetaState): EpisodeStatus
   const episode = CHARACTER_EPISODES_BY_ID[episodeId];
   if (!episode) return 'locked';
   if (meta.completedEpisodeIds.includes(episode.id)) return 'completed';
-  const characterUnlocked = meta.unlockedCharacterIds.includes(episode.characterId) || (
-    import.meta.env?.DEV && meta.devModeAllUnlocks
-  );
+  const characterUnlocked = meta.unlockedCharacterIds.includes(episode.characterId) || meta.devModeAllUnlocks;
   if (!characterUnlocked || !isUnlocked(episode.unlock, meta)) return 'locked';
   return (meta.episodeProgressById[episode.id] ?? 0) > 0 ? 'in-progress' : 'available';
 }
