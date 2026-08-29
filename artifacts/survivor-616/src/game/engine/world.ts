@@ -1675,9 +1675,9 @@ function ambientRange(w: World, min: number, max: number): number {
   return min + w.ambientRng() * (max - min);
 }
 
-/** Street life is hidden under a roof (dungeon rooms, building interiors). */
+/** No street life under a roof: authored interiors, dungeon rooms, buildings. */
 function ambientSuppressed(w: World): boolean {
-  return Boolean(w.endless?.inDungeon || w.endless?.inBuilding);
+  return w.area.sky === 'roofed' || Boolean(w.endless?.inDungeon || w.endless?.inBuilding);
 }
 
 /**

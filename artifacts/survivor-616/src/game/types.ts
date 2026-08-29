@@ -598,6 +598,13 @@ export interface ObstacleDef {
 
 export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench';
 
+/**
+ * Overhead conditions for an area. Drives clouds, rain, fog and lightning.
+ * `roofed` means there is no sky at all (cellars, interiors) -- every sky
+ * effect is suppressed rather than dimmed.
+ */
+export type AreaSky = 'clear' | 'overcast' | 'rain' | 'fog' | 'roofed';
+
 export interface AreaDef {
   id: string;
   name: string;
@@ -613,6 +620,8 @@ export interface AreaDef {
     seam: string;
     glow: string;
   };
+  /** Overhead conditions; defaults to 'clear' when omitted. */
+  sky?: AreaSky;
   obstacles: ObstacleDef[];
   /** A readable set piece drawn into the arena as a visual story cue. */
   landmark?: {

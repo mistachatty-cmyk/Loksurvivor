@@ -549,6 +549,16 @@ test('ambient street life flees the player, stays in the arena, and never joins 
   }
 });
 
+test('a roofed area gets no street life', () => {
+  const cellar = AREAS.find((a) => a.id === 'crystal-cellar');
+  assert.ok(cellar, 'the crystal cellar should still exist');
+  assert.equal(cellar.sky, 'roofed', 'a cave under the city has no sky');
+
+  const world = createWorld(cellar, testCharacter('the-bus'), CHARACTERS[0].stats, 99);
+  for (let i = 0; i < 180; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.ambient.length, 0, 'pedestrians should not wander through a sealed cellar');
+});
+
 test('ambient life uses its own rng stream so it cannot shift gameplay rolls', () => {
   // Same seed, but one world burns a pile of ambient rolls first. Wave and
   // objective rolls come off `rng` and must be identical either way.
