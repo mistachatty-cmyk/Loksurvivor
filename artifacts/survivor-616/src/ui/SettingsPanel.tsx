@@ -13,6 +13,7 @@ import {
   Maximize2,
   MousePointer2,
   Palette,
+  PanelBottom,
   PanelRight,
   PauseCircle,
   Plug,
@@ -30,11 +31,21 @@ export interface SettingsPanelProps {
   onBack: () => void;
 }
 
+/** Shared look for the segmented-choice buttons below (level-up flow, secondary alerts). */
+function segmentButtonClass(active: boolean): string {
+  return `flex shrink-0 items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+    active
+      ? 'border-primary bg-primary text-primary-foreground'
+      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+  }`;
+}
+
 export function SettingsPanel({ onBack }: SettingsPanelProps) {
   const {
     meta,
     setPhysicsObjectClicks,
-    setLevelUpPauses,
+    setLevelUpMode,
+    setHudSecondaryAlwaysShown,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
@@ -76,43 +87,85 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
   return (
     <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
+        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-run-hud-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <PauseCircle className="h-5 w-5" />
+              <LayoutDashboard className="h-5 w-5" />
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Level-up flow</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Keep the run moving</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Choose whether leveling up pauses the action. Continuous mode keeps your character moving while the
-                    upgrade cards wait in the lower-left corner.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLevelUpPauses(!meta.levelUpPausesEnabled)}
-                  aria-pressed={!meta.levelUpPausesEnabled}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.levelUpPausesEnabled
-                      ? 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                      : 'border-primary bg-primary text-primary-foreground'
-                  }`}
-                  data-testid="button-toggle-continuous-levelups"
-                >
-                  {meta.levelUpPausesEnabled ? 'Pause on level-up' : 'Keep moving'}
-                </button>
+            <div className="min-w-0 flex-1 space-y-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run HUD</p>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">Keep the screen clear</h2>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  Choose how leveling up shows up, and how much run status stays visible without tapping anything.
+                </p>
               </div>
-              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <PauseCircle className="h-4 w-4 text-primary" />
-                  <span>Pause mode gives you a quiet moment to compare each card.</span>
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-white">Level-up flow</p>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  Full pause gives you a quiet moment to compare cards. Lower panel pauses the same way but only covers
+                  the bottom of the screen. Keep moving never stops the run.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLevelUpMode('pause')}
+                    aria-pressed={meta.levelUpMode === 'pause'}
+                    className={segmentButtonClass(meta.levelUpMode === 'pause')}
+                    data-testid="button-levelup-mode-pause"
+                  >
+                    <PauseCircle className="h-4 w-4" />
+                    Full pause
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLevelUpMode('partial')}
+                    aria-pressed={meta.levelUpMode === 'partial'}
+                    className={segmentButtonClass(meta.levelUpMode === 'partial')}
+                    data-testid="button-levelup-mode-partial"
+                  >
+                    <PanelBottom className="h-4 w-4" />
+                    Lower panel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLevelUpMode('continuous')}
+                    aria-pressed={meta.levelUpMode === 'continuous'}
+                    className={segmentButtonClass(meta.levelUpMode === 'continuous')}
+                    data-testid="button-levelup-mode-continuous"
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Keep moving
+                  </button>
                 </div>
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <LayoutDashboard className="h-4 w-4 text-primary" />
-                  <span>Continuous mode keeps enemies, hazards, and movement active.</span>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-white">Secondary alerts</p>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                  Loadout, rumors, objectives, and status effects can stay tucked behind a tap, or stay visible for the
+                  whole run.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHudSecondaryAlwaysShown(false)}
+                    aria-pressed={!meta.hudSecondaryAlwaysShown}
+                    className={segmentButtonClass(!meta.hudSecondaryAlwaysShown)}
+                    data-testid="button-hud-secondary-tap"
+                  >
+                    Tap to expand
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHudSecondaryAlwaysShown(true)}
+                    aria-pressed={meta.hudSecondaryAlwaysShown}
+                    className={segmentButtonClass(meta.hudSecondaryAlwaysShown)}
+                    data-testid="button-hud-secondary-always"
+                  >
+                    Always shown
+                  </button>
                 </div>
               </div>
             </div>

@@ -56,6 +56,7 @@ import type {
   LokPetElement,
   LokPetRarity,
   LokPetRunDiscovery,
+  LevelUpMode,
   MetaState,
   RunResult,
   FacilityTier,
@@ -120,7 +121,8 @@ export function createInitialMeta(): MetaState {
     version: META_VERSION,
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
-    levelUpPausesEnabled: true,
+    levelUpMode: 'pause',
+    hudSecondaryAlwaysShown: false,
     wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
@@ -596,7 +598,17 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     version: META_VERSION,
     devModeAllUnlocks: parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
-    levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
+    // 'levelUpMode' replaces the old 'levelUpPausesEnabled' boolean; saves
+    // from before this field existed only carry the boolean, so fall back
+    // to reading it (defaulting to 'pause', matching the boolean's old
+    // default-true behavior).
+    levelUpMode:
+      parsed.levelUpMode === 'partial' || parsed.levelUpMode === 'continuous' || parsed.levelUpMode === 'pause'
+        ? parsed.levelUpMode
+        : (parsed as { levelUpPausesEnabled?: boolean }).levelUpPausesEnabled === false
+          ? 'continuous'
+          : 'pause',
+    hudSecondaryAlwaysShown: parsed.hudSecondaryAlwaysShown === true,
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
@@ -853,7 +865,8 @@ type Action =
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
-  | { type: 'setLevelUpPauses'; enabled: boolean }
+  | { type: 'setLevelUpMode'; mode: LevelUpMode }
+  | { type: 'setHudSecondaryAlwaysShown'; enabled: boolean }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
@@ -1018,10 +1031,16 @@ export function reducer(state: StoreState, action: Action): StoreState {
         meta: { ...state.meta, physicsObjectClicksEnabled: action.enabled },
       };
 
-    case 'setLevelUpPauses':
+    case 'setLevelUpMode':
       return {
         ...state,
-        meta: { ...state.meta, levelUpPausesEnabled: action.enabled },
+        meta: { ...state.meta, levelUpMode: action.mode },
+      };
+
+    case 'setHudSecondaryAlwaysShown':
+      return {
+        ...state,
+        meta: { ...state.meta, hudSecondaryAlwaysShown: action.enabled },
       };
 
     case 'setWildlifeSheltersInRain':
@@ -1312,7 +1331,8 @@ export interface MetaContextValue {
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
-  setLevelUpPauses: (enabled: boolean) => void;
+  setLevelUpMode: (mode: LevelUpMode) => void;
+  setHudSecondaryAlwaysShown: (enabled: boolean) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
@@ -1370,8 +1390,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setPhysicsObjectClicks', enabled }),
     [],
   );
-  const setLevelUpPauses = useCallback(
-    (enabled: boolean) => dispatch({ type: 'setLevelUpPauses', enabled }),
+  const setLevelUpMode = useCallback(
+    (mode: LevelUpMode) => dispatch({ type: 'setLevelUpMode', mode }),
+    [],
+  );
+  const setHudSecondaryAlwaysShown = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setHudSecondaryAlwaysShown', enabled }),
     [],
   );
   const setWildlifeSheltersInRain = useCallback(
@@ -1466,7 +1490,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectUiThemeSwatch,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
-      setLevelUpPauses,
+      setLevelUpMode,
+      setHudSecondaryAlwaysShown,
       setWildlifeSheltersInRain,
       setMinimapVisible,
       setMusicReactive,
@@ -1504,7 +1529,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectUiThemeSwatch,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
-    setLevelUpPauses,
+    setLevelUpMode,
+    setHudSecondaryAlwaysShown,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMusicReactive,

@@ -51,7 +51,7 @@ import {
   reducer,
   startingWeaponLevel,
 } from '@/game/state/metaStore';
-import type { AreaDef, CharacterDef, LokPetRoll, RunResult } from '@/game/types';
+import type { AreaDef, CharacterDef, LokPetRoll, MetaState, RunResult } from '@/game/types';
 
 const neutralInput = { moveX: 0, moveY: 0, ultimate: false };
 
@@ -1213,12 +1213,12 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
 test('run-control preferences normalize safely and reducer updates persistable settings', () => {
   const normalized = normalizeMeta({
     version: 8,
-    levelUpPausesEnabled: false,
+    levelUpMode: 'continuous',
     minimapVisible: false,
     minimapExpanded: false,
     minimapPosition: { x: 4, y: -2 },
   });
-  assert.equal(normalized.levelUpPausesEnabled, false);
+  assert.equal(normalized.levelUpMode, 'continuous');
   assert.equal(normalized.minimapVisible, false);
   assert.equal(normalized.minimapExpanded, false);
   assert.deepEqual(normalized.minimapPosition, { x: 1, y: 0 });
@@ -1227,17 +1227,28 @@ test('run-control preferences normalize safely and reducer updates persistable s
   const updated = reducer(
     reducer(
       reducer(
-        reducer(store, { type: 'setLevelUpPauses', enabled: false }),
+        reducer(store, { type: 'setLevelUpMode', mode: 'partial' }),
         { type: 'setMinimapVisible', enabled: false },
       ),
       { type: 'setMinimapExpanded', enabled: false },
     ),
     { type: 'setMinimapPosition', position: { x: 0.4, y: 0.6 } },
   );
-  assert.equal(updated.meta.levelUpPausesEnabled, false);
+  assert.equal(updated.meta.levelUpMode, 'partial');
   assert.equal(updated.meta.minimapVisible, false);
   assert.equal(updated.meta.minimapExpanded, false);
   assert.deepEqual(updated.meta.minimapPosition, { x: 0.4, y: 0.6 });
+});
+
+test('a legacy levelUpPausesEnabled boolean save migrates to the new levelUpMode enum', () => {
+  const legacyFalse = { version: 8, levelUpPausesEnabled: false } as unknown as Partial<MetaState>;
+  assert.equal(normalizeMeta(legacyFalse).levelUpMode, 'continuous');
+
+  const legacyTrue = { version: 8, levelUpPausesEnabled: true } as unknown as Partial<MetaState>;
+  assert.equal(normalizeMeta(legacyTrue).levelUpMode, 'pause');
+
+  const fromMissingField = normalizeMeta({ version: 8 });
+  assert.equal(fromMissingField.levelUpMode, 'pause');
 });
 
 test('relic knowledge normalizes safely and clears unlock the matching recipe forever', () => {

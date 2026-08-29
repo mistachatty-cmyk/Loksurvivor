@@ -27,8 +27,14 @@ import { useGyroInput } from '@/game/input/gyro';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld } from '@/game/render/draw';
-import { effectiveStats, rewardCredMultiplier, startingWeaponLevel, useMeta } from '@/game/state/metaStore';
-import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import {
+  activeUiThemeSwatchId,
+  effectiveStats,
+  rewardCredMultiplier,
+  startingWeaponLevel,
+  useMeta,
+} from '@/game/state/metaStore';
+import type { AreaDef, HudSnapshot, LevelUpMode, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
@@ -37,6 +43,46 @@ import { WeaponIcon } from '@/ui/WeaponIcon';
 function resolveCardWeapon(upgrade: UpgradeDef) {
   if (upgrade.weaponId) return WEAPONS_BY_ID[upgrade.weaponId];
   return undefined;
+}
+
+/**
+ * One compact line inside the secondary-info drawer. `color` accepts any CSS
+ * color, including `hsl(var(--primary))` for entries that should reskin with
+ * the equipped UI theme rather than carry their own data-driven color.
+ */
+function SecondaryRow({
+  label,
+  detail,
+  color,
+  progressPct,
+  testId,
+}: {
+  label: string;
+  detail?: string;
+  color?: string;
+  progressPct?: number;
+  testId?: string;
+}) {
+  return (
+    <div className="flex items-start gap-2 border-b border-white/10 py-1 last:border-b-0" data-testid={testId}>
+      <span
+        className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: color ?? 'rgba(255,255,255,.4)', boxShadow: color ? `0 0 6px ${color}` : undefined }}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block font-mono text-[10px] font-bold uppercase tracking-wide text-white">{label}</span>
+        {detail ? <span className="block text-[10px] leading-snug text-white/70">{detail}</span> : null}
+        {progressPct !== undefined ? (
+          <span className="mt-1 block h-1 w-full overflow-hidden bg-white/10">
+            <span
+              className="block h-full transition-[width]"
+              style={{ width: `${Math.min(100, Math.max(0, progressPct))}%`, backgroundColor: color ?? 'rgba(255,255,255,.6)' }}
+            />
+          </span>
+        ) : null}
+      </span>
+    </div>
+  );
 }
 
 export interface RunScreenProps {
@@ -131,12 +177,44 @@ export function RunScreen({
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
   const reelTimerRef = useRef<number | null>(null);
   const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
-  const levelUpPausesRef = useRef(meta.levelUpPausesEnabled);
-  levelUpPausesRef.current = meta.levelUpPausesEnabled;
+  const levelUpModeRef = useRef<LevelUpMode>(meta.levelUpMode);
+  levelUpModeRef.current = meta.levelUpMode;
   const musicReactiveRef = useRef(meta.musicReactiveEnabled);
   musicReactiveRef.current = meta.musicReactiveEnabled;
+  const prevRescueAvailableRef = useRef(false);
+  const prevFirstNightBeatKeyRef = useRef<string | undefined>(undefined);
+  const secondaryAutoTimerRef = useRef<number | null>(null);
+
+  /** Briefly surfaces the secondary-info drawer when something mission-critical newly appears. */
+  const maybeAutoOpenSecondary = useCallback((next: HudSnapshot) => {
+    const rescueJustAppeared = next.rescueAvailable && !prevRescueAvailableRef.current;
+    prevRescueAvailableRef.current = next.rescueAvailable;
+
+    const beatKey = next.firstNightBeat ? `${next.firstNightBeat.chapter}:${next.firstNightBeat.title}` : undefined;
+    const beatJustAppeared = beatKey !== undefined && beatKey !== prevFirstNightBeatKeyRef.current;
+    prevFirstNightBeatKeyRef.current = beatKey;
+
+    if (!rescueJustAppeared && !beatJustAppeared) return;
+
+    setSecondaryOpen(true);
+    if (secondaryAutoTimerRef.current !== null) window.clearTimeout(secondaryAutoTimerRef.current);
+    secondaryAutoTimerRef.current = window.setTimeout(() => {
+      secondaryAutoTimerRef.current = null;
+      setSecondaryOpen(false);
+    }, 4000);
+  }, []);
+
+  /** Manual taps always win over the auto-open timer. */
+  const toggleSecondary = useCallback(() => {
+    if (secondaryAutoTimerRef.current !== null) {
+      window.clearTimeout(secondaryAutoTimerRef.current);
+      secondaryAutoTimerRef.current = null;
+    }
+    setSecondaryOpen((prev) => !prev);
+  }, []);
 
   // Tilt steering. The hook is inert unless the setting is on, and the ref is
   // read straight from the loop so orientation events never re-render.
@@ -410,7 +488,7 @@ export function RunScreen({
           accumulator -= FIXED_STEP;
           stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate, audio });
           ultimate = false;
-          if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
+          if ((world.pendingLevelUps > 0 && levelUpModeRef.current !== 'continuous') || world.outcome !== 'running') break;
         }
 
         // Detect dungeon room transitions and briefly flash the screen.
@@ -433,7 +511,7 @@ export function RunScreen({
             upgradeChoicesRef.current = nextChoices;
             setChoices(nextChoices);
           }
-          if (levelUpPausesRef.current) {
+          if (levelUpModeRef.current !== 'continuous') {
             setPhaseBoth('levelup');
           }
         } else if (world.outcome !== 'running') {
@@ -451,13 +529,15 @@ export function RunScreen({
 
       if (time - hudAt > 60) {
         hudAt = time;
-        setHud(hudSnapshot(world));
+        const next = hudSnapshot(world);
+        setHud(next);
+        maybeAutoOpenSecondary(next);
       }
     };
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [setPhaseBoth]);
+  }, [maybeAutoOpenSecondary, setPhaseBoth]);
 
   // Hand the result back once the closing beat has played.
   useEffect(() => {
@@ -551,8 +631,54 @@ export function RunScreen({
   const inDungeon = hud?.endless?.inDungeon ?? false;
   const dungeonEraName = hud?.endless?.dungeonEraName ?? '';
 
+  // Short, always-visible "where am I" line for endless mode; the longer
+  // beacon description/rewards and the distance/risk readout move into the
+  // secondary drawer, since they're useful but not glance-critical.
+  const endlessStatusLine =
+    area.endless && hud?.endless
+      ? inDungeon
+        ? `${dungeonEraName} · room ${hud.endless.dungeonRoom}/3`
+        : hud.endless.inBuilding
+          ? 'Interior route · find the lit door out'
+          : hud.endless.routeEvent?.phase === 'available'
+            ? `Beacon ahead · ${hud.endless.routeEvent.title}`
+            : dungeonDepth > 0
+              ? `Depth ${dungeonDepth}`
+              : 'Street grid · explore the block'
+      : null;
+  const routeDetail =
+    area.endless && hud?.endless && hud.endless.routeEvent?.phase === 'available'
+      ? `${hud.endless.routeEvent.description} · +${hud.endless.routeEvent.rewardCred} cred · ${hud.endless.routeEvent.rewardTokens} token${hud.endless.routeEvent.rewardTokens === 1 ? '' : 's'}`
+      : undefined;
+  const distanceDetail =
+    area.endless && hud?.endless && !inDungeon && !hud.endless.inBuilding
+      ? `${distancePx.toLocaleString()} units · ${hud.endless.riskLabel}`
+      : undefined;
+
+  const secondaryCount = hud
+    ? (hud.rescueAvailable ? 1 : 0) +
+      (challenges.length > 0 ? 1 : 0) +
+      (hud.crewRumor ? 1 : 0) +
+      (hud.loadout.weapons.length + hud.loadout.passives.length > 0 ? 1 : 0) +
+      (hud.lokPets.length > 0 ? 1 : 0) +
+      (hud.activeEffects.length > 0 ? 1 : 0) +
+      (hud.alerts.length > 0 ? 1 : 0) +
+      (hud.firstNightBeat ? 1 : 0) +
+      (hud.districtIncursion && hud.districtIncursion.phase !== 'pending' ? 1 : 0) +
+      (hud.evolution ? 1 : 0) +
+      (hud.relicWorkshop.activeRecipe || hud.relicWorkshop.readyRecipeIds.length > 0 ? 1 : 0) +
+      (hud.episode ? 1 : 0) +
+      (hud.objectives.some((o) => !o.completed) ? 1 : 0) +
+      (routeDetail || distanceDetail ? 1 : 0)
+    : 0;
+
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-black select-none" data-testid="screen-run">
+    <div
+      className="relative h-dvh w-full overflow-hidden bg-black select-none"
+      data-testid="screen-run"
+      data-ui-theme={meta.uiTheme}
+      data-ui-swatch={activeUiThemeSwatchId(meta)}
+    >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
       {/* Touch surface: dragging anywhere steers. */}
@@ -565,28 +691,28 @@ export function RunScreen({
         data-testid="surface-controls"
       />
 
-      {/* Top HUD */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 space-y-2 p-3">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="h-3 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+      {/* HUD: a slim always-on strip, plus one tappable drawer for everything else. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 p-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="h-2 w-full overflow-hidden border border-black/60 bg-black/60">
               <div
                 className="h-full bg-[#ff4d5e] transition-[width] duration-150"
                 style={{ width: `${hpPct}%` }}
                 data-testid="bar-health"
               />
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+            <div className="h-1 w-full overflow-hidden border border-black/60 bg-black/60">
               <div
                 className="h-full bg-[#6ee7ff] transition-[width] duration-150"
                 style={{ width: `${xpPct}%` }}
                 data-testid="bar-xp"
               />
             </div>
-            <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-widest text-white/80">
+            <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-white/80">
               <span data-testid="text-level">Lv {hud?.level ?? 1}</span>
               <span data-testid="text-kills">{hud?.kills ?? 0} down</span>
-              <span>
+              <span className="truncate">
                 {area.endless && hud?.endless
                   ? hud.endless.inBuilding
                     ? `Inside · ${hud.endless.buildingLabel}`
@@ -594,42 +720,22 @@ export function RunScreen({
                   : area.name}
               </span>
             </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
-            <div className="rounded-sm border border-white/20 bg-black/70 px-2.5 py-1 font-mono text-lg font-bold text-white tabular-nums" data-testid="text-timer">
-              {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
-            </div>
-            {area.endless && hud?.endless && (
-              <div className="font-mono text-[10px] uppercase tracking-widest text-primary/80 bg-black/60 px-2 py-0.5 border border-primary/20">
-                {inDungeon
-                  ? `${dungeonEraName} · room ${hud.endless.dungeonRoom}/3`
-                  : hud.endless.inBuilding
-                    ? 'Interior route · find the lit door out'
-                    : hud.endless.routeEvent?.phase === 'available'
-                      ? (
-                        <span className="flex max-w-[18rem] flex-col items-end gap-0.5 text-right">
-                          <span>Beacon ahead · {hud.endless.routeEvent.title}</span>
-                          <span className="text-[9px] normal-case tracking-normal text-white/60">
-                            {hud.endless.routeEvent.description} · +{hud.endless.routeEvent.rewardCred} cred · {hud.endless.routeEvent.rewardTokens} token{hud.endless.routeEvent.rewardTokens === 1 ? '' : 's'}
-                          </span>
-                        </span>
-                      )
-                      : dungeonDepth > 0
-                      ? `Depth ${dungeonDepth}`
-                      : 'Street grid · explore the block'}
-              </div>
-            )}
-            {area.endless && hud?.endless && !inDungeon && !hud.endless.inBuilding ? (
-              <div className="font-mono text-[9px] uppercase tracking-widest text-white/50">
-                {distancePx.toLocaleString()} units · {hud.endless.riskLabel}
+            {endlessStatusLine ? (
+              <div className="truncate font-mono text-[9px] uppercase tracking-widest text-primary/80" data-testid="text-endless-status">
+                {endlessStatusLine}
               </div>
             ) : null}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="border border-white/20 bg-black/70 px-2 py-1 font-mono text-sm font-bold text-white tabular-nums" data-testid="text-timer">
+              {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
+            </div>
             {phase === 'playing' || phase === 'paused' ? (
               <button
                 type="button"
                 onClick={() => setPhaseBoth(phase === 'playing' ? 'paused' : 'playing')}
-                className="pointer-events-auto rounded-sm border border-white/20 bg-black/70 px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-white/80"
+                className="pointer-events-auto border border-white/20 bg-black/70 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-white/80"
                 data-testid="button-pause"
               >
                 {phase === 'paused' ? 'Resume' : 'Pause'}
@@ -638,188 +744,176 @@ export function RunScreen({
           </div>
         </div>
 
-        {hud?.rescueAvailable ? (
-          <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
-            {hud.rescueAllyName ? `${hud.rescueAllyName} is caged` : 'Someone is caged'} — stand with them {hud.rescueProgressPct > 0 ? `(${hud.rescueProgressPct}%)` : ''}
-          </div>
-        ) : null}
-
-        {challenges.length > 0 ? (
-          <div className="mx-auto flex w-fit flex-wrap justify-center gap-1.5" data-testid="row-active-contracts">
-            {challenges.map((challenge) => (
-              <span key={challenge.id} className="border border-red-400/45 bg-black/75 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-200">
-                Contract: {challenge.name}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        {hud?.crewRumor ? (
-          <div className="mx-auto flex w-fit max-w-full items-center gap-2 border border-[#fbbf24]/45 bg-black/75 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-[#fbbf24]" data-testid="indicator-crew-rumor">
-            <span className="text-sm" aria-hidden="true">◆</span>
-            <span className="truncate">
-              Rumor · {hud.crewRumor.name} · {hud.crewRumor.triggered ? 'fired' : hud.crewRumor.effectLabel}
-            </span>
-          </div>
-        ) : null}
-
-        {hud?.loadout ? (
-          <div className="flex gap-1.5 overflow-x-auto" data-testid="row-loadout">
-            {hud.loadout.weapons.map((weapon) => {
-              const kind = WEAPONS_BY_ID[weapon.id]?.kind;
-              return (
-                <div key={weapon.id} title={weapon.name} className="flex h-8 min-w-8 items-center gap-1 justify-center border border-white/25 bg-black/75 px-1.5 font-mono text-[10px] font-bold text-white" style={{ borderColor: weapon.color ?? 'rgba(255,255,255,.25)' }}>
-                  {kind ? <WeaponIcon kind={kind} color={weapon.color} size={16} className="shrink-0" /> : null}
-                  {weapon.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5 text-primary">{weapon.level}</sup>
-                </div>
-              );
-            })}
-            {hud.loadout.passives.map((passive) => (
-              <div key={passive.id} title={passive.name} className="flex h-8 min-w-8 items-center justify-center border border-primary/35 bg-primary/10 px-1.5 font-mono text-[10px] font-bold text-primary">
-                {passive.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5">{passive.stacks}</sup>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {hud?.lokPets && hud.lokPets.length > 0 ? (
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5" data-testid="row-lokpets">
-            {hud.lokPets.map((pet) => (
-              <div
-                key={pet.uid}
-                title={`${pet.name} · ${pet.traitLabel} · ${pet.expiresInSec}s remaining`}
-                className={`flex min-h-9 min-w-[148px] items-center gap-2 border bg-black/80 px-2 py-1 font-mono text-[9px] uppercase tracking-wide ${pet.ghost ? 'border-white/25' : 'border-pink-400/50'}`}
-                style={{ color: pet.color, opacity: pet.ghost ? 0.68 : 1 }}
-              >
-                <span className="h-3 w-3 shrink-0 rotate-45 border" style={{ borderColor: pet.color, backgroundColor: `${pet.color}55`, boxShadow: `0 0 8px ${pet.color}` }} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-bold text-white">{pet.name}</span>
-                  <span className="block truncate opacity-80">{pet.traitLabel} · {pet.damage} dmg / {pet.cooldownMs}ms</span>
-                </span>
-                <span className="shrink-0 text-right opacity-80">
-                  <span className="block">{pet.ghost ? 'ghost' : `${pet.expiresInSec}s`}</span>
-                  <span className="block text-[8px]">{pet.silhouette}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {hud?.activeEffects && hud.activeEffects.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5" data-testid="row-status-effects">
-            {hud.activeEffects.map((effect) => (
-              <div
-                key={effect.id}
-                title={`${effect.name}: affecting ${effect.count} enemies`}
-                className="flex items-center gap-1 border bg-black/75 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide"
-                style={{ borderColor: `${effect.color}99`, color: effect.color }}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: effect.color, boxShadow: `0 0 7px ${effect.color}` }} />
-                {effect.name} <span className="opacity-70">×{effect.count}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {hud?.alerts.slice(-1).map((alert) => (
-          <div key={alert} className="mx-auto w-fit font-mono text-sm uppercase tracking-[0.25em] text-white/90 drop-shadow">
-            {alert}
-          </div>
-        ))}
-
-        {hud?.firstNightBeat ? (
-          <div className="mx-auto max-w-xl border border-cyan-200/40 bg-black/80 px-3 py-2 text-center" data-testid="story-beat">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">
-              First Night · {hud.firstNightBeat.title}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-white/80">{hud.firstNightBeat.text}</p>
-          </div>
-        ) : null}
-
-        {hud?.districtIncursion && hud.districtIncursion.phase !== 'pending' ? (
-          <div
-            className="mx-auto w-full max-w-xl border bg-black/80 px-3 py-2"
-            style={{ borderColor: `${hud.districtIncursion.accent}88` }}
-            data-testid="row-district-incursion"
+        {secondaryCount > 0 ? (
+          <button
+            type="button"
+            onClick={toggleSecondary}
+            aria-pressed={secondaryOpen}
+            className="pointer-events-auto mt-1 flex items-center gap-1.5 border border-primary/40 bg-black/70 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary"
+            data-testid="button-hud-secondary"
           >
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: hud.districtIncursion.accent }}>
-                {hud.districtIncursion.title} · {hud.districtIncursion.landmark}
-              </span>
-              <span className="font-mono text-[10px] uppercase text-white/70">
-                {hud.districtIncursion.phase === 'active'
-                  ? `${hud.districtIncursion.progress}/${hud.districtIncursion.target} · ${hud.districtIncursion.remainingSec}s`
-                  : hud.districtIncursion.phase}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-white/80">{hud.districtIncursion.objectiveLabel}</p>
-            {hud.districtIncursion.phase === 'active' ? (
-              <div className="mt-2 h-1 overflow-hidden bg-white/10">
-                <div
-                  className="h-full transition-[width]"
-                  style={{
-                    width: `${Math.min(100, (hud.districtIncursion.progress / Math.max(1, hud.districtIncursion.target)) * 100)}%`,
-                    backgroundColor: hud.districtIncursion.accent,
-                  }}
-                />
+            <span>{secondaryCount} update{secondaryCount === 1 ? '' : 's'}</span>
+            <span aria-hidden="true">{secondaryOpen ? '▴' : '▾'}</span>
+          </button>
+        ) : null}
+
+        {(secondaryOpen || meta.hudSecondaryAlwaysShown) && hud ? (
+          <div
+            className="pointer-events-auto mt-1.5 max-h-[42vh] overflow-y-auto border border-white/15 bg-black/85 p-2"
+            data-testid="panel-hud-secondary"
+          >
+            {hud.rescueAvailable ? (
+              <SecondaryRow
+                testId="text-rescue"
+                color="hsl(var(--primary))"
+                label={hud.rescueAllyName ? `${hud.rescueAllyName} is caged` : 'Someone is caged'}
+                detail={`Stand with them${hud.rescueProgressPct > 0 ? ` · ${hud.rescueProgressPct}%` : ''}`}
+              />
+            ) : null}
+
+            {challenges.length > 0 ? (
+              <SecondaryRow
+                testId="row-active-contracts"
+                color="#f87171"
+                label="Contracts"
+                detail={challenges.map((challenge) => challenge.name).join(', ')}
+              />
+            ) : null}
+
+            {hud.crewRumor ? (
+              <SecondaryRow
+                testId="indicator-crew-rumor"
+                color="hsl(var(--primary))"
+                label={`Rumor · ${hud.crewRumor.name}`}
+                detail={hud.crewRumor.triggered ? 'Fired' : hud.crewRumor.effectLabel}
+              />
+            ) : null}
+
+            {hud.loadout.weapons.length + hud.loadout.passives.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 border-b border-white/10 py-1" data-testid="row-loadout">
+                {hud.loadout.weapons.map((weapon) => {
+                  const kind = WEAPONS_BY_ID[weapon.id]?.kind;
+                  return (
+                    <div
+                      key={weapon.id}
+                      title={weapon.name}
+                      className="flex h-7 min-w-7 items-center gap-1 justify-center border border-white/25 bg-black/75 px-1.5 font-mono text-[10px] font-bold text-white"
+                      style={{ borderColor: weapon.color ?? 'rgba(255,255,255,.25)' }}
+                    >
+                      {kind ? <WeaponIcon kind={kind} color={weapon.color} size={14} className="shrink-0" /> : null}
+                      {weapon.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5 text-primary">{weapon.level}</sup>
+                    </div>
+                  );
+                })}
+                {hud.loadout.passives.map((passive) => (
+                  <div key={passive.id} title={passive.name} className="flex h-7 min-w-7 items-center justify-center border border-primary/35 bg-primary/10 px-1.5 font-mono text-[10px] font-bold text-primary">
+                    {passive.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5">{passive.stacks}</sup>
+                  </div>
+                ))}
               </div>
             ) : null}
-          </div>
-        ) : null}
 
-        {hud?.evolution ? (
-          <div
-            className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
-            style={{ borderColor: `${hud.evolution.color}88`, backgroundColor: `${hud.evolution.color}18`, color: hud.evolution.color }}
-            data-testid="text-signature-evolution"
-          >
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Signature · {hud.evolution.name}</span>
-            <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.evolution.identity}</span>
-          </div>
-        ) : null}
+            {hud.lokPets.length > 0 ? (
+              <div className="flex flex-col gap-1 border-b border-white/10 py-1" data-testid="row-lokpets">
+                {hud.lokPets.map((pet) => (
+                  <SecondaryRow
+                    key={pet.uid}
+                    color={pet.color}
+                    label={pet.name}
+                    detail={`${pet.traitLabel} · ${pet.damage} dmg / ${pet.cooldownMs}ms · ${pet.ghost ? 'ghost' : `${pet.expiresInSec}s`}`}
+                  />
+                ))}
+              </div>
+            ) : null}
 
-        {hud?.relicWorkshop.activeRecipe ? (
-          <div
-            className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
-            style={{ borderColor: `${hud.relicWorkshop.activeRecipe.color}88`, backgroundColor: `${hud.relicWorkshop.activeRecipe.color}18`, color: hud.relicWorkshop.activeRecipe.color }}
-            data-testid="text-relic-recipe"
-          >
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic · {hud.relicWorkshop.activeRecipe.name}</span>
-            <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.relicWorkshop.activeRecipe.identity}</span>
-          </div>
-        ) : hud?.relicWorkshop.readyRecipeIds.length ? (
-          <div className="mx-auto w-fit max-w-full border border-orange-300/35 bg-orange-300/10 px-3 py-1.5 text-center text-orange-100" data-testid="text-relic-ready">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic recipe ready · level the base weapon</span>
-          </div>
-        ) : null}
+            {hud.activeEffects.map((effect) => (
+              <SecondaryRow
+                key={effect.id}
+                color={effect.color}
+                label={effect.name}
+                detail={`Affecting ${effect.count} ${effect.count === 1 ? 'enemy' : 'enemies'}`}
+                testId="row-status-effects"
+              />
+            ))}
 
-        {hud?.episode ? (
-          <div className="mx-auto w-full max-w-xl border border-primary/35 bg-black/75 px-3 py-2" data-testid="row-character-episode">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Episode · {hud.episode.title}</span>
-              <span className="font-mono text-[10px] uppercase text-white/70">{hud.episode.progress}/{hud.episode.target}</span>
-            </div>
-            <p className="mt-1 text-xs text-white/80">{hud.episode.label}</p>
-            <div className="mt-2 h-1 overflow-hidden bg-white/10">
-              <div className="h-full bg-primary transition-[width]" style={{ width: `${(hud.episode.progress / Math.max(1, hud.episode.target)) * 100}%` }} />
-            </div>
-          </div>
-        ) : null}
+            {hud.alerts.slice(-1).map((alert) => (
+              <SecondaryRow key={alert} label={alert} />
+            ))}
 
-        {/* Objective strip */}
-        {hud && hud.objectives.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5" data-testid="row-objectives">
-            {hud.objectives.filter((o) => !o.completed).map((obj) => {
-              const pct = Math.min(100, Math.round((obj.progress / Math.max(1, obj.target)) * 100));
-              return (
-                <div key={obj.label} className="flex items-center gap-1.5 rounded-sm border border-amber-800/40 bg-black/70 px-2 py-0.5">
-                  <div className="w-16 h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 transition-[width]" style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="font-mono text-[9px] uppercase tracking-wide text-amber-300/80 truncate max-w-[110px]">{obj.label}</span>
-                </div>
-              );
-            })}
+            {hud.firstNightBeat ? (
+              <SecondaryRow
+                testId="story-beat"
+                color="#67e8f9"
+                label={`First Night · ${hud.firstNightBeat.title}`}
+                detail={hud.firstNightBeat.text}
+              />
+            ) : null}
+
+            {hud.districtIncursion && hud.districtIncursion.phase !== 'pending' ? (
+              <SecondaryRow
+                testId="row-district-incursion"
+                color={hud.districtIncursion.accent}
+                label={`${hud.districtIncursion.title} · ${hud.districtIncursion.landmark}`}
+                detail={`${hud.districtIncursion.objectiveLabel}${
+                  hud.districtIncursion.phase === 'active'
+                    ? ` · ${hud.districtIncursion.progress}/${hud.districtIncursion.target} · ${hud.districtIncursion.remainingSec}s`
+                    : ` · ${hud.districtIncursion.phase}`
+                }`}
+                progressPct={
+                  hud.districtIncursion.phase === 'active'
+                    ? (hud.districtIncursion.progress / Math.max(1, hud.districtIncursion.target)) * 100
+                    : undefined
+                }
+              />
+            ) : null}
+
+            {hud.evolution ? (
+              <SecondaryRow
+                testId="text-signature-evolution"
+                color={hud.evolution.color}
+                label={`Signature · ${hud.evolution.name}`}
+                detail={hud.evolution.identity}
+              />
+            ) : null}
+
+            {hud.relicWorkshop.activeRecipe ? (
+              <SecondaryRow
+                testId="text-relic-recipe"
+                color={hud.relicWorkshop.activeRecipe.color}
+                label={`Relic · ${hud.relicWorkshop.activeRecipe.name}`}
+                detail={hud.relicWorkshop.activeRecipe.identity}
+              />
+            ) : hud.relicWorkshop.readyRecipeIds.length > 0 ? (
+              <SecondaryRow
+                testId="text-relic-ready"
+                color="hsl(var(--primary))"
+                label="Relic recipe ready"
+                detail="Level the base weapon"
+              />
+            ) : null}
+
+            {hud.episode ? (
+              <SecondaryRow
+                testId="row-character-episode"
+                color="hsl(var(--primary))"
+                label={`Episode · ${hud.episode.title}`}
+                detail={`${hud.episode.label} · ${hud.episode.progress}/${hud.episode.target}`}
+                progressPct={(hud.episode.progress / Math.max(1, hud.episode.target)) * 100}
+              />
+            ) : null}
+
+            {hud.objectives.filter((o) => !o.completed).map((obj) => (
+              <SecondaryRow
+                key={obj.label}
+                testId="row-objectives"
+                color="hsl(var(--primary))"
+                label={obj.label}
+                progressPct={Math.round((obj.progress / Math.max(1, obj.target)) * 100)}
+              />
+            ))}
+
+            {routeDetail ? <SecondaryRow color="hsl(var(--primary))" label="Route" detail={routeDetail} /> : null}
+            {distanceDetail ? <SecondaryRow label="Distance" detail={distanceDetail} /> : null}
           </div>
         ) : null}
       </div>
@@ -897,7 +991,7 @@ export function RunScreen({
       ) : null}
 
       {/* Level up */}
-      {phase === 'levelup' && meta.levelUpPausesEnabled ? (
+      {phase === 'levelup' && meta.levelUpMode === 'pause' ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-5" data-testid="overlay-levelup">
           <div className="w-full max-w-md space-y-3">
             <p className="text-center font-mono text-xs uppercase tracking-[0.4em] text-white/60">Level {hud?.level}</p>
@@ -939,7 +1033,52 @@ export function RunScreen({
         </div>
       ) : null}
 
-      {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 ? (
+      {phase === 'levelup' && meta.levelUpMode === 'partial' ? (
+        <div
+          className="absolute inset-x-0 bottom-0 flex max-h-[36%] flex-col border-t border-primary/40 bg-black/92 p-3"
+          data-testid="overlay-levelup-partial"
+        >
+          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-primary">Level {hud?.level}</p>
+            <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
+          </div>
+          <div className="mx-auto mt-2 w-full max-w-md space-y-1.5 overflow-y-auto">
+            {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
+              <button
+                type="button"
+                onClick={claimRumorHeal}
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-2.5 text-left transition hover:bg-[#86efac]/20"
+                data-testid="button-rumor-heal-partial"
+              >
+                <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
+                <p className="mt-1 font-mono text-[10px] text-white/70">Use once alongside your upgrade.</p>
+              </button>
+            ) : null}
+            {choices.map((upgrade) => {
+              const cardWeapon = resolveCardWeapon(upgrade);
+              return (
+                <button
+                  key={upgrade.id}
+                  type="button"
+                  onClick={() => pickUpgrade(upgrade)}
+                  className="flex w-full items-center gap-2 border border-white/20 bg-white/5 p-2.5 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                  data-testid={`button-partial-upgrade-${upgrade.id}`}
+                >
+                  {cardWeapon ? (
+                    <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={22} className="shrink-0" />
+                  ) : null}
+                  <span>
+                    <p className="text-sm font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-white/70">{upgrade.description}</p>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {phase === 'playing' && meta.levelUpMode === 'continuous' && choices.length > 0 ? (
         <div
           className="pointer-events-none absolute bottom-4 left-4 z-40 w-[min(88vw,330px)]"
           data-testid="panel-continuous-levelup"

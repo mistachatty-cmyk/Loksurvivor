@@ -1149,8 +1149,10 @@ export interface MetaState {
   devModeAllUnlocks: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
-  /** When true, level-up choices pause the run; when false, the run keeps moving. */
-  levelUpPausesEnabled: boolean;
+  /** Whether level-up choices pause the run, dock as a partial lower panel, or let the run keep moving. */
+  levelUpMode: LevelUpMode;
+  /** Whether secondary HUD info (loadout, rumors, objectives, effects) stays always visible or collapses to a tap-to-expand drawer. */
+  hudSecondaryAlwaysShown: boolean;
   /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
   wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */
@@ -1520,3 +1522,11 @@ export interface HudSnapshot {
 }
 
 export type RunPhase = 'countdown' | 'playing' | 'levelup' | 'paused' | 'reel' | 'over';
+
+/**
+ * 'pause' and 'partial' both halt the sim while a level-up choice is
+ * pending -- they differ only in how much of the screen the card takes,
+ * not in whether combat continues. 'continuous' is the only mode that
+ * keeps the run moving.
+ */
+export type LevelUpMode = 'pause' | 'partial' | 'continuous';
