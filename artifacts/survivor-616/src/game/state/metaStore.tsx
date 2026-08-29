@@ -144,6 +144,7 @@ export function createInitialMeta(): MetaState {
     bestSurvivalSec: 0,
     cred: 0,
     lootTokens: 0,
+    skeletonKeys: 0,
     onboarded: false,
     endlessRecordDistancePx: 0,
     endlessRecordDepth: 0,
@@ -621,6 +622,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
     cred: counter(parsed.cred),
     lootTokens: counter(parsed.lootTokens),
+    skeletonKeys: counter(parsed.skeletonKeys),
     onboarded: parsed.onboarded === true,
     endlessRecordDistancePx: counter(parsed.endlessRecordDistancePx),
     endlessRecordDepth: counter(parsed.endlessRecordDepth),
@@ -919,12 +921,14 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const item = VENDOR_CATALOG_BY_ID[action.id];
       if (!item) return state;
       const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
-      if (owned >= item.maxStacks || state.meta.cred < item.cost) return state;
+      const currency = item.currency ?? 'cred';
+      const balance = state.meta[currency];
+      if (owned >= item.maxStacks || balance < item.cost) return state;
       return {
         ...state,
         meta: {
           ...state.meta,
-          cred: state.meta.cred - item.cost,
+          [currency]: balance - item.cost,
           vendorPurchases: { ...state.meta.vendorPurchases, [item.id]: owned + 1 },
         },
       };
@@ -939,26 +943,34 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const vendorPurchases = { ...state.meta.vendorPurchases };
       if (nextOwned > 0) vendorPurchases[item.id] = nextOwned;
       else delete vendorPurchases[item.id];
+      const currency = item.currency ?? 'cred';
       return {
         ...state,
         meta: {
           ...state.meta,
-          cred: state.meta.cred + item.cost,
+          [currency]: state.meta[currency] + item.cost,
           vendorPurchases,
         },
       };
     }
 
     case 'refundAllVendorItems': {
-      let refund = 0;
+      const refundByCurrency: Partial<Record<'cred' | 'skeletonKeys', number>> = {};
       for (const item of VENDOR_CATALOG) {
         const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
-        refund += owned * item.cost;
+        if (owned <= 0) continue;
+        const currency = item.currency ?? 'cred';
+        refundByCurrency[currency] = (refundByCurrency[currency] ?? 0) + owned * item.cost;
       }
-      if (refund <= 0) return state;
+      if (Object.keys(refundByCurrency).length === 0) return state;
       return {
         ...state,
-        meta: { ...state.meta, cred: state.meta.cred + refund, vendorPurchases: {} },
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred + (refundByCurrency.cred ?? 0),
+          skeletonKeys: state.meta.skeletonKeys + (refundByCurrency.skeletonKeys ?? 0),
+          vendorPurchases: {},
+        },
       };
     }
 
@@ -1205,6 +1217,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         cred: prev.cred + result.cred,
         lootTokens: prev.lootTokens + result.lootTokensGained,
+        skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
         // Endless records
         endlessRecordDistancePx: result.endless
           ? Math.max(prev.endlessRecordDistancePx, result.endless.maxDistancePx)

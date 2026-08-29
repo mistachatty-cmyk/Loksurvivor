@@ -8,6 +8,7 @@ import {
   Footprints,
   Gauge,
   HardHat,
+  KeyRound,
   LockKeyhole,
   PackageCheck,
   RotateCcw,
@@ -58,6 +59,13 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
     description: 'Make the streets meaner. The payout gets meaner in your favor.',
     icon: Target,
   },
+  {
+    key: 'relic',
+    eyebrow: 'Rare finds / 04',
+    title: "Locksmith's corner",
+    description: 'Paid for in skeleton keys — notably rare, found by breaking things out in the world.',
+    icon: KeyRound,
+  },
 ];
 
 const STAT_LABELS: Record<string, string> = {
@@ -79,10 +87,18 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'contract-redline': Gauge,
   'contract-hardcase': Skull,
   'contract-no-shelter': LockKeyhole,
+  'kit-strap': PackageCheck,
+  'salvager-instinct': BadgeDollarSign,
+  'loosened-padlock': KeyRound,
+  'masters-cut': Gauge,
 };
 
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
   return Math.min(item.maxStacks, Math.max(0, Math.floor(purchases[item.id] ?? 0)));
+}
+
+function currencyInfo(item: VendorItemDef, meta: { cred: number; skeletonKeys: number }): { balance: number; label: string } {
+  return item.currency === 'skeletonKeys' ? { balance: meta.skeletonKeys, label: 'keys' } : { balance: meta.cred, label: 'cred' };
 }
 
 function effectLabel(item: VendorItemDef): string {
@@ -132,16 +148,19 @@ function PipMeter({ owned, cap, category }: { owned: number; cap: number; catego
 function ItemTile({
   item,
   purchases,
+  meta,
   selected,
   onSelect,
 }: {
   item: VendorItemDef;
   purchases: Record<string, number>;
+  meta: { cred: number; skeletonKeys: number };
   selected: boolean;
   onSelect: () => void;
 }) {
   const owned = ownedStacks(item, purchases);
   const maxed = owned >= item.maxStacks;
+  const { label: currencyLabel } = currencyInfo(item, meta);
   return (
     <button
       type="button"
@@ -156,7 +175,7 @@ function ItemTile({
       <span className="text-[11px] font-black uppercase leading-tight tracking-wide text-white">{item.name}</span>
       <PipMeter owned={owned} cap={item.maxStacks} category={item.category} />
       <span className={`font-mono text-[10px] font-bold ${maxed ? 'text-emerald-300' : 'text-muted-foreground'}`}>
-        {maxed ? 'Maxed' : `${item.cost} cred`}
+        {maxed ? 'Maxed' : `${item.cost} ${currencyLabel}`}
       </span>
     </button>
   );
@@ -164,14 +183,14 @@ function ItemTile({
 
 function ItemDetail({
   item,
-  cred,
+  meta,
   purchases,
   onBuy,
   onRefund,
   inline = false,
 }: {
   item: VendorItemDef;
-  cred: number;
+  meta: { cred: number; skeletonKeys: number };
   purchases: Record<string, number>;
   onBuy: (id: string) => void;
   onRefund: (id: string) => void;
@@ -179,7 +198,8 @@ function ItemDetail({
 }) {
   const owned = ownedStacks(item, purchases);
   const maxed = owned >= item.maxStacks;
-  const short = cred < item.cost;
+  const { balance, label: currencyLabel } = currencyInfo(item, meta);
+  const short = balance < item.cost;
 
   return (
     <div
@@ -214,7 +234,7 @@ function ItemDetail({
           data-testid={`button-buy-vendor-item-${item.id}`}
         >
           {maxed ? <Check className="h-4 w-4 shrink-0" /> : <ArrowUpRight className="h-4 w-4 shrink-0" />}
-          <span>{maxed ? 'Capacity reached' : short ? `Need ${item.cost - cred} more` : 'Buy'}</span>
+          <span>{maxed ? 'Capacity reached' : short ? `Need ${item.cost - balance} more ${currencyLabel}` : `Buy for ${item.cost} ${currencyLabel}`}</span>
           {!maxed && !short && <kbd className="border border-current px-1 text-[9px]">E</kbd>}
         </button>
         <button
@@ -288,6 +308,13 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
               </p>
             </div>
           </div>
+          <div className="terminal-frame flex items-center gap-3 border border-sky-500/50 bg-sky-500/10 px-4 py-3" data-testid="vendor-skeleton-keys-balance">
+            <KeyRound className="h-5 w-5 text-sky-300" />
+            <div>
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-sky-200/70">Keys</p>
+              <p className="font-mono text-xl font-bold leading-none text-sky-200">{meta.skeletonKeys.toLocaleString()}</p>
+            </div>
+          </div>
         </div>
       }
     >
@@ -357,48 +384,52 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
           })}
         </div>
 
-        {selectedItem &&
-          (layout === 'rail' ? (
-            <div className="grid gap-4 lg:grid-cols-[16rem_1fr]" data-testid="section-vendor-grid">
-              <ItemDetail item={selectedItem} cred={meta.cred} purchases={meta.vendorPurchases} onBuy={buyVendorItem} onRefund={refundVendorItem} />
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <section data-testid={`section-vendor-${activeCategory}`}>
+          {selectedItem &&
+            (layout === 'rail' ? (
+              <div className="grid gap-4 lg:grid-cols-[16rem_1fr]" data-testid="section-vendor-grid">
+                <ItemDetail item={selectedItem} meta={meta} purchases={meta.vendorPurchases} onBuy={buyVendorItem} onRefund={refundVendorItem} />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {itemsInCategory.map((item) => (
+                    <ItemTile
+                      key={item.id}
+                      item={item}
+                      purchases={meta.vendorPurchases}
+                      meta={meta}
+                      selected={item.id === selectedItem.id}
+                      onSelect={() => setSelectedId(item.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [grid-auto-flow:dense]" data-testid="section-vendor-grid">
                 {itemsInCategory.map((item) => (
-                  <ItemTile
-                    key={item.id}
-                    item={item}
-                    purchases={meta.vendorPurchases}
-                    selected={item.id === selectedItem.id}
-                    onSelect={() => setSelectedId(item.id)}
-                  />
+                  <Fragment key={item.id}>
+                    <ItemTile
+                      item={item}
+                      purchases={meta.vendorPurchases}
+                      meta={meta}
+                      selected={item.id === selectedItem.id}
+                      onSelect={() => setSelectedId(item.id)}
+                    />
+                    {item.id === selectedItem.id && (
+                      <div className="col-span-full">
+                        <ItemDetail
+                          item={selectedItem}
+                          meta={meta}
+                          purchases={meta.vendorPurchases}
+                          onBuy={buyVendorItem}
+                          onRefund={refundVendorItem}
+                          inline
+                        />
+                      </div>
+                    )}
+                  </Fragment>
                 ))}
               </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [grid-auto-flow:dense]" data-testid="section-vendor-grid">
-              {itemsInCategory.map((item) => (
-                <Fragment key={item.id}>
-                  <ItemTile
-                    item={item}
-                    purchases={meta.vendorPurchases}
-                    selected={item.id === selectedItem.id}
-                    onSelect={() => setSelectedId(item.id)}
-                  />
-                  {item.id === selectedItem.id && (
-                    <div className="col-span-full">
-                      <ItemDetail
-                        item={selectedItem}
-                        cred={meta.cred}
-                        purchases={meta.vendorPurchases}
-                        onBuy={buyVendorItem}
-                        onRefund={refundVendorItem}
-                        inline
-                      />
-                    </div>
-                  )}
-                </Fragment>
-              ))}
-            </div>
-          ))}
+            ))}
+        </section>
 
         <div className="flex items-start gap-3 border-l-2 border-primary/45 bg-primary/[0.05] px-4 py-3 text-xs leading-5 text-muted-foreground">
           <Box className="mt-0.5 h-4 w-4 shrink-0 text-primary/75" />

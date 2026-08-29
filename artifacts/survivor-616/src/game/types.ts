@@ -388,6 +388,8 @@ export interface StatusEffectDef {
   maxStacks: number;
   /** Movement multiplier while active (0 completely stops movement). */
   speedMultiplier?: number;
+  /** Damage-dealt multiplier while active (used by enemy-empowering hazards). */
+  damageMultiplier?: number;
 }
 
 /** A status effect currently affecting an actor. */
@@ -590,7 +592,8 @@ export interface ObstacleDef {
   kind: 'dumpster' | 'car' | 'crate' | 'planter' | 'barrier' | 'ac-unit'
     | 'neon-sign' | 'barrel' | 'fuse-box' | 'street-lamp' | 'car-wreck'
     | 'crate-breakable' | 'security-camera' | 'cover' | 'reflective-surface' | 'flora'
-     | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole';
+     | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole'
+     | 'trash-can' | 'mailbox' | 'fire-hydrant' | 'parking-meter';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
@@ -1062,7 +1065,7 @@ export interface DiscoveryDef {
   blurb: string;
 }
 
-export type VendorItemCategory = 'stat' | 'utility' | 'challenge';
+export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic';
 
 export type VendorEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
@@ -1077,6 +1080,8 @@ export interface VendorItemDef {
   maxStacks: number;
   effects?: VendorEffect[];
   challengeId?: string;
+  /** Currency this item is priced in. Omitted means 'cred', the original default. */
+  currency?: 'cred' | 'skeletonKeys';
 }
 
 export interface ChallengeContractDef {
@@ -1188,6 +1193,8 @@ export interface MetaState {
   cred: number;
   /** Loot tokens spendable in the hideout. */
   lootTokens: number;
+  /** Rare currency found by breaking street props, weighted toward endless mode. Spendable in the hideout vendor's relic category. */
+  skeletonKeys: number;
   /** Whether the player has seen the intro briefing. */
   onboarded: boolean;
   /** Farthest endless distance ever reached (world units). */
@@ -1281,6 +1288,8 @@ export interface RunResult {
   lokPetDiscoveries?: LokPetRunDiscovery[];
   /** Loot tokens earned this run. */
   lootTokensGained: number;
+  /** Rare currency (skeleton keys) earned this run. */
+  skeletonKeysGained: number;
   /** Fatigue applied to the operative after this run. */
   fatigueAddedPct?: number;
   /** Operative's fatigue after this run, before recovery begins. */

@@ -211,7 +211,7 @@ export interface Orbiter {
   cooldowns: Map<number, number>;
 }
 
-export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box';
+export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'coin';
 
 export interface Pickup {
   uid: number;
@@ -344,6 +344,23 @@ export interface BreakableObstacle extends Aabb {
   hazardNextTickAt?: number;
 }
 
+/** Ground-hazard liquids spawned by breaking certain obstacles. Never solid — always kept out of `w.obstacles`. */
+export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff';
+
+export interface FluidTile {
+  uid: number;
+  kind: FluidKind;
+  x: number;
+  y: number;
+  /** Current footprint; grows from a fraction of maxRadius toward it after spawning. */
+  radius: number;
+  maxRadius: number;
+  spawnedAt: number;
+  expiresAt: number;
+  nextTickAt: number;
+  sourceUid?: number;
+}
+
 export type PotholeState = 'dormant' | 'opening' | 'open' | 'resolved';
 
 export interface PotholeObstacle extends Aabb {
@@ -389,10 +406,47 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   cover: { variant: 'medium-movable', hp: 270 },
   'metal-box': { variant: 'heavy-metal' },
   bench: { variant: 'fixed-bench' },
+  'trash-can': { variant: 'light-breakable', hp: 40 },
+  mailbox: { variant: 'light-breakable', hp: 70 },
+  'fire-hydrant': { variant: 'light-breakable', hp: 95 },
+  'parking-meter': { variant: 'light-breakable', hp: 55 },
+  /** Promoted from indestructible-by-omission so it can emit coolant on break. */
+  'ac-unit': { variant: 'light-breakable', hp: 100 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
 ]);
+
+/** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
+const NEW_STREET_PROP_KINDS = new Set<ObstacleDef['kind']>(['trash-can', 'mailbox', 'fire-hydrant', 'parking-meter']);
+const NEW_PROP_BONUS_DROP_CHANCE = 0.35;
+const NEW_PROP_BONUS_DROP_ENDLESS_MULT = 1.6;
+const RARE_CURRENCY_BASE_CHANCE = 0.02;
+const RARE_CURRENCY_ENDLESS_MULT = 3;
+
+const FLUID_SPAWN_GROW_MS = 900;
+const FLUID_TICK_MS = 420;
+const FLUID_LIFETIMES: Record<FluidKind, number> = {
+  water: 9000,
+  oil: 11000,
+  'burning-oil': 5000,
+  coolant: 8000,
+  runoff: 10000,
+};
+const FLUID_MAX_RADIUS: Record<FluidKind, number> = {
+  water: 84,
+  oil: 78,
+  'burning-oil': 78,
+  coolant: 70,
+  runoff: 82,
+};
+/** Immediate, position-based speed multiplier per fluid kind. Omitted kinds (runoff) don't change speed directly. */
+const FLUID_SPEED_MULTIPLIERS: Partial<Record<FluidKind, number>> = {
+  water: 0.85,
+  oil: 1.12,
+  'burning-oil': 1.12,
+  coolant: 0.4,
+};
 
 interface PropPhysicsProfile {
   variant: PropVariant;
@@ -489,6 +543,8 @@ export interface World {
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
   potholes: PotholeObstacle[];
+  /** Ground-hazard fluids spawned by breaking certain obstacles (fire hydrant, car-wreck, ac-unit, dumpster). */
+  fluids: FluidTile[];
   bounds: { w: number; h: number };
 
   camera: { x: number; y: number };
@@ -581,6 +637,8 @@ export interface World {
   openedPrizes: string[];
   /** Loot tokens earned (prizes + objective rewards). */
   lootTokensGained: number;
+  /** Rare currency (skeleton keys) earned this run, found by breaking street props. */
+  skeletonKeysGained: number;
 
   /* ---- Objective system ---- */
   objectives: RunObjective[];
@@ -723,6 +781,7 @@ export function createWorld(
       .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
     potholes: [],
+    fluids: [],
     bounds: area.bounds,
     camera: { x: 0, y: 0 },
     shake: 0,
@@ -808,6 +867,7 @@ export function createWorld(
     lootBoxesOpened: 0,
     openedPrizes: [],
     lootTokensGained: 0,
+    skeletonKeysGained: 0,
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
     episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
@@ -3085,8 +3145,161 @@ function damageBreakable(
       b.fallAngle = (w.rng() > 0.5 ? 1 : -1) * (Math.PI / 2);
       pushAlert(w, 'LIVE WIRE — KEEP CLEAR');
     }
+    if (NEW_STREET_PROP_KINDS.has(b.kind)) {
+      w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: 5, bornAt: w.now });
+      const bonusChance = NEW_PROP_BONUS_DROP_CHANCE * (w.area.endless ? NEW_PROP_BONUS_DROP_ENDLESS_MULT : 1);
+      if (w.rng() < bonusChance) {
+        w.pickups.push({
+          uid: uid(w),
+          kind: w.rng() > 0.5 ? 'cred' : 'health',
+          x: b.x + randRange(w.rng, -10, 10),
+          y: b.y + randRange(w.rng, -10, 10),
+          vx: 0,
+          vy: 0,
+          value: w.rng() > 0.5 ? 8 : 10,
+          bornAt: w.now,
+        });
+      }
+      const coinChance = RARE_CURRENCY_BASE_CHANCE * (w.area.endless ? RARE_CURRENCY_ENDLESS_MULT : 1);
+      if (w.rng() < coinChance) {
+        w.pickups.push({ uid: uid(w), kind: 'coin', x: b.x, y: b.y, vx: 0, vy: 0, value: 1, bornAt: w.now });
+      }
+    }
+    if (b.kind === 'fire-hydrant') {
+      spawnFluidTile(w, b.x, b.y, 'water', b.uid);
+      pushAlert(w, 'HYDRANT BLOWN — WATER MAIN OPEN');
+    }
+    if (b.kind === 'car-wreck') {
+      spawnFluidTile(w, b.x, b.y, 'oil', b.uid);
+    }
+    if (b.kind === 'ac-unit') {
+      spawnFluidTile(w, b.x, b.y, 'coolant', b.uid);
+    }
+    if (b.kind === 'dumpster') {
+      spawnFluidTile(w, b.x, b.y, 'runoff', b.uid);
+    }
   }
   syncObstacleAabbs(w);
+}
+
+function spawnFluidTile(w: World, x: number, y: number, kind: FluidKind, sourceUid?: number) {
+  const maxRadius = FLUID_MAX_RADIUS[kind];
+  w.fluids.push({
+    uid: uid(w),
+    kind,
+    x,
+    y,
+    radius: maxRadius * 0.3,
+    maxRadius,
+    spawnedAt: w.now,
+    expiresAt: w.now + FLUID_LIFETIMES[kind],
+    nextTickAt: w.now,
+    sourceUid,
+  });
+}
+
+function igniteFluidTile(w: World, tile: FluidTile) {
+  if (tile.kind !== 'oil') return;
+  tile.kind = 'burning-oil';
+  tile.expiresAt = w.now + FLUID_LIFETIMES['burning-oil'];
+  tile.nextTickAt = w.now;
+  pushAlert(w, 'OIL SLICK IGNITED');
+  spawnParticles(w, tile.x, tile.y, '#ff6b35', 10, 90);
+}
+
+/**
+ * The player has no persisted status-effect system (only EnemyActor carries
+ * activeEffects), so fluid-driven speed change for the player is a pure
+ * per-frame position read covering every fluid kind. Standing in water takes
+ * priority over any overlapping fluid, matching water "washing away" other
+ * ground effects.
+ */
+function fluidSpeedMultiplierAt(w: World, x: number, y: number): number {
+  let waterMultiplier: number | null = null;
+  let otherMultiplier = 1;
+  for (const tile of w.fluids) {
+    if (dist2(x, y, tile.x, tile.y) > tile.radius ** 2) continue;
+    if (tile.kind === 'water') {
+      waterMultiplier = FLUID_SPEED_MULTIPLIERS.water!;
+      continue;
+    }
+    const multiplier = FLUID_SPEED_MULTIPLIERS[tile.kind];
+    if (multiplier !== undefined) otherMultiplier *= multiplier;
+  }
+  return waterMultiplier ?? otherMultiplier;
+}
+
+/**
+ * Enemies get lingering water/coolant/runoff speed change via the
+ * wet/chilled/irradiated status effects applied in updateFluids(). Oil has no
+ * lingering status (it's not meant to persist after stepping out), so its
+ * speed boost is this separate immediate check, reused for both actors.
+ */
+function fluidOilBoostAt(w: World, x: number, y: number): number {
+  for (const tile of w.fluids) {
+    if (tile.kind !== 'oil' && tile.kind !== 'burning-oil') continue;
+    if (dist2(x, y, tile.x, tile.y) <= tile.radius ** 2) return FLUID_SPEED_MULTIPLIERS.oil!;
+  }
+  return 1;
+}
+
+function statusDamageMultiplier(enemy: EnemyActor): number {
+  return enemy.activeEffects.reduce((multiplier, effect) => {
+    const def = STATUS_EFFECTS_BY_ID[effect.id];
+    return multiplier * (def?.damageMultiplier ?? 1);
+  }, 1);
+}
+
+function updateFluids(w: World) {
+  for (let i = w.fluids.length - 1; i >= 0; i -= 1) {
+    const tile = w.fluids[i]!;
+    if (w.now >= tile.expiresAt) {
+      w.fluids.splice(i, 1);
+      continue;
+    }
+    const growth = clamp((w.now - tile.spawnedAt) / FLUID_SPAWN_GROW_MS, 0, 1);
+    tile.radius = tile.maxRadius * (0.3 + growth * 0.7);
+    if (w.now < tile.nextTickAt) continue;
+    tile.nextTickAt = w.now + FLUID_TICK_MS;
+
+    const p = w.player;
+    const dashing = p.dashUntil > w.now;
+    const playerInside = dist2(p.x, p.y, tile.x, tile.y) <= (tile.radius + p.radius) ** 2;
+    if (playerInside && !dashing) {
+      if (tile.kind === 'runoff') damagePlayer(w, 5, tile.x, tile.y);
+      else if (tile.kind === 'burning-oil') damagePlayer(w, 6, tile.x, tile.y);
+    }
+
+    if (tile.kind === 'oil') {
+      // An enemy already on fire that wanders in ignites the slick.
+      for (const enemy of w.enemies) {
+        if (enemy.dying) continue;
+        if (dist2(enemy.x, enemy.y, tile.x, tile.y) > (tile.radius + enemy.radius) ** 2) continue;
+        if (enemy.activeEffects.some((effect) => effect.id === 'burning')) {
+          igniteFluidTile(w, tile);
+          break;
+        }
+      }
+      continue;
+    }
+
+    for (const enemy of w.enemies) {
+      if (enemy.dying) continue;
+      if (dist2(enemy.x, enemy.y, tile.x, tile.y) > (tile.radius + enemy.radius) ** 2) continue;
+      if (tile.kind === 'water') {
+        applyStatusEffect(w, enemy, 'wet');
+        enemy.activeEffects = enemy.activeEffects.filter(
+          (effect) => effect.id !== 'chilled' && effect.id !== 'irradiated' && effect.id !== 'burning',
+        );
+      } else if (tile.kind === 'coolant') {
+        applyStatusEffect(w, enemy, 'chilled');
+      } else if (tile.kind === 'runoff') {
+        applyStatusEffect(w, enemy, 'irradiated');
+      } else if (tile.kind === 'burning-oil') {
+        applyStatusEffect(w, enemy, 'burning');
+      }
+    }
+  }
 }
 
 function potholeContains(pothole: PotholeObstacle, actor: Actor): boolean {
@@ -3337,6 +3550,19 @@ function updateBreakables(w: World, dt: number) {
             damageEnemy(w, enemy, 14 * w.stats.power, 1, b.x, b.y);
           }
         }
+        // Water conducts the lamp's charge through the whole connected puddle,
+        // not just its own raw radius.
+        for (const tile of w.fluids) {
+          if (tile.kind !== 'water' || dist2(tile.x, tile.y, b.x, b.y) > (radius + tile.radius) ** 2) continue;
+          if (dist2(w.player.x, w.player.y, tile.x, tile.y) <= (tile.radius + w.player.radius) ** 2) {
+            damagePlayer(w, 9, tile.x, tile.y);
+          }
+          for (const enemy of w.enemies) {
+            if (!enemy.dying && dist2(enemy.x, enemy.y, tile.x, tile.y) <= (tile.radius + enemy.radius) ** 2) {
+              damageEnemy(w, enemy, 14 * w.stats.power, 1, tile.x, tile.y);
+            }
+          }
+        }
       }
       continue;
     }
@@ -3409,7 +3635,7 @@ function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w);
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y);
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -3511,7 +3737,7 @@ function updateEnemies(w: World, dt: number) {
       const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, new Set([enemy.uid]));
       if (allyTarget && w.now >= enemy.convertedAttackReadyAt) {
         enemy.convertedAttackReadyAt = w.now + 650;
-        damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8)), 2, enemy.x, enemy.y);
+        damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8 * statusDamageMultiplier(enemy))), 2, enemy.x, enemy.y);
         const attackAngle = Math.atan2(allyTarget.y - enemy.y, allyTarget.x - enemy.x);
         const attackDistance = Math.hypot(allyTarget.x - enemy.x, allyTarget.y - enemy.y);
         w.effects.push({
@@ -3551,7 +3777,7 @@ function updateEnemies(w: World, dt: number) {
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
 
-    let speed = enemy.speed * statusSpeedMultiplier(enemy);
+    let speed = enemy.speed * statusSpeedMultiplier(enemy) * fluidOilBoostAt(w, enemy.x, enemy.y);
     speed *= musicMultiplier(w, enemy.def.react, 'speed');
     if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
@@ -3659,7 +3885,7 @@ function updateEnemies(w: World, dt: number) {
           enemy.specialUntil = w.now + 360;
           enemy.specialReadyAt = w.now + randRange(w.rng, 2800, 4200);
           if (distance <= radius) {
-            damagePlayer(w, enemy.damage, enemy.x, enemy.y);
+            damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y);
             if (enemy.def.behavior === 'current') {
               const push = (190 * Math.max(0, 1 - distance / radius));
               p.kx += dirX * push;
@@ -3722,7 +3948,7 @@ function updateEnemies(w: World, dt: number) {
     const contact = enemy.radius + p.radius;
     if (enemy.ghostUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
-      damagePlayer(w, enemy.damage, enemy.x, enemy.y, 'contact');
+      damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
     }
     const elapsed = w.now - enemy.animStartedAt;
     if (enemy.anim === 'attack' && elapsed < 260) continue;
@@ -4068,6 +4294,11 @@ function updatePickups(w: World, dt: number) {
           break;
         case 'cred':
           w.cred += pickup.value;
+          break;
+        case 'coin':
+          w.skeletonKeysGained += pickup.value;
+          w.popups.push({ x: p.x, y: p.y - 20, text: `+${pickup.value} KEY`, color: '#e8d48a', bornAt: w.now, vy: 30 });
+          pushAlert(w, 'Skeleton key found');
           break;
         case 'loot-box': {
           // Roll and apply the prize immediately (safe even if run ends during reel).
@@ -4493,6 +4724,7 @@ function updateEndlessChunks(w: World) {
     w.obstacles = [];
     w.breakables = [];
     w.potholes = [];
+    w.fluids = [];
     for (const obsArr of e.chunkObstacles.values()) {
       for (const o of obsArr) {
         if (o.kind === 'pothole') {
@@ -4549,6 +4781,7 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
      x: p.x + obs.x,
      y: p.y + obs.y,
    }));
+  w.fluids = [];
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -4630,6 +4863,7 @@ function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]
   w.obstacles = [...interiorShell, ...interiorProps];
   w.breakables = [...interiorShell, ...interiorProps].map((obs) => createBreakable(w, { ...obs, kind: obs.kind }));
   w.potholes = [];
+  w.fluids = [];
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
   w.projectiles = [];
@@ -4690,6 +4924,7 @@ function restoreStreetObstacles(w: World) {
   w.obstacles = [];
   w.breakables = [];
   w.potholes = [];
+  w.fluids = [];
   for (const obsArr of e.chunkObstacles.values()) {
     for (const o of obsArr) {
       if (o.kind === 'pothole') w.potholes.push(createPothole(w, { ...o, kind: 'pothole' }));
@@ -4921,6 +5156,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateFollowers(w, dt);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
+  updateFluids(w);
 
   // Weapon cadence.
   updateOrbiters(w, dt);
@@ -5186,6 +5422,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     })),
     lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
+    skeletonKeysGained: w.skeletonKeysGained,
     completedObjectives: [...w.completedObjectives],
     episode: (() => {
       const snapshot = episodeSnapshot(w);

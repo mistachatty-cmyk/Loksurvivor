@@ -6,7 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
-import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
+import { LANDED_HEAT_RADIUS, type FluidKind, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
@@ -1450,7 +1450,75 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'metal-box': { top: '#536273', side: '#2d3745', trim: '#cbd5e1' },
   bench: { top: '#70543a', side: '#3b2c20', trim: '#c58b5d' },
   pothole: { top: '#17131a', side: '#0a080d', trim: '#ef4444' },
+  'trash-can': { top: '#3a4a3f', side: '#20291f', trim: '#7fae8f' },
+  mailbox: { top: '#1c3f66', side: '#0f2440', trim: '#4d8bd6' },
+  'fire-hydrant': { top: '#8c1f1f', side: '#4a0f0f', trim: '#ffb3b3' },
+  'parking-meter': { top: '#4a4a52', side: '#28282e', trim: '#c9c9d2' },
 };
+
+const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
+  water: { base: '#1f6f9e', rim: '#3fb6ff', glow: '#dff6ff' },
+  oil: { base: '#17141c', rim: '#3d3550', glow: '#6d5f8a' },
+  'burning-oil': { base: '#3a1408', rim: '#ff6b35', glow: '#ffd166' },
+  coolant: { base: '#8fd0e8', rim: '#bfe9ff', glow: '#eaf9ff' },
+  runoff: { base: '#5a6a1a', rim: '#6b7a1f', glow: '#b6ff2e' },
+};
+
+function drawFluids(ctx: CanvasRenderingContext2D, w: World) {
+  for (const tile of w.fluids) {
+    const colors = FLUID_FILL_COLORS[tile.kind];
+    // Hold near-full alpha, only fade during the final third of the tile's life.
+    const remaining = (tile.expiresAt - w.now) / Math.max(1, tile.expiresAt - tile.spawnedAt);
+    const fadeAlpha = clamp(remaining * 3, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = 0.55 * fadeAlpha;
+    ctx.fillStyle = colors.base;
+    ctx.beginPath();
+    ctx.ellipse(tile.x, tile.y + 4, tile.radius, tile.radius * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.35 * fadeAlpha;
+    ctx.strokeStyle = colors.rim;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(tile.x, tile.y + 4, tile.radius * 0.92, tile.radius * 0.57, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (tile.kind === 'burning-oil' || tile.kind === 'coolant' || tile.kind === 'runoff') {
+      const pulse = 0.5 + Math.sin(w.now / 140 + tile.uid) * 0.3;
+      ctx.globalAlpha = pulse * 0.4 * fadeAlpha;
+      ctx.fillStyle = colors.glow;
+      ctx.beginPath();
+      ctx.ellipse(tile.x, tile.y + 4, tile.radius * 0.4, tile.radius * 0.24, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Electrified water: a jittered arc from a connected puddle to any live street-lamp hazard.
+  const activeLamps = w.breakables.filter(
+    (b) => b.kind === 'street-lamp' && b.broken && b.hazardUntil && w.now < b.hazardUntil,
+  );
+  for (const tile of w.fluids) {
+    if (tile.kind !== 'water') continue;
+    for (const lamp of activeLamps) {
+      if (Math.hypot(tile.x - lamp.x, tile.y - lamp.y) > 92 + tile.radius) continue;
+      ctx.save();
+      const pulse = 0.65 + Math.sin(w.now / 85) * 0.2;
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#8be9ff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(lamp.x, lamp.y);
+      const midX = (lamp.x + tile.x) / 2 + Math.sin(w.now / 40) * 6;
+      const midY = (lamp.y + tile.y) / 2 + Math.cos(w.now / 46) * 6;
+      ctx.lineTo(midX, midY);
+      ctx.lineTo(tile.x, tile.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
 
 function drawPotholes(ctx: CanvasRenderingContext2D, w: World) {
   for (const pothole of w.potholes) {
@@ -1582,6 +1650,53 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fillStyle = '#11121a';
       ctx.fillRect(x + obstacle.w * 0.16, y - height + obstacle.h * 0.7, 12, 5);
       ctx.fillRect(x + obstacle.w * 0.72, y - height + obstacle.h * 0.7, 12, 5);
+      ctx.restore();
+    } else if (obstacle.kind === 'trash-can') {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = colors.trim;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(obstacle.x, y - height + obstacle.h * 0.16, obstacle.w * 0.42, obstacle.h * 0.1, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#3f2b19';
+      ctx.lineWidth = 1.5;
+      for (let i = -1; i <= 1; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(obstacle.x + i * obstacle.w * 0.18, y - height + obstacle.h * 0.05);
+        ctx.lineTo(obstacle.x + i * obstacle.w * 0.24, y - height - obstacle.h * 0.14);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (obstacle.kind === 'mailbox') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = colors.trim;
+      ctx.fillRect(x + obstacle.w * 0.6, y - height + obstacle.h * 0.1, obstacle.w * 0.32, obstacle.h * 0.16);
+      ctx.strokeStyle = '#0f2440';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + obstacle.w * 0.18, y - height + obstacle.h * 0.45, obstacle.w * 0.64, 2);
+      ctx.restore();
+    } else if (obstacle.kind === 'fire-hydrant') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = colors.trim;
+      ctx.fillRect(x - 3, y - height + obstacle.h * 0.42, 5, 5);
+      ctx.fillRect(x + obstacle.w - 2, y - height + obstacle.h * 0.42, 5, 5);
+      ctx.beginPath();
+      ctx.arc(obstacle.x, y - height + obstacle.h * 0.16, obstacle.w * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (obstacle.kind === 'parking-meter') {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = colors.trim;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(obstacle.x, y - height + obstacle.h * 0.22, obstacle.w * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#28282e';
+      ctx.fillRect(obstacle.x - 1, y - height + obstacle.h * 0.16, 2, obstacle.h * 0.12);
       ctx.restore();
     }
 
@@ -2605,6 +2720,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawDungeonEntrances(ctx, w);
   drawDungeonExit(ctx, w);
   drawDungeonChest(ctx, w);
+  drawFluids(ctx, w);
   drawPotholes(ctx, w);
   drawAmbient(ctx, w);
   drawObstacles(ctx, w);
