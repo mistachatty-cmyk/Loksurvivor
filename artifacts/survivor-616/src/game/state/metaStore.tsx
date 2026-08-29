@@ -109,16 +109,28 @@ function settleRecovery(meta: MetaState, now = Date.now()): MetaState {
   };
 }
 
+/** Keeps a persisted or dispatched tilt sensitivity inside a usable range. */
+function clampGyroSensitivity(value: unknown): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 1;
+  return Math.max(0.5, Math.min(2, numeric));
+}
+
 export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
+    wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
     minimapPosition: { x: 0.82, y: 0.18 },
     uiDensity: 'grid',
+    musicReactiveEnabled: true,
+    gyroEnabled: false,
+    studioPluginsEnabled: false,
+    gyroSensitivity: 1,
+    gyroInvertY: false,
     selectedCharacterId: 'shade',
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
@@ -584,10 +596,18 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     devModeAllUnlocks: parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
+    wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
+    musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
+    gyroEnabled: parsed.gyroEnabled === true,
+    // Defaults to false on every load, including projects saved before this
+    // existed -- remote code is never enabled by an upgrade.
+    studioPluginsEnabled: parsed.studioPluginsEnabled === true,
+    gyroSensitivity: clampGyroSensitivity(parsed.gyroSensitivity),
+    gyroInvertY: parsed.gyroInvertY === true,
     selectedCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
@@ -832,7 +852,13 @@ type Action =
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
+  | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
+  | { type: 'setMusicReactive'; enabled: boolean }
+  | { type: 'setGyroEnabled'; enabled: boolean }
+  | { type: 'setStudioPlugins'; enabled: boolean }
+  | { type: 'setGyroSensitivity'; value: number }
+  | { type: 'setGyroInvertY'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
@@ -985,6 +1011,30 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ...state,
         meta: { ...state.meta, levelUpPausesEnabled: action.enabled },
       };
+
+    case 'setWildlifeSheltersInRain':
+      return {
+        ...state,
+        meta: { ...state.meta, wildlifeSheltersInRain: action.enabled },
+      };
+
+    case 'setMusicReactive':
+      return { ...state, meta: { ...state.meta, musicReactiveEnabled: action.enabled } };
+
+    case 'setGyroEnabled':
+      return { ...state, meta: { ...state.meta, gyroEnabled: action.enabled } };
+
+    case 'setStudioPlugins':
+      return { ...state, meta: { ...state.meta, studioPluginsEnabled: action.enabled } };
+
+    case 'setGyroSensitivity':
+      return {
+        ...state,
+        meta: { ...state.meta, gyroSensitivity: clampGyroSensitivity(action.value) },
+      };
+
+    case 'setGyroInvertY':
+      return { ...state, meta: { ...state.meta, gyroInvertY: action.enabled } };
 
     case 'setMinimapVisible':
       return {
@@ -1250,7 +1300,13 @@ export interface MetaContextValue {
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
+  setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
+  setMusicReactive: (enabled: boolean) => void;
+  setGyroEnabled: (enabled: boolean) => void;
+  setStudioPlugins: (enabled: boolean) => void;
+  setGyroSensitivity: (value: number) => void;
+  setGyroInvertY: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
   setMinimapPosition: (position: { x: number; y: number }) => void;
   setUiDensity: (density: 'grid' | 'list') => void;
@@ -1303,6 +1359,30 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setLevelUpPauses = useCallback(
     (enabled: boolean) => dispatch({ type: 'setLevelUpPauses', enabled }),
+    [],
+  );
+  const setWildlifeSheltersInRain = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
+    [],
+  );
+  const setMusicReactive = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setMusicReactive', enabled }),
+    [],
+  );
+  const setStudioPlugins = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setStudioPlugins', enabled }),
+    [],
+  );
+  const setGyroEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setGyroEnabled', enabled }),
+    [],
+  );
+  const setGyroSensitivity = useCallback(
+    (value: number) => dispatch({ type: 'setGyroSensitivity', value }),
+    [],
+  );
+  const setGyroInvertY = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setGyroInvertY', enabled }),
     [],
   );
   const setMinimapVisible = useCallback(
@@ -1374,7 +1454,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
+      setWildlifeSheltersInRain,
       setMinimapVisible,
+      setMusicReactive,
+      setGyroEnabled,
+      setStudioPlugins,
+      setGyroSensitivity,
+      setGyroInvertY,
       setMinimapExpanded,
       setMinimapPosition,
       setUiDensity,
@@ -1406,7 +1492,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,
+    setWildlifeSheltersInRain,
     setMinimapVisible,
+    setMusicReactive,
+    setGyroEnabled,
+    setGyroSensitivity,
+    setGyroInvertY,
     setMinimapExpanded,
     setMinimapPosition,
     setUiDensity,

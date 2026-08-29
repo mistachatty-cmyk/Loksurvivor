@@ -35,7 +35,10 @@ import {
   type EnemyActor,
   type Projectile,
   stepWorld,
+  isOnBeat,
+  musicMultiplier,
 } from '@/game/engine/world';
+import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
 import { generateChunk } from '@/game/engine/chunks';
 import { createRng } from '@/game/engine/math';
 import {
@@ -515,6 +518,105 @@ test('a heavy metal box absorbs a hit, moves under strong impact, and never brea
   const xBefore = box.x;
   for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 30, neutralInput);
   assert.ok(box.x > xBefore);
+});
+
+test('ambient street life flees the player, stays in the arena, and never joins combat', () => {
+  const world = createWorld(
+    testArea({ x: 300, y: 200, w: 40, h: 40, kind: 'crate' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    4242,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(world.ambient.length > 0, 'a run should populate background life');
+  assert.equal(world.enemies.length, 0, 'ambient actors must never enter the enemy list');
+
+  // Park one on top of the player: it should bolt away, not drift closer.
+  const startled = world.ambient[0]!;
+  startled.x = world.player.x + 20;
+  startled.y = world.player.y;
+  const before = Math.hypot(startled.x - world.player.x, startled.y - world.player.y);
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  const after = Math.hypot(startled.x - world.player.x, startled.y - world.player.y);
+  assert.ok(after > before, 'a startled civilian should put distance between itself and the player');
+
+  const halfW = world.bounds.w / 2;
+  const halfH = world.bounds.h / 2;
+  for (let i = 0; i < 600; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.enemies.length, 0);
+  for (const actor of world.ambient) {
+    assert.ok(Math.abs(actor.x) <= halfW, `ambient actor left the arena on x: ${actor.x}`);
+    assert.ok(Math.abs(actor.y) <= halfH, `ambient actor left the arena on y: ${actor.y}`);
+  }
+});
+
+test('wildlifeSheltersInRain defaults true and honors an explicit setup override', () => {
+  const defaulted = createWorld(AREAS[0]!, testCharacter('the-bus'), CHARACTERS[0].stats, 5);
+  assert.equal(defaulted.wildlifeSheltersInRain, true);
+
+  const overridden = createWorld(
+    AREAS[0]!,
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    5,
+    [],
+    1,
+    true,
+    null,
+    { wildlifeSheltersInRain: false },
+  );
+  assert.equal(overridden.wildlifeSheltersInRain, false);
+});
+
+test('a roofed area gets no street life', () => {
+  const cellar = AREAS.find((a) => a.id === 'crystal-cellar');
+  assert.ok(cellar, 'the crystal cellar should still exist');
+  assert.equal(cellar.sky, 'roofed', 'a cave under the city has no sky');
+
+  const world = createWorld(cellar, testCharacter('the-bus'), CHARACTERS[0].stats, 99);
+  for (let i = 0; i < 180; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.ambient.length, 0, 'pedestrians should not wander through a sealed cellar');
+});
+
+test('ambient life uses its own rng stream so it cannot shift gameplay rolls', () => {
+  // Same seed, but one world burns a pile of ambient rolls first. Wave and
+  // objective rolls come off `rng` and must be identical either way.
+  const build = () => createWorld(AREAS[0]!, testCharacter('the-bus'), CHARACTERS[0].stats, 8080);
+  const plain = build();
+  const drained = build();
+  for (let i = 0; i < 500; i += 1) drained.ambientRng();
+
+  assert.deepEqual(
+    drained.objectives.map((o) => o.def.id),
+    plain.objectives.map((o) => o.def.id),
+  );
+  for (let i = 0; i < 200; i += 1) {
+    assert.equal(drained.rng(), plain.rng());
+  }
+});
+
+test('a launched prop bounces off the arena wall instead of flying through it', () => {
+  const halfW = AREAS[0]!.bounds.w / 2;
+  const world = createWorld(
+    testArea({ x: halfW - 60, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    701,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const prop = world.breakables[0]!;
+  prop.vx = 2000;
+
+  const maxX = halfW - prop.w / 2;
+  let sawNegativeVx = false;
+  for (let i = 0; i < 60; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+    assert.ok(prop.x <= maxX + 0.01, `prop crossed the wall at step ${i}: x=${prop.x}, wall=${maxX}`);
+    if (prop.vx < 0) sawNegativeVx = true;
+  }
+  assert.ok(sawNegativeVx, 'the wall should bounce the prop back with reversed velocity');
 });
 
 test('clicking a movable prop primes one reverse launch and gives it a damaging path', () => {
@@ -2032,4 +2134,74 @@ test('completed or dead outcomes do not advance a pending district incursion', (
   world.now = world.time * 1000;
   stepWorld(world, 1, neutralInput);
   assert.equal(world.districtIncursion?.phase, 'pending');
+});
+/* ------------------------------------------------------------------ */
+/* Music reactivity                                                    */
+/* ------------------------------------------------------------------ */
+
+/** A synthetic music frame, so the audio path is testable without a browser. */
+function audioFrame(overrides: Partial<AudioFrame> = {}): AudioFrame {
+  return { ...SILENT_FRAME, source: 'studio', bpm: 120, confidence: 1, ...overrides };
+}
+
+test('a run with no music behaves exactly as before', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.audio.source, 'none');
+  assert.equal(world.beatPulse, 0);
+  assert.equal(world.onBeatHits, 0);
+  assert.equal(musicMultiplier(world, getEnemy('bass-bruiser').react, 'speed'), 1);
+});
+
+test('crossing into a new beat retriggers the pulse, which then decays', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 1, phase: 0 }) });
+  const struck = world.beatPulse;
+  assert.ok(struck > 0.8, `expected a fresh pulse, got ${struck}`);
+
+  // Same beat index on later frames must not retrigger, only decay.
+  for (let i = 0; i < 5; i += 1) {
+    stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 1, phase: 0.5 }) });
+  }
+  assert.ok(world.beatPulse < struck, 'pulse should decay while the beat index holds');
+});
+
+test('a rewound source resets the beat index instead of firing every beat between', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 64 }) });
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 0 }) });
+  assert.equal(world.lastBeatIndex, 0);
+});
+
+test('the on-beat window opens near a beat and only when tempo is trusted', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+
+  // 120bpm => a 500ms beat, so the +-90ms window is phase <= 0.18.
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.02 }) });
+  assert.equal(isOnBeat(world), true);
+
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.5 }) });
+  assert.equal(isOnBeat(world), false, 'halfway between beats is off-beat');
+
+  // Just off the grid but still inside the window on the trailing side.
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.98 }) });
+  assert.equal(isOnBeat(world), true, 'just before the next beat still counts');
+
+  // A shaky tempo estimate must never gate damage.
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ phase: 0.01, confidence: 0.1 }) });
+  assert.equal(isOnBeat(world), false, 'low confidence disables the bonus entirely');
+});
+
+test('reaction records drive multipliers without touching enemies that declare none', () => {
+  const world = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ beatIndex: 1, downbeat: true, bands: { ...SILENT_FRAME.bands, sub: 1 } }) });
+
+  // 'crypt-bouncer' declares downbeatLunge, so its speed rises on a downbeat.
+  assert.ok(musicMultiplier(world, getEnemy('crypt-bouncer').react, 'speed') > 1);
+  // 'ash-wisp' declares nothing and must be untouched.
+  assert.equal(musicMultiplier(world, getEnemy('ash-wisp').react, 'speed'), 1);
+  // A declared reaction only drives the target it names.
+  assert.equal(musicMultiplier(world, getEnemy('bass-bruiser').react, 'speed'), 1);
 });

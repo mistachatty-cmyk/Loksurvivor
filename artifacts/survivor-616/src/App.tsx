@@ -32,6 +32,9 @@ import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
 import { MapBuilder } from '@/ui/MapBuilder';
+import { lazy, Suspense } from 'react';
+
+const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 
 const queryClient = new QueryClient();
 
@@ -43,6 +46,7 @@ type Screen =
   | { name: 'bestiary' }
   | { name: 'archive'; variantId?: string }
   | { name: 'music' }
+  | { name: 'studio' }
   | { name: 'recovery' }
   | { name: 'vendor' }
   | { name: 'workshop' }
@@ -71,6 +75,7 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'bestiary' ||
       requested === 'archive' ||
       requested === 'music' ||
+      requested === 'studio' ||
       requested === 'recovery' ||
       requested === 'vendor' ||
       requested === 'workshop' ||
@@ -108,6 +113,9 @@ function Game() {
         break;
       case 'music':
         setScreen({ name: 'music' });
+        break;
+      case 'studio':
+        setScreen({ name: 'studio' });
         break;
       case 'recovery':
         setScreen({ name: 'recovery' });
@@ -181,6 +189,13 @@ function Game() {
 
     case 'music':
       return <MusicPanel onBack={goHub} />;
+
+    case 'studio':
+      return (
+        <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading studio...</div>}>
+          <StudioScreen onBack={goHub} />
+        </Suspense>
+      );
 
     case 'recovery':
       return <RecoveryPanel onBack={goHub} />;

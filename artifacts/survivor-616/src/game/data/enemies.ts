@@ -1,5 +1,6 @@
 import { blobRig, expressiveRig, humanoidRig } from '@/game/sprites/rigs';
 import type { EnemyDef } from '@/game/types';
+import { REACTION_PRESETS } from './reactivity';
 
 /**
  * Everything that wants the player gone. `behavior` selects the movement
@@ -8,6 +9,7 @@ import type { EnemyDef } from '@/game/types';
 export const ENEMIES: EnemyDef[] = [
   {
     id: 'nightcrawler',
+    react: REACTION_PRESETS.beatTwitch,
     name: 'Nightcrawler',
     family: 'Street',
     behavior: 'chase',
@@ -31,6 +33,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'neon-leech',
+    react: REACTION_PRESETS.beatTwitch,
     name: 'Neon Leech',
     family: 'Street',
     behavior: 'drifter',
@@ -100,6 +103,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'bass-bruiser',
+    react: REACTION_PRESETS.bassBulge,
     name: 'Bass Bruiser',
     family: 'Heavy',
     behavior: 'shockwave',
@@ -193,6 +197,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'bloodhound',
+    react: REACTION_PRESETS.downbeatLunge,
     name: 'Bloodhound',
     family: 'Pack',
     behavior: 'charger',
@@ -240,6 +245,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'belfry-bat',
+    react: REACTION_PRESETS.beatTwitch,
     name: 'Belfry Bat',
     family: 'Coven',
     behavior: 'drifter',
@@ -263,6 +269,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'crypt-bouncer',
+    react: REACTION_PRESETS.downbeatLunge,
     name: 'Crypt Bouncer',
     family: 'Elite',
     behavior: 'charger',
@@ -286,6 +293,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'the-sire',
+    react: REACTION_PRESETS.bassBulge,
     name: 'The Sire',
     family: 'Boss',
     behavior: 'chase',
@@ -327,6 +335,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'neon-comet',
+    react: REACTION_PRESETS.beatTwitch,
     name: 'Neon Comet',
     family: 'Cosmic',
     behavior: 'drifter',
