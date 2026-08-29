@@ -1140,6 +1140,8 @@ export interface MetaState {
   physicsObjectClicksEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */
   levelUpPausesEnabled: boolean;
+  /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
+  wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */
   minimapVisible: boolean;
   /** Whether the endless minimap shows its full map details. */

@@ -549,6 +549,24 @@ test('ambient street life flees the player, stays in the arena, and never joins 
   }
 });
 
+test('wildlifeSheltersInRain defaults true and honors an explicit setup override', () => {
+  const defaulted = createWorld(AREAS[0]!, testCharacter('the-bus'), CHARACTERS[0].stats, 5);
+  assert.equal(defaulted.wildlifeSheltersInRain, true);
+
+  const overridden = createWorld(
+    AREAS[0]!,
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    5,
+    [],
+    1,
+    true,
+    null,
+    { wildlifeSheltersInRain: false },
+  );
+  assert.equal(overridden.wildlifeSheltersInRain, false);
+});
+
 test('a roofed area gets no street life', () => {
   const cellar = AREAS.find((a) => a.id === 'crystal-cellar');
   assert.ok(cellar, 'the crystal cellar should still exist');

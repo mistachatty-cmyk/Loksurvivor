@@ -115,6 +115,7 @@ export function createInitialMeta(): MetaState {
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
+    wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
     minimapPosition: { x: 0.82, y: 0.18 },
@@ -584,6 +585,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     devModeAllUnlocks: Boolean(import.meta.env?.DEV) && parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
+    wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
@@ -834,6 +836,7 @@ type Action =
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
+  | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
@@ -986,6 +989,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, levelUpPausesEnabled: action.enabled },
+      };
+
+    case 'setWildlifeSheltersInRain':
+      return {
+        ...state,
+        meta: { ...state.meta, wildlifeSheltersInRain: action.enabled },
       };
 
     case 'setMinimapVisible':
@@ -1252,6 +1261,7 @@ export interface MetaContextValue {
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
+  setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
   setMinimapPosition: (position: { x: number; y: number }) => void;
@@ -1305,6 +1315,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setLevelUpPauses = useCallback(
     (enabled: boolean) => dispatch({ type: 'setLevelUpPauses', enabled }),
+    [],
+  );
+  const setWildlifeSheltersInRain = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
     [],
   );
   const setMinimapVisible = useCallback(
@@ -1376,6 +1390,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
+      setWildlifeSheltersInRain,
       setMinimapVisible,
       setMinimapExpanded,
       setMinimapPosition,
@@ -1408,6 +1423,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,
+    setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
     setMinimapPosition,

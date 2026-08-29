@@ -2552,6 +2552,10 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const ground = effectiveGround(w);
   const sky = effectiveSky(w);
   const profile = SKY_PROFILES[sky];
+  // Settings toggle: some players would rather birds/fireflies stay put
+  // through bad weather than duck out of sight for it.
+  const showBirds = profile.birds || !w.wildlifeSheltersInRain;
+  const showFireflies = profile.fireflies || !w.wildlifeSheltersInRain;
   const cloudPuffs = computeCloudPuffs(w, profile, left, top, right, bottom);
   drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   if (w.endless?.inDungeon) {
@@ -2572,7 +2576,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawObjectLighting(ctx, w);
   if (sky !== 'roofed') {
     drawSteamVents(ctx, w, left, top, right, bottom);
-    if (profile.fireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
+    if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
     if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
     drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
   }
@@ -2595,7 +2599,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawParticles(ctx, w);
   drawPopups(ctx, w);
   if (sky !== 'roofed') {
-    if (profile.birds) drawBirds(ctx, w, left, top, right, bottom);
+    if (showBirds) drawBirds(ctx, w, left, top, right, bottom);
     drawClouds(ctx, w, cloudPuffs, profile);
     drawFogBanks(ctx, w, left, top, right, bottom, profile.fog);
     drawRain(ctx, w, left, top, right, bottom, profile.rain);

@@ -532,6 +532,8 @@ export interface World {
   endless?: EndlessState;
   /** Whether pointer clicks can prime movable props during this run. */
   physicsObjectClicksEnabled: boolean;
+  /** When false, birds and fireflies stay visible through rain/fog instead of sheltering. */
+  wildlifeSheltersInRain: boolean;
   /** Optional difficulty contracts selected before the run. */
   challenges: ChallengeContractDef[];
   /** One bounded hideout rumor carried into this run. */
@@ -635,6 +637,7 @@ export function createWorld(
     episode?: CharacterEpisodeDef;
     episodeProgress?: number;
     districtIncursionId?: string;
+    wildlifeSheltersInRain?: boolean;
   } = {},
 ): World {
   const player: PlayerActor = {
@@ -737,6 +740,7 @@ export function createWorld(
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
+    wildlifeSheltersInRain: setup.wildlifeSheltersInRain !== false,
     challenges: [...challenges],
     activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
     rumorTriggered: activeCrewRumor?.rumorId === 'painted-shortcut',

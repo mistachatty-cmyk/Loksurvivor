@@ -165,6 +165,7 @@ export function RunScreen({
         knownRelicIds: meta.knownRelicIds,
         episode,
         episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
+        wildlifeSheltersInRain: meta.wildlifeSheltersInRain,
       },
     );
   }
