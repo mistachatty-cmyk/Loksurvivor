@@ -517,6 +517,105 @@ test('a heavy metal box absorbs a hit, moves under strong impact, and never brea
   assert.ok(box.x > xBefore);
 });
 
+test('ambient street life flees the player, stays in the arena, and never joins combat', () => {
+  const world = createWorld(
+    testArea({ x: 300, y: 200, w: 40, h: 40, kind: 'crate' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    4242,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(world.ambient.length > 0, 'a run should populate background life');
+  assert.equal(world.enemies.length, 0, 'ambient actors must never enter the enemy list');
+
+  // Park one on top of the player: it should bolt away, not drift closer.
+  const startled = world.ambient[0]!;
+  startled.x = world.player.x + 20;
+  startled.y = world.player.y;
+  const before = Math.hypot(startled.x - world.player.x, startled.y - world.player.y);
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  const after = Math.hypot(startled.x - world.player.x, startled.y - world.player.y);
+  assert.ok(after > before, 'a startled civilian should put distance between itself and the player');
+
+  const halfW = world.bounds.w / 2;
+  const halfH = world.bounds.h / 2;
+  for (let i = 0; i < 600; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.enemies.length, 0);
+  for (const actor of world.ambient) {
+    assert.ok(Math.abs(actor.x) <= halfW, `ambient actor left the arena on x: ${actor.x}`);
+    assert.ok(Math.abs(actor.y) <= halfH, `ambient actor left the arena on y: ${actor.y}`);
+  }
+});
+
+test('wildlifeSheltersInRain defaults true and honors an explicit setup override', () => {
+  const defaulted = createWorld(AREAS[0]!, testCharacter('the-bus'), CHARACTERS[0].stats, 5);
+  assert.equal(defaulted.wildlifeSheltersInRain, true);
+
+  const overridden = createWorld(
+    AREAS[0]!,
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    5,
+    [],
+    1,
+    true,
+    null,
+    { wildlifeSheltersInRain: false },
+  );
+  assert.equal(overridden.wildlifeSheltersInRain, false);
+});
+
+test('a roofed area gets no street life', () => {
+  const cellar = AREAS.find((a) => a.id === 'crystal-cellar');
+  assert.ok(cellar, 'the crystal cellar should still exist');
+  assert.equal(cellar.sky, 'roofed', 'a cave under the city has no sky');
+
+  const world = createWorld(cellar, testCharacter('the-bus'), CHARACTERS[0].stats, 99);
+  for (let i = 0; i < 180; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.ambient.length, 0, 'pedestrians should not wander through a sealed cellar');
+});
+
+test('ambient life uses its own rng stream so it cannot shift gameplay rolls', () => {
+  // Same seed, but one world burns a pile of ambient rolls first. Wave and
+  // objective rolls come off `rng` and must be identical either way.
+  const build = () => createWorld(AREAS[0]!, testCharacter('the-bus'), CHARACTERS[0].stats, 8080);
+  const plain = build();
+  const drained = build();
+  for (let i = 0; i < 500; i += 1) drained.ambientRng();
+
+  assert.deepEqual(
+    drained.objectives.map((o) => o.def.id),
+    plain.objectives.map((o) => o.def.id),
+  );
+  for (let i = 0; i < 200; i += 1) {
+    assert.equal(drained.rng(), plain.rng());
+  }
+});
+
+test('a launched prop bounces off the arena wall instead of flying through it', () => {
+  const halfW = AREAS[0]!.bounds.w / 2;
+  const world = createWorld(
+    testArea({ x: halfW - 60, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('the-bus'),
+    CHARACTERS[0].stats,
+    701,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const prop = world.breakables[0]!;
+  prop.vx = 2000;
+
+  const maxX = halfW - prop.w / 2;
+  let sawNegativeVx = false;
+  for (let i = 0; i < 60; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+    assert.ok(prop.x <= maxX + 0.01, `prop crossed the wall at step ${i}: x=${prop.x}, wall=${maxX}`);
+    if (prop.vx < 0) sawNegativeVx = true;
+  }
+  assert.ok(sawNegativeVx, 'the wall should bounce the prop back with reversed velocity');
+});
+
 test('clicking a movable prop primes one reverse launch and gives it a damaging path', () => {
   const world = createWorld(
     testArea({ x: 80, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),

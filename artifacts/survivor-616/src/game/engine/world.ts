@@ -10,6 +10,7 @@
  */
 
 import { getEnemy } from '@/game/data/enemies';
+import { AMBIENT_KINDS } from '@/game/data/ambient';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
@@ -261,6 +262,28 @@ export interface Follower {
   readyAt?: number;
 }
 
+/**
+ * Background city life (civilians, cats). Cosmetic only: never added to the
+ * enemy grid, never collided with, never damaged. Driven by its own RNG
+ * stream so adding or tuning ambient life can't shift gameplay rolls.
+ */
+export interface AmbientActor {
+  uid: number;
+  kindId: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  facing: 1 | -1;
+  anim: AnimState;
+  animStartedAt: number;
+  /** Current wander destination. */
+  targetX: number;
+  targetY: number;
+  /** Timestamp at which a new wander destination is picked. */
+  nextWanderAt: number;
+}
+
 export interface RescueState {
   status: 'pending' | 'available' | 'freeing' | 'freed';
   x: number;
@@ -455,6 +478,8 @@ export interface World {
   popups: Popup[];
   particles: Particle[];
   followers: Follower[];
+  /** Cosmetic background life; never collided with or damaged. */
+  ambient: AmbientActor[];
   lokPets: LokPetInstance[];
   /** All LokPets generated this run, including companions that have expired. */
   lokPetHistory: LokPetInstance[];
@@ -493,6 +518,11 @@ export interface World {
   spawnCredit: number[];
   nextUid: number;
   rng: () => number;
+  /**
+   * Separate stream for cosmetic ambiance. Kept apart from `rng` so tuning
+   * background life never shifts wave/objective/loot rolls for a given seed.
+   */
+  ambientRng: () => number;
   /** Rebuilt every frame for enemy separation. */
   grid: Map<number, EnemyActor[]>;
 
@@ -502,6 +532,8 @@ export interface World {
   endless?: EndlessState;
   /** Whether pointer clicks can prime movable props during this run. */
   physicsObjectClicksEnabled: boolean;
+  /** When false, birds and fireflies stay visible through rain/fog instead of sheltering. */
+  wildlifeSheltersInRain: boolean;
   /** Optional difficulty contracts selected before the run. */
   challenges: ChallengeContractDef[];
   /** One bounded hideout rumor carried into this run. */
@@ -605,6 +637,7 @@ export function createWorld(
     episode?: CharacterEpisodeDef;
     episodeProgress?: number;
     districtIncursionId?: string;
+    wildlifeSheltersInRain?: boolean;
   } = {},
 ): World {
   const player: PlayerActor = {
@@ -664,6 +697,7 @@ export function createWorld(
     popups: [],
     particles: [],
     followers: [],
+    ambient: [],
     lokPets: [],
     lokPetHistory: [],
     obstacles: area.obstacles
@@ -701,10 +735,12 @@ export function createWorld(
     spawnCredit: area.waves.map(() => 0),
     nextUid: 100,
     rng,
+    ambientRng: createRng(seed + 0x5eed),
     grid: new Map(),
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
+    wildlifeSheltersInRain: setup.wildlifeSheltersInRain !== false,
     challenges: [...challenges],
     activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
     rumorTriggered: activeCrewRumor?.rumorId === 'painted-shortcut',
@@ -1624,6 +1660,157 @@ function updateFollowers(w: World, dt: number) {
         damageEnemy(w, target, follower.damage * damageMult(w), WEAPONS_BY_ID[follower.weaponId]?.impactIntensity ?? 1, follower.x, follower.y);
         spawnParticles(w, follower.x, follower.y, follower.color, 3, 55);
       }
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Ambient background life                                             */
+/* ------------------------------------------------------------------ */
+
+/** Background actors kept alive at once -- enough to feel lived-in, cheap to step. */
+const AMBIENT_POPULATION = 7;
+/** Endless mode recycles anyone this far from the player back into view. */
+const AMBIENT_RECYCLE_DISTANCE = 1100;
+/** Ambient actors never spawn closer than this to the player. */
+const AMBIENT_SPAWN_CLEARANCE = 150;
+
+function ambientRange(w: World, min: number, max: number): number {
+  return min + w.ambientRng() * (max - min);
+}
+
+/** No street life under a roof: authored interiors, dungeon rooms, buildings. */
+function ambientSuppressed(w: World): boolean {
+  return w.area.sky === 'roofed' || Boolean(w.endless?.inDungeon || w.endless?.inBuilding);
+}
+
+/**
+ * A spot clear of props and away from the player. Ambient actors are never
+ * collided with, so this only keeps them from *starting* inside a wall --
+ * it is placement, not physics.
+ */
+function pickAmbientSpot(w: World): { x: number; y: number } {
+  let fallbackX = w.player.x;
+  let fallbackY = w.player.y;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    let x: number;
+    let y: number;
+    if (w.area.endless) {
+      const angle = w.ambientRng() * Math.PI * 2;
+      const radius = ambientRange(w, 430, 780);
+      x = w.player.x + Math.cos(angle) * radius;
+      y = w.player.y + Math.sin(angle) * radius;
+    } else {
+      const halfW = Math.max(20, w.bounds.w / 2 - 44);
+      const halfH = Math.max(20, w.bounds.h / 2 - 44);
+      x = ambientRange(w, -halfW, halfW);
+      y = ambientRange(w, -halfH, halfH);
+    }
+    fallbackX = x;
+    fallbackY = y;
+    if (dist2(x, y, w.player.x, w.player.y) < AMBIENT_SPAWN_CLEARANCE ** 2) continue;
+    const insideProp = w.obstacles.some(
+      (box) => Math.abs(x - box.x) < box.w / 2 + 14 && Math.abs(y - box.y) < box.h / 2 + 14,
+    );
+    if (!insideProp) return { x, y };
+  }
+  return { x: fallbackX, y: fallbackY };
+}
+
+function spawnAmbientActor(w: World): AmbientActor {
+  const kind = AMBIENT_KINDS[Math.floor(w.ambientRng() * AMBIENT_KINDS.length)] ?? AMBIENT_KINDS[0]!;
+  const spot = pickAmbientSpot(w);
+  const target = pickAmbientSpot(w);
+  return {
+    uid: w.nextUid++,
+    kindId: kind.id,
+    x: spot.x,
+    y: spot.y,
+    vx: 0,
+    vy: 0,
+    facing: w.ambientRng() < 0.5 ? -1 : 1,
+    anim: 'idle',
+    animStartedAt: w.now,
+    targetX: target.x,
+    targetY: target.y,
+    nextWanderAt: w.now + ambientRange(w, 900, 4200),
+  };
+}
+
+/**
+ * Civilians and cats wander until the player gets close, then bolt away.
+ * Deliberately outside every collision/damage path: they are scenery that
+ * happens to move.
+ */
+function updateAmbient(w: World, dt: number) {
+  if (ambientSuppressed(w)) return;
+
+  while (w.ambient.length < AMBIENT_POPULATION) {
+    w.ambient.push(spawnAmbientActor(w));
+  }
+
+  const halfW = w.bounds.w / 2;
+  const halfH = w.bounds.h / 2;
+
+  for (const actor of w.ambient) {
+    const kind = AMBIENT_KINDS.find((k) => k.id === actor.kindId) ?? AMBIENT_KINDS[0]!;
+    const toPlayerX = actor.x - w.player.x;
+    const toPlayerY = actor.y - w.player.y;
+    const playerDistance = Math.hypot(toPlayerX, toPlayerY);
+
+    // Endless streams outward forever, so anyone left far behind is reused.
+    if (w.area.endless && playerDistance > AMBIENT_RECYCLE_DISTANCE) {
+      Object.assign(actor, spawnAmbientActor(w), { uid: actor.uid });
+      continue;
+    }
+
+    let dirX: number;
+    let dirY: number;
+    let speed: number;
+    const fleeing = playerDistance < kind.fleeRadius;
+    if (fleeing) {
+      const len = playerDistance || 1;
+      dirX = toPlayerX / len;
+      dirY = toPlayerY / len;
+      speed = kind.speed * kind.fleeSpeedMult;
+    } else {
+      if (w.now >= actor.nextWanderAt) {
+        const next = pickAmbientSpot(w);
+        actor.targetX = next.x;
+        actor.targetY = next.y;
+        actor.nextWanderAt = w.now + ambientRange(w, 900, 4200);
+      }
+      const dx = actor.targetX - actor.x;
+      const dy = actor.targetY - actor.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 12) {
+        actor.vx = 0;
+        actor.vy = 0;
+        if (actor.anim !== 'idle') {
+          actor.anim = 'idle';
+          actor.animStartedAt = w.now;
+        }
+        continue;
+      }
+      dirX = dx / len;
+      dirY = dy / len;
+      speed = kind.speed;
+    }
+
+    actor.vx = dirX * speed;
+    actor.vy = dirY * speed;
+    actor.x += actor.vx * dt;
+    actor.y += actor.vy * dt;
+
+    if (!w.area.endless) {
+      actor.x = clamp(actor.x, -halfW + 10, halfW - 10);
+      actor.y = clamp(actor.y, -halfH + 10, halfH - 10);
+    }
+
+    if (Math.abs(dirX) > 0.05) actor.facing = dirX > 0 ? 1 : -1;
+    if (actor.anim !== 'walk') {
+      actor.anim = 'walk';
+      actor.animStartedAt = w.now;
     }
   }
 }
@@ -2989,6 +3176,46 @@ function resolveMovingPropCollisions(w: World, prop: BreakableObstacle) {
   }
 }
 
+/**
+ * Same bounded-space test clampToArena uses for the player/enemies -- a
+ * walled story arena, or a dungeon/building room while in endless mode.
+ * Open endless streets have no walls at all.
+ */
+function arenaWallBounds(w: World): { halfW: number; halfH: number; centerX: number; centerY: number } | null {
+  if (w.area.endless) {
+    if (w.endless?.inDungeon || w.endless?.inBuilding) {
+      const e = w.endless;
+      return { halfW: e.dungeonBounds.w / 2, halfH: e.dungeonBounds.h / 2, centerX: e.dungeonCenterX, centerY: e.dungeonCenterY };
+    }
+    return null;
+  }
+  return { halfW: w.bounds.w / 2, halfH: w.bounds.h / 2, centerX: 0, centerY: 0 };
+}
+
+/** Launched props bounce off the arena walls instead of flying through them. */
+function resolvePropArenaWalls(w: World, prop: BreakableObstacle) {
+  const bounds = arenaWallBounds(w);
+  if (!bounds) return;
+  const minX = bounds.centerX - bounds.halfW + prop.w / 2;
+  const maxX = bounds.centerX + bounds.halfW - prop.w / 2;
+  const minY = bounds.centerY - bounds.halfH + prop.h / 2;
+  const maxY = bounds.centerY + bounds.halfH - prop.h / 2;
+  if (prop.x < minX) {
+    prop.x = minX;
+    prop.vx *= -0.28;
+  } else if (prop.x > maxX) {
+    prop.x = maxX;
+    prop.vx *= -0.28;
+  }
+  if (prop.y < minY) {
+    prop.y = minY;
+    prop.vy *= -0.28;
+  } else if (prop.y > maxY) {
+    prop.y = maxY;
+    prop.vy *= -0.28;
+  }
+}
+
 function pointToSegmentDistanceSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
   const dy = by - ay;
@@ -3095,6 +3322,7 @@ function updateBreakables(w: World, dt: number) {
       const speedBeforeMove = Math.hypot(b.vx, b.vy);
       b.x += b.vx * dt; b.y += b.vy * dt;
       resolveMovingPropCollisions(w, b);
+      resolvePropArenaWalls(w, b);
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
       const friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
       b.vx *= Math.pow(friction, dt * 60);
@@ -4587,6 +4815,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   }
 
   updateStatusEffects(w);
+  updateAmbient(w, dt);
   updateLokPets(w, dt);
   updateFollowers(w, dt);
   updateEnemies(w, dt);

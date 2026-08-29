@@ -10,9 +10,10 @@ import { LANDED_HEAT_RADIUS, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { ALLIES_BY_ID } from '@/game/data/progression';
-import type { ObstacleDef } from '@/game/types';
+import type { AreaSky, ObstacleDef } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
 
 import { drawRig, drawShadow } from './sprite';
@@ -134,6 +135,606 @@ function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: numbe
     }
   }
   ctx.restore();
+}
+
+/* ------------------------------------------------------------------ */
+/* Sky ambiance -- drifting clouds, their ground shadows, birds, and    */
+/* firefly-lit stretches of road. Purely decorative: derived each frame */
+/* from world position + w.now, never touching engine/simulation state. */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What the sky is doing overhead. Endless dungeons and building interiors are
+ * roofed no matter what the area authored, and an area with no `sky` is clear.
+ */
+function effectiveSky(w: World): AreaSky {
+  if (w.endless?.inDungeon || w.endless?.inBuilding) return 'roofed';
+  return w.area.sky ?? 'clear';
+}
+
+/**
+ * Every weather-driven knob in one table, so a new condition is a record here
+ * rather than a scatter of `if (sky === ...)` through the draw calls.
+ */
+interface SkyProfile {
+  /** Upper bound on the cell hash -- higher means more clouds. */
+  cloudChance: number;
+  cloudAlpha: number;
+  shadowAlpha: number;
+  birds: boolean;
+  /** Light bugs shelter in the wet. */
+  fireflies: boolean;
+  litter: boolean;
+  /** 0..1 rain strength. */
+  rain: number;
+  /** 0..1 fog strength. */
+  fog: number;
+  /** Milliseconds between lightning windows; 0 disables it. */
+  lightningPeriodMs: number;
+}
+
+const SKY_PROFILES: Record<AreaSky, SkyProfile> = {
+  clear: {
+    cloudChance: 0.42, cloudAlpha: 1, shadowAlpha: 1,
+    birds: true, fireflies: true, litter: true,
+    rain: 0, fog: 0, lightningPeriodMs: 34000,
+  },
+  overcast: {
+    cloudChance: 0.6, cloudAlpha: 0.9, shadowAlpha: 1.5,
+    birds: true, fireflies: true, litter: true,
+    rain: 0, fog: 0.1, lightningPeriodMs: 24000,
+  },
+  rain: {
+    // Rain already carries the mood; heavy fog on top of streaks and shade
+    // just turns the arena to mush, so this stays light.
+    cloudChance: 0.6, cloudAlpha: 0.7, shadowAlpha: 1.6,
+    birds: false, fireflies: false, litter: true,
+    rain: 1, fog: 0.1, lightningPeriodMs: 9000,
+  },
+  fog: {
+    cloudChance: 0.4, cloudAlpha: 0.4, shadowAlpha: 0.5,
+    birds: false, fireflies: true, litter: true,
+    rain: 0, fog: 1, lightningPeriodMs: 0,
+  },
+  roofed: {
+    cloudChance: 0, cloudAlpha: 0, shadowAlpha: 0,
+    birds: false, fireflies: false, litter: false,
+    rain: 0, fog: 0, lightningPeriodMs: 0,
+  },
+};
+
+/**
+ * Bounded (non-endless) arenas are walled off well inside the padded camera
+ * view, and the void beyond those walls is painted over later by
+ * drawArenaEdges -- so ground-level ambiance has to stay inside the actual
+ * arena bounds or it silently disappears under that overpaint.
+ */
+function clipToArena(w: World, left: number, top: number, right: number, bottom: number) {
+  if (w.area.endless) return { left, top, right, bottom };
+  const halfW = w.bounds.w / 2;
+  const halfH = w.bounds.h / 2;
+  return {
+    left: Math.max(left, -halfW),
+    top: Math.max(top, -halfH),
+    right: Math.min(right, halfW),
+    bottom: Math.min(bottom, halfH),
+  };
+}
+
+interface CloudPuff { x: number; y: number; rx: number; ry: number; density: number; }
+
+const CLOUD_CELL = 300;
+/**
+ * How far a cloud is displaced from its own shadow per unit of distance from
+ * the camera. This is what sells the clouds as being *above* the street
+ * rather than painted onto it: pan the camera and they slide against the
+ * ground the way a real overhead object would.
+ */
+const CLOUD_PARALLAX = 0.075;
+
+/**
+ * Lobes tracing one cloud, in units of its radii. Filled as a single path so
+ * the overlaps union instead of showing seams -- gives a lumpy silhouette
+ * rather than the obvious stack of two ellipses this used to be.
+ */
+const CLOUD_LOBES = [
+  { dx: -0.58, dy: 0.12, rx: 0.52, ry: 0.58 },
+  { dx: -0.18, dy: -0.2, rx: 0.74, ry: 0.9 },
+  { dx: 0.28, dy: -0.04, rx: 0.64, ry: 0.74 },
+  { dx: 0.68, dy: 0.16, rx: 0.42, ry: 0.48 },
+  { dx: 0.04, dy: 0.24, rx: 0.62, ry: 0.42 },
+];
+
+function withAlpha(hex: string, alpha: number): string {
+  const raw = hex.replace('#', '');
+  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+  const r = parseInt(full.slice(0, 2), 16) || 0;
+  const g = parseInt(full.slice(2, 4), 16) || 0;
+  const b = parseInt(full.slice(4, 6), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const parse = (hex: string) => {
+    const raw = hex.replace('#', '');
+    const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+    return [
+      parseInt(full.slice(0, 2), 16) || 0,
+      parseInt(full.slice(2, 4), 16) || 0,
+      parseInt(full.slice(4, 6), 16) || 0,
+    ];
+  };
+  const [r1, g1, b1] = parse(a);
+  const [r2, g2, b2] = parse(b);
+  const to = (x: number, y: number) => Math.round(x + (y - x) * t);
+  return `#${[to(r1!, r2!), to(g1!, g2!), to(b1!, b2!)]
+    .map((v) => v.toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/**
+ * One soft radial blob per colour, rasterised once and reused.
+ *
+ * Building a fresh `createRadialGradient` for every lobe of every cloud each
+ * frame measured ~22ms/frame in rain -- well under 60fps on a desktop, so
+ * hopeless on a phone. Blitting a cached sprite instead is a plain drawImage,
+ * and the non-uniform scale gives the ellipse shape for free.
+ */
+const SOFT_BLOB_SIZE = 128;
+const softBlobCache = new Map<string, HTMLCanvasElement>();
+
+function softBlob(color: string): HTMLCanvasElement | null {
+  const cached = softBlobCache.get(color);
+  if (cached) return cached;
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = SOFT_BLOB_SIZE;
+  canvas.height = SOFT_BLOB_SIZE;
+  const blobCtx = canvas.getContext('2d');
+  if (!blobCtx) return null;
+  const r = SOFT_BLOB_SIZE / 2;
+  const gradient = blobCtx.createRadialGradient(r, r, r * 0.2, r, r, r);
+  gradient.addColorStop(0, withAlpha(color, 1));
+  gradient.addColorStop(1, withAlpha(color, 0));
+  blobCtx.fillStyle = gradient;
+  blobCtx.fillRect(0, 0, SOFT_BLOB_SIZE, SOFT_BLOB_SIZE);
+  // Only ever a handful of distinct colours (one per area palette); the cap is
+  // just so a pathological caller can't grow this without bound.
+  if (softBlobCache.size < 64) softBlobCache.set(color, canvas);
+  return canvas;
+}
+
+/**
+ * A cloud painted as a cluster of soft-edged blobs rather than filled shapes.
+ *
+ * This is the whole trick for reading these as sky: a hard edge reads as a
+ * solid object lying on the street, while a soft falloff reads as atmosphere
+ * passing overhead. The lobes overlap and accumulate, so the middle of a cloud
+ * comes out denser than its fringes the way a real one does -- which means the
+ * per-lobe alpha here is much lower than the density you actually see.
+ */
+function paintSoftCloud(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  color: string,
+  alpha: number,
+  scale = 1,
+  lobes = CLOUD_LOBES,
+) {
+  if (alpha <= 0.002) return;
+  const blob = softBlob(color);
+  if (!blob) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (const lobe of lobes) {
+    const lrx = Math.max(1, lobe.rx * rx * scale);
+    const lry = Math.max(1, lobe.ry * ry * scale);
+    ctx.drawImage(
+      blob,
+      x + lobe.dx * rx * scale - lrx,
+      y + lobe.dy * ry * scale - lry,
+      lrx * 2,
+      lry * 2,
+    );
+  }
+  ctx.restore();
+}
+
+/** One drifting cloud silhouette per sparse grid cell in view, wrapped seamlessly along its lane. */
+function computeCloudPuffs(
+  w: World,
+  profile: SkyProfile,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+): CloudPuff[] {
+  if (profile.cloudChance <= 0) return [];
+  const clip = clipToArena(w, left, top, right, bottom);
+  const puffs: CloudPuff[] = [];
+  const startX = Math.floor(clip.left / CLOUD_CELL) * CLOUD_CELL - CLOUD_CELL;
+  const startY = Math.floor(clip.top / CLOUD_CELL) * CLOUD_CELL - CLOUD_CELL;
+  for (let x = startX; x < clip.right + CLOUD_CELL; x += CLOUD_CELL) {
+    for (let y = startY; y < clip.bottom + CLOUD_CELL; y += CLOUD_CELL) {
+      const gx = x / CLOUD_CELL;
+      const gy = y / CLOUD_CELL;
+      const n = hashCell(gx, gy);
+      if (n > profile.cloudChance) continue;
+      const laneSpeed = 0.006 + hashCell(gx + 31, gy) * 0.008;
+      const phase = hashCell(gx + 71, gy - 17) * CLOUD_CELL;
+      const driftX = (w.now * laneSpeed + phase) % CLOUD_CELL;
+      const cx = x + driftX;
+      const cy = y + CLOUD_CELL * 0.5 + Math.sin(w.now / 6000 + gy * 3.1) * 30;
+      // Normalise the hash so cloud size stays consistent as cloudChance
+      // changes with the weather -- otherwise overcast skies get only big ones.
+      const size = hashCell(gx + 13, gy + 13);
+      puffs.push({ x: cx, y: cy, rx: 62 + size * 92, ry: 27 + size * 35, density: size });
+    }
+  }
+  return puffs;
+}
+
+/**
+ * Cool indigo shade sliding across the street. This is the primary read of the
+ * whole effect -- in a top-down view a passing cloud is mostly its shadow --
+ * so it is drawn stronger than the cloud body above it.
+ */
+function drawCloudShadows(ctx: CanvasRenderingContext2D, puffs: CloudPuff[], profile: SkyProfile) {
+  if (puffs.length === 0 || profile.shadowAlpha <= 0) return;
+  ctx.save();
+  for (const p of puffs) {
+    const alpha = Math.min(0.26, (0.12 + p.density * 0.09) * profile.shadowAlpha);
+    paintSoftCloud(ctx, p.x, p.y, p.rx, p.ry, '#141b3a', alpha);
+  }
+  ctx.restore();
+}
+
+/** Only the crown of a cloud catches light; keep the lit pass to the top lobes. */
+const CLOUD_CROWN_LOBES = CLOUD_LOBES.slice(1, 4);
+
+/**
+ * The clouds themselves.
+ *
+ * 616 runs at night, and a night city lights its own cloud deck from below --
+ * so the body is tinted toward the district's accent and reads as a faint warm
+ * glow rather than a grey mass. That is also what makes it legible at all:
+ * pushing the ground shadow harder instead just loses it against pavement
+ * that is already nearly black.
+ */
+function drawClouds(ctx: CanvasRenderingContext2D, w: World, puffs: CloudPuff[], profile: SkyProfile) {
+  if (puffs.length === 0 || profile.cloudAlpha <= 0) return;
+  const body = mixHex('#c3cfe9', w.area.ground.glow, 0.35);
+  ctx.save();
+  for (const p of puffs) {
+    // Offset from the shadow grows with distance from the camera, so cloud and
+    // shade separate the further off-centre you look -- that separation moving
+    // as you walk is what sells them as being up in the air.
+    const x = p.x + (p.x - w.camera.x) * CLOUD_PARALLAX - 24;
+    const y = p.y + (p.y - w.camera.y) * CLOUD_PARALLAX - 46;
+    paintSoftCloud(ctx, x, y, p.rx, p.ry, body, (0.13 + p.density * 0.09) * profile.cloudAlpha);
+    paintSoftCloud(
+      ctx,
+      x - p.rx * 0.08,
+      y - p.ry * 0.28,
+      p.rx,
+      p.ry,
+      '#fff8e8',
+      (0.07 + p.density * 0.05) * profile.cloudAlpha,
+      0.75,
+      CLOUD_CROWN_LOBES,
+    );
+  }
+  ctx.restore();
+}
+
+const BIRD_CELL = 420;
+
+/** Loose flocks of small birds wheeling across the sky in slow, wrapped passes. */
+function drawBirds(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const startX = Math.floor(left / BIRD_CELL) * BIRD_CELL - BIRD_CELL;
+  const startY = Math.floor(top / BIRD_CELL) * BIRD_CELL - BIRD_CELL;
+  ctx.save();
+  ctx.strokeStyle = '#1c1c22';
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.5;
+  for (let x = startX; x < right + BIRD_CELL; x += BIRD_CELL) {
+    for (let y = startY; y < bottom + BIRD_CELL; y += BIRD_CELL) {
+      const gx = x / BIRD_CELL;
+      const gy = y / BIRD_CELL;
+      const n = hashCell(gx + 500, gy + 500);
+      if (n > 0.16) continue;
+      const angle = hashCell(gx, gy + 200) * Math.PI * 2;
+      const speed = 0.03 + hashCell(gx + 9, gy) * 0.018;
+      const phase = hashCell(gx - 9, gy + 9) * BIRD_CELL;
+      const drift = ((w.now * speed + phase) % BIRD_CELL) - BIRD_CELL / 2;
+      const leaderX = x + BIRD_CELL / 2 + Math.cos(angle) * drift;
+      const leaderY = y + BIRD_CELL / 2 + Math.sin(angle) * drift;
+      const count = 3 + Math.floor(hashCell(gx + 3, gy - 3) * 3);
+      for (let i = 0; i < count; i += 1) {
+        const back = i * 16;
+        const lateral = (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 10;
+        const bx = leaderX - Math.cos(angle) * back - Math.sin(angle) * lateral;
+        const by = leaderY - Math.sin(angle) * back + Math.cos(angle) * lateral;
+        const flap = 0.55 + Math.sin(w.now / 110 + i * 1.7 + n * 6) * 0.55;
+        const wing = 5 + flap * 4;
+        ctx.beginPath();
+        ctx.moveTo(bx - wing, by + wing * 0.5);
+        ctx.lineTo(bx, by - 1);
+        ctx.lineTo(bx + wing, by + wing * 0.5);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+const FIREFLY_CELL = 260;
+
+/** A handful of road stretches glow with small clusters of hovering light bugs. */
+function drawRoadFireflies(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const clip = clipToArena(w, left, top, right, bottom);
+  const startX = Math.floor(clip.left / FIREFLY_CELL) * FIREFLY_CELL;
+  const startY = Math.floor(clip.top / FIREFLY_CELL) * FIREFLY_CELL;
+  ctx.save();
+  for (let x = startX; x < clip.right; x += FIREFLY_CELL) {
+    for (let y = startY; y < clip.bottom; y += FIREFLY_CELL) {
+      const gx = x / FIREFLY_CELL;
+      const gy = y / FIREFLY_CELL;
+      const n = hashCell(gx + 900, gy + 900);
+      if (n > 0.16) continue;
+      const cx = x + FIREFLY_CELL * (0.25 + 0.5 * hashCell(gx + 900, gy));
+      const cy = y + FIREFLY_CELL * (0.25 + 0.5 * hashCell(gx, gy + 900));
+      const count = 3 + Math.floor(hashCell(gx - 4, gy + 4) * 4);
+      for (let i = 0; i < count; i += 1) {
+        const seed = hashCell(gx + i * 7.3, gy - i * 3.1);
+        const orbitR = 14 + seed * 30;
+        const orbitSpeed = i % 2 === 0 ? 1 : -1;
+        const angle = w.now / (700 + seed * 500) * orbitSpeed + seed * Math.PI * 2;
+        const fx = cx + Math.cos(angle) * orbitR;
+        const fy = cy + Math.sin(angle * 1.3) * orbitR * 0.6;
+        const glow = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(w.now / (240 + seed * 200) + seed * 10));
+        const r = 10 + glow * 6;
+        const gradient = ctx.createRadialGradient(fx, fy, 0, fx, fy, r);
+        gradient.addColorStop(0, `rgba(214, 245, 140, ${0.55 * glow})`);
+        gradient.addColorStop(1, 'rgba(214, 245, 140, 0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(fx, fy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255, 255, 220, ${0.7 * glow})`;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+const LITTER_CELL = 340;
+
+/** Paper scraps and leaves tumbling along the same wind lanes the clouds ride. */
+function drawWindLitter(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const clip = clipToArena(w, left, top, right, bottom);
+  const startX = Math.floor(clip.left / LITTER_CELL) * LITTER_CELL - LITTER_CELL;
+  const startY = Math.floor(clip.top / LITTER_CELL) * LITTER_CELL;
+  ctx.save();
+  for (let x = startX; x < clip.right + LITTER_CELL; x += LITTER_CELL) {
+    for (let y = startY; y < clip.bottom; y += LITTER_CELL) {
+      const gx = x / LITTER_CELL;
+      const gy = y / LITTER_CELL;
+      const n = hashCell(gx + 210, gy - 210);
+      if (n > 0.34) continue;
+      const speed = 0.05 + n * 0.09;
+      const phase = hashCell(gx + 5, gy + 5) * LITTER_CELL;
+      const sx = x + ((w.now * speed + phase) % (LITTER_CELL * 2));
+      const sy = y + LITTER_CELL * hashCell(gx - 5, gy - 5) + Math.sin(w.now / 320 + gx * 2.3) * 14;
+      // A scrap that has blown past the arena edge would be painted over by
+      // drawArenaEdges anyway -- skip it rather than draw into the void.
+      if (sx < clip.left || sx > clip.right || sy < clip.top || sy > clip.bottom) continue;
+      const size = 3 + n * 5;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(w.now / 180 + n * 9);
+      ctx.globalAlpha = 0.3 + n * 0.4;
+      ctx.fillStyle = n > 0.2 ? '#8a7f6a' : '#6f7a5c';
+      ctx.fillRect(-size / 2, -size / 3, size, size * 0.66);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+const VENT_CELL = 420;
+
+/** Street grates breathing steam -- a grate plate plus a few rising puffs. */
+function drawSteamVents(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  const clip = clipToArena(w, left, top, right, bottom);
+  const startX = Math.floor(clip.left / VENT_CELL) * VENT_CELL;
+  const startY = Math.floor(clip.top / VENT_CELL) * VENT_CELL;
+  ctx.save();
+  for (let x = startX; x < clip.right; x += VENT_CELL) {
+    for (let y = startY; y < clip.bottom; y += VENT_CELL) {
+      const gx = x / VENT_CELL;
+      const gy = y / VENT_CELL;
+      const n = hashCell(gx - 330, gy + 330);
+      if (n > 0.16) continue;
+      const vx = x + VENT_CELL * (0.2 + 0.6 * hashCell(gx - 330, gy));
+      const vy = y + VENT_CELL * (0.2 + 0.6 * hashCell(gx, gy + 330));
+      if (vx < clip.left || vx > clip.right) continue;
+
+      // Grate plate so the steam reads as coming from somewhere.
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#0c0f14';
+      ctx.fillRect(vx - 14, vy - 7, 28, 14);
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = '#2b3440';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = -9; i <= 9; i += 6) {
+        ctx.moveTo(vx + i, vy - 6);
+        ctx.lineTo(vx + i, vy + 6);
+      }
+      ctx.stroke();
+
+      for (let i = 0; i < 3; i += 1) {
+        const t = ((w.now / 2600) + i / 3 + n * 4) % 1;
+        const rise = t * 52;
+        const radius = 7 + t * 20;
+        const alpha = Math.sin(t * Math.PI) * 0.42;
+        if (alpha <= 0.005) continue;
+        const puffX = vx + Math.sin(w.now / 900 + i * 2 + n * 6) * 8 * t;
+        const puffY = vy - rise;
+        const gradient = ctx.createRadialGradient(puffX, puffY, 0, puffX, puffY, radius);
+        gradient.addColorStop(0, `rgba(206, 220, 235, ${alpha})`);
+        gradient.addColorStop(1, 'rgba(206, 220, 235, 0)');
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(puffX, puffY, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+const RAIN_CELL = 64;
+
+/**
+ * Falling rain, leaning with the same wind that carries the clouds and litter.
+ * Each cell owns one drop that wraps within the cell; neighbouring cells fill
+ * the gaps, so a sparse grid reads as continuous rainfall.
+ */
+function drawRain(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number, intensity: number) {
+  if (intensity <= 0) return;
+  const startX = Math.floor(left / RAIN_CELL) * RAIN_CELL;
+  const startY = Math.floor(top / RAIN_CELL) * RAIN_CELL;
+  ctx.save();
+  ctx.strokeStyle = '#a8c8e8';
+  ctx.lineWidth = 1.3;
+  ctx.globalAlpha = 0.38 * intensity;
+  ctx.beginPath();
+  for (let x = startX; x < right; x += RAIN_CELL) {
+    for (let y = startY; y < bottom; y += RAIN_CELL) {
+      const n = hashCell(x / RAIN_CELL + 11, y / RAIN_CELL - 11);
+      const fall = (w.now * (0.5 + n * 0.28) + n * 5000) % RAIN_CELL;
+      const dx = x + n * RAIN_CELL * 0.8 + fall * 0.26;
+      const dy = y + fall;
+      const len = 13 + n * 10;
+      ctx.moveTo(dx, dy);
+      ctx.lineTo(dx - len * 0.26, dy - len);
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Ripple rings sitting exactly on the puddles `drawGround` paints -- same tile
+ * size, same 0.93 hash threshold, same offsets -- so the rain lands in the
+ * water instead of merely near it. Keep in sync if those puddles ever move.
+ */
+const PUDDLE_TILE = 64;
+
+function drawPuddleRipples(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number, intensity: number) {
+  if (intensity <= 0) return;
+  const clip = clipToArena(w, left, top, right, bottom);
+  const startX = Math.floor(clip.left / PUDDLE_TILE) * PUDDLE_TILE;
+  const startY = Math.floor(clip.top / PUDDLE_TILE) * PUDDLE_TILE;
+  ctx.save();
+  ctx.strokeStyle = '#cfe6f5';
+  ctx.lineWidth = 1;
+  for (let x = startX; x < clip.right; x += PUDDLE_TILE) {
+    for (let y = startY; y < clip.bottom; y += PUDDLE_TILE) {
+      const noise = hashCell(x / PUDDLE_TILE, y / PUDDLE_TILE);
+      if (noise <= 0.93) continue;
+      const px = x + 10 + noise * 18;
+      const py = y + 14 + noise * 12;
+      for (let i = 0; i < 3; i += 1) {
+        const t = ((w.now / 1400) + i / 3 + noise * 7) % 1;
+        const radius = 3 + t * 19;
+        ctx.globalAlpha = (1 - t) * 0.45 * intensity;
+        ctx.beginPath();
+        ctx.ellipse(px, py, radius, radius * 0.4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/** A cold wash over wet ground, so a rainy district doesn't just have rain in the air. */
+function drawWetSheen(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number, intensity: number) {
+  if (intensity <= 0) return;
+  const clip = clipToArena(w, left, top, right, bottom);
+  ctx.save();
+  ctx.globalAlpha = 0.07 * intensity;
+  ctx.fillStyle = '#5d8fbf';
+  ctx.fillRect(clip.left, clip.top, clip.right - clip.left, clip.bottom - clip.top);
+  ctx.restore();
+}
+
+const FOG_CELL = 460;
+
+/**
+ * Slow banks of fog. Drawn as soft overlapping blobs on their own drift lanes
+ * rather than a flat wash, so the murk moves and thins instead of sitting
+ * over the whole arena as dead grey.
+ */
+function drawFogBanks(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number, intensity: number) {
+  if (intensity <= 0) return;
+  const startX = Math.floor(left / FOG_CELL) * FOG_CELL - FOG_CELL;
+  const startY = Math.floor(top / FOG_CELL) * FOG_CELL - FOG_CELL;
+  ctx.save();
+  for (let x = startX; x < right + FOG_CELL; x += FOG_CELL) {
+    for (let y = startY; y < bottom + FOG_CELL; y += FOG_CELL) {
+      const gx = x / FOG_CELL;
+      const gy = y / FOG_CELL;
+      const n = hashCell(gx - 47, gy + 47);
+      if (n > 0.7) continue;
+      const drift = (w.now * (0.004 + n * 0.005) + n * FOG_CELL) % (FOG_CELL * 2);
+      const fx = x + drift;
+      const fy = y + FOG_CELL * 0.5 + Math.sin(w.now / 7000 + gy * 2.2) * 26;
+      const rx = 210 + n * 190;
+      const ry = 64 + n * 54;
+      const blob = softBlob('#b0becd');
+      if (!blob) continue;
+      ctx.globalAlpha = (0.16 + n * 0.16) * intensity;
+      ctx.drawImage(blob, fx - rx, fy - ry, rx * 2, ry * 2);
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Neon doesn't breathe evenly -- it holds, then stutters. A per-sign hash on a
+ * coarse time slot gives each sign its own arrhythmic brownouts.
+ */
+function neonFlicker(now: number, uid: number): number {
+  const base = 0.82 + Math.sin(now / 420 + uid) * 0.12;
+  const n = hashCell(Math.floor(now / 90), uid);
+  if (n > 0.955) return base * 0.34;
+  if (n > 0.9) return base * 0.68;
+  return base;
+}
+
+/**
+ * Distant lightning: most windows stay quiet, and a live one fires two quick
+ * strokes. Capped low so it never washes out the fight.
+ */
+function lightningIntensity(now: number, period: number): number {
+  if (period <= 0) return 0;
+  if (hashCell(Math.floor(now / period), 77) > 0.45) return 0;
+  const t = (now % period) / period;
+  const stroke = (offset: number, width: number) => {
+    const d = t - offset;
+    return d >= 0 && d < width ? 1 - d / width : 0;
+  };
+  return Math.min(1, stroke(0.01, 0.012) * 0.9 + stroke(0.035, 0.02) * 0.6);
 }
 
 function drawChunkLandmark(
@@ -1143,7 +1744,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     const isBarrel = b.kind === 'barrel';
     const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : 80;
     const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'fuse-box' ? '#7ef0bd' : '#ffd166';
-    const pulse = b.kind === 'neon-sign' ? 0.8 + Math.sin(w.now / 420) * 0.15 : 1;
+    const pulse = b.kind === 'neon-sign' ? neonFlicker(w.now, b.uid) : 1;
     const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
     gradient.addColorStop(0, `${color}55`);
     gradient.addColorStop(0.45, `${color}20`);
@@ -1641,6 +2242,35 @@ function drawRescue(ctx: CanvasRenderingContext2D, w: World) {
   ctx.restore();
 }
 
+/**
+ * Civilians and cats. Drawn before the props so scenery occludes them --
+ * they read as background life moving behind the cars rather than as
+ * combatants, and it hides the fact that they never collide with anything.
+ */
+function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
+  if (effectiveSky(w) === 'roofed') return;
+  for (const actor of w.ambient) {
+    const kind = AMBIENT_KINDS_BY_ID[actor.kindId];
+    if (!kind) continue;
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    drawShadow(ctx, actor.x, actor.y + 2, 11);
+    drawRig(
+      ctx,
+      kind.rig,
+      kind.palette,
+      actor.anim,
+      w.now - actor.animStartedAt,
+      actor.x,
+      actor.y,
+      actor.facing,
+      SPRITE_SCALE * 0.78,
+      { outline: false },
+    );
+    ctx.restore();
+  }
+}
+
 function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   const outlineEnemies = w.enemies.length < 70;
 
@@ -1920,6 +2550,13 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
 
   // Use the era's ground palette when inside a dungeon room.
   const ground = effectiveGround(w);
+  const sky = effectiveSky(w);
+  const profile = SKY_PROFILES[sky];
+  // Settings toggle: some players would rather birds/fireflies stay put
+  // through bad weather than duck out of sight for it.
+  const showBirds = profile.birds || !w.wildlifeSheltersInRain;
+  const showFireflies = profile.fireflies || !w.wildlifeSheltersInRain;
+  const cloudPuffs = computeCloudPuffs(w, profile, left, top, right, bottom);
   drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
   if (w.endless?.inDungeon) {
     ctx.fillStyle = '#000';
@@ -1927,6 +2564,8 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
   }
+  drawCloudShadows(ctx, cloudPuffs, profile);
+  drawWetSheen(ctx, w, left, top, right, bottom, profile.rain);
   drawCityMapFeatures(ctx, w);
   drawEndlessRouteEvent(ctx, w);
   drawBuildingInterior(ctx, w);
@@ -1935,6 +2574,12 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawLandmark(ctx, w);
   drawDistrictIncursion(ctx, w);
   drawObjectLighting(ctx, w);
+  if (sky !== 'roofed') {
+    drawSteamVents(ctx, w, left, top, right, bottom);
+    if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
+    if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
+    drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
+  }
   drawArenaEdges(ctx, w);
   drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
@@ -1944,6 +2589,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawDungeonExit(ctx, w);
   drawDungeonChest(ctx, w);
   drawPotholes(ctx, w);
+  drawAmbient(ctx, w);
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);
@@ -1952,6 +2598,12 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawProjectiles(ctx, w);
   drawParticles(ctx, w);
   drawPopups(ctx, w);
+  if (sky !== 'roofed') {
+    if (showBirds) drawBirds(ctx, w, left, top, right, bottom);
+    drawClouds(ctx, w, cloudPuffs, profile);
+    drawFogBanks(ctx, w, left, top, right, bottom, profile.fog);
+    drawRain(ctx, w, left, top, right, bottom, profile.rain);
+  }
 
   ctx.restore();
 
@@ -1968,6 +2620,15 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
+
+  // Distant lightning, under the damage flash so a hit still reads as red.
+  const bolt = lightningIntensity(w.now, profile.lightningPeriodMs);
+  if (bolt > 0) {
+    ctx.globalAlpha = bolt * 0.16;
+    ctx.fillStyle = '#cfe0ff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1;
+  }
 
   // Damage flash.
   const sinceHit = w.now - w.player.lastDamageAt;

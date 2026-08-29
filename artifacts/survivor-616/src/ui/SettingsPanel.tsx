@@ -1,4 +1,5 @@
 import {
+  Bird,
   Check,
   FlaskConical,
   LayoutDashboard,
@@ -27,6 +28,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     meta,
     setPhysicsObjectClicks,
     setLevelUpPauses,
+    setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
     setUiDensity,
@@ -185,6 +187,39 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <Smartphone className="h-4 w-4 text-primary" />
                   <span>Tap targets on mobile; drag elsewhere to steer.</span>
                 </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
+              <Bird className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-200">Street ambiance</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Birds &amp; fireflies in bad weather</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    By default, birds and the road fireflies duck out of sight during rain and fog. Turn this off to
+                    keep them visible through any weather.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWildlifeSheltersInRain(!meta.wildlifeSheltersInRain)}
+                  aria-pressed={meta.wildlifeSheltersInRain}
+                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.wildlifeSheltersInRain
+                      ? 'border-amber-300/60 bg-amber-300/15 text-amber-100'
+                      : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'
+                  }`}
+                  data-testid="button-toggle-wildlife-shelters"
+                >
+                  {meta.wildlifeSheltersInRain ? 'Shelters in rain' : 'Stays visible'}
+                </button>
               </div>
             </div>
           </div>
