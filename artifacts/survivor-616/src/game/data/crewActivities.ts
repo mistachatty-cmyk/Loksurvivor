@@ -30,6 +30,15 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
     effects: [{ stat: 'magnet', add: 10 }],
   },
   {
+    id: 'work-the-room',
+    roomId: 'main-floor',
+    name: 'Work the room',
+    description: 'Nobody in the Sanctum owes a favor they have not already called in. Tonight the currency is information — who is slow, who is careless, who flinches first.',
+    benefitLabel: '+4% crit chance',
+    icon: 'eye',
+    effects: [{ stat: 'crit', add: 0.04 }],
+  },
+  {
     id: 'scout-routes',
     roomId: 'rooftop-perch',
     name: 'Scout the routes',
@@ -48,6 +57,15 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
     effects: [{ stat: 'area', mult: 1.1 }],
   },
   {
+    id: 'time-the-patrols',
+    roomId: 'rooftop-perch',
+    name: 'Time the patrols',
+    description: 'Nyx has the rooftop routes down to the minute — when the block goes quiet, and exactly how long it stays that way.',
+    benefitLabel: '5% faster cooldowns',
+    icon: 'timer',
+    effects: [{ stat: 'haste', mult: 0.95 }],
+  },
+  {
     id: 'tune-the-rig',
     roomId: 'the-cellar',
     name: 'Tune the rig',
@@ -64,6 +82,15 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
     benefitLabel: '+8% damage',
     icon: 'sparkles',
     effects: [{ stat: 'power', mult: 1.08 }],
+  },
+  {
+    id: 'wire-the-backup',
+    roomId: 'the-cellar',
+    name: 'Wire the backup',
+    description: 'Sable runs a line to the old fuse box so the lanterns never really go dark, even when the block does.',
+    benefitLabel: '+3% armor',
+    icon: 'zap',
+    effects: [{ stat: 'armor', add: 0.03 }],
   },
 ];
 

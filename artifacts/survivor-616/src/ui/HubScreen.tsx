@@ -12,7 +12,7 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Eye, Timer, Zap } from 'lucide-react';
 import type { AllyDef, CrewActivityIcon } from '@/game/types';
 
 /** Small rig built on the fly for a rescued ally -- matches the crew-card portrait's params. */
@@ -48,10 +48,13 @@ const ACTIVITY_ICONS = {
   utensils: Utensils,
   shield: ShieldCheck,
   package: PackageCheck,
+  eye: Eye,
   compass: Compass,
   map: MapIcon,
+  timer: Timer,
   radio: Radio,
   sparkles: Sparkles,
+  zap: Zap,
 } satisfies Record<CrewActivityIcon, typeof Utensils>;
 const RUMOR_ICONS: Record<string, typeof Bell> = {
   bell: Bell,
@@ -105,7 +108,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5 }}
-          className="absolute inset-0 z-0 pointer-events-none"
+          className="absolute inset-x-0 top-0 h-[100dvh] z-0 pointer-events-none"
         >
           <div className="absolute inset-0 bg-background/90 z-10" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent z-10" />
@@ -350,6 +353,35 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
                  right={{ name: newlyRescuedAlly.name, rig: allyRig(newlyRescuedAlly), palette: newlyRescuedAlly.palette }}
                  size={110}
                />
+               {(() => {
+                 const activities = preferredActivitiesForAlly(newlyRescuedAlly.id);
+                 if (activities.length === 0) return null;
+                 const activeActivityId = meta.crewActivityByAlly[newlyRescuedAlly.id];
+                 return (
+                   <div className="shrink-0" data-testid="welcome-home-activities">
+                     <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300/80">Ready to help</p>
+                     <div className="flex gap-2">
+                       {activities.map((activity) => {
+                         const ActivityIcon = ACTIVITY_ICONS[activity.icon];
+                         const isPicked = activity.id === activeActivityId;
+                         return (
+                           <div
+                             key={activity.id}
+                             title={`${activity.name} — ${activity.benefitLabel}`}
+                             className={`grid h-11 w-11 place-items-center border ${
+                               isPicked ? 'border-primary bg-primary/15 text-primary' : 'border-border bg-black/30 text-muted-foreground'
+                             }`}
+                             data-testid={`welcome-home-activity-${activity.id}`}
+                             data-picked={isPicked}
+                           >
+                             <ActivityIcon className="h-5 w-5" aria-hidden="true" />
+                           </div>
+                         );
+                       })}
+                     </div>
+                   </div>
+                 );
+               })()}
                <p className="text-sm text-white/80">
                  <span className="font-black uppercase text-white">{newlyRescuedAlly.name}</span> made it back with {selectedCharacter.name}.
                  {' '}{newlyRescuedAlly.boostLabel}

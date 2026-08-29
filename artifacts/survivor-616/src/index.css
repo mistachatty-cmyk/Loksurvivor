@@ -191,6 +191,15 @@
   92% { transform: translate3d(112vw, 1vh, 0); opacity: 0; }
 }
 
+@keyframes hideout-window-flicker {
+  0%, 100% { opacity: .78; }
+  47% { opacity: .78; }
+  50% { opacity: .4; }
+  53% { opacity: .78; }
+  91% { opacity: .78; }
+  94% { opacity: .5; }
+}
+
 @keyframes hideout-rain {
   from { background-position: 0 0; }
   to { background-position: -3rem 8rem; }
@@ -222,7 +231,16 @@
 .hideout-weather-snow .hideout-weather-particles { background-image: radial-gradient(circle, rgba(255,255,255,.65) 0 1px, transparent 1.5px); background-size: 2.4rem 2.4rem; animation: hideout-rain 5s linear infinite; }
 .hideout-home-art { position: absolute; right: 6%; bottom: 13%; display: grid; place-items: center; color: var(--scene-accent); opacity: .65; }
 .hideout-window-grid { display: flex; gap: .5rem; padding: .8rem; border: 2px solid currentColor; box-shadow: 0 0 2rem color-mix(in srgb, var(--scene-accent) 35%, transparent); }
-.hideout-window-grid span { display: block; width: 1.2rem; height: 1.6rem; background: currentColor; opacity: .5; }
+.hideout-window-grid span {
+  display: block; width: 1.2rem; height: 1.6rem; opacity: .78;
+  background:
+    linear-gradient(color-mix(in srgb, currentColor 40%, black), color-mix(in srgb, currentColor 40%, black)) center / 100% 2px no-repeat,
+    linear-gradient(90deg, color-mix(in srgb, currentColor 40%, black), color-mix(in srgb, currentColor 40%, black)) center / 2px 100% no-repeat,
+    radial-gradient(circle at 50% 35%, color-mix(in srgb, currentColor 90%, white), currentColor 70%);
+  animation: hideout-window-flicker 7s ease-in-out infinite;
+}
+.hideout-window-grid span:nth-child(2) { animation-delay: -2.3s; }
+.hideout-window-grid span:nth-child(3) { animation-delay: -4.6s; }
 
 .music-reactive-root {
   --music-energy: 0;

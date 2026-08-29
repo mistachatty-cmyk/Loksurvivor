@@ -916,19 +916,25 @@ export type CrewActivityId =
   | 'field-rations'
   | 'fortify-doors'
   | 'sort-supplies'
+  | 'work-the-room'
   | 'scout-routes'
   | 'mark-approach-lanes'
+  | 'time-the-patrols'
   | 'tune-the-rig'
-  | 'study-anomalies';
+  | 'study-anomalies'
+  | 'wire-the-backup';
 
 export type CrewActivityIcon =
   | 'utensils'
   | 'shield'
   | 'package'
+  | 'eye'
   | 'compass'
   | 'map'
+  | 'timer'
   | 'radio'
-  | 'sparkles';
+  | 'sparkles'
+  | 'zap';
 
 export interface CrewActivityEffect {
   stat: keyof BaseStats;

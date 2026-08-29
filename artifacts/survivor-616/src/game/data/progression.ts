@@ -22,7 +22,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { magnet: 18 },
     boostLabel: '+18 pickup range',
-    preferredActivityIds: ['sort-supplies', 'fortify-doors'],
+    preferredActivityIds: ['sort-supplies', 'fortify-doors', 'work-the-room'],
     palette: {
       ink: '#1a1208', body: '#d97706', bodyDark: '#78350f', accent: '#fbbf24',
       accentBright: '#fef3c7', skin: '#b45309', glow: '#fbbf24',
@@ -36,7 +36,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { armor: 0.06, maxHp: 12 },
     boostLabel: '+6% armor, +12 max HP',
-    preferredActivityIds: ['fortify-doors', 'field-rations'],
+    preferredActivityIds: ['fortify-doors', 'field-rations', 'work-the-room'],
     palette: {
       ink: '#0d1117', body: '#475569', bodyDark: '#1e293b', accent: '#94a3b8',
       accentBright: '#e2e8f0', skin: '#64748b', glow: '#cbd5e1',
@@ -50,7 +50,7 @@ export const ALLIES: AllyDef[] = [
     room: 'rooftop-perch',
     boost: { speed: 8 },
     boostLabel: '+8 move speed',
-    preferredActivityIds: ['scout-routes', 'mark-approach-lanes'],
+    preferredActivityIds: ['scout-routes', 'mark-approach-lanes', 'time-the-patrols'],
     palette: {
       ink: '#1b0a1a', body: '#db2777', bodyDark: '#831843', accent: '#f9a8d4',
       accentBright: '#fce7f3', skin: '#9d174d', glow: '#f472b6',
@@ -64,7 +64,7 @@ export const ALLIES: AllyDef[] = [
     room: 'the-cellar',
     boost: { power: 0.08 },
     boostLabel: '+8% damage',
-    preferredActivityIds: ['tune-the-rig', 'study-anomalies'],
+    preferredActivityIds: ['tune-the-rig', 'study-anomalies', 'wire-the-backup'],
     palette: {
       ink: '#0a1410', body: '#0f766e', bodyDark: '#134e4a', accent: '#5eead4',
       accentBright: '#ccfbf1', skin: '#0d9488', glow: '#2dd4bf',
@@ -78,7 +78,7 @@ export const ALLIES: AllyDef[] = [
     room: 'main-floor',
     boost: { maxHp: 25 },
     boostLabel: '+25 max HP',
-    preferredActivityIds: ['field-rations', 'sort-supplies'],
+    preferredActivityIds: ['field-rations', 'sort-supplies', 'work-the-room'],
     palette: {
       ink: '#1a0f0a', body: '#b91c1c', bodyDark: '#7f1d1d', accent: '#fca5a5',
       accentBright: '#fee2e2', skin: '#92400e', glow: '#f87171',
@@ -115,7 +115,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/rooftops.jpeg',
     biome: 'rooftop',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
-    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings'],
+    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'allies', 'settings'],
   },
   {
     id: 'the-cellar',
