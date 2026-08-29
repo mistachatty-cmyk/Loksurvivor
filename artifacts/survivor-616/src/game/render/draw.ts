@@ -2453,7 +2453,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     if (playerDrawn.done) return;
     playerDrawn.done = true;
     const p = w.player;
-    const scale = SPRITE_SCALE;
+    const scale = SPRITE_SCALE * w.playerSizeMult;
     const fallProgress = p.falling ? clamp((w.now - p.fallStartedAt) / 700, 0, 1) : 0;
     drawShadow(ctx, p.x, p.y + 2, p.radius * (1 - fallProgress * 0.65));
 
@@ -2496,6 +2496,8 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
 
     const invuln = w.now < p.invulnUntil && w.outcome === 'running';
     const blink = invuln && Math.floor(w.now / 70) % 2 === 0;
+    const stealthed = w.now < w.stealthUntil;
+    const stealthAlpha = w.stealthConfig?.fullInvisible ? 0.12 : 0.32;
     drawRig(
       ctx,
       w.character.rig,
@@ -2509,7 +2511,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       {
         flash: w.now < p.hitFlashUntil,
         outline: true,
-        alpha: blink ? 0.45 : 1,
+        alpha: blink ? 0.45 : stealthed ? stealthAlpha : 1,
         dissolve: w.outcome === 'dead' && !p.falling ? Math.min(0.85, (w.now - p.animStartedAt) / 900) : fallProgress * 0.25,
         tint:
           w.now < w.ultActiveUntil

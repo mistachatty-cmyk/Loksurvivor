@@ -13,11 +13,12 @@ import {
   LOKPET_VARIANTS_BY_ID,
   LOKPET_VARIANTS,
 } from '@/game/data/lokPets';
-import { ALLIES, DISCOVERIES } from '@/game/data/progression';
+import { ALLIES, DISCOVERIES, allyRig } from '@/game/data/progression';
 import { STATUS_EFFECTS } from '@/game/data/statusEffects';
 import { WorkshopOverview } from './WorkshopPanel';
 import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
 import { LokPetIcon } from './LokPetVariantSheet';
+import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
 import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, type LucideIcon } from 'lucide-react';
@@ -68,7 +69,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           name: found ? ally.name : 'Still out there',
           desc: found ? `${ally.role} · ${ally.boostLabel}` : 'Rescue them during a run',
           found,
-          testId: `card-ally-${ally.id}`
+          testId: `card-ally-${ally.id}`,
+          portrait: found ? { rig: allyRig(ally), palette: ally.palette } : undefined,
         };
       })
     },
@@ -84,7 +86,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           name: found ? disc.name : 'Undiscovered',
           desc: found ? disc.blurb : 'Find hidden locations',
           found,
-          testId: `card-discovery-${disc.id}`
+          testId: `card-discovery-${disc.id}`,
+          portrait: undefined,
         };
       })
     },
@@ -100,7 +103,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           name: area.name,
           desc: cleared ? 'Cleared' : describeUnlock(area.unlock),
           found: cleared,
-          testId: `card-district-${area.id}`
+          testId: `card-district-${area.id}`,
+          portrait: undefined,
         };
       })
     },
@@ -116,7 +120,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           name: unlocked ? char.name : 'Locked',
           desc: unlocked ? char.tagline : describeUnlock(char.unlock),
           found: unlocked,
-          testId: `card-character-${char.id}`
+          testId: `card-character-${char.id}`,
+          portrait: undefined,
         };
       })
     },
@@ -130,7 +135,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
         name: effect.name,
         desc: effect.description,
         found: true,
-        testId: `card-status-effect-${effect.id}`
+        testId: `card-status-effect-${effect.id}`,
+        portrait: undefined,
       }))
     },
     {
@@ -155,6 +161,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               : `${episode.teaser} · ${progress}/${episode.objective.targetCount}`,
           found: completed,
           testId: `card-episode-${episode.id}`,
+          portrait: undefined,
         };
       }),
     }
@@ -440,17 +447,24 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               {section.items.map(item => (
                 <li
                   key={item.id}
-                  className={`p-4 border border-l-4 ${
+                  className={`flex gap-3 p-4 border border-l-4 ${
                     item.found
                       ? 'border-border border-l-primary bg-card text-white'
                       : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
                   }`}
                   data-testid={item.testId}
                 >
-                  <p className="font-bold uppercase tracking-wide text-sm mb-1">{item.name}</p>
-                  <p className={`text-xs ${item.found ? 'text-muted-foreground' : 'opacity-70'}`}>
-                    {item.desc}
-                  </p>
+                  {item.portrait ? (
+                    <div className="grid h-14 w-14 shrink-0 place-items-center border border-primary/40 bg-primary/10">
+                      <RigPortrait rig={item.portrait.rig} palette={item.portrait.palette} anim="idle" size={52} />
+                    </div>
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold uppercase tracking-wide text-sm mb-1">{item.name}</p>
+                    <p className={`text-xs ${item.found ? 'text-muted-foreground' : 'opacity-70'}`}>
+                      {item.desc}
+                    </p>
+                  </div>
                 </li>
               ))}
             </ul>

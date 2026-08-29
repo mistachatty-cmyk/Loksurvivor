@@ -57,6 +57,7 @@ import type {
   PotholeTrigger,
   PropVariant,
   RelicRecipeDef,
+  StealthAbilityConfig,
 } from '@/game/types';
 
 import {
@@ -606,6 +607,23 @@ export interface World {
   endless?: EndlessState;
   /** Whether pointer clicks can prime movable props during this run. */
   physicsObjectClicksEnabled: boolean;
+  /** Extra world units added to the physics-object click/tap radius, from Grabby Hands stacks. */
+  physicsObjectClickRadiusBonus: number;
+  /** 2 once Colossus Frame is owned; scales the player's collision radius and sprite. */
+  playerSizeMult: number;
+  /** Resolved Ghost Cloak config from the vendor tree, or null when the ability isn't owned. */
+  stealthConfig: StealthAbilityConfig | null;
+  /** Timestamp (w.now) the current cloak activation ends; 0 or in the past when not cloaked. */
+  stealthUntil: number;
+  /** Timestamp (w.now) the cloak is next allowed to activate. */
+  stealthReadyAt: number;
+  /** Player position frozen at cloak activation -- enemies chase this instead of the live position while cloaked. */
+  stealthAnchorX: number;
+  stealthAnchorY: number;
+  /** Quartermaster minimap recon tiers, resolved once at run start. */
+  minimapEnemyRadar: boolean;
+  minimapLootSense: boolean;
+  minimapHazardSense: boolean;
   /** When false, birds and fireflies stay visible through rain/fog instead of sheltering. */
   wildlifeSheltersInRain: boolean;
   /** Optional difficulty contracts selected before the run. */
@@ -714,8 +732,15 @@ export function createWorld(
     episodeProgress?: number;
     districtIncursionId?: string;
     wildlifeSheltersInRain?: boolean;
+    physicsObjectClickRadiusBonus?: number;
+    sizeMult?: number;
+    stealth?: StealthAbilityConfig | null;
+    minimapEnemyRadar?: boolean;
+    minimapLootSense?: boolean;
+    minimapHazardSense?: boolean;
   } = {},
 ): World {
+  const sizeMult = setup.sizeMult ?? 1;
   const player: PlayerActor = {
     uid: 1,
     x: 0,
@@ -724,7 +749,7 @@ export function createWorld(
     vy: 0,
     kx: 0,
     ky: 0,
-    radius: 12,
+    radius: 12 * sizeMult,
     hp: stats.maxHp,
     maxHp: stats.maxHp,
     facing: 1,
@@ -823,6 +848,16 @@ export function createWorld(
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
+    physicsObjectClickRadiusBonus: setup.physicsObjectClickRadiusBonus ?? 0,
+    playerSizeMult: sizeMult,
+    stealthConfig: setup.stealth ?? null,
+    stealthUntil: 0,
+    stealthReadyAt: setup.stealth ? 4000 : Number.POSITIVE_INFINITY,
+    stealthAnchorX: 0,
+    stealthAnchorY: 0,
+    minimapEnemyRadar: setup.minimapEnemyRadar ?? false,
+    minimapLootSense: setup.minimapLootSense ?? false,
+    minimapHazardSense: setup.minimapHazardSense ?? false,
     wildlifeSheltersInRain: setup.wildlifeSheltersInRain !== false,
     challenges: [...challenges],
     activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
@@ -1959,7 +1994,8 @@ function damageEnemy(
   // Landing a hit on the beat is its own bonus, stacking with a rolled crit.
   const onBeat = burstDepth === 0 && isOnBeat(w);
   const beatBonus = onBeat ? ON_BEAT_CRIT_MULT : 1;
-  const dealt = Math.max(1, Math.round((isCrit ? amount * 2 : amount) * beatBonus));
+  const stealthBonus = w.now < w.stealthUntil ? 1 + (w.stealthConfig?.damageBonusPct ?? 0) : 1;
+  const dealt = Math.max(1, Math.round((isCrit ? amount * 2 : amount) * beatBonus * stealthBonus));
   if (onBeat) w.onBeatHits += 1;
   enemy.hp -= dealt;
   enemy.hitFlashUntil = w.now + 90;
@@ -2151,6 +2187,7 @@ function damagePlayer(
   const p = w.player;
   if (p.falling || w.outcome !== 'running') return;
   if (w.now < p.invulnUntil) return;
+  if (w.stealthConfig?.fullInvisible && w.now < w.stealthUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
 
   if (source === 'contact') triggerBellShock(w);
@@ -2938,9 +2975,10 @@ function activatePotholes(w: World, x: number, y: number, radius: number, trigge
 /** Prime the nearest movable prop for a single, boosted reverse launch. */
 export function primePhysicsObject(w: World, x: number, y: number): BreakableObstacle | null {
   if (!w.physicsObjectClicksEnabled) return null;
+  const reach = 12 + w.physicsObjectClickRadiusBonus;
   const target = w.breakables
     .filter((b) => !b.broken && b.movable)
-    .filter((b) => Math.abs(x - b.x) <= b.w / 2 + 12 && Math.abs(y - b.y) <= b.h / 2 + 12)
+    .filter((b) => Math.abs(x - b.x) <= b.w / 2 + reach && Math.abs(y - b.y) <= b.h / 2 + reach)
     .sort((a, b) => (a.x - x) ** 2 + (a.y - y) ** 2 - ((b.x - x) ** 2 + (b.y - y) ** 2))[0];
   if (!target) return null;
   target.clickPrimed = true;
@@ -3727,8 +3765,23 @@ export function dashPlayer(w: World, directionX: number, directionY: number): bo
   return true;
 }
 
+/** Ghost Cloak's automatic timer. When active, enemy AI tracks a frozen anchor instead of the live player. */
+function updateStealth(w: World) {
+  const cfg = w.stealthConfig;
+  if (!cfg) return;
+  if (w.now < w.stealthUntil) return;
+  if (w.now < w.stealthReadyAt) return;
+  w.stealthUntil = w.now + cfg.durationMs;
+  w.stealthReadyAt = w.now + cfg.durationMs + cfg.cooldownMs;
+  w.stealthAnchorX = w.player.x;
+  w.stealthAnchorY = w.player.y;
+}
+
 function updateEnemies(w: World, dt: number) {
   const p = w.player;
+  const stealthed = w.now < w.stealthUntil;
+  const trackX = stealthed ? w.stealthAnchorX : p.x;
+  const trackY = stealthed ? w.stealthAnchorY : p.y;
 
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
@@ -3770,8 +3823,8 @@ function updateEnemies(w: World, dt: number) {
       spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
     }
 
-    const dx = p.x - enemy.x;
-    const dy = p.y - enemy.y;
+    const dx = trackX - enemy.x;
+    const dy = trackY - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
     const dirX = dx / distance;
     const dirY = dy / distance;
@@ -5137,6 +5190,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  updateStealth(w);
   updateDistrictIncursion(w, dt);
 
   if (w.area.endless && w.endless) {
@@ -5371,6 +5425,19 @@ export function hudSnapshot(w: World): HudSnapshot {
           buildings: e.buildings.map(({ id, prefabId, name, sign, accent, x, y, w: width, h: height, doorSide }) => ({
             id, prefabId, name, sign, accent, x, y, w: width, h: height, doorSide,
           })),
+          nearbyEnemies: w.minimapEnemyRadar
+            ? w.enemies.filter((enemy) => !enemy.dying).map((enemy) => ({ x: enemy.x, y: enemy.y }))
+            : [],
+          nearbyPickups: w.minimapLootSense
+            ? w.pickups
+                .filter((pickup) => pickup.kind !== 'xp' && pickup.kind !== 'sweep')
+                .map((pickup) => ({ x: pickup.x, y: pickup.y, kind: pickup.kind }))
+            : [],
+          nearbyHazards: w.minimapHazardSense
+            ? w.enemies
+                .filter((enemy) => !enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now))
+                .map((enemy) => ({ x: enemy.x, y: enemy.y, radius: enemy.specialRadius || enemy.radius * 3 }))
+            : [],
         }
       : undefined,
   };

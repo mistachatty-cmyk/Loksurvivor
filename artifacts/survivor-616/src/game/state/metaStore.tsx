@@ -38,7 +38,7 @@ import {
   RECOVERY_FACILITIES_BY_ID,
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
-import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
@@ -60,6 +60,7 @@ import type {
   RunResult,
   FacilityTier,
   RecoverySession,
+  StealthAbilityConfig,
   UnlockRule,
   CustomMap,
   UIPanelLayout,
@@ -125,6 +126,8 @@ export function createInitialMeta(): MetaState {
     minimapVisible: true,
     minimapExpanded: true,
     minimapPosition: { x: 0.82, y: 0.18 },
+    worldInvertEnabled: false,
+    paletteInvertEnabled: false,
     uiDensity: 'grid',
     musicReactiveEnabled: true,
     gyroEnabled: false,
@@ -601,6 +604,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
+    worldInvertEnabled: parsed.worldInvertEnabled === true,
+    paletteInvertEnabled: parsed.paletteInvertEnabled === true,
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
     gyroEnabled: parsed.gyroEnabled === true,
@@ -815,6 +820,43 @@ export function rewardCredMultiplier(meta: MetaState): number {
   return 1 + bonus;
 }
 
+/** Extra world units the "prime a movable prop" tap/click radius reaches, from Grabby Hands stacks. */
+export function physicsObjectClickRadiusBonus(meta: MetaState): number {
+  return vendorPurchaseCount(meta, 'grabby-hands') * 18;
+}
+
+/** 2 once Colossus Frame is owned (player renders and collides twice as large), else 1. */
+export function giantSizeMult(meta: MetaState): number {
+  return vendorPurchaseCount(meta, 'colossus-frame') > 0 ? 2 : 1;
+}
+
+/** Ghost Cloak + its upgrade tree, resolved into the numbers stepWorld needs. Null when not owned. */
+export function stealthConfig(meta: MetaState): StealthAbilityConfig | null {
+  if (vendorPurchaseCount(meta, 'ghost-cloak') <= 0) return null;
+  const durationStacks = vendorPurchaseCount(meta, 'ghost-cloak-duration');
+  const rateStacks = vendorPurchaseCount(meta, 'ghost-cloak-rate');
+  const fullInvisible = vendorPurchaseCount(meta, 'ghost-cloak-full') > 0;
+  return {
+    durationMs: 2500 + durationStacks * 1200 + (fullInvisible ? 1500 : 0),
+    cooldownMs: Math.max(4000, 14000 - rateStacks * 3000 - (fullInvisible ? 2000 : 0)),
+    fullInvisible,
+    damageBonusPct: fullInvisible ? 0.05 : 0,
+  };
+}
+
+/** Which minimap recon tiers are unlocked, in purchase order. */
+export function minimapUnlockTiers(meta: MetaState): {
+  enemyRadar: boolean;
+  lootSense: boolean;
+  hazardSense: boolean;
+} {
+  return {
+    enemyRadar: vendorPurchaseCount(meta, 'minimap-street-ears') > 0,
+    lootSense: vendorPurchaseCount(meta, 'minimap-loot-sense') > 0,
+    hazardSense: vendorPurchaseCount(meta, 'minimap-hazard-sense') > 0,
+  };
+}
+
 export function currentFatiguePct(meta: MetaState, characterId: string): number {
   return Math.min(MAX_FATIGUE_PCT, Math.max(0, settleRecovery(meta).fatigueByCharacter[characterId] ?? 0));
 }
@@ -863,6 +905,8 @@ type Action =
   | { type: 'setGyroInvertY'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
+  | { type: 'setWorldInvertEnabled'; enabled: boolean }
+  | { type: 'setPaletteInvertEnabled'; enabled: boolean }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
@@ -920,6 +964,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'buyVendorItem': {
       const item = VENDOR_CATALOG_BY_ID[action.id];
       if (!item) return state;
+      if (item.requires && vendorPurchaseCount(state.meta, item.requires) <= 0) return state;
       const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
       const currency = item.currency ?? 'cred';
       const balance = state.meta[currency];
@@ -1074,6 +1119,14 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ...state,
         meta: { ...state.meta, uiDensity: action.density },
       };
+
+    case 'setWorldInvertEnabled':
+      if (action.enabled && vendorPurchaseCount(state.meta, 'invert-world') <= 0) return state;
+      return { ...state, meta: { ...state.meta, worldInvertEnabled: action.enabled } };
+
+    case 'setPaletteInvertEnabled':
+      if (action.enabled && vendorPurchaseCount(state.meta, 'invert-palette') <= 0) return state;
+      return { ...state, meta: { ...state.meta, paletteInvertEnabled: action.enabled } };
 
     case 'tickRecovery':
       return { ...state, meta: settleRecovery(state.meta, action.now) };
@@ -1322,6 +1375,8 @@ export interface MetaContextValue {
   setGyroInvertY: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
   setMinimapPosition: (position: { x: number; y: number }) => void;
+  setWorldInvertEnabled: (enabled: boolean) => void;
+  setPaletteInvertEnabled: (enabled: boolean) => void;
   setUiDensity: (density: 'grid' | 'list') => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
@@ -1410,6 +1465,14 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (position: { x: number; y: number }) => dispatch({ type: 'setMinimapPosition', position }),
     [],
   );
+  const setWorldInvertEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setWorldInvertEnabled', enabled }),
+    [],
+  );
+  const setPaletteInvertEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setPaletteInvertEnabled', enabled }),
+    [],
+  );
   const setUiDensity = useCallback(
     (density: 'grid' | 'list') => dispatch({ type: 'setUiDensity', density }),
     [],
@@ -1476,6 +1539,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setGyroInvertY,
       setMinimapExpanded,
       setMinimapPosition,
+      setWorldInvertEnabled,
+      setPaletteInvertEnabled,
       setUiDensity,
       resetProgress,
       startRecovery,
@@ -1513,6 +1578,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setGyroInvertY,
     setMinimapExpanded,
     setMinimapPosition,
+    setWorldInvertEnabled,
+    setPaletteInvertEnabled,
     setUiDensity,
     resetProgress,
     startRecovery,

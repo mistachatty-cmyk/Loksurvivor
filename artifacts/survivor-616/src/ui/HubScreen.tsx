@@ -6,19 +6,14 @@ import { useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
-import { humanoidRig } from '@/game/sprites/rigs';
+import { allyRig } from '@/game/data/progression';
 import { RigPortrait } from './RigPortrait';
 import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
-import type { AllyDef, CrewActivityIcon } from '@/game/types';
-
-/** Small rig built on the fly for a rescued ally -- matches the crew-card portrait's params. */
-function allyRig(ally: AllyDef) {
-  return humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' });
-}
+import type { CrewActivityIcon } from '@/game/types';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
 

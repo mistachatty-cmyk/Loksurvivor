@@ -1,9 +1,20 @@
+import { humanoidRig } from '@/game/sprites/rigs';
 import type {
   AllyDef,
   DiscoveryDef,
   HubRoomDef,
+  SpriteRig,
   UpgradeDef,
 } from '@/game/types';
+
+/**
+ * Small rig built on the fly for a rescued ally -- AllyDef only carries a
+ * palette, not a full rig, so every crew portrait (hideout room, archive)
+ * derives its silhouette from this instead of showing raw reference art.
+ */
+export function allyRig(ally: AllyDef): SpriteRig {
+  return humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' });
+}
 
 /* ------------------------------------------------------------------ */
 /* Rescued allies                                                      */
