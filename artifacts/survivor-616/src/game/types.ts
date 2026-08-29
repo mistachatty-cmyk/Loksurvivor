@@ -1065,7 +1065,7 @@ export interface DiscoveryDef {
   blurb: string;
 }
 
-export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic';
+export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'ability';
 
 export type VendorEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
@@ -1082,6 +1082,22 @@ export interface VendorItemDef {
   challengeId?: string;
   /** Currency this item is priced in. Omitted means 'cred', the original default. */
   currency?: 'cred' | 'skeletonKeys';
+  /**
+   * Another vendor item's id that must own at least one stack first. Used to
+   * chain "ability" category items into a purchase tree (e.g. minimap tiers,
+   * the ghost cloak line) without a generic prerequisite-graph system.
+   */
+  requires?: string;
+}
+
+/** Derived from Ghost Cloak + its upgrade-tree stacks; null when the base unlock isn't owned. */
+export interface StealthAbilityConfig {
+  durationMs: number;
+  cooldownMs: number;
+  /** True once Full Invisibility is owned: cloak also blocks contact damage entirely. */
+  fullInvisible: boolean;
+  /** Extra damage dealt (e.g. 0.05 = +5%) while cloaked. */
+  damageBonusPct: number;
 }
 
 export interface ChallengeContractDef {
@@ -1159,6 +1175,10 @@ export interface MetaState {
   minimapExpanded: boolean;
   /** Normalized top-left position of the endless minimap within the viewport. */
   minimapPosition: { x: number; y: number };
+  /** Cheat-code toggle from the Quartermaster's "Flip the Script" unlock: rotates the whole run 180°. Requires owning that vendor item. */
+  worldInvertEnabled: boolean;
+  /** Cheat-code toggle from the Quartermaster's "Negative Exposure" unlock: inverts the run's color palette. Requires owning that vendor item. */
+  paletteInvertEnabled: boolean;
   /** 'grid' shows list-heavy hub panels as multi-column card grids; 'list' is the original single-column layout. */
   uiDensity: 'grid' | 'list';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
@@ -1516,6 +1536,12 @@ export interface HudSnapshot {
     riverSegments: Array<{ x: number; y: number; w: number; h: number; crossingX: number | null }>;
     buildingEntrances: Array<{ x: number; y: number; label: string; prefabId: string; doorSide: 'north' | 'south' | 'east' | 'west' }>;
     buildings: Array<{ id: string; prefabId: string; name: string; sign: string; accent: string; x: number; y: number; w: number; h: number; doorSide: 'north' | 'south' | 'east' | 'west' }>;
+    /** Quartermaster "Street Ears" unlock: live enemy positions. Empty when not owned. */
+    nearbyEnemies: Array<{ x: number; y: number }>;
+    /** Quartermaster "Loot Sense" unlock: non-XP pickup positions (cred, health, loot boxes). Empty when not owned. */
+    nearbyPickups: Array<{ x: number; y: number; kind: string }>;
+    /** Quartermaster "Hazard Sense" unlock: telegraphed enemy attack radii. Empty when not owned. */
+    nearbyHazards: Array<{ x: number; y: number; radius: number }>;
   };
 }
 

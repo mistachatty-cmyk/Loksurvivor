@@ -1,26 +1,37 @@
 import { Fragment, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowUpRight,
   BadgeDollarSign,
   Box,
   Check,
   Crosshair,
+  EyeOff,
+  FlipVertical2,
   Footprints,
   Gauge,
+  Gem,
+  Ghost,
   HardHat,
+  Hand,
   KeyRound,
+  Lock,
   LockKeyhole,
+  Maximize2,
   PackageCheck,
+  Palette,
+  Radar,
   RotateCcw,
   Shield,
   Skull,
   Sparkles,
   Target,
+  Timer,
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
 
-import { VENDOR_CATALOG } from '@/game/data/vendor';
+import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { useMeta } from '@/game/state/metaStore';
 import type { VendorItemCategory, VendorItemDef } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
@@ -66,6 +77,13 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
     description: 'Paid for in skeleton keys — notably rare, found by breaking things out in the world.',
     icon: KeyRound,
   },
+  {
+    key: 'ability',
+    eyebrow: 'Permanent issue / 05',
+    title: 'Field ops',
+    description: 'Gear that changes how a run plays, not just its numbers. Some of it chains — buy the first rung to unlock the next.',
+    icon: Radar,
+  },
 ];
 
 const STAT_LABELS: Record<string, string> = {
@@ -91,10 +109,43 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'salvager-instinct': BadgeDollarSign,
   'loosened-padlock': KeyRound,
   'masters-cut': Gauge,
+  'minimap-street-ears': Radar,
+  'minimap-loot-sense': Gem,
+  'minimap-hazard-sense': AlertTriangle,
+  'grabby-hands': Hand,
+  'colossus-frame': Maximize2,
+  'ghost-cloak': Ghost,
+  'ghost-cloak-duration': Timer,
+  'ghost-cloak-rate': Gauge,
+  'ghost-cloak-full': EyeOff,
+  'invert-world': FlipVertical2,
+  'invert-palette': Palette,
+};
+
+/** Short, hand-written labels for "ability" items whose real effect can't be summarized by a single stat/utility delta. */
+const ABILITY_EFFECT_LABELS: Record<string, string> = {
+  'minimap-street-ears': 'Minimap tier 1 — enemy blips',
+  'minimap-loot-sense': 'Minimap tier 2 — loot blips',
+  'minimap-hazard-sense': 'Minimap tier 3 — hazard radii',
+  'grabby-hands': '+18 grab/tap reach per stack',
+  'colossus-frame': '2x size · +25% damage',
+  'ghost-cloak': 'Auto-cloak every 14s for 2.5s',
+  'ghost-cloak-duration': '+1.2s cloak uptime per stack',
+  'ghost-cloak-rate': '-3s cloak cooldown per stack',
+  'ghost-cloak-full': 'Full invisibility · +5% stealth dmg',
+  'invert-world': 'Unlocks a Settings toggle',
+  'invert-palette': 'Unlocks a Settings toggle',
 };
 
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
   return Math.min(item.maxStacks, Math.max(0, Math.floor(purchases[item.id] ?? 0)));
+}
+
+/** True when a chained "ability" item's prerequisite hasn't been bought yet. */
+function isLocked(item: VendorItemDef, purchases: Record<string, number>): boolean {
+  if (!item.requires) return false;
+  const required = VENDOR_CATALOG_BY_ID[item.requires];
+  return Boolean(required) && ownedStacks(required, purchases) <= 0;
 }
 
 function currencyInfo(item: VendorItemDef, meta: { cred: number; skeletonKeys: number }): { balance: number; label: string } {
@@ -102,6 +153,7 @@ function currencyInfo(item: VendorItemDef, meta: { cred: number; skeletonKeys: n
 }
 
 function effectLabel(item: VendorItemDef): string {
+  if (ABILITY_EFFECT_LABELS[item.id]) return ABILITY_EFFECT_LABELS[item.id]!;
   const effect = item.effects?.[0];
   if (!effect) {
     return item.category === 'challenge' ? 'Contract modifier' : 'Permanent field benefit';
@@ -160,6 +212,7 @@ function ItemTile({
 }) {
   const owned = ownedStacks(item, purchases);
   const maxed = owned >= item.maxStacks;
+  const locked = isLocked(item, purchases);
   const { label: currencyLabel } = currencyInfo(item, meta);
   return (
     <button
@@ -168,14 +221,17 @@ function ItemTile({
       aria-pressed={selected}
       className={`terminal-frame flex flex-col gap-2 border p-3 text-left transition-colors ${
         selected ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
-      }`}
+      } ${locked ? 'opacity-50' : ''}`}
       data-testid={`button-vendor-tile-${item.id}`}
     >
       <ItemIcon item={item} />
-      <span className="text-[11px] font-black uppercase leading-tight tracking-wide text-white">{item.name}</span>
+      <span className="flex items-center gap-1 text-[11px] font-black uppercase leading-tight tracking-wide text-white">
+        {locked ? <Lock className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" /> : null}
+        {item.name}
+      </span>
       <PipMeter owned={owned} cap={item.maxStacks} category={item.category} />
       <span className={`font-mono text-[10px] font-bold ${maxed ? 'text-emerald-300' : 'text-muted-foreground'}`}>
-        {maxed ? 'Maxed' : `${item.cost} ${currencyLabel}`}
+        {maxed ? 'Maxed' : locked ? 'Locked' : `${item.cost} ${currencyLabel}`}
       </span>
     </button>
   );
@@ -198,8 +254,11 @@ function ItemDetail({
 }) {
   const owned = ownedStacks(item, purchases);
   const maxed = owned >= item.maxStacks;
+  const locked = isLocked(item, purchases);
   const { balance, label: currencyLabel } = currencyInfo(item, meta);
   const short = balance < item.cost;
+  const requiredName = item.requires ? VENDOR_CATALOG_BY_ID[item.requires]?.name : undefined;
+  const buyDisabled = maxed || short || locked;
 
   return (
     <div
@@ -208,7 +267,10 @@ function ItemDetail({
     >
       <ItemIcon item={item} size="lg" />
       <div className={inline ? 'min-w-[12rem] flex-1' : ''}>
-        <h3 className="terminal-glow text-base font-black uppercase text-white">{item.name}</h3>
+        <h3 className="terminal-glow flex items-center gap-2 text-base font-black uppercase text-white">
+          {locked ? <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" /> : null}
+          {item.name}
+        </h3>
         <p
           className={`mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] ${
             item.category === 'challenge' ? 'text-destructive' : 'text-primary'
@@ -217,6 +279,11 @@ function ItemDetail({
           {effectLabel(item)}
         </p>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.description}</p>
+        {locked && requiredName ? (
+          <p className="mt-2 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-300">
+            Requires {requiredName} first
+          </p>
+        ) : null}
         <div className="mt-3 max-w-xs">
           <PipMeter owned={owned} cap={item.maxStacks} category={item.category} />
         </div>
@@ -224,18 +291,26 @@ function ItemDetail({
       <div className={`flex gap-2 ${inline ? 'shrink-0' : 'flex-col'}`}>
         <button
           type="button"
-          disabled={maxed || short}
+          disabled={buyDisabled}
           onClick={() => onBuy(item.id)}
           className={`flex items-center justify-between gap-2 whitespace-nowrap border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-            maxed || short
+            buyDisabled
               ? 'cursor-not-allowed border-border text-muted-foreground/50'
               : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
           }`}
           data-testid={`button-buy-vendor-item-${item.id}`}
         >
-          {maxed ? <Check className="h-4 w-4 shrink-0" /> : <ArrowUpRight className="h-4 w-4 shrink-0" />}
-          <span>{maxed ? 'Capacity reached' : short ? `Need ${item.cost - balance} more ${currencyLabel}` : `Buy for ${item.cost} ${currencyLabel}`}</span>
-          {!maxed && !short && <kbd className="border border-current px-1 text-[9px]">E</kbd>}
+          {maxed ? <Check className="h-4 w-4 shrink-0" /> : locked ? <Lock className="h-4 w-4 shrink-0" /> : <ArrowUpRight className="h-4 w-4 shrink-0" />}
+          <span>
+            {maxed
+              ? 'Capacity reached'
+              : locked
+                ? `Requires ${requiredName ?? 'prior tier'}`
+                : short
+                  ? `Need ${item.cost - balance} more ${currencyLabel}`
+                  : `Buy for ${item.cost} ${currencyLabel}`}
+          </span>
+          {!buyDisabled && <kbd className="border border-current px-1 text-[9px]">E</kbd>}
         </button>
         <button
           type="button"

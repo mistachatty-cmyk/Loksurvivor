@@ -6,6 +6,7 @@ import {
   Check,
   Compass,
   FlaskConical,
+  FlipVertical2,
   LayoutDashboard,
   LayoutList,
   Lock,
@@ -23,6 +24,7 @@ import {
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES } from '@/game/data/uiThemes';
+import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 
@@ -49,6 +51,8 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setGyroSensitivity,
     setGyroInvertY,
     setStudioPlugins,
+    setWorldInvertEnabled,
+    setPaletteInvertEnabled,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
 
@@ -403,6 +407,67 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
             </div>
           </div>
         </section>
+
+        {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
+          <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
+            <div className="flex items-start gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
+                <FlipVertical2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-300">Quartermaster cheats</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Chaos toggles</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Unlocked in the Field ops shop. Purely cosmetic, purely for chaos — flip either back off any time.
+                  </p>
+                </div>
+                {vendorPurchaseCount(meta, 'invert-world') > 0 ? (
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-white">Flip the Script</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Rotate the whole run 180°.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWorldInvertEnabled(!meta.worldInvertEnabled)}
+                      aria-pressed={meta.worldInvertEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.worldInvertEnabled
+                          ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
+                          : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-world-invert"
+                    >
+                      {meta.worldInvertEnabled ? 'Flipped' : 'Off'}
+                    </button>
+                  </div>
+                ) : null}
+                {vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-white">Negative Exposure</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Invert every color on screen.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPaletteInvertEnabled(!meta.paletteInvertEnabled)}
+                      aria-pressed={meta.paletteInvertEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.paletteInvertEnabled
+                          ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
+                          : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-palette-invert"
+                    >
+                      {meta.paletteInvertEnabled ? 'Inverted' : 'Off'}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
           <div className="flex items-start gap-4">

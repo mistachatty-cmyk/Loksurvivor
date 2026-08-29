@@ -223,6 +223,41 @@ export function Minimap({
             const point = toMap(door.x, door.y);
             return <circle key={`door:${index}`} cx={point.x} cy={point.y} r="3" fill="#fbbf24" />;
           })}
+          {map.nearbyHazards.map((hazard, index) => {
+            const point = toMap(hazard.x, hazard.y);
+            return (
+              <circle
+                key={`hazard:${index}`}
+                cx={point.x}
+                cy={point.y}
+                r={Math.max(3, hazard.radius * SCALE)}
+                fill="#e879f9"
+                fillOpacity=".16"
+                stroke="#e879f9"
+                strokeOpacity=".65"
+                strokeWidth="1"
+              />
+            );
+          })}
+          {map.nearbyPickups.map((pickup, index) => {
+            const point = toMap(pickup.x, pickup.y);
+            const color = pickup.kind === 'health' ? '#4ade80' : pickup.kind === 'loot-box' ? '#c084fc' : '#facc15';
+            return (
+              <rect
+                key={`pickup:${index}`}
+                x={point.x - 2}
+                y={point.y - 2}
+                width="4"
+                height="4"
+                fill={color}
+                transform={`rotate(45 ${point.x} ${point.y})`}
+              />
+            );
+          })}
+          {map.nearbyEnemies.map((enemy, index) => {
+            const point = toMap(enemy.x, enemy.y);
+            return <circle key={`enemy:${index}`} cx={point.x} cy={point.y} r="2.4" fill="#f87171" />;
+          })}
           <circle cx={MAP_W / 2} cy={MAP_H / 2} r="4" fill="#f8fafc" stroke="#22d3ee" strokeWidth="2" />
           <path d={`M ${MAP_W / 2} 8 v 7 M ${MAP_W / 2} ${MAP_H - 8} v -7 M 8 ${MAP_H / 2} h 7 M ${MAP_W - 8} ${MAP_H / 2} h -7`} stroke="#e2e8f0" opacity=".4" />
             </svg>
@@ -236,6 +271,9 @@ export function Minimap({
               <span className="text-amber-100">□ building</span>
               <span className="text-fuchsia-200">◆ landmark</span>
               <span style={{ color: map.currentBandAccent }}>✦ beacon</span>
+              {map.nearbyEnemies.length > 0 ? <span className="text-red-400">● enemy</span> : null}
+              {map.nearbyPickups.length > 0 ? <span className="text-amber-300">◆ loot</span> : null}
+              {map.nearbyHazards.length > 0 ? <span className="text-fuchsia-400">○ hazard</span> : null}
             </div>
           </>
         ) : (

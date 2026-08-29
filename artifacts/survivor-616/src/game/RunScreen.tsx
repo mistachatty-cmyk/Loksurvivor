@@ -27,7 +27,16 @@ import { useGyroInput } from '@/game/input/gyro';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld } from '@/game/render/draw';
-import { effectiveStats, rewardCredMultiplier, startingWeaponLevel, useMeta } from '@/game/state/metaStore';
+import {
+  effectiveStats,
+  giantSizeMult,
+  minimapUnlockTiers,
+  physicsObjectClickRadiusBonus,
+  rewardCredMultiplier,
+  startingWeaponLevel,
+  stealthConfig,
+  useMeta,
+} from '@/game/state/metaStore';
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
@@ -178,6 +187,12 @@ export function RunScreen({
         episode,
         episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
         wildlifeSheltersInRain: meta.wildlifeSheltersInRain,
+        physicsObjectClickRadiusBonus: physicsObjectClickRadiusBonus(meta),
+        sizeMult: giantSizeMult(meta),
+        stealth: stealthConfig(meta),
+        minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,
+        minimapLootSense: minimapUnlockTiers(meta).lootSense,
+        minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
       },
     );
   }
@@ -552,7 +567,14 @@ export function RunScreen({
   const dungeonEraName = hud?.endless?.dungeonEraName ?? '';
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-black select-none" data-testid="screen-run">
+    <div
+      className="relative h-dvh w-full overflow-hidden bg-black select-none"
+      style={{
+        transform: meta.worldInvertEnabled ? 'rotate(180deg)' : undefined,
+        filter: meta.paletteInvertEnabled ? 'invert(1)' : undefined,
+      }}
+      data-testid="screen-run"
+    >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
       {/* Touch surface: dragging anywhere steers. */}
@@ -898,19 +920,26 @@ export function RunScreen({
 
       {/* Level up */}
       {phase === 'levelup' && meta.levelUpPausesEnabled ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-5" data-testid="overlay-levelup">
-          <div className="w-full max-w-md space-y-3">
-            <p className="text-center font-mono text-xs uppercase tracking-[0.4em] text-white/60">Level {hud?.level}</p>
-            <h2 className="text-center text-2xl font-black uppercase text-white">Pick your edge</h2>
+        <div
+          className="absolute inset-0 flex items-end justify-start bg-black/55 p-3"
+          style={{
+            paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+            paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
+          }}
+          data-testid="overlay-levelup"
+        >
+          <div className="max-h-[70vh] w-[min(90vw,300px)] space-y-2 overflow-y-auto border border-primary/40 bg-black/90 p-3 shadow-[0_0_24px_rgba(251,191,36,.16)]">
+            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60">Level {hud?.level}</p>
+            <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
             {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
               <button
                 type="button"
                 onClick={claimRumorHeal}
-                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-4 text-left transition hover:bg-[#86efac]/20 active:scale-[0.99]"
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-3 text-left transition hover:bg-[#86efac]/20 active:scale-[0.99]"
                 data-testid="button-rumor-heal"
               >
                 <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
-                <p className="mt-1 font-mono text-xs text-white/70">Use Pantry Surge once alongside your normal upgrade.</p>
+                <p className="mt-1 font-mono text-[10px] text-white/70">Use Pantry Surge once alongside your normal upgrade.</p>
               </button>
             ) : null}
             <div className="space-y-2">
@@ -921,15 +950,15 @@ export function RunScreen({
                     key={upgrade.id}
                     type="button"
                     onClick={() => pickUpgrade(upgrade)}
-                    className="flex w-full items-center gap-3 rounded-sm border border-white/20 bg-white/5 p-4 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                    className="flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-2.5 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
                     data-testid={`button-upgrade-${upgrade.id}`}
                   >
                     {cardWeapon ? (
-                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={32} className="shrink-0" />
+                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={26} className="shrink-0" />
                     ) : null}
                     <span>
-                      <p className="font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
-                      <p className="mt-1 font-mono text-xs text-white/70">{upgrade.description}</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                      <p className="mt-1 font-mono text-[10px] text-white/70">{upgrade.description}</p>
                     </span>
                   </button>
                 );
