@@ -100,7 +100,7 @@ export interface StreetChunk {
 
 const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot', 'market', 'rail', 'plaza'];
 const BLOCK_KINDS: BlockKind[] = ['storefronts', 'residential', 'parking', 'industrial', 'park', 'bridge', 'river-edge'];
-const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable', 'cover', 'reflective-surface', 'flora', 'metal-box', 'bench'];
+const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable', 'cover', 'reflective-surface', 'flora', 'metal-box', 'bench', 'trash-can', 'mailbox', 'fire-hydrant', 'parking-meter'];
 
 export const BUILDING_PREFABS: BuildingPrefab[] = [
   {
@@ -444,21 +444,23 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   const bandPropBonus = band.id === 'industrial-fringe' || band.id === 'outer-threshold' ? 2 : 0;
   const propCount = minProps + bandPropBonus + Math.floor(rng() * (maxProps - minProps + 1));
 
+  // Trailing 4 weights on every row are [trash-can, mailbox, fire-hydrant, parking-meter] —
+  // the endless-mode street-prop set, skewed toward alley/market/strip/parking variants.
   const kindWeights: Record<ChunkVariant, number[]> = {
     // strip: lots of cars, some planters
-    strip: [4, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+    strip: [4, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 1, 1, 3],
     // alley: dumpsters and crates
-    alley: [1, 3, 4, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
+    alley: [1, 3, 4, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 4, 1, 2, 0],
     // parking: mostly cars
-    parking: [6, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1],
+    parking: [6, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 0, 1, 5],
     // lot: mixed
-     lot: [1, 2, 3, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 3, 2, 1],
+     lot: [1, 2, 3, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 3, 2, 1, 2, 2, 2, 2],
     // market: stalls, barriers, signs
-     market: [1, 1, 3, 2, 4, 0, 3, 1, 1, 1, 0, 2, 2, 1, 3, 1, 2],
+     market: [1, 1, 3, 2, 4, 0, 3, 1, 1, 1, 0, 2, 2, 1, 3, 1, 2, 3, 2, 2, 1],
     // rail: long barriers, wrecks and signal boxes
-     rail: [1, 0, 1, 0, 5, 1, 0, 1, 3, 2, 4, 1, 3, 2, 2, 3, 1],
+     rail: [1, 0, 1, 0, 5, 1, 0, 1, 3, 2, 4, 1, 3, 2, 2, 3, 1, 0, 0, 0, 0],
     // plaza: open lanes with lamps and planters
-     plaza: [0, 0, 1, 5, 3, 0, 1, 0, 1, 4, 0, 1, 2, 1, 4, 1, 3],
+     plaza: [0, 0, 1, 5, 3, 0, 1, 0, 1, 4, 0, 1, 2, 1, 4, 1, 3, 2, 1, 1, 0],
   };
   const weights = kindWeights[variant];
 
@@ -502,6 +504,10 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       'metal-box': [52, 76, 52, 76],
       bench: [90, 130, 24, 34],
       pothole: [58, 82, 46, 68],
+      'trash-can': [30, 42, 34, 46],
+      mailbox: [26, 34, 50, 64],
+      'fire-hydrant': [26, 34, 30, 38],
+      'parking-meter': [14, 20, 46, 58],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);

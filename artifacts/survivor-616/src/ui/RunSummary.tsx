@@ -12,7 +12,7 @@ import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
-import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio } from 'lucide-react';
+import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 
 export interface RunSummaryProps {
   result: RunResult;
@@ -430,7 +430,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
         )}
 
         {/* Loot & Objectives */}
-        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0) && (
+        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0 || result.skeletonKeysGained > 0) && (
           <div className="grid gap-4 md:grid-cols-2">
             {result.lootBoxesOpened > 0 && (
               <div className="border border-border bg-card p-5" data-testid="section-loot">
@@ -452,6 +452,21 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {result.skeletonKeysGained > 0 && (
+              <div className="border border-sky-500/30 bg-card p-5" data-testid="section-skeleton-keys">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-sky-400" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Skeleton keys found
+                  </span>
+                  <span className="ml-auto font-mono text-xs text-sky-400 font-bold">
+                    +{result.skeletonKeysGained}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">Notably rare. Spend them at the hideout Quartermaster.</p>
               </div>
             )}
 

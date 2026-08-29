@@ -12,7 +12,7 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper } from 'lucide-react';
+import { Skull, Users, Music, Unlock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
 import type { AllyDef, CrewActivityIcon } from '@/game/types';
 
 /** Small rig built on the fly for a rescued ally -- matches the crew-card portrait's params. */
@@ -149,6 +149,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
               {meta.lootTokens > 0 && (
                 <p className="text-xs font-mono text-amber-400 mt-1">
                   <Package className="inline w-3 h-3 mr-1" />{meta.lootTokens} loot tokens
+                </p>
+              )}
+              {meta.skeletonKeys > 0 && (
+                <p className="text-xs font-mono text-sky-400 mt-1">
+                  <KeyRound className="inline w-3 h-3 mr-1" />{meta.skeletonKeys} skeleton keys
                 </p>
               )}
             </div>
@@ -412,6 +417,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
               <span className="ml-1.5 font-mono text-xs text-muted-foreground uppercase tracking-widest">loot tokens — token shop coming soon</span>
             </div>
           </section>
+        )}
+
+        {meta.skeletonKeys > 0 && (
+          <button
+            type="button"
+            onClick={() => onOpen('vendor')}
+            className="mt-3 w-full border border-sky-900/40 bg-sky-950/20 px-5 py-3 flex items-center gap-3 text-left transition-colors hover:border-sky-500/50 hover:bg-sky-950/35"
+            data-testid="section-skeleton-keys"
+          >
+            <KeyRound className="w-4 h-4 text-sky-400 shrink-0" />
+            <div>
+              <span className="font-mono text-sm text-sky-300 font-bold">{meta.skeletonKeys}</span>
+              <span className="ml-1.5 font-mono text-xs text-muted-foreground uppercase tracking-widest">skeleton keys — spend at the Quartermaster</span>
+            </div>
+          </button>
         )}
       </div>
     </motion.div>

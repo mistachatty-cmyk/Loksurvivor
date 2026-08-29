@@ -38,6 +38,34 @@ export const STATUS_EFFECTS: StatusEffectDef[] = [
     maxStacks: 3,
     speedMultiplier: 0.82,
   },
+  {
+    id: 'wet',
+    name: 'Wet',
+    description: 'Soaked from a broken hydrant. Drags movement slightly and conducts electricity.',
+    color: '#3fb6ff',
+    durationMs: 650,
+    maxStacks: 1,
+    speedMultiplier: 0.85,
+  },
+  {
+    id: 'chilled',
+    name: 'Chilled',
+    description: 'Coolant underfoot bites harder than wet pavement.',
+    color: '#bfe9ff',
+    durationMs: 750,
+    maxStacks: 1,
+    speedMultiplier: 0.4,
+  },
+  {
+    id: 'irradiated',
+    name: 'Irradiated',
+    description: 'Chemical runoff empowers whatever stands in it.',
+    color: '#b6ff2e',
+    durationMs: 700,
+    maxStacks: 1,
+    speedMultiplier: 1.3,
+    damageMultiplier: 1.25,
+  },
 ];
 
 export const STATUS_EFFECTS_BY_ID: Record<string, StatusEffectDef> =

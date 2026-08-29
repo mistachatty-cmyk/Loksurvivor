@@ -9,6 +9,7 @@ import {
   Footprints,
   Gauge,
   HardHat,
+  KeyRound,
   LockKeyhole,
   PackageCheck,
   Shield,
@@ -58,6 +59,13 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
     description: 'Make the streets meaner. The payout gets meaner in your favor.',
     icon: Target,
   },
+  {
+    key: 'relic',
+    eyebrow: 'Rare finds / 04',
+    title: "Locksmith's corner",
+    description: 'Paid for in skeleton keys — notably rare, found by breaking things out in the world.',
+    icon: KeyRound,
+  },
 ];
 
 const STAT_LABELS: Record<string, string> = {
@@ -79,18 +87,24 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'contract-redline': Gauge,
   'contract-hardcase': Skull,
   'contract-no-shelter': LockKeyhole,
+  'kit-strap': PackageCheck,
+  'salvager-instinct': BadgeDollarSign,
+  'loosened-padlock': KeyRound,
+  'masters-cut': Gauge,
 };
 
 const categoryTint: Record<VendorItemCategory, string> = {
   stat: 'border-amber-500/30 bg-amber-500/[0.045]',
   utility: 'border-orange-500/30 bg-orange-500/[0.045]',
   challenge: 'border-red-500/30 bg-red-500/[0.045]',
+  relic: 'border-sky-500/30 bg-sky-500/[0.045]',
 };
 
 const categoryText: Record<VendorItemCategory, string> = {
   stat: 'text-amber-300',
   utility: 'text-orange-300',
   challenge: 'text-red-300',
+  relic: 'text-sky-300',
 };
 
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
@@ -133,7 +147,7 @@ function StackMeter({ owned, cap, category }: { owned: number; cap: number; cate
         {Array.from({ length: cap }).map((_, index) => (
           <span
             key={index}
-            className={`h-1.5 w-3.5 sm:w-5 ${index < owned ? category === 'challenge' ? 'bg-red-400' : 'bg-amber-400' : 'bg-white/10'}`}
+            className={`h-1.5 w-3.5 sm:w-5 ${index < owned ? (category === 'challenge' ? 'bg-red-400' : category === 'relic' ? 'bg-sky-400' : 'bg-amber-400') : 'bg-white/10'}`}
           />
         ))}
       </div>
@@ -145,16 +159,18 @@ function StackMeter({ owned, cap, category }: { owned: number; cap: number; cate
 function PurchaseButton({
   item,
   owned,
-  cred,
+  balance,
+  currencyLabel,
   onPurchase,
 }: {
   item: VendorItemDef;
   owned: number;
-  cred: number;
+  balance: number;
+  currencyLabel: string;
   onPurchase: (id: string) => void;
 }) {
   const isMaxed = owned >= item.maxStacks;
-  const isShort = cred < item.cost;
+  const isShort = balance < item.cost;
   const disabled = isMaxed || isShort;
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -168,8 +184,8 @@ function PurchaseButton({
   const buttonLabel = isMaxed
     ? 'Capacity reached'
     : isShort
-      ? `Need ${item.cost - cred} more cred`
-      : `Issue for ${item.cost} cred`;
+      ? `Need ${item.cost - balance} more ${currencyLabel}`
+      : `Issue for ${item.cost} ${currencyLabel}`;
 
   return (
     <div className="relative mt-5">
@@ -187,7 +203,7 @@ function PurchaseButton({
         }`}
         data-testid={`button-buy-vendor-item-${item.id}`}
         aria-label={`${item.name}: ${buttonLabel}`}
-        title={isMaxed ? `Maxed at ${item.maxStacks} stacks` : isShort ? `Insufficient funds: ${item.cost - cred} more cred needed` : `Purchase ${item.name}`}
+        title={isMaxed ? `Maxed at ${item.maxStacks} stacks` : isShort ? `Insufficient funds: ${item.cost - balance} more ${currencyLabel} needed` : `Purchase ${item.name}`}
       >
         <span className="flex min-w-0 items-center gap-2">
           {isMaxed ? <Check className="h-4 w-4 shrink-0" /> : <ArrowUpRight className="h-4 w-4 shrink-0 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />}
@@ -213,20 +229,22 @@ function PurchaseButton({
 
 function VendorCard({
   item,
-  cred,
+  balance,
+  currencyLabel,
   purchases,
   onPurchase,
   index,
 }: {
   item: VendorItemDef;
-  cred: number;
+  balance: number;
+  currencyLabel: string;
   purchases: Record<string, number>;
   onPurchase: (id: string) => void;
   index: number;
 }) {
   const owned = ownedStacks(item, purchases);
   const isMaxed = owned >= item.maxStacks;
-  const isShort = cred < item.cost;
+  const isShort = balance < item.cost;
 
   return (
     <motion.article
@@ -257,11 +275,11 @@ function VendorCard({
         </div>
         <div className="text-right">
           <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Unit price</p>
-          <p className={`font-mono text-sm font-bold ${isShort && !isMaxed ? 'text-red-300' : 'text-amber-300'}`}>{item.cost} cred</p>
+          <p className={`font-mono text-sm font-bold ${isShort && !isMaxed ? 'text-red-300' : 'text-amber-300'}`}>{item.cost} {currencyLabel}</p>
         </div>
       </div>
 
-      <PurchaseButton item={item} owned={owned} cred={cred} onPurchase={onPurchase} />
+      <PurchaseButton item={item} owned={owned} balance={balance} currencyLabel={currencyLabel} onPurchase={onPurchase} />
     </motion.article>
   );
 }
@@ -280,11 +298,20 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
       onBack={onBack}
       className="bg-[#100e0b]"
       action={
-        <div className="flex items-center gap-3 border border-amber-500/50 bg-amber-500/10 px-4 py-3 shadow-[4px_4px_0_rgba(245,158,11,0.12)]" data-testid="vendor-cred-balance">
-          <BadgeDollarSign className="h-5 w-5 text-amber-300" />
-          <div>
-            <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-amber-200/60">On hand</p>
-            <p className="font-mono text-xl font-bold leading-none text-amber-200">{meta.cred.toLocaleString()} <span className="text-xs text-amber-300/60">cred</span></p>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 border border-amber-500/50 bg-amber-500/10 px-4 py-3 shadow-[4px_4px_0_rgba(245,158,11,0.12)]" data-testid="vendor-cred-balance">
+            <BadgeDollarSign className="h-5 w-5 text-amber-300" />
+            <div>
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-amber-200/60">On hand</p>
+              <p className="font-mono text-xl font-bold leading-none text-amber-200">{meta.cred.toLocaleString()} <span className="text-xs text-amber-300/60">cred</span></p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 border border-sky-500/50 bg-sky-500/10 px-4 py-3 shadow-[4px_4px_0_rgba(14,165,233,0.12)]" data-testid="vendor-skeleton-keys-balance">
+            <KeyRound className="h-5 w-5 text-sky-300" />
+            <div>
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-sky-200/60">Keys</p>
+              <p className="font-mono text-xl font-bold leading-none text-sky-200">{meta.skeletonKeys.toLocaleString()}</p>
+            </div>
           </div>
         </div>
       }
@@ -341,10 +368,23 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
                   </div>
                   <p className="max-w-md text-xs leading-5 text-white/40 sm:text-right">{category.description}</p>
                 </div>
-                <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : category.key === 'stat' ? 'sm:grid-cols-2 xl:grid-cols-3' : category.key === 'utility' ? 'md:grid-cols-2' : 'lg:grid-cols-3'}`}>
-                  {items.map((item, index) => (
-                    <VendorCard key={item.id} item={item} cred={meta.cred} purchases={meta.vendorPurchases} onPurchase={buyVendorItem} index={index} />
-                  ))}
+                <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : category.key === 'stat' ? 'sm:grid-cols-2 xl:grid-cols-3' : category.key === 'utility' || category.key === 'relic' ? 'md:grid-cols-2' : 'lg:grid-cols-3'}`}>
+                  {items.map((item, index) => {
+                    const currency = item.currency ?? 'cred';
+                    const balance = currency === 'skeletonKeys' ? meta.skeletonKeys : meta.cred;
+                    const currencyLabel = currency === 'skeletonKeys' ? 'keys' : 'cred';
+                    return (
+                      <VendorCard
+                        key={item.id}
+                        item={item}
+                        balance={balance}
+                        currencyLabel={currencyLabel}
+                        purchases={meta.vendorPurchases}
+                        onPurchase={buyVendorItem}
+                        index={index}
+                      />
+                    );
+                  })}
                 </div>
               </section>
             );
