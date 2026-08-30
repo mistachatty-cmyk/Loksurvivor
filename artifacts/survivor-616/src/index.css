@@ -187,6 +187,129 @@
   --ring: 326 100% 70%;
 }
 
+/* Pothole Oracle: road paint and oil-slick omens over cracked asphalt. */
+[data-ui-theme='pothole-oracle'] {
+  --background: 32 16% 7%;
+  --foreground: 42 40% 92%;
+  --card: 29 17% 12%;
+  --card-foreground: 42 40% 92%;
+  --card-border: 35 60% 28%;
+  --popover: 29 17% 12%;
+  --popover-foreground: 42 40% 92%;
+  --popover-border: 35 60% 28%;
+  --primary: 52 100% 62%;
+  --primary-foreground: 32 16% 7%;
+  --secondary: 29 20% 17%;
+  --secondary-foreground: 42 40% 92%;
+  --muted: 29 20% 14%;
+  --muted-foreground: 39 20% 62%;
+  --accent: 52 90% 15%;
+  --accent-foreground: 52 100% 62%;
+  --border: 35 60% 28%;
+  --input: 35 60% 28%;
+  --ring: 52 100% 62%;
+  background-image:
+    radial-gradient(circle at 82% 12%, hsl(52 100% 62% / 0.08), transparent 25%),
+    repeating-linear-gradient(116deg, transparent 0 5rem, hsl(42 40% 92% / 0.025) 5.05rem 5.12rem);
+}
+[data-ui-theme='pothole-oracle'][data-ui-swatch='wet-asphalt'] {
+  --primary: 190 90% 70%;
+  --accent-foreground: 190 90% 70%;
+  --ring: 190 90% 70%;
+}
+[data-ui-theme='pothole-oracle'][data-ui-swatch='oil-slick'] {
+  --primary: 316 100% 68%;
+  --accent-foreground: 316 100% 68%;
+  --ring: 316 100% 68%;
+}
+[data-ui-theme='pothole-oracle'][data-ui-swatch='warning-violet'] {
+  --primary: 274 100% 70%;
+  --accent-foreground: 274 100% 70%;
+  --ring: 274 100% 70%;
+}
+
+/* Mall Ghost: dead fluorescent light and a directory map with no "you are here". */
+[data-ui-theme='mall-ghost'] {
+  --background: 260 15% 7%;
+  --foreground: 270 30% 94%;
+  --card: 260 14% 11%;
+  --card-foreground: 270 30% 94%;
+  --card-border: 281 50% 35%;
+  --popover: 260 14% 11%;
+  --popover-foreground: 270 30% 94%;
+  --popover-border: 281 50% 35%;
+  --primary: 86 100% 68%;
+  --primary-foreground: 260 15% 7%;
+  --secondary: 260 18% 16%;
+  --secondary-foreground: 270 30% 94%;
+  --muted: 260 18% 13%;
+  --muted-foreground: 270 18% 64%;
+  --accent: 281 70% 17%;
+  --accent-foreground: 86 100% 68%;
+  --border: 281 50% 35%;
+  --input: 281 50% 35%;
+  --ring: 86 100% 68%;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0 2rem,
+    hsl(86 100% 68% / 0.025) 2.05rem 2.1rem
+  );
+}
+[data-ui-theme='mall-ghost'][data-ui-swatch='food-court-coral'] {
+  --primary: 12 100% 68%;
+  --accent-foreground: 12 100% 68%;
+  --ring: 12 100% 68%;
+}
+[data-ui-theme='mall-ghost'][data-ui-swatch='aquarium-blue'] {
+  --primary: 191 100% 68%;
+  --accent-foreground: 191 100% 68%;
+  --ring: 191 100% 68%;
+}
+[data-ui-theme='mall-ghost'][data-ui-swatch='security-purple'] {
+  --primary: 286 100% 73%;
+  --accent-foreground: 286 100% 73%;
+  --ring: 286 100% 73%;
+}
+
+/* Weather Radio: a tiny broadcast console waiting for the next impossible alert. */
+[data-ui-theme='weather-radio'] {
+  --background: 213 45% 6%;
+  --foreground: 195 35% 93%;
+  --card: 215 40% 10%;
+  --card-foreground: 195 35% 93%;
+  --card-border: 199 50% 30%;
+  --popover: 215 40% 10%;
+  --popover-foreground: 195 35% 93%;
+  --popover-border: 199 50% 30%;
+  --primary: 142 90% 58%;
+  --primary-foreground: 213 45% 6%;
+  --secondary: 214 36% 15%;
+  --secondary-foreground: 195 35% 93%;
+  --muted: 214 36% 12%;
+  --muted-foreground: 198 20% 62%;
+  --accent: 199 75% 15%;
+  --accent-foreground: 142 90% 58%;
+  --border: 199 50% 30%;
+  --input: 199 50% 30%;
+  --ring: 142 90% 58%;
+  background-image: radial-gradient(circle at 20% 20%, hsl(142 90% 58% / 0.06), transparent 22%);
+}
+[data-ui-theme='weather-radio'][data-ui-swatch='storm-warning'] {
+  --primary: 4 100% 68%;
+  --accent-foreground: 4 100% 68%;
+  --ring: 4 100% 68%;
+}
+[data-ui-theme='weather-radio'][data-ui-swatch='lake-effect'] {
+  --primary: 199 100% 70%;
+  --accent-foreground: 199 100% 70%;
+  --ring: 199 100% 70%;
+}
+[data-ui-theme='weather-radio'][data-ui-swatch='sunset-static'] {
+  --primary: 24 100% 66%;
+  --accent-foreground: 24 100% 66%;
+  --ring: 24 100% 66%;
+}
+
 /* Arcade Cabinet's CRT flourishes: chrome frame, phosphor glow, scanlines. Inert under every other theme. */
 [data-ui-theme='arcade'] .terminal-frame {
   border-width: 2px;

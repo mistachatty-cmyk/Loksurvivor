@@ -5,6 +5,7 @@ import {
   Bird,
   Check,
   Compass,
+  Dices,
   FlaskConical,
   FlipVertical2,
   LayoutDashboard,
@@ -23,7 +24,7 @@ import {
 
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
-import { UI_THEMES } from '@/game/data/uiThemes';
+import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
@@ -45,6 +46,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     buyUiTheme,
     equipUiTheme,
     selectUiThemeSwatch,
+    cycleUiLook,
     setDevModeAllUnlocks,
     setMusicReactive,
     setGyroEnabled,
@@ -55,6 +57,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setPaletteInvertEnabled,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
+  const ownedLookCount = uiLooksForOwnedThemeIds(meta.ownedUiThemeIds).length;
 
   const [gyroDenied, setGyroDenied] = useState(false);
   const tiltAvailable = gyroSupported();
@@ -608,9 +611,24 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Hideout customization</p>
               <h2 className="mt-1 text-xl font-black uppercase text-white">Theme &amp; palette</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Set the hideout&rsquo;s mood without changing the action. Themes change the menu chrome; palettes
-                change its signal color and are remembered independently for every theme.
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  Set the hideout&rsquo;s mood without changing the action. Themes change the menu chrome; palettes
+                  change its signal color and are remembered independently for every theme.
+                </p>
+                <button
+                  type="button"
+                  onClick={cycleUiLook}
+                  disabled={ownedLookCount <= 1}
+                  className="flex shrink-0 items-center justify-center gap-2 border border-primary px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground"
+                  data-testid="button-cycle-ui-look"
+                >
+                  <Dices className="h-4 w-4" />
+                  Roll the look
+                </button>
+              </div>
+              <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Lookbook: {ownedLookCount} owned {ownedLookCount === 1 ? 'look' : 'looks'}
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {UI_THEMES.map((theme) => {

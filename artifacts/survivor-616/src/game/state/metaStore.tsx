@@ -39,7 +39,12 @@ import {
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
-import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
+import {
+  DEFAULT_UI_THEME_ID,
+  UI_THEMES_BY_ID,
+  defaultSwatchId,
+  uiLooksForOwnedThemeIds,
+} from '@/game/data/uiThemes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import type {
@@ -893,6 +898,7 @@ type Action =
   | { type: 'buyUiTheme'; id: string }
   | { type: 'equipUiTheme'; id: string }
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
+  | { type: 'cycleUiLook' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
@@ -1047,6 +1053,31 @@ export function reducer(state: StoreState, action: Action): StoreState {
         meta: {
           ...state.meta,
           uiThemeSwatchByTheme: { ...state.meta.uiThemeSwatchByTheme, [action.themeId]: action.swatchId },
+        },
+      };
+    }
+
+    case 'cycleUiLook': {
+      const looks = uiLooksForOwnedThemeIds(state.meta.ownedUiThemeIds);
+      if (looks.length <= 1) return state;
+      const currentSwatchId = activeUiThemeSwatchId(state.meta);
+      const currentIndex = looks.findIndex(
+        (look) => look.themeId === state.meta.uiTheme && look.swatchId === currentSwatchId,
+      );
+      const next = looks[(currentIndex + 1 + looks.length) % looks.length] ?? looks[0];
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          uiTheme: next.themeId,
+          ...(next.swatchId
+            ? {
+                uiThemeSwatchByTheme: {
+                  ...state.meta.uiThemeSwatchByTheme,
+                  [next.themeId]: next.swatchId,
+                },
+              }
+            : {}),
         },
       };
     }
@@ -1363,6 +1394,7 @@ export interface MetaContextValue {
   buyUiTheme: (id: string) => void;
   equipUiTheme: (id: string) => void;
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
+  cycleUiLook: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
@@ -1417,6 +1449,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (themeId: string, swatchId: string) => dispatch({ type: 'selectUiThemeSwatch', themeId, swatchId }),
     [],
   );
+  const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -1527,6 +1560,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyUiTheme,
       equipUiTheme,
       selectUiThemeSwatch,
+      cycleUiLook,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
@@ -1567,6 +1601,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyUiTheme,
     equipUiTheme,
     selectUiThemeSwatch,
+    cycleUiLook,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,

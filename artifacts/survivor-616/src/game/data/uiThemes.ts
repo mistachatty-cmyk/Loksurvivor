@@ -1,5 +1,10 @@
 import type { UIThemeDef } from '@/game/types';
 
+export interface UiLook {
+  themeId: string;
+  swatchId?: string;
+}
+
 /**
  * Purchasable UI chrome themes for hideout/menu screens. Recolors run through
  * CSS custom properties (see `data-ui-theme` in ScreenLayout + src/index.css)
@@ -43,6 +48,45 @@ export const UI_THEMES: UIThemeDef[] = [
       { id: 'motel-pink', name: 'Motel Pink', primaryHsl: '326 100% 70%' },
     ],
   },
+  {
+    id: 'pothole-oracle',
+    name: 'Pothole Oracle',
+    description:
+      'A cracked-concrete divination board: every menu looks like it was found under a streetlight after the rain.',
+    cost: 1200,
+    swatches: [
+      { id: 'road-salt', name: 'Road Salt', primaryHsl: '52 100% 62%' },
+      { id: 'wet-asphalt', name: 'Wet Asphalt', primaryHsl: '190 90% 70%' },
+      { id: 'oil-slick', name: 'Oil Slick', primaryHsl: '316 100% 68%' },
+      { id: 'warning-violet', name: 'Warning Violet', primaryHsl: '274 100% 70%' },
+    ],
+  },
+  {
+    id: 'mall-ghost',
+    name: 'Mall Ghost',
+    description:
+      'Fluorescent signage, closed kiosks, and one vending machine that still remembers your name.',
+    cost: 1600,
+    swatches: [
+      { id: 'fluorescent-lime', name: 'Fluorescent Lime', primaryHsl: '86 100% 68%' },
+      { id: 'food-court-coral', name: 'Food Court Coral', primaryHsl: '12 100% 68%' },
+      { id: 'aquarium-blue', name: 'Aquarium Blue', primaryHsl: '191 100% 68%' },
+      { id: 'security-purple', name: 'Security Purple', primaryHsl: '286 100% 73%' },
+    ],
+  },
+  {
+    id: 'weather-radio',
+    name: 'Weather Radio',
+    description:
+      'A forecast station from a parallel Grand Rapids: warning tones, radar sweeps, and a sky that never quite clears.',
+    cost: 2000,
+    swatches: [
+      { id: 'radar-green', name: 'Radar Green', primaryHsl: '142 90% 58%' },
+      { id: 'storm-warning', name: 'Storm Warning', primaryHsl: '4 100% 68%' },
+      { id: 'lake-effect', name: 'Lake Effect', primaryHsl: '199 100% 70%' },
+      { id: 'sunset-static', name: 'Sunset Static', primaryHsl: '24 100% 66%' },
+    ],
+  },
 ];
 
 export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(
@@ -53,4 +97,13 @@ export const DEFAULT_UI_THEME_ID = 'house';
 
 export function defaultSwatchId(themeId: string): string | undefined {
   return UI_THEMES_BY_ID[themeId]?.swatches?.[0]?.id;
+}
+
+/** Returns the deterministic order used by the hideout's "Roll the Look" control. */
+export function uiLooksForOwnedThemeIds(ownedThemeIds: string[]): UiLook[] {
+  const owned = new Set(ownedThemeIds);
+  return UI_THEMES.filter((theme) => owned.has(theme.id)).flatMap((theme) => {
+    if (!theme.swatches?.length) return [{ themeId: theme.id }];
+    return theme.swatches.map((swatch) => ({ themeId: theme.id, swatchId: swatch.id }));
+  });
 }
