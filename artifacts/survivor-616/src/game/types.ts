@@ -518,6 +518,9 @@ export interface CharacterDef {
 /* Enemies                                                             */
 /* ------------------------------------------------------------------ */
 
+/** Rarity ladder for world-dropped gems, weakest to strongest/rarest. */
+export type GemRarity = 'blue' | 'purple' | 'gold' | 'red' | 'white';
+
 export type EnemyBehavior =
   | 'chase'
   | 'charger'
@@ -560,6 +563,8 @@ export interface EnemyDef {
   traits?: { teleportMs?: number; ghostMs?: number; shiftMs?: number; shiftScale?: number; burstSpeed?: number };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
+  /** Chance (0..1) per rarity that a kill drops a world gem. Omitted rarities never drop. */
+  gemDropTable?: Partial<Record<GemRarity, number>>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1081,13 +1086,43 @@ export interface VendorItemDef {
   effects?: VendorEffect[];
   challengeId?: string;
   /** Currency this item is priced in. Omitted means 'cred', the original default. */
-  currency?: 'cred' | 'skeletonKeys';
+  currency?: 'cred' | 'skeletonKeys' | 'lootTokens';
   /**
    * Another vendor item's id that must own at least one stack first. Used to
    * chain "ability" category items into a purchase tree (e.g. minimap tiers,
    * the ghost cloak line) without a generic prerequisite-graph system.
    */
   requires?: string;
+  /**
+   * Shop UI grouping only -- `cost` stays the source of truth for pricing.
+   * See `data/shop-tiers.ts` for the reference price rungs each band/rung
+   * pair targets.
+   */
+  tierBand?: 'low' | 'medium';
+  tierRung?: number;
+}
+
+/**
+ * A small percentage modifier attachable to an owned `VendorItemDef` node
+ * (its `hostId`) -- not a standalone purchase. `effect` is a short
+ * descriptive label of what the host's node improves; it is display-only
+ * until that node's own numeric behavior is built.
+ */
+export interface GemDef {
+  id: string;
+  hostId: string;
+  pct: 5 | 10 | 15 | 25 | 100;
+  cost: number;
+  effect: string;
+}
+
+/** A cosmetic recolor unlocked permanently with loot tokens, one per gem rarity. */
+export interface GemPaletteItemDef {
+  id: string;
+  rarity: GemRarity;
+  name: string;
+  description: string;
+  cost: number;
 }
 
 /** Derived from Ghost Cloak + its upgrade-tree stacks; null when the base unlock isn't owned. */
@@ -1257,6 +1292,14 @@ export interface MetaState {
   uiTheme: string;
   /** Selected accent swatch id per theme, for themes that offer swatches. */
   uiThemeSwatchByTheme: Record<string, string>;
+  /** GemDef id -> count owned (bought at least once; detaching keeps ownership). */
+  gemsOwned: Record<string, number>;
+  /** VendorItemDef (host) id -> the GemDef id currently socketed into it. */
+  attachedGems: Record<string, string>;
+  /** Lifetime count of world-dropped gems collected across all runs. */
+  totalGemsCollected: number;
+  /** GemPaletteItemDef id -> permanently unlocked. */
+  gemPaletteUnlocked: Record<string, boolean>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1310,6 +1353,10 @@ export interface RunResult {
   lootTokensGained: number;
   /** Rare currency (skeleton keys) earned this run. */
   skeletonKeysGained: number;
+  /** World-dropped gems collected this run. */
+  gemsCollected: number;
+  /** Per-rarity breakdown of gems collected this run. */
+  gemsByRarity: Partial<Record<GemRarity, number>>;
   /** Fatigue applied to the operative after this run. */
   fatigueAddedPct?: number;
   /** Operative's fatigue after this run, before recovery begins. */

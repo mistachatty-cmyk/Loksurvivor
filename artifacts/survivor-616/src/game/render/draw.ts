@@ -13,6 +13,7 @@ import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { ALLIES_BY_ID } from '@/game/data/progression';
+import { GEM_RARITY_COLORS } from '@/game/data/gems';
 import type { AreaSky, ObstacleDef } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
 
@@ -2066,6 +2067,29 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
+function drawGems(ctx: CanvasRenderingContext2D, w: World) {
+  for (const gem of w.gems) {
+    const bob = Math.sin((w.now - gem.bornAt) / 220) * 2;
+    const x = gem.x;
+    const y = gem.y + bob;
+    const color = GEM_RARITY_COLORS[gem.rarity];
+    const r = gem.radius;
+
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8 + r;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 0.7, y);
+    ctx.lineTo(x, y + r);
+    ctx.lineTo(x - r * 0.7, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
   for (const effect of w.effects) {
     const life = (w.now - effect.bornAt) / Math.max(1, effect.expiresAt - effect.bornAt);
@@ -2719,6 +2743,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);
   drawPickups(ctx, w);
+  drawGems(ctx, w);
   drawDungeonEntrances(ctx, w);
   drawDungeonExit(ctx, w);
   drawDungeonChest(ctx, w);

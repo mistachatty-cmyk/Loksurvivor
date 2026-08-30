@@ -38,7 +38,8 @@ import {
   RECOVERY_FACILITIES_BY_ID,
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
-import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
+import { GEM_CATALOG_BY_ID, VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
+import { GEM_PALETTE_ITEMS_BY_ID } from '@/game/data/gems';
 import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
@@ -67,7 +68,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 8;
+const META_VERSION = 9;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -169,6 +170,10 @@ export function createInitialMeta(): MetaState {
     ownedUiThemeIds: [DEFAULT_UI_THEME_ID],
     uiTheme: DEFAULT_UI_THEME_ID,
     uiThemeSwatchByTheme: {},
+    gemsOwned: {},
+    attachedGems: {},
+    totalGemsCollected: 0,
+    gemPaletteUnlocked: {},
   };
 }
 
@@ -221,6 +226,40 @@ function normalizeVendorPurchases(value: unknown): Record<string, number> {
     if (count > 0) purchases[id] = Math.min(item.maxStacks, count);
   }
   return purchases;
+}
+
+function normalizeGemsOwned(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const owned: Record<string, number> = {};
+  for (const [id, rawCount] of Object.entries(value)) {
+    if (!GEM_CATALOG_BY_ID[id]) continue;
+    const count = counter(rawCount);
+    if (count > 0) owned[id] = count;
+  }
+  return owned;
+}
+
+/** Drops any attachment whose gem isn't owned or whose gem/host pairing no longer matches the catalog. */
+function normalizeAttachedGems(value: unknown, gemsOwned: Record<string, number>): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const attached: Record<string, string> = {};
+  for (const [hostId, rawGemId] of Object.entries(value)) {
+    if (typeof rawGemId !== 'string') continue;
+    const gem = GEM_CATALOG_BY_ID[rawGemId];
+    if (!gem || gem.hostId !== hostId) continue;
+    if (!((gemsOwned[rawGemId] ?? 0) > 0)) continue;
+    attached[hostId] = rawGemId;
+  }
+  return attached;
+}
+
+function normalizeGemPaletteUnlocked(value: unknown): Record<string, boolean> {
+  if (!isRecord(value)) return {};
+  const unlocked: Record<string, boolean> = {};
+  for (const [id, flag] of Object.entries(value)) {
+    if (flag === true && GEM_PALETTE_ITEMS_BY_ID[id]) unlocked[id] = true;
+  }
+  return unlocked;
 }
 
 function normalizeOwnedUiThemeIds(value: unknown): string[] {
@@ -594,6 +633,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     .map((episodeId) => CHARACTER_EPISODES_BY_ID[episodeId]?.evolutionId)
     .filter((evolutionId): evolutionId is string => Boolean(evolutionId));
   const unlockedEvolutionIds = [...new Set([...explicitEvolutionIds, ...completedEvolutionIds])];
+  const gemsOwned = normalizeGemsOwned(parsed.gemsOwned);
 
   return {
     version: META_VERSION,
@@ -654,6 +694,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedUiThemeIds,
     uiTheme: normalizeUiTheme(parsed.uiTheme, ownedUiThemeIds),
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
+    gemsOwned,
+    attachedGems: normalizeAttachedGems(parsed.attachedGems, gemsOwned),
+    totalGemsCollected: counter(parsed.totalGemsCollected),
+    gemPaletteUnlocked: normalizeGemPaletteUnlocked(parsed.gemPaletteUnlocked),
   };
 }
 
@@ -664,7 +708,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -889,6 +933,10 @@ type Action =
   | { type: 'buyVendorItem'; id: string }
   | { type: 'refundVendorItem'; id: string }
   | { type: 'refundAllVendorItems' }
+  | { type: 'attachGem'; gemId: string }
+  | { type: 'detachGem'; hostId: string }
+  | { type: 'refundGem'; gemId: string }
+  | { type: 'buyGemPalette'; id: string }
   | { type: 'setUiPanelLayout'; layout: UIPanelLayout }
   | { type: 'buyUiTheme'; id: string }
   | { type: 'equipUiTheme'; id: string }
@@ -989,18 +1037,21 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (nextOwned > 0) vendorPurchases[item.id] = nextOwned;
       else delete vendorPurchases[item.id];
       const currency = item.currency ?? 'cred';
+      const attachedGems = { ...state.meta.attachedGems };
+      if (nextOwned === 0) delete attachedGems[item.id];
       return {
         ...state,
         meta: {
           ...state.meta,
           [currency]: state.meta[currency] + item.cost,
           vendorPurchases,
+          attachedGems,
         },
       };
     }
 
     case 'refundAllVendorItems': {
-      const refundByCurrency: Partial<Record<'cred' | 'skeletonKeys', number>> = {};
+      const refundByCurrency: Partial<Record<'cred' | 'skeletonKeys' | 'lootTokens', number>> = {};
       for (const item of VENDOR_CATALOG) {
         const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
         if (owned <= 0) continue;
@@ -1014,7 +1065,74 @@ export function reducer(state: StoreState, action: Action): StoreState {
           ...state.meta,
           cred: state.meta.cred + (refundByCurrency.cred ?? 0),
           skeletonKeys: state.meta.skeletonKeys + (refundByCurrency.skeletonKeys ?? 0),
+          lootTokens: state.meta.lootTokens + (refundByCurrency.lootTokens ?? 0),
           vendorPurchases: {},
+          attachedGems: {},
+        },
+      };
+    }
+
+    case 'attachGem': {
+      const gem = GEM_CATALOG_BY_ID[action.gemId];
+      if (!gem) return state;
+      if (vendorPurchaseCount(state.meta, gem.hostId) <= 0) return state;
+      const alreadyOwned = (state.meta.gemsOwned[gem.id] ?? 0) > 0;
+      let cred = state.meta.cred;
+      let gemsOwned = state.meta.gemsOwned;
+      if (!alreadyOwned) {
+        if (cred < gem.cost) return state;
+        cred -= gem.cost;
+        gemsOwned = { ...gemsOwned, [gem.id]: 1 };
+      }
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred,
+          gemsOwned,
+          attachedGems: { ...state.meta.attachedGems, [gem.hostId]: gem.id },
+        },
+      };
+    }
+
+    case 'detachGem': {
+      if (!state.meta.attachedGems[action.hostId]) return state;
+      const attachedGems = { ...state.meta.attachedGems };
+      delete attachedGems[action.hostId];
+      return { ...state, meta: { ...state.meta, attachedGems } };
+    }
+
+    case 'refundGem': {
+      const gem = GEM_CATALOG_BY_ID[action.gemId];
+      if (!gem) return state;
+      const owned = state.meta.gemsOwned[gem.id] ?? 0;
+      if (owned <= 0) return state;
+      const gemsOwned = { ...state.meta.gemsOwned };
+      delete gemsOwned[gem.id];
+      const attachedGems = { ...state.meta.attachedGems };
+      if (attachedGems[gem.hostId] === gem.id) delete attachedGems[gem.hostId];
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred + gem.cost,
+          gemsOwned,
+          attachedGems,
+        },
+      };
+    }
+
+    case 'buyGemPalette': {
+      const item = GEM_PALETTE_ITEMS_BY_ID[action.id];
+      if (!item) return state;
+      if (state.meta.gemPaletteUnlocked[item.id]) return state;
+      if (state.meta.lootTokens < item.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lootTokens: state.meta.lootTokens - item.cost,
+          gemPaletteUnlocked: { ...state.meta.gemPaletteUnlocked, [item.id]: true },
         },
       };
     }
@@ -1271,6 +1389,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         cred: prev.cred + result.cred,
         lootTokens: prev.lootTokens + result.lootTokensGained,
         skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
+        totalGemsCollected: prev.totalGemsCollected + result.gemsCollected,
         // Endless records
         endlessRecordDistancePx: result.endless
           ? Math.max(prev.endlessRecordDistancePx, result.endless.maxDistancePx)
@@ -1359,6 +1478,10 @@ export interface MetaContextValue {
   buyVendorItem: (id: string) => void;
   refundVendorItem: (id: string) => void;
   refundAllVendorItems: () => void;
+  attachGem: (gemId: string) => void;
+  detachGem: (hostId: string) => void;
+  refundGem: (gemId: string) => void;
+  buyGemPalette: (id: string) => void;
   setUiPanelLayout: (layout: UIPanelLayout) => void;
   buyUiTheme: (id: string) => void;
   equipUiTheme: (id: string) => void;
@@ -1410,6 +1533,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
   const refundVendorItem = useCallback((id: string) => dispatch({ type: 'refundVendorItem', id }), []);
   const refundAllVendorItems = useCallback(() => dispatch({ type: 'refundAllVendorItems' }), []);
+  const attachGem = useCallback((gemId: string) => dispatch({ type: 'attachGem', gemId }), []);
+  const detachGem = useCallback((hostId: string) => dispatch({ type: 'detachGem', hostId }), []);
+  const refundGem = useCallback((gemId: string) => dispatch({ type: 'refundGem', gemId }), []);
+  const buyGemPalette = useCallback((id: string) => dispatch({ type: 'buyGemPalette', id }), []);
   const setUiPanelLayout = useCallback((layout: UIPanelLayout) => dispatch({ type: 'setUiPanelLayout', layout }), []);
   const buyUiTheme = useCallback((id: string) => dispatch({ type: 'buyUiTheme', id }), []);
   const equipUiTheme = useCallback((id: string) => dispatch({ type: 'equipUiTheme', id }), []);
@@ -1523,6 +1650,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyVendorItem,
       refundVendorItem,
       refundAllVendorItems,
+      attachGem,
+      detachGem,
+      refundGem,
+      buyGemPalette,
       setUiPanelLayout,
       buyUiTheme,
       equipUiTheme,
@@ -1563,6 +1694,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyVendorItem,
     refundVendorItem,
     refundAllVendorItems,
+    attachGem,
+    detachGem,
+    refundGem,
+    buyGemPalette,
     setUiPanelLayout,
     buyUiTheme,
     equipUiTheme,

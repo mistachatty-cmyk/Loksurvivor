@@ -8,11 +8,12 @@ import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
+import { GEM_RARITY_COLORS, GEM_RARITY_LABELS, GEM_RARITY_ORDER } from '@/game/data/gems';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { motion } from 'framer-motion';
-import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
+import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound, Gem } from 'lucide-react';
 
 export interface RunSummaryProps {
   result: RunResult;
@@ -430,7 +431,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
         )}
 
         {/* Loot & Objectives */}
-        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0 || result.skeletonKeysGained > 0) && (
+        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0 || result.skeletonKeysGained > 0 || result.gemsCollected > 0) && (
           <div className="grid gap-4 md:grid-cols-2">
             {result.lootBoxesOpened > 0 && (
               <div className="border border-border bg-card p-5" data-testid="section-loot">
@@ -467,6 +468,31 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">Notably rare. Spend them at the hideout Quartermaster.</p>
+              </div>
+            )}
+
+            {result.gemsCollected > 0 && (
+              <div className="border border-border bg-card p-5" data-testid="section-gems-collected">
+                <div className="flex items-center gap-2">
+                  <Gem className="w-4 h-4 text-primary" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Gems collected
+                  </span>
+                  <span className="ml-auto font-mono text-xs font-bold text-white" data-testid="text-gems-collected">
+                    {result.gemsCollected}
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {GEM_RARITY_ORDER.filter((rarity) => (result.gemsByRarity[rarity] ?? 0) > 0).map((rarity) => (
+                    <span
+                      key={rarity}
+                      className="border border-white/10 bg-black/30 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+                      style={{ color: GEM_RARITY_COLORS[rarity] }}
+                    >
+                      {GEM_RARITY_LABELS[rarity]} × {result.gemsByRarity[rarity]}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 

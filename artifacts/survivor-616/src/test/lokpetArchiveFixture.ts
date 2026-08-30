@@ -107,6 +107,8 @@ export function createLokPetArchiveFixtureResult(): RunResult {
     ],
     lootTokensGained: 0,
     skeletonKeysGained: 0,
+    gemsCollected: 0,
+    gemsByRarity: {},
     completedObjectives: [],
     crewRumor: {
       rumorId: 'bell-shock',

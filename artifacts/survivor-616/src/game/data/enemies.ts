@@ -1,6 +1,7 @@
 import { blobRig, expressiveRig, humanoidRig } from '@/game/sprites/rigs';
 import type { EnemyDef } from '@/game/types';
 import { REACTION_PRESETS } from './reactivity';
+import { gemDrops } from './gems';
 
 /**
  * Everything that wants the player gone. `behavior` selects the movement
@@ -9,6 +10,7 @@ import { REACTION_PRESETS } from './reactivity';
 export const ENEMIES: EnemyDef[] = [
   {
     id: 'nightcrawler',
+    gemDropTable: gemDrops('common'),
     react: REACTION_PRESETS.beatTwitch,
     name: 'Nightcrawler',
     family: 'Street',
@@ -33,6 +35,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'neon-leech',
+    gemDropTable: gemDrops('common'),
     react: REACTION_PRESETS.beatTwitch,
     name: 'Neon Leech',
     family: 'Street',
@@ -57,6 +60,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'ash-wisp',
+    gemDropTable: gemDrops('common'),
     name: 'Ash Wisp',
     family: 'Cinder',
     behavior: 'drifter',
@@ -80,6 +84,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'corner-cutter',
+    gemDropTable: gemDrops('common'),
     name: 'Corner Cutter',
     family: 'Street',
     behavior: 'flanker',
@@ -103,6 +108,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'bass-bruiser',
+    gemDropTable: gemDrops('uncommon'),
     react: REACTION_PRESETS.bassBulge,
     name: 'Bass Bruiser',
     family: 'Heavy',
@@ -127,6 +133,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'lightless-prowler',
+    gemDropTable: gemDrops('uncommon'),
     name: 'Lightless Prowler',
     family: 'Shadow',
     behavior: 'prowler',
@@ -150,6 +157,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'bridge-lookout',
+    gemDropTable: gemDrops('uncommon'),
     name: 'Bridge Lookout',
     family: 'Rooftop',
     behavior: 'lookout',
@@ -174,6 +182,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'river-wraith',
+    gemDropTable: gemDrops('uncommon'),
     name: 'River Wraith',
     family: 'River',
     behavior: 'current',
@@ -197,6 +206,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'bloodhound',
+    gemDropTable: gemDrops('uncommon'),
     react: REACTION_PRESETS.downbeatLunge,
     name: 'Bloodhound',
     family: 'Pack',
@@ -221,6 +231,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'crypt-spitter',
+    gemDropTable: gemDrops('uncommon'),
     name: 'Crypt Spitter',
     family: 'Coven',
     behavior: 'spitter',
@@ -245,6 +256,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'belfry-bat',
+    gemDropTable: gemDrops('common'),
     react: REACTION_PRESETS.beatTwitch,
     name: 'Belfry Bat',
     family: 'Coven',
@@ -269,6 +281,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'crypt-bouncer',
+    gemDropTable: gemDrops('elite'),
     react: REACTION_PRESETS.downbeatLunge,
     name: 'Crypt Bouncer',
     family: 'Elite',
@@ -293,6 +306,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'the-sire',
+    gemDropTable: gemDrops('boss'),
     react: REACTION_PRESETS.bassBulge,
     name: 'The Sire',
     family: 'Boss',
@@ -317,6 +331,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'spiral-moth',
+    gemDropTable: gemDrops('common'),
     name: 'Spiral Moth',
     family: 'Shadow',
     behavior: 'flanker',
@@ -335,6 +350,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'neon-comet',
+    gemDropTable: gemDrops('uncommon'),
     react: REACTION_PRESETS.beatTwitch,
     name: 'Neon Comet',
     family: 'Cosmic',
@@ -354,6 +370,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'smoke-horn',
+    gemDropTable: gemDrops('elite'),
     name: 'Smoke Horn',
     family: 'Elite',
     behavior: 'charger',
@@ -372,6 +389,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'current-stag',
+    gemDropTable: gemDrops('uncommon'),
     name: 'Current Stag',
     family: 'River',
     behavior: 'current',
@@ -390,6 +408,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'ring-scribe',
+    gemDropTable: gemDrops('uncommon'),
     name: 'Ring Scribe',
     family: 'Astral',
     behavior: 'spitter',

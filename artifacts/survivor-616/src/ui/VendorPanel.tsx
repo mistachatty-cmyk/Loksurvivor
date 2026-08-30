@@ -18,6 +18,7 @@ import {
   Lock,
   LockKeyhole,
   Maximize2,
+  Package,
   PackageCheck,
   Palette,
   Radar,
@@ -28,20 +29,26 @@ import {
   Target,
   Timer,
   TrendingUp,
+  Unlock,
   type LucideIcon,
 } from 'lucide-react';
 
-import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import { GEMS_BY_HOST, VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import { GEM_PALETTE_ITEMS, GEM_RARITY_COLORS, GEM_RARITY_LABELS } from '@/game/data/gems';
+import { shopTierFor } from '@/game/data/shop-tiers';
 import { useMeta } from '@/game/state/metaStore';
-import type { VendorItemCategory, VendorItemDef } from '@/game/types';
+import type { GemDef, MetaState, VendorItemCategory, VendorItemDef } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 
 export interface VendorPanelProps {
   onBack: () => void;
 }
 
+/** The vendor's category tabs, plus a pseudo-category for the loot-token cosmetics shelf. */
+type PanelSection = VendorItemCategory | 'gem-palette';
+
 type CategoryConfig = {
-  key: VendorItemCategory;
+  key: PanelSection;
   eyebrow: string;
   title: string;
   description: string;
@@ -84,6 +91,13 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
     description: 'Gear that changes how a run plays, not just its numbers. Some of it chains — buy the first rung to unlock the next.',
     icon: Radar,
   },
+  {
+    key: 'gem-palette',
+    eyebrow: 'Loot token shelf / 06',
+    title: 'Gem palette',
+    description: 'Recolor cuts for dropped gems, one per rarity. Paid for in loot tokens, unlocked for good.',
+    icon: Gem,
+  },
 ];
 
 const STAT_LABELS: Record<string, string> = {
@@ -120,6 +134,8 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'ghost-cloak-full': EyeOff,
   'invert-world': FlipVertical2,
   'invert-palette': Palette,
+  'veteran-plating': Shield,
+  'street-legend': TrendingUp,
 };
 
 /** Short, hand-written labels for "ability" items whose real effect can't be summarized by a single stat/utility delta. */
@@ -148,8 +164,37 @@ function isLocked(item: VendorItemDef, purchases: Record<string, number>): boole
   return Boolean(required) && ownedStacks(required, purchases) <= 0;
 }
 
-function currencyInfo(item: VendorItemDef, meta: { cred: number; skeletonKeys: number }): { balance: number; label: string } {
-  return item.currency === 'skeletonKeys' ? { balance: meta.skeletonKeys, label: 'keys' } : { balance: meta.cred, label: 'cred' };
+type VendorBalances = Pick<MetaState, 'cred' | 'skeletonKeys' | 'lootTokens'>;
+
+function currencyInfo(item: VendorItemDef, meta: VendorBalances): { balance: number; label: string } {
+  if (item.currency === 'skeletonKeys') return { balance: meta.skeletonKeys, label: 'keys' };
+  if (item.currency === 'lootTokens') return { balance: meta.lootTokens, label: 'tokens' };
+  return { balance: meta.cred, label: 'cred' };
+}
+
+/** Buckets a category's items into the plain list plus any tier-banded groups, ordered low→medium, rung ascending. */
+function groupByTier(items: VendorItemDef[]): { untiered: VendorItemDef[]; tiers: Array<{ key: string; label: string; items: VendorItemDef[] }> } {
+  const untiered: VendorItemDef[] = [];
+  const tierMap = new Map<string, VendorItemDef[]>();
+  for (const item of items) {
+    if (!item.tierBand || !item.tierRung) {
+      untiered.push(item);
+      continue;
+    }
+    const key = `${item.tierBand}:${item.tierRung}`;
+    const bucket = tierMap.get(key) ?? [];
+    bucket.push(item);
+    tierMap.set(key, bucket);
+  }
+  const bandOrder: Record<string, number> = { low: 0, medium: 1 };
+  const tiers = [...tierMap.entries()]
+    .map(([key, tierItems]) => {
+      const [band, rung] = key.split(':');
+      const label = shopTierFor({ tierBand: band as VendorItemDef['tierBand'], tierRung: Number(rung) })?.label ?? key;
+      return { key, label, items: tierItems, band: band!, rung: Number(rung) };
+    })
+    .sort((a, b) => (bandOrder[a.band] ?? 0) - (bandOrder[b.band] ?? 0) || a.rung - b.rung);
+  return { untiered, tiers };
 }
 
 function effectLabel(item: VendorItemDef): string {
@@ -206,7 +251,7 @@ function ItemTile({
 }: {
   item: VendorItemDef;
   purchases: Record<string, number>;
-  meta: { cred: number; skeletonKeys: number };
+  meta: VendorBalances;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -237,19 +282,122 @@ function ItemTile({
   );
 }
 
+function gemLabel(gem: GemDef): string {
+  return `+${gem.pct}% ${gem.effect}`;
+}
+
+/** Attach/detach/refund UI for the gems available to one owned node -- the shared pattern every gem-eligible host reuses. */
+function GemSocketSection({
+  hostId,
+  cred,
+  gemsOwned,
+  attachedGems,
+  onAttachGem,
+  onDetachGem,
+  onRefundGem,
+}: {
+  hostId: string;
+  cred: number;
+  gemsOwned: Record<string, number>;
+  attachedGems: Record<string, string>;
+  onAttachGem: (gemId: string) => void;
+  onDetachGem: (hostId: string) => void;
+  onRefundGem: (gemId: string) => void;
+}) {
+  const gems = GEMS_BY_HOST[hostId];
+  if (!gems || gems.length === 0) return null;
+  const attachedId = attachedGems[hostId];
+
+  return (
+    <div className="mt-4 border-t border-border pt-3" data-testid={`section-gem-socket-${hostId}`}>
+      <p className="mb-2 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+        <Gem className="h-3.5 w-3.5 text-primary/70" /> Gem socket
+      </p>
+      <div className="flex flex-col gap-2">
+        {gems.map((gem) => {
+          const owned = (gemsOwned[gem.id] ?? 0) > 0;
+          const attached = attachedId === gem.id;
+          const short = cred < gem.cost;
+          return (
+            <div
+              key={gem.id}
+              className={`flex flex-wrap items-center justify-between gap-2 border px-3 py-2 ${
+                attached ? 'border-primary bg-primary/10' : 'border-border bg-black/20'
+              }`}
+              data-testid={`row-gem-${gem.id}`}
+            >
+              <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-white">
+                {gemLabel(gem)}
+                {attached && <span className="ml-2 text-primary">Attached</span>}
+              </span>
+              <div className="flex items-center gap-2">
+                {!attached && (
+                  <button
+                    type="button"
+                    disabled={!owned && short}
+                    onClick={() => onAttachGem(gem.id)}
+                    className={`border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                      !owned && short
+                        ? 'cursor-not-allowed border-border text-muted-foreground/50'
+                        : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
+                    }`}
+                    data-testid={`button-attach-gem-${gem.id}`}
+                  >
+                    {owned ? 'Attach' : `Attach · ${gem.cost} cred`}
+                  </button>
+                )}
+                {attached && (
+                  <button
+                    type="button"
+                    onClick={() => onDetachGem(hostId)}
+                    className="border border-border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:border-amber-400 hover:text-amber-300"
+                    data-testid={`button-detach-gem-${gem.id}`}
+                  >
+                    Detach
+                  </button>
+                )}
+                {owned && (
+                  <button
+                    type="button"
+                    onClick={() => onRefundGem(gem.id)}
+                    className="border border-border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
+                    data-testid={`button-refund-gem-${gem.id}`}
+                  >
+                    Refund
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ItemDetail({
   item,
   meta,
   purchases,
   onBuy,
   onRefund,
+  gemsOwned,
+  attachedGems,
+  onAttachGem,
+  onDetachGem,
+  onRefundGem,
   inline = false,
 }: {
   item: VendorItemDef;
-  meta: { cred: number; skeletonKeys: number };
+  meta: VendorBalances;
   purchases: Record<string, number>;
   onBuy: (id: string) => void;
   onRefund: (id: string) => void;
+  gemsOwned: Record<string, number>;
+  attachedGems: Record<string, string>;
+  onAttachGem: (gemId: string) => void;
+  onDetachGem: (hostId: string) => void;
+  onRefundGem: (gemId: string) => void;
   inline?: boolean;
 }) {
   const owned = ownedStacks(item, purchases);
@@ -328,19 +476,87 @@ function ItemDetail({
           <kbd className="border border-current px-1 text-[9px]">R</kbd>
         </button>
       </div>
+      {owned > 0 && (
+        <GemSocketSection
+          hostId={item.id}
+          cred={meta.cred}
+          gemsOwned={gemsOwned}
+          attachedGems={attachedGems}
+          onAttachGem={onAttachGem}
+          onDetachGem={onDetachGem}
+          onRefundGem={onRefundGem}
+        />
+      )}
+    </div>
+  );
+}
+
+function GemPaletteSection({
+  gemPaletteUnlocked,
+  lootTokens,
+  onBuy,
+}: {
+  gemPaletteUnlocked: Record<string, boolean>;
+  lootTokens: number;
+  onBuy: (id: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="grid-gem-palette-items">
+      {GEM_PALETTE_ITEMS.map((item) => {
+        const unlocked = gemPaletteUnlocked[item.id] === true;
+        const short = lootTokens < item.cost;
+        const color = GEM_RARITY_COLORS[item.rarity];
+        return (
+          <div
+            key={item.id}
+            className="terminal-frame flex flex-col gap-2 border border-border bg-card p-3"
+            data-testid={`card-gem-palette-${item.id}`}
+          >
+            <div
+              className="grid h-10 w-10 shrink-0 place-items-center border"
+              style={{ borderColor: `${color}66`, backgroundColor: `${color}1a`, color }}
+            >
+              <Gem className="h-5 w-5" strokeWidth={1.7} />
+            </div>
+            <span className="text-[11px] font-black uppercase leading-tight tracking-wide text-white">{item.name}</span>
+            <span className="font-mono text-[9px] font-bold uppercase tracking-widest" style={{ color }}>
+              {GEM_RARITY_LABELS[item.rarity]} cut
+            </span>
+            <p className="text-xs leading-5 text-muted-foreground">{item.description}</p>
+            <button
+              type="button"
+              disabled={unlocked || short}
+              onClick={() => onBuy(item.id)}
+              className={`mt-1 flex items-center justify-center gap-2 border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                unlocked
+                  ? 'cursor-default border-emerald-400/50 text-emerald-300'
+                  : short
+                    ? 'cursor-not-allowed border-border text-muted-foreground/50'
+                    : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
+              }`}
+              data-testid={`button-buy-gem-palette-${item.id}`}
+            >
+              {unlocked ? <Check className="h-4 w-4 shrink-0" /> : <Unlock className="h-4 w-4 shrink-0" />}
+              {unlocked ? 'Unlocked' : `Unlock · ${item.cost.toLocaleString()} tokens`}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 export function VendorPanel({ onBack }: VendorPanelProps) {
-  const { meta, buyVendorItem, refundVendorItem, refundAllVendorItems } = useMeta();
-  const [activeCategory, setActiveCategory] = useState<VendorItemCategory>('stat');
+  const { meta, buyVendorItem, refundVendorItem, refundAllVendorItems, attachGem, detachGem, refundGem, buyGemPalette } = useMeta();
+  const [activeCategory, setActiveCategory] = useState<PanelSection>('stat');
   const [selectedId, setSelectedId] = useState<string>(
     VENDOR_CATALOG.find((item) => item.category === 'stat')?.id ?? VENDOR_CATALOG[0].id,
   );
 
-  const itemsInCategory = VENDOR_CATALOG.filter((item) => item.category === activeCategory);
+  const isGemPalette = activeCategory === 'gem-palette';
+  const itemsInCategory = isGemPalette ? [] : VENDOR_CATALOG.filter((item) => item.category === activeCategory);
   const selectedItem = itemsInCategory.find((item) => item.id === selectedId) ?? itemsInCategory[0];
+  const { untiered, tiers } = groupByTier(itemsInCategory);
 
   const totalOwned = VENDOR_CATALOG.reduce((total, item) => total + ownedStacks(item, meta.vendorPurchases), 0);
   const maxStacks = VENDOR_CATALOG.reduce((total, item) => total + item.maxStacks, 0);
@@ -348,8 +564,14 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
 
   const layout = meta.uiPanelLayout;
 
-  function selectCategory(category: VendorItemCategory) {
+  const tierBuckets = [
+    { key: 'untiered', label: null as string | null, items: untiered },
+    ...tiers.map((tier) => ({ key: tier.key, label: tier.label, items: tier.items })),
+  ].filter((bucket) => bucket.items.length > 0);
+
+  function selectCategory(category: PanelSection) {
     setActiveCategory(category);
+    if (category === 'gem-palette') return;
     const firstItem = VENDOR_CATALOG.find((item) => item.category === category);
     if (firstItem) setSelectedId(firstItem.id);
   }
@@ -388,6 +610,13 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
             <div>
               <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-sky-200/70">Keys</p>
               <p className="font-mono text-xl font-bold leading-none text-sky-200">{meta.skeletonKeys.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="terminal-frame flex items-center gap-3 border border-amber-500/50 bg-amber-500/10 px-4 py-3" data-testid="vendor-loot-tokens-balance">
+            <Package className="h-5 w-5 text-amber-300" />
+            <div>
+              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-amber-200/70">Tokens</p>
+              <p className="font-mono text-xl font-bold leading-none text-amber-200">{meta.lootTokens.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -460,50 +689,88 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
         </div>
 
         <section data-testid={`section-vendor-${activeCategory}`}>
-          {selectedItem &&
+          {isGemPalette ? (
+            <GemPaletteSection gemPaletteUnlocked={meta.gemPaletteUnlocked} lootTokens={meta.lootTokens} onBuy={buyGemPalette} />
+          ) : (
+            selectedItem &&
             (layout === 'rail' ? (
               <div className="grid gap-4 lg:grid-cols-[16rem_1fr]" data-testid="section-vendor-grid">
-                <ItemDetail item={selectedItem} meta={meta} purchases={meta.vendorPurchases} onBuy={buyVendorItem} onRefund={refundVendorItem} />
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {itemsInCategory.map((item) => (
-                    <ItemTile
-                      key={item.id}
-                      item={item}
-                      purchases={meta.vendorPurchases}
-                      meta={meta}
-                      selected={item.id === selectedItem.id}
-                      onSelect={() => setSelectedId(item.id)}
-                    />
+                <ItemDetail
+                  item={selectedItem}
+                  meta={meta}
+                  purchases={meta.vendorPurchases}
+                  onBuy={buyVendorItem}
+                  onRefund={refundVendorItem}
+                  gemsOwned={meta.gemsOwned}
+                  attachedGems={meta.attachedGems}
+                  onAttachGem={attachGem}
+                  onDetachGem={detachGem}
+                  onRefundGem={refundGem}
+                />
+                <div className="flex flex-col gap-4">
+                  {tierBuckets.map((bucket) => (
+                    <div key={bucket.key}>
+                      {bucket.label && (
+                        <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-primary/70">{bucket.label}</p>
+                      )}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {bucket.items.map((item) => (
+                          <ItemTile
+                            key={item.id}
+                            item={item}
+                            purchases={meta.vendorPurchases}
+                            meta={meta}
+                            selected={item.id === selectedItem.id}
+                            onSelect={() => setSelectedId(item.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [grid-auto-flow:dense]" data-testid="section-vendor-grid">
-                {itemsInCategory.map((item) => (
-                  <Fragment key={item.id}>
-                    <ItemTile
-                      item={item}
-                      purchases={meta.vendorPurchases}
-                      meta={meta}
-                      selected={item.id === selectedItem.id}
-                      onSelect={() => setSelectedId(item.id)}
-                    />
-                    {item.id === selectedItem.id && (
-                      <div className="col-span-full">
-                        <ItemDetail
-                          item={selectedItem}
-                          meta={meta}
-                          purchases={meta.vendorPurchases}
-                          onBuy={buyVendorItem}
-                          onRefund={refundVendorItem}
-                          inline
-                        />
-                      </div>
+              <div className="flex flex-col gap-5" data-testid="section-vendor-grid">
+                {tierBuckets.map((bucket) => (
+                  <div key={bucket.key}>
+                    {bucket.label && (
+                      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-primary/70">{bucket.label}</p>
                     )}
-                  </Fragment>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [grid-auto-flow:dense]">
+                      {bucket.items.map((item) => (
+                        <Fragment key={item.id}>
+                          <ItemTile
+                            item={item}
+                            purchases={meta.vendorPurchases}
+                            meta={meta}
+                            selected={item.id === selectedItem.id}
+                            onSelect={() => setSelectedId(item.id)}
+                          />
+                          {item.id === selectedItem.id && (
+                            <div className="col-span-full">
+                              <ItemDetail
+                                item={selectedItem}
+                                meta={meta}
+                                purchases={meta.vendorPurchases}
+                                onBuy={buyVendorItem}
+                                onRefund={refundVendorItem}
+                                gemsOwned={meta.gemsOwned}
+                                attachedGems={meta.attachedGems}
+                                onAttachGem={attachGem}
+                                onDetachGem={detachGem}
+                                onRefundGem={refundGem}
+                                inline
+                              />
+                            </div>
+                          )}
+                        </Fragment>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-            ))}
+            ))
+          )}
         </section>
 
         <div className="flex items-start gap-3 border-l-2 border-primary/45 bg-primary/[0.05] px-4 py-3 text-xs leading-5 text-muted-foreground">

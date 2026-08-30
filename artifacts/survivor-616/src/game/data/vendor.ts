@@ -1,4 +1,4 @@
-import type { ChallengeContractDef, MetaState, VendorItemDef } from '@/game/types';
+import type { ChallengeContractDef, GemDef, MetaState, VendorItemDef } from '@/game/types';
 
 /**
  * Permanent hideout purchases. Costs are intentionally fixed: the player can
@@ -234,11 +234,73 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     cost: 90,
     maxStacks: 1,
   },
+
+  // -- Low tier: priced for crews who have been doing this a while. --
+  {
+    id: 'veteran-plating',
+    name: 'Veteran Plating',
+    description: '+2% contact resistance per stack. Armor cannot exceed the game-wide 60% cap.',
+    category: 'stat',
+    cost: 2_000,
+    maxStacks: 3,
+    tierBand: 'low',
+    tierRung: 1,
+    effects: [{ kind: 'stat', stat: 'armor', add: 0.02, cap: 0.6 }],
+  },
+  {
+    id: 'street-legend',
+    name: 'Street Legend',
+    description: '+15% final cred. Word travels when you have survived this long.',
+    category: 'utility',
+    cost: 8_000,
+    maxStacks: 1,
+    tierBand: 'low',
+    tierRung: 2,
+    effects: [{ kind: 'utility', utility: 'reward-cred-mult', amount: 0.15 }],
+  },
 ];
 
 export const VENDOR_CATALOG_BY_ID: Record<string, VendorItemDef> = Object.fromEntries(
   VENDOR_CATALOG.map((item) => [item.id, item]),
 );
+
+/**
+ * Gems attach to an owned `VendorItemDef` node (their `hostId`) as a
+ * modifier, not a standalone purchase. Each is a small, fixed pct/host/cost
+ * combo -- see `GemDef` in `types.ts`.
+ */
+export const GEM_CATALOG: GemDef[] = [
+  {
+    id: 'grabby-hands-reach-15',
+    hostId: 'grabby-hands',
+    pct: 15,
+    cost: 220,
+    effect: 'reach',
+  },
+  {
+    id: 'colossus-frame-impact-25',
+    hostId: 'colossus-frame',
+    pct: 25,
+    cost: 480,
+    effect: 'impact',
+  },
+  {
+    id: 'ghost-cloak-fade-10',
+    hostId: 'ghost-cloak',
+    pct: 10,
+    cost: 260,
+    effect: 'fade',
+  },
+];
+
+export const GEM_CATALOG_BY_ID: Record<string, GemDef> = Object.fromEntries(
+  GEM_CATALOG.map((gem) => [gem.id, gem]),
+);
+
+export const GEMS_BY_HOST: Record<string, GemDef[]> = GEM_CATALOG.reduce<Record<string, GemDef[]>>((byHost, gem) => {
+  (byHost[gem.hostId] ??= []).push(gem);
+  return byHost;
+}, {});
 
 export const CHALLENGE_CONTRACTS: ChallengeContractDef[] = [
   {
@@ -276,6 +338,16 @@ export const CHALLENGE_CONTRACTS_BY_ID: Record<string, ChallengeContractDef> = O
 
 export function vendorPurchaseCount(meta: MetaState, itemId: string): number {
   return Math.max(0, Math.floor(meta.vendorPurchases[itemId] ?? 0));
+}
+
+export function gemOwnedCount(meta: MetaState, gemId: string): number {
+  return Math.max(0, Math.floor(meta.gemsOwned[gemId] ?? 0));
+}
+
+/** The GemDef currently socketed into a host's node, if any. */
+export function attachedGemFor(meta: MetaState, hostId: string): GemDef | undefined {
+  const gemId = meta.attachedGems[hostId];
+  return gemId ? GEM_CATALOG_BY_ID[gemId] : undefined;
 }
 
 export function availableChallengeContracts(meta: MetaState): ChallengeContractDef[] {

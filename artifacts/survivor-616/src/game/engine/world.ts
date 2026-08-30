@@ -19,6 +19,7 @@ import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
+import { GEM_RADIUS_BY_RARITY, GEM_RARITY_COLORS, GEM_RARITY_LOOT_TOKENS } from '@/game/data/gems';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
@@ -38,6 +39,7 @@ import type {
   DistrictIncursionState,
   EnemyDef,
   EndlessState,
+  GemRarity,
   EvolutionBehavior,
   EvolutionDef,
   HudSnapshot,
@@ -222,6 +224,18 @@ export interface Pickup {
   vx: number;
   vy: number;
   value: number;
+  bornAt: number;
+}
+
+/** A world-dropped gem: cosmetic loot that magnets to the player like a Pickup, but carries a rarity instead of a kind. */
+export interface Gem {
+  uid: number;
+  rarity: GemRarity;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
   bornAt: number;
 }
 
@@ -658,6 +672,15 @@ export interface World {
   /** Rare currency (skeleton keys) earned this run, found by breaking street props. */
   skeletonKeysGained: number;
 
+  /* ---- Gem drop system ---- */
+  gems: Gem[];
+  /** Total world-dropped gems collected this run. */
+  gemsCollected: number;
+  /** Per-rarity breakdown of gems collected this run. */
+  gemsByRarity: Partial<Record<GemRarity, number>>;
+  /** Wide auto-collect radius for dropped gems, replacing the normal magnet. Off until a later phase wires up the ability that toggles it. */
+  gemVacuumActive: boolean;
+
   /* ---- Objective system ---- */
   objectives: RunObjective[];
   completedObjectives: CompletedObjective[];
@@ -903,6 +926,10 @@ export function createWorld(
     openedPrizes: [],
     lootTokensGained: 0,
     skeletonKeysGained: 0,
+    gems: [],
+    gemsCollected: 0,
+    gemsByRarity: {},
+    gemVacuumActive: false,
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
     episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
@@ -2109,6 +2136,12 @@ function killEnemy(w: World, enemy: EnemyActor) {
     });
   }
 
+  if (enemy.def.gemDropTable) {
+    for (const [rarity, chance] of Object.entries(enemy.def.gemDropTable) as Array<[GemRarity, number]>) {
+      if (w.rng() < chance) spawnGem(w, enemy.x, enemy.y, rarity);
+    }
+  }
+
   if (enemy.def.family === 'Boss') {
     if (w.endless?.inDungeon && w.endless.dungeonRoom === 3) {
       w.endless.dungeonBossDefeated = true;
@@ -2873,6 +2906,19 @@ function spawnLootBox(w: World, x: number, y: number) {
     uid: uid(w), kind: 'loot-box', x, y,
     vx: randRange(w.rng, -20, 20), vy: randRange(w.rng, -20, 20),
     value: 0, bornAt: w.now,
+  });
+}
+
+function spawnGem(w: World, x: number, y: number, rarity: GemRarity) {
+  w.gems.push({
+    uid: uid(w),
+    rarity,
+    x,
+    y,
+    vx: randRange(w.rng, -35, 35),
+    vy: randRange(w.rng, -35, 35),
+    radius: GEM_RADIUS_BY_RARITY[rarity],
+    bornAt: w.now,
   });
 }
 
@@ -4385,6 +4431,44 @@ function updatePickups(w: World, dt: number) {
   }
 }
 
+/** Wide auto-collect radius once `gemVacuumActive` is set; a later phase wires up the ability that flips it. */
+const GEM_VACUUM_RADIUS = 480;
+
+function updateGems(w: World, dt: number) {
+  const p = w.player;
+  const magnet = w.gemVacuumActive ? GEM_VACUUM_RADIUS : w.stats.magnet;
+
+  for (let i = w.gems.length - 1; i >= 0; i -= 1) {
+    const gem = w.gems[i]!;
+    const dx = p.x - gem.x;
+    const dy = p.y - gem.y;
+    const distance = Math.hypot(dx, dy) || 1;
+
+    if (distance < magnet) {
+      const pull = 260 + (magnet - distance) * 5;
+      gem.vx += (dx / distance) * pull * dt;
+      gem.vy += (dy / distance) * pull * dt;
+    }
+
+    gem.x += gem.vx * dt;
+    gem.y += gem.vy * dt;
+    gem.vx *= Math.pow(0.02, dt);
+    gem.vy *= Math.pow(0.02, dt);
+
+    if (distance < p.radius + gem.radius) {
+      w.gemsCollected += 1;
+      w.gemsByRarity[gem.rarity] = (w.gemsByRarity[gem.rarity] ?? 0) + 1;
+      const tokens = GEM_RARITY_LOOT_TOKENS[gem.rarity];
+      w.lootTokensGained += tokens;
+      w.popups.push({
+        x: p.x, y: p.y - 20, text: `+${tokens}t`,
+        color: GEM_RARITY_COLORS[gem.rarity], bornAt: w.now, vy: 28,
+      });
+      w.gems.splice(i, 1);
+    }
+  }
+}
+
 function updateObjectives(w: World) {
   const e = w.endless;
   const freshlyCompleted: RunObjective[] = [];
@@ -5227,6 +5311,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updatePotholes(w);
   updateRumorPulses(w);
   updatePickups(w, dt);
+  updateGems(w, dt);
   updateObjectives(w);
   updateParticles(w, dt);
   updateRescue(w, dt);
@@ -5490,6 +5575,8 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     skeletonKeysGained: w.skeletonKeysGained,
+    gemsCollected: w.gemsCollected,
+    gemsByRarity: { ...w.gemsByRarity },
     completedObjectives: [...w.completedObjectives],
     episode: (() => {
       const snapshot = episodeSnapshot(w);
