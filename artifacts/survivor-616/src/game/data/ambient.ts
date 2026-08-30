@@ -31,6 +31,30 @@ export const AMBIENT_KINDS: AmbientKindDef[] = [
     fleeSpeedMult: 4.5,
     fleeRadius: 60,
   },
+  {
+    id: 'bubble-duck',
+    name: 'Bubble Duck',
+    palette: {
+      ink: '#0a1a26', body: '#7dd3fc', bodyDark: '#0369a1', accent: '#fde68a',
+      accentBright: '#fffbeb', skin: '#38bdf8', glow: '#bae6fd',
+    },
+    rig: blobRig({ height: 8, width: 11, wings: true }),
+    speed: 22,
+    fleeSpeedMult: 3.0,
+    fleeRadius: 70,
+  },
+  {
+    id: 'drifting-bubble',
+    name: 'Drifting Bubble',
+    palette: {
+      ink: '#0c1c2a', body: '#a5d8ff', bodyDark: '#5eb1ef', accent: '#e0f7ff',
+      accentBright: '#ffffff', skin: '#a5d8ff', glow: '#cdefff',
+    },
+    rig: blobRig({ height: 9, width: 9 }),
+    speed: 10,
+    fleeSpeedMult: 1.4,
+    fleeRadius: 40,
+  },
 ];
 
 export const AMBIENT_KINDS_BY_ID: Record<string, AmbientKindDef> = Object.fromEntries(
