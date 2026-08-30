@@ -95,6 +95,20 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#fee2e2', skin: '#92400e', glow: '#f87171',
     },
   },
+  {
+    id: 'bulbosa',
+    name: 'Bulbosa',
+    role: 'Bubbleteer commander',
+    blurb: 'Led the crossing into the Bubblenaughts\' kingdom in her father\'s name, same as he led it in his. Whatever happened out there, it ended in something other than blood, and now she keeps a corner of the hideout blue and pink at once.',
+    room: 'main-floor',
+    boost: { area: 0.1 },
+    boostLabel: '+10% area',
+    preferredActivityIds: ['scout-routes', 'study-anomalies'],
+    palette: {
+      ink: '#22091a', body: '#db2777', bodyDark: '#831843', accent: '#f9a8d4',
+      accentBright: '#fff0f7', skin: '#f6c9de', glow: '#ff9ecb',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
@@ -181,6 +195,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'market-bell', name: 'The Market Bell', blurb: 'A brass bell from the old market hall. Vee says it rang once for every person who made it home.' },
   { id: 'northline-switch', name: 'Northline Switch', blurb: 'A rail switch marked with the Sanctum symbol. Someone has been moving supplies under the city.' },
   { id: 'civic-fountain', name: 'The Civic Fountain', blurb: 'The plaza fountain still runs red at midnight, carrying the Sire’s oldest route toward the river.' },
+  { id: 'bubble-truce', name: 'The Bubble Truce', blurb: 'Two family lines, one rivalry passed down twice over, and one afternoon where nobody could remember why they were still fighting.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(
