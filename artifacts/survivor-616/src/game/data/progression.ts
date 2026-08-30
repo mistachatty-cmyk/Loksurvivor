@@ -366,6 +366,26 @@ export const UPGRADES: UpgradeDef[] = [
     maxStacks: 5,
     effects: [{ kind: 'stat', stat: 'lifesteal', add: 0.04 }],
   },
+  {
+    id: '33-rpm',
+    name: '33 RPM',
+    description: 'Slower, heavier attacks: -15% attack speed, +45% damage.',
+    weight: 5,
+    maxStacks: 3,
+    effects: [
+      { kind: 'stat', stat: 'haste', mult: 1.15 },
+      { kind: 'stat', stat: 'power', mult: 1.45 },
+    ],
+    weaponKinds: ['projectile'],
+  },
+  {
+    id: 'color-correct',
+    name: 'Color Correct',
+    description: 'Everything caught without its color takes 5% more damage from all sources.',
+    weight: 6,
+    maxStacks: 4,
+    effects: [{ kind: 'stat', stat: 'power', mult: 1.05 }],
+  },
 ];
 
 export const UPGRADES_BY_ID: Record<string, UpgradeDef> = Object.fromEntries(

@@ -218,6 +218,15 @@ export const CHARACTER_EPISODES: CharacterEpisodeDef[] = [
     completionText: 'Punchline gets the whole plaza laughing on the second beat.',
     evolutionId: 'punchline-reprise',
   }),
+  episode({
+    id: 'artisanvalor-gallery-heist', characterId: 'artisanvalor', title: 'Gallery Heist',
+    teaser: "Someone's trying to walk out with the last real color in the city.",
+    cityLocation: 'Civic Plaza · the final gallery',
+    areaId: 'civic-plaza', crewAllyId: 'vee',
+    objective: killAny('artisanvalor-gallery-kills', 'Take out 70 plaza threats', 70),
+    completionText: 'The Curator scratches a second groove into the record — the gallery keeps its color.',
+    evolutionId: 'scratch-track',
+  }),
 ];
 
 export const CHARACTER_EPISODES_BY_ID: Record<string, CharacterEpisodeDef> =

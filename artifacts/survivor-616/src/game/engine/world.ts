@@ -2497,6 +2497,19 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
 
     case 'homing':
     case 'projectile': {
+      if (weapon.groundSlam) {
+        // Needle Drop & Scratch: the stylus stabs the ground before ejecting its disc,
+        // snapping a ring of light outward that stuns and shoves anything caught in it.
+        w.effects.push({
+          uid: uid(w), kind: 'nova', x: p.x, y: p.y, radius: weapon.range, angle: 0, spread: 0,
+          bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
+          damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger,
+          hitUids: new Set(), followPlayer: false,
+        });
+        novaDamage(w, p.x, p.y, weapon.range, damage, weaponImpact(weapon), 'freeze');
+        damageBreakable(w, p.x, p.y, weapon.range, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
+        w.shake = Math.max(w.shake, 4);
+      }
       const used = new Set<number>();
       const shots = Math.max(1, runWeapon.count);
       for (let i = 0; i < shots; i += 1) {
@@ -2521,7 +2534,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           turnRate: weapon.kind === 'homing' ? 5.2 : 0,
           color: palette.accent,
           trail: [],
-          pierce: 0,
+          pierce: weapon.pierce ?? 0,
           hitUids: new Set(),
           obstacleUids: new Set(),
           obstacleInteraction: weapon.obstacleInteraction ?? 'block',

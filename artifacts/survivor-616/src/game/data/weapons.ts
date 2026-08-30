@@ -24,6 +24,7 @@ export const WEAPONS: WeaponDef[] = [
   { id: 'orbit-whale', name: 'Orbit Whale', kind: 'wave', description: 'A deep blue breach rolls outward like a whale through stars.', damage: 30, cooldownMs: 1550, range: 190, count: 2, levelDamageScale: 0.27, impactIntensity: 4, color: '#60a5fa' },
   { id: 'blink-choir', name: 'Blink Choir', kind: 'teleport', description: 'The choir disappears and reappears behind the nearest threat.', damage: 22, cooldownMs: 1250, range: 320, durationMs: 700, levelDamageScale: 0.26, impactIntensity: 3, color: '#f0abfc', statusEffectId: 'slow' },
   { id: 'punchline', name: 'Punchline', kind: 'punch', description: 'A delayed joke detonates after the first hit lands.', damage: 42, cooldownMs: 2100, range: 150, durationMs: 500, levelDamageScale: 0.32, impactIntensity: 4, impactTrigger: 'stomp', color: '#facc15' },
+  { id: 'hard-light-stylus', name: 'Hard-Light Stylus', kind: 'projectile', description: 'A heavy hard-light tonearm blade. Stabs the ground and snaps the floor into a scratch-groove burst before ejecting a piercing neon disc.', damage: 20, cooldownMs: 900, range: 140, speed: 380, lifetimeMs: 1600, levelDamageScale: 0.26, pierce: 1, impactIntensity: 3, color: '#ff2b4d', groundSlam: true },
 ];
 
 export const WEAPONS_BY_ID: Record<string, WeaponDef> = Object.fromEntries(WEAPONS.map((weapon) => [weapon.id, weapon]));
