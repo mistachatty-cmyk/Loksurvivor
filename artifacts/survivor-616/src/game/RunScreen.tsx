@@ -70,8 +70,8 @@ function SecondaryRow({
         style={{ backgroundColor: color ?? 'rgba(255,255,255,.4)', boxShadow: color ? `0 0 6px ${color}` : undefined }}
       />
       <span className="min-w-0 flex-1">
-        <span className="block font-mono text-[10px] font-bold uppercase tracking-wide text-white">{label}</span>
-        {detail ? <span className="block text-[10px] leading-snug text-white/70">{detail}</span> : null}
+        <span className="block font-mono font-bold uppercase tracking-wide text-white">{label}</span>
+        {detail ? <span className="block text-[0.92em] leading-snug text-white/70">{detail}</span> : null}
         {progressPct !== undefined ? (
           <span className="mt-1 block h-1 w-full overflow-hidden bg-white/10">
             <span
@@ -691,25 +691,28 @@ export function RunScreen({
         data-testid="surface-controls"
       />
 
-      {/* HUD: a slim always-on strip, plus one tappable drawer for everything else. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 p-2">
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="h-2 w-full overflow-hidden border border-black/60 bg-black/60">
+      {/* HUD: a slim always-on strip, plus one tappable drawer for everything else.
+          Chrome stays transparent or lightly tinted (never a flat black plate) so
+          the game world reads through it, and scales up at wider viewports --
+          the interaction is identical on phone and desktop, only the size differs. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 p-2 sm:p-3">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <div className="min-w-0 flex-1 space-y-1 sm:space-y-1.5">
+            <div className="h-2 w-full overflow-hidden border border-white/10 bg-black/20 sm:h-2.5 md:h-3">
               <div
-                className="h-full bg-[#ff4d5e] transition-[width] duration-150"
+                className="h-full bg-[#ff4d5e] shadow-[0_0_6px_rgba(255,77,94,.6)] transition-[width] duration-150"
                 style={{ width: `${hpPct}%` }}
                 data-testid="bar-health"
               />
             </div>
-            <div className="h-1 w-full overflow-hidden border border-black/60 bg-black/60">
+            <div className="h-1 w-full overflow-hidden border border-white/10 bg-black/20 sm:h-1.5 md:h-2">
               <div
-                className="h-full bg-[#6ee7ff] transition-[width] duration-150"
+                className="h-full bg-[#6ee7ff] shadow-[0_0_6px_rgba(110,231,255,.6)] transition-[width] duration-150"
                 style={{ width: `${xpPct}%` }}
                 data-testid="bar-xp"
               />
             </div>
-            <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-white/80">
+            <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-white/90 drop-shadow sm:gap-3 sm:text-[11px] md:text-xs">
               <span data-testid="text-level">Lv {hud?.level ?? 1}</span>
               <span data-testid="text-kills">{hud?.kills ?? 0} down</span>
               <span className="truncate">
@@ -721,21 +724,21 @@ export function RunScreen({
               </span>
             </div>
             {endlessStatusLine ? (
-              <div className="truncate font-mono text-[9px] uppercase tracking-widest text-primary/80" data-testid="text-endless-status">
+              <div className="truncate font-mono text-[9px] uppercase tracking-widest text-primary drop-shadow sm:text-[11px] md:text-xs" data-testid="text-endless-status">
                 {endlessStatusLine}
               </div>
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            <div className="border border-white/20 bg-black/70 px-2 py-1 font-mono text-sm font-bold text-white tabular-nums" data-testid="text-timer">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <div className="font-mono text-sm font-bold text-white tabular-nums drop-shadow sm:text-base md:text-lg" data-testid="text-timer">
               {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
             </div>
             {phase === 'playing' || phase === 'paused' ? (
               <button
                 type="button"
                 onClick={() => setPhaseBoth(phase === 'playing' ? 'paused' : 'playing')}
-                className="pointer-events-auto border border-white/20 bg-black/70 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-white/80"
+                className="pointer-events-auto border border-white/25 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-white/90 drop-shadow sm:px-2.5 sm:text-[11px] md:text-xs"
                 data-testid="button-pause"
               >
                 {phase === 'paused' ? 'Resume' : 'Pause'}
@@ -749,7 +752,7 @@ export function RunScreen({
             type="button"
             onClick={toggleSecondary}
             aria-pressed={secondaryOpen}
-            className="pointer-events-auto mt-1 flex items-center gap-1.5 border border-primary/40 bg-black/70 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary"
+            className="pointer-events-auto mt-1 flex items-center gap-1.5 border border-primary/40 bg-[#050911]/45 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-primary shadow-[0_0_10px_hsl(var(--primary)/0.35)] sm:mt-1.5 sm:px-2.5 sm:py-1 sm:text-[11px] md:text-xs"
             data-testid="button-hud-secondary"
           >
             <span>{secondaryCount} update{secondaryCount === 1 ? '' : 's'}</span>
@@ -759,7 +762,7 @@ export function RunScreen({
 
         {(secondaryOpen || meta.hudSecondaryAlwaysShown) && hud ? (
           <div
-            className="pointer-events-auto mt-1.5 max-h-[42vh] overflow-y-auto border border-white/15 bg-black/85 p-2"
+            className="pointer-events-auto mt-1.5 max-h-[42vh] overflow-y-auto border border-white/10 bg-[#050911]/55 p-2 text-[10px] sm:mt-2 sm:max-h-[46vh] sm:p-2.5 sm:text-xs md:max-h-[50vh] md:text-sm"
             data-testid="panel-hud-secondary"
           >
             {hud.rescueAvailable ? (
@@ -790,15 +793,15 @@ export function RunScreen({
             ) : null}
 
             {hud.loadout.weapons.length + hud.loadout.passives.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 border-b border-white/10 py-1" data-testid="row-loadout">
+              <div className="flex flex-wrap gap-1.5 border-b border-white/10 py-1 sm:gap-2" data-testid="row-loadout">
                 {hud.loadout.weapons.map((weapon) => {
                   const kind = WEAPONS_BY_ID[weapon.id]?.kind;
                   return (
                     <div
                       key={weapon.id}
                       title={weapon.name}
-                      className="flex h-7 min-w-7 items-center gap-1 justify-center border border-white/25 bg-black/75 px-1.5 font-mono text-[10px] font-bold text-white"
-                      style={{ borderColor: weapon.color ?? 'rgba(255,255,255,.25)' }}
+                      className="flex h-7 min-w-7 items-center gap-1 justify-center border px-1.5 font-mono font-bold text-white drop-shadow sm:h-8 sm:min-w-8"
+                      style={{ borderColor: weapon.color ?? 'rgba(255,255,255,.35)' }}
                     >
                       {kind ? <WeaponIcon kind={kind} color={weapon.color} size={14} className="shrink-0" /> : null}
                       {weapon.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5 text-primary">{weapon.level}</sup>
@@ -806,7 +809,7 @@ export function RunScreen({
                   );
                 })}
                 {hud.loadout.passives.map((passive) => (
-                  <div key={passive.id} title={passive.name} className="flex h-7 min-w-7 items-center justify-center border border-primary/35 bg-primary/10 px-1.5 font-mono text-[10px] font-bold text-primary">
+                  <div key={passive.id} title={passive.name} className="flex h-7 min-w-7 items-center justify-center border border-primary/50 px-1.5 font-mono font-bold text-primary drop-shadow sm:h-8 sm:min-w-8">
                     {passive.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5">{passive.stacks}</sup>
                   </div>
                 ))}
@@ -933,12 +936,12 @@ export function RunScreen({
         type="button"
         onClick={triggerUltimate}
         disabled={(hud?.ultimateReadyPct ?? 0) < 100}
-        className="absolute bottom-8 right-6 h-20 w-20 rounded-full border-2 border-white/25 bg-black/70 font-mono text-[10px] uppercase leading-tight tracking-widest text-white disabled:opacity-45"
+        className="absolute bottom-8 right-6 h-20 w-20 rounded-full border-2 border-white/25 font-mono text-[10px] uppercase leading-tight tracking-widest text-white drop-shadow disabled:opacity-45 sm:h-24 sm:w-24 sm:text-xs"
         style={{
           background:
             hud && hud.ultimateReadyPct >= 100
-              ? `radial-gradient(circle, ${character.palette.accent}55, rgba(0,0,0,0.75))`
-              : `conic-gradient(${character.palette.accent}88 ${(hud?.ultimateReadyPct ?? 0) * 3.6}deg, rgba(0,0,0,0.75) 0deg)`,
+              ? `radial-gradient(circle, ${character.palette.accent}55, rgba(5,9,17,0.55))`
+              : `conic-gradient(${character.palette.accent}88 ${(hud?.ultimateReadyPct ?? 0) * 3.6}deg, rgba(5,9,17,0.5) 0deg)`,
         }}
         data-testid="button-ultimate"
       >
@@ -1035,23 +1038,23 @@ export function RunScreen({
 
       {phase === 'levelup' && meta.levelUpMode === 'partial' ? (
         <div
-          className="absolute inset-x-0 bottom-0 flex max-h-[36%] flex-col border-t border-primary/40 bg-black/92 p-3"
+          className="absolute inset-x-0 bottom-0 flex max-h-[36%] flex-col border-t border-primary/40 bg-[#050911]/70 p-3 sm:max-h-[32%] sm:p-4"
           data-testid="overlay-levelup-partial"
         >
-          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-primary">Level {hud?.level}</p>
-            <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
+          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 sm:max-w-lg">
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-primary sm:text-xs">Level {hud?.level}</p>
+            <h2 className="text-sm font-black uppercase text-white sm:text-base">Pick your edge</h2>
           </div>
-          <div className="mx-auto mt-2 w-full max-w-md space-y-1.5 overflow-y-auto">
+          <div className="mx-auto mt-2 w-full max-w-md space-y-1.5 overflow-y-auto sm:max-w-lg">
             {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
               <button
                 type="button"
                 onClick={claimRumorHeal}
-                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-2.5 text-left transition hover:bg-[#86efac]/20"
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-2.5 text-left transition hover:bg-[#86efac]/20 sm:p-3"
                 data-testid="button-rumor-heal-partial"
               >
                 <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
-                <p className="mt-1 font-mono text-[10px] text-white/70">Use once alongside your upgrade.</p>
+                <p className="mt-1 font-mono text-[10px] text-white/70 sm:text-xs">Use once alongside your upgrade.</p>
               </button>
             ) : null}
             {choices.map((upgrade) => {
@@ -1061,7 +1064,7 @@ export function RunScreen({
                   key={upgrade.id}
                   type="button"
                   onClick={() => pickUpgrade(upgrade)}
-                  className="flex w-full items-center gap-2 border border-white/20 bg-white/5 p-2.5 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                  className="flex w-full items-center gap-2 border border-white/20 bg-white/5 p-2.5 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99] sm:p-3"
                   data-testid={`button-partial-upgrade-${upgrade.id}`}
                 >
                   {cardWeapon ? (
@@ -1069,7 +1072,7 @@ export function RunScreen({
                   ) : null}
                   <span>
                     <p className="text-sm font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-white/70">{upgrade.description}</p>
+                    <p className="mt-0.5 font-mono text-[10px] text-white/70 sm:text-xs">{upgrade.description}</p>
                   </span>
                 </button>
               );
@@ -1080,14 +1083,14 @@ export function RunScreen({
 
       {phase === 'playing' && meta.levelUpMode === 'continuous' && choices.length > 0 ? (
         <div
-          className="pointer-events-none absolute bottom-4 left-4 z-40 w-[min(88vw,330px)]"
+          className="pointer-events-none absolute bottom-4 left-4 z-40 w-[min(88vw,330px)] sm:w-[min(60vw,380px)]"
           data-testid="panel-continuous-levelup"
         >
-          <div className="pointer-events-auto space-y-2 border border-primary/40 bg-black/85 p-3 shadow-[0_0_24px_rgba(251,191,36,.16)]">
+          <div className="pointer-events-auto space-y-2 border border-primary/40 bg-[#050911]/65 p-3 shadow-[0_0_24px_rgba(251,191,36,.16)] sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">Level {hud?.level}</p>
-                <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
+                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary sm:text-xs">Level {hud?.level}</p>
+                <h2 className="text-sm font-black uppercase text-white sm:text-base">Pick your edge</h2>
               </div>
               <span className="font-mono text-[9px] uppercase tracking-widest text-white/45">Run continues</span>
             </div>
