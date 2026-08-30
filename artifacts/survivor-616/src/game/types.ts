@@ -469,6 +469,48 @@ export interface UltimateDef {
   };
 }
 
+/**
+ * An always-on passive tied to a character's signature weapon that the dash
+ * button also triggers or empowers -- the first of a family of "dash skills".
+ */
+export type DashSkillDef =
+  | {
+      kind: 'pulse-shield';
+      /** Damage each directional pulse deals to enemies it catches. */
+      pulseDamage: number;
+      /** World-unit reach of one pulse. */
+      pulseRadius: number;
+      /** Angular width of one pulse wedge, in radians. */
+      pulseArc: number;
+      /** Music beats between pulses on a single direction slot. */
+      beatsPerPulse: number;
+      /** Weapon levels needed to unlock one more simultaneous direction. */
+      levelsPerDirection: number;
+      /** Hard cap on simultaneous pulse directions. */
+      maxDirections: number;
+      /** Damage multiplier for the all-direction burst a dash triggers. */
+      dashBurstMult: number;
+    }
+  | {
+      kind: 'directional-wall';
+      /** Passive tick damage dealt to anything touching the wall. */
+      wallDamage: number;
+      /** How far the wall stands off from the player. */
+      wallRange: number;
+      /** Angular width of the wall arc, in radians. */
+      wallArc: number;
+      /** Milliseconds between passive wall damage ticks. */
+      wallTickMs: number;
+      /** Damage multiplier applied when a dash pushes the wall outward. */
+      dashPushMult: number;
+      /** Delay after a dash-pushed enemy lands before it detonates, in ms. */
+      landExplodeDelayMs: number;
+      /** Damage dealt by the delayed landing explosion. */
+      landExplodeDamage: number;
+      /** Radius of the delayed landing explosion. */
+      landExplodeRadius: number;
+    };
+
 export interface BaseStats {
   maxHp: number;
   /** World units per second. */
@@ -508,6 +550,8 @@ export interface CharacterDef {
   weapon: WeaponDef;
   ultimate: UltimateDef;
   unlock: UnlockRule;
+  /** Optional always-on ability the dash button also triggers or empowers. */
+  dashSkill?: DashSkillDef;
   /** Path to the reference art the rig was built from, if any. */
   referenceArt?: string;
   /** How this character moves to the music. See `data/reactivity.ts`. */
