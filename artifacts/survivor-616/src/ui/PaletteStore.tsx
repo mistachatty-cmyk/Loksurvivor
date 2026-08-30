@@ -19,11 +19,12 @@ export function PaletteStore() {
           <Sparkles className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Hideout customization</p>
-          <h2 className="mt-1 text-xl font-black uppercase text-white">Color palettes</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Artisian Valur</p>
+          <h2 className="mt-1 text-xl font-black uppercase text-white">Paint Gallery</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Spend loot tokens earned in runs to recolor your characters and the world. Purely cosmetic &mdash;
-            gameplay never changes.
+            Visit the Paint Gallery to spend loot tokens earned in runs and commission custom character and world
+            colorways through Artisian Valur's exquisite palette collection. Purely cosmetic &mdash; gameplay never
+            changes.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             {THEMED_PALETTES.map((theme) => {
