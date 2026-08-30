@@ -40,6 +40,7 @@ import {
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
+import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import type {
@@ -61,6 +62,7 @@ import type {
   FacilityTier,
   RecoverySession,
   StealthAbilityConfig,
+  ThemedPaletteDef,
   UnlockRule,
   CustomMap,
   UIPanelLayout,
@@ -169,6 +171,8 @@ export function createInitialMeta(): MetaState {
     ownedUiThemeIds: [DEFAULT_UI_THEME_ID],
     uiTheme: DEFAULT_UI_THEME_ID,
     uiThemeSwatchByTheme: {},
+    ownedPaletteIds: [DEFAULT_PALETTE_ID],
+    activePaletteId: DEFAULT_PALETTE_ID,
   };
 }
 
@@ -248,6 +252,20 @@ function normalizeUiThemeSwatchByTheme(value: unknown): Record<string, string> {
     }
   }
   return swatches;
+}
+
+function normalizeOwnedPaletteIds(value: unknown): string[] {
+  const owned = new Set<string>([DEFAULT_PALETTE_ID]);
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === 'string' && THEMED_PALETTES_BY_ID[entry]) owned.add(entry);
+    }
+  }
+  return [...owned];
+}
+
+function normalizePaletteId(value: unknown, ownedPaletteIds: string[]): string {
+  return typeof value === 'string' && ownedPaletteIds.includes(value) ? value : DEFAULT_PALETTE_ID;
 }
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
@@ -654,6 +672,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedUiThemeIds,
     uiTheme: normalizeUiTheme(parsed.uiTheme, ownedUiThemeIds),
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
+    ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
+    activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
   };
 }
 
@@ -893,6 +913,8 @@ type Action =
   | { type: 'buyUiTheme'; id: string }
   | { type: 'equipUiTheme'; id: string }
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
+  | { type: 'buyPalette'; id: string }
+  | { type: 'equipPalette'; id: string }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
@@ -1050,6 +1072,23 @@ export function reducer(state: StoreState, action: Action): StoreState {
         },
       };
     }
+
+    case 'buyPalette': {
+      const palette = THEMED_PALETTES_BY_ID[action.id];
+      if (!palette || state.meta.ownedPaletteIds.includes(palette.id) || state.meta.lootTokens < palette.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lootTokens: state.meta.lootTokens - palette.cost,
+          ownedPaletteIds: [...state.meta.ownedPaletteIds, palette.id],
+        },
+      };
+    }
+
+    case 'equipPalette':
+      if (!state.meta.ownedPaletteIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
 
     case 'setDevModeAllUnlocks':
       return {
@@ -1363,6 +1402,8 @@ export interface MetaContextValue {
   buyUiTheme: (id: string) => void;
   equipUiTheme: (id: string) => void;
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
+  buyPalette: (id: string) => void;
+  equipPalette: (id: string) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
@@ -1417,6 +1458,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (themeId: string, swatchId: string) => dispatch({ type: 'selectUiThemeSwatch', themeId, swatchId }),
     [],
   );
+  const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
+  const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -1527,6 +1570,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyUiTheme,
       equipUiTheme,
       selectUiThemeSwatch,
+      buyPalette,
+      equipPalette,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
@@ -1567,6 +1612,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyUiTheme,
     equipUiTheme,
     selectUiThemeSwatch,
+    buyPalette,
+    equipPalette,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,

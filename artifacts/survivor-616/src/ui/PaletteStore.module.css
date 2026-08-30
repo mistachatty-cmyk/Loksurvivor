@@ -1,0 +1,171 @@
+.store {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: 0.5rem;
+  max-width: 1200px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.currency {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.label {
+  color: var(--text-secondary);
+}
+
+.amount {
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 0.5rem;
+  background: var(--bg-tertiary);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.card.active {
+  border-color: var(--accent-bright);
+  background: var(--bg-secondary);
+}
+
+.preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activeIcon {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+.info {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.info h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.footer {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: var(--accent);
+}
+
+.button:hover:not(.disabled) {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+.button.buy {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button.buy:hover {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+.button.equip {
+  border-color: var(--accent-bright);
+  color: var(--accent-bright);
+}
+
+.button.equip:hover {
+  background: var(--accent-bright);
+  color: var(--bg-primary);
+}
+
+.button.active {
+  background: var(--accent);
+  color: var(--bg-primary);
+  border-color: var(--accent);
+  cursor: default;
+}
+
+.button.active:hover {
+  background: var(--accent);
+}
+
+.button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--text-tertiary);
+  color: var(--text-tertiary);
+}
+
+.button.disabled:hover {
+  background: transparent;
+}
