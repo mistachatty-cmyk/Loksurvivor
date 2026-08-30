@@ -252,5 +252,17 @@ export const EVOLUTIONS: EvolutionDef[] = [
     behavior: { kind: 'delayed-burst', radius: 1.16 },
     result: { ...WEAPONS_BY_ID['punchline']!, id: 'punchline-reprise', name: 'Punchline Reprise', description: 'The delayed detonation gets a second laugh from every enemy standing too close.', damage: 48, range: 166, durationMs: 760, cooldownMs: 1980, color: '#fde047', impactTrigger: 'stomp' },
   },
+  {
+    id: 'scratch-track',
+    name: 'Scratch Track',
+    description: 'The disc leaves a lingering, jagged trail of neon audio-wave sparks that keep damaging enemies who walk over it.',
+    identity: 'The vinyl disc leaves a short-lived damaging trail behind its flight path.',
+    color: '#ff5c7a',
+    characterId: 'artisanvalor',
+    episodeId: 'artisanvalor-gallery-heist',
+    baseWeaponId: 'hard-light-stylus',
+    behavior: { kind: 'field', radius: 0.5 },
+    result: { ...WEAPONS_BY_ID['hard-light-stylus']!, id: 'scratch-track', name: 'Scratch Track', description: 'The disc leaves a lingering, jagged trail of neon audio-wave sparks that keep damaging enemies who walk over it.', damage: 24, cooldownMs: 860, color: '#ff5c7a' },
+  },
 ];
 export const EVOLUTIONS_BY_ID: Record<string, EvolutionDef> = Object.fromEntries(EVOLUTIONS.map((evolution) => [evolution.id, evolution]));

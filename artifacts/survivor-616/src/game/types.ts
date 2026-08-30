@@ -376,6 +376,14 @@ export interface WeaponDef {
   durationMs?: number;
   /** Follower behavior metadata for swarm-style signature weapons. */
   follower?: { speed: number; radius: number; count: number; growAfterMs?: number; maxRadius?: number; lifetimeMs?: number };
+  /** Number of additional enemies a projectile can pass through after its first hit. */
+  pierce?: number;
+  /**
+   * Projectile/homing weapons only: before firing, slam an AoE nova (radius
+   * `range`) at the player that stuns and knocks back everything caught in
+   * it. Used for ground-impact attack styles like Needle Drop & Scratch.
+   */
+  groundSlam?: boolean;
 }
 
 /** Designer-facing metadata for a combat status effect. */
