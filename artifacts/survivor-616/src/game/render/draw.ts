@@ -1073,6 +1073,42 @@ function musicVisual(w: World, reactions: Parameters<typeof reactionMultiplier>[
   });
 }
 
+/**
+ * Screen-wide tint stops keyed to `w.cycle.phase` (0/1 = midnight, 0.5 =
+ * neutral daylight) -- a cool blue at midnight, a warm dusk/dawn tone
+ * either side of it, fully transparent at noon.
+ */
+const TIME_OF_DAY_STOPS: Array<[number, [number, number, number, number]]> = [
+  [0, [10, 14, 40, 0.16]],
+  [0.25, [60, 24, 70, 0.12]],
+  [0.5, [0, 0, 0, 0]],
+  [0.75, [90, 46, 12, 0.1]],
+  [1, [10, 14, 40, 0.16]],
+];
+
+function timeOfDayTint(phase: number): string {
+  const clamped = clamp(phase, 0, 1);
+  let a = TIME_OF_DAY_STOPS[0]!;
+  let b = TIME_OF_DAY_STOPS[TIME_OF_DAY_STOPS.length - 1]!;
+  for (let i = 0; i < TIME_OF_DAY_STOPS.length - 1; i += 1) {
+    if (clamped >= TIME_OF_DAY_STOPS[i]![0] && clamped <= TIME_OF_DAY_STOPS[i + 1]![0]) {
+      a = TIME_OF_DAY_STOPS[i]!;
+      b = TIME_OF_DAY_STOPS[i + 1]!;
+      break;
+    }
+  }
+  const span = b[0] - a[0] || 1;
+  const t = (clamped - a[0]) / span;
+  const lerp = (x: number, y: number) => x + (y - x) * t;
+  const [r1, g1, b1, alpha1] = a[1];
+  const [r2, g2, b2, alpha2] = b[1];
+  const r = Math.round(lerp(r1, r2));
+  const g = Math.round(lerp(g1, g2));
+  const bl = Math.round(lerp(b1, b2));
+  const alpha = lerp(alpha1, alpha2);
+  return `rgba(${r}, ${g}, ${bl}, ${alpha.toFixed(3)})`;
+}
+
 function drawLightPool(ctx: CanvasRenderingContext2D, w: World) {
   // The player's pool of light breathes with the low end -- the most legible
   // beat cue on screen, because it moves the whole frame rather than a sprite.
@@ -2697,6 +2733,11 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.globalAlpha = 0.1 + Math.min(0.08, w.endless.dungeonEraIndex * 0.015);
     ctx.fillRect(left, top, right - left, bottom - top);
     ctx.globalAlpha = 1;
+  }
+  const tint = timeOfDayTint(w.cycle.phase);
+  if (tint !== 'rgba(0, 0, 0, 0.000)') {
+    ctx.fillStyle = tint;
+    ctx.fillRect(left, top, right - left, bottom - top);
   }
   drawCloudShadows(ctx, cloudPuffs, profile);
   drawWetSheen(ctx, w, left, top, right, bottom, profile.rain);
