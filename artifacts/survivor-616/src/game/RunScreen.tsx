@@ -10,6 +10,7 @@ import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
@@ -162,7 +163,14 @@ export function RunScreen({
   });
 
   const area = areaOverride ?? getArea(areaId);
-  const character = getCharacter(characterId);
+  const baseCharacter = getCharacter(characterId);
+  // A purchased palette recolors the character (and, via its glow/accent, the
+  // weapons/effects that key off it) without touching the shared data record
+  // -- everyone else selecting this character still gets the authored look.
+  const character =
+    meta.activePaletteId === DEFAULT_PALETTE_ID
+      ? baseCharacter
+      : { ...baseCharacter, palette: getActivePalette(meta.activePaletteId) ?? baseCharacter.palette };
   const firstNightChapter = getFirstNightChapter(areaId);
   const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));

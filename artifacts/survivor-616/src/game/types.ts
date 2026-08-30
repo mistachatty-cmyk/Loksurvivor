@@ -1184,6 +1184,18 @@ export interface UIThemeDef {
   swatches?: UIThemeSwatchDef[];
 }
 
+export interface ThemedPaletteDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Loot token cost to unlock. 0 = always owned. */
+  cost: number;
+  /** When true, this palette is included in default owned set. */
+  owned?: boolean;
+  /** Color palette to apply to sprites and world when active. */
+  palette: SpritePalette;
+}
+
 export type UpgradeEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number }
   | { kind: 'weaponLevel'; amount: number }
@@ -1311,6 +1323,10 @@ export interface MetaState {
   uiTheme: string;
   /** Selected accent swatch id per theme, for themes that offer swatches. */
   uiThemeSwatchByTheme: Record<string, string>;
+  /** Purchased themed palette ids. The 'default' palette is always included. */
+  ownedPaletteIds: string[];
+  /** Currently active character/world color palette id. */
+  activePaletteId: string;
 }
 
 /* ------------------------------------------------------------------ */
