@@ -1011,7 +1011,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'kinetic' | 'settings'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1063,6 +1063,36 @@ export interface DiscoveryDef {
   id: string;
   name: string;
   blurb: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Kinetic Bender kits                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The Kinetic Bender line: reality-bending specials that change how a run
+ * plays rather than nudging a number. They are picked up as kits in the
+ * Kinetic Bender room, one equipped at a time, and fire on their own button
+ * during a run.
+ */
+export type KineticKitId = 'time-stop' | 'kinetic-throw';
+
+export interface KineticKitDef {
+  id: KineticKitId;
+  name: string;
+  tagline: string;
+  description: string;
+  /** One line of in-world colour for the room's card. */
+  flavor: string;
+  /** How the kit is earned, read by the shared unlock evaluator. */
+  unlock: UnlockRule;
+  cost: number;
+  currency: 'cred' | 'skeletonKeys';
+  /** Milliseconds before the kit can fire again. */
+  cooldownMs: number;
+  /** Milliseconds the kit stays active; 0 for instant kits. */
+  durationMs: number;
+  accent: string;
 }
 
 export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'ability';
@@ -1275,6 +1305,10 @@ export interface MetaState {
   uiTheme: string;
   /** Selected accent swatch id per theme, for themes that offer swatches. */
   uiThemeSwatchByTheme: Record<string, string>;
+  /** Kinetic Bender kits picked up so far. */
+  ownedKineticKitIds: KineticKitId[];
+  /** The one kit carried into a run, or null for none. */
+  equippedKineticKitId: KineticKitId | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1479,6 +1513,16 @@ export interface HudSnapshot {
   cyclePhase: number;
   /** True while a timeless contract has the spawn timeline locked. */
   timeless: boolean;
+  /** The equipped Kinetic Bender kit's live state, absent when none is carried. */
+  kinetic?: {
+    id: KineticKitId;
+    name: string;
+    accent: string;
+    readyPct: number;
+    active: boolean;
+    /** True while Time Stop has the world held. */
+    worldHeld: boolean;
+  };
   /** One-run hideout rumor currently carried by this run. */
   crewRumor?: {
     rumorId: CrewRumorId;

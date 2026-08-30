@@ -151,6 +151,17 @@ export const HUB_ROOMS: HubRoomDef[] = [
     features: ['vendor', 'workshop', 'allies', 'settings'],
   },
   {
+    id: 'the-bender',
+    name: 'The Kinetic Bender',
+    subtitle: 'Back room, past the amps',
+    description:
+      'Sable cleared out the speaker graveyard and built something in it. Whatever the rig does, it does not do it to numbers — it does it to the street. One kit leaves with you.',
+    backdrop: 'art/cellar.jpeg',
+    biome: 'cellar',
+    unlock: { kind: 'discovery', discoveryId: 'floodwall-mark' },
+    features: ['kinetic', 'runs', 'settings'],
+  },
+  {
     id: 'the-storefront',
     name: 'The Storefront',
     subtitle: 'Street-level records room',

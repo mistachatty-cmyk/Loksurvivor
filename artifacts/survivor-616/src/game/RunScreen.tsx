@@ -12,6 +12,7 @@ import { getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
+import { equippedKineticKit } from '@/game/data/kinetic';
 import {
   applyUpgrade,
   buildResult,
@@ -125,6 +126,7 @@ export function RunScreen({
   const finishedRef = useRef(false);
   const keysRef = useRef(new Set<string>());
   const ultRequestRef = useRef(false);
+  const kineticRequestRef = useRef(false);
   const stickRef = useRef<StickState>({
     active: false,
     pointerId: null,
@@ -197,6 +199,7 @@ export function RunScreen({
         minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
+        kineticKit: equippedKineticKit(meta),
       },
     );
   }
@@ -213,6 +216,7 @@ export function RunScreen({
       }
       keysRef.current.add(key);
       if (key === ' ') ultRequestRef.current = true;
+      if (key === 'q') kineticRequestRef.current = true;
       if (key === 'escape' || key === 'p') {
         if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
         else if (phaseRef.current === 'paused') setPhaseBoth('playing');
@@ -416,6 +420,8 @@ export function RunScreen({
 
         let ultimate = ultRequestRef.current;
         ultRequestRef.current = false;
+        let kinetic = kineticRequestRef.current;
+        kineticRequestRef.current = false;
 
         // Read the beat once per rendered frame and hold it across every
         // catch-up substep -- re-reading inside the loop would let one beat
@@ -427,8 +433,9 @@ export function RunScreen({
         accumulator = Math.min(accumulator + dt, FIXED_STEP * MAX_SUBSTEPS);
         while (accumulator >= FIXED_STEP) {
           accumulator -= FIXED_STEP;
-          stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate, audio });
+          stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate, kinetic, audio });
           ultimate = false;
+          kinetic = false;
           if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
         }
 
@@ -517,6 +524,10 @@ export function RunScreen({
 
   const triggerUltimate = useCallback(() => {
     ultRequestRef.current = true;
+  }, []);
+
+  const triggerKinetic = useCallback(() => {
+    kineticRequestRef.current = true;
   }, []);
 
   /** Dismiss the reel overlay and resume the run. */
@@ -896,6 +907,38 @@ export function RunScreen({
       >
         {hud?.ultimateActive ? 'Active' : hud && hud.ultimateReadyPct >= 100 ? character.ultimate.name : `${Math.floor(hud?.ultimateReadyPct ?? 0)}%`}
       </button>
+
+      {/* Kinetic Bender kit */}
+      {hud?.kinetic ? (
+        <button
+          type="button"
+          onClick={triggerKinetic}
+          disabled={hud.kinetic.readyPct < 100}
+          className="absolute bottom-32 right-8 h-14 w-14 rounded-full border-2 border-white/25 bg-black/70 font-mono text-[9px] uppercase leading-tight tracking-widest text-white disabled:opacity-45"
+          style={{
+            background:
+              hud.kinetic.readyPct >= 100
+                ? `radial-gradient(circle, ${hud.kinetic.accent}55, rgba(0,0,0,0.75))`
+                : `conic-gradient(${hud.kinetic.accent}88 ${hud.kinetic.readyPct * 3.6}deg, rgba(0,0,0,0.75) 0deg)`,
+          }}
+          data-testid="button-kinetic"
+        >
+          {hud.kinetic.active ? 'Held' : hud.kinetic.readyPct >= 100 ? 'Q' : `${hud.kinetic.readyPct}%`}
+        </button>
+      ) : null}
+
+      {/* Time Stop tint: the one screen-space cue that the world is held. */}
+      {hud?.kinetic?.worldHeld ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-30 border-4"
+          style={{ borderColor: `${hud.kinetic.accent}66`, background: `${hud.kinetic.accent}12` }}
+          data-testid="overlay-time-stop"
+        >
+          <div className="absolute inset-x-0 top-40 text-center font-mono text-xs font-bold uppercase tracking-[0.4em] text-white/70">
+            Time stopped
+          </div>
+        </div>
+      ) : null}
 
       <ChestTally count={hud?.lootBoxesOpened ?? 0} />
 

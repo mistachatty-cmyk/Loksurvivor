@@ -12,10 +12,10 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
+import { Hourglass, Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'kinetic' | 'settings';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -35,6 +35,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
+  kinetic: { label: 'Kinetic Bender', icon: Hourglass, testId: 'button-open-kinetic', description: 'Specials that bend the street' },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
 };
 

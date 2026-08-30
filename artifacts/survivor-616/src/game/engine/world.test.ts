@@ -17,6 +17,7 @@ import { FIRST_NIGHT_CHAPTERS, recommendedFirstNightChapter } from '@/game/data/
 import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { UPGRADES_BY_ID } from '@/game/data/progression';
+import { KINETIC_KITS_BY_ID } from '@/game/data/kinetic';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { DISTRICT_INCURSIONS, DISTRICT_INCURSIONS_BY_ID, chooseDistrictIncursion } from '@/game/data/incursions';
@@ -40,6 +41,8 @@ import {
   isOnBeat,
   musicMultiplier,
   activateUltimate,
+  activateKinetic,
+  timeStopped,
   MIN_TIME_SCALE,
   MAX_TIME_SCALE,
 } from '@/game/engine/world';
@@ -2289,4 +2292,81 @@ test('the pause menu effect list reads existing timers and sorts by expiry', () 
 
   const remaining = effects.map((effect) => effect.remainingMs);
   assert.deepEqual(remaining, [...remaining].sort((a, b) => a - b), 'soonest to expire first');
+});
+
+/* ------------------------------------------------------------------ */
+/* Kinetic Bender kits                                                 */
+/* ------------------------------------------------------------------ */
+
+function kitWorld(kitId: 'time-stop' | 'kinetic-throw') {
+  const world = createWorld(AREAS[0]!, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats }, 11, [], 1, true, null, {
+    kineticKit: KINETIC_KITS_BY_ID[kitId]!,
+  });
+  world.kineticReadyAt = 0;
+  return world;
+}
+
+test('Time Stop holds the enemies and their shots while the player keeps going', () => {
+  const world = kitWorld('time-stop');
+  // Give the freeze something to hold: an enemy and a shot already in flight.
+  runSeconds(world, 6);
+  assert.ok(world.enemies.length > 0, 'the area spawned something to freeze');
+  const enemy = world.enemies[0]!;
+  world.projectiles.push({
+    uid: 9001, x: enemy.x, y: enemy.y, vx: 120, vy: 0, radius: 5, damage: 4, impactIntensity: 0,
+    fromPlayer: false, expiresAt: world.now + 60_000, targetUid: null, turnRate: 0, color: '#f00',
+    trail: [], pierce: 0, hitUids: new Set(),
+  });
+
+  assert.equal(activateKinetic(world), true);
+  assert.equal(timeStopped(world), true);
+
+  const enemyBefore = { x: enemy.x, y: enemy.y };
+  const shot = world.projectiles.find((p) => p.uid === 9001)!;
+  const shotBefore = { x: shot.x, y: shot.y };
+  const enemyCount = world.enemies.length;
+  const playerBefore = world.player.x;
+
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 60, { ...neutralInput, moveX: 1 });
+
+  assert.equal(enemy.x, enemyBefore.x, 'the enemy does not move');
+  assert.equal(enemy.y, enemyBefore.y);
+  assert.equal(shot.x, shotBefore.x, 'an enemy shot hangs in the air');
+  assert.equal(world.enemies.length, enemyCount, 'nothing new spawns while held');
+  assert.ok(world.player.x > playerBefore, 'the player keeps moving');
+
+  // The freeze is a gate, not a rate: the clamped time multiplier is untouched.
+  assert.equal(world.timeMultiplier, 1);
+
+  // It ends on its own, and the street starts again. Track every live enemy
+  // rather than one reference -- the one we froze may have died meanwhile.
+  runSeconds(world, 5);
+  assert.equal(timeStopped(world), false);
+  const before = world.enemies.filter((e) => !e.dying).map((e) => ({ uid: e.uid, x: e.x, y: e.y }));
+  runSeconds(world, 1);
+  const moved = before.some((snapshot) => {
+    const live = world.enemies.find((e) => e.uid === snapshot.uid);
+    return live ? live.x !== snapshot.x || live.y !== snapshot.y : true;
+  });
+  assert.ok(moved, 'enemies move again once the hold ends');
+});
+
+test('Kinetic Throw launches a real prop and does not burn its cooldown on an empty reach', () => {
+  const world = kitWorld('kinetic-throw');
+  const prop = world.breakables.find((b) => !b.broken && b.movable);
+  assert.ok(prop, 'the test area has a movable prop');
+
+  // Nothing in reach: the kit refuses and stays ready.
+  world.player.x = -100_000;
+  world.player.y = -100_000;
+  assert.equal(activateKinetic(world), false);
+  assert.equal(world.kineticReadyAt, 0, 'a failed throw costs nothing');
+
+  // In reach: the prop is handed a velocity, and the existing prop-impact
+  // path carries the damage from there.
+  world.player.x = prop!.x - 40;
+  world.player.y = prop!.y;
+  assert.equal(activateKinetic(world), true);
+  assert.ok(Math.hypot(prop!.vx, prop!.vy) > 0, 'the prop was thrown');
+  assert.ok(world.kineticReadyAt > world.now, 'a landed throw starts the cooldown');
 });

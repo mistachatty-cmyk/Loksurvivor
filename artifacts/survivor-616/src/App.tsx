@@ -26,6 +26,7 @@ import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { VendorPanel } from '@/ui/VendorPanel';
 import { WorkshopPanel } from '@/ui/WorkshopPanel';
+import { KineticBenderPanel } from '@/ui/KineticBenderPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
@@ -50,6 +51,7 @@ type Screen =
   | { name: 'recovery' }
   | { name: 'vendor' }
   | { name: 'workshop' }
+  | { name: 'kinetic' }
   | { name: 'settings' }
   | { name: 'map-editor' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
@@ -79,6 +81,7 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'recovery' ||
       requested === 'vendor' ||
       requested === 'workshop' ||
+      requested === 'kinetic' ||
       requested === 'settings'
     ) {
       return { name: requested };
@@ -125,6 +128,9 @@ function Game() {
         break;
       case 'workshop':
         setScreen({ name: 'workshop' });
+        break;
+      case 'kinetic':
+        setScreen({ name: 'kinetic' });
         break;
       case 'settings':
         setScreen({ name: 'settings' });
@@ -205,6 +211,9 @@ function Game() {
 
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
+
+    case 'kinetic':
+      return <KineticBenderPanel onBack={goHub} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} />;

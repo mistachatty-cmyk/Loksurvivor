@@ -37,6 +37,7 @@ import type {
   CompletedObjective,
   DistrictIncursionState,
   EnemyDef,
+  KineticKitDef,
   EndlessBandId,
   EndlessState,
   EvolutionBehavior,
@@ -606,6 +607,18 @@ export interface World {
    */
   timeless: boolean;
   timelessAtSec: number;
+  /**
+   * The equipped Kinetic Bender kit, or null. One kit per run: it is picked up
+   * in the hideout, not drawn at level-up, so it never competes with upgrades.
+   */
+  kineticKit: KineticKitDef | null;
+  /** Timestamp (`w.now`) the kit is next allowed to fire. */
+  kineticReadyAt: number;
+  /**
+   * Timestamp (`w.now`) the kit's effect ends. For Time Stop this is the
+   * window the world is held; instant kits leave it in the past.
+   */
+  kineticActiveUntil: number;
   /** Endless band whose enemy pool was locked in at activation. */
   timelessBandId: EndlessBandId | null;
 
@@ -771,6 +784,7 @@ export function createWorld(
     minimapEnemyRadar?: boolean;
     minimapLootSense?: boolean;
     minimapHazardSense?: boolean;
+    kineticKit?: KineticKitDef | null;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -863,6 +877,10 @@ export function createWorld(
     timeless: challenges.some((contract) => contract.timeless === true),
     timelessAtSec: 0,
     timelessBandId: null,
+    kineticKit: setup.kineticKit ?? null,
+    // The kit starts on a half cooldown so it cannot open the run.
+    kineticReadyAt: (setup.kineticKit?.cooldownMs ?? 0) / 2,
+    kineticActiveUntil: 0,
     weaponReadyAt: 400,
     ultReadyAt: 4000,
     ultActiveUntil: -1,
@@ -4105,9 +4123,18 @@ function updateEnemies(w: World, dt: number) {
 
 function updateProjectiles(w: World, dt: number) {
   const p = w.player;
+  const held = timeStopped(w);
 
   for (let i = w.projectiles.length - 1; i >= 0; i -= 1) {
     const proj = w.projectiles[i]!;
+
+    // Under Time Stop an enemy shot hangs exactly where it was, expiry
+    // included -- otherwise it would quietly time out mid-freeze and the
+    // player would get a free clear rather than a held one.
+    if (held && !proj.fromPlayer) {
+      proj.expiresAt += dt * 1000;
+      continue;
+    }
 
     if (proj.targetUid !== null) {
       const target = w.enemies.find((e) => e.uid === proj.targetUid && !e.dying);
@@ -5223,6 +5250,8 @@ export interface StepInput {
   moveX: number;
   moveY: number;
   ultimate: boolean;
+  /** True on the frame the player fires their Kinetic Bender kit. */
+  kinetic?: boolean;
   /**
    * The music frame for this rendered frame. Optional so tests and any caller
    * that does not care about audio can omit it and get silence.
@@ -5275,6 +5304,17 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   }
 
   if (input.ultimate) activateUltimate(w);
+  if (input.kinetic) activateKinetic(w);
+
+  /*
+   * Time Stop holds the street, not the player. Everything that belongs to
+   * the opposition -- enemies, their status timers, their spawn flow, the
+   * shots already in the air, the cosmetic crowd -- is skipped, while the
+   * player, their weapons, companions and the props they shove all keep
+   * stepping. Gating the calls rather than zeroing `dt` is what lets those
+   * two halves come apart.
+   */
+  const held = timeStopped(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
   updateStealth(w);
@@ -5286,18 +5326,20 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
     updateEndlessBandHazard(w);
     updateEndlessLandmarkCue(w);
     updateEndlessDungeon(w);
-    updateEndlessSpawning(w, dt);
-  } else {
+    if (!held) updateEndlessSpawning(w, dt);
+  } else if (!held) {
     updateSpawning(w, dt);
   }
 
-  updateStatusEffects(w);
-  updateAmbient(w, dt);
+  if (!held) {
+    updateStatusEffects(w);
+    updateAmbient(w, dt);
+  }
   updateLokPets(w, dt);
   updateFollowers(w, dt);
-  updateEnemies(w, dt);
+  if (!held) updateEnemies(w, dt);
   updateBreakables(w, dt);
-  updateFluids(w);
+  if (!held) updateFluids(w);
 
   // Weapon cadence.
   updateOrbiters(w, dt);
@@ -5336,6 +5378,111 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 /* ------------------------------------------------------------------ */
 /* Read models                                                         */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* Kinetic Bender kits                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * True while Time Stop has the street held.
+ *
+ * This is deliberately *not* expressed through `timeMultiplier`. That value is
+ * a clamped rate in [0.5, 1.5] and a full stop is 0 -- outside it by design.
+ * A freeze is a different kind of thing: a gate on which subsystems step at
+ * all. Keeping the two apart means no combination of time abilities can ever
+ * approach a stop by accident, and the freeze can let the player, their
+ * weapons and the props keep running while the enemies do not.
+ */
+export function timeStopped(w: World): boolean {
+  return w.kineticKit?.id === 'time-stop' && w.now < w.kineticActiveUntil;
+}
+
+/** Reach, in world units, that Kinetic Throw will look for a prop within. */
+const KINETIC_THROW_REACH = 190;
+/** Launch speed of a thrown prop. Fast enough to read as a throw, not a shove. */
+const KINETIC_THROW_SPEED = 620;
+
+/**
+ * Hurl the nearest loose prop along the player's aim.
+ *
+ * The throw does no damage of its own: it hands the prop a velocity and lets
+ * `damageEnemiesFromMovingProp` do the rest, so a thrown dumpster obeys the
+ * same impact spectrum, elite damage caps and chain rules as one the player
+ * shoulder-checked. That is the whole point of reusing the prop physics
+ * rather than spawning a bespoke projectile.
+ */
+function throwKineticProp(w: World): boolean {
+  const p = w.player;
+  const candidates = w.breakables.filter(
+    (b) => !b.broken && b.movable && dist2(p.x, p.y, b.x, b.y) <= KINETIC_THROW_REACH ** 2,
+  );
+  if (candidates.length === 0) {
+    pushAlert(w, 'Nothing loose in reach');
+    return false;
+  }
+  candidates.sort((a, b) => dist2(p.x, p.y, a.x, a.y) - dist2(p.x, p.y, b.x, b.y));
+  const prop = candidates[0]!;
+
+  // Aim at the nearest enemy ahead of the player when there is one, so the
+  // throw lands where the player is looking rather than where they last moved.
+  let aimX = p.facing;
+  let aimY = 0;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const enemy of w.enemies) {
+    if (enemy.dying) continue;
+    const d = dist2(p.x, p.y, enemy.x, enemy.y);
+    if (d > 520 ** 2 || d >= bestDist) continue;
+    bestDist = d;
+    const length = Math.hypot(enemy.x - p.x, enemy.y - p.y) || 1;
+    aimX = (enemy.x - p.x) / length;
+    aimY = (enemy.y - p.y) / length;
+  }
+
+  resetPropChain(prop, true);
+  prop.impactVelocityMultiplier = 1.6;
+  prop.lastPlayerImpactX = -aimX;
+  prop.lastPlayerImpactY = -aimY;
+  prop.nextImpactDamageAt = 0;
+  const speed = KINETIC_THROW_SPEED / Math.max(1, Math.sqrt(prop.mass));
+  prop.vx = aimX * speed;
+  prop.vy = aimY * speed;
+
+  w.shake = Math.max(w.shake, 7);
+  spawnParticles(w, prop.x, prop.y, '#ffb347', 12, 130);
+  w.popups.push({
+    x: prop.x,
+    y: prop.y - prop.h / 2 - 14,
+    text: 'KINETIC THROW',
+    color: '#ffb347',
+    bornAt: w.now,
+    vy: 24,
+  });
+  return true;
+}
+
+/**
+ * Fire the equipped Kinetic Bender kit. Returns false when it is on cooldown,
+ * nothing is equipped, or the kit found nothing to act on.
+ */
+export function activateKinetic(w: World): boolean {
+  const kit = w.kineticKit;
+  if (!kit || w.outcome !== 'running' || w.now < w.kineticReadyAt) return false;
+
+  if (kit.id === 'kinetic-throw') {
+    // A throw with nothing in reach must not burn the cooldown.
+    if (!throwKineticProp(w)) return false;
+  } else {
+    w.kineticActiveUntil = w.now + kit.durationMs;
+    w.shake = Math.max(w.shake, 10);
+    for (const enemy of w.enemies) {
+      spawnParticles(w, enemy.x, enemy.y, kit.accent, 3, 40);
+    }
+  }
+
+  w.kineticReadyAt = w.now + kit.cooldownMs;
+  pushAlert(w, kit.name);
+  return true;
+}
 
 /* ------------------------------------------------------------------ */
 /* Player effect read model                                            */
@@ -5384,6 +5531,16 @@ function playerEffectSnapshots(w: World): PlayerEffectSnapshot[] {
       `World at ${w.timeMultiplier.toFixed(2)}x speed`,
     );
   }
+  if (w.kineticKit && w.kineticKit.durationMs > 0) {
+    add(
+      `kinetic-${w.kineticKit.id}`,
+      w.kineticKit.name,
+      'buff',
+      w.kineticKit.accent,
+      w.kineticActiveUntil,
+      'The street is held still',
+    );
+  }
   add('cloak', 'Ghost Cloak', 'buff', '#a78bfa', w.stealthUntil, 'Enemies chase your last position');
   add('rumor-speed', 'Painted Shortcut', 'buff', '#f472b6', w.rumorSpeedUntil, '+44 move speed');
   add('dash', 'Dash', 'buff', '#e2e8f0', w.player.dashUntil, 'Charging through the crowd');
@@ -5423,6 +5580,22 @@ export function hudSnapshot(w: World): HudSnapshot {
     timeMultiplier: w.timeMultiplier,
     cyclePhase: w.cycle.phase,
     timeless: w.timeless,
+    kinetic: w.kineticKit
+      ? {
+          id: w.kineticKit.id,
+          name: w.kineticKit.name,
+          accent: w.kineticKit.accent,
+          readyPct: Math.round(
+            clamp(
+              100 - (Math.max(0, w.kineticReadyAt - w.now) / Math.max(1, w.kineticKit.cooldownMs)) * 100,
+              0,
+              100,
+            ),
+          ),
+          active: w.now < w.kineticActiveUntil,
+          worldHeld: timeStopped(w),
+        }
+      : undefined,
     kills: w.kills,
     cred: w.cred,
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),

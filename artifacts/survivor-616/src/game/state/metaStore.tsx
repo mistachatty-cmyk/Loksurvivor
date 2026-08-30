@@ -39,6 +39,7 @@ import {
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
+import { KINETIC_KITS, KINETIC_KITS_BY_ID } from '@/game/data/kinetic';
 import { isUnlocked } from '@/game/state/unlocks';
 import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
@@ -56,6 +57,7 @@ import type {
   LokPetDiscoveryHistoryEntry,
   LokPetElement,
   LokPetRarity,
+  KineticKitId,
   LokPetRunDiscovery,
   MetaState,
   RunResult,
@@ -117,6 +119,8 @@ function clampGyroSensitivity(value: unknown): number {
   return Math.max(0.5, Math.min(2, numeric));
 }
 
+const KINETIC_KIT_IDS = new Set(KINETIC_KITS.map((kit) => kit.id));
+
 export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
@@ -170,6 +174,8 @@ export function createInitialMeta(): MetaState {
     ownedUiThemeIds: [DEFAULT_UI_THEME_ID],
     uiTheme: DEFAULT_UI_THEME_ID,
     uiThemeSwatchByTheme: {},
+    ownedKineticKitIds: [],
+    equippedKineticKitId: null,
   };
 }
 
@@ -655,6 +661,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedUiThemeIds,
     uiTheme: normalizeUiTheme(parsed.uiTheme, ownedUiThemeIds),
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
+    ownedKineticKitIds: idList(parsed.ownedKineticKitIds, KINETIC_KIT_IDS, []) as KineticKitId[],
+    equippedKineticKitId: KINETIC_KIT_IDS.has(String(parsed.equippedKineticKitId) as KineticKitId)
+      ? (parsed.equippedKineticKitId as KineticKitId)
+      : null,
   };
 }
 
@@ -871,6 +881,8 @@ type Action =
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
   | { type: 'buyVendorItem'; id: string }
+  | { type: 'buyKineticKit'; id: KineticKitId }
+  | { type: 'equipKineticKit'; id: KineticKitId | null }
   | { type: 'refundVendorItem'; id: string }
   | { type: 'refundAllVendorItems' }
   | { type: 'setUiPanelLayout'; layout: UIPanelLayout }
@@ -961,6 +973,35 @@ export function reducer(state: StoreState, action: Action): StoreState {
           vendorPurchases: { ...state.meta.vendorPurchases, [item.id]: owned + 1 },
         },
       };
+    }
+
+    case 'buyKineticKit': {
+      const kit = KINETIC_KITS_BY_ID[action.id];
+      if (!kit) return state;
+      if (state.meta.ownedKineticKitIds.includes(kit.id)) return state;
+      if (!isUnlocked(kit.unlock, state.meta)) return state;
+      const currency = kit.currency;
+      const balance = state.meta[currency];
+      if (balance < kit.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          [currency]: balance - kit.cost,
+          ownedKineticKitIds: [...state.meta.ownedKineticKitIds, kit.id],
+          // Picking a kit up equips it; carrying nothing after a purchase is
+          // never what the player meant.
+          equippedKineticKitId: kit.id,
+        },
+      };
+    }
+
+    case 'equipKineticKit': {
+      if (action.id !== null) {
+        const kit = KINETIC_KITS_BY_ID[action.id];
+        if (!kit || !state.meta.ownedKineticKitIds.includes(kit.id)) return state;
+      }
+      return { ...state, meta: { ...state.meta, equippedKineticKitId: action.id } };
     }
 
     case 'refundVendorItem': {
@@ -1341,6 +1382,8 @@ export interface MetaContextValue {
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
   buyVendorItem: (id: string) => void;
+  buyKineticKit: (id: KineticKitId) => void;
+  equipKineticKit: (id: KineticKitId | null) => void;
   refundVendorItem: (id: string) => void;
   refundAllVendorItems: () => void;
   setUiPanelLayout: (layout: UIPanelLayout) => void;
@@ -1392,6 +1435,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
   const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
+  const buyKineticKit = useCallback((id: KineticKitId) => dispatch({ type: 'buyKineticKit', id }), []);
+  const equipKineticKit = useCallback((id: KineticKitId | null) => dispatch({ type: 'equipKineticKit', id }), []);
   const refundVendorItem = useCallback((id: string) => dispatch({ type: 'refundVendorItem', id }), []);
   const refundAllVendorItems = useCallback(() => dispatch({ type: 'refundAllVendorItems' }), []);
   const setUiPanelLayout = useCallback((layout: UIPanelLayout) => dispatch({ type: 'setUiPanelLayout', layout }), []);
@@ -1505,6 +1550,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       markOnboarded,
       spendTokens,
       buyVendorItem,
+      buyKineticKit,
+      equipKineticKit,
       refundVendorItem,
       refundAllVendorItems,
       setUiPanelLayout,
@@ -1545,6 +1592,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     markOnboarded,
     spendTokens,
     buyVendorItem,
+    buyKineticKit,
+    equipKineticKit,
     refundVendorItem,
     refundAllVendorItems,
     setUiPanelLayout,
