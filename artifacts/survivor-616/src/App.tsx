@@ -14,6 +14,7 @@ import {
   startingWeaponLevel,
   useMeta,
 } from '@/game/state/metaStore';
+import { advanceDailyContracts } from '@/game/data/contracts';
 import type { RunResult } from '@/game/types';
 import { ArchivePanel } from '@/ui/ArchivePanel';
 import { AreaSelect } from '@/ui/AreaSelect';
@@ -136,6 +137,14 @@ function Game() {
     (result: RunResult) => {
       const fatigueBefore = meta.fatigueByCharacter[result.characterId] ?? 0;
       const fatigueAfter = Math.min(MAX_FATIGUE_PCT, fatigueBefore + FATIGUE_PER_RUN_PCT);
+      const dailyContracts = advanceDailyContracts(
+        {
+          dayKey: meta.dailyContractDayKey,
+          progressById: meta.dailyContractProgressById,
+          completedIds: meta.completedDailyContractIds,
+        },
+        result,
+      );
       const resultWithFatigue = {
         ...result,
         fatigueAddedPct: fatigueAfter - fatigueBefore,
@@ -145,6 +154,12 @@ function Game() {
           !meta.knownRelicIds.includes(RELIC_BY_DISCOVERY_ID[result.discoveryId]!.id)
           ? [RELIC_BY_DISCOVERY_ID[result.discoveryId]!.id]
           : [],
+        completedDailyContracts: dailyContracts.completed.map((contract) => ({
+          id: contract.id,
+          name: contract.name,
+          rewardCred: contract.rewardCred,
+          rewardTokens: contract.rewardTokens,
+        })),
       };
       completeRun(resultWithFatigue);
       setScreen({ name: 'summary', result: resultWithFatigue });

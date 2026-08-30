@@ -40,6 +40,12 @@ import {
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import {
+  advanceDailyContracts,
+  contractDayKey,
+  dailyContractDefs,
+  dailyContractStatuses,
+} from '@/game/data/contracts';
+import {
   DEFAULT_UI_THEME_ID,
   UI_THEMES_BY_ID,
   defaultSwatchId,
@@ -72,7 +78,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 8;
+const META_VERSION = 9;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -174,6 +180,9 @@ export function createInitialMeta(): MetaState {
     ownedUiThemeIds: [DEFAULT_UI_THEME_ID],
     uiTheme: DEFAULT_UI_THEME_ID,
     uiThemeSwatchByTheme: {},
+    dailyContractDayKey: contractDayKey(),
+    dailyContractProgressById: {},
+    completedDailyContractIds: [],
   };
 }
 
@@ -591,6 +600,21 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const endlessDiscoveryIds = normalizeEndlessDiscoveries(parsed.endlessDiscoveryIds);
   const customMaps = normalizeCustomMaps(parsed.customMaps);
   const ownedUiThemeIds = normalizeOwnedUiThemeIds(parsed.ownedUiThemeIds);
+  const today = contractDayKey();
+  const savedContractDay = typeof parsed.dailyContractDayKey === 'string' ? parsed.dailyContractDayKey : today;
+  const dailyContractDayKey = savedContractDay === today ? savedContractDay : today;
+  const validContractIds = new Set(dailyContractDefs(dailyContractDayKey).map((contract) => contract.id));
+  const dailyContractProgressById: Record<string, number> = {};
+  if (dailyContractDayKey === savedContractDay && parsed.dailyContractProgressById && typeof parsed.dailyContractProgressById === 'object') {
+    for (const [id, value] of Object.entries(parsed.dailyContractProgressById)) {
+      if (validContractIds.has(id) && typeof value === 'number' && Number.isFinite(value)) {
+        dailyContractProgressById[id] = Math.max(0, Math.floor(value));
+      }
+    }
+  }
+  const completedDailyContractIds = dailyContractDayKey === savedContractDay && Array.isArray(parsed.completedDailyContractIds)
+    ? parsed.completedDailyContractIds.filter((id): id is string => typeof id === 'string' && validContractIds.has(id))
+    : [];
   const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
     const evolution = EVOLUTIONS_BY_ID[evolutionId];
     return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
@@ -659,6 +683,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedUiThemeIds,
     uiTheme: normalizeUiTheme(parsed.uiTheme, ownedUiThemeIds),
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
+    dailyContractDayKey,
+    dailyContractProgressById,
+    completedDailyContractIds: [...new Set(completedDailyContractIds)],
   };
 }
 
@@ -669,7 +696,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -1268,6 +1295,14 @@ export function reducer(state: StoreState, action: Action): StoreState {
             ...result.endless.discoveredRouteEventIds,
           ])]
         : prev.endlessDiscoveryIds;
+      const dailyContracts = advanceDailyContracts(
+        {
+          dayKey: prev.dailyContractDayKey,
+          progressById: prev.dailyContractProgressById,
+          completedIds: prev.completedDailyContractIds,
+        },
+        result,
+      );
 
       const clearedAreaIds = result.cleared
         ? addUnique(prev.clearedAreaIds, result.areaId)
@@ -1299,8 +1334,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
         totalKills: prev.totalKills + result.kills,
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
-        cred: prev.cred + result.cred,
-        lootTokens: prev.lootTokens + result.lootTokensGained,
+        cred: prev.cred + result.cred + dailyContracts.rewardCred,
+        lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
         skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
         // Endless records
         endlessRecordDistancePx: result.endless
@@ -1325,6 +1360,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
         unlockedEvolutionIds: [...prev.unlockedEvolutionIds],
         episodeProgressById: { ...prev.episodeProgressById },
         knownRelicIds,
+        dailyContractDayKey: dailyContracts.dayKey,
+        dailyContractProgressById: dailyContracts.progressById,
+        completedDailyContractIds: dailyContracts.completedIds,
       };
 
       const episodeDefinition = validEpisodeResult(result);
@@ -1381,6 +1419,7 @@ export interface MetaContextValue {
   lockedRooms: HubRoomDef[];
   rescuedAllies: AllyDef[];
   missingAllies: AllyDef[];
+  dailyContracts: ReturnType<typeof dailyContractStatuses>;
   enterHideout: () => void;
   selectCharacter: (id: string) => void;
   completeRun: (result: RunResult) => void;
@@ -1530,6 +1569,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     const lockedRooms = HUB_ROOMS.filter((r) => !isUnlocked(r.unlock, meta));
     const rescuedAllies = ALLIES.filter((a) => meta.rescuedAllyIds.includes(a.id));
     const missingAllies = ALLIES.filter((a) => !meta.rescuedAllyIds.includes(a.id));
+    const dailyContracts = dailyContractStatuses({
+      dayKey: meta.dailyContractDayKey,
+      progressById: meta.dailyContractProgressById,
+      completedIds: meta.completedDailyContractIds,
+    });
 
     const selectedCharacter = unlockedCharacters.some((c) => c.id === meta.selectedCharacterId)
       ? getCharacter(meta.selectedCharacterId)
@@ -1547,6 +1591,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       lockedRooms,
       rescuedAllies,
       missingAllies,
+      dailyContracts,
       enterHideout,
       selectCharacter,
       completeRun,

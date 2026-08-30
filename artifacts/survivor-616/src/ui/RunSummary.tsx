@@ -57,6 +57,30 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
     >
       <div className="max-w-4xl mx-auto w-full space-y-8 mt-4">
 
+        {result.completedDailyContracts && result.completedDailyContracts.length > 0 ? (
+          <section className="border border-cyan-200/40 bg-cyan-950/15 p-5" data-testid="section-daily-contract-rewards">
+            <div className="flex items-center gap-3">
+              <Radio className="h-5 w-5 text-cyan-200" />
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">Broadcast Board</p>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">Signal answered</h2>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              {result.completedDailyContracts.map((contract) => (
+                <div key={contract.id} className="flex flex-wrap items-center justify-between gap-2 border border-cyan-200/20 bg-black/20 px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm font-bold uppercase text-white">
+                    <CheckCircle className="h-4 w-4 text-primary" /> {contract.name}
+                  </span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">
+                    +{contract.rewardCred} cred{contract.rewardTokens > 0 ? ` · +${contract.rewardTokens} token` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {firstNight ? (
           <section className="border border-cyan-300/30 bg-cyan-950/10 p-5" data-testid="section-first-night-consequence">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
