@@ -4323,8 +4323,7 @@ function updatePickups(w: World, dt: number) {
     const dy = p.y - pickup.y;
     const distance = Math.hypot(dx, dy) || 1;
 
-    // Loot boxes don't magnet — player must walk over them.
-    if (pickup.kind !== 'loot-box' && distance < magnet) {
+    if (distance < magnet) {
       // Accelerate toward the player once inside the magnet radius.
       const pull = 260 + (magnet - distance) * 5;
       pickup.vx += (dx / distance) * pull * dt;

@@ -3,6 +3,7 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
@@ -38,6 +39,7 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import { ChestTally } from '@/ui/ChestTally';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
@@ -140,6 +142,8 @@ export function RunScreen({
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
+  const [hudMinimized, setHudMinimized] = useState(false);
+  const [levelUpMinimized, setLevelUpMinimized] = useState(false);
   const reelTimerRef = useRef<number | null>(null);
   const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
   const levelUpPausesRef = useRef(meta.levelUpPausesEnabled);
@@ -588,41 +592,60 @@ export function RunScreen({
       />
 
       {/* Top HUD */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 space-y-2 p-3">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="h-3 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
-              <div
-                className="h-full bg-[#ff4d5e] transition-[width] duration-150"
-                style={{ width: `${hpPct}%` }}
-                data-testid="bar-health"
-              />
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
-              <div
-                className="h-full bg-[#6ee7ff] transition-[width] duration-150"
-                style={{ width: `${xpPct}%` }}
-                data-testid="bar-xp"
-              />
-            </div>
-            <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-widest text-white/80">
-              <span data-testid="text-level">Lv {hud?.level ?? 1}</span>
-              <span data-testid="text-kills">{hud?.kills ?? 0} down</span>
-              <span>
-                {area.endless && hud?.endless
-                  ? hud.endless.inBuilding
-                    ? `Inside · ${hud.endless.buildingLabel}`
-                    : `${hud.endless.currentBandLabel} · ${hud.endless.currentDistrict}`
-                  : area.name}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 space-y-1.5 p-2">
+        <div className="flex items-start gap-2">
+          <button
+            type="button"
+            onClick={() => setHudMinimized((v) => !v)}
+            className="pointer-events-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-white/20 bg-black/70 text-white/70"
+            data-testid="button-hud-minimize"
+            aria-label={hudMinimized ? 'Expand HUD' : 'Minimize HUD'}
+          >
+            {hudMinimized ? <Maximize2 size={11} /> : <Minimize2 size={11} />}
+          </button>
+
+          {hudMinimized ? (
+            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/80" data-testid="hud-minimized">
+              <span className="rounded-sm border border-white/20 bg-black/70 px-1.5 py-0.5" data-testid="text-level">Lv {hud?.level ?? 1}</span>
+              <span className="h-1.5 w-16 overflow-hidden rounded-sm border border-black/60 bg-black/60">
+                <span className="block h-full bg-[#ff4d5e]" style={{ width: `${hpPct}%` }} />
               </span>
             </div>
-          </div>
+          ) : (
+            <div className="min-w-0 flex-1 max-w-[min(70vw,220px)] space-y-1">
+              <div className="h-2 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+                <div
+                  className="h-full bg-[#ff4d5e] transition-[width] duration-150"
+                  style={{ width: `${hpPct}%` }}
+                  data-testid="bar-health"
+                />
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+                <div
+                  className="h-full bg-[#6ee7ff] transition-[width] duration-150"
+                  style={{ width: `${xpPct}%` }}
+                  data-testid="bar-xp"
+                />
+              </div>
+              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/80">
+                <span data-testid="text-level">Lv {hud?.level ?? 1}</span>
+                <span data-testid="text-kills">{hud?.kills ?? 0} down</span>
+                <span className="truncate">
+                  {area.endless && hud?.endless
+                    ? hud.endless.inBuilding
+                      ? `Inside · ${hud.endless.buildingLabel}`
+                      : `${hud.endless.currentBandLabel} · ${hud.endless.currentDistrict}`
+                    : area.name}
+                </span>
+              </div>
+            </div>
+          )}
 
-          <div className="flex flex-col items-end gap-2">
-            <div className="rounded-sm border border-white/20 bg-black/70 px-2.5 py-1 font-mono text-lg font-bold text-white tabular-nums" data-testid="text-timer">
+          <div className="ml-auto flex flex-col items-end gap-1.5">
+            <div className="rounded-sm border border-white/20 bg-black/70 px-2 py-0.5 font-mono text-sm font-bold text-white tabular-nums" data-testid="text-timer">
               {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
             </div>
-            {area.endless && hud?.endless && (
+            {!hudMinimized && area.endless && hud?.endless && (
               <div className="font-mono text-[10px] uppercase tracking-widest text-primary/80 bg-black/60 px-2 py-0.5 border border-primary/20">
                 {inDungeon
                   ? `${dungeonEraName} · room ${hud.endless.dungeonRoom}/3`
@@ -642,7 +665,7 @@ export function RunScreen({
                       : 'Street grid · explore the block'}
               </div>
             )}
-            {area.endless && hud?.endless && !inDungeon && !hud.endless.inBuilding ? (
+            {!hudMinimized && area.endless && hud?.endless && !inDungeon && !hud.endless.inBuilding ? (
               <div className="font-mono text-[9px] uppercase tracking-widest text-white/50">
                 {distancePx.toLocaleString()} units · {hud.endless.riskLabel}
               </div>
@@ -873,6 +896,8 @@ export function RunScreen({
         {hud?.ultimateActive ? 'Active' : hud && hud.ultimateReadyPct >= 100 ? character.ultimate.name : `${Math.floor(hud?.ultimateReadyPct ?? 0)}%`}
       </button>
 
+      <ChestTally count={hud?.lootBoxesOpened ?? 0} />
+
       {/* Virtual stick */}
       {stickVisual.active ? (
         <div
@@ -970,50 +995,62 @@ export function RunScreen({
 
       {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 ? (
         <div
-          className="pointer-events-none absolute bottom-4 left-4 z-40 w-[min(88vw,330px)]"
+          className="pointer-events-none absolute bottom-3 left-3 z-40 w-[min(72vw,250px)]"
           data-testid="panel-continuous-levelup"
         >
-          <div className="pointer-events-auto space-y-2 border border-primary/40 bg-black/85 p-3 shadow-[0_0_24px_rgba(251,191,36,.16)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">Level {hud?.level}</p>
-                <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
+          <div className="pointer-events-auto space-y-1.5 border border-primary/40 bg-black/85 p-2 shadow-[0_0_18px_rgba(251,191,36,.16)]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-primary">Level {hud?.level}</p>
+                {!levelUpMinimized ? <h2 className="text-xs font-black uppercase text-white">Pick your edge</h2> : null}
               </div>
-              <span className="font-mono text-[9px] uppercase tracking-widest text-white/45">Run continues</span>
-            </div>
-            {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
               <button
                 type="button"
-                onClick={claimRumorHeal}
-                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-3 text-left transition hover:bg-[#86efac]/20"
-                data-testid="button-rumor-heal-continuous"
+                onClick={() => setLevelUpMinimized((v) => !v)}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-white/20 bg-black/60 text-white/70"
+                data-testid="button-levelup-minimize"
+                aria-label={levelUpMinimized ? 'Expand level-up choices' : 'Minimize level-up choices'}
               >
-                <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
-                <p className="mt-1 font-mono text-[10px] text-white/70">Use once alongside your upgrade.</p>
+                {levelUpMinimized ? <Maximize2 size={10} /> : <Minimize2 size={10} />}
               </button>
-            ) : null}
-            <div className="space-y-2">
-              {choices.map((upgrade) => {
-                const cardWeapon = resolveCardWeapon(upgrade);
-                return (
-                  <button
-                    key={upgrade.id}
-                    type="button"
-                    onClick={() => pickUpgrade(upgrade)}
-                    className="flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-3 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
-                    data-testid={`button-continuous-upgrade-${upgrade.id}`}
-                  >
-                    {cardWeapon ? (
-                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={24} className="shrink-0" />
-                    ) : null}
-                    <span>
-                      <p className="text-sm font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
-                      <p className="mt-1 font-mono text-[10px] text-white/70">{upgrade.description}</p>
-                    </span>
-                  </button>
-                );
-              })}
             </div>
+            {levelUpMinimized ? null : (
+              <>
+                {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
+                  <button
+                    type="button"
+                    onClick={claimRumorHeal}
+                    className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-2 text-left transition hover:bg-[#86efac]/20"
+                    data-testid="button-rumor-heal-continuous"
+                  >
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
+                    <p className="mt-0.5 font-mono text-[9px] text-white/70">Use once alongside your upgrade.</p>
+                  </button>
+                ) : null}
+                <div className="max-h-[40vh] space-y-1.5 overflow-y-auto">
+                  {choices.map((upgrade) => {
+                    const cardWeapon = resolveCardWeapon(upgrade);
+                    return (
+                      <button
+                        key={upgrade.id}
+                        type="button"
+                        onClick={() => pickUpgrade(upgrade)}
+                        className="flex w-full items-center gap-1.5 rounded-sm border border-white/20 bg-white/5 p-2 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                        data-testid={`button-continuous-upgrade-${upgrade.id}`}
+                      >
+                        {cardWeapon ? (
+                          <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={18} className="shrink-0" />
+                        ) : null}
+                        <span className="min-w-0">
+                          <p className="truncate text-[11px] font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
+                          <p className="mt-0.5 line-clamp-2 font-mono text-[9px] text-white/70">{upgrade.description}</p>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}
