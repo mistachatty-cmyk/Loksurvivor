@@ -693,13 +693,13 @@ export function RunScreen({
           </div>
         </div>
 
-        {hud?.rescueAvailable ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud?.rescueAvailable ? (
           <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
             {hud.rescueAllyName ? `${hud.rescueAllyName} is caged` : 'Someone is caged'} — stand with them {hud.rescueProgressPct > 0 ? `(${hud.rescueProgressPct}%)` : ''}
           </div>
         ) : null}
 
-        {challenges.length > 0 ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && challenges.length > 0 ? (
           <div className="mx-auto flex w-fit flex-wrap justify-center gap-1.5" data-testid="row-active-contracts">
             {challenges.map((challenge) => (
               <span key={challenge.id} className="border border-red-400/45 bg-black/75 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-red-200">
@@ -709,7 +709,7 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.crewRumor ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud?.crewRumor ? (
           <div className="mx-auto flex w-fit max-w-full items-center gap-2 border border-[#fbbf24]/45 bg-black/75 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-[#fbbf24]" data-testid="indicator-crew-rumor">
             <span className="text-sm" aria-hidden="true">◆</span>
             <span className="truncate">
@@ -718,7 +718,7 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.loadout ? (
+        {!hudMinimized && hud?.loadout ? (
           <div className="flex gap-1.5 overflow-x-auto" data-testid="row-loadout">
             {hud.loadout.weapons.map((weapon) => {
               const kind = WEAPONS_BY_ID[weapon.id]?.kind;
@@ -737,7 +737,7 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.lokPets && hud.lokPets.length > 0 ? (
+        {!hudMinimized && hud?.lokPets && hud.lokPets.length > 0 ? (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5" data-testid="row-lokpets">
             {hud.lokPets.map((pet) => (
               <div
@@ -760,7 +760,7 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.activeEffects && hud.activeEffects.length > 0 ? (
+        {!hudMinimized && hud?.activeEffects && hud.activeEffects.length > 0 ? (
           <div className="flex flex-wrap gap-1.5" data-testid="row-status-effects">
             {hud.activeEffects.map((effect) => (
               <div
@@ -776,13 +776,13 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.alerts.slice(-1).map((alert) => (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud?.alerts.slice(-1).map((alert) => (
           <div key={alert} className="mx-auto w-fit font-mono text-sm uppercase tracking-[0.25em] text-white/90 drop-shadow">
             {alert}
           </div>
         ))}
 
-        {hud?.firstNightBeat ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud?.firstNightBeat ? (
           <div className="mx-auto max-w-xl border border-cyan-200/40 bg-black/80 px-3 py-2 text-center" data-testid="story-beat">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">
               First Night · {hud.firstNightBeat.title}
@@ -791,7 +791,7 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.districtIncursion && hud.districtIncursion.phase !== 'pending' ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud?.districtIncursion && hud.districtIncursion.phase !== 'pending' ? (
           <div
             className="mx-auto w-full max-w-xl border bg-black/80 px-3 py-2"
             style={{ borderColor: `${hud.districtIncursion.accent}88` }}
@@ -822,7 +822,7 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.evolution ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud?.evolution ? (
           <div
             className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
             style={{ borderColor: `${hud.evolution.color}88`, backgroundColor: `${hud.evolution.color}18`, color: hud.evolution.color }}
@@ -833,22 +833,24 @@ export function RunScreen({
           </div>
         ) : null}
 
-        {hud?.relicWorkshop.activeRecipe ? (
-          <div
-            className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
-            style={{ borderColor: `${hud.relicWorkshop.activeRecipe.color}88`, backgroundColor: `${hud.relicWorkshop.activeRecipe.color}18`, color: hud.relicWorkshop.activeRecipe.color }}
-            data-testid="text-relic-recipe"
-          >
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic · {hud.relicWorkshop.activeRecipe.name}</span>
-            <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.relicWorkshop.activeRecipe.identity}</span>
-          </div>
-        ) : hud?.relicWorkshop.readyRecipeIds.length ? (
-          <div className="mx-auto w-fit max-w-full border border-orange-300/35 bg-orange-300/10 px-3 py-1.5 text-center text-orange-100" data-testid="text-relic-ready">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic recipe ready · level the base weapon</span>
-          </div>
+        {!hudMinimized && meta.hudNotificationsEnabled ? (
+          hud?.relicWorkshop.activeRecipe ? (
+            <div
+              className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
+              style={{ borderColor: `${hud.relicWorkshop.activeRecipe.color}88`, backgroundColor: `${hud.relicWorkshop.activeRecipe.color}18`, color: hud.relicWorkshop.activeRecipe.color }}
+              data-testid="text-relic-recipe"
+            >
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic · {hud.relicWorkshop.activeRecipe.name}</span>
+              <span className="hidden text-[10px] uppercase tracking-wider text-white/70 sm:inline">{hud.relicWorkshop.activeRecipe.identity}</span>
+            </div>
+          ) : hud?.relicWorkshop.readyRecipeIds.length ? (
+            <div className="mx-auto w-fit max-w-full border border-orange-300/35 bg-orange-300/10 px-3 py-1.5 text-center text-orange-100" data-testid="text-relic-ready">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Relic recipe ready · level the base weapon</span>
+            </div>
+          ) : null
         ) : null}
 
-        {hud?.episode ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud?.episode ? (
           <div className="mx-auto w-full max-w-xl border border-primary/35 bg-black/75 px-3 py-2" data-testid="row-character-episode">
             <div className="flex items-center justify-between gap-3">
               <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Episode · {hud.episode.title}</span>
@@ -862,7 +864,7 @@ export function RunScreen({
         ) : null}
 
         {/* Objective strip */}
-        {hud && hud.objectives.length > 0 ? (
+        {!hudMinimized && meta.hudNotificationsEnabled && hud && hud.objectives.length > 0 ? (
           <div className="flex flex-wrap gap-1.5" data-testid="row-objectives">
             {hud.objectives.filter((o) => !o.completed).map((obj) => {
               const pct = Math.min(100, Math.round((obj.progress / Math.max(1, obj.target)) * 100));

@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
+  Bell,
+  BellOff,
   Bird,
   Check,
   Compass,
@@ -41,6 +43,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
+    setHudNotificationsEnabled,
     setUiDensity,
     setUiPanelLayout,
     buyUiTheme,
@@ -118,6 +121,49 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
                   <LayoutDashboard className="h-4 w-4 text-primary" />
                   <span>Continuous mode keeps enemies, hazards, and movement active.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-hud-notifications-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              {meta.hudNotificationsEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">HUD display</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">In-run notifications</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Turn off event pop-ups, the objective tracker, and rumor/incursion/episode banners so they stop
+                    stacking up over the action. Your health, XP, level, timer, and loadout stay on screen either way.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHudNotificationsEnabled(!meta.hudNotificationsEnabled)}
+                  aria-pressed={meta.hudNotificationsEnabled}
+                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    meta.hudNotificationsEnabled
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                  }`}
+                  data-testid="button-toggle-hud-notifications"
+                >
+                  {meta.hudNotificationsEnabled ? 'On' : 'Off'}
+                </button>
+              </div>
+              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                  <Bell className="h-4 w-4 text-primary" />
+                  <span>Covers kill/pickup alerts, the objective strip, and story/rumor banners.</span>
+                </div>
+                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                  <Maximize2 className="h-4 w-4 text-primary" />
+                  <span>You can also collapse the whole HUD mid-run from its minimize button.</span>
                 </div>
               </div>
             </div>

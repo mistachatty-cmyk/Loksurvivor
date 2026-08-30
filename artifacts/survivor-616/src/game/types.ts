@@ -1241,6 +1241,8 @@ export interface MetaState {
   minimapExpanded: boolean;
   /** Normalized top-left position of the endless minimap within the viewport. */
   minimapPosition: { x: number; y: number };
+  /** Whether in-run HUD notifications (event alerts, objective tracker, rumor/incursion/episode banners) are shown. */
+  hudNotificationsEnabled: boolean;
   /** Cheat-code toggle from the Quartermaster's "Flip the Script" unlock: rotates the whole run 180°. Requires owning that vendor item. */
   worldInvertEnabled: boolean;
   /** Cheat-code toggle from the Quartermaster's "Negative Exposure" unlock: inverts the run's color palette. Requires owning that vendor item. */

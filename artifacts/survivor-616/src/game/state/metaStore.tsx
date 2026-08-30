@@ -128,6 +128,7 @@ export function createInitialMeta(): MetaState {
     minimapVisible: true,
     minimapExpanded: true,
     minimapPosition: { x: 0.82, y: 0.18 },
+    hudNotificationsEnabled: true,
     worldInvertEnabled: false,
     paletteInvertEnabled: false,
     uiDensity: 'grid',
@@ -622,6 +623,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
+    hudNotificationsEnabled: parsed.hudNotificationsEnabled !== false,
     worldInvertEnabled: parsed.worldInvertEnabled === true,
     paletteInvertEnabled: parsed.paletteInvertEnabled === true,
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
@@ -920,6 +922,7 @@ type Action =
   | { type: 'setLevelUpPauses'; enabled: boolean }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
+  | { type: 'setHudNotificationsEnabled'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
   | { type: 'setStudioPlugins'; enabled: boolean }
@@ -1142,6 +1145,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, minimapExpanded: action.enabled },
+      };
+
+    case 'setHudNotificationsEnabled':
+      return {
+        ...state,
+        meta: { ...state.meta, hudNotificationsEnabled: action.enabled },
       };
 
     case 'setMinimapPosition':
@@ -1409,6 +1418,7 @@ export interface MetaContextValue {
   setLevelUpPauses: (enabled: boolean) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
+  setHudNotificationsEnabled: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
   setStudioPlugins: (enabled: boolean) => void;
@@ -1504,6 +1514,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setMinimapExpanded', enabled }),
     [],
   );
+  const setHudNotificationsEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setHudNotificationsEnabled', enabled }),
+    [],
+  );
   const setMinimapPosition = useCallback(
     (position: { x: number; y: number }) => dispatch({ type: 'setMinimapPosition', position }),
     [],
@@ -1577,6 +1591,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPauses,
       setWildlifeSheltersInRain,
       setMinimapVisible,
+      setHudNotificationsEnabled,
       setMusicReactive,
       setGyroEnabled,
       setStudioPlugins,
@@ -1619,6 +1634,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPauses,
     setWildlifeSheltersInRain,
     setMinimapVisible,
+    setHudNotificationsEnabled,
     setMusicReactive,
     setGyroEnabled,
     setGyroSensitivity,
