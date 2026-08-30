@@ -1554,7 +1554,14 @@ function updateDistrictIncursion(w: World, dt: number) {
       if (state.outsideSafeSince === 0) state.outsideSafeSince = w.now;
       if (w.now >= state.nextHazardTickAt) {
         state.nextHazardTickAt = w.now + 760;
-        damagePlayer(w, state.kind === 'flood-surge' ? 5 : 4, w.player.x + (w.player.x >= 0 ? 90 : -90), w.player.y);
+        // Knock away from the current safe lane, not toward map origin — the
+        // old `player.x`-relative direction happened to push an idle player
+        // toward x=0, which is where every safe lane sits, letting repeated
+        // "punishment" knockback accidentally rescue them from failing.
+        const pushAwaySign = state.kind === 'flood-surge'
+          ? (w.player.x >= incursionSafeLane(state) ? 1 : -1)
+          : (w.player.x >= 0 ? 1 : -1);
+        damagePlayer(w, state.kind === 'flood-surge' ? 5 : 4, w.player.x - pushAwaySign * 90, w.player.y);
       }
       if (w.now - state.outsideSafeSince > 4600) {
         finishDistrictIncursion(w, false);
