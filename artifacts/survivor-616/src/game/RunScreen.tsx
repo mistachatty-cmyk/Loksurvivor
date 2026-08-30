@@ -614,15 +614,15 @@ export function RunScreen({
               </span>
             </div>
           ) : (
-            <div className="min-w-0 flex-1 max-w-[min(70vw,220px)] space-y-1">
-              <div className="h-2 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+            <div className="min-w-0 flex-1 max-w-[min(55vw,180px)] space-y-1">
+              <div className="h-1.5 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
                 <div
                   className="h-full bg-[#ff4d5e] transition-[width] duration-150"
                   style={{ width: `${hpPct}%` }}
                   data-testid="bar-health"
                 />
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+              <div className="h-1 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
                 <div
                   className="h-full bg-[#6ee7ff] transition-[width] duration-150"
                   style={{ width: `${xpPct}%` }}
@@ -676,7 +676,7 @@ export function RunScreen({
               <button
                 type="button"
                 onClick={() => setPhaseBoth(phase === 'playing' ? 'paused' : 'playing')}
-                className="pointer-events-auto rounded-sm border border-white/20 bg-black/70 px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-white/80"
+                className="pointer-events-auto rounded-sm border border-white/20 bg-black/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/80"
                 data-testid="button-pause"
               >
                 {phase === 'paused' ? 'Resume' : 'Pause'}
@@ -955,14 +955,14 @@ export function RunScreen({
           }}
           data-testid="overlay-levelup"
         >
-          <div className="max-h-[70vh] w-[min(90vw,300px)] space-y-2 overflow-y-auto border border-primary/40 bg-black/90 p-3 shadow-[0_0_24px_rgba(251,191,36,.16)]">
+          <div className="max-h-[60vh] w-[min(75vw,260px)] space-y-2 overflow-y-auto border border-primary/40 bg-black/90 p-2 shadow-[0_0_24px_rgba(251,191,36,.16)]">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60">Level {hud?.level}</p>
-            <h2 className="text-sm font-black uppercase text-white">Pick your edge</h2>
+            <h2 className="text-xs font-black uppercase text-white">Pick your edge</h2>
             {hud?.crewRumor?.rumorId === 'pantry-surge' && hud.crewRumor.ready ? (
               <button
                 type="button"
                 onClick={claimRumorHeal}
-                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-3 text-left transition hover:bg-[#86efac]/20 active:scale-[0.99]"
+                className="w-full border border-[#86efac]/60 bg-[#86efac]/10 p-2 text-left transition hover:bg-[#86efac]/20 active:scale-[0.99]"
                 data-testid="button-rumor-heal"
               >
                 <p className="font-bold uppercase tracking-wide text-[#86efac]">Emergency pantry heal</p>
@@ -977,11 +977,11 @@ export function RunScreen({
                     key={upgrade.id}
                     type="button"
                     onClick={() => pickUpgrade(upgrade)}
-                    className="flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-2.5 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                    className="flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-2 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
                     data-testid={`button-upgrade-${upgrade.id}`}
                   >
                     {cardWeapon ? (
-                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={26} className="shrink-0" />
+                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={22} className="shrink-0" />
                     ) : null}
                     <span>
                       <p className="text-xs font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
@@ -997,10 +997,10 @@ export function RunScreen({
 
       {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 ? (
         <div
-          className="pointer-events-none absolute bottom-3 left-3 z-40 w-[min(72vw,250px)]"
+          className={`pointer-events-none absolute bottom-3 left-3 z-40 ${levelUpMinimized ? 'w-fit' : 'w-[min(56vw,190px)]'}`}
           data-testid="panel-continuous-levelup"
         >
-          <div className="pointer-events-auto space-y-1.5 border border-primary/40 bg-black/85 p-2 shadow-[0_0_18px_rgba(251,191,36,.16)]">
+          <div className="pointer-events-auto space-y-1.5 border border-primary/40 bg-black/85 p-1.5 shadow-[0_0_18px_rgba(251,191,36,.16)]">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-primary">Level {hud?.level}</p>
@@ -1029,7 +1029,7 @@ export function RunScreen({
                     <p className="mt-0.5 font-mono text-[9px] text-white/70">Use once alongside your upgrade.</p>
                   </button>
                 ) : null}
-                <div className="max-h-[40vh] space-y-1.5 overflow-y-auto">
+                <div className="max-h-[32vh] space-y-1.5 overflow-y-auto">
                   {choices.map((upgrade) => {
                     const cardWeapon = resolveCardWeapon(upgrade);
                     return (
@@ -1037,11 +1037,11 @@ export function RunScreen({
                         key={upgrade.id}
                         type="button"
                         onClick={() => pickUpgrade(upgrade)}
-                        className="flex w-full items-center gap-1.5 rounded-sm border border-white/20 bg-white/5 p-2 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                        className="flex w-full items-center gap-1.5 rounded-sm border border-white/20 bg-white/5 p-1.5 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
                         data-testid={`button-continuous-upgrade-${upgrade.id}`}
                       >
                         {cardWeapon ? (
-                          <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={18} className="shrink-0" />
+                          <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={16} className="shrink-0" />
                         ) : null}
                         <span className="min-w-0">
                           <p className="truncate text-[11px] font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
