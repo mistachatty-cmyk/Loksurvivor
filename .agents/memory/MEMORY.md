@@ -11,3 +11,4 @@
 - [Music reactivity contract](music-reactivity.md) — one beat bus arbitrates detected vs authored tempo; reactions are records, and visual ones never touch the simulation.
 - [Tilt steering](tilt-steering.md) — map tilt through the gravity vector rotated by screen angle, never raw Euler axes; the two silent failures are a non-secure origin and ungranted permission.
 - [Studio engine contract](studio-engine.md) — one `AudioContext` per app, one music path from studio through soundtrack to game; plain-data project model reconciled into a Tone graph whose inserts are never hard-wired, so plugins drop in; plugins stay opt-in because they run off-device code.
+- [Soundtrack import](soundtrack-import.md) — dropped video files play immediately with no transcode step; "Convert to MP3" and link import both stay client-side, and link import is a direct-file fetch, never a streaming-service downloader.

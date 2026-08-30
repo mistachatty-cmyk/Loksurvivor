@@ -20,8 +20,10 @@ than the sheet. Scene photos (street, alley, bar, cellar, rooftops) are clean an
 as backdrops directly.
 
 Related standing constraint from the user: do not invent real artists, names, likenesses, or
-represent music as licensed. The soundtrack feature only plays files the player picks from
-their own device.
+represent music as licensed. The soundtrack feature only plays files the player controls --
+picked from their own device, or fetched from a direct link they paste in (see
+`soundtrack-import.md` for exactly where that line is drawn). It never pulls from a streaming
+catalog and never claims a track is licensed.
 
 **Added later:** three more supplementary reference images the user shared in chat, saved into
 `public/art/` but **not** wired to any `CharacterDef.referenceArt`:
