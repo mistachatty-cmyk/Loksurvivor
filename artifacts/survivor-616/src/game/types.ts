@@ -730,6 +730,8 @@ export interface DistrictIncursionState {
   accent: string;
   startedAt: number;
   endsAt: number;
+  /** w.now at which the incursion left 'active'/'warning' for a terminal phase; 0 while still live. */
+  endedAt: number;
   cycle: number;
   nextPulseAt: number;
   nextHazardTickAt: number;
