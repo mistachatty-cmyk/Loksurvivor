@@ -1,6 +1,30 @@
 import { blobRig, eelRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, triangleRig } from '@/game/sprites/rigs';
-import type { CharacterDef } from '@/game/types';
+import type { CharacterDef, SpriteRig } from '@/game/types';
 import { REACTION_PRESETS } from './reactivity';
+
+/** Static Nomad's rig: a cloud-afro head, metallic arms and a flared trouser stance, plus a floating electrified trail. */
+function staticNomadRig(): SpriteRig {
+  const rig = humanoidRig({ height: 20, width: 11, cloudHair: true, flarePants: true, headColor: 'accentBright', torsoColor: 'body' });
+  rig.parts.push(
+    { key: 'aura', x: -9, y: 8, w: 2, h: 4, color: 'accent', z: 0 },
+    { key: 'aura', x: 7, y: 10, w: 2, h: 4, color: 'glow', z: 0 },
+    { key: 'crest', x: -8, y: 21, w: 2, h: 2, color: 'accentBright', z: 9 },
+    { key: 'crest', x: 6, y: 23, w: 2, h: 2, color: 'accentBright', z: 9 },
+  );
+  return rig;
+}
+
+/** Ember Ascetic's rig: a dark forge-silhouette body with glowing eyes, a flared hakama stance and an orbiting thermal aura. */
+function emberAsceticRig(): SpriteRig {
+  const rig = humanoidRig({ height: 22, width: 10, flarePants: true, headColor: 'ink', torsoColor: 'body' });
+  rig.parts.push(
+    { key: 'crest', x: -4, y: 23, w: 3, h: 5, color: 'accent', z: 8 },
+    { key: 'crest', x: 0, y: 25, w: 3, h: 6, color: 'glow', z: 9 },
+    { key: 'aura', x: -8, y: 2, w: 2, h: 6, color: 'glow', z: 0 },
+    { key: 'aura', x: 6, y: 4, w: 2, h: 5, color: 'accent', z: 0 },
+  );
+  return rig;
+}
 
 /**
  * The playable roster. Each entry is fully data-driven: silhouette, palette,
@@ -577,6 +601,89 @@ export const CHARACTERS: CharacterDef[] = [
       effect: { novaDamage: 80, novaRadius: 200, damageMult: 1.3, invulnerable: true },
     },
     unlock: { kind: 'default' },
+  },
+  {
+    id: 'staticnomad',
+    react: REACTION_PRESETS.playerBob,
+    name: 'Static Nomad',
+    handle: 'The Afro-Cyborg',
+    tagline: 'Fights with the rhythm of a rolling thunderstorm.',
+    bio: 'A street-level brawler who traded his arms to keep up with the city\'s pulse, but kept his head in the clouds. He fights with the rhythm of a rolling thunderstorm.',
+    palette: {
+      ink: '#0a0d12',
+      body: '#20262e',
+      bodyDark: '#7c8a99',
+      accent: '#4fd6ff',
+      accentBright: '#e8e8ee',
+      skin: '#5c6470',
+      glow: '#8be9ff',
+    },
+    rig: staticNomadRig(),
+    stats: { maxHp: 100, speed: 106, power: 1.12, area: 1, haste: 1.05, magnet: 52, armor: 0.06, crit: 0.08, lifesteal: 0 },
+    weapon: {
+      id: 'wire-fist',
+      name: 'Wire-Fist',
+      kind: 'melee',
+      description: 'Rapid, short-range kinetic punches -- jagged glitch squares pop into existence and vanish on impact.',
+      damage: 18,
+      cooldownMs: 420,
+      range: 46,
+      levelDamageScale: 0.3,
+      count: 1,
+      impactIntensity: 4,
+      color: '#4fd6ff',
+    },
+    ultimate: {
+      id: 'rolling-thunder',
+      name: 'Rolling Thunder',
+      description: 'His cybernetic arms vent excess charge in a ring of electrified smoke, quickening every punch.',
+      cooldownMs: 24000,
+      durationMs: 4200,
+      effect: { cooldownMult: 0.4, speedMult: 1.2, novaDamage: 70, novaRadius: 170 },
+    },
+    unlock: { kind: 'kills', count: 260 },
+  },
+  {
+    id: 'emberascetic',
+    react: REACTION_PRESETS.playerBob,
+    name: 'Ember Ascetic',
+    handle: 'Furnace Monk',
+    tagline: 'His spirit burns so bright it bleeds through his physical form.',
+    bio: 'He found absolute clarity in the heat of the forge. Now, his spirit burns so bright it bleeds through his physical form.',
+    palette: {
+      ink: '#0c0605',
+      body: '#241814',
+      bodyDark: '#140b09',
+      accent: '#ff7a1a',
+      accentBright: '#ffffff',
+      skin: '#3a2420',
+      glow: '#ff2fb0',
+    },
+    rig: emberAsceticRig(),
+    stats: { maxHp: 118, speed: 90, power: 1.2, area: 1.1, haste: 0.95, magnet: 48, armor: 0.1, crit: 0.05, lifesteal: 0 },
+    weapon: {
+      id: 'formless-cleave',
+      name: 'Formless Cleave',
+      kind: 'melee',
+      description: 'A vibrant, brush-stroke arc of fire that lingers a fraction longer than a normal swing before fading to ash.',
+      damage: 25,
+      cooldownMs: 820,
+      range: 78,
+      levelDamageScale: 0.32,
+      count: 1,
+      impactIntensity: 3,
+      color: '#ff7a1a',
+      statusEffectId: 'burning',
+    },
+    ultimate: {
+      id: 'inner-furnace',
+      name: 'Inner Furnace',
+      description: 'A slow, rhythmic heat pulse turns the block into a mirage -- everything nearby flashes white and burns.',
+      cooldownMs: 27000,
+      durationMs: 4600,
+      effect: { novaDamage: 98, novaRadius: 195, damageMult: 1.4, invulnerable: true },
+    },
+    unlock: { kind: 'clearArea', areaId: 'old-market' },
   },
 ];
 

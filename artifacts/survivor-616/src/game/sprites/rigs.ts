@@ -40,6 +40,10 @@ interface HumanoidOptions {
   bulk?: boolean;
   /** Narrows the frame and drops the head low for a small, hunched silhouette. */
   hunched?: boolean;
+  /** Replaces the head block with a wider, textured cluster -- a cloud or afro silhouette. */
+  cloudHair?: boolean;
+  /** Replaces the two thin legs with a single wide, stepped base -- flared trousers or a hakama stance. */
+  flarePants?: boolean;
 }
 
 export type ExpressiveStyle = 'prism' | 'flame' | 'spiral' | 'river' | 'astral';
@@ -224,6 +228,8 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
     torsoColor = 'body',
     bulk = false,
     hunched = false,
+    cloudHair = false,
+    flarePants = false,
   } = options;
 
   const effectiveWidth = width + (bulk ? 3 : 0) - (hunched ? 2 : 0);
@@ -251,6 +257,10 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
 
   if (seated) {
     parts.push({ key: 'legL', x: -half - 1, y: 0, w: effectiveWidth + 2, h: legH, color: 'bodyDark', z: 1 });
+  } else if (flarePants) {
+    // A single wide, stepped base -- wider than the torso, like flared
+    // trousers or a hakama stance -- instead of two thin legs.
+    parts.push({ key: 'legL', x: -half - 3, y: 0, w: effectiveWidth + 6, h: legH, color: 'bodyDark', z: 1 });
   } else {
     parts.push(
       { key: 'legL', x: -half + 1, y: 0, w: 3, h: legH, color: 'bodyDark', z: 1 },
@@ -266,6 +276,17 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
     { key: 'face', x: -half + 2, y: legH + torsoH + Math.floor(headH / 2), w: effectiveWidth - 4, h: 2, color: 'accentBright', z: 6 },
   );
 
+  if (cloudHair) {
+    // A wider, textured cluster standing in for a single head block --
+    // a handful of offset squares read as a cloud or afro silhouette.
+    const cloudY = legH + torsoH + headH;
+    parts.push(
+      { key: 'crest', x: -half - 2, y: cloudY - 3, w: effectiveWidth + 4, h: 3, color: headColor, z: 6 },
+      { key: 'crest', x: -half - 3, y: cloudY - 1, w: 3, h: 3, color: headColor, z: 6 },
+      { key: 'crest', x: half, y: cloudY - 1, w: 3, h: 3, color: headColor, z: 6 },
+      { key: 'crest', x: -half, y: cloudY + 1, w: effectiveWidth - 1, h: 2, color: headColor, z: 6 },
+    );
+  }
   if (hood) {
     parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 2, w: effectiveWidth, h: 3, color: 'bodyDark', z: 6 });
   }
@@ -289,7 +310,7 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
     parts.push({ key: 'crest', x: -half + 1, y: legH + torsoH + headH + 2, w: width - 2, h: 1, color: 'glow', z: 8 });
   }
 
-  return { pixelHeight: height + (halo ? 3 : 0), parts, anims: baseAnims(seated) };
+  return { pixelHeight: height + (halo ? 3 : 0) + (cloudHair ? 2 : 0), parts, anims: baseAnims(seated) };
 }
 
 interface QuadrupedOptions {
