@@ -632,6 +632,8 @@ export interface World {
   activeCrewRumor: ActiveCrewRumor | null;
   /** Whether the carried rumor has fired its gameplay effect yet. */
   rumorTriggered: boolean;
+  /** w.now at which rumorTriggered flipped true; used to fade the HUD banner after firing. */
+  rumorTriggeredAt: number;
   /** Human-readable outcome used by the run HUD and summary. */
   rumorOutcome: string;
   rumorSpeedUntil: number;
@@ -641,6 +643,8 @@ export interface World {
   /** Authored opening-campaign cue for this area, when one exists. */
   firstNightChapter?: ReturnType<typeof getFirstNightChapter>;
   firstNightBeatTriggered: boolean;
+  /** w.now at which firstNightBeatTriggered flipped true; used to fade the HUD banner after it fires. */
+  firstNightBeatTriggeredAt: number;
   /** Optional, short landmark encounter selected for this run. */
   districtIncursion?: DistrictIncursionState;
 
@@ -862,6 +866,7 @@ export function createWorld(
     challenges: [...challenges],
     activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
     rumorTriggered: activeCrewRumor?.rumorId === 'painted-shortcut',
+    rumorTriggeredAt: activeCrewRumor?.rumorId === 'painted-shortcut' ? 0 : Number.POSITIVE_INFINITY,
     rumorOutcome: activeCrewRumor?.rumorId === 'painted-shortcut'
       ? 'Painted Shortcut boosted movement at run start.'
       : activeCrewRumor
@@ -873,6 +878,7 @@ export function createWorld(
     rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
     firstNightChapter: getFirstNightChapter(area.id),
     firstNightBeatTriggered: false,
+    firstNightBeatTriggeredAt: Number.POSITIVE_INFINITY,
     districtIncursion: selectedIncursion
       ? {
           id: selectedIncursion.id,
@@ -886,6 +892,7 @@ export function createWorld(
           accent: selectedIncursion.accent,
           startedAt: 0,
           endsAt: 0,
+          endedAt: 0,
           cycle: -1,
           nextPulseAt: 0,
           nextHazardTickAt: 0,
@@ -1036,6 +1043,14 @@ function pushAlert(w: World, text: string) {
   w.alerts.push({ text, bornAt: w.now });
   if (w.alerts.length > 4) w.alerts.shift();
 }
+
+/**
+ * How long a one-shot story/event banner (first night beat, a fired rumor,
+ * a finished district incursion) stays on the HUD before it fades. Past
+ * this window the outcome is history, not something the player still needs
+ * on screen — keeping it up forever crowds out live gameplay HUD elements.
+ */
+const HUD_STORY_BEAT_MS = 6000;
 
 /* ------------------------------------------------------------------ */
 /* Derived stats                                                       */
@@ -1207,6 +1222,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
   ) {
     w.rumorBroadcastAvailable = false;
     w.rumorTriggered = true;
+    w.rumorTriggeredAt = w.now;
     w.rumorOutcome = `Basement Broadcast warned about ${def.name} before the arrival.`;
     pushAlert(w, `RUMOR — ${def.name} on the air`);
   }
@@ -1405,6 +1421,7 @@ function finishDistrictIncursion(w: World, completed: boolean) {
   if (!def) return;
 
   state.phase = completed ? 'complete' : 'failed';
+  state.endedAt = w.now;
   if (completed && !state.rewardGranted) {
     state.rewardGranted = true;
     w.cred += state.rewardCred;
@@ -2143,6 +2160,7 @@ function killEnemy(w: World, enemy: EnemyActor) {
 function triggerBellShock(w: World) {
   if (w.activeCrewRumor?.rumorId !== 'bell-shock' || w.rumorTriggered) return;
   w.rumorTriggered = true;
+  w.rumorTriggeredAt = w.now;
   w.rumorOutcome = 'Bell Shock shoved nearby threats away on first contact.';
   const radius = 132;
   for (const enemy of w.enemies) {
@@ -4259,6 +4277,7 @@ export function claimRumorEmergencyHeal(w: World): boolean {
   if (w.activeCrewRumor?.rumorId !== 'pantry-surge' || !w.rumorPantryAvailable) return false;
   w.rumorPantryAvailable = false;
   w.rumorTriggered = true;
+  w.rumorTriggeredAt = w.now;
   const amount = Math.max(12, Math.round(w.player.maxHp * 0.18));
   w.player.hp = clamp(w.player.hp + amount, 0, w.player.maxHp);
   w.rumorOutcome = `Pantry Surge restored ${amount} HP at the first level-up.`;
@@ -4281,6 +4300,7 @@ function updateRumorPulses(w: World) {
   ) return;
 
   w.rumorTriggered = true;
+  w.rumorTriggeredAt = w.now;
   w.rumorOutcome = 'Magnet Parade pulled experience and cred toward the operative.';
   const radius = 280;
   for (const pickup of w.pickups) {
@@ -5183,6 +5203,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
     w.time >= w.firstNightChapter.beatAtSec
   ) {
     w.firstNightBeatTriggered = true;
+    w.firstNightBeatTriggeredAt = w.now;
     pushAlert(w, `${w.firstNightChapter.beatTitle} — ${w.firstNightChapter.beatText}`);
   }
 
@@ -5340,7 +5361,8 @@ export function hudSnapshot(w: World): HudSnapshot {
           }
         : undefined,
     },
-    crewRumor: w.activeCrewRumor
+    crewRumor: w.activeCrewRumor &&
+      (!w.rumorTriggered || w.rumorPantryAvailable || w.now - w.rumorTriggeredAt < HUD_STORY_BEAT_MS)
       ? (() => {
           const rumor = getCrewRumor(w.activeCrewRumor.rumorId);
           if (!rumor) return undefined;
@@ -5355,14 +5377,24 @@ export function hudSnapshot(w: World): HudSnapshot {
           };
         })()
       : undefined,
-    firstNightBeat: w.firstNightChapter && w.firstNightBeatTriggered
+    // Shown only for a short window after it fires -- the same beat is
+    // already announced transiently via `alerts`, so leaving this up for
+    // the rest of the run would just duplicate that text permanently.
+    firstNightBeat: w.firstNightChapter && w.firstNightBeatTriggered &&
+      w.now - w.firstNightBeatTriggeredAt < HUD_STORY_BEAT_MS
       ? {
           chapter: w.firstNightChapter.chapter,
           title: w.firstNightChapter.beatTitle,
           text: w.firstNightChapter.beatText,
         }
       : undefined,
-    districtIncursion: w.districtIncursion
+    // Live states (pending/warning/active) always show; a finished incursion
+    // (complete/failed) is only shown briefly -- its outcome text already
+    // went out via `alerts`, and "FAILED" sitting on screen for the rest of
+    // the run reads as an ongoing problem rather than a resolved event.
+    districtIncursion: w.districtIncursion &&
+      (w.districtIncursion.phase !== 'complete' && w.districtIncursion.phase !== 'failed'
+        || w.now - w.districtIncursion.endedAt < HUD_STORY_BEAT_MS)
       ? {
           id: w.districtIncursion.id,
           title: w.districtIncursion.title,

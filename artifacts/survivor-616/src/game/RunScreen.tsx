@@ -7,6 +7,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
@@ -118,6 +119,7 @@ export function RunScreen({
     setMinimapExpanded,
     setMinimapPosition,
   } = useMeta();
+  const musicPlayer = useMusicPlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const phaseRef = useRef<RunPhase>('countdown');
@@ -641,7 +643,7 @@ export function RunScreen({
             </div>
           )}
 
-          <div className="ml-auto flex flex-col items-end gap-1.5">
+          <div className={`ml-auto flex flex-col items-end gap-1.5 ${musicPlayer.currentTrack ? 'mt-12' : ''}`}>
             <div className="rounded-sm border border-white/20 bg-black/70 px-2 py-0.5 font-mono text-sm font-bold text-white tabular-nums" data-testid="text-timer">
               {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
             </div>
