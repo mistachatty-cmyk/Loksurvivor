@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { AREAS } from '@/game/data/areas';
-import { CHARACTERS } from '@/game/data/characters';
+import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { getEnemy } from '@/game/data/enemies';
@@ -2204,4 +2204,50 @@ test('reaction records drive multipliers without touching enemies that declare n
   assert.equal(musicMultiplier(world, getEnemy('ash-wisp').react, 'speed'), 1);
   // A declared reaction only drives the target it names.
   assert.equal(musicMultiplier(world, getEnemy('bass-bruiser').react, 'speed'), 1);
+});
+
+test("Static Nomad's pulse-shield fires an all-direction burst the instant the character dashes", () => {
+  const character = getCharacter('staticnomad');
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 701);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'nightcrawler', 40, 0);
+  enemy.speed = 0;
+  // `novaDamage` reads the spatial grid, which is only rebuilt inside
+  // `stepWorld` -- prime it once before dashing so the burst can see the enemy.
+  stepWorld(world, 1 / 60, neutralInput);
+  const hpBefore = enemy.hp;
+
+  assert.equal(dashPlayer(world, 1, 0), true);
+
+  assert.ok(enemy.hp < hpBefore, 'the dash burst should immediately damage a nearby enemy');
+  assert.ok(world.effects.some((e) => e.kind === 'nova' && !e.followPlayer), 'a cosmetic burst ring should be queued');
+});
+
+test("Static Nomad's pulse-shield keeps pulsing a wedge on its own even without dashing", () => {
+  const character = getCharacter('staticnomad');
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 702);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < 40; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(world.effects.some((e) => e.kind === 'wave'), 'the passive pulse should have fired at least once');
+});
+
+test("Ember Ascetic's directional wall deals bonus damage on a dash push and detonates a delayed landing explosion", () => {
+  const character = getCharacter('emberascetic');
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 703);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'nightcrawler', 40, 0);
+  enemy.speed = 0;
+  const hpBeforeDash = enemy.hp;
+
+  assert.equal(dashPlayer(world, 1, 0), true);
+  for (let i = 0; i < 4; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(enemy.hp < hpBeforeDash, 'the dash push should deal bonus damage on top of the knockback hit');
+  assert.equal(world.dashSkill?.pendingLandings.length, 1, 'the hit enemy should be queued for a landing explosion');
+  const hpAfterPush = enemy.hp;
+
+  for (let i = 0; i < 40; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(enemy.hp < hpAfterPush, 'the delayed landing explosion should deal further damage');
+  assert.equal(world.dashSkill?.pendingLandings.length, 0, 'the landing explosion should have resolved and cleared');
 });

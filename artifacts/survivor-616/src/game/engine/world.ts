@@ -35,6 +35,7 @@ import type {
   ChallengeContractDef,
   CharacterDef,
   CompletedObjective,
+  DashSkillDef,
   DistrictIncursionState,
   EnemyDef,
   EndlessState,
@@ -210,6 +211,33 @@ export interface Orbiter {
   radius: number;
   damage: number;
   cooldowns: Map<number, number>;
+}
+
+/** An enemy queued to detonate a beat after a dash-pushed hit sends it flying. */
+export interface PendingLandExplosion {
+  /** Enemy uid to re-check for a fresher position; falls back to x/y if it died first. */
+  uid: number;
+  x: number;
+  y: number;
+  readyAt: number;
+  damage: number;
+  radius: number;
+}
+
+/** Per-run bookkeeping for a character's `dashSkill`. */
+export interface DashSkillRuntime {
+  def: DashSkillDef;
+  /** pulse-shield: next-ready timestamp for each currently unlocked direction slot. */
+  slotReadyAt: number[];
+  /** directional-wall: next-ready timestamp for the passive wall tick. */
+  wallReadyAt: number;
+  /** directional-wall: dash-pushed enemies waiting to detonate after landing. */
+  pendingLandings: PendingLandExplosion[];
+}
+
+function createDashSkillRuntime(def: DashSkillDef | undefined): DashSkillRuntime | null {
+  if (!def) return null;
+  return { def, slotReadyAt: [0], wallReadyAt: 0, pendingLandings: [] };
 }
 
 export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'coin';
@@ -523,6 +551,8 @@ export interface World {
   effects: Effect[];
   orbiters: Orbiter[];
   weapons: RunWeapon[];
+  /** Runtime bookkeeping for the character's dash skill, when it has one. */
+  dashSkill: DashSkillRuntime | null;
   /** Account-wide signature evolution active for the selected character. */
   activeEvolution?: EvolutionDef;
   /** Relic knowledge carried into this run; recipes are still earned in-run. */
@@ -793,6 +823,7 @@ export function createWorld(
     effects: [],
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
+    dashSkill: createDashSkillRuntime(character.dashSkill),
     activeEvolution: evolved,
     knownRelicIds: [...new Set(setup.knownRelicIds ?? [])],
     activeRelicRecipe: undefined,
@@ -3698,6 +3729,21 @@ function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
       enemy.animStartedAt = w.now;
     }
     spawnParticles(w, enemy.x, enemy.y, '#fef08a', 5, 80);
+
+    const dashSkill = w.dashSkill;
+    if (dashSkill?.def.kind === 'directional-wall') {
+      const def = dashSkill.def;
+      const pushDamage = def.wallDamage * def.dashPushMult * damageMult(w);
+      damageEnemy(w, enemy, pushDamage, 0, p.x, p.y);
+      dashSkill.pendingLandings.push({
+        uid: enemy.uid,
+        x: enemy.x,
+        y: enemy.y,
+        readyAt: w.now + def.landExplodeDelayMs,
+        damage: def.landExplodeDamage * damageMult(w),
+        radius: def.landExplodeRadius * areaMult(w),
+      });
+    }
   }
 }
 
@@ -3793,7 +3839,155 @@ export function dashPlayer(w: World, directionX: number, directionY: number): bo
     bornAt: w.now,
     vy: 34,
   });
+
+  if (w.dashSkill?.def.kind === 'pulse-shield') triggerPulseShieldDashBurst(w, w.dashSkill, w.dashSkill.def);
+  if (w.dashSkill?.def.kind === 'directional-wall') triggerDirectionalWallDashPush(w, w.dashSkill.def);
+
   return true;
+}
+
+/** Fires a short-lived damaging wedge in front of the player -- the shared primitive both dash skills pulse. */
+function spawnDashSkillArc(
+  w: World,
+  angle: number,
+  halfSpread: number,
+  radius: number,
+  damage: number,
+  impactIntensity: ImpactIntensity,
+  lifeMs: number,
+  color = w.character.palette.accent,
+) {
+  const p = w.player;
+  w.effects.push({
+    uid: uid(w),
+    kind: 'wave',
+    x: p.x,
+    y: p.y,
+    radius,
+    angle,
+    spread: halfSpread,
+    bornAt: w.now,
+    expiresAt: w.now + lifeMs,
+    color,
+    damage,
+    impactIntensity,
+    hitUids: new Set(),
+    followPlayer: true,
+  });
+}
+
+/** Music-derived cadence for a pulse-shield direction; falls back to a fixed tempo when nothing is playing. */
+const DASH_SKILL_FALLBACK_BPM = 118;
+function dashSkillBeatPeriodMs(w: World, beatsPerPulse: number): number {
+  const bpm = w.audio.bpm > 0 ? w.audio.bpm : DASH_SKILL_FALLBACK_BPM;
+  return (60000 / bpm) * beatsPerPulse;
+}
+
+/** How many simultaneous pulse directions the signature weapon's current level has unlocked. */
+function pulseDirectionCount(w: World, def: Extract<DashSkillDef, { kind: 'pulse-shield' }>): number {
+  const level = w.weapons[0]?.level ?? 1;
+  const unlocked = 1 + Math.floor((level - 1) / def.levelsPerDirection);
+  return clamp(unlocked, 1, def.maxDirections);
+}
+
+function triggerPulseShieldDashBurst(
+  w: World,
+  runtime: DashSkillRuntime,
+  def: Extract<DashSkillDef, { kind: 'pulse-shield' }>,
+) {
+  const p = w.player;
+  const radius = def.pulseRadius * areaMult(w) * 1.35;
+  const damage = def.pulseDamage * def.dashBurstMult * damageMult(w);
+  novaDamage(w, p.x, p.y, radius, damage, 3);
+  damageBreakable(w, p.x, p.y, radius, damage, 3, p.x, p.y);
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: p.x,
+    y: p.y,
+    radius,
+    angle: 0,
+    spread: 0,
+    bornAt: w.now,
+    expiresAt: w.now + 320,
+    color: w.character.palette.accentBright,
+    damage: 0,
+    impactIntensity: 0,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  w.shake = Math.max(w.shake, 6);
+  // Re-sync every slot off the burst so they don't immediately re-fire on top of it.
+  const period = dashSkillBeatPeriodMs(w, def.beatsPerPulse);
+  for (let i = 0; i < runtime.slotReadyAt.length; i += 1) {
+    runtime.slotReadyAt[i] = w.now + period * (0.85 + i * 0.15);
+  }
+}
+
+function triggerDirectionalWallDashPush(w: World, def: Extract<DashSkillDef, { kind: 'directional-wall' }>) {
+  const p = w.player;
+  const angle = Math.atan2(p.dashDirectionY, p.dashDirectionX);
+  // Purely the "the wall pushed outward" flash -- the actual bonus damage and
+  // landing-explosion bookkeeping happen per-enemy in knockEnemiesAlongDash.
+  spawnDashSkillArc(w, angle, def.wallArc / 2, def.wallRange * areaMult(w) * 1.6, 0, 0, 220, w.character.palette.accentBright);
+}
+
+/** Advances a character's dash skill: pulse-shield's beat-synced wedges, or the directional wall's tick and delayed landing explosions. */
+function updateDashSkill(w: World) {
+  const dashSkill = w.dashSkill;
+  if (!dashSkill) return;
+  const p = w.player;
+  const def = dashSkill.def;
+
+  if (def.kind === 'pulse-shield') {
+    const count = pulseDirectionCount(w, def);
+    const period = dashSkillBeatPeriodMs(w, def.beatsPerPulse);
+    while (dashSkill.slotReadyAt.length < count) {
+      dashSkill.slotReadyAt.push(w.now + period * (dashSkill.slotReadyAt.length * 0.5));
+    }
+    for (let i = 0; i < count; i += 1) {
+      if (w.now < dashSkill.slotReadyAt[i]!) continue;
+      const angle = (Math.PI * 2 * i) / count;
+      spawnDashSkillArc(w, angle, def.pulseArc / 2, def.pulseRadius * areaMult(w), def.pulseDamage * damageMult(w), 1, 260);
+      // Each slot runs at a slightly different pace once more than one is
+      // active, so they read as independently-timed pulses, not one ring.
+      dashSkill.slotReadyAt[i] = w.now + period * (0.85 + i * 0.15);
+    }
+  } else if (def.kind === 'directional-wall') {
+    if (w.now >= dashSkill.wallReadyAt) {
+      const angle = p.facing > 0 ? 0 : Math.PI;
+      spawnDashSkillArc(w, angle, def.wallArc / 2, def.wallRange * areaMult(w), def.wallDamage * damageMult(w), 1, 220);
+      dashSkill.wallReadyAt = w.now + def.wallTickMs;
+    }
+
+    for (let i = dashSkill.pendingLandings.length - 1; i >= 0; i -= 1) {
+      const landing = dashSkill.pendingLandings[i]!;
+      if (w.now < landing.readyAt) continue;
+      const stillAlive = w.enemies.find((e) => e.uid === landing.uid && !e.dying);
+      const x = stillAlive?.x ?? landing.x;
+      const y = stillAlive?.y ?? landing.y;
+      novaDamage(w, x, y, landing.radius, landing.damage, 3);
+      damageBreakable(w, x, y, landing.radius, landing.damage, 3, x, y);
+      w.effects.push({
+        uid: uid(w),
+        kind: 'ring',
+        x,
+        y,
+        radius: landing.radius,
+        angle: 0,
+        spread: 0,
+        bornAt: w.now,
+        expiresAt: w.now + 260,
+        color: w.character.palette.accent,
+        damage: 0,
+        impactIntensity: 0,
+        hitUids: new Set(),
+        followPlayer: false,
+      });
+      spawnParticles(w, x, y, w.character.palette.accent, 8, 90);
+      dashSkill.pendingLandings.splice(i, 1);
+    }
+  }
 }
 
 /** Ghost Cloak's automatic timer. When active, enemy AI tracks a frozen anchor instead of the live player. */
@@ -5257,6 +5451,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   updateProjectiles(w, dt);
   updateEffects(w);
+  updateDashSkill(w);
   updatePotholes(w);
   updateRumorPulses(w);
   updatePickups(w, dt);
