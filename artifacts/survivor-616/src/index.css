@@ -129,6 +129,63 @@
   --accent-foreground: 193 100% 62%;
   --ring: 193 100% 62%;
 }
+[data-ui-theme='arcade'][data-ui-swatch='violet-signal'] {
+  --primary: 274 100% 70%;
+  --accent-foreground: 274 100% 70%;
+  --ring: 274 100% 70%;
+}
+
+/* House Style stays free, but its accent can still match the player's mood. */
+[data-ui-theme='house'][data-ui-swatch='lake-blue'] {
+  --primary: 199 92% 62%;
+  --accent-foreground: 199 92% 62%;
+  --ring: 199 92% 62%;
+}
+[data-ui-theme='house'][data-ui-swatch='copper-rose'] {
+  --primary: 348 92% 66%;
+  --accent-foreground: 348 92% 66%;
+  --ring: 348 92% 66%;
+}
+
+/* Night Drive: a cool, cinematic chrome that still uses the same UI tokens. */
+[data-ui-theme='night-drive'] {
+  --background: 226 42% 7%;
+  --foreground: 216 45% 94%;
+
+  --card: 225 38% 11%;
+  --card-foreground: 216 45% 94%;
+  --card-border: 219 52% 30%;
+
+  --popover: 225 38% 11%;
+  --popover-foreground: 216 45% 94%;
+  --popover-border: 219 52% 30%;
+
+  --primary: 39 100% 62%;
+  --primary-foreground: 226 42% 7%;
+
+  --secondary: 224 35% 16%;
+  --secondary-foreground: 216 45% 94%;
+
+  --muted: 224 35% 13%;
+  --muted-foreground: 216 22% 63%;
+
+  --accent: 219 75% 16%;
+  --accent-foreground: 39 100% 62%;
+
+  --border: 219 52% 30%;
+  --input: 219 52% 30%;
+  --ring: 39 100% 62%;
+}
+[data-ui-theme='night-drive'][data-ui-swatch='blue-hour'] {
+  --primary: 207 100% 68%;
+  --accent-foreground: 207 100% 68%;
+  --ring: 207 100% 68%;
+}
+[data-ui-theme='night-drive'][data-ui-swatch='motel-pink'] {
+  --primary: 326 100% 70%;
+  --accent-foreground: 326 100% 70%;
+  --ring: 326 100% 70%;
+}
 
 /* Arcade Cabinet's CRT flourishes: chrome frame, phosphor glow, scanlines. Inert under every other theme. */
 [data-ui-theme='arcade'] .terminal-frame {
