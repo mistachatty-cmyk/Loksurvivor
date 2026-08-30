@@ -1,3 +1,4 @@
+import { isUnlocked } from '@/game/state/unlocks';
 import type { ChallengeContractDef, MetaState, VendorItemDef } from '@/game/types';
 
 /**
@@ -260,6 +261,20 @@ export const CHALLENGE_CONTRACTS: ChallengeContractDef[] = [
     enemyDamageMultiplier: 1,
   },
   {
+    id: 'timeless',
+    name: 'Timeless Mode',
+    description:
+      'The clock stops: the day/night phase holds where it stood and the street keeps sending the same crowd, whatever the hour.',
+    rewardMultiplier: 1.25,
+    enemySpawnMultiplier: 1,
+    enemyHealthMultiplier: 1,
+    enemyDamageMultiplier: 1,
+    timeless: true,
+    // Earned, not sold: the fountain that "runs red at midnight" is the record
+    // that teaches you the hour can be held.
+    unlock: { kind: 'discovery', discoveryId: 'civic-fountain' },
+  },
+  {
     id: 'no-shelter',
     name: 'No Shelter',
     description: 'Enemy contact damage +40%.',
@@ -278,8 +293,17 @@ export function vendorPurchaseCount(meta: MetaState, itemId: string): number {
   return Math.max(0, Math.floor(meta.vendorPurchases[itemId] ?? 0));
 }
 
+/**
+ * Contracts the player may take into a run.
+ *
+ * Most are bought from the Quartermaster. A contract carrying an `unlock` rule
+ * is earned instead, and is evaluated by the same `isUnlocked` evaluator every
+ * other locked surface in the game uses -- so the development all-unlocks
+ * switch reaches it exactly like it reaches characters, areas and hub rooms.
+ */
 export function availableChallengeContracts(meta: MetaState): ChallengeContractDef[] {
   return CHALLENGE_CONTRACTS.filter((contract) => {
+    if (contract.unlock) return isUnlocked(contract.unlock, meta);
     const item = VENDOR_CATALOG.find((candidate) => candidate.challengeId === contract.id);
     return item ? vendorPurchaseCount(meta, item.id) > 0 : false;
   });

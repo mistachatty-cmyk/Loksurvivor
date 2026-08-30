@@ -37,6 +37,7 @@ import type {
   CompletedObjective,
   DistrictIncursionState,
   EnemyDef,
+  EndlessBandId,
   EndlessState,
   EvolutionBehavior,
   EvolutionDef,
@@ -56,6 +57,7 @@ import type {
   ImpactIntensity,
   PotholeTrigger,
   PropVariant,
+  PlayerEffectSnapshot,
   RelicRecipeDef,
   StealthAbilityConfig,
 } from '@/game/types';
@@ -576,6 +578,37 @@ export interface World {
   weaponCount: number;
   ultCooldownMult: number;
 
+  /**
+   * Speed the simulation is advancing at this frame. Always the clamped
+   * composition of the base scale and any time ability -- read it, never
+   * recompute it.
+   */
+  timeMultiplier: number;
+  /**
+   * Time ability granted by a `timeScale` upgrade (0.7 for Slack Time, 1.4 for
+   * Overdrive), applied only while the character's ultimate is running. The
+   * ability has no cooldown of its own; it rides `ultReadyAt`.
+   */
+  timeAbilityMult: number;
+  /** Name of the time ability in play, for the HUD. */
+  timeAbilityName: string;
+  /**
+   * Day/night clock, 0..1. A pure function of `now` (run-elapsed ms), never
+   * wall-clock time, so a replayed seed sees the same sky. Held still while a
+   * timeless contract is active.
+   */
+  cycle: { phase: number };
+  /**
+   * Set by a `timeless` challenge contract. `timelessAtSec` is the run second
+   * the spawn timeline froze at: wave windows and the endless difficulty tier
+   * are evaluated against it instead of the live clock, so composition stops
+   * escalating while everything else keeps running.
+   */
+  timeless: boolean;
+  timelessAtSec: number;
+  /** Endless band whose enemy pool was locked in at activation. */
+  timelessBandId: EndlessBandId | null;
+
   weaponReadyAt: number;
   ultReadyAt: number;
   ultActiveUntil: number;
@@ -823,6 +856,13 @@ export function createWorld(
     weaponLevel: startingWeaponLevel,
     weaponCount: signatureWeapon.count ?? 1,
     ultCooldownMult: 1,
+    timeMultiplier: 1,
+    timeAbilityMult: 1,
+    timeAbilityName: '',
+    cycle: { phase: 0 },
+    timeless: challenges.some((contract) => contract.timeless === true),
+    timelessAtSec: 0,
+    timelessBandId: null,
     weaponReadyAt: 400,
     ultReadyAt: 4000,
     ultActiveUntil: -1,
@@ -1249,11 +1289,21 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
   return positions;
 }
 
+/**
+ * The run second wave composition is read at. Normally the live clock; a
+ * timeless contract pins it to the second the contract engaged, so which
+ * waves are in play stops changing while their rates keep running.
+ */
+function spawnTimelineSec(w: World): number {
+  return w.timeless ? w.timelessAtSec : w.time;
+}
+
 function updateSpawning(w: World, dt: number) {
   const waves = w.area.waves;
+  const timelineSec = spawnTimelineSec(w);
   for (let i = 0; i < waves.length; i += 1) {
     const wave = waves[i]!;
-    if (w.time < wave.fromSec || w.time > wave.toSec) continue;
+    if (timelineSec < wave.fromSec || timelineSec > wave.toSec) continue;
     const spawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
@@ -2786,6 +2836,7 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
   for (const effect of upgrade.effects) {
     applyEffect(w, effect);
   }
+  if (upgrade.effects.some((effect) => effect.kind === 'timeScale')) w.timeAbilityName = upgrade.name;
   w.pendingLevelUps = Math.max(0, w.pendingLevelUps - 1);
 }
 
@@ -2913,6 +2964,11 @@ function applyEffect(w: World, effect: UpgradeDef['effects'][number]) {
         break;
       case 'ultimateCooldown':
         w.ultCooldownMult *= effect.mult;
+        break;
+      case 'timeScale':
+        // Later picks replace earlier ones -- Slack Time and Overdrive pull in
+        // opposite directions and multiplying them would cancel both out.
+        w.timeAbilityMult = effect.mult;
         break;
   }
 }
@@ -5066,10 +5122,16 @@ function updateEndlessSpawning(w: World, dt: number) {
   const spawnRate = Math.min(3.2, (0.8 + tier * 0.14) * contractSpawnMultiplier);
   const hpMult = Math.min(1.7, 1 + tier * 0.07);
 
-  const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
+  // A timeless contract locks *composition*, not difficulty: the band's enemy
+  // pool is pinned to whatever was live at activation while the
+  // distance-driven tier (and so the capped rate and hp) keeps escalating.
+  if (w.timeless && w.timelessBandId === null) w.timelessBandId = e.currentBandId;
+  const poolBandId = w.timeless ? (w.timelessBandId ?? e.currentBandId) : e.currentBandId;
+  const bandPool = ENDLESS_BANDS_BY_ID[poolBandId]?.enemyPool;
+  const poolTier = w.timeless ? Math.min(Math.floor(w.timelessAtSec / 30), tier) : tier;
   const pool = bandPool?.length
     ? bandPool
-    : ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
+    : ENDLESS_ENEMY_POOLS[Math.min(poolTier, ENDLESS_ENEMY_POOLS.length - 1)]!;
 
   e.spawnBudget += spawnRate * dt;
   while (e.spawnBudget >= 1) {
@@ -5168,12 +5230,38 @@ export interface StepInput {
   audio?: AudioFrame;
 }
 
+/** Slowest and fastest the world is ever allowed to run. */
+export const MIN_TIME_SCALE = 0.5;
+export const MAX_TIME_SCALE = 1.5;
+/** Real seconds of run time in one full day/night cycle. */
+const CYCLE_PERIOD_SEC = 240;
+
+/**
+ * The one place the simulation's speed is decided.
+ *
+ * Like the endless-mode difficulty caps, this is a single composed clamp
+ * rather than a multiplier stacked on top of one: the base scale and the
+ * active time ability are multiplied first and the product is clamped once,
+ * so no combination of abilities can push the world outside [0.5, 1.5].
+ */
+function resolveTimeMultiplier(w: World): number {
+  const abilityMult = ultActive(w) ? w.timeAbilityMult : 1;
+  const baseTime = 1;
+  return Math.max(MIN_TIME_SCALE, Math.min(MAX_TIME_SCALE, baseTime * abilityMult));
+}
+
 export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (w.outcome !== 'running') return;
 
-  const dt = Math.min(dtSeconds, 1 / 30);
+  w.timeMultiplier = resolveTimeMultiplier(w);
+  const dt = Math.min(dtSeconds, 1 / 30) * w.timeMultiplier;
   w.time += dt;
   w.now += dt * 1000;
+
+  // Day/night. A timeless contract holds the phase where it stood at
+  // activation instead of skipping the advance entirely, so `cycle.phase`
+  // stays a plain readable number for the renderer and HUD.
+  if (!w.timeless) w.cycle.phase = (w.now / 1000 / CYCLE_PERIOD_SEC) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
 
@@ -5249,6 +5337,69 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 /* Read models                                                         */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Player effect read model                                            */
+/* ------------------------------------------------------------------ */
+
+/** Ground fluids the player can be standing in, as HUD-facing effects. */
+const FLUID_EFFECTS: Record<FluidKind, { name: string; kind: PlayerEffectSnapshot['kind']; color: string; detail: string }> = {
+  water: { name: 'Soaked', kind: 'debuff', color: '#3fb6ff', detail: '-15% move speed' },
+  coolant: { name: 'Chilled', kind: 'debuff', color: '#bfe9ff', detail: '-60% move speed' },
+  oil: { name: 'Oil Slick', kind: 'buff', color: '#f5d90a', detail: '+12% move speed' },
+  'burning-oil': { name: 'Burning Slick', kind: 'debuff', color: '#ff6b35', detail: '+12% move speed, standing in fire' },
+  runoff: { name: 'Irradiated', kind: 'status', color: '#b6ff2e', detail: 'Chemical runoff underfoot' },
+};
+
+/**
+ * Everything currently riding on the player, soonest-to-expire first.
+ *
+ * Every entry reads the timer that already owns the effect -- the ultimate's
+ * `ultActiveUntil`, the cloak's `stealthUntil`, a fluid tile's `expiresAt`.
+ * There is no second clock, and nothing here is written back to the world.
+ */
+function playerEffectSnapshots(w: World): PlayerEffectSnapshot[] {
+  const effects: PlayerEffectSnapshot[] = [];
+  const add = (
+    id: string,
+    name: string,
+    kind: PlayerEffectSnapshot['kind'],
+    color: string,
+    until: number,
+    detail: string,
+  ) => {
+    const remainingMs = until - w.now;
+    if (remainingMs <= 0) return;
+    effects.push({ id, name, kind, color, remainingMs, detail });
+  };
+
+  const ult = w.character.ultimate;
+  add('ultimate', ult.name, 'buff', w.character.palette.glow, w.ultActiveUntil, 'Ultimate active');
+  if (w.timeAbilityMult !== 1) {
+    add(
+      'time-ability',
+      w.timeAbilityName || 'Time Warp',
+      w.timeAbilityMult < 1 ? 'status' : 'buff',
+      w.timeAbilityMult < 1 ? '#8be9ff' : '#ffd166',
+      w.ultActiveUntil,
+      `World at ${w.timeMultiplier.toFixed(2)}x speed`,
+    );
+  }
+  add('cloak', 'Ghost Cloak', 'buff', '#a78bfa', w.stealthUntil, 'Enemies chase your last position');
+  add('rumor-speed', 'Painted Shortcut', 'buff', '#f472b6', w.rumorSpeedUntil, '+44 move speed');
+  add('dash', 'Dash', 'buff', '#e2e8f0', w.player.dashUntil, 'Charging through the crowd');
+
+  const seenFluids = new Set<FluidKind>();
+  for (const tile of w.fluids) {
+    if (seenFluids.has(tile.kind)) continue;
+    if (dist2(w.player.x, w.player.y, tile.x, tile.y) > tile.radius ** 2) continue;
+    seenFluids.add(tile.kind);
+    const meta = FLUID_EFFECTS[tile.kind];
+    add(`fluid-${tile.kind}`, meta.name, meta.kind, meta.color, tile.expiresAt, meta.detail);
+  }
+
+  return effects.sort((a, b) => a.remainingMs - b.remainingMs);
+}
+
 export function hudSnapshot(w: World): HudSnapshot {
   const ultRemaining = Math.max(0, w.ultReadyAt - w.now);
   const ultTotal = w.character.ultimate.cooldownMs * w.ultCooldownMult;
@@ -5267,6 +5418,11 @@ export function hudSnapshot(w: World): HudSnapshot {
     xpToNext: Math.round(w.xpToNext),
     elapsedSec: w.time,
     durationSec: w.area.durationSec,
+    stats: { ...w.stats },
+    playerEffects: playerEffectSnapshots(w),
+    timeMultiplier: w.timeMultiplier,
+    cyclePhase: w.cycle.phase,
+    timeless: w.timeless,
     kills: w.kills,
     cred: w.cred,
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),

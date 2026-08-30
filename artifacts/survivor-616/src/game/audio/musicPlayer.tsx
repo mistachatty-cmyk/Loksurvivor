@@ -197,6 +197,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     setCurrentIndex(index);
     audio.src = track.url;
     audio.currentTime = 0;
+    // Track identity goes out on the beat bus, the one seam consumers read for
+    // anything music-related. A now-playing cue watches for this changing
+    // rather than subscribing to the player a second time.
+    beatBus.publish({ track: { id: track.id, title: track.title } }, 'detected');
     void audio
       .play()
       .then(() => {
@@ -353,6 +357,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
         if (index === currentIndex) {
           audioRef.current?.pause();
+          beatBus.publish({ track: null }, 'detected');
           setIsPlaying(false);
           setCurrentIndex(-1);
           setProgressSec(0);
@@ -373,6 +378,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
     tracksRef.current = BUNDLED_TRACKS;
     setTracks(BUNDLED_TRACKS);
+    beatBus.publish({ track: null }, 'detected');
     setCurrentIndex(-1);
     setIsPlaying(false);
     setProgressSec(0);

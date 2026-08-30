@@ -31,9 +31,12 @@ Run from the repo root unless noted:
   fail without it — this is a pre-existing quirk of that package, unrelated
   to the game; if you just need the game to build, run the survivor-616
   commands directly instead (below).
-- No unit test runner exists anywhere in this repo (script lists are always
-  dev/build/serve/typecheck) — don't introduce one as a side effect of an
-  unrelated task.
+- Only `artifacts/survivor-616` has tests: `pnpm test` (node:test via tsx, over
+  the `*.test.ts` files named in its `test` script) and `pnpm e2e`
+  (Playwright, `e2e/`). Add engine coverage to the existing
+  `src/game/engine/world.test.ts` rather than introducing another runner or a
+  file the `test` script does not name. Nothing else in the workspace has a
+  test runner — don't add one as a side effect of an unrelated task.
 
 For the game itself, run from `artifacts/survivor-616/`:
 - `PORT=5173 BASE_PATH=/ pnpm dev` — Vite dev server. `PORT` and `BASE_PATH`
@@ -42,8 +45,8 @@ For the game itself, run from `artifacts/survivor-616/`:
 - `PORT=5173 BASE_PATH=/ pnpm build` — production build (`dist/public/`).
 - `pnpm typecheck` — just this package.
 
-There is no automated visual/gameplay test suite. Verify changes by running
-`pnpm typecheck`, then playtesting via `pnpm dev` (a headless browser +
+There is no automated visual test suite. Verify changes by running
+`pnpm typecheck` and `pnpm test`, then playtesting via `pnpm dev` (a headless browser +
 screenshots works well for this from an agent context — see any recent
 commit's description for the manual-verification pattern used).
 

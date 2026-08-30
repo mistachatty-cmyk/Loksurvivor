@@ -301,6 +301,30 @@ export const UPGRADES: UpgradeDef[] = [
     effects: [{ kind: 'ultimateCooldown', mult: 0.8 }],
   },
   {
+    id: 'slack-time',
+    name: 'Slack Time',
+    description:
+      'Your ultimate drags the whole block into slow motion — the world runs at 0.7x while it is up. Ultimate recharges 15% faster.',
+    weight: 4,
+    maxStacks: 1,
+    effects: [
+      { kind: 'timeScale', mult: 0.7 },
+      { kind: 'ultimateCooldown', mult: 0.85 },
+    ],
+  },
+  {
+    id: 'overdrive',
+    name: 'Overdrive',
+    description:
+      'Your ultimate winds everything forward instead — the world runs at 1.4x while it is up. Ultimate recharges 15% faster.',
+    weight: 4,
+    maxStacks: 1,
+    effects: [
+      { kind: 'timeScale', mult: 1.4 },
+      { kind: 'ultimateCooldown', mult: 0.85 },
+    ],
+  },
+  {
     id: 'street-sense',
     name: 'Street Sense',
     description: 'A little of everything: +8% damage, +6 speed, +10 max HP.',

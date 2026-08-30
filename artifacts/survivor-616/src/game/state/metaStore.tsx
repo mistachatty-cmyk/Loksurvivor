@@ -39,6 +39,7 @@ import {
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
+import { isUnlocked } from '@/game/state/unlocks';
 import { DEFAULT_UI_THEME_ID, UI_THEMES_BY_ID, defaultSwatchId } from '@/game/data/uiThemes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
@@ -687,24 +688,7 @@ function saveMeta(meta: MetaState) {
 /* Unlock evaluation                                                   */
 /* ------------------------------------------------------------------ */
 
-export function isUnlocked(rule: UnlockRule, meta: MetaState): boolean {
-  if (meta.devModeAllUnlocks) return true;
-
-  switch (rule.kind) {
-    case 'default':
-      return true;
-    case 'rescue':
-      return meta.rescuedAllyIds.includes(rule.allyId);
-    case 'clearArea':
-      return meta.clearedAreaIds.includes(rule.areaId);
-    case 'discovery':
-      return meta.discoveryIds.includes(rule.discoveryId);
-    case 'kills':
-      return meta.totalKills >= rule.count;
-    default:
-      return false;
-  }
-}
+export { isUnlocked } from '@/game/state/unlocks';
 
 export function describeUnlock(rule: UnlockRule): string {
   switch (rule.kind) {

@@ -16,6 +16,7 @@ import { getCrewRumor, rollCrewRumor } from '@/game/data/crewRumors';
 import { FIRST_NIGHT_CHAPTERS, recommendedFirstNightChapter } from '@/game/data/firstNight';
 import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import { UPGRADES_BY_ID } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { DISTRICT_INCURSIONS, DISTRICT_INCURSIONS_BY_ID, chooseDistrictIncursion } from '@/game/data/incursions';
@@ -34,9 +35,13 @@ import {
   relicRecipeEligibility,
   type EnemyActor,
   type Projectile,
+  type World,
   stepWorld,
   isOnBeat,
   musicMultiplier,
+  activateUltimate,
+  MIN_TIME_SCALE,
+  MAX_TIME_SCALE,
 } from '@/game/engine/world';
 import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
 import { generateChunk } from '@/game/engine/chunks';
@@ -51,7 +56,7 @@ import {
   reducer,
   startingWeaponLevel,
 } from '@/game/state/metaStore';
-import type { AreaDef, CharacterDef, LokPetRoll, RunResult } from '@/game/types';
+import type { AreaDef, ChallengeContractDef, CharacterDef, LokPetRoll, RunResult } from '@/game/types';
 
 const neutralInput = { moveX: 0, moveY: 0, ultimate: false };
 
@@ -2204,4 +2209,84 @@ test('reaction records drive multipliers without touching enemies that declare n
   assert.equal(musicMultiplier(world, getEnemy('ash-wisp').react, 'speed'), 1);
   // A declared reaction only drives the target it names.
   assert.equal(musicMultiplier(world, getEnemy('bass-bruiser').react, 'speed'), 1);
+});
+
+/* ------------------------------------------------------------------ */
+/* Time abilities and the timeless contract                            */
+/* ------------------------------------------------------------------ */
+
+/** A plain world with the ultimate off cooldown, so a time ability can run. */
+function timeTestWorld(challenges: ChallengeContractDef[] = []) {
+  const world = createWorld(AREAS[0]!, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats }, 42, challenges);
+  world.ultReadyAt = 0;
+  return world;
+}
+
+function runSeconds(world: World, seconds: number) {
+  for (let i = 0; i < Math.round(seconds * 60); i += 1) {
+    stepWorld(world, 1 / 60, { ...neutralInput });
+  }
+}
+
+test('time abilities scale the simulation and stay inside the clamp', () => {
+  const base = timeTestWorld();
+  runSeconds(base, 1);
+  assert.equal(base.timeMultiplier, 1);
+
+  const slack = timeTestWorld();
+  applyUpgrade(slack, UPGRADES_BY_ID['slack-time']!);
+  assert.ok(activateUltimate(slack));
+  runSeconds(slack, 1);
+  assert.equal(slack.timeMultiplier, 0.7);
+  assert.ok(slack.time < base.time, 'Slack Time advances the world more slowly');
+
+  const overdrive = timeTestWorld();
+  applyUpgrade(overdrive, UPGRADES_BY_ID['overdrive']!);
+  assert.ok(activateUltimate(overdrive));
+  runSeconds(overdrive, 1);
+  assert.equal(overdrive.timeMultiplier, 1.4);
+  assert.ok(overdrive.time > base.time, 'Overdrive advances the world faster');
+
+  // Both ride the ultimate's cooldown rather than owning one, and tune it
+  // through the existing ultimateCooldown effect.
+  assert.equal(overdrive.ultCooldownMult, 0.85);
+  runSeconds(overdrive, 30);
+  assert.equal(overdrive.timeMultiplier, 1, 'the ability ends with the ultimate');
+
+  // No authored value can push the world outside the clamp.
+  const wild = timeTestWorld();
+  wild.timeAbilityMult = 9;
+  activateUltimate(wild);
+  runSeconds(wild, 0.2);
+  assert.equal(wild.timeMultiplier, MAX_TIME_SCALE);
+  wild.timeAbilityMult = 0.01;
+  runSeconds(wild, 0.2);
+  assert.equal(wild.timeMultiplier, MIN_TIME_SCALE);
+});
+
+test('timeless mode holds the day/night phase while the run clock keeps running', () => {
+  const normal = timeTestWorld();
+  runSeconds(normal, 20);
+  assert.ok(normal.cycle.phase > 0, 'the clock advances normally');
+
+  const timeless = timeTestWorld([CHALLENGE_CONTRACTS_BY_ID['timeless']!]);
+  assert.equal(timeless.timeless, true);
+  runSeconds(timeless, 20);
+  assert.equal(timeless.cycle.phase, 0, 'the phase is held where it stood');
+  assert.ok(timeless.time > 19, 'the run itself is not frozen');
+});
+
+test('the pause menu effect list reads existing timers and sorts by expiry', () => {
+  const world = timeTestWorld();
+  activateUltimate(world);
+  world.stealthUntil = world.now + 60_000;
+  runSeconds(world, 0.5);
+
+  const effects = hudSnapshot(world).playerEffects;
+  const ids = effects.map((effect) => effect.id);
+  assert.ok(ids.includes('ultimate'), ids.join(','));
+  assert.ok(ids.includes('cloak'), ids.join(','));
+
+  const remaining = effects.map((effect) => effect.remainingMs);
+  assert.deepEqual(remaining, [...remaining].sort((a, b) => a - b), 'soonest to expire first');
 });

@@ -51,6 +51,13 @@ export interface AudioFrame {
   bands: Readonly<Record<FrequencyBand, number>>;
   /** True on frames where a transient was detected. */
   onset: boolean;
+  /**
+   * What is playing right now, or null for silence. Published by whichever
+   * producer owns the bus so consumers get track identity from the same seam
+   * as the beat -- there is deliberately no second way to learn about a track
+   * change.
+   */
+  track: { id: string; title: string } | null;
   source: BeatSource;
 }
 
@@ -65,6 +72,7 @@ export const SILENT_FRAME: AudioFrame = Object.freeze({
   energy: 0,
   bands: Object.freeze({ sub: 0, bass: 0, lowMid: 0, mid: 0, high: 0 }),
   onset: false,
+  track: null,
   source: 'none' as const,
 });
 

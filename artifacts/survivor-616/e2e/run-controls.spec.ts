@@ -41,11 +41,11 @@ test.describe('interactive run controls', () => {
     await page.waitForTimeout(1800);
     await page.getByTestId('button-pause').click();
     await expect(page.getByTestId('overlay-paused')).toBeVisible();
-    await page.getByTestId('button-pause-settings').click();
-    await expect(page.getByTestId('overlay-run-settings')).toBeVisible();
+    await page.getByTestId('tab-pause-settings').click();
+    await expect(page.getByTestId('pause-tab-settings')).toBeVisible();
     await expect(page.getByTestId('section-minimap-settings')).toBeVisible();
     await page.getByTestId('button-back').click();
-    await expect(page.getByTestId('overlay-paused')).toBeVisible();
+    await expect(page.getByTestId('pause-tab-status')).toBeVisible();
   });
 
   test('can minimize and drag the live minimap without steering the run', async ({ page }) => {

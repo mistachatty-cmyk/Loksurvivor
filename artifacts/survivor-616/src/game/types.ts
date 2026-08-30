@@ -1108,6 +1108,17 @@ export interface ChallengeContractDef {
   enemySpawnMultiplier: number;
   enemyHealthMultiplier: number;
   enemyDamageMultiplier: number;
+  /**
+   * Freezes the run's spawn timeline: the day/night phase stops advancing and
+   * wave/band composition locks to whatever was live at activation.
+   */
+  timeless?: true;
+  /**
+   * How this contract is earned. Contracts without a rule are sold by the
+   * Quartermaster; contracts with one are evaluated by the shared unlock
+   * evaluator, exactly like characters, areas and hideout rooms.
+   */
+  unlock?: UnlockRule;
 }
 
 /** Whether a detail panel (shop item, character) sits fixed beside its grid or expands under the selected row. */
@@ -1135,7 +1146,14 @@ export type UpgradeEffect =
   | { kind: 'weaponLevel'; amount: number }
   | { kind: 'weaponCount'; amount: number }
   | { kind: 'heal'; amount: number }
-  | { kind: 'ultimateCooldown'; mult: number };
+  | { kind: 'ultimateCooldown'; mult: number }
+  /**
+   * Grants a time ability: while the character's ultimate is active the whole
+   * simulation advances at `mult` speed. It deliberately rides the ultimate's
+   * own cooldown rather than carrying one of its own -- pair it with an
+   * `ultimateCooldown` effect to tune how often it comes back.
+   */
+  | { kind: 'timeScale'; mult: number };
 
 export interface UpgradeDef {
   id: string;
@@ -1390,6 +1408,23 @@ export interface RunResult {
   };
 }
 
+/**
+ * One effect currently riding on the player, for the pause menu's buff list.
+ *
+ * `remainingMs` always comes from the timer that already governs the effect
+ * (`ultActiveUntil`, `stealthUntil`, a fluid tile's `expiresAt`, ...) -- the
+ * HUD never runs a clock of its own.
+ */
+export interface PlayerEffectSnapshot {
+  id: string;
+  name: string;
+  /** buff = green, debuff = red, status = blue. */
+  kind: 'buff' | 'debuff' | 'status';
+  color: string;
+  remainingMs: number;
+  detail: string;
+}
+
 export interface HudSnapshot {
   hp: number;
   maxHp: number;
@@ -1434,6 +1469,16 @@ export interface HudSnapshot {
   }>;
   /** Effects currently active on the player's enemies, grouped for HUD display. */
   activeEffects: Array<{ id: string; name: string; color: string; count: number }>;
+  /** Live run stats after upgrades, allies and vendor boosts. */
+  stats: BaseStats;
+  /** Effects currently riding on the player, soonest-to-expire first. */
+  playerEffects: PlayerEffectSnapshot[];
+  /** Current simulation speed, 1 when no time ability is running. */
+  timeMultiplier: number;
+  /** Day/night clock, 0..1. Frozen while a timeless contract is active. */
+  cyclePhase: number;
+  /** True while a timeless contract has the spawn timeline locked. */
+  timeless: boolean;
   /** One-run hideout rumor currently carried by this run. */
   crewRumor?: {
     rumorId: CrewRumorId;

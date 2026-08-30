@@ -41,7 +41,8 @@ import {
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { ChestTally } from '@/ui/ChestTally';
 import { Minimap } from '@/ui/Minimap';
-import { SettingsPanel } from '@/ui/SettingsPanel';
+import { NowPlayingCue } from '@/ui/NowPlayingCue';
+import { PauseMenu } from '@/ui/PauseMenu';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 
 /** Resolve the weapon a level-up card represents, if any, for its icon. */
@@ -141,7 +142,6 @@ export function RunScreen({
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
-  const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(false);
   const reelTimerRef = useRef<number | null>(null);
@@ -645,6 +645,7 @@ export function RunScreen({
             <div className="rounded-sm border border-white/20 bg-black/70 px-2 py-0.5 font-mono text-sm font-bold text-white tabular-nums" data-testid="text-timer">
               {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
             </div>
+            <NowPlayingCue />
             {!hudMinimized && area.endless && hud?.endless && (
               <div className="font-mono text-[10px] uppercase tracking-widest text-primary/80 bg-black/60 px-2 py-0.5 border border-primary/20">
                 {inDungeon
@@ -1056,55 +1057,16 @@ export function RunScreen({
       ) : null}
 
       {/* Pause */}
-      {phase === 'paused' && !runSettingsOpen ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6" data-testid="overlay-paused">
-          <div className="w-full max-w-xs space-y-3 text-center">
-            <h2 className="text-2xl font-black uppercase text-white">Paused</h2>
-            <p className="font-mono text-xs text-white/60">
-              WASD or arrows to move. Space for {character.ultimate.name}.
-            </p>
-            <button
-              type="button"
-              onClick={() => setPhaseBoth('playing')}
-              className="w-full rounded-sm border border-white/25 bg-white/10 px-4 py-3 font-bold uppercase tracking-widest text-white"
-              data-testid="button-resume"
-            >
-              Resume
-            </button>
-            <button
-              type="button"
-              onClick={() => setRunSettingsOpen(true)}
-              className="w-full rounded-sm border border-cyan-200/40 bg-cyan-300/10 px-4 py-3 font-bold uppercase tracking-widest text-cyan-100"
-              data-testid="button-pause-settings"
-            >
-              Settings
-            </button>
-            {area.endless && (
-              <button
-                type="button"
-                onClick={headHome}
-                className="w-full rounded-sm border border-primary/50 bg-primary/10 px-4 py-3 font-bold uppercase tracking-widest text-primary"
-                data-testid="button-head-home"
-              >
-                Head home
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onAbort}
-              className="w-full rounded-sm border border-white/15 px-4 py-3 font-mono text-xs uppercase tracking-widest text-white/70"
-              data-testid="button-abandon"
-            >
-              Abandon run
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {phase === 'paused' && runSettingsOpen ? (
-        <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-run-settings">
-          <SettingsPanel onBack={() => setRunSettingsOpen(false)} />
-        </div>
+      {phase === 'paused' ? (
+        <PauseMenu
+          hud={hud}
+          character={character}
+          areaName={area.name}
+          endless={Boolean(area.endless)}
+          onResume={() => setPhaseBoth('playing')}
+          onHeadHome={headHome}
+          onAbandon={onAbort}
+        />
       ) : null}
 
       {/* Loot box reel overlay */}
