@@ -16,7 +16,7 @@ import {
 import { ALLIES, DISCOVERIES, allyRig } from '@/game/data/progression';
 import { STATUS_EFFECTS } from '@/game/data/statusEffects';
 import { WorkshopOverview } from './WorkshopPanel';
-import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
+import { describeUnlock, episodeProgress, episodeStatus, isUnlocked, useMeta } from '@/game/state/metaStore';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
@@ -114,7 +114,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
       count: meta.unlockedCharacterIds.length,
       total: CHARACTERS.length,
       items: CHARACTERS.map(char => {
-        const unlocked = meta.unlockedCharacterIds.includes(char.id);
+        const unlocked = isUnlocked(char.unlock, meta);
         return {
           id: char.id,
           name: unlocked ? char.name : 'Locked',

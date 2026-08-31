@@ -12,6 +12,7 @@ import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
+import { EVOLUTIONS } from '@/game/data/evolutions';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
@@ -196,7 +197,9 @@ export function RunScreen({
       physicsObjectClicksEnabled,
       meta.activeCrewRumor,
       {
-        unlockedEvolutionIds: meta.unlockedEvolutionIds,
+        unlockedEvolutionIds: meta.devModeAllUnlocks
+          ? EVOLUTIONS.map((e) => e.id)
+          : meta.unlockedEvolutionIds,
         knownRelicIds: meta.knownRelicIds,
         episode,
         episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
