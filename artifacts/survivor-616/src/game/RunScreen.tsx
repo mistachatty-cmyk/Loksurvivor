@@ -456,7 +456,13 @@ export function RunScreen({
           setPhaseBoth('reel');
         }
 
-        if (world.pendingLevelUps > 0) {
+        if (world.outcome !== 'running') {
+          // The run ended (block cleared or death) -- don't force the
+          // player to click through any still-queued level-ups first.
+          upgradeChoicesRef.current = [];
+          setChoices([]);
+          setPhaseBoth('over');
+        } else if (world.pendingLevelUps > 0) {
           if (upgradeChoicesRef.current.length === 0) {
             const nextChoices = rollUpgradeChoices(world);
             upgradeChoicesRef.current = nextChoices;
@@ -465,8 +471,6 @@ export function RunScreen({
           if (levelUpPausesRef.current) {
             setPhaseBoth('levelup');
           }
-        } else if (world.outcome !== 'running') {
-          setPhaseBoth('over');
         }
       } else if (phaseRef.current === 'over' && !finishedRef.current) {
         // Let the death or clear beat land before leaving.
