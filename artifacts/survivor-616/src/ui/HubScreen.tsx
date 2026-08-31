@@ -12,10 +12,10 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, PawPrint, FlaskConical } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'petTeam';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -34,6 +34,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   studio: { label: 'Studio', icon: RadioTower, testId: 'button-open-studio', description: 'Remix & record' },
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
+  petTeam: { label: 'Pet Team', icon: PawPrint, testId: 'button-open-pet-team', description: 'Field your earned LokPets' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
 };
@@ -150,6 +151,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
               {meta.skeletonKeys > 0 && (
                 <p className="text-xs font-mono text-sky-400 mt-1">
                   <KeyRound className="inline w-3 h-3 mr-1" />{meta.skeletonKeys} skeleton keys
+                </p>
+              )}
+              {meta.elixirs > 0 && (
+                <p className="text-xs font-mono text-purple-400 mt-1">
+                  <FlaskConical className="inline w-3 h-3 mr-1" />{meta.elixirs} elixirs
                 </p>
               )}
             </div>

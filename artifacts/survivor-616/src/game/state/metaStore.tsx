@@ -22,7 +22,7 @@ import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episod
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
-import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
+import { ELIXIR_REVIVE_COST, LOKPET_VARIANTS_BY_ID, MAX_PET_TEAM_SIZE, PET_WHISPERER_VENDOR_ID } from '@/game/data/lokPets';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
 import {
   crewActivityEffects,
@@ -55,6 +55,7 @@ import type {
   LokPetCatalogTrait,
   LokPetDiscoveryHistoryEntry,
   LokPetElement,
+  LokPetOwnedPet,
   LokPetRarity,
   LokPetRunDiscovery,
   MetaState,
@@ -150,6 +151,9 @@ export function createInitialMeta(): MetaState {
     cred: 0,
     lootTokens: 0,
     skeletonKeys: 0,
+    elixirs: 0,
+    ownedLokPets: [],
+    petTeamIds: [],
     onboarded: false,
     endlessRecordDistancePx: 0,
     endlessRecordDepth: 0,
@@ -513,6 +517,66 @@ function normalizeLokPetHistory(value: unknown): LokPetDiscoveryHistoryEntry[] {
     .slice(0, 100);
 }
 
+/**
+ * Rebuild the presentation fields (palette, family, silhouette) from the
+ * variant sheet rather than trusting the saved payload, same rationale as
+ * normalizeLokPetCatalog: malformed localStorage cannot inject a different
+ * look into an owned pet.
+ */
+export function normalizeOwnedLokPets(value: unknown): LokPetOwnedPet[] {
+  if (!Array.isArray(value)) return [];
+
+  const owned: LokPetOwnedPet[] = [];
+  const seenIds = new Set<string>();
+  for (const rawValue of value) {
+    if (!isRecord(rawValue) || typeof rawValue.id !== 'string' || seenIds.has(rawValue.id)) continue;
+    const rawRoll = rawValue.roll;
+    if (!isRecord(rawRoll) || typeof rawRoll.variantId !== 'string' || typeof rawRoll.name !== 'string') continue;
+    const variant = LOKPET_VARIANTS_BY_ID[rawRoll.variantId];
+    if (!variant) continue;
+    if (!isOneOf(rawRoll.rarity, LOKPET_RARITIES)) continue;
+    if (!isOneOf(rawRoll.attackKind, LOKPET_ATTACK_KINDS)) continue;
+    if (!isOneOf(rawRoll.element, LOKPET_ELEMENTS)) continue;
+    const rawStats = rawRoll.stats;
+    if (!isRecord(rawStats)) continue;
+
+    seenIds.add(rawValue.id);
+    owned.push({
+      id: rawValue.id,
+      capturedAt:
+        typeof rawValue.capturedAt === 'number' && Number.isFinite(rawValue.capturedAt) ? rawValue.capturedAt : 0,
+      alive: rawValue.alive !== false,
+      roll: {
+        name: rawRoll.name,
+        variantId: variant.id,
+        family: variant.family,
+        silhouette: variant.silhouette,
+        palette: variant.palette,
+        rarity: rawRoll.rarity,
+        rarityLabel: typeof rawRoll.rarityLabel === 'string' ? rawRoll.rarityLabel : rawRoll.rarity,
+        attackKind: rawRoll.attackKind,
+        element: rawRoll.element,
+        elementLabel: typeof rawRoll.elementLabel === 'string' ? rawRoll.elementLabel : rawRoll.element,
+        description: typeof rawRoll.description === 'string' ? rawRoll.description : variant.description,
+        traitLabel: typeof rawRoll.traitLabel === 'string' ? rawRoll.traitLabel : rawRoll.attackKind,
+        stats: {
+          health: counter(rawStats.health, 1),
+          moveSpeed: counter(rawStats.moveSpeed),
+          damage: counter(rawStats.damage),
+          cooldownMs: counter(rawStats.cooldownMs, 1000),
+          range: counter(rawStats.range),
+          projectileSpeed: counter(rawStats.projectileSpeed),
+          explosionRadius: counter(rawStats.explosionRadius),
+          pulseRadius: counter(rawStats.pulseRadius),
+          lifetimeMs: counter(rawStats.lifetimeMs),
+        },
+      },
+    });
+  }
+
+  return owned;
+}
+
 /** Coerce an untrusted save payload into a usable MetaState. */
 export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
@@ -612,6 +676,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     .map((episodeId) => CHARACTER_EPISODES_BY_ID[episodeId]?.evolutionId)
     .filter((evolutionId): evolutionId is string => Boolean(evolutionId));
   const unlockedEvolutionIds = [...new Set([...explicitEvolutionIds, ...completedEvolutionIds])];
+  const ownedLokPets = normalizeOwnedLokPets(parsed.ownedLokPets);
 
   return {
     version: META_VERSION,
@@ -646,6 +711,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     cred: counter(parsed.cred),
     lootTokens: counter(parsed.lootTokens),
     skeletonKeys: counter(parsed.skeletonKeys),
+    elixirs: counter(parsed.elixirs),
+    ownedLokPets,
+    petTeamIds: idList(parsed.petTeamIds, new Set(ownedLokPets.filter((pet) => pet.alive).map((pet) => pet.id)), [])
+      .slice(0, MAX_PET_TEAM_SIZE),
     onboarded: parsed.onboarded === true,
     endlessRecordDistancePx: counter(parsed.endlessRecordDistancePx),
     endlessRecordDepth: counter(parsed.endlessRecordDepth),
@@ -938,6 +1007,9 @@ type Action =
   | { type: 'saveCustomMap'; map: CustomMap }
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
+  | { type: 'setPetTeam'; ids: string[] }
+  | { type: 'reviveLokPet'; id: string }
+  | { type: 'purgeFallenLokPets' }
   | { type: 'reset' };
 
 function addUnique(list: string[], value?: string): string[] {
@@ -1245,6 +1317,45 @@ export function reducer(state: StoreState, action: Action): StoreState {
         meta: { ...state.meta, customMaps: state.meta.customMaps.filter((map) => map.id !== action.id) },
       };
 
+    case 'setPetTeam': {
+      const alive = new Set(state.meta.ownedLokPets.filter((pet) => pet.alive).map((pet) => pet.id));
+      const ids = [...new Set(action.ids)].filter((id) => alive.has(id)).slice(0, MAX_PET_TEAM_SIZE);
+      return { ...state, meta: { ...state.meta, petTeamIds: ids } };
+    }
+
+    case 'reviveLokPet': {
+      const prev = state.meta;
+      const pet = prev.ownedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet || pet.alive || prev.elixirs < ELIXIR_REVIVE_COST) return state;
+      return {
+        ...state,
+        meta: {
+          ...prev,
+          elixirs: prev.elixirs - ELIXIR_REVIVE_COST,
+          ownedLokPets: prev.ownedLokPets.map((candidate) =>
+            candidate.id === action.id ? { ...candidate, alive: true } : candidate,
+          ),
+        },
+      };
+    }
+
+    // Called once the player leaves the run summary: any team pet that fell
+    // and wasn't revived there is gone for good, not just benched.
+    case 'purgeFallenLokPets': {
+      const prev = state.meta;
+      const ownedLokPets = prev.ownedLokPets.filter((pet) => pet.alive);
+      if (ownedLokPets.length === prev.ownedLokPets.length) return state;
+      const keptIds = new Set(ownedLokPets.map((pet) => pet.id));
+      return {
+        ...state,
+        meta: {
+          ...prev,
+          ownedLokPets,
+          petTeamIds: prev.petTeamIds.filter((id) => keptIds.has(id)),
+        },
+      };
+    }
+
     case 'completeRun': {
       const result = action.result;
       const prev = state.meta;
@@ -1296,6 +1407,28 @@ export function reducer(state: StoreState, action: Action): StoreState {
           ].slice(0, 100)
         : prev.lokPetHistory;
 
+      // Team pets that fell in a defeat drop to alive:false here; the player
+      // gets one chance to revive them with elixirs on the summary screen
+      // before purgeFallenLokPets removes anything still down.
+      const fallenIds = new Set(result.fallenTeamPetIds);
+      let ownedLokPets = fallenIds.size > 0
+        ? prev.ownedLokPets.map((pet) => (fallenIds.has(pet.id) ? { ...pet, alive: false } : pet))
+        : prev.ownedLokPets;
+      // Chest-rolled LokPets only stick around permanently once Pet Whisperer
+      // is owned -- without it they're still the original, run-only signal.
+      if (vendorPurchaseCount(prev, PET_WHISPERER_VENDOR_ID) > 0 && result.capturedLokPetRolls.length > 0) {
+        const capturedAt = Date.now();
+        ownedLokPets = [
+          ...ownedLokPets,
+          ...result.capturedLokPetRolls.map((roll, index) => ({
+            id: `pet-${capturedAt.toString(36)}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+            roll,
+            capturedAt,
+            alive: true,
+          })),
+        ];
+      }
+
       const next: MetaState = {
         ...prev,
         bestiary,
@@ -1303,6 +1436,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         discoveryIds,
         lokPetCatalog,
         lokPetHistory,
+        ownedLokPets,
         clearedAreaIds,
         totalKills: prev.totalKills + result.kills,
         totalRuns: prev.totalRuns + 1,
@@ -1310,6 +1444,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         cred: prev.cred + result.cred,
         lootTokens: prev.lootTokens + result.lootTokensGained,
         skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
+        elixirs: prev.elixirs + result.elixirsGained,
         // Endless records
         endlessRecordDistancePx: result.endless
           ? Math.max(prev.endlessRecordDistancePx, result.endless.maxDistancePx)
@@ -1427,6 +1562,9 @@ export interface MetaContextValue {
   saveCustomMap: (map: CustomMap) => void;
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
+  setPetTeam: (ids: string[]) => void;
+  reviveLokPet: (id: string) => void;
+  purgeFallenLokPets: () => void;
   resetProgress: () => void;
 }
 
@@ -1528,6 +1666,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const saveCustomMap = useCallback((map: CustomMap) => dispatch({ type: 'saveCustomMap', map }), []);
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
+  const setPetTeam = useCallback((ids: string[]) => dispatch({ type: 'setPetTeam', ids }), []);
+  const reviveLokPet = useCallback((id: string) => dispatch({ type: 'reviveLokPet', id }), []);
+  const purgeFallenLokPets = useCallback(() => dispatch({ type: 'purgeFallenLokPets' }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -1596,6 +1737,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       saveCustomMap,
       duplicateCustomMap,
       deleteCustomMap,
+      setPetTeam,
+      reviveLokPet,
+      purgeFallenLokPets,
     };
   }, [
     state,
@@ -1637,6 +1781,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     saveCustomMap,
     duplicateCustomMap,
     deleteCustomMap,
+    setPetTeam,
+    reviveLokPet,
+    purgeFallenLokPets,
   ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;

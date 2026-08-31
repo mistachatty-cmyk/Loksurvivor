@@ -85,7 +85,7 @@ export interface SpriteRig {
 /* ------------------------------------------------------------------ */
 
 export interface LootPrizeDef {
-  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon' | 'lokpet';
+  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon' | 'lokpet' | 'elixir';
   amount?: number;
   label: string;
   /** Stat key when kind === 'stat'. */
@@ -217,6 +217,19 @@ export interface LokPetInstance extends LokPetRoll {
   nextPulseAt: number;
   hp: number;
   maxHp: number;
+  /** True for a pet brought in from the player's permanent team roster: no lifetime expiry/ghost fade. */
+  permanent?: boolean;
+  /** Set alongside `permanent` -- the MetaState.ownedLokPets id this instance was spawned from. */
+  ownedPetId?: string;
+}
+
+/** A specific LokPet the player has permanently earned (Pet Whisperer unlock required to capture). */
+export interface LokPetOwnedPet {
+  id: string;
+  roll: LokPetRoll;
+  capturedAt: number;
+  /** False once the pet has fallen in a failed run and not yet been revived with an elixir. */
+  alive: boolean;
 }
 
 export type ObjectiveKind = 'kill-any' | 'kill-enemy' | 'survive-sec' | 'walk-blocks';
@@ -1065,7 +1078,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'petTeam'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1281,6 +1294,12 @@ export interface MetaState {
   lootTokens: number;
   /** Rare currency found by breaking street props, weighted toward endless mode. Spendable in the hideout vendor's relic category. */
   skeletonKeys: number;
+  /** Rare currency earned from loot boxes; spent to revive a fallen team LokPet and keep it in the roster. */
+  elixirs: number;
+  /** Permanent LokPet roster, captured from chest rolls once the Pet Whisperer vendor unlock is owned. */
+  ownedLokPets: LokPetOwnedPet[];
+  /** Ids into ownedLokPets chosen to guarantee-spawn (permanent, no expiry) at the start of every run. */
+  petTeamIds: string[];
   /** Whether the player has seen the intro briefing. */
   onboarded: boolean;
   /** Farthest endless distance ever reached (world units). */
@@ -1380,6 +1399,12 @@ export interface RunResult {
   lootTokensGained: number;
   /** Rare currency (skeleton keys) earned this run. */
   skeletonKeysGained: number;
+  /** Elixirs earned this run, spendable to revive a fallen team LokPet. */
+  elixirsGained: number;
+  /** Chest-rolled LokPets from this run, ready to capture into the permanent roster (Pet Whisperer only). */
+  capturedLokPetRolls: LokPetRoll[];
+  /** ownedLokPets ids that were on the active team and fell because the run ended in defeat. */
+  fallenTeamPetIds: string[];
   /** Fatigue applied to the operative after this run. */
   fatigueAddedPct?: number;
   /** Operative's fatigue after this run, before recovery begins. */

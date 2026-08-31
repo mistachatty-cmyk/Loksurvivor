@@ -129,7 +129,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'settings'],
+    features: ['runs', 'roster', 'vendor', 'workshop', 'petTeam', 'allies', 'music', 'settings'],
   },
   {
     id: 'rooftop-perch',

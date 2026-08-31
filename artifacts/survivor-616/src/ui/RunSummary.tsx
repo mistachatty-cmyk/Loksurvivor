@@ -6,13 +6,14 @@ import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
-import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
+import { ELIXIR_REVIVE_COST, LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
-import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
+import type { AreaDef, LokPetOwnedPet, LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
+import { LokPetIcon } from './LokPetVariantSheet';
 import { motion } from 'framer-motion';
-import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
+import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound, FlaskConical, HeartPulse } from 'lucide-react';
 
 export interface RunSummaryProps {
   result: RunResult;
@@ -20,6 +21,11 @@ export interface RunSummaryProps {
   onRetry: () => void;
   onOpenArchive?: (variantId: string) => void;
   areaOverride?: AreaDef;
+  /** Current elixir balance, for the fallen-team-pet revive prompt. */
+  elixirs?: number;
+  /** Owned team pets that fell in this run's defeat and haven't been revived yet. */
+  fallenTeamPets?: LokPetOwnedPet[];
+  onReviveLokPet?: (id: string) => void;
 }
 
 function discoveryHeadline(discovery: LokPetRunDiscovery): string {
@@ -36,7 +42,16 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, areaOverride }: RunSummaryProps) {
+export function RunSummary({
+  result,
+  onReturnToHub,
+  onRetry,
+  onOpenArchive,
+  areaOverride,
+  elixirs = 0,
+  fallenTeamPets = [],
+  onReviveLokPet,
+}: RunSummaryProps) {
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
@@ -429,8 +444,54 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
           </div>
         )}
 
+        {fallenTeamPets.length > 0 && (
+          <div className="border border-destructive/40 bg-card p-5" data-testid="section-fallen-team-pets">
+            <div className="mb-3 flex items-center gap-2">
+              <HeartPulse className="w-4 h-4 text-destructive" />
+              <span className="text-xs font-bold uppercase tracking-widest text-destructive">
+                Team LokPets fell this run
+              </span>
+              <span className="ml-auto font-mono text-xs text-purple-300 font-bold">{elixirs} elixirs</span>
+            </div>
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              Revive them now for {ELIXIR_REVIVE_COST} elixirs each, or they're gone from your roster once you leave.
+            </p>
+            <div className="space-y-2">
+              {fallenTeamPets.map((pet) => (
+                <div
+                  key={pet.id}
+                  className="flex items-center justify-between gap-3 border border-white/10 bg-black/25 px-2 py-1.5"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <LokPetIcon silhouette={pet.roll.silhouette} palette={pet.roll.palette} size={28} />
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-black uppercase tracking-wide text-white">{pet.roll.name}</p>
+                      <p className="truncate font-mono text-[9px] uppercase tracking-wider" style={{ color: LOKPET_RARITY_COLORS[pet.roll.rarity] }}>
+                        {pet.roll.rarityLabel} · {pet.roll.traitLabel}
+                      </p>
+                    </div>
+                  </div>
+                  {pet.alive ? (
+                    <span className="shrink-0 font-mono text-[9px] uppercase tracking-widest text-emerald-300">Revived</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onReviveLokPet?.(pet.id)}
+                      disabled={!onReviveLokPet || elixirs < ELIXIR_REVIVE_COST}
+                      data-testid={`button-revive-lokpet-${pet.id}`}
+                      className="shrink-0 border border-purple-400/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-purple-200 transition-colors hover:border-purple-200 hover:bg-purple-300/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Revive · {ELIXIR_REVIVE_COST}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Loot & Objectives */}
-        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0 || result.skeletonKeysGained > 0) && (
+        {(result.lootBoxesOpened > 0 || lokPets.length > 0 || result.completedObjectives.length > 0 || result.skeletonKeysGained > 0 || result.elixirsGained > 0) && (
           <div className="grid gap-4 md:grid-cols-2">
             {result.lootBoxesOpened > 0 && (
               <div className="border border-border bg-card p-5" data-testid="section-loot">
@@ -467,6 +528,21 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">Notably rare. Spend them at the hideout Quartermaster.</p>
+              </div>
+            )}
+
+            {result.elixirsGained > 0 && (
+              <div className="border border-purple-500/30 bg-card p-5" data-testid="section-elixirs">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Elixirs found
+                  </span>
+                  <span className="ml-auto font-mono text-xs text-purple-400 font-bold">
+                    +{result.elixirsGained}
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">Spend them to revive a fallen team LokPet.</p>
               </div>
             )}
 

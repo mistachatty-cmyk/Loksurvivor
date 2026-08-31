@@ -25,6 +25,8 @@ export const PRIZE_TABLE: PrizeEntry[] = [
   { weight: 4, prize: { kind: 'stat', stat: 'speed', add: 12, label: '+12 Speed' } },
   // Temporary companions — the chest generates the complete variant sheet.
   { weight: 9, prize: { kind: 'lokpet', label: 'LokPet signal' } },
+  // Elixirs — rare, spent to revive a fallen team LokPet.
+  { weight: 3, prize: { kind: 'elixir', amount: 1, label: '+1 Elixir' } },
 ];
 
 /** Visual face shown on each reel strip panel. */
@@ -35,6 +37,7 @@ export const REEL_FACES = [
   { symbol: '^', color: '#6ee7ff', label: 'Stat'  },
   { symbol: 'W', color: '#a78bfa', label: 'Weapon' },
   { symbol: 'P', color: '#ff7ab8', label: 'LokPet' },
+  { symbol: 'E', color: '#c084fc', label: 'Elixir' },
 ];
 
 export function prizeToFaceIndex(prize: LootPrizeDef): number {
@@ -43,7 +46,8 @@ export function prizeToFaceIndex(prize: LootPrizeDef): number {
   if (prize.kind === 'heal') return 2;
   if (prize.kind === 'stat') return 3;
   if (prize.kind === 'weapon') return 4;
-  return 5; // LokPet
+  if (prize.kind === 'lokpet') return 5;
+  return 6; // Elixir
 }
 
 export function rollPrize(rng: () => number): LootPrizeDef {

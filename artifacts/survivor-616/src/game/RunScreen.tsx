@@ -174,6 +174,10 @@ export function RunScreen({
   const firstNightChapter = getFirstNightChapter(areaId);
   const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
+  const teamPets = meta.petTeamIds
+    .map((id) => meta.ownedLokPets.find((pet) => pet.id === id && pet.alive))
+    .filter((pet): pet is (typeof meta.ownedLokPets)[number] => Boolean(pet))
+    .map((pet) => ({ id: pet.id, roll: pet.roll }));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
 
@@ -207,6 +211,7 @@ export function RunScreen({
         minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
+        teamPets,
       },
     );
   }

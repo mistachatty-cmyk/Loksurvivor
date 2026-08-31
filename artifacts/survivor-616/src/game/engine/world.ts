@@ -691,6 +691,8 @@ export interface World {
   lootTokensGained: number;
   /** Rare currency (skeleton keys) earned this run, found by breaking street props. */
   skeletonKeysGained: number;
+  /** Elixirs earned this run, spendable to revive a fallen team LokPet. */
+  elixirsGained: number;
 
   /* ---- Objective system ---- */
   objectives: RunObjective[];
@@ -772,6 +774,8 @@ export function createWorld(
     minimapEnemyRadar?: boolean;
     minimapLootSense?: boolean;
     minimapHazardSense?: boolean;
+    /** Owned LokPets guaranteed to spawn at run start as permanent (non-expiring) companions. */
+    teamPets?: Array<{ id: string; roll: LokPetRoll }>;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -941,6 +945,7 @@ export function createWorld(
     openedPrizes: [],
     lootTokensGained: 0,
     skeletonKeysGained: 0,
+    elixirsGained: 0,
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
     episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
@@ -1005,6 +1010,11 @@ export function createWorld(
     rebuildOrbiters(world);
   }
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
+
+  for (const teamPet of setup.teamPets ?? []) {
+    spawnLokPet(world, teamPet.roll, { permanent: true, ownedPetId: teamPet.id });
+  }
+
   return world;
 }
 
@@ -1714,15 +1724,27 @@ function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
   spawnParticles(w, pet.x, pet.y, pet.palette.glow, 2, 40);
 }
 
-/** Spawn one generated chest companion, replacing the oldest at the mobile-safe cap. */
-export function spawnLokPet(w: World, roll: LokPetRoll): LokPetInstance {
+/**
+ * Spawn one LokPet, replacing the oldest non-permanent pet at the mobile-safe
+ * cap (falling back to the oldest pet overall if every current slot happens
+ * to be permanent). `permanent` pets (brought in from the player's team
+ * roster) never expire/ghost; pass `ownedPetId` alongside it so a run-end
+ * defeat can trace the instance back to its MetaState.ownedLokPets entry.
+ */
+export function spawnLokPet(
+  w: World,
+  roll: LokPetRoll,
+  options: { permanent?: boolean; ownedPetId?: string } = {},
+): LokPetInstance {
   if (w.lokPets.length >= MAX_LOKPETS) {
-    const oldest = w.lokPets.shift();
-    if (oldest) spawnParticles(w, oldest.x, oldest.y, oldest.palette.glow, 6, 65);
+    const evictIndex = Math.max(0, w.lokPets.findIndex((pet) => !pet.permanent));
+    const [evicted] = w.lokPets.splice(evictIndex, 1);
+    if (evicted) spawnParticles(w, evicted.x, evicted.y, evicted.palette.glow, 6, 65);
     pushAlert(w, 'LokPet signal rotated');
   }
   const index = w.lokPets.length;
   const orbitAngle = (Math.PI * 2 * index) / MAX_LOKPETS + w.rng() * 0.2;
+  const permanent = options.permanent ?? false;
   const pet: LokPetInstance = {
     ...roll,
     uid: uid(w),
@@ -1733,13 +1755,15 @@ export function spawnLokPet(w: World, roll: LokPetRoll): LokPetInstance {
     orbitAngle,
     orbitRadius: 40 + index * 6,
     bornAt: w.now,
-    ghostAt: w.now + LOKPET_GHOST_AFTER_MS,
-    expiresAt: w.now + roll.stats.lifetimeMs,
+    ghostAt: permanent ? Infinity : w.now + LOKPET_GHOST_AFTER_MS,
+    expiresAt: permanent ? Infinity : w.now + roll.stats.lifetimeMs,
     ghost: false,
     readyAt: w.now + 500,
     nextPulseAt: w.now + 500,
     hp: roll.stats.health,
     maxHp: roll.stats.health,
+    permanent,
+    ownedPetId: options.ownedPetId,
   };
   w.lokPets.push(pet);
   w.lokPetHistory.push(pet);
@@ -2865,6 +2889,13 @@ function applyLootPrize(w: World, prize: LootPrizeDef) {
       w.popups.push({
         x: w.player.x, y: w.player.y + 30, text: prize.label,
         color: '#f59e0b', bornAt: w.now, vy: 28,
+      });
+      break;
+    case 'elixir':
+      w.elixirsGained += prize.amount ?? 1;
+      w.popups.push({
+        x: w.player.x, y: w.player.y + 30, text: prize.label,
+        color: '#c084fc', bornAt: w.now, vy: 28,
       });
       break;
     case 'heal':
@@ -5729,6 +5760,13 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     skeletonKeysGained: w.skeletonKeysGained,
+    elixirsGained: w.elixirsGained,
+    // Chest rolls only -- team pets are already owned, so recapturing them would be a no-op duplicate.
+    capturedLokPetRolls: w.lokPetHistory.filter((pet) => !pet.permanent),
+    // A team pet that's still active when the run ends in defeat didn't make it out.
+    fallenTeamPetIds: cleared
+      ? []
+      : w.lokPets.filter((pet) => pet.permanent && pet.ownedPetId).map((pet) => pet.ownedPetId!),
     completedObjectives: [...w.completedObjectives],
     episode: (() => {
       const snapshot = episodeSnapshot(w);

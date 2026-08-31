@@ -25,6 +25,7 @@ import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { VendorPanel } from '@/ui/VendorPanel';
+import { PetTeamPanel } from '@/ui/PetTeamPanel';
 import { WorkshopPanel } from '@/ui/WorkshopPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
@@ -49,6 +50,7 @@ type Screen =
   | { name: 'studio' }
   | { name: 'recovery' }
   | { name: 'vendor' }
+  | { name: 'petTeam' }
   | { name: 'workshop' }
   | { name: 'settings' }
   | { name: 'map-editor' }
@@ -88,7 +90,7 @@ function initialScreen(onboarded: boolean): Screen {
 }
 
 function Game() {
-  const { meta, markOnboarded, selectedCharacter, completeRun, enterHideout, unlockedAreas } = useMeta();
+  const { meta, markOnboarded, selectedCharacter, completeRun, enterHideout, unlockedAreas, reviveLokPet, purgeFallenLokPets } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
 
@@ -122,6 +124,9 @@ function Game() {
         break;
       case 'vendor':
         setScreen({ name: 'vendor' });
+        break;
+      case 'petTeam':
+        setScreen({ name: 'petTeam' });
         break;
       case 'workshop':
         setScreen({ name: 'workshop' });
@@ -203,6 +208,9 @@ function Game() {
     case 'vendor':
       return <VendorPanel onBack={goHub} />;
 
+    case 'petTeam':
+      return <PetTeamPanel onBack={goHub} />;
+
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
 
@@ -240,18 +248,27 @@ function Game() {
         <RunSummary
           result={screen.result}
           areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
-          onReturnToHub={goHub}
+          elixirs={meta.elixirs}
+          fallenTeamPets={meta.ownedLokPets.filter((pet) => screen.result.fallenTeamPetIds.includes(pet.id))}
+          onReviveLokPet={reviveLokPet}
+          onReturnToHub={() => {
+            purgeFallenLokPets();
+            goHub();
+          }}
           onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
-          onRetry={() =>
-            canRetry
-              ? setScreen({
-                  name: 'run',
-                  areaId: screen.result.areaId,
-                  episodeId: screen.result.episode?.id,
-                  challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
-                })
-              : goHub()
-          }
+          onRetry={() => {
+            purgeFallenLokPets();
+            if (canRetry) {
+              setScreen({
+                name: 'run',
+                areaId: screen.result.areaId,
+                episodeId: screen.result.episode?.id,
+                challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
+              });
+            } else {
+              goHub();
+            }
+          }}
         />
       );
     }

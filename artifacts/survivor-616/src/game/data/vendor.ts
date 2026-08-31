@@ -234,6 +234,14 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     cost: 90,
     maxStacks: 1,
   },
+  {
+    id: 'pet-whisperer',
+    name: 'Pet Whisperer',
+    description: "LokPets you roll from chests now join your permanent roster instead of fading at the end of the run. Field up to three of them as a guaranteed team on every run, and spend elixirs to revive any that fall.",
+    category: 'ability',
+    cost: 320,
+    maxStacks: 1,
+  },
 ];
 
 export const VENDOR_CATALOG_BY_ID: Record<string, VendorItemDef> = Object.fromEntries(

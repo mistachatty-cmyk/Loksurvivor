@@ -12,6 +12,14 @@ import type {
 } from '@/game/types';
 import { blobRig } from '@/game/sprites/rigs';
 
+/** Max owned pets a player may field as a guaranteed, non-expiring team per run. */
+export const MAX_PET_TEAM_SIZE = 3;
+
+/** Elixir cost to revive one fallen team LokPet and keep it in the roster. */
+export const ELIXIR_REVIVE_COST = 3;
+
+export const PET_WHISPERER_VENDOR_ID = 'pet-whisperer';
+
 /** Original silhouette and palette sheets for the temporary LokPet family. */
 export const LOKPET_VARIANTS: LokPetVariantDef[] = [
   { id: 'moss-pouncer', name: 'Moss Pouncer', family: 'animal', silhouette: 'pouncer', palette: { body: '#54734c', bodyDark: '#26392c', accent: '#b8ff5c', glow: '#7dffb2', eye: '#fff1a8' }, description: 'A spring-loaded alley creature with leaf-bright eyes.' },
