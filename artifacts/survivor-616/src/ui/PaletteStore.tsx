@@ -81,7 +81,9 @@ export function PaletteStore() {
                       data-testid={`button-buy-palette-${theme.id}`}
                     >
                       {!affordable ? <Lock className="h-3 w-3" /> : null}
-                      {affordable ? `Buy for ${theme.cost} tokens` : `Need ${theme.cost} tokens`}
+                      {affordable
+                        ? `Buy for ${theme.cost} token${theme.cost === 1 ? '' : 's'}`
+                        : `Need ${theme.cost} token${theme.cost === 1 ? '' : 's'}`}
                     </button>
                   )}
                 </div>

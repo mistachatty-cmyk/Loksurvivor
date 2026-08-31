@@ -33,6 +33,7 @@ import { renderWorld } from '@/game/render/draw';
 import {
   effectiveStats,
   giantSizeMult,
+  hazardImmunityUnlocked,
   minimapUnlockTiers,
   physicsObjectClickRadiusBonus,
   rewardCredMultiplier,
@@ -204,6 +205,7 @@ export function RunScreen({
         physicsObjectClickRadiusBonus: physicsObjectClickRadiusBonus(meta),
         sizeMult: giantSizeMult(meta),
         stealth: stealthConfig(meta),
+        hazardImmune: hazardImmunityUnlocked(meta),
         minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,

@@ -418,6 +418,49 @@ test('persistent hazard fields tick enemies, apply Burning, and hurt the player'
   assert.ok(world.player.hp < world.player.maxHp);
 });
 
+test('native characters take no self-damage from their own hazard weapon', () => {
+  for (const characterId of ['emberback', 'acid-botanist'] as const) {
+    const world = createWorld(
+      testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+      getCharacter(characterId),
+      CHARACTERS[0]!.stats,
+      8,
+    );
+    addEnemy(world, 34, 0);
+    world.weapons[0]!.readyAt = 0;
+    for (let i = 0; i < 25; i += 1) stepWorld(world, 1 / 30, neutralInput);
+    assert.ok(world.effects.some((effect) => effect.kind === 'hazard'));
+    assert.equal(world.player.hp, world.player.maxHp);
+  }
+});
+
+test('Let Me Hold This grants universal hazard self-immunity to non-native wielders', () => {
+  const worldWithoutAbility = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('acid-garden'),
+    CHARACTERS[0]!.stats,
+    9,
+  );
+  worldWithoutAbility.weapons[0]!.readyAt = 0;
+  for (let i = 0; i < 25; i += 1) stepWorld(worldWithoutAbility, 1 / 30, neutralInput);
+  assert.ok(worldWithoutAbility.player.hp < worldWithoutAbility.player.maxHp);
+
+  const worldWithAbility = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('acid-garden'),
+    CHARACTERS[0]!.stats,
+    9,
+    undefined,
+    undefined,
+    undefined,
+    null,
+    { hazardImmune: true },
+  );
+  worldWithAbility.weapons[0]!.readyAt = 0;
+  for (let i = 0; i < 25; i += 1) stepWorld(worldWithAbility, 1 / 30, neutralInput);
+  assert.equal(worldWithAbility.player.hp, worldWithAbility.player.maxHp);
+});
+
 test('teleport weapons blink near a target and damage on arrival', () => {
   const world = createWorld(
     testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
