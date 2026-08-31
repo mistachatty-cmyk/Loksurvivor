@@ -643,6 +643,8 @@ export interface World {
   playerSizeMult: number;
   /** Resolved Ghost Cloak config from the vendor tree, or null when the ability isn't owned. */
   stealthConfig: StealthAbilityConfig | null;
+  /** "Let Me Hold This" owned: hazard weapons never hurt whoever's holding them, native character or not. */
+  hazardImmune: boolean;
   /** Timestamp (w.now) the current cloak activation ends; 0 or in the past when not cloaked. */
   stealthUntil: number;
   /** Timestamp (w.now) the cloak is next allowed to activate. */
@@ -769,6 +771,7 @@ export function createWorld(
     physicsObjectClickRadiusBonus?: number;
     sizeMult?: number;
     stealth?: StealthAbilityConfig | null;
+    hazardImmune?: boolean;
     minimapEnemyRadar?: boolean;
     minimapLootSense?: boolean;
     minimapHazardSense?: boolean;
@@ -886,6 +889,7 @@ export function createWorld(
     physicsObjectClickRadiusBonus: setup.physicsObjectClickRadiusBonus ?? 0,
     playerSizeMult: sizeMult,
     stealthConfig: setup.stealth ?? null,
+    hazardImmune: setup.hazardImmune ?? false,
     stealthUntil: 0,
     stealthReadyAt: setup.stealth ? 4000 : Number.POSITIVE_INFINITY,
     stealthAnchorX: 0,
@@ -2472,7 +2476,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         uid: uid(w), kind: 'hazard', x: p.x, y: p.y, radius: reach, angle: 0, spread: Math.PI * 2,
         bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
         damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
-        hurtsPlayer: true,
+        hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
         statusEffectId: weapon.statusEffectId,
         evolutionBehavior: behavior,
       });

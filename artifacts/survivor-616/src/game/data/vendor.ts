@@ -164,6 +164,14 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     requires: 'minimap-loot-sense',
   },
   {
+    id: 'hazard-handler',
+    name: 'Let Me Hold This',
+    description: 'Calloused grip. Wield any hazard weapon — yours or picked up off the ground — without taking damage from your own puddle or firewall.',
+    category: 'ability',
+    cost: 180,
+    maxStacks: 1,
+  },
+  {
     id: 'grabby-hands',
     name: 'Grabby Hands',
     description: '+18 world units on how far a tap or click reaches to prime a movable prop, per stack. Everything on the block gets grabbier.',

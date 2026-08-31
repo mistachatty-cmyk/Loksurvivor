@@ -25,7 +25,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'neon-night',
     name: 'Neon Night',
     description: 'Vibrant cyberpunk neon glow. Bright synthwave aesthetic.',
-    cost: 150,
+    cost: 1,
     palette: {
       ink: '#0a0e27',
       body: '#1a1a2e',
@@ -40,7 +40,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'molten-lava',
     name: 'Molten Lava',
     description: 'Fiery reds and oranges. Heat-scorched volcanic palette.',
-    cost: 150,
+    cost: 1,
     palette: {
       ink: '#2a1a0a',
       body: '#8b3e2e',
@@ -55,7 +55,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'frozen-tundra',
     name: 'Frozen Tundra',
     description: 'Cool icy blues and whites. Arctic wasteland vibes.',
-    cost: 150,
+    cost: 1,
     palette: {
       ink: '#0a1a2a',
       body: '#3a5a7a',
@@ -70,7 +70,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'forest-twilight',
     name: 'Forest Twilight',
     description: 'Deep greens and purples. Enchanted woodland darkness.',
-    cost: 150,
+    cost: 1,
     palette: {
       ink: '#1a2a1a',
       body: '#2d5a2d',
@@ -85,7 +85,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'toxic-waste',
     name: 'Toxic Waste',
     description: 'Sickly yellows and greens. Radioactive hazard palette.',
-    cost: 150,
+    cost: 1,
     palette: {
       ink: '#1a2a0a',
       body: '#4a5a2a',
@@ -100,7 +100,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'royal-purple',
     name: 'Royal Purple',
     description: 'Deep purples and golds. Regal, majestic atmosphere.',
-    cost: 200,
+    cost: 1,
     palette: {
       ink: '#2a1a3a',
       body: '#4a2a6a',
@@ -115,7 +115,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'blood-moon',
     name: 'Blood Moon',
     description: 'Dark crimsons and blacks. Vampiric midnight aesthetic.',
-    cost: 200,
+    cost: 1,
     palette: {
       ink: '#0a0a0a',
       body: '#3a1a1a',
@@ -130,7 +130,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'sunset-beach',
     name: 'Sunset Beach',
     description: 'Warm pinks, oranges, and teals. Coastal paradise vibes.',
-    cost: 150,
+    cost: 1,
     palette: {
       ink: '#1a2a3a',
       body: '#5a6a4a',
@@ -145,7 +145,7 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
     id: 'chrome-steel',
     name: 'Chrome Steel',
     description: 'Silvery grays and cool metallics. Industrial future tech.',
-    cost: 200,
+    cost: 1,
     palette: {
       ink: '#0a0a0a',
       body: '#505050',

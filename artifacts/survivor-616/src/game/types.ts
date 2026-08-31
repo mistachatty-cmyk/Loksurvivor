@@ -384,6 +384,12 @@ export interface WeaponDef {
    * it. Used for ground-impact attack styles like Needle Drop & Scratch.
    */
   groundSlam?: boolean;
+  /** Hazard-kind weapons only: the character who takes no self-damage from
+   *  this weapon's own puddle/field by default. Any other character
+   *  wielding it (e.g. picked up as a loot weapon) still takes self-damage
+   *  from it, unless the "Let Me Hold This" Quartermaster ability is
+   *  unlocked. */
+  nativeCharacterId?: string;
 }
 
 /** Designer-facing metadata for a combat status effect. */

@@ -864,6 +864,11 @@ export function stealthConfig(meta: MetaState): StealthAbilityConfig | null {
   };
 }
 
+/** Whether "Let Me Hold This" is owned: any hazard weapon stops hurting whoever's holding it, native character or not. */
+export function hazardImmunityUnlocked(meta: MetaState): boolean {
+  return vendorPurchaseCount(meta, 'hazard-handler') > 0;
+}
+
 /** Which minimap recon tiers are unlocked, in purchase order. */
 export function minimapUnlockTiers(meta: MetaState): {
   enemyRadar: boolean;
