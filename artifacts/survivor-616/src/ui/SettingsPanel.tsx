@@ -27,7 +27,6 @@ import { UI_THEMES } from '@/game/data/uiThemes';
 import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
-import { PaletteStore } from './PaletteStore';
 
 export interface SettingsPanelProps {
   onBack: () => void;
@@ -682,8 +681,6 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
             </div>
           </div>
         </section>
-
-        <PaletteStore />
 
         <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
           <div className="flex items-start gap-4">

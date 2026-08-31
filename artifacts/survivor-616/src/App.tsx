@@ -27,6 +27,7 @@ import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { VendorPanel } from '@/ui/VendorPanel';
 import { WorkshopPanel } from '@/ui/WorkshopPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
+import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
@@ -51,6 +52,7 @@ type Screen =
   | { name: 'vendor' }
   | { name: 'workshop' }
   | { name: 'settings' }
+  | { name: 'palette-store' }
   | { name: 'map-editor' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
   | { name: 'summary'; result: RunResult };
@@ -128,6 +130,9 @@ function Game() {
         break;
       case 'settings':
         setScreen({ name: 'settings' });
+        break;
+      case 'palette-store':
+        setScreen({ name: 'palette-store' });
         break;
     }
   }, []);
@@ -208,6 +213,9 @@ function Game() {
 
     case 'settings':
       return <SettingsPanel onBack={goHub} />;
+
+    case 'palette-store':
+      return <PaletteGalleryPanel onBack={goHub} />;
 
     case 'run':
       {
