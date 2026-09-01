@@ -252,6 +252,30 @@ export interface CompletedObjective {
   rewardTokens: number;
 }
 
+export type DailyContractKind = 'clear-area' | 'kill-any' | 'survive-sec';
+
+export interface DailyContractDef {
+  id: string;
+  name: string;
+  description: string;
+  kind: DailyContractKind;
+  targetCount: number;
+  rewardCred: number;
+  rewardTokens: number;
+}
+
+export interface DailyContractStatus extends DailyContractDef {
+  progress: number;
+  completed: boolean;
+}
+
+export interface CompletedDailyContract {
+  id: string;
+  name: string;
+  rewardCred: number;
+  rewardTokens: number;
+}
+
 export type EpisodeObjectiveKind =
   | 'kill-any'
   | 'kill-enemy'
@@ -1333,6 +1357,12 @@ export interface MetaState {
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */
   activePaletteId: string;
+  /** Local-date key for the currently active Broadcast contract board. */
+  dailyContractDayKey: string;
+  /** Progress accumulated against today's Broadcast contracts. */
+  dailyContractProgressById: Record<string, number>;
+  /** Contracts already paid out for today's Broadcast board. */
+  completedDailyContractIds: string[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -1392,6 +1422,8 @@ export interface RunResult {
   fatigueAfterPct?: number;
   /** Objectives completed this run. */
   completedObjectives: CompletedObjective[];
+  /** Broadcast contracts completed by this run. */
+  completedDailyContracts?: CompletedDailyContract[];
   /** Active character episode progress, when this run was on its episode route. */
   episode?: {
     id: string;

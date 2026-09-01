@@ -35,6 +35,27 @@ test.describe('interactive run controls', () => {
     await expect(page.getByTestId('button-minimap-compact')).toHaveAttribute('aria-pressed', 'true');
   });
 
+  test('shows and persists the hideout palette selection', async ({ page }) => {
+    await page.goto('/?screen=settings');
+
+    await expect(page.getByTestId('card-ui-theme-house')).toBeVisible();
+    await expect(page.getByTestId('card-ui-theme-night-drive')).toBeVisible();
+    await expect(page.getByTestId('button-ui-theme-swatch-house-amber-standard')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await page.getByTestId('button-ui-theme-swatch-house-lake-blue').click();
+    await expect(page.getByTestId('button-ui-theme-swatch-house-lake-blue')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.locator('[data-ui-theme="house"]')).toHaveAttribute('data-ui-swatch', 'lake-blue');
+
+    await page.reload();
+    await expect(page.locator('[data-ui-theme="house"]')).toHaveAttribute('data-ui-swatch', 'lake-blue');
+  });
+
   test('returns to the paused run after viewing settings', async ({ page }) => {
     await page.goto('/?screen=run&area=endless-streets');
     await expect(page.getByTestId('screen-run')).toBeVisible();

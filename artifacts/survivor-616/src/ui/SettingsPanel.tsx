@@ -5,6 +5,7 @@ import {
   Bird,
   Check,
   Compass,
+  Dices,
   FlaskConical,
   FlipVertical2,
   LayoutDashboard,
@@ -23,7 +24,7 @@ import {
 
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
-import { UI_THEMES } from '@/game/data/uiThemes';
+import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
@@ -45,6 +46,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     buyUiTheme,
     equipUiTheme,
     selectUiThemeSwatch,
+    cycleUiLook,
     setDevModeAllUnlocks,
     setMusicReactive,
     setGyroEnabled,
@@ -55,6 +57,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setPaletteInvertEnabled,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
+  const ownedLookCount = uiLooksForOwnedThemeIds(meta.ownedUiThemeIds).length;
 
   const [gyroDenied, setGyroDenied] = useState(false);
   const tiltAvailable = gyroSupported();
@@ -607,12 +610,27 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Hideout customization</p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">UI theme</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                Spend cred on a new look for every menu screen. Arcade Cabinet is the first theme with its own
-                accent swatches &mdash; more themes and swatches are on the way.
+              <h2 className="mt-1 text-xl font-black uppercase text-white">Theme &amp; palette</h2>
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  Set the hideout&rsquo;s mood without changing the action. Themes change the menu chrome; palettes
+                  change its signal color and are remembered independently for every theme.
+                </p>
+                <button
+                  type="button"
+                  onClick={cycleUiLook}
+                  disabled={ownedLookCount <= 1}
+                  className="flex shrink-0 items-center justify-center gap-2 border border-primary px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground"
+                  data-testid="button-cycle-ui-look"
+                >
+                  <Dices className="h-4 w-4" />
+                  Roll the look
+                </button>
+              </div>
+              <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Lookbook: {ownedLookCount} owned {ownedLookCount === 1 ? 'look' : 'looks'}
               </p>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {UI_THEMES.map((theme) => {
                   const owned = meta.ownedUiThemeIds.includes(theme.id);
                   const equipped = meta.uiTheme === theme.id;
@@ -624,6 +642,20 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                         {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
                       </div>
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{theme.description}</p>
+                      {theme.swatches ? (
+                        <div
+                          className="mt-3 flex h-2 overflow-hidden border border-border/70"
+                          aria-label={`${theme.name} palette preview`}
+                        >
+                          {theme.swatches.map((swatch) => (
+                            <span
+                              key={swatch.id}
+                              className="min-w-0 flex-1"
+                              style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
 
                       {owned ? (
                         <button
@@ -657,21 +689,37 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                       )}
 
                       {owned && equipped && theme.swatches ? (
-                        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+                        <div className="mt-3 border-t border-border pt-3">
+                          <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                            Active palette
+                          </p>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {theme.swatches.map((swatch) => (
                             <button
                               key={swatch.id}
                               type="button"
                               onClick={() => selectUiThemeSwatch(theme.id, swatch.id)}
                               aria-pressed={activeSwatchId === swatch.id}
+                              aria-label={`Use ${swatch.name} palette`}
                               title={swatch.name}
-                              className={`h-7 w-7 border-2 transition-transform ${
-                                activeSwatchId === swatch.id ? 'scale-110 border-white' : 'border-white/20 hover:scale-105'
+                              className={`flex items-center gap-2 border px-2 py-2 text-left transition-colors ${
+                                activeSwatchId === swatch.id
+                                  ? 'border-white bg-white/10 text-white'
+                                  : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
                               }`}
-                              style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
                               data-testid={`button-ui-theme-swatch-${theme.id}-${swatch.id}`}
-                            />
+                            >
+                              <span
+                                className="h-4 w-4 shrink-0 border border-white/30"
+                                style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
+                              />
+                              <span className="truncate font-mono text-[10px] font-bold uppercase tracking-wider">
+                                {swatch.name}
+                              </span>
+                              {activeSwatchId === swatch.id ? <Check className="ml-auto h-3 w-3 shrink-0" /> : null}
+                            </button>
                           ))}
+                          </div>
                         </div>
                       ) : null}
                     </div>
