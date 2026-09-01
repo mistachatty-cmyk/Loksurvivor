@@ -29,6 +29,7 @@ import { VendorPanel } from '@/ui/VendorPanel';
 import { WorkshopPanel } from '@/ui/WorkshopPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
+import { LookbookStudioPanel } from '@/ui/LookbookStudioPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
@@ -54,6 +55,7 @@ type Screen =
   | { name: 'workshop' }
   | { name: 'settings' }
   | { name: 'palette-store' }
+  | { name: 'lookbook' }
   | { name: 'map-editor' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
   | { name: 'summary'; result: RunResult };
@@ -82,7 +84,9 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'recovery' ||
       requested === 'vendor' ||
       requested === 'workshop' ||
-      requested === 'settings'
+      requested === 'settings' ||
+      requested === 'palette-store' ||
+      requested === 'lookbook'
     ) {
       return { name: requested };
     }
@@ -134,6 +138,9 @@ function Game() {
         break;
       case 'palette-store':
         setScreen({ name: 'palette-store' });
+        break;
+      case 'lookbook':
+        setScreen({ name: 'lookbook' });
         break;
     }
   }, []);
@@ -231,6 +238,9 @@ function Game() {
 
     case 'palette-store':
       return <PaletteGalleryPanel onBack={goHub} />;
+
+    case 'lookbook':
+      return <LookbookStudioPanel onBack={goHub} />;
 
     case 'run':
       {

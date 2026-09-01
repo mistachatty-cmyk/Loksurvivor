@@ -1095,7 +1095,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'lookbook'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1224,6 +1224,35 @@ export interface ThemedPaletteDef {
   owned?: boolean;
   /** Color palette to apply to sprites and world when active. */
   palette: SpritePalette;
+}
+
+/** A named, portable combination of menu chrome and gameplay colorway. */
+export interface CustomizationLook {
+  /** Stable namespaced id so imports can update a look without duplicating it. */
+  id: string;
+  name: string;
+  uiThemeId: string;
+  uiSwatchId?: string;
+  paletteId: string;
+  createdAt: number;
+  updatedAt: number;
+  provenance: {
+    source: 'local' | 'imported';
+    author?: string;
+  };
+}
+
+/** Versioned local-first exchange format for LOK customization assets. */
+export interface LokCustomizationBundleV1 {
+  schema: 'lok.customization-bundle';
+  schemaVersion: 1;
+  namespace: 'lok.survivor-616';
+  exportedAt: string;
+  provenance: {
+    generator: 'Loksurvivor';
+    ownership: 'references-only';
+  };
+  looks: CustomizationLook[];
 }
 
 export type UpgradeEffect =
@@ -1357,6 +1386,8 @@ export interface MetaState {
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */
   activePaletteId: string;
+  /** Player-authored portable combinations of UI theme, swatch, and gameplay palette. */
+  customizationLooks: CustomizationLook[];
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */

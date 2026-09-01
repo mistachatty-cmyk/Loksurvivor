@@ -7,7 +7,7 @@ test.describe('interactive run controls', () => {
       localStorage.setItem(
         'survivor616.meta.v1',
         JSON.stringify({
-          version: 8,
+          version: 10,
           onboarded: true,
           levelUpPausesEnabled: true,
           minimapVisible: true,
@@ -54,6 +54,19 @@ test.describe('interactive run controls', () => {
 
     await page.reload();
     await expect(page.locator('[data-ui-theme="house"]')).toHaveAttribute('data-ui-swatch', 'lake-blue');
+  });
+
+  test('saves and persists a complete Lookbook combination', async ({ page }) => {
+    await page.goto('/?screen=lookbook');
+
+    await expect(page.getByTestId('section-lookbook-capture')).toBeVisible();
+    await page.getByTestId('input-look-name').fill('House Signal');
+    await page.getByTestId('button-save-look').click();
+    await expect(page.getByText('House Signal', { exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByText('House Signal', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Equipped' })).toBeDisabled();
   });
 
   test('returns to the paused run after viewing settings', async ({ page }) => {
