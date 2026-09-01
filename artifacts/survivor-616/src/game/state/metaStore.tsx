@@ -54,6 +54,12 @@ import {
 import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
+import {
+  mergeCustomizationLooks,
+  missingLookAssets,
+  normalizeCustomizationLooks,
+  sanitizeLookName,
+} from '@/game/data/customizations';
 import type {
   AllyDef,
   AreaDef,
@@ -77,10 +83,11 @@ import type {
   UnlockRule,
   CustomMap,
   UIPanelLayout,
+  CustomizationLook,
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 9;
+const META_VERSION = 10;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -184,6 +191,7 @@ export function createInitialMeta(): MetaState {
     uiThemeSwatchByTheme: {},
     ownedPaletteIds: [DEFAULT_PALETTE_ID],
     activePaletteId: DEFAULT_PALETTE_ID,
+    customizationLooks: [],
     dailyContractDayKey: contractDayKey(),
     dailyContractProgressById: {},
     completedDailyContractIds: [],
@@ -703,6 +711,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
     ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
     activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
+    customizationLooks: normalizeCustomizationLooks(parsed.customizationLooks),
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
@@ -716,7 +725,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -953,6 +962,11 @@ type Action =
   | { type: 'buyPalette'; id: string }
   | { type: 'equipPalette'; id: string }
   | { type: 'cycleUiLook' }
+  | { type: 'saveCustomizationLook'; id: string; name: string; now: number }
+  | { type: 'renameCustomizationLook'; id: string; name: string; now: number }
+  | { type: 'deleteCustomizationLook'; id: string }
+  | { type: 'equipCustomizationLook'; id: string }
+  | { type: 'importCustomizationLooks'; looks: CustomizationLook[] }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
@@ -1152,6 +1166,81 @@ export function reducer(state: StoreState, action: Action): StoreState {
         },
       };
     }
+
+    case 'saveCustomizationLook': {
+      const uiSwatchId = activeUiThemeSwatchId(state.meta);
+      const look: CustomizationLook = {
+        id: action.id,
+        name: sanitizeLookName(action.name),
+        uiThemeId: state.meta.uiTheme,
+        ...(uiSwatchId ? { uiSwatchId } : {}),
+        paletteId: state.meta.activePaletteId,
+        createdAt: action.now,
+        updatedAt: action.now,
+        provenance: { source: 'local' },
+      };
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          customizationLooks: mergeCustomizationLooks(state.meta.customizationLooks, [look]),
+        },
+      };
+    }
+
+    case 'renameCustomizationLook':
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          customizationLooks: state.meta.customizationLooks.map((look) =>
+            look.id === action.id
+              ? { ...look, name: sanitizeLookName(action.name, look.name), updatedAt: action.now }
+              : look,
+          ),
+        },
+      };
+
+    case 'deleteCustomizationLook':
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          customizationLooks: state.meta.customizationLooks.filter((look) => look.id !== action.id),
+        },
+      };
+
+    case 'equipCustomizationLook': {
+      const look = state.meta.customizationLooks.find((candidate) => candidate.id === action.id);
+      if (!look || missingLookAssets(look, state.meta.ownedUiThemeIds, state.meta.ownedPaletteIds).length > 0) {
+        return state;
+      }
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          uiTheme: look.uiThemeId,
+          activePaletteId: look.paletteId,
+          ...(look.uiSwatchId
+            ? {
+                uiThemeSwatchByTheme: {
+                  ...state.meta.uiThemeSwatchByTheme,
+                  [look.uiThemeId]: look.uiSwatchId,
+                },
+              }
+            : {}),
+        },
+      };
+    }
+
+    case 'importCustomizationLooks':
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          customizationLooks: mergeCustomizationLooks(state.meta.customizationLooks, action.looks),
+        },
+      };
 
     case 'setDevModeAllUnlocks':
       return {
@@ -1480,6 +1569,11 @@ export interface MetaContextValue {
   buyPalette: (id: string) => void;
   equipPalette: (id: string) => void;
   cycleUiLook: () => void;
+  saveCustomizationLook: (id: string, name: string) => void;
+  renameCustomizationLook: (id: string, name: string) => void;
+  deleteCustomizationLook: (id: string) => void;
+  equipCustomizationLook: (id: string) => void;
+  importCustomizationLooks: (looks: CustomizationLook[]) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
@@ -1537,6 +1631,20 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
   const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
+  const saveCustomizationLook = useCallback(
+    (id: string, name: string) => dispatch({ type: 'saveCustomizationLook', id, name, now: Date.now() }),
+    [],
+  );
+  const renameCustomizationLook = useCallback(
+    (id: string, name: string) => dispatch({ type: 'renameCustomizationLook', id, name, now: Date.now() }),
+    [],
+  );
+  const deleteCustomizationLook = useCallback((id: string) => dispatch({ type: 'deleteCustomizationLook', id }), []);
+  const equipCustomizationLook = useCallback((id: string) => dispatch({ type: 'equipCustomizationLook', id }), []);
+  const importCustomizationLooks = useCallback(
+    (looks: CustomizationLook[]) => dispatch({ type: 'importCustomizationLooks', looks }),
+    [],
+  );
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -1656,6 +1764,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyPalette,
       equipPalette,
       cycleUiLook,
+      saveCustomizationLook,
+      renameCustomizationLook,
+      deleteCustomizationLook,
+      equipCustomizationLook,
+      importCustomizationLooks,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
@@ -1699,6 +1812,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyPalette,
     equipPalette,
     cycleUiLook,
+    saveCustomizationLook,
+    renameCustomizationLook,
+    deleteCustomizationLook,
+    equipCustomizationLook,
+    importCustomizationLooks,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,
