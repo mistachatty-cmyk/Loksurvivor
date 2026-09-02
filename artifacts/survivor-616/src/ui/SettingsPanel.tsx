@@ -628,7 +628,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 </button>
               </div>
               <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Lookbook: {ownedLookCount} owned {ownedLookCount === 1 ? 'look' : 'looks'}
+                Theme combinations: {ownedLookCount} owned
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {UI_THEMES.map((theme) => {

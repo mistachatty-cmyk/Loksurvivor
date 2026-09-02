@@ -2476,7 +2476,8 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       ctx.restore();
     }
 
-    // A faint accent ring keeps the player findable in a crowd.
+    // Every cosmetic keeps the same readable base ring, then adds a
+    // deterministic procedural flourish. No style touches simulation state.
     ctx.save();
     const ring = ctx.createRadialGradient(p.x, p.y + 2, 2, p.x, p.y + 2, p.radius + 15);
     ring.addColorStop(0, `${w.character.palette.accent}35`);
@@ -2492,6 +2493,128 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     ctx.beginPath();
     ctx.ellipse(p.x, p.y + 2, p.radius + 3, (p.radius + 3) * 0.42, 0, 0, Math.PI * 2);
     ctx.stroke();
+
+    const accent = w.character.palette.accentBright;
+    const glow = w.character.palette.glow;
+    const phase = w.now / 1000;
+    if (w.runAuraStyle === 'radar-sweep') {
+      ctx.translate(p.x, p.y + 2);
+      ctx.rotate(phase * 2.4);
+      ctx.globalAlpha = 0.75;
+      ctx.strokeStyle = accent;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, p.radius + 16, (p.radius + 16) * 0.44, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(p.radius + 20, 0);
+      ctx.stroke();
+    } else if (w.runAuraStyle === 'ember-orbit') {
+      for (let i = 0; i < 3; i += 1) {
+        const angle = phase * 2.8 + (i * Math.PI * 2) / 3;
+        const x = p.x + Math.cos(angle) * (p.radius + 11);
+        const y = p.y + 2 + Math.sin(angle) * (p.radius * 0.42 + 4);
+        ctx.globalAlpha = 0.68 + Math.sin(phase * 5 + i) * 0.22;
+        ctx.fillStyle = i === 1 ? glow : accent;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5 + i * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (w.runAuraStyle === 'rain-signal') {
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 7; i += 1) {
+        const lane = i - 3;
+        const travel = (phase * 52 + i * 9) % 34;
+        const x = p.x + lane * 5;
+        const y = p.y - 28 + travel;
+        ctx.globalAlpha = 0.25 + (i % 3) * 0.18;
+        ctx.beginPath();
+        ctx.moveTo(x + 2, y - 4);
+        ctx.lineTo(x - 1, y + 3);
+        ctx.stroke();
+      }
+    } else if (w.runAuraStyle === 'glitch-echo') {
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i += 1) {
+        const jitter = Math.sin(phase * 13 + i * 4.7) * 5;
+        ctx.globalAlpha = 0.18 + i * 0.08;
+        ctx.strokeStyle = i % 2 === 0 ? accent : glow;
+        ctx.strokeRect(
+          p.x - p.radius - 5 + jitter,
+          p.y - 20 + i * 8,
+          p.radius * 2 + 10 - Math.abs(jitter),
+          3,
+        );
+      }
+    } else if (w.runAuraStyle === 'mothlight') {
+      ctx.fillStyle = accent;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 7;
+      for (let i = 0; i < 5; i += 1) {
+        const angle = phase * (0.8 + i * 0.07) + i * 1.27;
+        const radius = p.radius + 12 + (i % 2) * 7;
+        const x = p.x + Math.cos(angle) * radius;
+        const y = p.y - 5 + Math.sin(angle * 1.4) * (p.radius + 7);
+        const size = 1.8 + (i % 2);
+        ctx.globalAlpha = 0.4 + Math.sin(phase * 4 + i) * 0.22;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillRect(-size, -size, size * 2, size * 2);
+        ctx.restore();
+      }
+    }
+
+    const paletteEffect = w.paletteEffect;
+    if (paletteEffect) {
+      const cycle = phase * Math.PI * 2 * paletteEffect.speed;
+      const intensity = paletteEffect.intensity;
+      ctx.translate(p.x, p.y + 2);
+      ctx.strokeStyle = paletteEffect.kind === 'prism' ? accent : glow;
+      ctx.shadowColor = paletteEffect.kind === 'prism' ? w.character.palette.accent : glow;
+      ctx.shadowBlur = 8 + intensity * 14;
+      ctx.lineWidth = 1.5 + intensity * 1.5;
+      if (paletteEffect.kind === 'glow') {
+        ctx.globalAlpha = 0.28 + Math.sin(cycle) * 0.08;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.radius + 18, (p.radius + 18) * 0.44, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (paletteEffect.kind === 'pulse') {
+        const pulse = (Math.sin(cycle) + 1) / 2;
+        ctx.globalAlpha = (0.18 + pulse * 0.45) * intensity;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.radius + 9 + pulse * 15, (p.radius + 9 + pulse * 15) * 0.42, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (paletteEffect.kind === 'prism') {
+        for (let i = 0; i < 3; i += 1) {
+          const offset = Math.sin(cycle + i * 2.1) * 5;
+          ctx.globalAlpha = (0.22 + i * 0.09) * intensity;
+          ctx.strokeStyle = [w.character.palette.accent, w.character.palette.accentBright, w.character.palette.glow][i]!;
+          ctx.beginPath();
+          ctx.ellipse(offset, i - 1, p.radius + 11 + i * 4, (p.radius + 11 + i * 4) * 0.4, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      } else if (paletteEffect.kind === 'flicker') {
+        const on = Math.sin(cycle * 2.7) > -0.2;
+        ctx.globalAlpha = (on ? 0.6 : 0.12) * intensity;
+        ctx.setLineDash([3, 5]);
+        ctx.strokeRect(-p.radius - 8, -p.radius - 12, p.radius * 2 + 16, p.radius * 2 + 16);
+        ctx.setLineDash([]);
+      } else if (paletteEffect.kind === 'wave') {
+        for (let i = 0; i < 2; i += 1) {
+          const travel = ((phase * paletteEffect.speed + i * 0.5) % 1);
+          ctx.globalAlpha = (1 - travel) * 0.42 * intensity;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.radius + 8 + travel * 28, (p.radius + 8 + travel * 28) * 0.42, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
     ctx.restore();
 
     const invuln = w.now < p.invulnUntil && w.outcome === 'running';

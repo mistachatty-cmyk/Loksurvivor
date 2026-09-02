@@ -310,6 +310,71 @@
   --ring: 24 100% 66%;
 }
 
+/* Salvage Terminal: warm steel and workshop warning paint. */
+[data-ui-theme='salvage-terminal'] {
+  --background: 24 12% 6%; --foreground: 30 22% 92%;
+  --card: 24 11% 11%; --card-foreground: 30 22% 92%; --card-border: 28 26% 30%;
+  --popover: 24 11% 11%; --popover-foreground: 30 22% 92%; --popover-border: 28 26% 30%;
+  --primary: 24 100% 62%; --primary-foreground: 24 12% 6%;
+  --secondary: 24 12% 16%; --secondary-foreground: 30 22% 92%;
+  --muted: 24 12% 13%; --muted-foreground: 28 13% 62%;
+  --accent: 24 72% 15%; --accent-foreground: 24 100% 62%;
+  --border: 28 26% 30%; --input: 28 26% 30%; --ring: 24 100% 62%;
+  background-image: repeating-linear-gradient(135deg, transparent 0 4rem, hsl(24 100% 62% / 0.025) 4.05rem 4.12rem);
+}
+[data-ui-theme='salvage-terminal'][data-ui-swatch='welding-blue'] { --primary: 193 100% 68%; --accent-foreground: 193 100% 68%; --ring: 193 100% 68%; }
+[data-ui-theme='salvage-terminal'][data-ui-swatch='shop-lime'] { --primary: 87 90% 62%; --accent-foreground: 87 90% 62%; --ring: 87 90% 62%; }
+
+/* River Dawn: blue-grey concrete with a soft horizon glow. */
+[data-ui-theme='river-dawn'] {
+  --background: 207 35% 7%; --foreground: 198 30% 94%;
+  --card: 205 30% 12%; --card-foreground: 198 30% 94%; --card-border: 195 36% 32%;
+  --popover: 205 30% 12%; --popover-foreground: 198 30% 94%; --popover-border: 195 36% 32%;
+  --primary: 187 92% 63%; --primary-foreground: 207 35% 7%;
+  --secondary: 205 26% 17%; --secondary-foreground: 198 30% 94%;
+  --muted: 205 26% 14%; --muted-foreground: 198 18% 65%;
+  --accent: 187 65% 16%; --accent-foreground: 187 92% 63%;
+  --border: 195 36% 32%; --input: 195 36% 32%; --ring: 187 92% 63%;
+  background-image: radial-gradient(ellipse at 50% 100%, hsl(187 92% 63% / 0.08), transparent 42%);
+}
+[data-ui-theme='river-dawn'][data-ui-swatch='dawn-peach'] { --primary: 18 100% 72%; --accent-foreground: 18 100% 72%; --ring: 18 100% 72%; }
+[data-ui-theme='river-dawn'][data-ui-swatch='mist-violet'] { --primary: 259 88% 74%; --accent-foreground: 259 88% 74%; --ring: 259 88% 74%; }
+
+/* Block Party: ink-dark flyers under shifting speaker light. */
+[data-ui-theme='block-party'] {
+  --background: 285 30% 6%; --foreground: 300 24% 94%;
+  --card: 282 28% 11%; --card-foreground: 300 24% 94%; --card-border: 326 45% 34%;
+  --popover: 282 28% 11%; --popover-foreground: 300 24% 94%; --popover-border: 326 45% 34%;
+  --primary: 326 100% 68%; --primary-foreground: 285 30% 6%;
+  --secondary: 282 25% 17%; --secondary-foreground: 300 24% 94%;
+  --muted: 282 25% 14%; --muted-foreground: 300 16% 65%;
+  --accent: 326 65% 16%; --accent-foreground: 326 100% 68%;
+  --border: 326 45% 34%; --input: 326 45% 34%; --ring: 326 100% 68%;
+  background-image: linear-gradient(120deg, hsl(326 100% 68% / 0.035), transparent 35%, hsl(166 88% 58% / 0.025));
+}
+[data-ui-theme='block-party'][data-ui-swatch='flyer-yellow'] { --primary: 50 100% 62%; --accent-foreground: 50 100% 62%; --ring: 50 100% 62%; }
+[data-ui-theme='block-party'][data-ui-swatch='porch-teal'] { --primary: 166 88% 58%; --accent-foreground: 166 88% 58%; --ring: 166 88% 58%; }
+
+/* Small shop previews for palettes whose in-run glow is animated by Canvas2D. */
+@keyframes palette-preview-glow { 50% { filter: brightness(1.45); box-shadow: 0 0 10px currentColor; } }
+@keyframes palette-preview-pulse { 50% { transform: scaleY(0.62); filter: brightness(1.35); } }
+@keyframes palette-preview-prism { to { filter: hue-rotate(360deg) saturate(1.4); } }
+@keyframes palette-preview-flicker { 0%, 18%, 22%, 62%, 68%, 100% { opacity: 1; } 20%, 65% { opacity: 0.3; } }
+@keyframes palette-preview-wave { 50% { transform: translateY(-3px); filter: brightness(1.3); } }
+.palette-preview-glow { animation: palette-preview-glow 1.8s ease-in-out infinite; }
+.palette-preview-pulse { animation: palette-preview-pulse 1.15s ease-in-out infinite; }
+.palette-preview-prism { animation: palette-preview-prism 2.8s linear infinite; }
+.palette-preview-flicker { animation: palette-preview-flicker 1.4s steps(1) infinite; }
+.palette-preview-wave { animation: palette-preview-wave 1.3s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .palette-preview-glow,
+  .palette-preview-pulse,
+  .palette-preview-prism,
+  .palette-preview-flicker,
+  .palette-preview-wave { animation: none; }
+}
+
 /* Arcade Cabinet's CRT flourishes: chrome frame, phosphor glow, scanlines. Inert under every other theme. */
 [data-ui-theme='arcade'] .terminal-frame {
   border-width: 2px;

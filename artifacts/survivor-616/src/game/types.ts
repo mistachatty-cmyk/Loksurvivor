@@ -1095,7 +1095,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'lookbook'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1214,6 +1214,18 @@ export interface UIThemeDef {
   swatches?: UIThemeSwatchDef[];
 }
 
+export type CosmeticTier = 'standard' | 'uncommon' | 'rare' | 'legendary';
+export type PaletteEffectKind = 'glow' | 'pulse' | 'prism' | 'flicker' | 'wave';
+
+export interface PaletteEffectDef {
+  kind: PaletteEffectKind;
+  label: string;
+  /** Animation cycles per second. */
+  speed: number;
+  /** Normalized visual strength from 0 to 1. */
+  intensity: number;
+}
+
 export interface ThemedPaletteDef {
   id: string;
   name: string;
@@ -1222,37 +1234,30 @@ export interface ThemedPaletteDef {
   cost: number;
   /** When true, this palette is included in default owned set. */
   owned?: boolean;
+  tier?: CosmeticTier;
+  /** Optional procedural glow/animation applied around the player. */
+  effect?: PaletteEffectDef;
   /** Color palette to apply to sprites and world when active. */
   palette: SpritePalette;
 }
 
-/** A named, portable combination of menu chrome and gameplay colorway. */
-export interface CustomizationLook {
-  /** Stable namespaced id so imports can update a look without duplicating it. */
+/** Procedural player aura rendered during runs. These styles are visual only. */
+export type RunAuraStyle =
+  | 'street-halo'
+  | 'radar-sweep'
+  | 'ember-orbit'
+  | 'rain-signal'
+  | 'glitch-echo'
+  | 'mothlight';
+
+export interface RunAuraDef {
   id: string;
   name: string;
-  uiThemeId: string;
-  uiSwatchId?: string;
-  paletteId: string;
-  createdAt: number;
-  updatedAt: number;
-  provenance: {
-    source: 'local' | 'imported';
-    author?: string;
-  };
-}
-
-/** Versioned local-first exchange format for LOK customization assets. */
-export interface LokCustomizationBundleV1 {
-  schema: 'lok.customization-bundle';
-  schemaVersion: 1;
-  namespace: 'lok.survivor-616';
-  exportedAt: string;
-  provenance: {
-    generator: 'Loksurvivor';
-    ownership: 'references-only';
-  };
-  looks: CustomizationLook[];
+  description: string;
+  /** Loot token cost to unlock. 0 = always owned. */
+  cost: number;
+  tier: CosmeticTier;
+  style: RunAuraStyle;
 }
 
 export type UpgradeEffect =
@@ -1386,8 +1391,10 @@ export interface MetaState {
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */
   activePaletteId: string;
-  /** Player-authored portable combinations of UI theme, swatch, and gameplay palette. */
-  customizationLooks: CustomizationLook[];
+  /** Purchased procedural run aura ids. The street halo is always included. */
+  ownedRunAuraIds: string[];
+  /** Currently equipped procedural run aura id. */
+  activeRunAuraId: string;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */
