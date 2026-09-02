@@ -1299,6 +1299,14 @@ export interface MetaState {
   physicsObjectClicksEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */
   levelUpPausesEnabled: boolean;
+  /** Master preset that keeps reward and menu interactions from pausing simulation. */
+  liveModeEnabled: boolean;
+  /** How unopened loot reveals are presented after their reward is applied. */
+  lootPresentation: 'auto-pause' | 'queue';
+  /** How level-up rewards are selected and presented. */
+  levelUpPresentation: 'pause-focus' | 'compact-live' | 'random-live';
+  /** Show the tactical map by default in the pause dashboard. */
+  pauseMapVisible: boolean;
   /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
   wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */

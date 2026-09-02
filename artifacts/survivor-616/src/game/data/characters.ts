@@ -26,6 +26,28 @@ function emberAsceticRig(): SpriteRig {
   return rig;
 }
 
+/** Switchback reads as a courier in a cropped jacket, route visor and trailing signal ribbons. */
+function switchbackRig(): SpriteRig {
+  const rig = humanoidRig({ height: 19, width: 9, cap: true, torsoColor: 'bodyDark' });
+  rig.parts.push(
+    { key: 'crest', x: -7, y: 18, w: 14, h: 2, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -11, y: 8, w: 8, h: 2, color: 'accent', z: 0 },
+    { key: 'aura', x: 5, y: 4, w: 10, h: 2, color: 'glow', z: 0 },
+  );
+  return rig;
+}
+
+/** Bellwether has a broad coat, bell-shaped shoulder guards and a grounded luminous stance. */
+function bellwetherRig(): SpriteRig {
+  const rig = humanoidRig({ height: 23, width: 14, flarePants: true, hood: true, torsoColor: 'body' });
+  rig.parts.push(
+    { key: 'crest', x: -10, y: 12, w: 5, h: 7, color: 'accent', z: 7 },
+    { key: 'crest', x: 5, y: 12, w: 5, h: 7, color: 'accent', z: 7 },
+    { key: 'aura', x: -12, y: 0, w: 24, h: 2, color: 'glow', z: 0 },
+  );
+  return rig;
+}
+
 /**
  * The playable roster. Each entry is fully data-driven: silhouette, palette,
  * base stats, signature weapon, ultimate and unlock condition.
@@ -705,6 +727,34 @@ export const CHARACTERS: CharacterDef[] = [
       landExplodeRadius: 66,
     },
     unlock: { kind: 'clearArea', areaId: 'old-market' },
+  },
+  {
+    id: 'switchback',
+    react: REACTION_PRESETS.playerBob,
+    name: 'Switchback',
+    handle: 'Route Breaker',
+    tagline: 'Finds the angle nobody else saw.',
+    bio: 'A night courier who turned a spool of municipal signal wire into a weapon. Every shot changes direction, and so does she.',
+    palette: { ink: '#07131b', body: '#174153', bodyDark: '#0b2835', accent: '#33f0c1', accentBright: '#e6fff8', skin: '#b97555', glow: '#5ee7ff' },
+    rig: switchbackRig(),
+    stats: { maxHp: 92, speed: 121, power: 1.02, area: 0.96, haste: 0.84, magnet: 68, armor: 0.03, crit: 0.12, lifesteal: 0 },
+    weapon: { id: 'signal-wire', name: 'Signal Wire', kind: 'projectile', description: 'Fast reflective line shots thread through cover and crowds.', damage: 13, cooldownMs: 480, range: 340, speed: 310, count: 2, lifetimeMs: 1800, levelDamageScale: 0.29, impactIntensity: 2, color: '#33f0c1', obstacleInteraction: 'reflect', pierce: 1 },
+    ultimate: { id: 'wrong-way-home', name: 'Wrong Way Home', description: 'The route redraws itself: movement and fire cadence spike while a signal burst clears space.', cooldownMs: 23000, durationMs: 4300, effect: { speedMult: 1.55, cooldownMult: 0.42, novaDamage: 48, novaRadius: 145 } },
+    unlock: { kind: 'kills', count: 80 },
+  },
+  {
+    id: 'bellwether',
+    react: REACTION_PRESETS.playerBob,
+    name: 'Bellwether',
+    handle: 'Last Chime',
+    tagline: 'Holds the line until the block remembers it has one.',
+    bio: 'A former tower keeper wrapped in a coat full of cracked brass. The deeper the ring, the less the crowd can move.',
+    palette: { ink: '#120d08', body: '#55402c', bodyDark: '#261b13', accent: '#f6c866', accentBright: '#fff4c2', skin: '#80543e', glow: '#ff9f43' },
+    rig: bellwetherRig(),
+    stats: { maxHp: 158, speed: 79, power: 1.16, area: 1.38, haste: 1.08, magnet: 54, armor: 0.24, crit: 0.04, lifesteal: 0.02 },
+    weapon: { id: 'resonance-bell', name: 'Resonance Bell', kind: 'nova', description: 'Heavy concentric chimes shove nearby threats away from your ground.', damage: 19, cooldownMs: 980, range: 104, levelDamageScale: 0.34, impactIntensity: 4, color: '#f6c866' },
+    ultimate: { id: 'hold-the-hour', name: 'Hold the Hour', description: 'A city-sized chime grants invulnerability and breaks the crowd around you.', cooldownMs: 28500, durationMs: 3400, effect: { invulnerable: true, damageMult: 1.55, novaDamage: 110, novaRadius: 250 } },
+    unlock: { kind: 'clearArea', areaId: 'back-alley' },
   },
 ];
 

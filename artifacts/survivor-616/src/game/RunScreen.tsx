@@ -92,6 +92,12 @@ interface ReelState {
   faceIndex: number;
 }
 
+interface RandomUpgradeReveal {
+  selected: UpgradeDef;
+  candidates: UpgradeDef[];
+  visibleName: string;
+}
+
 const STICK_RADIUS = 54;
 /** Simulation timestep. */
 const FIXED_STEP = 1 / 60;
@@ -149,10 +155,15 @@ export function RunScreen({
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(false);
+  const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
+  const [randomUpgradeReveal, setRandomUpgradeReveal] = useState<RandomUpgradeReveal | null>(null);
+  const [liveDashboardOpen, setLiveDashboardOpen] = useState(false);
   const reelTimerRef = useRef<number | null>(null);
   const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
-  const levelUpPausesRef = useRef(meta.levelUpPausesEnabled);
-  levelUpPausesRef.current = meta.levelUpPausesEnabled;
+  const levelUpPausesRef = useRef(meta.levelUpPresentation === 'pause-focus' && !meta.liveModeEnabled);
+  levelUpPausesRef.current = meta.levelUpPresentation === 'pause-focus' && !meta.liveModeEnabled;
+  const presentationRef = useRef(meta);
+  presentationRef.current = meta;
   const musicReactiveRef = useRef(meta.musicReactiveEnabled);
   musicReactiveRef.current = meta.musicReactiveEnabled;
 
@@ -231,7 +242,8 @@ export function RunScreen({
       keysRef.current.add(key);
       if (key === ' ') ultRequestRef.current = true;
       if (key === 'escape' || key === 'p') {
-        if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
+        if (phaseRef.current === 'playing' && meta.liveModeEnabled) setLiveDashboardOpen((open) => !open);
+        else if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
         else if (phaseRef.current === 'paused') setPhaseBoth('playing');
       }
     };
@@ -265,7 +277,7 @@ export function RunScreen({
       window.removeEventListener('blur', blur);
       document.removeEventListener('visibilitychange', visibilityChange);
     };
-  }, [setPhaseBoth]);
+  }, [meta.liveModeEnabled, setPhaseBoth]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (phaseRef.current !== 'playing') return;
@@ -458,9 +470,14 @@ export function RunScreen({
         // Pop a queued loot-box prize and open the reel overlay.
         // Use the dedicated 'reel' phase so Escape/P cannot toggle back to 'playing'.
         if (world.pendingReel.length > 0) {
-          const prize = world.pendingReel.shift()!;
-          setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
-          setPhaseBoth('reel');
+          if (presentationRef.current.liveModeEnabled || presentationRef.current.lootPresentation === 'queue') {
+            const prizes = world.pendingReel.splice(0);
+            setQueuedPrizes((current) => [...current, ...prizes]);
+          } else {
+            const prize = world.pendingReel.shift()!;
+            setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
+            setPhaseBoth('reel');
+          }
         }
 
         if (world.outcome !== 'running') {
@@ -475,7 +492,14 @@ export function RunScreen({
             upgradeChoicesRef.current = nextChoices;
             setChoices(nextChoices);
           }
-          if (levelUpPausesRef.current) {
+          if (presentationRef.current.levelUpPresentation === 'random-live' && upgradeChoicesRef.current.length > 0) {
+            const candidates = upgradeChoicesRef.current;
+            const selected = candidates[Math.floor(world.rng() * candidates.length)] ?? candidates[0];
+            applyUpgrade(world, selected);
+            upgradeChoicesRef.current = [];
+            setChoices([]);
+            setRandomUpgradeReveal({ selected, candidates, visibleName: candidates[0]?.name ?? selected.name });
+          } else if (levelUpPausesRef.current) {
             setPhaseBoth('levelup');
           }
         }
@@ -540,6 +564,32 @@ export function RunScreen({
     ultRequestRef.current = true;
   }, []);
 
+  const openQueuedPrize = useCallback(() => {
+    setQueuedPrizes((current) => {
+      const [prize, ...rest] = current;
+      if (prize) {
+        setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
+        if (!meta.liveModeEnabled) setPhaseBoth('reel');
+      }
+      return rest;
+    });
+  }, [meta.liveModeEnabled, setPhaseBoth]);
+
+  useEffect(() => {
+    if (!randomUpgradeReveal) return;
+    let frame = 0;
+    const interval = window.setInterval(() => {
+      frame += 1;
+      setRandomUpgradeReveal((current) => current ? { ...current, visibleName: current.candidates[frame % current.candidates.length]?.name ?? current.selected.name } : null);
+    }, prefersReducedMotion ? 300 : 90);
+    const finish = window.setTimeout(() => {
+      window.clearInterval(interval);
+      setRandomUpgradeReveal((current) => current ? { ...current, visibleName: current.selected.name } : null);
+    }, prefersReducedMotion ? 300 : 720);
+    const dismiss = window.setTimeout(() => setRandomUpgradeReveal(null), prefersReducedMotion ? 1100 : 1900);
+    return () => { window.clearInterval(interval); window.clearTimeout(finish); window.clearTimeout(dismiss); };
+  }, [randomUpgradeReveal?.selected.id, prefersReducedMotion]);
+
   /** Dismiss the reel overlay and resume the run. */
   const dismissReel = useCallback(() => {
     if (reelTimerRef.current !== null) {
@@ -547,7 +597,7 @@ export function RunScreen({
       reelTimerRef.current = null;
     }
     setReel(null);
-    setPhaseBoth('playing');
+    if (phaseRef.current === 'reel') setPhaseBoth('playing');
   }, [setPhaseBoth]);
 
   // Auto-land the reel after a short spin, then auto-dismiss.
@@ -559,7 +609,7 @@ export function RunScreen({
         // Auto-dismiss 2s after landing.
         reelTimerRef.current = window.setTimeout(() => {
           setReel(null);
-          setPhaseBoth('playing');
+          if (phaseRef.current === 'reel') setPhaseBoth('playing');
         }, 2200);
       }, 1400);
       return () => window.clearTimeout(t);
@@ -694,11 +744,11 @@ export function RunScreen({
             {phase === 'playing' || phase === 'paused' ? (
               <button
                 type="button"
-                onClick={() => setPhaseBoth(phase === 'playing' ? 'paused' : 'playing')}
+                onClick={() => meta.liveModeEnabled && phase === 'playing' ? setLiveDashboardOpen((open) => !open) : setPhaseBoth(phase === 'playing' ? 'paused' : 'playing')}
                 className="pointer-events-auto rounded-sm border border-white/20 bg-black/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/80"
                 data-testid="button-pause"
               >
-                {phase === 'paused' ? 'Resume' : 'Pause'}
+                {meta.liveModeEnabled && phase === 'playing' ? (liveDashboardOpen ? 'Close' : 'Tactics') : phase === 'paused' ? 'Resume' : 'Pause'}
               </button>
             ) : null}
           </div>
@@ -918,6 +968,16 @@ export function RunScreen({
       </button>
 
       <ChestTally count={hud?.lootBoxesOpened ?? 0} />
+      <button
+        type="button"
+        onClick={openQueuedPrize}
+        disabled={queuedPrizes.length === 0 || Boolean(reel)}
+        className="absolute bottom-3 left-1/2 z-40 -translate-x-1/2 border border-blue-300/50 bg-[#071225]/90 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
+        data-testid="button-loot-tray"
+        aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
+      >
+        ◇ Loot tray · {queuedPrizes.length}
+      </button>
 
       {/* Virtual stick */}
       {stickVisual.active ? (
@@ -1076,31 +1136,46 @@ export function RunScreen({
         </div>
       ) : null}
 
+      {randomUpgradeReveal ? (
+        <div className="pointer-events-none absolute bottom-24 left-1/2 z-40 w-[min(72vw,300px)] -translate-x-1/2 border border-fuchsia-300/60 bg-black/88 px-4 py-3 text-center shadow-[0_0_28px_rgba(232,121,249,.3)]" data-testid="random-upgrade-reel" aria-live="polite">
+          <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-fuchsia-200/70">Live level-up</p>
+          <p className="mt-1 truncate text-lg font-black uppercase text-white">{randomUpgradeReveal.visibleName}</p>
+          {randomUpgradeReveal.visibleName === randomUpgradeReveal.selected.name ? <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300">Locked in · keep moving</p> : null}
+        </div>
+      ) : null}
+
       {/* Pause */}
-      {phase === 'paused' && !runSettingsOpen ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6" data-testid="overlay-paused">
-          <div className="w-full max-w-xs space-y-3 text-center">
-            <h2 className="text-2xl font-black uppercase text-white">Paused</h2>
-            <p className="font-mono text-xs text-white/60">
-              WASD or arrows to move. Space for {character.ultimate.name}.
-            </p>
+      {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen ? (
+        <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
+          <div className="pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
+            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div>
+            <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
+              {meta.pauseMapVisible ? <div className="min-h-44 border border-cyan-200/20 bg-[#08111a] p-3">{hud?.endless ? <div className="relative h-52 overflow-hidden"><Minimap map={hud.endless} expanded position={{x:0,y:0}} onPositionChange={() => undefined} onToggleExpanded={() => undefined} /></div> : <div className="grid h-44 place-items-center"><div className="relative h-32 w-52 border border-white/15 bg-[radial-gradient(circle_at_center,rgba(34,211,238,.16),transparent_55%)]"><span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-cyan-300 shadow-[0_0_14px_#67e8f9]"/><span className="absolute left-2 top-2 font-mono text-[9px] uppercase text-white/45">{area.district}</span><span className="absolute bottom-2 right-2 font-mono text-[9px] uppercase text-white/45">{area.name}</span></div></div>}</div> : null}
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2 font-mono text-[10px] uppercase"><span className="border border-emerald-400/30 bg-emerald-400/5 p-2 text-emerald-300 shadow-[0_0_10px_rgba(52,211,153,.08)]">HP {Math.ceil(hud?.hp ?? 0)}/{Math.ceil(hud?.maxHp ?? 0)}</span><span className="border border-emerald-400/30 bg-emerald-400/5 p-2 text-emerald-300">Level {hud?.level ?? 1}</span><span className="border border-emerald-400/30 bg-emerald-400/5 p-2 text-emerald-300">Kills {hud?.kills ?? 0}</span><span className="border border-red-400/30 bg-red-400/5 p-2 text-red-300 shadow-[0_0_10px_rgba(248,113,113,.08)]">Threats {challenges.length}</span></div>
+                <div><p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-white/50">Weapons</p>{hud?.loadout.weapons.map((weapon) => <div key={weapon.id} className="flex justify-between border-b border-white/10 py-1 text-xs text-white"><span>{weapon.name}</span><span className="text-emerald-300">Lv {weapon.level}</span></div>)}</div>
+                <div><p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-white/50">Passives / buffs</p>{hud?.loadout.passives.length ? hud.loadout.passives.map((passive) => <div key={passive.id} className="flex justify-between border-b border-white/10 py-1 text-xs text-emerald-200"><span>{passive.name}</span><span>+{passive.stacks}</span></div>) : <p className="text-xs text-white/35">No passives yet</p>}</div>
+                {challenges.map((challenge) => <p key={challenge.id} className="font-mono text-[10px] uppercase text-red-300 [text-shadow:0_0_8px_rgba(248,113,113,.6)]">Debuff · {challenge.name}</p>)}
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <button
               type="button"
-              onClick={() => setPhaseBoth('playing')}
+              onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')}
               className="w-full rounded-sm border border-white/25 bg-white/10 px-4 py-3 font-bold uppercase tracking-widest text-white"
               data-testid="button-resume"
             >
-              Resume
+              {liveDashboardOpen ? 'Close dashboard' : 'Resume'}
             </button>
             <button
               type="button"
-              onClick={() => setRunSettingsOpen(true)}
+              onClick={() => { if (liveDashboardOpen) setPhaseBoth('paused'); setLiveDashboardOpen(false); setRunSettingsOpen(true); }}
               className="w-full rounded-sm border border-cyan-200/40 bg-cyan-300/10 px-4 py-3 font-bold uppercase tracking-widest text-cyan-100"
               data-testid="button-pause-settings"
             >
               Settings
             </button>
-            {area.endless && (
+            {area.endless && !liveDashboardOpen && (
               <button
                 type="button"
                 onClick={headHome}
@@ -1110,14 +1185,15 @@ export function RunScreen({
                 Head home
               </button>
             )}
-            <button
+            {!liveDashboardOpen ? <button
               type="button"
               onClick={onAbort}
               className="w-full rounded-sm border border-white/15 px-4 py-3 font-mono text-xs uppercase tracking-widest text-white/70"
               data-testid="button-abandon"
             >
               Abandon run
-            </button>
+            </button> : null}
+            </div>
           </div>
         </div>
       ) : null}
@@ -1131,23 +1207,23 @@ export function RunScreen({
       {/* Loot box reel overlay */}
       {reel ? (
         <div
-          className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/92"
+          className={meta.liveModeEnabled ? 'absolute bottom-24 right-3 z-50 flex w-[min(70vw,300px)] flex-col items-center justify-center border border-blue-300/45 bg-black/90 p-3 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/92'}
           data-testid="overlay-reel"
         >
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.4em] text-white/50">Blue Box</p>
-          <h2 className="mb-6 text-2xl font-black uppercase tracking-widest text-blue-300">
+          <h2 className={`${meta.liveModeEnabled ? 'mb-2 text-lg' : 'mb-6 text-2xl'} font-black uppercase tracking-widest text-blue-300`}>
             {reel.phase === 'spinning' ? 'Spinning...' : 'You got'}
           </h2>
 
           {/* Reel strip — 3 faces scroll, then land */}
-          <div className="mb-6 flex gap-3">
+          <div className={`${meta.liveModeEnabled ? 'mb-2 gap-1.5' : 'mb-6 gap-3'} flex`}>
             {[0, 1, 2].map((col) => {
               const landed = reel.phase === 'landed';
               const face = landed ? REEL_FACES[reel.faceIndex] : REEL_FACES[(reel.faceIndex + col + 1) % REEL_FACES.length];
               return (
                 <div
                   key={col}
-                  className="flex h-24 w-20 flex-col items-center justify-center border-2 bg-black/80 font-black text-4xl transition-all duration-500"
+                  className={`${meta.liveModeEnabled ? 'h-14 w-12 text-xl' : 'h-24 w-20 text-4xl'} flex flex-col items-center justify-center border-2 bg-black/80 font-black transition-all duration-500`}
                   style={{
                     borderColor: landed ? (face?.color ?? '#3b82f6') : '#334155',
                     color: landed ? (face?.color ?? '#3b82f6') : '#94a3b8',
