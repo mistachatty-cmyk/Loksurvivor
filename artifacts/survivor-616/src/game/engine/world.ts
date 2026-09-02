@@ -48,6 +48,7 @@ import type {
   ObjectiveDef,
   RunObjective,
   RunResult,
+  RunAuraStyle,
   RunPassive,
   RunWeapon,
   StatusEffectInstance,
@@ -56,6 +57,7 @@ import type {
   ObstacleDef,
   ImpactIntensity,
   PotholeTrigger,
+  PaletteEffectDef,
   PropVariant,
   RelicRecipeDef,
   StealthAbilityConfig,
@@ -658,6 +660,10 @@ export interface World {
   minimapHazardSense: boolean;
   /** When false, birds and fireflies stay visible through rain/fog instead of sheltering. */
   wildlifeSheltersInRain: boolean;
+  /** Procedural player aura selected in the hideout; visual only. */
+  runAuraStyle: RunAuraStyle;
+  /** Optional animated flourish supplied by the active palette; visual only. */
+  paletteEffect?: PaletteEffectDef;
   /** Optional difficulty contracts selected before the run. */
   challenges: ChallengeContractDef[];
   /** One bounded hideout rumor carried into this run. */
@@ -775,6 +781,8 @@ export function createWorld(
     minimapEnemyRadar?: boolean;
     minimapLootSense?: boolean;
     minimapHazardSense?: boolean;
+    runAuraStyle?: RunAuraStyle;
+    paletteEffect?: PaletteEffectDef;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -898,6 +906,8 @@ export function createWorld(
     minimapLootSense: setup.minimapLootSense ?? false,
     minimapHazardSense: setup.minimapHazardSense ?? false,
     wildlifeSheltersInRain: setup.wildlifeSheltersInRain !== false,
+    runAuraStyle: setup.runAuraStyle ?? 'street-halo',
+    paletteEffect: setup.paletteEffect,
     challenges: [...challenges],
     activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,
     rumorTriggered: activeCrewRumor?.rumorId === 'painted-shortcut',
@@ -1558,7 +1568,13 @@ function updateDistrictIncursion(w: World, dt: number) {
       if (state.outsideSafeSince === 0) state.outsideSafeSince = w.now;
       if (w.now >= state.nextHazardTickAt) {
         state.nextHazardTickAt = w.now + 760;
-        damagePlayer(w, state.kind === 'flood-surge' ? 5 : 4, w.player.x + (w.player.x >= 0 ? 90 : -90), w.player.y);
+        // Floodwater should push an exposed player farther out of the lit
+        // lane. The previous source point sat outside the player and knocked
+        // them inward, accidentally resetting the failure timer.
+        const hazardSourceX = state.kind === 'flood-surge'
+          ? w.player.x - (w.player.x >= 0 ? 90 : -90)
+          : w.player.x + (w.player.x >= 0 ? 90 : -90);
+        damagePlayer(w, state.kind === 'flood-surge' ? 5 : 4, hazardSourceX, w.player.y);
       }
       if (w.now - state.outsideSafeSince > 4600) {
         finishDistrictIncursion(w, false);

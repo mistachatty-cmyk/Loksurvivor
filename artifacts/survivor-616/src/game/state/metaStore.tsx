@@ -52,14 +52,9 @@ import {
   uiLooksForOwnedThemeIds,
 } from '@/game/data/uiThemes';
 import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
+import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
-import {
-  mergeCustomizationLooks,
-  missingLookAssets,
-  normalizeCustomizationLooks,
-  sanitizeLookName,
-} from '@/game/data/customizations';
 import type {
   AllyDef,
   AreaDef,
@@ -83,7 +78,6 @@ import type {
   UnlockRule,
   CustomMap,
   UIPanelLayout,
-  CustomizationLook,
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
@@ -191,7 +185,8 @@ export function createInitialMeta(): MetaState {
     uiThemeSwatchByTheme: {},
     ownedPaletteIds: [DEFAULT_PALETTE_ID],
     activePaletteId: DEFAULT_PALETTE_ID,
-    customizationLooks: [],
+    ownedRunAuraIds: [DEFAULT_RUN_AURA_ID],
+    activeRunAuraId: DEFAULT_RUN_AURA_ID,
     dailyContractDayKey: contractDayKey(),
     dailyContractProgressById: {},
     completedDailyContractIds: [],
@@ -288,6 +283,14 @@ function normalizeOwnedPaletteIds(value: unknown): string[] {
 
 function normalizePaletteId(value: unknown, ownedPaletteIds: string[]): string {
   return typeof value === 'string' && ownedPaletteIds.includes(value) ? value : DEFAULT_PALETTE_ID;
+}
+
+function normalizeOwnedRunAuraIds(value: unknown): string[] {
+  return idList(value, new Set(RUN_AURAS.map((aura) => aura.id)), [DEFAULT_RUN_AURA_ID]);
+}
+
+function normalizeRunAuraId(value: unknown, ownedRunAuraIds: string[]): string {
+  return typeof value === 'string' && ownedRunAuraIds.includes(value) ? value : DEFAULT_RUN_AURA_ID;
 }
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
@@ -626,6 +629,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const endlessDiscoveryIds = normalizeEndlessDiscoveries(parsed.endlessDiscoveryIds);
   const customMaps = normalizeCustomMaps(parsed.customMaps);
   const ownedUiThemeIds = normalizeOwnedUiThemeIds(parsed.ownedUiThemeIds);
+  const ownedRunAuraIds = normalizeOwnedRunAuraIds(parsed.ownedRunAuraIds);
   const today = contractDayKey();
   const savedContractDay = typeof parsed.dailyContractDayKey === 'string' ? parsed.dailyContractDayKey : today;
   const dailyContractDayKey = savedContractDay === today ? savedContractDay : today;
@@ -711,7 +715,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
     ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
     activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
-    customizationLooks: normalizeCustomizationLooks(parsed.customizationLooks),
+    ownedRunAuraIds,
+    activeRunAuraId: normalizeRunAuraId(parsed.activeRunAuraId, ownedRunAuraIds),
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
@@ -961,12 +966,9 @@ type Action =
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'buyPalette'; id: string }
   | { type: 'equipPalette'; id: string }
+  | { type: 'buyRunAura'; id: string }
+  | { type: 'equipRunAura'; id: string }
   | { type: 'cycleUiLook' }
-  | { type: 'saveCustomizationLook'; id: string; name: string; now: number }
-  | { type: 'renameCustomizationLook'; id: string; name: string; now: number }
-  | { type: 'deleteCustomizationLook'; id: string }
-  | { type: 'equipCustomizationLook'; id: string }
-  | { type: 'importCustomizationLooks'; looks: CustomizationLook[] }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
@@ -1142,6 +1144,23 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (!state.meta.ownedPaletteIds.includes(action.id)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
 
+    case 'buyRunAura': {
+      const aura = RUN_AURAS_BY_ID[action.id];
+      if (!aura || state.meta.ownedRunAuraIds.includes(aura.id) || state.meta.lootTokens < aura.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lootTokens: state.meta.lootTokens - aura.cost,
+          ownedRunAuraIds: [...state.meta.ownedRunAuraIds, aura.id],
+        },
+      };
+    }
+
+    case 'equipRunAura':
+      if (!state.meta.ownedRunAuraIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, activeRunAuraId: action.id } };
+
     case 'cycleUiLook': {
       const looks = uiLooksForOwnedThemeIds(state.meta.ownedUiThemeIds);
       if (looks.length <= 1) return state;
@@ -1166,81 +1185,6 @@ export function reducer(state: StoreState, action: Action): StoreState {
         },
       };
     }
-
-    case 'saveCustomizationLook': {
-      const uiSwatchId = activeUiThemeSwatchId(state.meta);
-      const look: CustomizationLook = {
-        id: action.id,
-        name: sanitizeLookName(action.name),
-        uiThemeId: state.meta.uiTheme,
-        ...(uiSwatchId ? { uiSwatchId } : {}),
-        paletteId: state.meta.activePaletteId,
-        createdAt: action.now,
-        updatedAt: action.now,
-        provenance: { source: 'local' },
-      };
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          customizationLooks: mergeCustomizationLooks(state.meta.customizationLooks, [look]),
-        },
-      };
-    }
-
-    case 'renameCustomizationLook':
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          customizationLooks: state.meta.customizationLooks.map((look) =>
-            look.id === action.id
-              ? { ...look, name: sanitizeLookName(action.name, look.name), updatedAt: action.now }
-              : look,
-          ),
-        },
-      };
-
-    case 'deleteCustomizationLook':
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          customizationLooks: state.meta.customizationLooks.filter((look) => look.id !== action.id),
-        },
-      };
-
-    case 'equipCustomizationLook': {
-      const look = state.meta.customizationLooks.find((candidate) => candidate.id === action.id);
-      if (!look || missingLookAssets(look, state.meta.ownedUiThemeIds, state.meta.ownedPaletteIds).length > 0) {
-        return state;
-      }
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          uiTheme: look.uiThemeId,
-          activePaletteId: look.paletteId,
-          ...(look.uiSwatchId
-            ? {
-                uiThemeSwatchByTheme: {
-                  ...state.meta.uiThemeSwatchByTheme,
-                  [look.uiThemeId]: look.uiSwatchId,
-                },
-              }
-            : {}),
-        },
-      };
-    }
-
-    case 'importCustomizationLooks':
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          customizationLooks: mergeCustomizationLooks(state.meta.customizationLooks, action.looks),
-        },
-      };
 
     case 'setDevModeAllUnlocks':
       return {
@@ -1568,12 +1512,9 @@ export interface MetaContextValue {
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   buyPalette: (id: string) => void;
   equipPalette: (id: string) => void;
+  buyRunAura: (id: string) => void;
+  equipRunAura: (id: string) => void;
   cycleUiLook: () => void;
-  saveCustomizationLook: (id: string, name: string) => void;
-  renameCustomizationLook: (id: string, name: string) => void;
-  deleteCustomizationLook: (id: string) => void;
-  equipCustomizationLook: (id: string) => void;
-  importCustomizationLooks: (looks: CustomizationLook[]) => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
@@ -1630,21 +1571,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
+  const buyRunAura = useCallback((id: string) => dispatch({ type: 'buyRunAura', id }), []);
+  const equipRunAura = useCallback((id: string) => dispatch({ type: 'equipRunAura', id }), []);
   const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
-  const saveCustomizationLook = useCallback(
-    (id: string, name: string) => dispatch({ type: 'saveCustomizationLook', id, name, now: Date.now() }),
-    [],
-  );
-  const renameCustomizationLook = useCallback(
-    (id: string, name: string) => dispatch({ type: 'renameCustomizationLook', id, name, now: Date.now() }),
-    [],
-  );
-  const deleteCustomizationLook = useCallback((id: string) => dispatch({ type: 'deleteCustomizationLook', id }), []);
-  const equipCustomizationLook = useCallback((id: string) => dispatch({ type: 'equipCustomizationLook', id }), []);
-  const importCustomizationLooks = useCallback(
-    (looks: CustomizationLook[]) => dispatch({ type: 'importCustomizationLooks', looks }),
-    [],
-  );
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -1763,12 +1692,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectUiThemeSwatch,
       buyPalette,
       equipPalette,
+      buyRunAura,
+      equipRunAura,
       cycleUiLook,
-      saveCustomizationLook,
-      renameCustomizationLook,
-      deleteCustomizationLook,
-      equipCustomizationLook,
-      importCustomizationLooks,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
@@ -1811,12 +1737,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectUiThemeSwatch,
     buyPalette,
     equipPalette,
+    buyRunAura,
+    equipRunAura,
     cycleUiLook,
-    saveCustomizationLook,
-    renameCustomizationLook,
-    deleteCustomizationLook,
-    equipCustomizationLook,
-    importCustomizationLooks,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,

@@ -87,6 +87,39 @@ export const UI_THEMES: UIThemeDef[] = [
       { id: 'sunset-static', name: 'Sunset Static', primaryHsl: '24 100% 66%' },
     ],
   },
+  {
+    id: 'salvage-terminal',
+    name: 'Salvage Terminal',
+    description: 'Stamped steel panels, grease-pencil marks, and a workbench light that never quits.',
+    cost: 2400,
+    swatches: [
+      { id: 'torch-orange', name: 'Torch Orange', primaryHsl: '24 100% 62%' },
+      { id: 'welding-blue', name: 'Welding Blue', primaryHsl: '193 100% 68%' },
+      { id: 'shop-lime', name: 'Shop Lime', primaryHsl: '87 90% 62%' },
+    ],
+  },
+  {
+    id: 'river-dawn',
+    name: 'River Dawn',
+    description: 'Cool water, pale concrete, and the first clean light after a long run.',
+    cost: 2800,
+    swatches: [
+      { id: 'bridge-cyan', name: 'Bridge Cyan', primaryHsl: '187 92% 63%' },
+      { id: 'dawn-peach', name: 'Dawn Peach', primaryHsl: '18 100% 72%' },
+      { id: 'mist-violet', name: 'Mist Violet', primaryHsl: '259 88% 74%' },
+    ],
+  },
+  {
+    id: 'block-party',
+    name: 'Block Party',
+    description: 'Flyers, speaker lights, and bright hand-painted signs for a hideout that finally feels alive.',
+    cost: 3200,
+    swatches: [
+      { id: 'speaker-magenta', name: 'Speaker Magenta', primaryHsl: '326 100% 68%' },
+      { id: 'flyer-yellow', name: 'Flyer Yellow', primaryHsl: '50 100% 62%' },
+      { id: 'porch-teal', name: 'Porch Teal', primaryHsl: '166 88% 58%' },
+    ],
+  },
 ];
 
 export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(
