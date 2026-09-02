@@ -3,7 +3,7 @@
  * name and props stable.
  */
 import { Fragment } from 'react';
-import { BookOpen, LockKeyhole, Swords, Zap } from 'lucide-react';
+import { BookOpen, LockKeyhole, Zap } from 'lucide-react';
 
 import { describeUnlock, effectiveStats, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
@@ -12,6 +12,7 @@ import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { CharacterAbilityVisualizer } from './CharacterAbilityVisualizer';
 import { LokPetVariantSheet } from './LokPetVariantSheet';
+import { WeaponIcon } from './WeaponIcon';
 
 export interface CharacterSelectProps {
   onBack: () => void;
@@ -76,7 +77,7 @@ function CharacterDetail({
       <div className={`flex flex-col gap-3 ${inline ? 'min-w-[14rem] flex-1' : ''}`}>
         <div>
           <div className="mb-1 flex items-center gap-2">
-            <Swords className="h-3 w-3 text-primary" />
+            <WeaponIcon weaponId={character.weapon.id} kind={character.weapon.kind} color={character.weapon.color ?? character.palette.accent} size={24} label={character.weapon.name} />
             <span className="text-[10px] font-bold uppercase tracking-widest text-white">{character.weapon.name}</span>
           </div>
           <p className="text-xs text-muted-foreground">{character.weapon.description}</p>

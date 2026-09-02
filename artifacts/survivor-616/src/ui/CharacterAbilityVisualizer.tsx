@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
-import { Crosshair, Footprints, Sparkles, Target } from 'lucide-react';
+import { Crosshair, Footprints, Sparkles } from 'lucide-react';
 import type { CharacterDef, WeaponKind } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
+import { WeaponIcon } from './WeaponIcon';
 
 interface CharacterAbilityVisualizerProps {
   character: CharacterDef;
@@ -222,7 +223,7 @@ export function CharacterAbilityVisualizer({ character }: CharacterAbilityVisual
             <Footprints className="h-3 w-3" /> advancing
           </div>
         </div>
-        <DemoBox title={character.weapon.name} icon={<Target className="h-3.5 w-3.5" />} color={accent} description={character.weapon.description}>
+        <DemoBox title={character.weapon.name} icon={<WeaponIcon weaponId={character.weapon.id} kind={character.weapon.kind} color={accent} size={28} label={character.weapon.name} />} color={accent} description={character.weapon.description}>
           <WeaponPatternDemo kind={character.weapon.kind} color={accent} count={character.weapon.count} />
           <div className="absolute bottom-3 left-3 text-[9px] uppercase tracking-widest text-white/50">{character.weapon.kind} pattern</div>
         </DemoBox>

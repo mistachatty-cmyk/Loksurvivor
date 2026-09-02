@@ -59,7 +59,7 @@ export function createLokPetArchiveFixtureResult(): RunResult {
     killsByEnemy: {},
     newlyUnlockedCharacterIds: [],
     loadout: {
-      weapons: [{ id: 'shade-blade', name: 'Shade Blade', level: 2 }],
+      weapons: [{ id: 'shade-blade', name: 'Shade Blade', level: 2, kind: 'melee', color: '#67e8f9' }],
       passives: [],
     },
     lootBoxesOpened: 3,

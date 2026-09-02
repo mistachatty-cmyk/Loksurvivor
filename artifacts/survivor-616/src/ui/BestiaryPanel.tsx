@@ -7,11 +7,22 @@ import { CHARACTERS } from '@/game/data/characters';
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
+import { WeaponIcon } from './WeaponIcon';
 import { motion } from 'framer-motion';
-import { Skull, Ghost, LockKeyhole, Swords, Sparkles, Users } from 'lucide-react';
+import { Skull, Ghost, LockKeyhole, Sparkles, Users } from 'lucide-react';
 
 export interface BestiaryPanelProps {
   onBack: () => void;
+}
+
+function EnemyPreview({ enemy }: { enemy: (typeof ENEMIES)[number] }) {
+  const activeAnim = enemy.behavior === 'shockwave' || enemy.behavior === 'spitter' || enemy.behavior === 'charger' ? 'attack' : 'walk';
+  return (
+    <div className="relative grid h-28 w-24 shrink-0 place-items-center overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.08),transparent_62%)]" role="img" aria-label={`Animated pixel model of ${enemy.name}`}>
+      <RigPortrait rig={enemy.rig} palette={enemy.palette} anim={activeAnim} size={94} />
+      <span className="absolute inset-x-1 bottom-1 text-center font-mono text-[8px] uppercase tracking-widest text-white/35">live specimen</span>
+    </div>
+  );
 }
 
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
@@ -80,7 +91,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
                     <p className="text-xs italic leading-relaxed text-muted-foreground">"{character.bio}"</p>
                     <div className="grid gap-3 border-t border-border/60 pt-3">
                       <div className="flex gap-3">
-                        <Swords className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <WeaponIcon weaponId={character.weapon.id} kind={character.weapon.kind} color={character.weapon.color ?? character.palette.accent} size={32} label={character.weapon.name} className="shrink-0" />
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-white">{character.weapon.name}</p>
                           <p className="mt-1 text-xs text-muted-foreground">{character.weapon.description}</p>
@@ -149,9 +160,10 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
 
                 {known ? (
                   <>
-                    <p className="text-sm text-muted-foreground mb-6 flex-1">
-                      {enemy.lore}
-                    </p>
+                    <div className="mb-6 flex flex-1 items-start gap-4">
+                      <EnemyPreview enemy={enemy} />
+                      <p className="pt-1 text-sm leading-relaxed text-muted-foreground">{enemy.lore}</p>
+                    </div>
                     <div className="grid grid-cols-4 gap-2 pt-4 border-t border-border/50">
                       <div className="flex flex-col">
                         <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">HP</span>

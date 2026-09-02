@@ -11,6 +11,7 @@ import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
+import { WeaponIcon } from './WeaponIcon';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 
@@ -343,7 +344,8 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">Final weapons</p>
             <div className="flex flex-wrap gap-2">
               {result.loadout.weapons.map((weapon) => (
-                <span key={weapon.id} className="border border-primary/40 bg-primary/5 px-3 py-1.5 text-sm font-bold uppercase text-white">
+                <span key={weapon.id} className="flex items-center gap-2 border border-primary/40 bg-primary/5 px-2 py-1.5 text-sm font-bold uppercase text-white">
+                  <WeaponIcon weaponId={weapon.id} kind={weapon.kind} color={weapon.color} size={28} label={weapon.name} />
                   {weapon.name} <span className="font-mono text-primary">Lv {weapon.level}</span>
                 </span>
               ))}
