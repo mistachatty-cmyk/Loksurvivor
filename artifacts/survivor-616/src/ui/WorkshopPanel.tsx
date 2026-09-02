@@ -1,7 +1,8 @@
 import { CITY_RELICS, RELIC_RECIPES } from '@/game/data/relics';
 import { useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
-import { Hammer, LockKeyhole, Sparkles, Swords } from 'lucide-react';
+import { WeaponIcon } from './WeaponIcon';
+import { Hammer, LockKeyhole, Sparkles } from 'lucide-react';
 
 export interface WorkshopOverviewProps {
   compact?: boolean;
@@ -87,7 +88,7 @@ export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
                     </p>
                     <h4 className="mt-1 text-base font-black uppercase text-white">{known ? recipe.name : 'Sealed recipe'}</h4>
                   </div>
-                  {known ? <Swords className="h-5 w-5 shrink-0" style={{ color: recipe.color }} /> : <LockKeyhole className="h-5 w-5 shrink-0 text-muted-foreground" />}
+                  {known ? <WeaponIcon weaponId={recipe.result.id} kind={recipe.result.kind} color={recipe.color} size={38} label={recipe.result.name} className="shrink-0" /> : <LockKeyhole className="h-5 w-5 shrink-0 text-muted-foreground" />}
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-white/75">
                   {known ? recipe.description : 'Find the matching district relic to decode this treatment.'}

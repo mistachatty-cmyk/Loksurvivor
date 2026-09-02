@@ -782,10 +782,10 @@ export function RunScreen({
         {hud?.loadout ? (
           <div className="flex gap-1.5 overflow-x-auto" data-testid="row-loadout">
             {hud.loadout.weapons.map((weapon) => {
-              const kind = WEAPONS_BY_ID[weapon.id]?.kind;
+              const kind = weapon.kind;
               return (
                 <div key={weapon.id} title={weapon.name} className="flex h-8 min-w-8 items-center gap-1 justify-center border border-white/25 bg-black/75 px-1.5 font-mono text-[10px] font-bold text-white" style={{ borderColor: weapon.color ?? 'rgba(255,255,255,.25)' }}>
-                  {kind ? <WeaponIcon kind={kind} color={weapon.color} size={16} className="shrink-0" /> : null}
+                  <WeaponIcon weaponId={weapon.id} kind={kind} color={weapon.color} size={20} className="shrink-0" />
                   {weapon.name.split(' ').map((part) => part[0]).join('').slice(0, 3)}<sup className="ml-0.5 text-primary">{weapon.level}</sup>
                 </div>
               );
@@ -1060,7 +1060,7 @@ export function RunScreen({
                     data-testid={`button-upgrade-${upgrade.id}`}
                   >
                     {cardWeapon ? (
-                      <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={22} className="shrink-0" />
+                      <WeaponIcon weaponId={cardWeapon.id} kind={cardWeapon.kind} color={cardWeapon.color} size={28} className="shrink-0" />
                     ) : null}
                     <span>
                       <p className="text-xs font-bold uppercase tracking-wide text-white">{upgrade.name}</p>
@@ -1120,7 +1120,7 @@ export function RunScreen({
                         data-testid={`button-continuous-upgrade-${upgrade.id}`}
                       >
                         {cardWeapon ? (
-                          <WeaponIcon kind={cardWeapon.kind} color={cardWeapon.color} size={16} className="shrink-0" />
+                          <WeaponIcon weaponId={cardWeapon.id} kind={cardWeapon.kind} color={cardWeapon.color} size={22} className="shrink-0" />
                         ) : null}
                         <span className="min-w-0">
                           <p className="truncate text-[11px] font-bold uppercase tracking-wide text-white">{upgrade.name}</p>

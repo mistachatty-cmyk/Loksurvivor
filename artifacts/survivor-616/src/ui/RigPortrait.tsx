@@ -15,6 +15,8 @@ export interface RigPortraitProps {
   /** Canvas height in CSS pixels; width is derived from it. */
   size?: number;
   className?: string;
+  /** Disable frame animation for compact/static contexts; reduced-motion also disables it automatically. */
+  animated?: boolean;
 }
 
 export function RigPortrait({
@@ -23,6 +25,7 @@ export function RigPortrait({
   anim = 'idle',
   size = 96,
   className = '',
+  animated = true,
 }: RigPortraitProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -42,8 +45,10 @@ export function RigPortrait({
     const start = performance.now();
     let raf = 0;
 
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldAnimate = animated && !reduceMotion;
     const frame = (time: number) => {
-      raf = requestAnimationFrame(frame);
+      if (shouldAnimate) raf = requestAnimationFrame(frame);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
 
@@ -61,9 +66,10 @@ export function RigPortrait({
       });
     };
 
-    raf = requestAnimationFrame(frame);
+    if (shouldAnimate) raf = requestAnimationFrame(frame);
+    else frame(start);
     return () => cancelAnimationFrame(raf);
-  }, [rig, palette, anim, size]);
+  }, [rig, palette, anim, size, animated]);
 
   return (
     <canvas

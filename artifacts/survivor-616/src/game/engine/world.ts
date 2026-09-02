@@ -5522,7 +5522,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
     loadout: {
-      weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, color: weapon.def.color })),
+      weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),
     },
     alerts: w.alerts.map((a) => a.text),
@@ -5723,7 +5723,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     discoveryId: w.area.discoveryId,
     newlyUnlockedCharacterIds: [],
     loadout: {
-      weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level })),
+      weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),
     },
     lootBoxesOpened: w.lootBoxesOpened,

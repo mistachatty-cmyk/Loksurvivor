@@ -1432,7 +1432,7 @@ export interface RunResult {
   discoveryId?: string;
   newlyUnlockedCharacterIds: string[];
   loadout: {
-    weapons: Array<{ id: string; name: string; level: number }>;
+    weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;
     passives: Array<{ id: string; name: string; stacks: number }>;
   };
   /** Loot boxes opened this run. */
@@ -1560,7 +1560,7 @@ export interface HudSnapshot {
   ultimateActive: boolean;
   weaponLevel: number;
   loadout: {
-    weapons: Array<{ id: string; name: string; level: number; color?: string }>;
+    weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;
     passives: Array<{ id: string; name: string; stacks: number }>;
   };
   alerts: string[];
