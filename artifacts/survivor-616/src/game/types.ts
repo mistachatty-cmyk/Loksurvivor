@@ -1291,6 +1291,8 @@ export interface UpgradeDef {
 
 export interface MetaState {
   version: number;
+  /** Four-tap gate has been completed, revealing persistent Dev Mode controls. */
+  devModeAccessUnlocked: boolean;
   /** Settings toggle for exposing every unlockable surface regardless of progress. */
   devModeAllUnlocks: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */

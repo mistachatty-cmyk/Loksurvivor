@@ -53,6 +53,7 @@ import {
 } from '@/game/data/uiThemes';
 import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
+import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import type {
@@ -81,7 +82,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 10;
+const META_VERSION = 11;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -133,6 +134,7 @@ function clampGyroSensitivity(value: unknown): number {
 export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
+    devModeAccessUnlocked: false,
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
@@ -656,7 +658,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
 
   return {
     version: META_VERSION,
-    devModeAllUnlocks: parsed.devModeAllUnlocks === true,
+    devModeAccessUnlocked: parsed.devModeAccessUnlocked === true,
+    devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
@@ -730,7 +733,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -969,6 +972,7 @@ type Action =
   | { type: 'buyRunAura'; id: string }
   | { type: 'equipRunAura'; id: string }
   | { type: 'cycleUiLook' }
+  | { type: 'unlockDevModeAccess' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
@@ -1112,7 +1116,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
     }
 
     case 'equipUiTheme':
-      if (!state.meta.ownedUiThemeIds.includes(action.id)) return state;
+      if (!hasCatalogItem(state.meta, 'uiThemes', action.id, state.meta.ownedUiThemeIds)) return state;
       return { ...state, meta: { ...state.meta, uiTheme: action.id } };
 
     case 'selectUiThemeSwatch': {
@@ -1141,7 +1145,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
     }
 
     case 'equipPalette':
-      if (!state.meta.ownedPaletteIds.includes(action.id)) return state;
+      if (!hasCatalogItem(state.meta, 'palettes', action.id, state.meta.ownedPaletteIds)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
 
     case 'buyRunAura': {
@@ -1158,11 +1162,11 @@ export function reducer(state: StoreState, action: Action): StoreState {
     }
 
     case 'equipRunAura':
-      if (!state.meta.ownedRunAuraIds.includes(action.id)) return state;
+      if (!hasCatalogItem(state.meta, 'runAuras', action.id, state.meta.ownedRunAuraIds)) return state;
       return { ...state, meta: { ...state.meta, activeRunAuraId: action.id } };
 
     case 'cycleUiLook': {
-      const looks = uiLooksForOwnedThemeIds(state.meta.ownedUiThemeIds);
+      const looks = uiLooksForOwnedThemeIds(effectiveCatalogIds(state.meta, 'uiThemes', state.meta.ownedUiThemeIds));
       if (looks.length <= 1) return state;
       const currentSwatchId = activeUiThemeSwatchId(state.meta);
       const currentIndex = looks.findIndex(
@@ -1186,10 +1190,24 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'unlockDevModeAccess':
+      return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
+
     case 'setDevModeAllUnlocks':
+      if (!state.meta.devModeAccessUnlocked) return state;
       return {
         ...state,
-        meta: { ...state.meta, devModeAllUnlocks: action.enabled },
+        meta: {
+          ...state.meta,
+          devModeAllUnlocks: action.enabled,
+          ...(!action.enabled
+            ? {
+                uiTheme: state.meta.ownedUiThemeIds.includes(state.meta.uiTheme) ? state.meta.uiTheme : DEFAULT_UI_THEME_ID,
+                activePaletteId: state.meta.ownedPaletteIds.includes(state.meta.activePaletteId) ? state.meta.activePaletteId : DEFAULT_PALETTE_ID,
+                activeRunAuraId: state.meta.ownedRunAuraIds.includes(state.meta.activeRunAuraId) ? state.meta.activeRunAuraId : DEFAULT_RUN_AURA_ID,
+              }
+            : {}),
+        },
       };
 
     case 'setPhysicsObjectClicks':
@@ -1515,6 +1533,7 @@ export interface MetaContextValue {
   buyRunAura: (id: string) => void;
   equipRunAura: (id: string) => void;
   cycleUiLook: () => void;
+  unlockDevModeAccess: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
@@ -1574,6 +1593,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyRunAura = useCallback((id: string) => dispatch({ type: 'buyRunAura', id }), []);
   const equipRunAura = useCallback((id: string) => dispatch({ type: 'equipRunAura', id }), []);
   const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
+  const unlockDevModeAccess = useCallback(() => dispatch({ type: 'unlockDevModeAccess' }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
@@ -1695,6 +1715,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyRunAura,
       equipRunAura,
       cycleUiLook,
+      unlockDevModeAccess,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
@@ -1740,6 +1761,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyRunAura,
     equipRunAura,
     cycleUiLook,
+    unlockDevModeAccess,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,

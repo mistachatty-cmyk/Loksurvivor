@@ -25,6 +25,12 @@ import {
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
+import {
+  DEV_ACCESS_TAPS_REQUIRED,
+  advanceDevAccessTap,
+  effectiveCatalogIds,
+  hasCatalogItem,
+} from '@/game/data/devUnlockRegistry';
 import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
@@ -47,6 +53,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     equipUiTheme,
     selectUiThemeSwatch,
     cycleUiLook,
+    unlockDevModeAccess,
     setDevModeAllUnlocks,
     setMusicReactive,
     setGyroEnabled,
@@ -57,9 +64,11 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setPaletteInvertEnabled,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
-  const ownedLookCount = uiLooksForOwnedThemeIds(meta.ownedUiThemeIds).length;
+  const effectiveUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
+  const ownedLookCount = uiLooksForOwnedThemeIds(effectiveUiThemeIds).length;
 
   const [gyroDenied, setGyroDenied] = useState(false);
+  const [devTapCount, setDevTapCount] = useState(0);
   const tiltAvailable = gyroSupported();
 
   /**
@@ -79,6 +88,14 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setGyroDenied(false);
     setGyroEnabled(true);
   }, [meta.gyroEnabled, setGyroEnabled]);
+
+  const handleDevAccessTap = useCallback(() => {
+    setDevTapCount((current) => {
+      const next = advanceDevAccessTap(current);
+      if (next.unlocked) unlockDevModeAccess();
+      return next.taps;
+    });
+  }, [unlockDevModeAccess]);
 
   return (
     <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
@@ -632,7 +649,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {UI_THEMES.map((theme) => {
-                  const owned = meta.ownedUiThemeIds.includes(theme.id);
+                  const owned = hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds);
                   const equipped = meta.uiTheme === theme.id;
                   const affordable = meta.cred >= theme.cost;
                   return (
@@ -730,37 +747,60 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
           </div>
         </section>
 
-        <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <FlaskConical className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Progression</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">All unlocks</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Expose every unlockable character, area, and hideout room, regardless of progress.
-                  </p>
+        {meta.devModeAccessUnlocked ? (
+          <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
+            <div className="flex items-start gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                <FlaskConical className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Developer access unlocked</p>
+                    <h2 className="mt-1 text-xl font-black uppercase text-white">Catalog registry</h2>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Temporarily expose every registered character, area, room, theme, palette, and aura. Turning
+                      this off restores your real progression and never grants permanent ownership.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDevModeAllUnlocks(!meta.devModeAllUnlocks)}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.devModeAllUnlocks ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'}`}
+                    aria-pressed={meta.devModeAllUnlocks}
+                    data-testid="button-toggle-dev-unlocks"
+                  >
+                    Dev Mode: {meta.devModeAllUnlocks ? 'On' : 'Off'}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDevModeAllUnlocks(!meta.devModeAllUnlocks)}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.devModeAllUnlocks
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                  }`}
-                  aria-pressed={meta.devModeAllUnlocks}
-                  data-testid="button-toggle-dev-unlocks"
-                >
-                  All unlocks: {meta.devModeAllUnlocks ? 'On' : 'Off'}
-                </button>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-gate">
+            <button
+              type="button"
+              onClick={handleDevAccessTap}
+              className="flex w-full items-center gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              aria-label="Tap four times to unlock developer mode"
+              data-testid="button-unlock-dev-mode"
+            >
+              <span className="grid h-11 w-11 shrink-0 place-items-center border border-border bg-background text-muted-foreground">
+                <FlaskConical className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">Build channel</span>
+                <span className="mt-1 block text-lg font-black uppercase text-white">Developer Mode</span>
+                <span className="mt-1 block text-xs text-muted-foreground" aria-live="polite">
+                  {devTapCount === 0
+                    ? 'Tap four times to reveal testing controls.'
+                    : `${Math.max(0, DEV_ACCESS_TAPS_REQUIRED - devTapCount)} tap${DEV_ACCESS_TAPS_REQUIRED - devTapCount === 1 ? '' : 's'} remaining.`}
+                </span>
+              </span>
+              <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </section>
+        )}
       </div>
     </ScreenLayout>
   );

@@ -51,7 +51,7 @@ test('version ten Lookbook-era saves migrate without carrying portable customiza
     version: 10,
     customizationLooks: [{ id: 'old-lookbook-record' }],
   } as ReturnType<typeof createInitialMeta> & { customizationLooks: unknown[] });
-  assert.equal(migrated.version, 10);
+  assert.equal(migrated.version, 11);
   assert.equal('customizationLooks' in migrated, false);
   assert.deepEqual(migrated.ownedRunAuraIds, ['street-halo']);
   assert.equal(migrated.activeRunAuraId, 'street-halo');
