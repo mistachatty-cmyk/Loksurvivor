@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, CloudRain, Flame, Lock, Palette, Radar, ScanLine, Sparkles } from 'lucide-react';
 
 import { RUN_AURAS } from '@/game/data/runAuras';
+import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { useMeta } from '@/game/state/metaStore';
 import { humanoidRig } from '@/game/sprites/rigs';
@@ -131,7 +132,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
               {category === 'palettes' ? (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="shop-palette-grid">
                   {THEMED_PALETTES.map((palette) => {
-                    const owned = meta.ownedPaletteIds.includes(palette.id);
+                    const owned = hasCatalogItem(meta, 'palettes', palette.id, meta.ownedPaletteIds);
                     const equipped = meta.activePaletteId === palette.id;
                     const affordable = meta.lootTokens >= palette.cost;
                     return (
@@ -162,7 +163,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
               ) : (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="shop-aura-grid">
                   {RUN_AURAS.map((aura) => {
-                    const owned = meta.ownedRunAuraIds.includes(aura.id);
+                    const owned = hasCatalogItem(meta, 'runAuras', aura.id, meta.ownedRunAuraIds);
                     const equipped = meta.activeRunAuraId === aura.id;
                     const affordable = meta.lootTokens >= aura.cost;
                     const Icon = AURA_ICONS[aura.style];
