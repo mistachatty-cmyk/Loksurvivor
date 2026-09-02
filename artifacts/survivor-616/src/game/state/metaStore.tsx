@@ -52,6 +52,7 @@ import {
   uiLooksForOwnedThemeIds,
 } from '@/game/data/uiThemes';
 import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
+import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import type {
@@ -80,7 +81,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 9;
+const META_VERSION = 10;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -184,6 +185,8 @@ export function createInitialMeta(): MetaState {
     uiThemeSwatchByTheme: {},
     ownedPaletteIds: [DEFAULT_PALETTE_ID],
     activePaletteId: DEFAULT_PALETTE_ID,
+    ownedRunAuraIds: [DEFAULT_RUN_AURA_ID],
+    activeRunAuraId: DEFAULT_RUN_AURA_ID,
     dailyContractDayKey: contractDayKey(),
     dailyContractProgressById: {},
     completedDailyContractIds: [],
@@ -280,6 +283,14 @@ function normalizeOwnedPaletteIds(value: unknown): string[] {
 
 function normalizePaletteId(value: unknown, ownedPaletteIds: string[]): string {
   return typeof value === 'string' && ownedPaletteIds.includes(value) ? value : DEFAULT_PALETTE_ID;
+}
+
+function normalizeOwnedRunAuraIds(value: unknown): string[] {
+  return idList(value, new Set(RUN_AURAS.map((aura) => aura.id)), [DEFAULT_RUN_AURA_ID]);
+}
+
+function normalizeRunAuraId(value: unknown, ownedRunAuraIds: string[]): string {
+  return typeof value === 'string' && ownedRunAuraIds.includes(value) ? value : DEFAULT_RUN_AURA_ID;
 }
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
@@ -618,6 +629,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const endlessDiscoveryIds = normalizeEndlessDiscoveries(parsed.endlessDiscoveryIds);
   const customMaps = normalizeCustomMaps(parsed.customMaps);
   const ownedUiThemeIds = normalizeOwnedUiThemeIds(parsed.ownedUiThemeIds);
+  const ownedRunAuraIds = normalizeOwnedRunAuraIds(parsed.ownedRunAuraIds);
   const today = contractDayKey();
   const savedContractDay = typeof parsed.dailyContractDayKey === 'string' ? parsed.dailyContractDayKey : today;
   const dailyContractDayKey = savedContractDay === today ? savedContractDay : today;
@@ -703,6 +715,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
     ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
     activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
+    ownedRunAuraIds,
+    activeRunAuraId: normalizeRunAuraId(parsed.activeRunAuraId, ownedRunAuraIds),
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
@@ -716,7 +730,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -952,6 +966,8 @@ type Action =
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'buyPalette'; id: string }
   | { type: 'equipPalette'; id: string }
+  | { type: 'buyRunAura'; id: string }
+  | { type: 'equipRunAura'; id: string }
   | { type: 'cycleUiLook' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
@@ -1127,6 +1143,23 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'equipPalette':
       if (!state.meta.ownedPaletteIds.includes(action.id)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
+
+    case 'buyRunAura': {
+      const aura = RUN_AURAS_BY_ID[action.id];
+      if (!aura || state.meta.ownedRunAuraIds.includes(aura.id) || state.meta.lootTokens < aura.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lootTokens: state.meta.lootTokens - aura.cost,
+          ownedRunAuraIds: [...state.meta.ownedRunAuraIds, aura.id],
+        },
+      };
+    }
+
+    case 'equipRunAura':
+      if (!state.meta.ownedRunAuraIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, activeRunAuraId: action.id } };
 
     case 'cycleUiLook': {
       const looks = uiLooksForOwnedThemeIds(state.meta.ownedUiThemeIds);
@@ -1479,6 +1512,8 @@ export interface MetaContextValue {
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   buyPalette: (id: string) => void;
   equipPalette: (id: string) => void;
+  buyRunAura: (id: string) => void;
+  equipRunAura: (id: string) => void;
   cycleUiLook: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
@@ -1536,6 +1571,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
+  const buyRunAura = useCallback((id: string) => dispatch({ type: 'buyRunAura', id }), []);
+  const equipRunAura = useCallback((id: string) => dispatch({ type: 'equipRunAura', id }), []);
   const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
@@ -1655,6 +1692,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectUiThemeSwatch,
       buyPalette,
       equipPalette,
+      buyRunAura,
+      equipRunAura,
       cycleUiLook,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
@@ -1698,6 +1737,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectUiThemeSwatch,
     buyPalette,
     equipPalette,
+    buyRunAura,
+    equipRunAura,
     cycleUiLook,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,

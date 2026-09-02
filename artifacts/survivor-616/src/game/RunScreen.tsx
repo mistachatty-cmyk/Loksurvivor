@@ -10,7 +10,8 @@ import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
-import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
+import { getRunAuraStyle } from '@/game/data/runAuras';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
@@ -177,6 +178,8 @@ export function RunScreen({
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const setPhaseBoth = useCallback((next: RunPhase) => {
     // Once a run is over it stays over -- nothing may steal the hand-off.
@@ -209,6 +212,8 @@ export function RunScreen({
         minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
+        runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
+        paletteEffect: prefersReducedMotion ? undefined : getThemePalette(meta.activePaletteId)?.effect,
       },
     );
   }

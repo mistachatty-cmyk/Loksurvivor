@@ -37,7 +37,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
-  'palette-store': { label: 'Paint Gallery', icon: Palette, testId: 'button-open-palette-store', description: 'Cosmetic colorways' },
+  'palette-store': { label: 'Customization Shop', icon: Palette, testId: 'button-open-palette-store', description: 'Palettes & run auras' },
 };
 
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
