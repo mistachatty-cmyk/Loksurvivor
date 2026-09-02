@@ -1266,6 +1266,17 @@ test('run-control preferences normalize safely and reducer updates persistable s
   assert.equal(normalized.minimapExpanded, false);
   assert.deepEqual(normalized.minimapPosition, { x: 1, y: 0 });
 
+  const repairedLiveMode = normalizeMeta({
+    version: 12,
+    liveModeEnabled: true,
+    lootPresentation: 'auto-pause',
+    levelUpPausesEnabled: true,
+    levelUpPresentation: 'pause-focus',
+  });
+  assert.equal(repairedLiveMode.levelUpPausesEnabled, false);
+  assert.equal(repairedLiveMode.lootPresentation, 'queue');
+  assert.equal(repairedLiveMode.levelUpPresentation, 'compact-live');
+
   const store = { meta: createInitialMeta(), lastRun: null };
   const updated = reducer(
     reducer(

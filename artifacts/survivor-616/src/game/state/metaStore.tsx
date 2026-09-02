@@ -547,6 +547,7 @@ function normalizeLokPetHistory(value: unknown): LokPetDiscoveryHistoryEntry[] {
 /** Coerce an untrusted save payload into a usable MetaState. */
 export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
+  const liveModeEnabled = parsed.liveModeEnabled === true;
   const characterIds = new Set(CHARACTERS.map((c) => c.id));
   const areaIds = new Set(AREAS.map((a) => a.id));
   const allyIds = new Set(ALLIES.map((a) => a.id));
@@ -665,13 +666,13 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     devModeAccessUnlocked: parsed.devModeAccessUnlocked === true,
     devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
-    levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
-    liveModeEnabled: parsed.liveModeEnabled === true,
-    lootPresentation: parsed.lootPresentation === 'queue' ? 'queue' : 'auto-pause',
+    levelUpPausesEnabled: !liveModeEnabled && parsed.levelUpPausesEnabled !== false,
+    liveModeEnabled,
+    lootPresentation: liveModeEnabled || parsed.lootPresentation === 'queue' ? 'queue' : 'auto-pause',
     levelUpPresentation:
       parsed.levelUpPresentation === 'random-live' || parsed.levelUpPresentation === 'compact-live'
         ? parsed.levelUpPresentation
-        : parsed.levelUpPausesEnabled === false ? 'compact-live' : 'pause-focus',
+        : liveModeEnabled || parsed.levelUpPausesEnabled === false ? 'compact-live' : 'pause-focus',
     pauseMapVisible: parsed.pauseMapVisible !== false,
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
@@ -1241,7 +1242,14 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setLootPresentation':
       return { ...state, meta: { ...state.meta, lootPresentation: action.value } };
     case 'setLevelUpPresentation':
-      return { ...state, meta: { ...state.meta, levelUpPresentation: action.value, levelUpPausesEnabled: action.value === 'pause-focus' } };
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          levelUpPresentation: state.meta.liveModeEnabled && action.value === 'pause-focus' ? 'compact-live' : action.value,
+          levelUpPausesEnabled: !state.meta.liveModeEnabled && action.value === 'pause-focus',
+        },
+      };
     case 'setPauseMapVisible':
       return { ...state, meta: { ...state.meta, pauseMapVisible: action.enabled } };
 
