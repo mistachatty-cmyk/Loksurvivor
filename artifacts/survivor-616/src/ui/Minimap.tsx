@@ -94,7 +94,7 @@ export function Minimap({
     <div
       ref={rootRef}
       className={`pointer-events-auto absolute z-30 block ${
-        expanded ? 'w-[min(86vw,360px)]' : 'w-[min(62vw,220px)]'
+        expanded ? 'w-[min(62vw,300px)] sm:w-[min(70vw,360px)]' : 'w-[min(44vw,160px)] sm:w-[min(52vw,200px)]'
       }`}
       style={{ left: `${position.x * 100}%`, top: `${position.y * 100}%` }}
       data-testid="minimap"

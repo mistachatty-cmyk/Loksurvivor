@@ -23,14 +23,14 @@ test.describe('interactive run controls', () => {
 
     await expect(page.getByTestId('section-level-up-settings')).toBeVisible();
     await expect(page.getByTestId('section-minimap-settings')).toBeVisible();
-    await page.getByTestId('button-toggle-continuous-levelups').click();
+    await page.getByTestId('button-toggle-live-mode').click();
     await page.getByTestId('button-toggle-minimap').click();
     await page.getByTestId('button-minimap-compact').click();
-    await expect(page.getByTestId('button-toggle-continuous-levelups')).toContainText('Keep moving');
+    await expect(page.getByTestId('button-toggle-live-mode')).toContainText('Live on');
     await page.waitForTimeout(100);
 
     await page.reload();
-    await expect(page.getByTestId('button-toggle-continuous-levelups')).toContainText('Keep moving');
+    await expect(page.getByTestId('button-toggle-live-mode')).toContainText('Live on');
     await expect(page.getByTestId('button-toggle-minimap')).toContainText('Hidden');
     await expect(page.getByTestId('button-minimap-compact')).toHaveAttribute('aria-pressed', 'true');
   });
