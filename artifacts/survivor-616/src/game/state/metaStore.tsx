@@ -82,7 +82,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 11;
+const META_VERSION = 12;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -138,6 +138,10 @@ export function createInitialMeta(): MetaState {
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
+    liveModeEnabled: false,
+    lootPresentation: 'auto-pause',
+    levelUpPresentation: 'pause-focus',
+    pauseMapVisible: true,
     wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
@@ -662,6 +666,13 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: parsed.levelUpPausesEnabled !== false,
+    liveModeEnabled: parsed.liveModeEnabled === true,
+    lootPresentation: parsed.lootPresentation === 'queue' ? 'queue' : 'auto-pause',
+    levelUpPresentation:
+      parsed.levelUpPresentation === 'random-live' || parsed.levelUpPresentation === 'compact-live'
+        ? parsed.levelUpPresentation
+        : parsed.levelUpPausesEnabled === false ? 'compact-live' : 'pause-focus',
+    pauseMapVisible: parsed.pauseMapVisible !== false,
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
@@ -733,7 +744,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -976,6 +987,10 @@ type Action =
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
+  | { type: 'setLiveMode'; enabled: boolean }
+  | { type: 'setLootPresentation'; value: MetaState['lootPresentation'] }
+  | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
+  | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
@@ -1218,9 +1233,17 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setLevelUpPauses':
       return {
-        ...state,
-        meta: { ...state.meta, levelUpPausesEnabled: action.enabled },
+        ...state, meta: { ...state.meta, levelUpPausesEnabled: action.enabled, levelUpPresentation: action.enabled ? 'pause-focus' : 'compact-live' },
       };
+
+    case 'setLiveMode':
+      return { ...state, meta: { ...state.meta, liveModeEnabled: action.enabled, ...(action.enabled ? { lootPresentation: 'queue' as const, levelUpPausesEnabled: false, levelUpPresentation: state.meta.levelUpPresentation === 'random-live' ? 'random-live' as const : 'compact-live' as const } : {}) } };
+    case 'setLootPresentation':
+      return { ...state, meta: { ...state.meta, lootPresentation: action.value } };
+    case 'setLevelUpPresentation':
+      return { ...state, meta: { ...state.meta, levelUpPresentation: action.value, levelUpPausesEnabled: action.value === 'pause-focus' } };
+    case 'setPauseMapVisible':
+      return { ...state, meta: { ...state.meta, pauseMapVisible: action.enabled } };
 
     case 'setWildlifeSheltersInRain':
       return {
@@ -1537,6 +1560,10 @@ export interface MetaContextValue {
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
+  setLiveMode: (enabled: boolean) => void;
+  setLootPresentation: (value: MetaState['lootPresentation']) => void;
+  setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
+  setPauseMapVisible: (enabled: boolean) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
@@ -1606,6 +1633,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setLevelUpPauses', enabled }),
     [],
   );
+  const setLiveMode = useCallback((enabled: boolean) => dispatch({ type: 'setLiveMode', enabled }), []);
+  const setLootPresentation = useCallback((value: MetaState['lootPresentation']) => dispatch({ type: 'setLootPresentation', value }), []);
+  const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
+  const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
   const setWildlifeSheltersInRain = useCallback(
     (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
     [],
@@ -1719,6 +1750,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
       setLevelUpPauses,
+      setLiveMode,
+      setLootPresentation,
+      setLevelUpPresentation,
+      setPauseMapVisible,
       setWildlifeSheltersInRain,
       setMinimapVisible,
       setMusicReactive,
@@ -1765,6 +1800,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
     setLevelUpPauses,
+    setLiveMode,
+    setLootPresentation,
+    setLevelUpPresentation,
+    setPauseMapVisible,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMusicReactive,

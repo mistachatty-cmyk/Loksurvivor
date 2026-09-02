@@ -120,6 +120,9 @@ export const UI_THEMES: UIThemeDef[] = [
       { id: 'porch-teal', name: 'Porch Teal', primaryHsl: '166 88% 58%' },
     ],
   },
+  { id: 'signal-garden', name: 'Signal Garden', description: 'Botanical field notes crossed with luminous radio diagrams.', cost: 3600, swatches: [{ id: 'fern-signal', name: 'Fern Signal', primaryHsl: '145 76% 58%' }, { id: 'orchid-band', name: 'Orchid Band', primaryHsl: '292 82% 70%' }, { id: 'pollen-gold', name: 'Pollen Gold', primaryHsl: '46 96% 62%' }] },
+  { id: 'night-bus', name: 'Night Bus', description: 'Transit vinyl, dim route displays and rainy-window color.', cost: 4000, swatches: [{ id: 'route-amber', name: 'Route Amber', primaryHsl: '35 100% 60%' }, { id: 'transfer-blue', name: 'Transfer Blue', primaryHsl: '211 92% 68%' }, { id: 'seat-plum', name: 'Seat Plum', primaryHsl: '313 63% 68%' }] },
+  { id: 'impossible-manual', name: 'Impossible Manual', description: 'A technical manual for machinery that never existed.', cost: 4400, swatches: [{ id: 'diagram-cyan', name: 'Diagram Cyan', primaryHsl: '188 94% 65%' }, { id: 'warning-rose', name: 'Warning Rose', primaryHsl: '347 92% 68%' }, { id: 'annotation-lime', name: 'Annotation Lime', primaryHsl: '83 88% 62%' }] },
 ];
 
 export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(

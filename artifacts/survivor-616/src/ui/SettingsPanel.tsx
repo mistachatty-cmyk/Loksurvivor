@@ -43,7 +43,10 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
   const {
     meta,
     setPhysicsObjectClicks,
-    setLevelUpPauses,
+    setLiveMode,
+    setLootPresentation,
+    setLevelUpPresentation,
+    setPauseMapVisible,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
@@ -108,36 +111,28 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
             <div className="min-w-0 flex-1">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Level-up flow</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Keep the run moving</h2>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run presentation</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Live Mode</h2>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Choose whether leveling up pauses the action. Continuous mode keeps your character moving while the
-                    upgrade cards wait in the lower-left corner.
+                    Keep combat live while reward choices and chest reveals stay in the screen edges. Manual pause still opens the tactical dashboard.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setLevelUpPauses(!meta.levelUpPausesEnabled)}
-                  aria-pressed={!meta.levelUpPausesEnabled}
+                  onClick={() => setLiveMode(!meta.liveModeEnabled)}
+                  aria-pressed={meta.liveModeEnabled}
                   className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.levelUpPausesEnabled
-                      ? 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                      : 'border-primary bg-primary text-primary-foreground'
+                    meta.liveModeEnabled ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
                   }`}
-                  data-testid="button-toggle-continuous-levelups"
+                  data-testid="button-toggle-live-mode"
                 >
-                  {meta.levelUpPausesEnabled ? 'Pause on level-up' : 'Keep moving'}
+                  {meta.liveModeEnabled ? 'Live on' : 'Live off'}
                 </button>
               </div>
-              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <PauseCircle className="h-4 w-4 text-primary" />
-                  <span>Pause mode gives you a quiet moment to compare each card.</span>
-                </div>
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <LayoutDashboard className="h-4 w-4 text-primary" />
-                  <span>Continuous mode keeps enemies, hazards, and movement active.</span>
-                </div>
+              <div className="mt-5 space-y-3 text-xs text-muted-foreground">
+                <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
+                <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
+                <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
               </div>
             </div>
           </div>
