@@ -3,15 +3,15 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
-import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { getRunAuraStyle } from '@/game/data/runAuras';
+import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
@@ -128,7 +128,6 @@ export function RunScreen({
     setMinimapExpanded,
     setMinimapPosition,
   } = useMeta();
-  const musicPlayer = useMusicPlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const phaseRef = useRef<RunPhase>('countdown');
@@ -154,10 +153,11 @@ export function RunScreen({
   const [reel, setReel] = useState<ReelState | null>(null);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const [hudMinimized, setHudMinimized] = useState(false);
-  const [levelUpMinimized, setLevelUpMinimized] = useState(false);
+  const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
   const [randomUpgradeReveal, setRandomUpgradeReveal] = useState<RandomUpgradeReveal | null>(null);
   const [liveDashboardOpen, setLiveDashboardOpen] = useState(false);
+  const [hudIntelOpen, setHudIntelOpen] = useState(false);
   const reelTimerRef = useRef<number | null>(null);
   const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
   const levelUpPausesRef = useRef(meta.levelUpPresentation === 'pause-focus' && !meta.liveModeEnabled);
@@ -636,10 +636,8 @@ export function RunScreen({
   const xpPct = hud ? (hud.xp / Math.max(1, hud.xpToNext)) * 100 : 0;
   const timeLeft = hud && !area.endless ? Math.max(0, hud.durationSec - hud.elapsedSec) : 0;
   const blocksWalked = hud?.endless?.blocksWalked ?? 0;
-  const distancePx = hud?.endless?.distancePx ?? 0;
-  const dungeonDepth = hud?.endless?.dungeonDepth ?? 0;
-  const inDungeon = hud?.endless?.inDungeon ?? false;
-  const dungeonEraName = hud?.endless?.dungeonEraName ?? '';
+  const primaryHudSignal = selectPrimaryRunHudSignal(hud, challenges.map((challenge) => challenge.name));
+  const hudIntelItems = runHudIntelCount(hud, challenges.length);
 
   return (
     <div
@@ -663,12 +661,16 @@ export function RunScreen({
       />
 
       {/* Top HUD */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-40 space-y-1.5 p-2">
-        <div className="flex items-start gap-2">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-40 p-1"
+        style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))', paddingLeft: 'max(0.25rem, env(safe-area-inset-left))', paddingRight: 'max(0.25rem, env(safe-area-inset-right))' }}
+        data-testid="run-hud-safe-zone"
+      >
+        <div className="flex h-8 items-start gap-1.5">
           <button
             type="button"
             onClick={() => setHudMinimized((v) => !v)}
-            className="pointer-events-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border border-white/20 bg-black/70 text-white/70"
+            className="pointer-events-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-white/20 bg-black/75 text-white/70"
             data-testid="button-hud-minimize"
             aria-label={hudMinimized ? 'Expand HUD' : 'Minimize HUD'}
           >
@@ -676,31 +678,31 @@ export function RunScreen({
           </button>
 
           {hudMinimized ? (
-            <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/80" data-testid="hud-minimized">
-              <span className="rounded-sm border border-white/20 bg-black/70 px-1.5 py-0.5" data-testid="text-level">Lv {hud?.level ?? 1}</span>
-              <span className="h-1.5 w-16 overflow-hidden rounded-sm border border-black/60 bg-black/60">
+            <div className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wider text-white/80" data-testid="hud-minimized">
+              <span className="rounded-sm border border-white/20 bg-black/75 px-1 py-px" data-testid="text-level">L{hud?.level ?? 1}</span>
+              <span className="h-1 w-12 overflow-hidden bg-black/70">
                 <span className="block h-full bg-[#ff4d5e]" style={{ width: `${hpPct}%` }} />
               </span>
             </div>
           ) : (
-            <div className="min-w-0 flex-1 max-w-[min(55vw,180px)] space-y-1">
-              <div className="h-1.5 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+            <div className="min-w-0 flex-1 max-w-[min(42vw,170px)] space-y-0.5">
+              <div className="h-1 w-full overflow-hidden bg-black/70">
                 <div
                   className="h-full bg-[#ff4d5e] transition-[width] duration-150"
                   style={{ width: `${hpPct}%` }}
                   data-testid="bar-health"
                 />
               </div>
-              <div className="h-1 w-full overflow-hidden rounded-sm border border-black/60 bg-black/60">
+              <div className="h-0.5 w-full overflow-hidden bg-black/70">
                 <div
                   className="h-full bg-[#6ee7ff] transition-[width] duration-150"
                   style={{ width: `${xpPct}%` }}
                   data-testid="bar-xp"
                 />
               </div>
-              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-white/80">
+              <div className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-wider text-white/80">
                 <span data-testid="text-level">Lv {hud?.level ?? 1}</span>
-                <span data-testid="text-kills">{hud?.kills ?? 0} down</span>
+                <span data-testid="text-kills">{hud?.kills ?? 0} K</span>
                 <span className="truncate">
                   {area.endless && hud?.endless
                     ? hud.endless.inBuilding
@@ -712,40 +714,18 @@ export function RunScreen({
             </div>
           )}
 
-          <div className={`ml-auto flex flex-col items-end gap-1.5 ${musicPlayer.currentTrack ? 'mt-12' : ''}`}>
-            <div className="rounded-sm border border-white/20 bg-black/70 px-2 py-0.5 font-mono text-sm font-bold text-white tabular-nums" data-testid="text-timer">
+          <div className="ml-auto flex h-7 items-start gap-1">
+            <div className="rounded-sm border border-white/20 bg-black/75 px-1.5 py-0.5 font-mono text-[11px] font-bold text-white tabular-nums" data-testid="text-timer">
               {area.endless ? `${blocksWalked} blk` : formatClock(timeLeft)}
             </div>
-            {!hudMinimized && area.endless && hud?.endless && (
-              <div className="font-mono text-[10px] uppercase tracking-widest text-primary/80 bg-black/60 px-2 py-0.5 border border-primary/20">
-                {inDungeon
-                  ? `${dungeonEraName} · room ${hud.endless.dungeonRoom}/3`
-                  : hud.endless.inBuilding
-                    ? 'Interior route · find the lit door out'
-                    : hud.endless.routeEvent?.phase === 'available'
-                      ? (
-                        <span className="flex max-w-[18rem] flex-col items-end gap-0.5 text-right">
-                          <span>Beacon ahead · {hud.endless.routeEvent.title}</span>
-                          <span className="text-[9px] normal-case tracking-normal text-white/60">
-                            {hud.endless.routeEvent.description} · +{hud.endless.routeEvent.rewardCred} cred · {hud.endless.routeEvent.rewardTokens} token{hud.endless.routeEvent.rewardTokens === 1 ? '' : 's'}
-                          </span>
-                        </span>
-                      )
-                      : dungeonDepth > 0
-                      ? `Depth ${dungeonDepth}`
-                      : 'Street grid · explore the block'}
-              </div>
-            )}
-            {!hudMinimized && area.endless && hud?.endless && !inDungeon && !hud.endless.inBuilding ? (
-              <div className="font-mono text-[9px] uppercase tracking-widest text-white/50">
-                {distancePx.toLocaleString()} units · {hud.endless.riskLabel}
-              </div>
-            ) : null}
+            <button type="button" onClick={() => setHudIntelOpen((open) => !open)} className="pointer-events-auto flex h-6 items-center gap-1 border border-cyan-200/25 bg-black/75 px-1.5 font-mono text-[8px] uppercase tracking-wider text-cyan-100" aria-expanded={hudIntelOpen} data-testid="button-run-intel">
+              Intel {hudIntelItems}{hudIntelOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>
             {phase === 'playing' || phase === 'paused' ? (
               <button
                 type="button"
                 onClick={() => meta.liveModeEnabled && phase === 'playing' ? setLiveDashboardOpen((open) => !open) : setPhaseBoth(phase === 'playing' ? 'paused' : 'playing')}
-                className="pointer-events-auto rounded-sm border border-white/20 bg-black/70 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-white/80"
+                className="pointer-events-auto h-6 rounded-sm border border-white/20 bg-black/75 px-1.5 font-mono text-[8px] uppercase tracking-wider text-white/80"
                 data-testid="button-pause"
               >
                 {meta.liveModeEnabled && phase === 'playing' ? (liveDashboardOpen ? 'Close' : 'Tactics') : phase === 'paused' ? 'Resume' : 'Pause'}
@@ -753,6 +733,25 @@ export function RunScreen({
             ) : null}
           </div>
         </div>
+
+        {primaryHudSignal ? (
+          <div
+            className="absolute left-1/2 top-[max(2.15rem,calc(env(safe-area-inset-top)+2rem))] flex h-6 w-[min(62vw,310px)] -translate-x-1/2 items-center justify-center gap-1.5 overflow-hidden border bg-black/78 px-2 font-mono text-[8px] font-bold uppercase tracking-wider shadow-sm"
+            style={{ borderColor: `${primaryHudSignal.accent}66`, color: primaryHudSignal.accent }}
+            data-testid="run-hud-primary-signal"
+            aria-live={primaryHudSignal.urgent ? 'assertive' : 'polite'}
+          >
+            <span className="truncate">{primaryHudSignal.label}</span>
+            {primaryHudSignal.detail ? <span className="max-w-[42%] shrink-0 truncate text-white/55">{primaryHudSignal.detail}</span> : null}
+          </div>
+        ) : null}
+
+        {hudIntelOpen ? (
+          <aside
+            className="pointer-events-auto absolute right-1 top-[max(2.15rem,calc(env(safe-area-inset-top)+2rem))] max-h-[min(56dvh,430px)] w-[min(78vw,300px)] space-y-1 overflow-y-auto overscroll-contain border border-cyan-200/25 bg-[#050911]/94 p-1.5 shadow-[0_0_24px_rgba(0,0,0,.45)]"
+            data-testid="run-intel-drawer"
+            aria-label="Run details"
+          >
 
         {hud?.rescueAvailable ? (
           <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
@@ -938,6 +937,8 @@ export function RunScreen({
             })}
           </div>
         ) : null}
+          </aside>
+        ) : null}
       </div>
 
       {area.endless && hud?.endless && meta.minimapVisible ? (
@@ -955,7 +956,7 @@ export function RunScreen({
         type="button"
         onClick={triggerUltimate}
         disabled={(hud?.ultimateReadyPct ?? 0) < 100}
-        className="absolute bottom-8 right-6 h-20 w-20 rounded-full border-2 border-white/25 bg-black/70 font-mono text-[10px] uppercase leading-tight tracking-widest text-white disabled:opacity-45"
+        className="absolute bottom-5 right-3 h-16 w-16 rounded-full border-2 border-white/25 bg-black/75 font-mono text-[8px] uppercase leading-tight tracking-wider text-white disabled:opacity-45 sm:bottom-8 sm:right-6 sm:h-20 sm:w-20 sm:text-[10px]"
         style={{
           background:
             hud && hud.ultimateReadyPct >= 100
@@ -972,7 +973,7 @@ export function RunScreen({
         type="button"
         onClick={openQueuedPrize}
         disabled={queuedPrizes.length === 0 || Boolean(reel)}
-        className="absolute bottom-3 left-1/2 z-40 -translate-x-1/2 border border-blue-300/50 bg-[#071225]/90 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
+        className="absolute bottom-2 left-1/2 z-40 h-7 -translate-x-1/2 border border-blue-300/50 bg-[#071225]/90 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
         data-testid="button-loot-tray"
         aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
       >
@@ -1207,7 +1208,7 @@ export function RunScreen({
       {/* Loot box reel overlay */}
       {reel ? (
         <div
-          className={meta.liveModeEnabled ? 'absolute bottom-24 right-3 z-50 flex w-[min(70vw,300px)] flex-col items-center justify-center border border-blue-300/45 bg-black/90 p-3 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/92'}
+          className={meta.liveModeEnabled ? 'absolute bottom-20 right-2 z-50 flex max-h-[42dvh] w-[min(58vw,220px)] flex-col items-center justify-center overflow-y-auto border border-blue-300/45 bg-black/90 p-2 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/92'}
           data-testid="overlay-reel"
         >
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.4em] text-white/50">Blue Box</p>
@@ -1244,13 +1245,13 @@ export function RunScreen({
           {reel.phase === 'landed' ? (
             <div className="mb-6 text-center">
               <p
-                className="text-3xl font-black uppercase tracking-wide"
+                className={`${meta.liveModeEnabled ? 'text-lg' : 'text-3xl'} font-black uppercase tracking-wide`}
                 style={{ color: REEL_FACES[reel.faceIndex]?.color ?? '#3b82f6' }}
               >
                 {reel.prize.label}
               </p>
               {reel.prize.lokPet ? (
-                <div className="mt-3 border border-pink-400/30 bg-pink-400/5 px-4 py-3 text-left font-mono text-[11px] uppercase tracking-widest text-white/80">
+                <div className={`${meta.liveModeEnabled ? 'mt-1 px-2 py-1 text-[8px]' : 'mt-3 px-4 py-3 text-[11px]'} border border-pink-400/30 bg-pink-400/5 text-left font-mono uppercase tracking-widest text-white/80`}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-black text-pink-200">{reel.prize.lokPet.rarityLabel} {reel.prize.lokPet.family} signal</span>
                     <span className="text-pink-300">{reel.prize.lokPet.elementLabel}</span>
@@ -1259,7 +1260,7 @@ export function RunScreen({
                   <p className="mt-1 text-[9px] text-pink-100/70">
                     {reel.prize.lokPet.stats.damage} dmg · {reel.prize.lokPet.stats.cooldownMs}ms cadence · {reel.prize.lokPet.stats.range} range · {Math.round(reel.prize.lokPet.stats.lifetimeMs / 1000)}s lifespan
                   </p>
-                  <p className="mt-1 text-[9px] text-white/50">{reel.prize.lokPet.description}</p>
+                  {!meta.liveModeEnabled ? <p className="mt-1 text-[9px] text-white/50">{reel.prize.lokPet.description}</p> : null}
                 </div>
               ) : null}
               <p className="mt-1 font-mono text-xs text-white/40">already applied — you keep it</p>
@@ -1281,8 +1282,8 @@ export function RunScreen({
 
       {/* Dungeon transition flash */}
       {dungeonTransition ? (
-        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-black/80">
-          <p className="font-mono text-xs uppercase tracking-[0.4em] text-white/70">
+        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center">
+          <p className="border border-white/20 bg-black/82 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.28em] text-white/75 shadow-lg">
             {dungeonTransition === 'enter' ? 'Going down...' : 'Back on the block'}
           </p>
         </div>

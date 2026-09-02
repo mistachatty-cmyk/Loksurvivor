@@ -17,7 +17,7 @@ export function ChestTally({ count }: ChestTallyProps) {
 
   return (
     <div
-      className="absolute bottom-3 right-28 z-30 flex h-12 w-12 items-center justify-center rounded-full border-[3px] shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+      className="absolute bottom-3 right-20 z-30 flex h-9 w-9 items-center justify-center rounded-full border-2 shadow-[0_0_10px_rgba(0,0,0,0.5)] sm:right-28 sm:h-12 sm:w-12 sm:border-[3px]"
       style={{
         borderColor: '#d4af37',
         background: 'radial-gradient(circle at 35% 30%, #7a4a26, #4a2c14 70%)',
