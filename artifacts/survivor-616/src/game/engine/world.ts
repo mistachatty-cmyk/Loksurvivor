@@ -42,6 +42,7 @@ import type {
   EvolutionBehavior,
   EvolutionDef,
   HudSnapshot,
+  HatStyle,
   LootPrizeDef,
   LokPetInstance,
   LokPetRoll,
@@ -662,6 +663,8 @@ export interface World {
   wildlifeSheltersInRain: boolean;
   /** Procedural player aura selected in the hideout; visual only. */
   runAuraStyle: RunAuraStyle;
+  /** Floating headwear selected in the hideout; visual only. */
+  hatStyle: HatStyle;
   /** Optional animated flourish supplied by the active palette; visual only. */
   paletteEffect?: PaletteEffectDef;
   /** Optional difficulty contracts selected before the run. */
@@ -784,6 +787,7 @@ export function createWorld(
     minimapLootSense?: boolean;
     minimapHazardSense?: boolean;
     runAuraStyle?: RunAuraStyle;
+    hatStyle?: HatStyle;
     paletteEffect?: PaletteEffectDef;
     /** Progression-aware rescue selected by the meta layer. Undefined means this route is complete. */
     rescueAllyId?: string | undefined;
@@ -912,6 +916,7 @@ export function createWorld(
     minimapHazardSense: setup.minimapHazardSense ?? false,
     wildlifeSheltersInRain: setup.wildlifeSheltersInRain !== false,
     runAuraStyle: setup.runAuraStyle ?? 'street-halo',
+    hatStyle: setup.hatStyle ?? 'none',
     paletteEffect: setup.paletteEffect,
     challenges: [...challenges],
     activeCrewRumor: activeCrewRumor ? { ...activeCrewRumor } : null,

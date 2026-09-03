@@ -1,6 +1,8 @@
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { RUN_AURAS } from '@/game/data/runAuras';
+import { HATS } from '@/game/data/hats';
+import { CELEBRATIONS } from '@/game/data/celebrations';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { UI_THEMES } from '@/game/data/uiThemes';
 import { HUB_ROOMS } from '@/game/data/progression';
@@ -17,6 +19,8 @@ export const DEV_UNLOCK_REGISTRY = {
   uiThemes: UI_THEMES.map((item) => item.id),
   palettes: THEMED_PALETTES.map((item) => item.id),
   runAuras: RUN_AURAS.map((item) => item.id),
+  hats: HATS.map((item) => item.id),
+  celebrations: CELEBRATIONS.map((item) => item.id),
 } as const;
 
 export type DevUnlockCatalog = keyof typeof DEV_UNLOCK_REGISTRY;

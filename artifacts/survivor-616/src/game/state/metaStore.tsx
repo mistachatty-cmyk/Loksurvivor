@@ -53,6 +53,8 @@ import {
 } from '@/game/data/uiThemes';
 import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
+import { DEFAULT_HAT_ID, HATS, HATS_BY_ID } from '@/game/data/hats';
+import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game/data/celebrations';
 import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
@@ -83,7 +85,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 13;
+const META_VERSION = 14;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -198,6 +200,10 @@ export function createInitialMeta(): MetaState {
     activePaletteId: DEFAULT_PALETTE_ID,
     ownedRunAuraIds: [DEFAULT_RUN_AURA_ID],
     activeRunAuraId: DEFAULT_RUN_AURA_ID,
+    ownedHatIds: [DEFAULT_HAT_ID],
+    activeHatId: DEFAULT_HAT_ID,
+    ownedCelebrationIds: [DEFAULT_CELEBRATION_ID],
+    activeCelebrationId: DEFAULT_CELEBRATION_ID,
     dailyContractDayKey: contractDayKey(),
     dailyContractProgressById: {},
     completedDailyContractIds: [],
@@ -302,6 +308,14 @@ function normalizeOwnedRunAuraIds(value: unknown): string[] {
 
 function normalizeRunAuraId(value: unknown, ownedRunAuraIds: string[]): string {
   return typeof value === 'string' && ownedRunAuraIds.includes(value) ? value : DEFAULT_RUN_AURA_ID;
+}
+
+function normalizeOwnedIds(value: unknown, ids: string[], defaultId: string): string[] {
+  return idList(value, new Set(ids), [defaultId]);
+}
+
+function normalizeOwnedCosmeticId(value: unknown, ownedIds: string[], defaultId: string): string {
+  return typeof value === 'string' && ownedIds.includes(value) ? value : defaultId;
 }
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
@@ -666,6 +680,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const customMaps = normalizeCustomMaps(parsed.customMaps);
   const ownedUiThemeIds = normalizeOwnedUiThemeIds(parsed.ownedUiThemeIds);
   const ownedRunAuraIds = normalizeOwnedRunAuraIds(parsed.ownedRunAuraIds);
+  const ownedHatIds = normalizeOwnedIds(parsed.ownedHatIds, HATS.map((hat) => hat.id), DEFAULT_HAT_ID);
+  const ownedCelebrationIds = normalizeOwnedIds(parsed.ownedCelebrationIds, CELEBRATIONS.map((entry) => entry.id), DEFAULT_CELEBRATION_ID);
   const today = contractDayKey();
   const savedContractDay = typeof parsed.dailyContractDayKey === 'string' ? parsed.dailyContractDayKey : today;
   const dailyContractDayKey = savedContractDay === today ? savedContractDay : today;
@@ -770,6 +786,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
     ownedRunAuraIds,
     activeRunAuraId: normalizeRunAuraId(parsed.activeRunAuraId, ownedRunAuraIds),
+    ownedHatIds,
+    activeHatId: normalizeOwnedCosmeticId(parsed.activeHatId, ownedHatIds, DEFAULT_HAT_ID),
+    ownedCelebrationIds,
+    activeCelebrationId: normalizeOwnedCosmeticId(parsed.activeCelebrationId, ownedCelebrationIds, DEFAULT_CELEBRATION_ID),
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
@@ -783,7 +803,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 12 && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 13 && parsed.version !== 12 && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -1024,6 +1044,10 @@ type Action =
   | { type: 'equipPalette'; id: string }
   | { type: 'buyRunAura'; id: string }
   | { type: 'equipRunAura'; id: string }
+  | { type: 'buyHat'; id: string }
+  | { type: 'equipHat'; id: string }
+  | { type: 'buyCelebration'; id: string }
+  | { type: 'equipCelebration'; id: string }
   | { type: 'cycleUiLook' }
   | { type: 'unlockDevModeAccess' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
@@ -1244,6 +1268,23 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'equipRunAura':
       if (!hasCatalogItem(state.meta, 'runAuras', action.id, state.meta.ownedRunAuraIds)) return state;
       return { ...state, meta: { ...state.meta, activeRunAuraId: action.id } };
+
+    case 'buyHat': {
+      const hat = HATS_BY_ID[action.id];
+      if (!hat || state.meta.ownedHatIds.includes(hat.id) || state.meta.lootTokens < hat.cost) return state;
+      return { ...state, meta: { ...state.meta, lootTokens: state.meta.lootTokens - hat.cost, ownedHatIds: [...state.meta.ownedHatIds, hat.id] } };
+    }
+    case 'equipHat':
+      if (!hasCatalogItem(state.meta, 'hats', action.id, state.meta.ownedHatIds)) return state;
+      return { ...state, meta: { ...state.meta, activeHatId: action.id } };
+    case 'buyCelebration': {
+      const celebration = CELEBRATIONS_BY_ID[action.id];
+      if (!celebration || state.meta.ownedCelebrationIds.includes(celebration.id) || state.meta.lootTokens < celebration.cost) return state;
+      return { ...state, meta: { ...state.meta, lootTokens: state.meta.lootTokens - celebration.cost, ownedCelebrationIds: [...state.meta.ownedCelebrationIds, celebration.id] } };
+    }
+    case 'equipCelebration':
+      if (!hasCatalogItem(state.meta, 'celebrations', action.id, state.meta.ownedCelebrationIds)) return state;
+      return { ...state, meta: { ...state.meta, activeCelebrationId: action.id } };
 
     case 'cycleUiLook': {
       const looks = uiLooksForOwnedThemeIds(effectiveCatalogIds(state.meta, 'uiThemes', state.meta.ownedUiThemeIds));
@@ -1642,6 +1683,10 @@ export interface MetaContextValue {
   equipPalette: (id: string) => void;
   buyRunAura: (id: string) => void;
   equipRunAura: (id: string) => void;
+  buyHat: (id: string) => void;
+  equipHat: (id: string) => void;
+  buyCelebration: (id: string) => void;
+  equipCelebration: (id: string) => void;
   cycleUiLook: () => void;
   unlockDevModeAccess: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
@@ -1709,6 +1754,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
   const buyRunAura = useCallback((id: string) => dispatch({ type: 'buyRunAura', id }), []);
   const equipRunAura = useCallback((id: string) => dispatch({ type: 'equipRunAura', id }), []);
+  const buyHat = useCallback((id: string) => dispatch({ type: 'buyHat', id }), []);
+  const equipHat = useCallback((id: string) => dispatch({ type: 'equipHat', id }), []);
+  const buyCelebration = useCallback((id: string) => dispatch({ type: 'buyCelebration', id }), []);
+  const equipCelebration = useCallback((id: string) => dispatch({ type: 'equipCelebration', id }), []);
   const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
   const unlockDevModeAccess = useCallback(() => dispatch({ type: 'unlockDevModeAccess' }), []);
   const setDevModeAllUnlocks = useCallback(
@@ -1838,6 +1887,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       equipPalette,
       buyRunAura,
       equipRunAura,
+      buyHat,
+      equipHat,
+      buyCelebration,
+      equipCelebration,
       cycleUiLook,
       unlockDevModeAccess,
       setDevModeAllUnlocks,
@@ -1891,6 +1944,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     equipPalette,
     buyRunAura,
     equipRunAura,
+    buyHat,
+    equipHat,
+    buyCelebration,
+    equipCelebration,
     cycleUiLook,
     unlockDevModeAccess,
     setDevModeAllUnlocks,

@@ -2642,6 +2642,107 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
             : undefined,
       },
     );
+
+    // The base aura stays on the ground for readable movement, while this
+    // second layer makes the selected aura clearly wrap the fighter too.
+    // It is rendered after the rig so it reads as an intentional cosmetic,
+    // not as a floor decal hidden beneath the player.
+    ctx.save();
+    const headY = p.y - 22 * w.playerSizeMult + fallProgress * 12;
+    const overheadRadius = (p.radius + 11) * w.playerSizeMult;
+    ctx.strokeStyle = accent;
+    ctx.fillStyle = glow;
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 8;
+    if (w.runAuraStyle === 'street-halo') {
+      ctx.globalAlpha = 0.58 + Math.sin(phase * 3) * 0.15;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.ellipse(p.x, headY - 3, overheadRadius, overheadRadius * 0.3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (w.runAuraStyle === 'radar-sweep') {
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.arc(p.x, headY, overheadRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const scan = phase * 3;
+      ctx.beginPath();
+      ctx.moveTo(p.x, headY);
+      ctx.lineTo(p.x + Math.cos(scan) * overheadRadius, headY + Math.sin(scan) * overheadRadius);
+      ctx.stroke();
+    } else if (w.runAuraStyle === 'ember-orbit') {
+      for (let i = 0; i < 3; i += 1) {
+        const angle = phase * 3.2 + (i * Math.PI * 2) / 3;
+        ctx.globalAlpha = 0.65 + Math.sin(phase * 7 + i) * 0.2;
+        ctx.beginPath();
+        ctx.arc(p.x + Math.cos(angle) * overheadRadius, headY + Math.sin(angle) * (overheadRadius * 0.55), 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (w.runAuraStyle === 'rain-signal') {
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1.4;
+      for (let i = -2; i <= 2; i += 1) {
+        const drift = (phase * 22 + i * 8) % 16;
+        ctx.beginPath();
+        ctx.moveTo(p.x + i * 7 + 2, headY - 14 + drift);
+        ctx.lineTo(p.x + i * 7 - 2, headY - 8 + drift);
+        ctx.stroke();
+      }
+    } else if (w.runAuraStyle === 'glitch-echo') {
+      ctx.globalAlpha = 0.34;
+      ctx.lineWidth = 1.4;
+      for (let i = 0; i < 3; i += 1) {
+        const jitter = Math.sin(phase * 15 + i) * 4;
+        ctx.strokeRect(p.x - overheadRadius + jitter, headY - 9 + i * 6, overheadRadius * 2, 2);
+      }
+    } else if (w.runAuraStyle === 'mothlight') {
+      for (let i = 0; i < 4; i += 1) {
+        const angle = phase * (1.2 + i * 0.1) + i * 1.6;
+        ctx.globalAlpha = 0.45 + Math.sin(phase * 4 + i) * 0.2;
+        ctx.save();
+        ctx.translate(p.x + Math.cos(angle) * overheadRadius, headY + Math.sin(angle * 1.3) * (overheadRadius * 0.65));
+        ctx.rotate(angle);
+        ctx.fillRect(-2, -1, 4, 2);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+
+    // Hats deliberately hover above every rig instead of being attached to a
+    // specific head shape. This keeps the first collection readable across
+    // the full roster and leaves room for character-specific fitting later.
+    if (w.hatStyle !== 'none') {
+      ctx.save();
+      const hatY = headY - 13 - Math.sin(phase * 2.4) * 1.8;
+      ctx.translate(p.x, hatY);
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = w.character.palette.accentBright;
+      ctx.strokeStyle = w.character.palette.glow;
+      ctx.shadowColor = w.character.palette.glow;
+      ctx.shadowBlur = 9;
+      ctx.lineWidth = 1.5;
+      if (w.hatStyle === 'top-hat') {
+        ctx.fillRect(-6, -8, 12, 7); ctx.fillRect(-9, -1, 18, 2);
+      } else if (w.hatStyle === 'halo') {
+        ctx.beginPath(); ctx.ellipse(0, 0, 9, 3, 0, 0, Math.PI * 2); ctx.stroke();
+      } else if (w.hatStyle === 'crown') {
+        ctx.beginPath(); ctx.moveTo(-8, 3); ctx.lineTo(-7, -6); ctx.lineTo(-2, -1); ctx.lineTo(0, -8); ctx.lineTo(3, -1); ctx.lineTo(8, -6); ctx.lineTo(8, 3); ctx.closePath(); ctx.fill();
+      } else if (w.hatStyle === 'satellite') {
+        ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(0, 0, 9, -0.9, 0.9); ctx.stroke();
+      } else if (w.hatStyle === 'rain-cloud') {
+        ctx.beginPath(); ctx.arc(-4, 0, 4, 0, Math.PI * 2); ctx.arc(1, -2, 5, 0, Math.PI * 2); ctx.arc(6, 1, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(-7, 0, 16, 3);
+      } else if (w.hatStyle === 'cone') {
+        ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(-7, 4); ctx.lineTo(7, 4); ctx.closePath(); ctx.fill();
+      } else if (w.hatStyle === 'orbital-eye') {
+        ctx.beginPath(); ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = w.character.palette.ink; ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+      } else if (w.hatStyle === 'moth-cap') {
+        ctx.fillRect(-7, -2, 14, 4); ctx.fillRect(-4, -6, 8, 4); ctx.beginPath(); ctx.arc(-7, -3, 3, 0, Math.PI * 2); ctx.arc(7, -3, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
   };
 
   for (const enemy of sorted) {

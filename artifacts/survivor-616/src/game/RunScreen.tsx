@@ -11,6 +11,8 @@ import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { getRunAuraStyle } from '@/game/data/runAuras';
+import { getCelebrationStyle } from '@/game/data/celebrations';
+import { getHatStyle } from '@/game/data/hats';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
@@ -244,6 +246,7 @@ export function RunScreen({
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
+        hatStyle: getHatStyle(meta.activeHatId),
         paletteEffect: prefersReducedMotion ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
@@ -702,12 +705,12 @@ export function RunScreen({
   const primaryHudSignal = selectPrimaryRunHudSignal(hud, challenges.map((challenge) => challenge.name));
   const hudIntelItems = runHudIntelCount(hud, challenges.length);
   const celebrationMarks = (() => {
-    switch (getRunAuraStyle(meta.activeRunAuraId)) {
-      case 'rain-signal': return ['│', '╎', '✦', '│', '╎', '✦', '│'];
-      case 'mothlight': return ['◇', '◈', '✧', '◇', '◈', '✧', '◇'];
-      case 'glitch-echo': return ['▣', '▥', '✦', '▣', '▥', '✦', '▣'];
-      case 'ember-orbit': return ['✦', '•', '✹', '✦', '•', '✹', '✦'];
-      default: return ['✦', '✧', '•', '✦', '✧', '•', '✦'];
+    switch (getCelebrationStyle(meta.activeCelebrationId)) {
+      case 'coin-burst': return ['●', '◉', '●', '✦', '◉', '●', '✦'];
+      case 'signal-hearts': return ['♥', '♡', '♥', '✧', '♡', '♥', '✧'];
+      case 'confetti-rain': return ['▰', '◆', '▴', '●', '✦', '◆', '▰'];
+      case 'moth-swarm': return ['◇', '◈', '✧', '◇', '◈', '✧', '◇'];
+      default: return ['✦', '✧', '★', '✦', '✧', '★', '✦'];
     }
   })();
 
