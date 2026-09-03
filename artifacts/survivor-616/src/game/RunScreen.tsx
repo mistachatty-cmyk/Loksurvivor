@@ -14,6 +14,7 @@ import { getRunAuraStyle } from '@/game/data/runAuras';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
+import { nextRescueAllyId } from '@/game/data/progression';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
@@ -158,6 +159,9 @@ export function RunScreen({
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
+  const [revealedPrizes, setRevealedPrizes] = useState<string[]>([]);
+  const [lootTrayOpen, setLootTrayOpen] = useState(false);
+  const [openingAllLoot, setOpeningAllLoot] = useState(false);
   const [randomUpgradeReveal, setRandomUpgradeReveal] = useState<RandomUpgradeReveal | null>(null);
   const [liveDashboardOpen, setLiveDashboardOpen] = useState(false);
   const [hudIntelOpen, setHudIntelOpen] = useState(false);
@@ -189,6 +193,10 @@ export function RunScreen({
       : { ...baseCharacter, palette: getActivePalette(meta.activePaletteId) ?? baseCharacter.palette };
   const firstNightChapter = getFirstNightChapter(areaId);
   const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
+  // Episodes have authored rescue objectives; their target takes priority
+  // over the normal rotating recruitment route.
+  const rescueAllyId = episode?.crewAllyId
+    ?? nextRescueAllyId(area.id, meta.rescuedAllyIds, area.rescueAllyId);
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
@@ -228,6 +236,7 @@ export function RunScreen({
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
         paletteEffect: prefersReducedMotion ? undefined : getThemePalette(meta.activePaletteId)?.effect,
+        rescueAllyId,
       },
     );
   }
@@ -573,11 +582,19 @@ export function RunScreen({
       const [prize, ...rest] = current;
       if (prize) {
         setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
+        setRevealedPrizes((history) => [prize.label, ...history].slice(0, 8));
         if (!meta.liveModeEnabled) setPhaseBoth('reel');
       }
       return rest;
     });
   }, [meta.liveModeEnabled, setPhaseBoth]);
+
+  const openAllQueuedPrizes = useCallback(() => {
+    if (reel || queuedPrizes.length === 0) return;
+    setLootTrayOpen(false);
+    setOpeningAllLoot(true);
+    openQueuedPrize();
+  }, [openQueuedPrize, queuedPrizes.length, reel]);
 
   /** A real ticking reel, rather than a timestamp sampled only during unrelated renders. */
   useEffect(() => {
@@ -585,6 +602,17 @@ export function RunScreen({
     const interval = window.setInterval(() => setReelTick((tick) => tick + 1), prefersReducedMotion ? 260 : 85);
     return () => window.clearInterval(interval);
   }, [reel?.phase, prefersReducedMotion]);
+
+  /** Chain short reveals for the player's explicit Open all action. */
+  useEffect(() => {
+    if (!openingAllLoot || reel) return;
+    if (queuedPrizes.length === 0) {
+      setOpeningAllLoot(false);
+      return;
+    }
+    const timer = window.setTimeout(openQueuedPrize, prefersReducedMotion ? 0 : 180);
+    return () => window.clearTimeout(timer);
+  }, [openingAllLoot, openQueuedPrize, prefersReducedMotion, queuedPrizes.length, reel]);
 
   useEffect(() => {
     if (!randomUpgradeReveal) return;
@@ -619,16 +647,16 @@ export function RunScreen({
       const t = window.setTimeout(() => {
         setReel((prev) => prev ? { ...prev, phase: 'landed' } : null);
         setCelebration(true);
-        // Auto-dismiss 2s after landing.
+        // Open-all stays brisk; a manually opened reward gets room to read.
         reelTimerRef.current = window.setTimeout(() => {
           setReel(null);
           if (phaseRef.current === 'reel') setPhaseBoth('playing');
-        }, 2200);
-      }, 1400);
+        }, openingAllLoot ? 650 : 2200);
+      }, openingAllLoot ? 450 : 1400);
       return () => window.clearTimeout(t);
     }
     return undefined;
-  }, [reel?.phase, setPhaseBoth]);
+  }, [openingAllLoot, reel?.phase, setPhaseBoth]);
 
   useEffect(() => {
     if (!celebration) return;
@@ -1000,16 +1028,38 @@ export function RunScreen({
       {chestFlight > 0 ? (
         <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
       ) : null}
-      <button
-        type="button"
-        onClick={openQueuedPrize}
-        disabled={queuedPrizes.length === 0 || Boolean(reel)}
-        className="absolute bottom-[5.25rem] right-2 z-40 flex h-8 w-16 items-center justify-center border border-blue-300/50 bg-[#071225]/92 px-1 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40 sm:bottom-[6.5rem] sm:right-5"
-        data-testid="button-loot-tray"
-        aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
-      >
-        ▣ {queuedPrizes.length} · Open
-      </button>
+      <div className="absolute bottom-[5.25rem] right-2 z-40 flex items-stretch sm:bottom-[6.5rem] sm:right-5">
+        <button
+          type="button"
+          onClick={openQueuedPrize}
+          disabled={queuedPrizes.length === 0 || Boolean(reel)}
+          className="flex h-8 w-16 items-center justify-center border border-blue-300/50 bg-[#071225]/92 px-1 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
+          data-testid="button-loot-tray"
+          aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
+        >
+          ▣ {queuedPrizes.length} · Open
+        </button>
+        <button
+          type="button"
+          onClick={() => setLootTrayOpen((open) => !open)}
+          className="h-8 border border-l-0 border-blue-300/50 bg-[#071225]/92 px-1.5 font-mono text-[10px] text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)]"
+          aria-expanded={lootTrayOpen}
+          aria-label="Loot pocket options"
+          data-testid="button-loot-tray-options"
+        >
+          {lootTrayOpen ? '⌃' : '⌄'}
+        </button>
+        {lootTrayOpen ? (
+          <aside className="absolute bottom-9 right-0 w-48 border border-blue-300/45 bg-[#050b16]/95 p-2 shadow-[0_0_24px_rgba(96,165,250,.2)]" aria-label="Loot pocket">
+            <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-wider text-blue-100"><span>Loot pocket</span><span>{queuedPrizes.length} waiting</span></div>
+            <div className="mt-2 grid grid-cols-2 gap-1">
+              <button type="button" onClick={() => { setLootTrayOpen(false); openQueuedPrize(); }} disabled={queuedPrizes.length === 0 || Boolean(reel)} className="border border-blue-200/30 px-2 py-1.5 font-mono text-[8px] uppercase text-blue-100 disabled:opacity-40">Open one</button>
+              <button type="button" onClick={openAllQueuedPrizes} disabled={queuedPrizes.length < 2 || Boolean(reel)} className="border border-amber-200/35 px-2 py-1.5 font-mono text-[8px] uppercase text-amber-100 disabled:opacity-40">Open all</button>
+            </div>
+            {revealedPrizes.length > 0 ? <div className="mt-2 border-t border-white/10 pt-1.5"><p className="font-mono text-[8px] uppercase tracking-wider text-white/45">This run</p><ul className="mt-1 space-y-0.5 font-mono text-[8px] text-white/75">{revealedPrizes.slice(0, 4).map((label, index) => <li key={`${label}-${index}`} className="truncate">{label}</li>)}</ul></div> : null}
+          </aside>
+        ) : null}
+      </div>
 
       {/* Virtual stick */}
       {stickVisual.active ? (

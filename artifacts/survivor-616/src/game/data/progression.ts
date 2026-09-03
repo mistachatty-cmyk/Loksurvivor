@@ -157,6 +157,28 @@ export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
   ALLIES.map((a) => [a.id, a]),
 );
 
+/**
+ * Each authored arena can return to the rescue route after its first ally is
+ * safe. This makes later crew recruitable through normal play instead of
+ * adding inaccessible records to the archive.
+ */
+export const RESCUE_ROUTE_BY_AREA: Record<string, string[]> = {
+  'monroe-strip': ['vee', 'pippa'],
+  rooftops: ['nyx', 'morrow'],
+  'crystal-cellar': ['sable', 'cinder'],
+};
+
+export function nextRescueAllyId(
+  areaId: string,
+  rescuedAllyIds: string[],
+  fallbackAllyId?: string,
+): string | undefined {
+  const rescued = new Set(rescuedAllyIds);
+  const route = RESCUE_ROUTE_BY_AREA[areaId];
+  if (route) return route.find((allyId) => !rescued.has(allyId));
+  return fallbackAllyId && !rescued.has(fallbackAllyId) ? fallbackAllyId : undefined;
+}
+
 /* ------------------------------------------------------------------ */
 /* Hideout rooms                                                       */
 /* ------------------------------------------------------------------ */
