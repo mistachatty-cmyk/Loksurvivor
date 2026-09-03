@@ -630,6 +630,8 @@ export interface World {
   ambientRng: () => number;
   /** Rebuilt every frame for enemy separation. */
   grid: Map<number, EnemyActor[]>;
+  /** Rebuilt whenever `obstacles` changes, for collideObstacles(). */
+  obstacleGrid: Map<number, Aabb[]>;
 
   /** Seed used to create rng; also forwarded to endless chunk generation. */
   rngSeed: number;
@@ -702,7 +704,13 @@ export interface World {
   };
 }
 
-const MAX_ENEMIES = 190;
+// Raised from 190 now that collision (collideObstacles/nearestEnemy) is
+// grid-scoped instead of full-array scans, the renderer culls off-screen
+// entities before any per-entity draw work, and per-actor shadow/glow
+// gradients are cached blobs instead of a fresh createRadialGradient() per
+// entity per frame -- the O(enemies x obstacles) and unculled-draw costs
+// that made a bigger swarm expensive no longer scale the same way.
+const MAX_ENEMIES = 320;
 const CELL = 48;
 
 /** Kill counts that drop a blue loot box (each fires once per run). */
@@ -880,6 +888,7 @@ export function createWorld(
     rng,
     ambientRng: createRng(seed + 0x5eed),
     grid: new Map(),
+    obstacleGrid: new Map(),
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
@@ -1005,6 +1014,7 @@ export function createWorld(
     rebuildOrbiters(world);
   }
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
+  rebuildObstacleGrid(world);
   return world;
 }
 
@@ -1155,6 +1165,51 @@ function forEachNearby(w: World, x: number, y: number, radius: number, fn: (e: E
       const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
       if (!bucket) continue;
       for (const enemy of bucket) fn(enemy);
+    }
+  }
+}
+
+/**
+ * Rebuild the obstacle spatial index. Unlike the enemy grid (rebuilt once a
+ * frame), obstacles only change on the handful of events that reassign
+ * `w.obstacles` (breaking a prop, streaming a new endless chunk, entering a
+ * dungeon room, ...), so this is called right after each of those instead
+ * of every frame -- collideObstacles() always sees a grid consistent with
+ * the current `w.obstacles`, with no added staleness.
+ */
+function rebuildObstacleGrid(w: World) {
+  w.obstacleGrid.clear();
+  for (const box of w.obstacles) {
+    const minX = Math.floor((box.x - box.w / 2) / CELL);
+    const maxX = Math.floor((box.x + box.w / 2) / CELL);
+    const minY = Math.floor((box.y - box.h / 2) / CELL);
+    const maxY = Math.floor((box.y + box.h / 2) / CELL);
+    for (let cx = minX; cx <= maxX; cx += 1) {
+      for (let cy = minY; cy <= maxY; cy += 1) {
+        const key = (cx + 512) * 4096 + (cy + 512);
+        const bucket = w.obstacleGrid.get(key);
+        if (bucket) bucket.push(box);
+        else w.obstacleGrid.set(key, [box]);
+      }
+    }
+  }
+}
+
+/** Obstacles overlapping `radius` around (x, y), each visited exactly once. */
+function forEachNearbyObstacle(w: World, x: number, y: number, radius: number, fn: (box: Aabb) => void) {
+  const cells = Math.ceil(radius / CELL);
+  const baseX = Math.floor(x / CELL);
+  const baseY = Math.floor(y / CELL);
+  const seen = new Set<Aabb>();
+  for (let ix = -cells; ix <= cells; ix += 1) {
+    for (let iy = -cells; iy <= cells; iy += 1) {
+      const bucket = w.obstacleGrid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+      if (!bucket) continue;
+      for (const box of bucket) {
+        if (seen.has(box)) continue;
+        seen.add(box);
+        fn(box);
+      }
     }
   }
 }
@@ -1637,7 +1692,9 @@ function spawnFollowers(w: World, weapon: WeaponDef) {
   spawnParticles(w, w.player.x, w.player.y, weapon.color ?? w.character.palette.accent, Math.min(10, spec.count * 2), 70);
 }
 
-const MAX_LOKPETS = 4;
+// Raised alongside MAX_ENEMIES for the same reason -- LokPet targeting
+// already goes through nearestEnemy(), so it inherits the grid-scoped fix.
+const MAX_LOKPETS = 8;
 const LOKPET_GHOST_AFTER_MS = 60_000;
 
 function lokPetStatusId(pet: LokPetInstance): string | undefined {
@@ -2306,18 +2363,21 @@ function rebuildOrbiters(w: World, runWeapon = w.weapons.find((entry) => entry.d
   }
 }
 
-function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?: Set<number>) {
+function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?: Set<number>): EnemyActor | null {
   let best: EnemyActor | null = null;
   let bestDist = maxRange * maxRange;
-  for (const enemy of w.enemies) {
-    if (enemy.dying) continue;
-    if (exclude?.has(enemy.uid)) continue;
+  // Grid-scoped instead of a full scan over w.enemies -- rebuildGrid() runs
+  // in updateEnemies() after every same-frame spawn source, so the grid is
+  // always current by the time weapon/projectile logic calls this.
+  forEachNearby(w, x, y, maxRange, (enemy) => {
+    if (enemy.dying) return;
+    if (exclude?.has(enemy.uid)) return;
     const d = dist2(enemy.x, enemy.y, x, y);
     if (d < bestDist) {
       bestDist = d;
       best = enemy;
     }
-  }
+  });
   return best;
 }
 
@@ -3019,12 +3079,17 @@ function clampToArena(w: World, actor: Actor) {
 }
 
 function collideObstacles(w: World, actor: Actor) {
-  for (const box of w.obstacles) {
+  // Obstacles are inserted into every grid cell their box spans (see
+  // rebuildObstacleGrid), so a search radius covering only the actor's own
+  // interaction range -- plus one cell of slack for grid quantization -- is
+  // enough to find every box that could actually touch it, regardless of
+  // how large that box is or how far its center sits from the actor.
+  forEachNearbyObstacle(w, actor.x, actor.y, actor.radius + 4 + CELL, (box) => {
     // Cheap reject before the precise test.
-    if (Math.abs(actor.x - box.x) > box.w / 2 + actor.radius + 4) continue;
-    if (Math.abs(actor.y - box.y) > box.h / 2 + actor.radius + 4) continue;
+    if (Math.abs(actor.x - box.x) > box.w / 2 + actor.radius + 4) return;
+    if (Math.abs(actor.y - box.y) > box.h / 2 + actor.radius + 4) return;
     resolveCircleBox(actor, actor.radius, box);
-  }
+  });
 }
 
 function activatePotholes(w: World, x: number, y: number, radius: number, trigger?: PotholeTrigger) {
@@ -3197,6 +3262,7 @@ function syncObstacleAabbs(w: World) {
   w.obstacles = w.breakables
     .filter((b) => !b.broken)
     .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+  rebuildObstacleGrid(w);
 }
 
 function damageBreakable(
@@ -5021,6 +5087,7 @@ function updateEndlessChunks(w: World) {
         }
       }
     }
+    rebuildObstacleGrid(w);
   }
 }
 
@@ -5068,6 +5135,7 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
      y: p.y + obs.y,
    }));
   w.fluids = [];
+  rebuildObstacleGrid(w);
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -5150,6 +5218,7 @@ function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]
   w.breakables = [...interiorShell, ...interiorProps].map((obs) => createBreakable(w, { ...obs, kind: obs.kind }));
   w.potholes = [];
   w.fluids = [];
+  rebuildObstacleGrid(w);
   w.enemies = w.enemies.filter((en) => en.dying);
   w.pickups = [];
   w.projectiles = [];
@@ -5220,6 +5289,7 @@ function restoreStreetObstacles(w: World) {
       }
     }
   }
+  rebuildObstacleGrid(w);
 }
 
 function updateEndlessDungeon(w: World) {
@@ -5437,6 +5507,11 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   } else {
     updateSpawning(w, dt);
   }
+
+  // Fresh as of this frame's spawns, for every nearestEnemy()/forEachNearby()
+  // consumer below that runs before updateEnemies() rebuilds it again (at
+  // post-movement positions, for its own separation pass).
+  rebuildGrid(w);
 
   updateStatusEffects(w);
   updateAmbient(w, dt);

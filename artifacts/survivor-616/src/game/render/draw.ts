@@ -18,12 +18,14 @@ import { getBuildingPrefab } from '@/game/engine/chunks';
 
 import { drawRig, drawShadow } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
-import { clamp } from '@/game/engine/math';
+import { clamp, dist2 } from '@/game/engine/math';
 
 /** World units of sprite height per rig pixel. */
 const SPRITE_SCALE = 2.05;
 /** LokPets read as small companions, a notch below full enemy scale. */
 const LOKPET_SPRITE_SCALE = SPRITE_SCALE * 0.82;
+/** Enemies this close to the player always draw at full detail (see LOD note in drawActors). */
+const ENEMY_LOD_NEAR_RADIUS = 300;
 
 export interface Viewport {
   width: number;
@@ -203,6 +205,16 @@ const SKY_PROFILES: Record<AreaSky, SkyProfile> = {
     rain: 0, fog: 0, lightningPeriodMs: 0,
   },
 };
+
+/**
+ * Cheap AABB-vs-point cull for gameplay entities. `left/top/right/bottom`
+ * are the padded camera viewport computed once per frame in renderWorld;
+ * `pad` should cover the entity's own on-screen extent (radius, glow,
+ * trail, etc.) so nothing pops in/out at the screen edge.
+ */
+function inView(x: number, y: number, left: number, top: number, right: number, bottom: number, pad = 0) {
+  return x >= left - pad && x <= right + pad && y >= top - pad && y <= bottom + pad;
+}
 
 /**
  * Bounded (non-endless) arenas are walled off well inside the padded camera
@@ -1567,16 +1579,14 @@ function drawPotholes(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
+function drawObstacles(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
   const height = 16;
-  // Draw the live prop records so streamed chunks and moving props share the
-  // same authored silhouette and profile.
-  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> =
-    w.area.endless
-      ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
-      : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
-
-  for (const obstacle of obstacleList) {
+  // Draw the live prop records directly -- streamed-chunk and authored props
+  // already share the same breakable shape, so there is no need to strip
+  // them down and re-find the original record per obstacle below.
+  for (const obstacle of w.breakables) {
+    if (obstacle.broken) continue;
+    if (!inView(obstacle.x, obstacle.y, left, top, right, bottom, Math.max(obstacle.w, obstacle.h) + 60)) continue;
     const colors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
     const x = obstacle.x - obstacle.w / 2;
     const y = obstacle.y - obstacle.h / 2;
@@ -1700,8 +1710,8 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.restore();
     }
 
-    const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
-    if (live?.chainActive && !live.landedHeatActive) {
+    const live = obstacle;
+    if (live.chainActive && !live.landedHeatActive) {
       ctx.save();
       const speed = Math.hypot(live.vx, live.vy);
       const pulse = 0.62 + Math.sin(w.now / 92) * 0.2;
@@ -1792,7 +1802,7 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
+function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
   for (const prop of w.breakables) {
     if (prop.broken || !prop.chainActive || prop.landedHeatActive || (!prop.vx && !prop.vy)) continue;
     const speed = Math.hypot(prop.vx, prop.vy);
@@ -1858,12 +1868,21 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     g.addColorStop(0, `${w.character.palette.glow}1f`); g.addColorStop(1, `${w.character.palette.glow}00`);
     ctx.fillStyle = g; ctx.fillRect(w.player.x - radius, w.player.y - radius, radius * 2, radius * 2);
   }
-  for (const enemy of w.enemies) {
-    if (enemy.dying || enemy.defId !== 'ash-wisp') continue;
+  {
+    // Same fixed-shape gradient repeated per ash-wisp on screen -- reuse the
+    // cached blob (see softBlob() above) instead of building a fresh one
+    // each frame for every wisp.
     const r = 52;
-    const g = ctx.createRadialGradient(enemy.x, enemy.y, 2, enemy.x, enemy.y, r);
-    g.addColorStop(0, '#ff4de155'); g.addColorStop(1, '#ff4de100');
-    ctx.fillStyle = g; ctx.fillRect(enemy.x - r, enemy.y - r, r * 2, r * 2);
+    const blob = softBlob('#ff4de1');
+    if (blob) {
+      for (const enemy of w.enemies) {
+        if (enemy.dying || enemy.defId !== 'ash-wisp') continue;
+        ctx.save();
+        ctx.globalAlpha = 0x55 / 0xff;
+        ctx.drawImage(blob, enemy.x - r, enemy.y - r, r * 2, r * 2);
+        ctx.restore();
+      }
+    }
   }
   for (const boss of w.enemies.filter((e) => !e.dying && e.def.family === 'Boss' && w.now - e.animStartedAt < 1200)) {
     const fade = 1 - (w.now - boss.animStartedAt) / 1200;
@@ -1910,7 +1929,14 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   // each nearby obstacle are projected away from the moving light source, so
   // shadows rotate, stretch, and vanish immediately when a breakable breaks.
   const shadowSources = sources.slice(0, 5);
-  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
+  // Only breakables near the padded viewport can ever cast a visible shadow
+  // (each source's own `distance > 260` check below bounds it further) --
+  // filtering the candidate list first avoids an O(sources x all-breakables)
+  // scan when endless mode has hundreds of props loaded across chunks.
+  const shadowObjects = w.breakables.filter((b) =>
+    !b.broken &&
+    !['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind) &&
+    inView(b.x, b.y, left, top, right, bottom, 260 + Math.max(b.w, b.h)));
   for (const source of shadowSources) {
     for (const object of shadowObjects) {
       const distance = Math.hypot(object.x - source.x, object.y - source.y);
@@ -1994,8 +2020,9 @@ function drawAwarenessArrow(ctx: CanvasRenderingContext2D, w: World) {
 /* Entities                                                            */
 /* ------------------------------------------------------------------ */
 
-function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
+function drawPickups(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
   for (const pickup of w.pickups) {
+    if (!inView(pickup.x, pickup.y, left, top, right, bottom, 30)) continue;
     const bob = Math.sin((w.now - pickup.bornAt) / 220) * 2;
     const x = pickup.x;
     const y = pickup.y + bob;
@@ -2066,8 +2093,9 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
+function drawEffects(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
   for (const effect of w.effects) {
+    if (!inView(effect.x, effect.y, left, top, right, bottom, effect.radius + 40)) continue;
     const life = (w.now - effect.bornAt) / Math.max(1, effect.expiresAt - effect.bornAt);
     const fade = 1 - life;
     ctx.save();
@@ -2265,8 +2293,9 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
+function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
   for (const proj of w.projectiles) {
+    if (!inView(proj.x, proj.y, left, top, right, bottom, proj.radius + 80)) continue;
     ctx.save();
     ctx.globalAlpha = 0.4;
     ctx.strokeStyle = proj.color;
@@ -2403,10 +2432,11 @@ function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawActors(ctx: CanvasRenderingContext2D, w: World) {
+function drawActors(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
   const outlineEnemies = w.enemies.length < 70;
 
   for (const pet of w.lokPets) {
+    if (!inView(pet.x, pet.y, left, top, right, bottom, 50)) continue;
     const pulse = 0.86 + Math.sin(w.now / 115 + pet.uid) * 0.14;
     const alpha = pet.ghost ? 0.3 + pulse * 0.08 : pulse;
     const facing: 1 | -1 = pet.vx < -4 ? -1 : 1;
@@ -2430,6 +2460,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   // Followers stay just above the ground layer and use a compact mark so
   // swarms remain readable on phones without needing a second sprite atlas.
   for (const follower of w.followers) {
+    if (!inView(follower.x, follower.y, left, top, right, bottom, follower.radius + 40)) continue;
     const pulse = 0.8 + Math.sin(w.now / 110 + follower.uid) * 0.2;
     ctx.save();
     ctx.globalAlpha = pulse;
@@ -2523,6 +2554,18 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
 
   for (const enemy of sorted) {
     if (enemy.y > w.player.y) drawPlayer();
+    // Off-screen enemies still need the painter's-order trigger above (it
+    // only affects when the player draws relative to visible enemies), but
+    // skip the actual per-enemy draw work -- rig, rings, shadow, health bar
+    // -- since none of it produces visible pixels.
+    if (!inView(enemy.x, enemy.y, left, top, right, bottom, enemy.radius * 3 + 80)) continue;
+    // LOD: the old rule was all-or-nothing (outline everyone, or no one,
+    // once the swarm passed 70). Enemies actively engaging the player stay
+    // crisp regardless of swarm size -- they're what the player is reading
+    // moment to moment -- while the outline budget still trims the rest of
+    // a big crowd the same way it always did.
+    const nearPlayer = dist2(enemy.x, enemy.y, w.player.x, w.player.y) < ENEMY_LOD_NEAR_RADIUS * ENEMY_LOD_NEAR_RADIUS;
+    const detailed = outlineEnemies || nearPlayer || enemy.def.family === 'Boss';
     const converted = enemy.convertedUntil > w.now && !enemy.dying;
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;
@@ -2605,7 +2648,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
       {
         flash: w.now < enemy.hitFlashUntil,
-        outline: outlineEnemies || enemy.def.family === 'Boss',
+        outline: detailed,
         dissolve,
         tint: converted
           ? { color: '#65f6d1', alpha: 0.42 }
@@ -2627,8 +2670,9 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   drawPlayer();
 }
 
-function drawParticles(ctx: CanvasRenderingContext2D, w: World) {
+function drawParticles(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
   for (const particle of w.particles) {
+    if (!inView(particle.x, particle.y, left, top, right, bottom, 20)) continue;
     const life = (w.now - particle.bornAt) / particle.lifeMs;
     ctx.globalAlpha = Math.max(0, 1 - life);
     ctx.fillStyle = particle.color;
@@ -2707,7 +2751,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawLightPool(ctx, w);
   drawLandmark(ctx, w);
   drawDistrictIncursion(ctx, w);
-  drawObjectLighting(ctx, w);
+  drawObjectLighting(ctx, w, left, top, right, bottom);
   if (sky !== 'roofed') {
     drawSteamVents(ctx, w, left, top, right, bottom);
     if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
@@ -2718,20 +2762,20 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);
-  drawPickups(ctx, w);
+  drawPickups(ctx, w, left, top, right, bottom);
   drawDungeonEntrances(ctx, w);
   drawDungeonExit(ctx, w);
   drawDungeonChest(ctx, w);
   drawFluids(ctx, w);
   drawPotholes(ctx, w);
   drawAmbient(ctx, w);
-  drawObstacles(ctx, w);
+  drawObstacles(ctx, w, left, top, right, bottom);
   drawAwarenessArrow(ctx, w);
-  drawActors(ctx, w);
+  drawActors(ctx, w, left, top, right, bottom);
   drawOrbiters(ctx, w);
-  drawEffects(ctx, w);
-  drawProjectiles(ctx, w);
-  drawParticles(ctx, w);
+  drawEffects(ctx, w, left, top, right, bottom);
+  drawProjectiles(ctx, w, left, top, right, bottom);
+  drawParticles(ctx, w, left, top, right, bottom);
   drawPopups(ctx, w);
   if (sky !== 'roofed') {
     if (showBirds) drawBirds(ctx, w, left, top, right, bottom);

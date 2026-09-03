@@ -105,6 +105,35 @@ export function drawRig(
   ctx.globalAlpha = previousAlpha;
 }
 
+/**
+ * Every actor -- up to MAX_ENEMIES of them -- draws one of these every
+ * frame. A fresh createRadialGradient() + ellipse fill per call is the same
+ * cost class the cloud rendering hit (see softBlob() in draw.ts, ~22ms/frame
+ * at scale): rasterise the gradient once and reuse it. The blob is a plain
+ * circle; drawImage's non-uniform destination scale (radius x, radius*0.42
+ * y) stretches it into the same ellipse the old per-call gradient produced.
+ */
+const SHADOW_BLOB_SIZE = 64;
+let shadowBlobCache: HTMLCanvasElement | null = null;
+
+function shadowBlob(): HTMLCanvasElement | null {
+  if (shadowBlobCache) return shadowBlobCache;
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = SHADOW_BLOB_SIZE;
+  canvas.height = SHADOW_BLOB_SIZE;
+  const blobCtx = canvas.getContext('2d');
+  if (!blobCtx) return null;
+  const r = SHADOW_BLOB_SIZE / 2;
+  const gradient = blobCtx.createRadialGradient(r, r, 0, r, r, r);
+  gradient.addColorStop(0, 'rgba(0,0,0,0.4)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  blobCtx.fillStyle = gradient;
+  blobCtx.fillRect(0, 0, SHADOW_BLOB_SIZE, SHADOW_BLOB_SIZE);
+  shadowBlobCache = canvas;
+  return canvas;
+}
+
 /** Soft contact shadow drawn under an actor. */
 export function drawShadow(
   ctx: CanvasRenderingContext2D,
@@ -112,13 +141,7 @@ export function drawShadow(
   screenY: number,
   radius: number,
 ) {
-  ctx.save();
-  const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, radius);
-  gradient.addColorStop(0, 'rgba(0,0,0,0.4)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.ellipse(screenX, screenY, radius, radius * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  const blob = shadowBlob();
+  if (!blob) return;
+  ctx.drawImage(blob, screenX - radius, screenY - radius * 0.42, radius * 2, radius * 0.84);
 }
