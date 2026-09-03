@@ -11,13 +11,17 @@ import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { getRunAuraStyle } from '@/game/data/runAuras';
+import { getCelebrationStyle } from '@/game/data/celebrations';
+import { getHatStyle } from '@/game/data/hats';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
+import { nextRescueAllyId } from '@/game/data/progression';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
+  claimLootPrize,
   claimRumorEmergencyHeal,
   createWorld,
   dashPlayer,
@@ -151,10 +155,24 @@ export function RunScreen({
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
+  const [reelTick, setReelTick] = useState(0);
+  const [chestFlight, setChestFlight] = useState(0);
+  const [celebration, setCelebration] = useState(false);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
+  const claimedLootRef = useRef(new Set<LootPrizeDef>());
+  const claimReelPrize = useCallback((prize: LootPrizeDef) => {
+    const world = worldRef.current;
+    if (!world || claimedLootRef.current.has(prize)) return;
+    claimedLootRef.current.add(prize);
+    claimLootPrize(world, prize);
+    setHud(hudSnapshot(world));
+  }, []);
+  const [revealedPrizes, setRevealedPrizes] = useState<string[]>([]);
+  const [lootTrayOpen, setLootTrayOpen] = useState(false);
+  const [openingAllLoot, setOpeningAllLoot] = useState(false);
   const [randomUpgradeReveal, setRandomUpgradeReveal] = useState<RandomUpgradeReveal | null>(null);
   const [liveDashboardOpen, setLiveDashboardOpen] = useState(false);
   const [hudIntelOpen, setHudIntelOpen] = useState(false);
@@ -186,6 +204,10 @@ export function RunScreen({
       : { ...baseCharacter, palette: getActivePalette(meta.activePaletteId) ?? baseCharacter.palette };
   const firstNightChapter = getFirstNightChapter(areaId);
   const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
+  // Episodes have authored rescue objectives; their target takes priority
+  // over the normal rotating recruitment route.
+  const rescueAllyId = episode?.crewAllyId
+    ?? nextRescueAllyId(area.id, meta.rescuedAllyIds, area.rescueAllyId);
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
@@ -224,7 +246,10 @@ export function RunScreen({
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
+        hatStyle: getHatStyle(meta.activeHatId),
         paletteEffect: prefersReducedMotion ? undefined : getThemePalette(meta.activePaletteId)?.effect,
+        rescueAllyId,
+        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
       },
     );
   }
@@ -473,6 +498,7 @@ export function RunScreen({
           if (presentationRef.current.liveModeEnabled || presentationRef.current.lootPresentation === 'queue') {
             const prizes = world.pendingReel.splice(0);
             setQueuedPrizes((current) => [...current, ...prizes]);
+            setChestFlight((flight) => flight + prizes.length);
           } else {
             const prize = world.pendingReel.shift()!;
             setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
@@ -531,10 +557,11 @@ export function RunScreen({
     const timer = window.setTimeout(() => {
       if (finishedRef.current) return;
       finishedRef.current = true;
-       onFinish(buildResult(world, finalRewardMultiplier));
+      for (const prize of [...world.pendingReel, ...queuedPrizes, ...(reel ? [reel.prize] : [])]) claimReelPrize(prize);
+      onFinish(buildResult(world, finalRewardMultiplier));
     }, 1100);
     return () => window.clearTimeout(timer);
-  }, [finalRewardMultiplier, onFinish, phase]);
+  }, [claimReelPrize, finalRewardMultiplier, onFinish, phase, queuedPrizes, reel]);
 
   const pickUpgrade = useCallback(
     (upgrade: UpgradeDef) => {
@@ -569,11 +596,37 @@ export function RunScreen({
       const [prize, ...rest] = current;
       if (prize) {
         setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
+        setRevealedPrizes((history) => [prize.label, ...history].slice(0, 8));
         if (!meta.liveModeEnabled) setPhaseBoth('reel');
       }
       return rest;
     });
   }, [meta.liveModeEnabled, setPhaseBoth]);
+
+  const openAllQueuedPrizes = useCallback(() => {
+    if (reel || queuedPrizes.length === 0) return;
+    setLootTrayOpen(false);
+    setOpeningAllLoot(true);
+    openQueuedPrize();
+  }, [openQueuedPrize, queuedPrizes.length, reel]);
+
+  /** A real ticking reel, rather than a timestamp sampled only during unrelated renders. */
+  useEffect(() => {
+    if (reel?.phase !== 'spinning') return;
+    const interval = window.setInterval(() => setReelTick((tick) => tick + 1), prefersReducedMotion ? 260 : 85);
+    return () => window.clearInterval(interval);
+  }, [reel?.phase, prefersReducedMotion]);
+
+  /** Chain short reveals for the player's explicit Open all action. */
+  useEffect(() => {
+    if (!openingAllLoot || reel) return;
+    if (queuedPrizes.length === 0) {
+      setOpeningAllLoot(false);
+      return;
+    }
+    const timer = window.setTimeout(openQueuedPrize, prefersReducedMotion ? 0 : 180);
+    return () => window.clearTimeout(timer);
+  }, [openingAllLoot, openQueuedPrize, prefersReducedMotion, queuedPrizes.length, reel]);
 
   useEffect(() => {
     if (!randomUpgradeReveal) return;
@@ -596,26 +649,39 @@ export function RunScreen({
       window.clearTimeout(reelTimerRef.current);
       reelTimerRef.current = null;
     }
+    if (reel) claimReelPrize(reel.prize);
     setReel(null);
+    setCelebration(false);
     if (phaseRef.current === 'reel') setPhaseBoth('playing');
-  }, [setPhaseBoth]);
+  }, [claimReelPrize, reel, setPhaseBoth]);
 
   // Auto-land the reel after a short spin, then auto-dismiss.
   useEffect(() => {
     if (!reel) return;
     if (reel.phase === 'spinning') {
       const t = window.setTimeout(() => {
-        setReel((prev) => prev ? { ...prev, phase: 'landed' } : null);
-        // Auto-dismiss 2s after landing.
+        setReel((prev) => {
+          if (!prev) return null;
+          claimReelPrize(prev.prize);
+          return { ...prev, phase: 'landed' };
+        });
+        setCelebration(true);
+        // Open-all stays brisk; a manually opened reward gets room to read.
         reelTimerRef.current = window.setTimeout(() => {
           setReel(null);
           if (phaseRef.current === 'reel') setPhaseBoth('playing');
-        }, 2200);
-      }, 1400);
+        }, openingAllLoot ? 650 : 2200);
+      }, openingAllLoot ? 450 : 1400);
       return () => window.clearTimeout(t);
     }
     return undefined;
-  }, [reel?.phase, setPhaseBoth]);
+  }, [claimReelPrize, openingAllLoot, reel?.phase, setPhaseBoth]);
+
+  useEffect(() => {
+    if (!celebration) return;
+    const timer = window.setTimeout(() => setCelebration(false), prefersReducedMotion ? 500 : 1250);
+    return () => window.clearTimeout(timer);
+  }, [celebration, prefersReducedMotion]);
 
   /** End the run successfully ("head home"). Only available in endless mode. */
   const headHome = useCallback(() => {
@@ -638,6 +704,15 @@ export function RunScreen({
   const blocksWalked = hud?.endless?.blocksWalked ?? 0;
   const primaryHudSignal = selectPrimaryRunHudSignal(hud, challenges.map((challenge) => challenge.name));
   const hudIntelItems = runHudIntelCount(hud, challenges.length);
+  const celebrationMarks = (() => {
+    switch (getCelebrationStyle(meta.activeCelebrationId)) {
+      case 'coin-burst': return ['●', '◉', '●', '✦', '◉', '●', '✦'];
+      case 'signal-hearts': return ['♥', '♡', '♥', '✧', '♡', '♥', '✧'];
+      case 'confetti-rain': return ['▰', '◆', '▴', '●', '✦', '◆', '▰'];
+      case 'moth-swarm': return ['◇', '◈', '✧', '◇', '◈', '✧', '◇'];
+      default: return ['✦', '✧', '★', '✦', '✧', '★', '✦'];
+    }
+  })();
 
   return (
     <div
@@ -969,16 +1044,41 @@ export function RunScreen({
       </button>
 
       <ChestTally count={hud?.lootBoxesOpened ?? 0} />
-      <button
-        type="button"
-        onClick={openQueuedPrize}
-        disabled={queuedPrizes.length === 0 || Boolean(reel)}
-        className="absolute bottom-2 left-1/2 z-40 h-7 -translate-x-1/2 border border-blue-300/50 bg-[#071225]/90 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
-        data-testid="button-loot-tray"
-        aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
-      >
-        ◇ Loot tray · {queuedPrizes.length}
-      </button>
+      {chestFlight > 0 ? (
+        <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
+      ) : null}
+      <div className="absolute bottom-[5.25rem] right-2 z-40 flex items-stretch sm:bottom-[6.5rem] sm:right-5">
+        <button
+          type="button"
+          onClick={openQueuedPrize}
+          disabled={queuedPrizes.length === 0 || Boolean(reel)}
+          className="flex h-8 w-16 items-center justify-center border border-blue-300/50 bg-[#071225]/92 px-1 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
+          data-testid="button-loot-tray"
+          aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
+        >
+          ▣ {queuedPrizes.length} · Open
+        </button>
+        <button
+          type="button"
+          onClick={() => setLootTrayOpen((open) => !open)}
+          className="h-8 border border-l-0 border-blue-300/50 bg-[#071225]/92 px-1.5 font-mono text-[10px] text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)]"
+          aria-expanded={lootTrayOpen}
+          aria-label="Loot pocket options"
+          data-testid="button-loot-tray-options"
+        >
+          {lootTrayOpen ? '⌃' : '⌄'}
+        </button>
+        {lootTrayOpen ? (
+          <aside className="absolute bottom-9 right-0 w-48 border border-blue-300/45 bg-[#050b16]/95 p-2 shadow-[0_0_24px_rgba(96,165,250,.2)]" aria-label="Loot pocket">
+            <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-wider text-blue-100"><span>Loot pocket</span><span>{queuedPrizes.length} waiting</span></div>
+            <div className="mt-2 grid grid-cols-2 gap-1">
+              <button type="button" onClick={() => { setLootTrayOpen(false); openQueuedPrize(); }} disabled={queuedPrizes.length === 0 || Boolean(reel)} className="border border-blue-200/30 px-2 py-1.5 font-mono text-[8px] uppercase text-blue-100 disabled:opacity-40">Open one</button>
+              <button type="button" onClick={openAllQueuedPrizes} disabled={queuedPrizes.length < 2 || Boolean(reel)} className="border border-amber-200/35 px-2 py-1.5 font-mono text-[8px] uppercase text-amber-100 disabled:opacity-40">Open all</button>
+            </div>
+            {revealedPrizes.length > 0 ? <div className="mt-2 border-t border-white/10 pt-1.5"><p className="font-mono text-[8px] uppercase tracking-wider text-white/45">This run</p><ul className="mt-1 space-y-0.5 font-mono text-[8px] text-white/75">{revealedPrizes.slice(0, 4).map((label, index) => <li key={`${label}-${index}`} className="truncate">{label}</li>)}</ul></div> : null}
+          </aside>
+        ) : null}
+      </div>
 
       {/* Virtual stick */}
       {stickVisual.active ? (
@@ -1231,7 +1331,7 @@ export function RunScreen({
                     boxShadow: landed ? `0 0 24px ${face?.color ?? '#3b82f6'}66` : 'none',
                   }}
                 >
-                  {landed ? face?.symbol : REEL_FACES[(Math.floor(Date.now() / 120 + col) % REEL_FACES.length)]?.symbol ?? '?'}
+                  {landed ? face?.symbol : REEL_FACES[(reelTick + col) % REEL_FACES.length]?.symbol ?? '?'}
                   {landed && (
                     <span className="mt-1 font-mono text-[9px] uppercase tracking-widest opacity-70">
                       {face?.label}
@@ -1263,7 +1363,7 @@ export function RunScreen({
                   {!meta.liveModeEnabled ? <p className="mt-1 text-[9px] text-white/50">{reel.prize.lokPet.description}</p> : null}
                 </div>
               ) : null}
-              <p className="mt-1 font-mono text-xs text-white/40">already applied — you keep it</p>
+              <p className="mt-1 font-mono text-xs text-white/40">reel landed — added to this run</p>
             </div>
           ) : (
             <div className="mb-6 h-12" />
@@ -1277,6 +1377,17 @@ export function RunScreen({
           >
             {reel.phase === 'landed' ? 'Continue' : 'Skip'}
           </button>
+        </div>
+      ) : null}
+
+      {celebration ? (
+        <div className="pointer-events-none absolute inset-0 z-[55] overflow-hidden" aria-hidden="true">
+          {celebrationMarks.map((mark, index) => (
+            <span key={`${chestFlight}-${index}`} className="absolute font-black" style={{
+              left: `${12 + index * 13}%`, top: `${32 + (index % 3) * 16}%`, color: [character.palette.accentBright, '#fde68a', '#67e8f9'][index % 3],
+              animation: `celebration-pop ${prefersReducedMotion ? 500 : 1050}ms ease-out ${index * 45}ms both`,
+            }}>{mark}</span>
+          ))}
         </div>
       ) : null}
 

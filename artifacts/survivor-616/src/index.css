@@ -69,6 +69,40 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   border: 0;
 }
 
+@keyframes chest-pocket-fly {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.55) rotate(-18deg); }
+  15% { opacity: 1; }
+  100% { opacity: .15; transform: translate(calc(50vw - 3.75rem), calc(50vh - 7.5rem)) scale(.42) rotate(20deg); }
+}
+
+@keyframes celebration-pop {
+  0% { opacity: 0; transform: scale(.25) translateY(10px); }
+  30% { opacity: 1; transform: scale(1.35) translateY(-8px); }
+  100% { opacity: 0; transform: scale(.7) translateY(-28px); }
+}
+
+.cosmetic-aura { border-radius: 999px; opacity: .8; pointer-events: none; }
+.cosmetic-aura::before, .cosmetic-aura::after { content: ''; position: absolute; inset: 18%; border: 2px solid var(--aura); border-radius: inherit; box-shadow: 0 0 18px var(--aura); }
+.cosmetic-aura-radar-sweep::after { border-color: var(--accent); clip-path: polygon(50% 50%, 100% 0, 100% 100%); animation: cosmetic-spin 2.4s linear infinite; }
+.cosmetic-aura-ember-orbit::before { border-style: dashed; animation: cosmetic-spin 1.3s linear infinite; }
+.cosmetic-aura-rain-signal::after { border-radius: 0; border-width: 0 2px; animation: cosmetic-rain 1s linear infinite; }
+.cosmetic-aura-glitch-echo::before { box-shadow: -10px 5px 0 -7px var(--accent), 10px -5px 0 -7px var(--aura); animation: cosmetic-glitch 1s steps(2) infinite; }
+.cosmetic-aura-mothlight::after { border-style: dotted; animation: cosmetic-spin 4s linear infinite; }
+.cosmetic-hat-top-hat { top: 18px; transform: scaleX(1.5); color: #16131c; text-shadow: 0 0 3px var(--primary); }
+.cosmetic-hat-halo { top: 14px; color: #fde68a; animation: cosmetic-float 1.8s ease-in-out infinite; }
+.cosmetic-hat-crown { top: 15px; color: #fbbf24; animation: cosmetic-float 1.6s ease-in-out infinite; }
+.cosmetic-hat-satellite, .cosmetic-hat-orbital-eye { top: 17px; color: #67e8f9; animation: cosmetic-orbit 2.2s linear infinite; }
+.cosmetic-hat-rain-cloud { top: 12px; color: #93c5fd; animation: cosmetic-float 1.3s ease-in-out infinite; }
+.cosmetic-hat-cone { top: 12px; color: #fb923c; animation: cosmetic-float 1.7s ease-in-out infinite; }
+.cosmetic-hat-moth-cap { top: 17px; color: #f0abfc; animation: cosmetic-float 1.5s ease-in-out infinite; }
+.cosmetic-celebration { top: 28%; animation: cosmetic-celebrate 900ms ease-out both; }
+@keyframes cosmetic-spin { to { transform: rotate(360deg); } }
+@keyframes cosmetic-float { 50% { transform: translateY(-7px); } }
+@keyframes cosmetic-orbit { to { transform: rotate(360deg) translateX(18px) rotate(-360deg); } }
+@keyframes cosmetic-rain { 50% { transform: translateY(12px); opacity: .25; } }
+@keyframes cosmetic-glitch { 50% { transform: translate(8px, -4px); opacity: .4; } }
+@keyframes cosmetic-celebrate { to { transform: translateY(-54px) rotate(120deg); opacity: 0; } }
+
 :root, .dark {
   --background: 240 6% 6%;
   --foreground: 0 0% 90%;

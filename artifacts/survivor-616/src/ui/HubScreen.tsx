@@ -430,15 +430,15 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
           </section>
         )}
 
-        {/* Token balance — spending wired in a later task */}
+        {/* Token balance — opens the existing customization shop. */}
         {meta.lootTokens > 0 && (
-          <section className="mt-6 border border-amber-900/40 bg-amber-950/20 px-5 py-3 flex items-center gap-3" data-testid="section-tokens">
+          <button type="button" onClick={() => onOpen('palette-store')} className="mt-6 w-full border border-amber-900/40 bg-amber-950/20 px-5 py-3 flex items-center gap-3 text-left transition-colors hover:border-amber-400/50 hover:bg-amber-950/35" data-testid="section-tokens">
             <Package className="w-4 h-4 text-amber-400 shrink-0" />
             <div>
               <span className="font-mono text-sm text-amber-300 font-bold">{meta.lootTokens}</span>
-              <span className="ml-1.5 font-mono text-xs text-muted-foreground uppercase tracking-widest">loot tokens — token shop coming soon</span>
+              <span className="ml-1.5 font-mono text-xs text-muted-foreground uppercase tracking-widest">loot tokens — open customization shop</span>
             </div>
-          </section>
+          </button>
         )}
 
         {meta.skeletonKeys > 0 && (

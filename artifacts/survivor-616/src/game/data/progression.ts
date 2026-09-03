@@ -109,11 +109,75 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#fff0f7', skin: '#f6c9de', glow: '#ff9ecb',
     },
   },
+  {
+    id: 'morrow',
+    name: 'Morrow',
+    role: 'Night-shift transit photographer',
+    blurb: 'Keeps a camera loaded with the last safe routes. Her long exposures catch doors and people the city tries to erase.',
+    room: 'rooftop-perch',
+    boost: { crit: 0.06, magnet: 8 },
+    boostLabel: '+6% crit, +8 pickup range',
+    preferredActivityIds: ['scout-routes', 'mark-approach-lanes'],
+    palette: {
+      ink: '#0b0b19', body: '#2d2a70', bodyDark: '#17153d', accent: '#a5b4fc',
+      accentBright: '#eef2ff', skin: '#9a5b48', glow: '#c084fc',
+    },
+  },
+  {
+    id: 'cinder',
+    name: 'Cinder Vale',
+    role: 'Street mechanic',
+    blurb: 'Can turn a seized motor into a barricade before the next chorus hits. Keeps the crew’s tools quieter than they should be.',
+    room: 'the-cellar',
+    boost: { haste: -0.035, armor: 0.025 },
+    boostLabel: '3.5% faster cooldowns, +2.5% armor',
+    preferredActivityIds: ['tune-the-rig', 'study-anomalies'],
+    palette: {
+      ink: '#11100d', body: '#435143', bodyDark: '#20291f', accent: '#b8d66b',
+      accentBright: '#f1ffd0', skin: '#81533b', glow: '#d8ff7a',
+    },
+  },
+  {
+    id: 'pippa',
+    name: 'Pippa Coil',
+    role: 'Ration runner',
+    blurb: 'Knows the block’s kitchen windows, locked pantries, and every person who still needs a hot meal before a run.',
+    room: 'main-floor',
+    boost: { maxHp: 14, lifesteal: 0.015 },
+    boostLabel: '+14 max HP, +1.5% lifesteal',
+    preferredActivityIds: ['field-rations', 'sort-supplies'],
+    palette: {
+      ink: '#1b0e12', body: '#a53d62', bodyDark: '#5c1c33', accent: '#ffb3c7',
+      accentBright: '#fff0f4', skin: '#a85b43', glow: '#ff7ab8',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
   ALLIES.map((a) => [a.id, a]),
 );
+
+/**
+ * Each authored arena can return to the rescue route after its first ally is
+ * safe. This makes later crew recruitable through normal play instead of
+ * adding inaccessible records to the archive.
+ */
+export const RESCUE_ROUTE_BY_AREA: Record<string, string[]> = {
+  'monroe-strip': ['vee', 'pippa'],
+  rooftops: ['nyx', 'morrow'],
+  'crystal-cellar': ['sable', 'cinder'],
+};
+
+export function nextRescueAllyId(
+  areaId: string,
+  rescuedAllyIds: string[],
+  fallbackAllyId?: string,
+): string | undefined {
+  const rescued = new Set(rescuedAllyIds);
+  const route = RESCUE_ROUTE_BY_AREA[areaId];
+  if (route) return route.find((allyId) => !rescued.has(allyId));
+  return fallbackAllyId && !rescued.has(fallbackAllyId) ? fallbackAllyId : undefined;
+}
 
 /* ------------------------------------------------------------------ */
 /* Hideout rooms                                                       */

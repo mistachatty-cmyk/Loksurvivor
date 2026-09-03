@@ -56,8 +56,10 @@ export function rollPrize(rng: () => number): LootPrizeDef {
         const lokPet = rollLokPet(rng);
         return { ...entry.prize, label: `LokPet · ${lokPet.name}`, lokPet };
       }
-      return entry.prize;
+      // Each chest must own its own prize object. The world uses object
+      // identity to guarantee a reel cannot grant the same drop twice.
+      return { ...entry.prize };
     }
   }
-  return PRIZE_TABLE[0]!.prize;
+  return { ...PRIZE_TABLE[0]!.prize };
 }
