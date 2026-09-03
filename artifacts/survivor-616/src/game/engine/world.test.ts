@@ -24,6 +24,7 @@ import {
   createWorld,
   dashPlayer,
   buildResult,
+  claimLootPrize,
   claimRumorEmergencyHeal,
   applyUpgrade,
   episodeSnapshot,
@@ -186,6 +187,7 @@ function runPet(
   overrides: Partial<RunResult['lokPets'][number]> = {},
 ): RunResult['lokPets'][number] {
   return {
+    origin: 'chest',
     name: roll.name,
     variantId: roll.variantId,
     family: roll.family,
@@ -1244,7 +1246,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 12);
+    assert.equal(loaded.version, 14);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1801,12 +1803,54 @@ test('a LokPet chest prize spawns a generated companion and exposes it to the HU
 
   stepWorld(world, 1 / 60, neutralInput);
 
-  assert.equal(world.lokPets.length, 1);
+  assert.equal(world.lokPets.length, 0);
   assert.equal(world.pendingReel[0]?.kind, 'lokpet');
+  claimLootPrize(world, world.pendingReel[0]!);
+  assert.equal(world.lokPets.length, 1);
   assert.equal(world.pendingReel[0]?.lokPet?.variantId, world.lokPets[0]?.variantId);
+  claimLootPrize(world, world.pendingReel[0]!);
+  assert.equal(world.lokPets.length, 1, 'a replayed reel landing cannot duplicate the companion');
   const snapshot = hudSnapshot(world);
   assert.equal(snapshot.lokPets.length, 1);
   assert.equal(snapshot.lokPets[0]?.ghost, false);
+});
+
+test('saved LokPets enter as loadout companions, consume stamina, and never clone themselves', () => {
+  const roll = rollLokPet(createRng(617));
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    617,
+    [],
+    1,
+    true,
+    null,
+    { startingLokPets: [roll] },
+  );
+  const result = buildResult(world);
+  assert.equal(result.lokPets.length, 1);
+  assert.equal(result.lokPets[0]?.origin, 'loadout');
+
+  const startedAt = Date.now();
+  const state = {
+    meta: {
+      ...createInitialMeta(),
+      savedLokPets: [{ id: 'packed-pet', roll, stamina: 1 }],
+      selectedLokPetIds: ['packed-pet'],
+      petElixirs: 0,
+      petElixirUpdatedAt: startedAt,
+    },
+    lastRun: null,
+  };
+  const afterRun = reducer(state, { type: 'completeRun', result });
+  assert.equal(afterRun.meta.savedLokPets.length, 1, 'loadout pets are not re-saved as chest captures');
+  assert.equal(afterRun.meta.savedLokPets[0]?.stamina, 0);
+  assert.deepEqual(afterRun.meta.selectedLokPetIds, []);
+
+  const restored = reducer(afterRun, { type: 'restoreSavedLokPet', id: 'packed-pet', now: startedAt + 20 * 60 * 1000 });
+  assert.equal(restored.meta.petElixirs, 2, 'one of the three regenerated elixirs restores the pet');
+  assert.equal(restored.meta.savedLokPets[0]?.stamina, 1);
 });
 
 test('LokPets follow, apply elemental attacks, explode, and become transparent ghosts', () => {
@@ -2016,11 +2060,15 @@ test('final dungeon chest is boss-gated and idempotent', () => {
   for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 60, neutralInput);
   assert.equal(world.endless!.dungeonChest?.unlocked, true);
   const prizesBeforeChest = world.openedPrizes.length;
+  const pendingBeforeChest = world.pendingReel.length;
 
   world.player.x = 190;
   world.player.y = 0;
   stepWorld(world, 1 / 60, neutralInput);
   assert.equal(world.endless!.dungeonChest?.opened, true);
+  assert.equal(world.openedPrizes.length - prizesBeforeChest, 0);
+  const pendingDungeonPrizes = world.pendingReel.splice(pendingBeforeChest);
+  pendingDungeonPrizes.forEach((prize) => claimLootPrize(world, prize));
   assert.equal(world.openedPrizes.length - prizesBeforeChest, 3);
   const prizesAfterChest = world.openedPrizes.length;
   assert.ok(world.lootBoxesOpened >= 1);

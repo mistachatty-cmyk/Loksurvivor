@@ -23,6 +23,14 @@ function fixturePet(
           : 'burst explosion';
 
   return {
+    origin: 'chest',
+    roll: {
+      name, variantId, family: variant.family, silhouette: variant.silhouette, palette: variant.palette,
+      rarity, rarityLabel: rarity, attackKind, element, elementLabel,
+      description: variant.description,
+      traitLabel: element === 'none' ? attackLabel : `${attackLabel} · ${elementLabel}`,
+      stats: { health: 42, moveSpeed: 125, damage: 11, cooldownMs: 900, range: 250, projectileSpeed: 280, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 90000 },
+    },
     name,
     variantId,
     family: variant.family,
