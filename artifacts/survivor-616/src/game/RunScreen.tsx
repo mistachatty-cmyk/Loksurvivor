@@ -11,7 +11,8 @@ import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { getRunAuraStyle } from '@/game/data/runAuras';
-import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
+import { DEV_RUN_TOOL_REGISTRY, type DevRunToolId } from '@/game/data/devUnlockRegistry';
+import { RUN_HUD_ZONES, RUN_HUD_ZONE_CLASSES, runHudArenaBudget, runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { availableChallengeContracts } from '@/game/data/vendor';
@@ -29,6 +30,7 @@ import {
 } from '@/game/engine/world';
 import { useGyroInput } from '@/game/input/gyro';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
+import { appendRunPresentation, dismissRunPresentation, recordRunHistory, updateRunPresentationHead } from '@/game/data/runPresentation';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld } from '@/game/render/draw';
 import {
@@ -43,7 +45,6 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
-import { ChestTally } from '@/ui/ChestTally';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
@@ -93,6 +94,7 @@ interface ReelState {
 }
 
 interface RandomUpgradeReveal {
+  sequence: number;
   selected: UpgradeDef;
   candidates: UpgradeDef[];
   visibleName: string;
@@ -155,10 +157,16 @@ export function RunScreen({
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
-  const [randomUpgradeReveal, setRandomUpgradeReveal] = useState<RandomUpgradeReveal | null>(null);
+  const [lootHistory, setLootHistory] = useState<LootPrizeDef[]>([]);
+  const [lootTrayOpen, setLootTrayOpen] = useState(false);
+  const [autoOpenLoot, setAutoOpenLoot] = useState(false);
+  const [randomUpgradeReveals, setRandomUpgradeReveals] = useState<RandomUpgradeReveal[]>([]);
   const [liveDashboardOpen, setLiveDashboardOpen] = useState(false);
   const [hudIntelOpen, setHudIntelOpen] = useState(false);
+  const [hudStressActive, setHudStressActive] = useState(false);
+  const [suppressedHudSignalIds, setSuppressedHudSignalIds] = useState<ReadonlySet<string>>(() => new Set());
   const reelTimerRef = useRef<number | null>(null);
+  const upgradeRevealSequenceRef = useRef(0);
   const upgradeChoicesRef = useRef<UpgradeDef[]>([]);
   const levelUpPausesRef = useRef(meta.levelUpPresentation === 'pause-focus' && !meta.liveModeEnabled);
   levelUpPausesRef.current = meta.levelUpPresentation === 'pause-focus' && !meta.liveModeEnabled;
@@ -498,7 +506,13 @@ export function RunScreen({
             applyUpgrade(world, selected);
             upgradeChoicesRef.current = [];
             setChoices([]);
-            setRandomUpgradeReveal({ selected, candidates, visibleName: candidates[0]?.name ?? selected.name });
+            setRandomUpgradeReveals((current) => appendRunPresentation(current, {
+              sequence: ++upgradeRevealSequenceRef.current,
+              selected,
+              candidates,
+              visibleName: candidates[0]?.name ?? selected.name,
+            }));
+            setLootTrayOpen(false);
           } else if (levelUpPausesRef.current) {
             setPhaseBoth('levelup');
           }
@@ -564,31 +578,43 @@ export function RunScreen({
     ultRequestRef.current = true;
   }, []);
 
-  const openQueuedPrize = useCallback(() => {
-    setQueuedPrizes((current) => {
-      const [prize, ...rest] = current;
-      if (prize) {
-        setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
-        if (!meta.liveModeEnabled) setPhaseBoth('reel');
-      }
-      return rest;
-    });
+  const presentPrize = useCallback((prize: LootPrizeDef) => {
+    setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
+    setLootHistory((current) => recordRunHistory(current, prize));
+    if (!meta.liveModeEnabled) setPhaseBoth('reel');
   }, [meta.liveModeEnabled, setPhaseBoth]);
+
+  const openQueuedPrize = useCallback((openAll = false) => {
+    if (reel || queuedPrizes.length === 0) return;
+    const [prize, ...rest] = queuedPrizes;
+    setQueuedPrizes(rest);
+    setAutoOpenLoot(openAll && rest.length > 0);
+    setLootTrayOpen(false);
+    presentPrize(prize);
+  }, [presentPrize, queuedPrizes, reel]);
+
+  const randomUpgradeReveal = randomUpgradeReveals[0] ?? null;
 
   useEffect(() => {
     if (!randomUpgradeReveal) return;
     let frame = 0;
     const interval = window.setInterval(() => {
       frame += 1;
-      setRandomUpgradeReveal((current) => current ? { ...current, visibleName: current.candidates[frame % current.candidates.length]?.name ?? current.selected.name } : null);
+      setRandomUpgradeReveals((current) => updateRunPresentationHead(current, (head) => ({
+        ...head,
+        visibleName: head.candidates[frame % head.candidates.length]?.name ?? head.selected.name,
+      })));
     }, prefersReducedMotion ? 300 : 90);
     const finish = window.setTimeout(() => {
       window.clearInterval(interval);
-      setRandomUpgradeReveal((current) => current ? { ...current, visibleName: current.selected.name } : null);
+      setRandomUpgradeReveals((current) => updateRunPresentationHead(current, (head) => ({
+        ...head,
+        visibleName: head.selected.name,
+      })));
     }, prefersReducedMotion ? 300 : 720);
-    const dismiss = window.setTimeout(() => setRandomUpgradeReveal(null), prefersReducedMotion ? 1100 : 1900);
+    const dismiss = window.setTimeout(() => setRandomUpgradeReveals(dismissRunPresentation), prefersReducedMotion ? 1100 : 1900);
     return () => { window.clearInterval(interval); window.clearTimeout(finish); window.clearTimeout(dismiss); };
-  }, [randomUpgradeReveal?.selected.id, prefersReducedMotion]);
+  }, [randomUpgradeReveal?.sequence, prefersReducedMotion]);
 
   /** Dismiss the reel overlay and resume the run. */
   const dismissReel = useCallback(() => {
@@ -597,8 +623,23 @@ export function RunScreen({
       reelTimerRef.current = null;
     }
     setReel(null);
-    if (phaseRef.current === 'reel') setPhaseBoth('playing');
-  }, [setPhaseBoth]);
+    if (!autoOpenLoot && phaseRef.current === 'reel') setPhaseBoth('playing');
+  }, [autoOpenLoot, setPhaseBoth]);
+
+  useEffect(() => {
+    if (reel || !autoOpenLoot) return;
+    const nextPrize = queuedPrizes[0];
+    if (!nextPrize) {
+      setAutoOpenLoot(false);
+      if (phaseRef.current === 'reel') setPhaseBoth('playing');
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setQueuedPrizes((current) => current.slice(1));
+      presentPrize(nextPrize);
+    }, 140);
+    return () => window.clearTimeout(timer);
+  }, [autoOpenLoot, presentPrize, queuedPrizes, reel, setPhaseBoth]);
 
   // Auto-land the reel after a short spin, then auto-dismiss.
   useEffect(() => {
@@ -609,13 +650,13 @@ export function RunScreen({
         // Auto-dismiss 2s after landing.
         reelTimerRef.current = window.setTimeout(() => {
           setReel(null);
-          if (phaseRef.current === 'reel') setPhaseBoth('playing');
-        }, 2200);
-      }, 1400);
+          if (!autoOpenLoot && phaseRef.current === 'reel') setPhaseBoth('playing');
+        }, autoOpenLoot ? 650 : 2200);
+      }, autoOpenLoot ? 450 : 1400);
       return () => window.clearTimeout(t);
     }
     return undefined;
-  }, [reel?.phase, setPhaseBoth]);
+  }, [autoOpenLoot, reel?.phase, setPhaseBoth]);
 
   /** End the run successfully ("head home"). Only available in endless mode. */
   const headHome = useCallback(() => {
@@ -624,6 +665,21 @@ export function RunScreen({
     world.outcome = 'cleared';
     setPhaseBoth('over');
   }, [setPhaseBoth]);
+
+  const runDevTool = useCallback((toolId: DevRunToolId) => {
+    if (!meta.devModeAllUnlocks) return;
+    switch (toolId) {
+      case 'run-hud-stress': {
+        const next = !hudStressActive;
+        setHudStressActive(next);
+        if (next) {
+          setHudIntelOpen(true);
+          setLootTrayOpen(true);
+        }
+        break;
+      }
+    }
+  }, [hudStressActive, meta.devModeAllUnlocks]);
 
   // Auto-clear the dungeon transition flash after a short beat.
   useEffect(() => {
@@ -636,8 +692,24 @@ export function RunScreen({
   const xpPct = hud ? (hud.xp / Math.max(1, hud.xpToNext)) * 100 : 0;
   const timeLeft = hud && !area.endless ? Math.max(0, hud.durationSec - hud.elapsedSec) : 0;
   const blocksWalked = hud?.endless?.blocksWalked ?? 0;
-  const primaryHudSignal = selectPrimaryRunHudSignal(hud, challenges.map((challenge) => challenge.name));
-  const hudIntelItems = runHudIntelCount(hud, challenges.length);
+  const primaryHudSignal = hudStressActive
+    ? { id: 'dev-hud-stress', label: 'HUD stress preview', detail: 'Arena remains live', accent: '#f0abfc', urgent: false }
+    : selectPrimaryRunHudSignal(hud, challenges.map((challenge) => challenge.name), suppressedHudSignalIds);
+  const hudIntelItems = runHudIntelCount(hud, challenges.length) + (hudStressActive ? 1 : 0);
+
+  useEffect(() => {
+    if (!primaryHudSignal?.ttlMs) return;
+    const signalId = primaryHudSignal.id;
+    const timer = window.setTimeout(() => {
+      setSuppressedHudSignalIds((current) => {
+        if (current.has(signalId)) return current;
+        const next = new Set(current);
+        next.add(signalId);
+        return next;
+      });
+    }, primaryHudSignal.ttlMs);
+    return () => window.clearTimeout(timer);
+  }, [primaryHudSignal?.id, primaryHudSignal?.ttlMs]);
 
   return (
     <div
@@ -649,6 +721,26 @@ export function RunScreen({
       data-testid="screen-run"
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+
+      {hudStressActive ? (
+        <div className="pointer-events-none absolute inset-0 z-[39]" data-testid="overlay-hud-stress" aria-hidden="true">
+          {Object.values(RUN_HUD_ZONES).map((zone) => (
+            <div
+              key={zone.id}
+              className={`${RUN_HUD_ZONE_CLASSES[zone.id]} border border-dashed border-fuchsia-300/55`}
+              style={{
+                width: zone.id === 'bottom-left' ? `min(56vw, ${zone.maxWidthPx ?? 190}px)` : undefined,
+                height: zone.maxHeightPx,
+                maxWidth: zone.maxWidthPx,
+                maxHeight: zone.maxHeightPx,
+              }}
+              data-testid={`hud-stress-zone-${zone.id}`}
+            >
+              <span className="absolute left-0 top-0 bg-fuchsia-950/90 px-1 font-mono text-[7px] uppercase text-fuchsia-100">{zone.id}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {/* Touch surface: dragging anywhere steers. */}
       <div
@@ -662,7 +754,7 @@ export function RunScreen({
 
       {/* Top HUD */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-40 p-1"
+        className={`pointer-events-none z-40 p-1 ${RUN_HUD_ZONE_CLASSES['top-bar']}`}
         style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))', paddingLeft: 'max(0.25rem, env(safe-area-inset-left))', paddingRight: 'max(0.25rem, env(safe-area-inset-right))' }}
         data-testid="run-hud-safe-zone"
       >
@@ -736,7 +828,7 @@ export function RunScreen({
 
         {primaryHudSignal ? (
           <div
-            className="absolute left-1/2 top-[max(2.15rem,calc(env(safe-area-inset-top)+2rem))] flex h-6 w-[min(62vw,310px)] -translate-x-1/2 items-center justify-center gap-1.5 overflow-hidden border bg-black/78 px-2 font-mono text-[8px] font-bold uppercase tracking-wider shadow-sm"
+            className={`${RUN_HUD_ZONE_CLASSES['primary-signal']} flex items-center justify-center gap-1.5 overflow-hidden border bg-black/78 px-2 font-mono text-[8px] font-bold uppercase tracking-wider shadow-sm`}
             style={{ borderColor: `${primaryHudSignal.accent}66`, color: primaryHudSignal.accent }}
             data-testid="run-hud-primary-signal"
             aria-live={primaryHudSignal.urgent ? 'assertive' : 'polite'}
@@ -748,10 +840,31 @@ export function RunScreen({
 
         {hudIntelOpen ? (
           <aside
-            className="pointer-events-auto absolute right-1 top-[max(2.15rem,calc(env(safe-area-inset-top)+2rem))] max-h-[min(56dvh,430px)] w-[min(78vw,300px)] space-y-1 overflow-y-auto overscroll-contain border border-cyan-200/25 bg-[#050911]/94 p-1.5 shadow-[0_0_24px_rgba(0,0,0,.45)]"
+            className={`pointer-events-auto ${RUN_HUD_ZONE_CLASSES['intel-drawer']} space-y-1 overflow-y-auto overscroll-contain border border-cyan-200/25 bg-[#050911]/94 p-1.5 shadow-[0_0_24px_rgba(0,0,0,.45)]`}
             data-testid="run-intel-drawer"
             aria-label="Run details"
           >
+
+        {meta.devModeAllUnlocks ? (
+          <div className="border border-dashed border-fuchsia-300/45 bg-fuchsia-400/5 p-2" data-testid="panel-run-dev-tools">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="font-mono text-[8px] font-bold uppercase tracking-widest text-fuchsia-200">Dev run tools</p>
+                <p className="mt-0.5 font-mono text-[8px] text-white/45">Presentation-only diagnostics</p>
+              </div>
+              {DEV_RUN_TOOL_REGISTRY.map((tool) => (
+                <button key={tool.id} type="button" onClick={() => runDevTool(tool.id)} aria-pressed={hudStressActive} className="border border-fuchsia-300/45 bg-black/60 px-2 py-1 font-mono text-[8px] font-bold uppercase text-fuchsia-100" data-testid={`button-dev-tool-${tool.id}`} title={tool.description}>
+                  {hudStressActive ? 'Stop stress' : tool.label}
+                </button>
+              ))}
+            </div>
+            {hudStressActive ? (
+              <p className="mt-1.5 font-mono text-[8px] leading-relaxed text-fuchsia-100/65">
+                Six zones registered · {Math.round(runHudArenaBudget(window.innerHeight).protectedRatio * 100)}% vertical arena budget protected on this screen.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {hud?.rescueAvailable ? (
           <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
@@ -956,7 +1069,7 @@ export function RunScreen({
         type="button"
         onClick={triggerUltimate}
         disabled={(hud?.ultimateReadyPct ?? 0) < 100}
-        className="absolute bottom-5 right-3 h-16 w-16 rounded-full border-2 border-white/25 bg-black/75 font-mono text-[8px] uppercase leading-tight tracking-wider text-white disabled:opacity-45 sm:bottom-8 sm:right-6 sm:h-20 sm:w-20 sm:text-[10px]"
+        className={`${RUN_HUD_ZONE_CLASSES['bottom-right']} rounded-full border-2 border-white/25 bg-black/75 font-mono text-[8px] uppercase leading-tight tracking-wider text-white disabled:opacity-45 sm:text-[10px]`}
         style={{
           background:
             hud && hud.ultimateReadyPct >= 100
@@ -968,17 +1081,39 @@ export function RunScreen({
         {hud?.ultimateActive ? 'Active' : hud && hud.ultimateReadyPct >= 100 ? character.ultimate.name : `${Math.floor(hud?.ultimateReadyPct ?? 0)}%`}
       </button>
 
-      <ChestTally count={hud?.lootBoxesOpened ?? 0} />
-      <button
-        type="button"
-        onClick={openQueuedPrize}
-        disabled={queuedPrizes.length === 0 || Boolean(reel)}
-        className="absolute bottom-2 left-1/2 z-40 h-7 -translate-x-1/2 border border-blue-300/50 bg-[#071225]/90 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
-        data-testid="button-loot-tray"
-        aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
-      >
-        ◇ Loot tray · {queuedPrizes.length}
-      </button>
+      <div className={`pointer-events-none z-40 flex flex-col items-center justify-end gap-1 ${RUN_HUD_ZONE_CLASSES['bottom-center']}`} data-testid="run-loot-zone">
+        {lootTrayOpen ? (
+          <section className="pointer-events-auto w-full overflow-hidden border border-blue-300/45 bg-[#050b18]/95 p-2 shadow-[0_0_24px_rgba(96,165,250,.24)]" data-testid="panel-loot-tray" aria-label="Loot tray">
+            <div className="flex items-center justify-between gap-2 font-mono text-[9px] uppercase tracking-wider">
+              <span className="font-bold text-blue-200">{queuedPrizes.length} waiting</span>
+              <span className="text-white/45">{hud?.lootBoxesOpened ?? 0} collected</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1">
+              <button type="button" onClick={() => openQueuedPrize(false)} disabled={queuedPrizes.length === 0 || Boolean(reel)} className="border border-white/20 bg-white/5 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-white/80 disabled:opacity-35" data-testid="button-loot-open-one">Open one</button>
+              <button type="button" onClick={() => openQueuedPrize(true)} disabled={queuedPrizes.length === 0 || Boolean(reel)} className="border border-blue-300/50 bg-blue-300/10 px-2 py-1.5 font-mono text-[9px] font-bold uppercase text-blue-100 disabled:opacity-35" data-testid="button-loot-open-all">Open all</button>
+            </div>
+            <div className="mt-2 border-t border-white/10 pt-1.5">
+              <p className="font-mono text-[8px] uppercase tracking-widest text-white/35">Recent rewards</p>
+              {lootHistory.length > 0 ? (
+                <ul className="mt-1 max-h-12 overflow-y-auto font-mono text-[9px] text-white/65" data-testid="list-loot-history">
+                  {lootHistory.map((prize, index) => <li key={`${prize.kind}-${prize.label}-${index}`} className="truncate">◇ {prize.label}</li>)}
+                </ul>
+              ) : <p className="mt-1 font-mono text-[9px] text-white/35">Nothing opened yet.</p>}
+            </div>
+          </section>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setLootTrayOpen((open) => !open)}
+          disabled={(queuedPrizes.length === 0 && lootHistory.length === 0) || Boolean(randomUpgradeReveal)}
+          className="pointer-events-auto h-7 border border-blue-300/50 bg-[#071225]/92 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
+          data-testid="button-loot-tray"
+          aria-expanded={lootTrayOpen}
+          aria-label={`Loot tray, ${queuedPrizes.length} waiting, ${hud?.lootBoxesOpened ?? 0} collected`}
+        >
+          ◇ Loot {autoOpenLoot ? 'opening' : queuedPrizes.length} · {hud?.lootBoxesOpened ?? 0} total
+        </button>
+      </div>
 
       {/* Virtual stick */}
       {stickVisual.active ? (
@@ -1077,7 +1212,7 @@ export function RunScreen({
 
       {phase === 'playing' && !meta.levelUpPausesEnabled && choices.length > 0 ? (
         <div
-          className={`pointer-events-none absolute bottom-3 left-3 z-40 ${levelUpMinimized ? 'w-fit' : 'w-[min(56vw,190px)]'}`}
+          className={`pointer-events-none z-40 ${RUN_HUD_ZONE_CLASSES['bottom-left']} ${levelUpMinimized ? 'w-fit' : 'w-[min(56vw,190px)]'}`}
           data-testid="panel-continuous-levelup"
         >
           <div className="pointer-events-auto space-y-1.5 border border-primary/40 bg-black/85 p-1.5 shadow-[0_0_18px_rgba(251,191,36,.16)]">
@@ -1139,7 +1274,9 @@ export function RunScreen({
 
       {randomUpgradeReveal ? (
         <div className="pointer-events-none absolute bottom-24 left-1/2 z-40 w-[min(72vw,300px)] -translate-x-1/2 border border-fuchsia-300/60 bg-black/88 px-4 py-3 text-center shadow-[0_0_28px_rgba(232,121,249,.3)]" data-testid="random-upgrade-reel" aria-live="polite">
-          <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-fuchsia-200/70">Live level-up</p>
+          <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-fuchsia-200/70">
+            Live level-up{randomUpgradeReveals.length > 1 ? ` · ${randomUpgradeReveals.length - 1} queued` : ''}
+          </p>
           <p className="mt-1 truncate text-lg font-black uppercase text-white">{randomUpgradeReveal.visibleName}</p>
           {randomUpgradeReveal.visibleName === randomUpgradeReveal.selected.name ? <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300">Locked in · keep moving</p> : null}
         </div>

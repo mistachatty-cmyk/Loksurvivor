@@ -27,6 +27,7 @@ import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
+  DEV_RUN_TOOL_REGISTRY,
   advanceDevAccessTap,
   effectiveCatalogIds,
   hasCatalogItem,
@@ -38,7 +39,6 @@ import { ScreenLayout } from './ScreenLayout';
 export interface SettingsPanelProps {
   onBack: () => void;
 }
-
 export function SettingsPanel({ onBack }: SettingsPanelProps) {
   const {
     meta,
@@ -114,7 +114,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run presentation</p>
                   <h2 className="mt-1 text-xl font-black uppercase text-white">Live Mode</h2>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Keep combat live while reward choices and chest reveals stay in the screen edges. Manual pause still opens the tactical dashboard.
+                    Keep combat live while reward choices and chest reveals stay in the screen edges. Tactics stays live; opening the full Settings screen pauses safely.
                   </p>
                 </div>
                 <button
@@ -767,6 +767,15 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   >
                     Dev Mode: {meta.devModeAllUnlocks ? 'On' : 'Off'}
                   </button>
+                </div>
+                <div className="mt-4 border-t border-primary/20 pt-3" data-testid="dev-run-tool-registry">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Registered run diagnostics</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Enable Dev Mode, start a run, then open Intel to use these without changing progression.</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {DEV_RUN_TOOL_REGISTRY.map((tool) => (
+                      <span key={tool.id} className="border border-primary/25 bg-background/70 px-2 py-1 font-mono text-[9px] uppercase text-white/65" title={tool.description}>{tool.label}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

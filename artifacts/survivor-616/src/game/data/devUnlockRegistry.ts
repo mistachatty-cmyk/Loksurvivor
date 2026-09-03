@@ -21,6 +21,24 @@ export const DEV_UNLOCK_REGISTRY = {
 
 export type DevUnlockCatalog = keyof typeof DEV_UNLOCK_REGISTRY;
 
+export interface DevRunToolDefinition {
+  id: string;
+  label: string;
+  description: string;
+  presentationOnly: true;
+}
+/** Run-only diagnostics register here and never add permanent save flags. */
+export const DEV_RUN_TOOL_REGISTRY = [
+  {
+    id: 'run-hud-stress',
+    label: 'HUD stress preview',
+    description: 'Outline every reserved HUD zone and open the compact drawers without changing the run.',
+    presentationOnly: true,
+  },
+] as const satisfies readonly DevRunToolDefinition[];
+
+export type DevRunToolId = (typeof DEV_RUN_TOOL_REGISTRY)[number]['id'];
+
 export function effectiveCatalogIds(
   meta: Pick<MetaState, 'devModeAllUnlocks'>,
   catalog: DevUnlockCatalog,
