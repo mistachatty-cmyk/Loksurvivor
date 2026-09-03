@@ -19,6 +19,7 @@ import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
+  claimLootPrize,
   claimRumorEmergencyHeal,
   createWorld,
   dashPlayer,
@@ -159,6 +160,14 @@ export function RunScreen({
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
+  const claimedLootRef = useRef(new Set<LootPrizeDef>());
+  const claimReelPrize = useCallback((prize: LootPrizeDef) => {
+    const world = worldRef.current;
+    if (!world || claimedLootRef.current.has(prize)) return;
+    claimedLootRef.current.add(prize);
+    claimLootPrize(world, prize);
+    setHud(hudSnapshot(world));
+  }, []);
   const [revealedPrizes, setRevealedPrizes] = useState<string[]>([]);
   const [lootTrayOpen, setLootTrayOpen] = useState(false);
   const [openingAllLoot, setOpeningAllLoot] = useState(false);
@@ -237,6 +246,7 @@ export function RunScreen({
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
         paletteEffect: prefersReducedMotion ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
+        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
       },
     );
   }
@@ -544,10 +554,11 @@ export function RunScreen({
     const timer = window.setTimeout(() => {
       if (finishedRef.current) return;
       finishedRef.current = true;
-       onFinish(buildResult(world, finalRewardMultiplier));
+      for (const prize of [...world.pendingReel, ...queuedPrizes, ...(reel ? [reel.prize] : [])]) claimReelPrize(prize);
+      onFinish(buildResult(world, finalRewardMultiplier));
     }, 1100);
     return () => window.clearTimeout(timer);
-  }, [finalRewardMultiplier, onFinish, phase]);
+  }, [claimReelPrize, finalRewardMultiplier, onFinish, phase, queuedPrizes, reel]);
 
   const pickUpgrade = useCallback(
     (upgrade: UpgradeDef) => {
@@ -635,17 +646,22 @@ export function RunScreen({
       window.clearTimeout(reelTimerRef.current);
       reelTimerRef.current = null;
     }
+    if (reel) claimReelPrize(reel.prize);
     setReel(null);
     setCelebration(false);
     if (phaseRef.current === 'reel') setPhaseBoth('playing');
-  }, [setPhaseBoth]);
+  }, [claimReelPrize, reel, setPhaseBoth]);
 
   // Auto-land the reel after a short spin, then auto-dismiss.
   useEffect(() => {
     if (!reel) return;
     if (reel.phase === 'spinning') {
       const t = window.setTimeout(() => {
-        setReel((prev) => prev ? { ...prev, phase: 'landed' } : null);
+        setReel((prev) => {
+          if (!prev) return null;
+          claimReelPrize(prev.prize);
+          return { ...prev, phase: 'landed' };
+        });
         setCelebration(true);
         // Open-all stays brisk; a manually opened reward gets room to read.
         reelTimerRef.current = window.setTimeout(() => {
@@ -656,7 +672,7 @@ export function RunScreen({
       return () => window.clearTimeout(t);
     }
     return undefined;
-  }, [openingAllLoot, reel?.phase, setPhaseBoth]);
+  }, [claimReelPrize, openingAllLoot, reel?.phase, setPhaseBoth]);
 
   useEffect(() => {
     if (!celebration) return;
@@ -1344,7 +1360,7 @@ export function RunScreen({
                   {!meta.liveModeEnabled ? <p className="mt-1 text-[9px] text-white/50">{reel.prize.lokPet.description}</p> : null}
                 </div>
               ) : null}
-              <p className="mt-1 font-mono text-xs text-white/40">already applied — you keep it</p>
+              <p className="mt-1 font-mono text-xs text-white/40">reel landed — added to this run</p>
             </div>
           ) : (
             <div className="mb-6 h-12" />

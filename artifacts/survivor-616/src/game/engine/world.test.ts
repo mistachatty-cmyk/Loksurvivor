@@ -24,6 +24,7 @@ import {
   createWorld,
   dashPlayer,
   buildResult,
+  claimLootPrize,
   claimRumorEmergencyHeal,
   applyUpgrade,
   episodeSnapshot,
@@ -186,6 +187,7 @@ function runPet(
   overrides: Partial<RunResult['lokPets'][number]> = {},
 ): RunResult['lokPets'][number] {
   return {
+    origin: 'chest',
     name: roll.name,
     variantId: roll.variantId,
     family: roll.family,
@@ -1244,7 +1246,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 12);
+    assert.equal(loaded.version, 13);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1801,8 +1803,10 @@ test('a LokPet chest prize spawns a generated companion and exposes it to the HU
 
   stepWorld(world, 1 / 60, neutralInput);
 
-  assert.equal(world.lokPets.length, 1);
+  assert.equal(world.lokPets.length, 0);
   assert.equal(world.pendingReel[0]?.kind, 'lokpet');
+  claimLootPrize(world, world.pendingReel[0]!);
+  assert.equal(world.lokPets.length, 1);
   assert.equal(world.pendingReel[0]?.lokPet?.variantId, world.lokPets[0]?.variantId);
   const snapshot = hudSnapshot(world);
   assert.equal(snapshot.lokPets.length, 1);
@@ -2016,11 +2020,15 @@ test('final dungeon chest is boss-gated and idempotent', () => {
   for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 60, neutralInput);
   assert.equal(world.endless!.dungeonChest?.unlocked, true);
   const prizesBeforeChest = world.openedPrizes.length;
+  const pendingBeforeChest = world.pendingReel.length;
 
   world.player.x = 190;
   world.player.y = 0;
   stepWorld(world, 1 / 60, neutralInput);
   assert.equal(world.endless!.dungeonChest?.opened, true);
+  assert.equal(world.openedPrizes.length - prizesBeforeChest, 0);
+  const pendingDungeonPrizes = world.pendingReel.splice(pendingBeforeChest);
+  pendingDungeonPrizes.forEach((prize) => claimLootPrize(world, prize));
   assert.equal(world.openedPrizes.length - prizesBeforeChest, 3);
   const prizesAfterChest = world.openedPrizes.length;
   assert.ok(world.lootBoxesOpened >= 1);

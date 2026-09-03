@@ -70,6 +70,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
 export function PaletteGalleryPanel({ onBack }: Props) {
   const { meta, buyPalette, equipPalette, buyRunAura, equipRunAura } = useMeta();
   const [category, setCategory] = useState<ShopCategory>('palettes');
+  const [previewPaletteId, setPreviewPaletteId] = useState(meta.activePaletteId);
   const [reactAnim, setReactAnim] = useState<AnimName>('idle');
   const [line, setLine] = useState(VENDOR_QUIPS[0]);
   const [notice, setNotice] = useState('Choose a commission. Every item is cosmetic-only.');
@@ -100,12 +101,15 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     triggerReaction(`${aura.name} purchased for ${aura.cost} loot token${aura.cost === 1 ? '' : 's'}.`);
   };
 
+  const previewPalette = THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette ?? VENDOR_PALETTE;
+
   return (
     <ScreenLayout title="Customization Shop" subtitle="Artisian Valur — Paint Gallery" onBack={onBack}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <aside className="flex shrink-0 flex-col items-center gap-3 border border-border bg-card px-6 py-5 lg:sticky lg:top-4 lg:w-72">
-          <RigPortrait rig={VENDOR_RIG} palette={VENDOR_PALETTE} anim={reactAnim} size={160} />
+          <RigPortrait rig={VENDOR_RIG} palette={previewPalette} anim={reactAnim} size={160} />
           <p className="text-sm font-black uppercase tracking-wide text-white">Artisian Valur</p>
+          <p className="-mt-2 text-center font-mono text-[8px] uppercase tracking-widest text-primary">Previewing {THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.name ?? 'Standard 616'}</p>
           <p className="min-h-[2.5rem] text-center text-xs italic leading-relaxed text-muted-foreground">&ldquo;{line}&rdquo;</p>
           <div className="w-full border border-primary/30 bg-primary/5 px-3 py-2 text-center">
             <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Wallet</p>
@@ -149,6 +153,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                           {[palette.palette.body, palette.palette.accent, palette.palette.accentBright, palette.palette.glow].map((color, colorIndex) => <span key={color} className={`h-5 flex-1 border border-white/10 ${palette.effect ? EFFECT_PREVIEW_CLASSES[palette.effect.kind] : ''}`} style={{ backgroundColor: color, animationDelay: `${colorIndex * 90}ms` }} />)}
                         </div>
                         <p className="mt-2 min-h-12 text-xs leading-relaxed text-muted-foreground">{palette.description}</p>
+                        <button type="button" onClick={() => setPreviewPaletteId(palette.id)} aria-pressed={previewPaletteId === palette.id} className={`mt-3 w-full border px-3 py-1.5 font-mono text-[8px] font-bold uppercase tracking-widest ${previewPaletteId === palette.id ? 'border-white/50 bg-white/10 text-white' : 'border-white/15 text-white/70 hover:border-white/40'}`} data-testid={`button-preview-palette-${palette.id}`}>{previewPaletteId === palette.id ? 'Previewing on Valur' : 'Preview on Valur'}</button>
                         {owned ? (
                           <button type="button" onClick={() => { equipPalette(palette.id); setNotice(`${palette.name} equipped.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-palette-${palette.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
                         ) : (

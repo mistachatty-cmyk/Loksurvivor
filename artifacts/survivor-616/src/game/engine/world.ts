@@ -785,6 +785,7 @@ export function createWorld(
     paletteEffect?: PaletteEffectDef;
     /** Progression-aware rescue selected by the meta layer. Undefined means this route is complete. */
     rescueAllyId?: string | undefined;
+    startingLokPets?: LokPetRoll[];
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1021,6 +1022,7 @@ export function createWorld(
     rebuildOrbiters(world);
   }
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
+  for (const pet of setup.startingLokPets ?? []) spawnLokPet(world, pet, 'loadout');
   return world;
 }
 
@@ -1737,7 +1739,7 @@ function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
 }
 
 /** Spawn one generated chest companion, replacing the oldest at the mobile-safe cap. */
-export function spawnLokPet(w: World, roll: LokPetRoll): LokPetInstance {
+export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['origin'] = 'chest'): LokPetInstance {
   if (w.lokPets.length >= MAX_LOKPETS) {
     const oldest = w.lokPets.shift();
     if (oldest) spawnParticles(w, oldest.x, oldest.y, oldest.palette.glow, 6, 65);
@@ -1747,6 +1749,7 @@ export function spawnLokPet(w: World, roll: LokPetRoll): LokPetInstance {
   const orbitAngle = (Math.PI * 2 * index) / MAX_LOKPETS + w.rng() * 0.2;
   const pet: LokPetInstance = {
     ...roll,
+    origin,
     uid: uid(w),
     x: w.player.x + Math.cos(orbitAngle) * (40 + index * 6),
     y: w.player.y + Math.sin(orbitAngle) * (40 + index * 6),
@@ -2873,7 +2876,9 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
   w.pendingLevelUps = Math.max(0, w.pendingLevelUps - 1);
 }
 
-function applyLootPrize(w: World, prize: LootPrizeDef) {
+/** Apply a revealed chest prize exactly when its reel lands (or is skipped). */
+export function claimLootPrize(w: World, prize: LootPrizeDef) {
+  w.openedPrizes.push(prize.label);
   switch (prize.kind) {
     case 'cred':
       w.cred += prize.amount ?? 0;
@@ -4602,11 +4607,10 @@ function updatePickups(w: World, dt: number) {
           pushAlert(w, 'Skeleton key found');
           break;
         case 'loot-box': {
-          // Roll and apply the prize immediately (safe even if run ends during reel).
+          // The prize is deliberately not granted until its reel lands. RunScreen
+          // settles any unseen prize before it hands the result back to meta.
           const prize = rollPrize(w.rng);
-          applyLootPrize(w, prize);
           w.lootBoxesOpened += 1;
-          w.openedPrizes.push(prize.label);
           // Queue for the reel overlay in RunScreen.
           w.pendingReel.push(prize);
           spawnParticles(w, p.x, p.y + 10, '#3b82f6', 14, 120);
@@ -5283,13 +5287,12 @@ function updateEndlessDungeon(w: World) {
       chest.opened = true;
       for (let i = 0; i < 3; i += 1) {
         const prize = rollPrize(w.rng);
-        applyLootPrize(w, prize);
-        w.openedPrizes.push(prize.label);
+        w.pendingReel.push(prize);
       }
       w.lootBoxesOpened += 1;
       const depthBonus = 10 + e.dungeonDepth * 8;
       w.cred += depthBonus;
-      pushAlert(w, 'Chest opened — 3 rewards secured');
+      pushAlert(w, 'Chest opened — 3 rewards waiting');
       pushAlert(w, `Depth bonus +${depthBonus} cred`);
       spawnParticles(w, chest.x, chest.y, '#ffd166', 24, 150);
     }
@@ -5731,6 +5734,12 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     lootBoxesOpened: w.lootBoxesOpened,
     openedPrizes: [...w.openedPrizes],
     lokPets: w.lokPetHistory.map((pet) => ({
+      origin: pet.origin,
+      roll: {
+        name: pet.name, variantId: pet.variantId, family: pet.family, silhouette: pet.silhouette, palette: pet.palette,
+        rarity: pet.rarity, rarityLabel: pet.rarityLabel, attackKind: pet.attackKind, element: pet.element,
+        elementLabel: pet.elementLabel, description: pet.description, stats: { ...pet.stats }, traitLabel: pet.traitLabel,
+      },
       name: pet.name,
       variantId: pet.variantId,
       family: pet.family,

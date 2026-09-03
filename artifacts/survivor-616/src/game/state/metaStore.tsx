@@ -70,6 +70,7 @@ import type {
   LokPetElement,
   LokPetRarity,
   LokPetRunDiscovery,
+  SavedLokPet,
   MetaState,
   RunResult,
   FacilityTier,
@@ -82,7 +83,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 12;
+const META_VERSION = 13;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -161,6 +162,10 @@ export function createInitialMeta(): MetaState {
     discoveryIds: [],
     lokPetCatalog: [],
     lokPetHistory: [],
+    savedLokPets: [],
+    selectedLokPetIds: [],
+    petElixirs: 3,
+    petElixirUpdatedAt: Date.now(),
     bestiary: {},
     totalKills: 0,
     totalRuns: 0,
@@ -544,6 +549,30 @@ function normalizeLokPetHistory(value: unknown): LokPetDiscoveryHistoryEntry[] {
     .slice(0, 100);
 }
 
+const PET_STAMINA_MAX = 3;
+const ELIXIR_GRANT_MS = 20 * 60 * 1000;
+const ELIXIR_GRANT_AMOUNT = 3;
+const ELIXIR_CAP = 18;
+
+function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry, index) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const candidate = entry as Partial<SavedLokPet>;
+    const roll = candidate.roll;
+    if (!roll || typeof roll !== 'object' || typeof candidate.id !== 'string' || typeof roll.variantId !== 'string' || typeof roll.name !== 'string') return [];
+    return [{ id: candidate.id, roll: roll as SavedLokPet['roll'], stamina: Math.max(0, Math.min(PET_STAMINA_MAX, counter(candidate.stamina))) }];
+  }).slice(0, 48);
+}
+
+function replenishPetElixirs(meta: MetaState, now = Date.now()): Pick<MetaState, 'petElixirs' | 'petElixirUpdatedAt'> {
+  const elapsed = Math.max(0, now - meta.petElixirUpdatedAt);
+  const grants = Math.floor(elapsed / ELIXIR_GRANT_MS);
+  return grants > 0
+    ? { petElixirs: Math.min(ELIXIR_CAP, meta.petElixirs + grants * ELIXIR_GRANT_AMOUNT), petElixirUpdatedAt: meta.petElixirUpdatedAt + grants * ELIXIR_GRANT_MS }
+    : { petElixirs: meta.petElixirs, petElixirUpdatedAt: meta.petElixirUpdatedAt };
+}
+
 /** Coerce an untrusted save payload into a usable MetaState. */
 export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const defaults = createInitialMeta();
@@ -660,6 +689,12 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     .map((episodeId) => CHARACTER_EPISODES_BY_ID[episodeId]?.evolutionId)
     .filter((evolutionId): evolutionId is string => Boolean(evolutionId));
   const unlockedEvolutionIds = [...new Set([...explicitEvolutionIds, ...completedEvolutionIds])];
+  const savedLokPets = normalizeSavedLokPets(parsed.savedLokPets);
+  const recoveredElixirs = replenishPetElixirs({
+    ...defaults,
+    petElixirs: Math.min(ELIXIR_CAP, counter(parsed.petElixirs ?? 3)),
+    petElixirUpdatedAt: Math.max(0, typeof parsed.petElixirUpdatedAt === 'number' ? parsed.petElixirUpdatedAt : Date.now()),
+  });
 
   return {
     version: META_VERSION,
@@ -695,6 +730,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
     lokPetHistory: normalizeLokPetHistory(parsed.lokPetHistory),
+    savedLokPets,
+    selectedLokPetIds: savedLokPets.filter((pet) => pet.stamina > 0 && Array.isArray(parsed.selectedLokPetIds) && parsed.selectedLokPetIds.includes(pet.id)).map((pet) => pet.id).slice(0, 3),
+    ...recoveredElixirs,
     bestiary,
     totalKills: counter(parsed.totalKills),
     totalRuns: counter(parsed.totalRuns),
@@ -745,7 +783,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 12 && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -969,6 +1007,9 @@ type Action =
   | { type: 'selectCharacter'; id: string }
   | { type: 'enterHideout' }
   | { type: 'completeRun'; result: RunResult }
+  | { type: 'toggleSavedLokPet'; id: string }
+  | { type: 'restoreSavedLokPet'; id: string; now: number }
+  | { type: 'refreshPetElixirs'; now: number }
   | { type: 'clearLastRun' }
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
@@ -1023,6 +1064,29 @@ export function reducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
     case 'selectCharacter':
       return { ...state, meta: { ...state.meta, selectedCharacterId: action.id } };
+
+    case 'toggleSavedLokPet': {
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet || pet.stamina <= 0) return state;
+      const selected = state.meta.selectedLokPetIds.includes(action.id)
+        ? state.meta.selectedLokPetIds.filter((id) => id !== action.id)
+        : state.meta.selectedLokPetIds.length < 3 ? [...state.meta.selectedLokPetIds, action.id] : state.meta.selectedLokPetIds;
+      return { ...state, meta: { ...state.meta, selectedLokPetIds: selected } };
+    }
+
+    case 'restoreSavedLokPet': {
+      const recovery = replenishPetElixirs(state.meta, action.now);
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet || pet.stamina >= PET_STAMINA_MAX || recovery.petElixirs < 1) return { ...state, meta: { ...state.meta, ...recovery } };
+      return { ...state, meta: { ...state.meta, ...recovery, petElixirs: recovery.petElixirs - 1, savedLokPets: state.meta.savedLokPets.map((candidate) => candidate.id === action.id ? { ...candidate, stamina: candidate.stamina + 1 } : candidate) } };
+    }
+
+    case 'refreshPetElixirs': {
+      const recovery = replenishPetElixirs(state.meta, action.now);
+      return recovery.petElixirs === state.meta.petElixirs
+        ? state
+        : { ...state, meta: { ...state.meta, ...recovery } };
+    }
 
     case 'enterHideout': {
       const crewActivitySeed = state.meta.crewActivitySeed + 1;
@@ -1434,6 +1498,15 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ? addUnique(prev.clearedAreaIds, result.areaId)
         : prev.clearedAreaIds;
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
+      const recoveredElixirs = replenishPetElixirs(prev);
+      const spentPetIds = new Set(prev.selectedLokPetIds);
+      const savedLokPets = [
+        ...result.lokPets
+          .filter((pet) => pet.origin === 'chest')
+          .map((pet, index) => ({ id: `pet-${Date.now().toString(36)}-${index}-${pet.variantId}`, roll: pet.roll, stamina: PET_STAMINA_MAX })),
+        ...prev.savedLokPets.map((pet) => spentPetIds.has(pet.id) ? { ...pet, stamina: Math.max(0, pet.stamina - 1) } : pet),
+      ].slice(0, 48);
+      const selectedLokPetIds = prev.selectedLokPetIds.filter((id) => savedLokPets.some((pet) => pet.id === id && pet.stamina > 0));
       const lokPetDiscoveries = getLokPetDiscoveries(prev.lokPetCatalog, result.lokPets);
       const lokPetHistory = lokPetDiscoveries.length > 0
         ? [
@@ -1456,6 +1529,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
         discoveryIds,
         lokPetCatalog,
         lokPetHistory,
+        savedLokPets,
+        selectedLokPetIds,
+        ...recoveredElixirs,
         clearedAreaIds,
         totalKills: prev.totalKills + result.kills,
         totalRuns: prev.totalRuns + 1,
@@ -1549,6 +1625,9 @@ export interface MetaContextValue {
   enterHideout: () => void;
   selectCharacter: (id: string) => void;
   completeRun: (result: RunResult) => void;
+  toggleSavedLokPet: (id: string) => void;
+  restoreSavedLokPet: (id: string) => void;
+  refreshPetElixirs: () => void;
   clearLastRun: () => void;
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
@@ -1610,6 +1689,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const selectCharacter = useCallback((id: string) => dispatch({ type: 'selectCharacter', id }), []);
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout' }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
+  const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
+  const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
+  const refreshPetElixirs = useCallback(() => dispatch({ type: 'refreshPetElixirs', now: Date.now() }), []);
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
@@ -1739,6 +1821,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       enterHideout,
       selectCharacter,
       completeRun,
+      toggleSavedLokPet,
+      restoreSavedLokPet,
+      refreshPetElixirs,
       clearLastRun,
       markOnboarded,
       spendTokens,
@@ -1789,6 +1874,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectCharacter,
     enterHideout,
     completeRun,
+    toggleSavedLokPet,
+    restoreSavedLokPet,
+    refreshPetElixirs,
     clearLastRun,
     markOnboarded,
     spendTokens,

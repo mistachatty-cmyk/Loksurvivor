@@ -10,6 +10,7 @@ import {
   getLokPetDiscoveries,
   MAX_FATIGUE_PCT,
   MetaProvider,
+  activeUiThemeSwatchId,
   rewardCredMultiplier,
   startingWeaponLevel,
   useMeta,
@@ -298,11 +299,21 @@ function Providers({ children }: { children: ReactNode }) {
   );
 }
 
+/** Theme attributes live above every screen, including the canvas run. */
+function ThemedGame() {
+  const { meta } = useMeta();
+  return (
+    <div data-ui-theme={meta.uiTheme} data-ui-swatch={activeUiThemeSwatchId(meta)} className="min-h-[100dvh]">
+      <Game />
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <Providers>
-        <Game />
+        <ThemedGame />
       </Providers>
     </ErrorBoundary>
   );

@@ -155,6 +155,14 @@ export interface LokPetRoll {
   traitLabel: string;
 }
 
+/** A captured, repeatable LokPet blueprint stored in the player's kennel. */
+export interface SavedLokPet {
+  id: string;
+  roll: LokPetRoll;
+  /** One charge is spent when the pet joins a run; elixirs restore it. */
+  stamina: number;
+}
+
 /** A run-independent record of a LokPet variant seen in any run. */
 export interface LokPetCatalogTrait {
   attackKind: LokPetAttackKind;
@@ -202,6 +210,8 @@ export interface LokPetDiscoveryHistoryEntry {
 
 /** A generated LokPet currently orbiting the player in a run. */
 export interface LokPetInstance extends LokPetRoll {
+  /** Whether this companion came from a chest this run or the saved loadout. */
+  origin: 'chest' | 'loadout';
   uid: number;
   x: number;
   y: number;
@@ -1344,6 +1354,13 @@ export interface MetaState {
   lokPetCatalog: LokPetCatalogEntry[];
   /** Chronological LokPet catalog progress, grouped by run. */
   lokPetHistory: LokPetDiscoveryHistoryEntry[];
+  /** Individually saved chest companions; duplicates are intentional and stack. */
+  savedLokPets: SavedLokPet[];
+  /** Up to three saved companions selected for the next run. */
+  selectedLokPetIds: string[];
+  /** Recovery currency, regenerated in groups of three every twenty minutes. */
+  petElixirs: number;
+  petElixirUpdatedAt: number;
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
   totalKills: number;
@@ -1441,6 +1458,8 @@ export interface RunResult {
   openedPrizes: string[];
   /** LokPets generated from chest rewards during this run. */
   lokPets: Array<{
+    origin: 'chest' | 'loadout';
+    roll: LokPetRoll;
     name: string;
     variantId: string;
     family: LokPetFamily;
