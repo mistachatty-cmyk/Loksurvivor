@@ -1808,9 +1808,49 @@ test('a LokPet chest prize spawns a generated companion and exposes it to the HU
   claimLootPrize(world, world.pendingReel[0]!);
   assert.equal(world.lokPets.length, 1);
   assert.equal(world.pendingReel[0]?.lokPet?.variantId, world.lokPets[0]?.variantId);
+  claimLootPrize(world, world.pendingReel[0]!);
+  assert.equal(world.lokPets.length, 1, 'a replayed reel landing cannot duplicate the companion');
   const snapshot = hudSnapshot(world);
   assert.equal(snapshot.lokPets.length, 1);
   assert.equal(snapshot.lokPets[0]?.ghost, false);
+});
+
+test('saved LokPets enter as loadout companions, consume stamina, and never clone themselves', () => {
+  const roll = rollLokPet(createRng(617));
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    617,
+    [],
+    1,
+    true,
+    null,
+    { startingLokPets: [roll] },
+  );
+  const result = buildResult(world);
+  assert.equal(result.lokPets.length, 1);
+  assert.equal(result.lokPets[0]?.origin, 'loadout');
+
+  const startedAt = Date.now();
+  const state = {
+    meta: {
+      ...createInitialMeta(),
+      savedLokPets: [{ id: 'packed-pet', roll, stamina: 1 }],
+      selectedLokPetIds: ['packed-pet'],
+      petElixirs: 0,
+      petElixirUpdatedAt: startedAt,
+    },
+    lastRun: null,
+  };
+  const afterRun = reducer(state, { type: 'completeRun', result });
+  assert.equal(afterRun.meta.savedLokPets.length, 1, 'loadout pets are not re-saved as chest captures');
+  assert.equal(afterRun.meta.savedLokPets[0]?.stamina, 0);
+  assert.deepEqual(afterRun.meta.selectedLokPetIds, []);
+
+  const restored = reducer(afterRun, { type: 'restoreSavedLokPet', id: 'packed-pet', now: startedAt + 20 * 60 * 1000 });
+  assert.equal(restored.meta.petElixirs, 2, 'one of the three regenerated elixirs restores the pet');
+  assert.equal(restored.meta.savedLokPets[0]?.stamina, 1);
 });
 
 test('LokPets follow, apply elemental attacks, explode, and become transparent ghosts', () => {

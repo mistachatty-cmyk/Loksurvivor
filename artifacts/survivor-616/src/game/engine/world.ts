@@ -691,6 +691,8 @@ export interface World {
   lootBoxMilestonesHit: Set<number>;
   /** Prizes queued for the reel overlay; each entry is consumed by RunScreen. */
   pendingReel: LootPrizeDef[];
+  /** Claim guard for reel rewards. Individual boxes may roll the same prize. */
+  claimedLootPrizes: WeakSet<LootPrizeDef>;
   /** Total blue boxes opened this run. */
   lootBoxesOpened: number;
   /** Label of each prize collected this run. */
@@ -954,6 +956,7 @@ export function createWorld(
       : undefined,
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
+    claimedLootPrizes: new WeakSet(),
     lootBoxesOpened: 0,
     openedPrizes: [],
     lootTokensGained: 0,
@@ -2878,6 +2881,8 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
 
 /** Apply a revealed chest prize exactly when its reel lands (or is skipped). */
 export function claimLootPrize(w: World, prize: LootPrizeDef) {
+  if (w.claimedLootPrizes.has(prize)) return;
+  w.claimedLootPrizes.add(prize);
   w.openedPrizes.push(prize.label);
   switch (prize.kind) {
     case 'cred':

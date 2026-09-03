@@ -1,10 +1,9 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
-import { RunScreen } from '@/game/RunScreen';
 import {
   FATIGUE_PER_RUN_PCT,
   getLokPetDiscoveries,
@@ -35,9 +34,8 @@ import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
 import { MapBuilder } from '@/ui/MapBuilder';
-import { lazy, Suspense } from 'react';
-
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
+const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
 
 const queryClient = new QueryClient();
 
@@ -240,19 +238,21 @@ function Game() {
           return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
         }
         return (
-          <RunScreen
-            key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
-            areaId={screen.areaId}
-            areaOverride={customMap ? customMapToArea(customMap) : undefined}
-            characterId={selectedCharacter.id}
-            challengeIds={screen.challengeIds}
-            episodeId={screen.episodeId}
-            startingWeaponLevel={startingWeaponLevel(meta)}
-            utilityRewardMultiplier={rewardCredMultiplier(meta)}
-            physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
-            onAbort={goHub}
-            onFinish={handleFinish}
-          />
+          <Suspense fallback={<div className="grid min-h-dvh place-items-center bg-black font-mono text-xs uppercase tracking-[0.25em] text-blue-200">Loading block…</div>}>
+            <RunScreen
+              key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
+              areaId={screen.areaId}
+              areaOverride={customMap ? customMapToArea(customMap) : undefined}
+              characterId={selectedCharacter.id}
+              challengeIds={screen.challengeIds}
+              episodeId={screen.episodeId}
+              startingWeaponLevel={startingWeaponLevel(meta)}
+              utilityRewardMultiplier={rewardCredMultiplier(meta)}
+              physicsObjectClicksEnabled={meta.physicsObjectClicksEnabled}
+              onAbort={goHub}
+              onFinish={handleFinish}
+            />
+          </Suspense>
         );
       }
 

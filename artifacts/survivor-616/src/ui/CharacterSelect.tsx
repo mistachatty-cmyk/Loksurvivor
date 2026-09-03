@@ -190,7 +190,40 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
     >
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <CharacterAbilityVisualizer character={selectedCharacter} />
-        {meta.savedLokPets.length > 0 ? <section className="border border-pink-300/30 bg-card p-4" data-testid="section-pet-loadout"><div className="flex items-center justify-between gap-3"><div><h2 className="font-black uppercase text-white">LokPet loadout</h2><p className="text-xs text-muted-foreground">Select up to three saved companions. Elixirs regenerate 3 every 20 minutes.</p></div><span className="font-mono text-sm text-pink-200">{meta.petElixirs} elixir</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{meta.savedLokPets.map((pet) => { const selected = meta.selectedLokPetIds.includes(pet.id); return <article key={pet.id} className={`flex items-center gap-2 border p-2 ${selected ? 'border-pink-300 bg-pink-300/10' : 'border-white/15'}`}><LokPetIcon silhouette={pet.roll.silhouette} palette={pet.roll.palette} size={30}/><div className="min-w-0 flex-1"><p className="truncate text-[10px] font-bold uppercase text-white">{pet.roll.name}</p><p className="text-[9px] text-muted-foreground">{pet.roll.rarityLabel} · {pet.stamina}/3 charge</p></div>{pet.stamina > 0 ? <button type="button" onClick={() => toggleSavedLokPet(pet.id)} className="border px-2 py-1 font-mono text-[8px] uppercase text-pink-100">{selected ? 'Packed' : 'Pack'}</button> : <button type="button" onClick={() => restoreSavedLokPet(pet.id)} disabled={meta.petElixirs < 1} className="border px-2 py-1 font-mono text-[8px] uppercase text-pink-100 disabled:opacity-40">Restore</button>}</article>; })}</div></section> : null}
+        {meta.savedLokPets.length > 0 ? (
+          <section className="border border-pink-300/30 bg-card p-4" data-testid="section-pet-loadout">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-black uppercase text-white">LokPet loadout</h2>
+                <p className="text-xs text-muted-foreground">Select up to three saved companions. Elixirs regenerate 3 every 20 minutes.</p>
+              </div>
+              <span className="font-mono text-sm text-pink-200">{meta.petElixirs} elixir</span>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {meta.savedLokPets.map((pet) => {
+                const selected = meta.selectedLokPetIds.includes(pet.id);
+                return (
+                  <article key={pet.id} className={`flex items-center gap-2 border p-2 ${selected ? 'border-pink-300 bg-pink-300/10' : 'border-white/15'}`}>
+                    <LokPetIcon silhouette={pet.roll.silhouette} palette={pet.roll.palette} size={30} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[10px] font-bold uppercase text-white">{pet.roll.name}</p>
+                      <p className="text-[9px] text-muted-foreground">{pet.roll.rarityLabel} · {pet.stamina}/3 charge</p>
+                    </div>
+                    {pet.stamina > 0 ? (
+                      <button type="button" onClick={() => toggleSavedLokPet(pet.id)} className="border px-2 py-1 font-mono text-[8px] uppercase text-pink-100">
+                        {selected ? 'Packed' : 'Pack'}
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => restoreSavedLokPet(pet.id)} disabled={meta.petElixirs < 1} className="border px-2 py-1 font-mono text-[8px] uppercase text-pink-100 disabled:opacity-40">
+                        Restore
+                      </button>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
         <LokPetVariantSheet />
 
         {layout === 'rail' ? (
