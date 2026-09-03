@@ -191,6 +191,7 @@ export function createInitialMeta(): MetaState {
     uiThemeSwatchByTheme: {},
     ownedPaletteIds: [DEFAULT_PALETTE_ID],
     activePaletteId: DEFAULT_PALETTE_ID,
+    paletteOverrideByCharacter: {},
     ownedRunAuraIds: [DEFAULT_RUN_AURA_ID],
     activeRunAuraId: DEFAULT_RUN_AURA_ID,
     dailyContractDayKey: contractDayKey(),
@@ -289,6 +290,21 @@ function normalizeOwnedPaletteIds(value: unknown): string[] {
 
 function normalizePaletteId(value: unknown, ownedPaletteIds: string[]): string {
   return typeof value === 'string' && ownedPaletteIds.includes(value) ? value : DEFAULT_PALETTE_ID;
+}
+
+function normalizePaletteOverrideByCharacter(
+  value: unknown,
+  characterIds: Set<string>,
+  ownedPaletteIds: string[],
+): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const overrides: Record<string, string> = {};
+  for (const [characterId, rawPaletteId] of Object.entries(value)) {
+    if (characterIds.has(characterId) && typeof rawPaletteId === 'string' && ownedPaletteIds.includes(rawPaletteId)) {
+      overrides[characterId] = rawPaletteId;
+    }
+  }
+  return overrides;
 }
 
 function normalizeOwnedRunAuraIds(value: unknown): string[] {
@@ -730,6 +746,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
     ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
     activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
+    paletteOverrideByCharacter: normalizePaletteOverrideByCharacter(
+      parsed.paletteOverrideByCharacter,
+      characterIds,
+      normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
+    ),
     ownedRunAuraIds,
     activeRunAuraId: normalizeRunAuraId(parsed.activeRunAuraId, ownedRunAuraIds),
     dailyContractDayKey,
@@ -981,6 +1002,7 @@ type Action =
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'buyPalette'; id: string }
   | { type: 'equipPalette'; id: string }
+  | { type: 'setCharacterPaletteOverride'; characterId: string; id: string }
   | { type: 'buyRunAura'; id: string }
   | { type: 'equipRunAura'; id: string }
   | { type: 'cycleUiLook' }
@@ -1164,6 +1186,16 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (!hasCatalogItem(state.meta, 'palettes', action.id, state.meta.ownedPaletteIds)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
 
+    case 'setCharacterPaletteOverride':
+      if (!hasCatalogItem(state.meta, 'palettes', action.id, state.meta.ownedPaletteIds)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          paletteOverrideByCharacter: { ...state.meta.paletteOverrideByCharacter, [action.characterId]: action.id },
+        },
+      };
+
     case 'buyRunAura': {
       const aura = RUN_AURAS_BY_ID[action.id];
       if (!aura || state.meta.ownedRunAuraIds.includes(aura.id) || state.meta.lootTokens < aura.cost) return state;
@@ -1220,6 +1252,11 @@ export function reducer(state: StoreState, action: Action): StoreState {
             ? {
                 uiTheme: state.meta.ownedUiThemeIds.includes(state.meta.uiTheme) ? state.meta.uiTheme : DEFAULT_UI_THEME_ID,
                 activePaletteId: state.meta.ownedPaletteIds.includes(state.meta.activePaletteId) ? state.meta.activePaletteId : DEFAULT_PALETTE_ID,
+                paletteOverrideByCharacter: Object.fromEntries(
+                  Object.entries(state.meta.paletteOverrideByCharacter).filter(([, paletteId]) =>
+                    state.meta.ownedPaletteIds.includes(paletteId),
+                  ),
+                ),
                 activeRunAuraId: state.meta.ownedRunAuraIds.includes(state.meta.activeRunAuraId) ? state.meta.activeRunAuraId : DEFAULT_RUN_AURA_ID,
               }
             : {}),
@@ -1561,6 +1598,7 @@ export interface MetaContextValue {
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   buyPalette: (id: string) => void;
   equipPalette: (id: string) => void;
+  setCharacterPaletteOverride: (characterId: string, id: string) => void;
   buyRunAura: (id: string) => void;
   equipRunAura: (id: string) => void;
   cycleUiLook: () => void;
@@ -1625,6 +1663,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
+  const setCharacterPaletteOverride = useCallback(
+    (characterId: string, id: string) => dispatch({ type: 'setCharacterPaletteOverride', characterId, id }),
+    [],
+  );
   const buyRunAura = useCallback((id: string) => dispatch({ type: 'buyRunAura', id }), []);
   const equipRunAura = useCallback((id: string) => dispatch({ type: 'equipRunAura', id }), []);
   const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
@@ -1751,6 +1793,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectUiThemeSwatch,
       buyPalette,
       equipPalette,
+      setCharacterPaletteOverride,
       buyRunAura,
       equipRunAura,
       cycleUiLook,
@@ -1801,6 +1844,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectUiThemeSwatch,
     buyPalette,
     equipPalette,
+    setCharacterPaletteOverride,
     buyRunAura,
     equipRunAura,
     cycleUiLook,

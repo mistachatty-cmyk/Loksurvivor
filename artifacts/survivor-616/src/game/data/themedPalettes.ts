@@ -1,4 +1,4 @@
-import type { ThemedPaletteDef } from '@/game/types';
+import type { MetaState, ThemedPaletteDef } from '@/game/types';
 
 /**
  * Purchasable character/world color palettes for cosmetic customization.
@@ -380,6 +380,14 @@ export const THEMED_PALETTES: ThemedPaletteDef[] = [
   { id: 'paper-dragon', name: 'Paper Dragon', description: 'Newsprint gray catches flashes of ceremonial red and gold.', cost: 2, tier: 'uncommon', effect: { kind: 'flicker', label: 'Paper flame', speed: 1.4, intensity: 0.58 }, palette: { ink: '#171717', body: '#737373', bodyDark: '#262626', accent: '#ef4444', accentBright: '#fde68a', skin: '#d6d3d1', glow: '#f59e0b' } },
   { id: 'gravity-grape', name: 'Gravity Grape', description: 'Dense ultraviolet bends a mint signal around the silhouette.', cost: 4, tier: 'legendary', effect: { kind: 'prism', label: 'Gravity lens', speed: 0.9, intensity: 0.92 }, palette: { ink: '#090316', body: '#4c1d95', bodyDark: '#2e1065', accent: '#6ee7b7', accentBright: '#ddd6fe', skin: '#8b5cf6', glow: '#c4b5fd' } },
   { id: 'storm-peach', name: 'Storm Peach', description: 'Soft peach light interrupted by blue-black lightning bands.', cost: 3, tier: 'rare', effect: { kind: 'wave', label: 'Heat lightning', speed: 1.8, intensity: 0.68 }, palette: { ink: '#0f172a', body: '#7c2d3c', bodyDark: '#312e4b', accent: '#fdba74', accentBright: '#ffedd5', skin: '#fb923c', glow: '#818cf8' } },
+  { id: 'copper-patina', name: 'Copper Patina', description: 'Aged verdigris and weathered copper. A century of Rust Belt rooftops.', cost: 1, tier: 'standard', palette: { ink: '#0a1410', body: '#3a6b5a', bodyDark: '#1f3d33', accent: '#5fae8c', accentBright: '#8fd4b3', skin: '#7a9a8a', glow: '#4fc99a' } },
+  { id: 'desert-mirage', name: 'Desert Mirage', description: 'Warm sand and shimmering turquoise. A heat-haze horizon.', cost: 1, tier: 'standard', palette: { ink: '#2a1f0a', body: '#c9a876', bodyDark: '#8a6a42', accent: '#3ab8b0', accentBright: '#7ee8df', skin: '#e8c9a0', glow: '#2ee6d6' } },
+  { id: 'cherry-blossom', name: 'Cherry Blossom', description: 'Soft petal pinks and cream. The gallery’s first pastel commission.', cost: 2, tier: 'uncommon', palette: { ink: '#3a1a28', body: '#f0b8c8', bodyDark: '#c988a0', accent: '#ff6fa5', accentBright: '#ffd0e0', skin: '#ffe0e8', glow: '#ff8fb8' } },
+  { id: 'midnight-rust', name: 'Midnight Rust', description: 'Scorched iron and dried blood-orange. Industrial decay, dressed up.', cost: 2, tier: 'uncommon', palette: { ink: '#1a0e08', body: '#7a4020', bodyDark: '#3d1f0f', accent: '#c9601f', accentBright: '#e8935a', skin: '#b06a3a', glow: '#d4571a' } },
+  { id: 'aurora-drift', name: 'Aurora Drift', description: 'A living shimmer that breathes brighter and dimmer, like the sky itself.', cost: 3, tier: 'rare', effect: { kind: 'pulse', label: 'Sky breath', speed: 0.25, intensity: 0.3 }, palette: { ink: '#0a1420', body: '#1c3a4a', bodyDark: '#0f222c', accent: '#3ee6c4', accentBright: '#8ffbe3', skin: '#bfe9ff', glow: '#4dffcf' } },
+  { id: 'void-pulse', name: 'Void Pulse', description: 'Near-black violet that throbs faintly, like something still breathing in there.', cost: 3, tier: 'rare', effect: { kind: 'pulse', label: 'Void throb', speed: 1, intensity: 0.3 }, palette: { ink: '#050208', body: '#1a0f2e', bodyDark: '#0a0515', accent: '#7c3aed', accentBright: '#a78bfa', skin: '#4a3868', glow: '#9d00ff' } },
+  { id: 'ember-pulse', name: 'Ember Pulse', description: 'A living coal, breathing brighter with every heartbeat. Legendary heat.', cost: 5, tier: 'legendary', effect: { kind: 'pulse', label: 'Coal heartbeat', speed: 0.6, intensity: 0.6 }, palette: { ink: '#1a0d05', body: '#6b2e12', bodyDark: '#3d1908', accent: '#ff5722', accentBright: '#ffab40', skin: '#c77b4a', glow: '#ff3d00' } },
+  { id: 'solar-flare', name: 'Solar Flare', description: 'Blinding gold that surges in slow, brilliant bursts. The gallery’s masterpiece.', cost: 5, tier: 'legendary', effect: { kind: 'pulse', label: 'Solar surge', speed: 0.4, intensity: 0.75 }, palette: { ink: '#2a1a00', body: '#b8860b', bodyDark: '#7a5200', accent: '#ffd700', accentBright: '#fff9c4', skin: '#e8c07a', glow: '#ffee00' } },
 ];
 
 export const THEMED_PALETTES_BY_ID: Record<string, ThemedPaletteDef> = Object.fromEntries(
@@ -395,4 +403,14 @@ export function getThemePalette(id: string): ThemedPaletteDef | undefined {
 export function getActivePalette(paletteId: string) {
   const palette = THEMED_PALETTES_BY_ID[paletteId];
   return palette?.palette ?? THEMED_PALETTES_BY_ID[DEFAULT_PALETTE_ID]?.palette;
+}
+
+/**
+ * A character with its own override (set on the Roster screen) uses that
+ * skin; otherwise it falls back to the Paint Gallery's globally-equipped
+ * one, exactly as every character behaved before per-character overrides
+ * existed.
+ */
+export function resolvePaletteIdForCharacter(meta: MetaState, characterId: string): string {
+  return meta.paletteOverrideByCharacter[characterId] ?? meta.activePaletteId;
 }

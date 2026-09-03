@@ -6,7 +6,7 @@ import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { useMeta } from '@/game/state/metaStore';
 import { humanoidRig } from '@/game/sprites/rigs';
-import type { AnimName, PaletteEffectKind, RunAuraStyle, SpritePalette } from '@/game/types';
+import type { AnimName, CosmeticTier, PaletteEffectKind, RunAuraStyle, SpritePalette } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
 
@@ -31,6 +31,13 @@ const AURA_ICONS = {
   'glitch-echo': ScanLine,
   mothlight: Sparkles,
 } satisfies Record<RunAuraStyle, typeof Sparkles>;
+
+const TIER_BADGE_CLASS = {
+  standard: 'border-white/15 text-white/65',
+  uncommon: 'border-emerald-500/40 text-emerald-400',
+  rare: 'border-sky-500/40 text-sky-400',
+  legendary: 'border-amber-400/50 text-amber-300',
+} satisfies Record<CosmeticTier, string>;
 
 const EFFECT_PREVIEW_CLASSES = {
   glow: 'palette-preview-glow',
@@ -142,7 +149,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                           {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Equipped" /> : null}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className="border border-white/15 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest text-white/65">{palette.tier ?? 'standard'}</span>
+                          <span className={`border px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest ${TIER_BADGE_CLASS[palette.tier ?? 'standard']}`}>{palette.tier ?? 'standard'}</span>
                           {palette.effect ? <span className="border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest text-primary">Animated · {palette.effect.label}</span> : null}
                         </div>
                         <div className="mt-2 flex gap-1" role="img" aria-label={`${palette.name} color preview`}>

@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
-import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
+import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette, resolvePaletteIdForCharacter } from '@/game/data/themedPalettes';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
@@ -180,10 +180,14 @@ export function RunScreen({
   // A purchased palette recolors the character (and, via its glow/accent, the
   // weapons/effects that key off it) without touching the shared data record
   // -- everyone else selecting this character still gets the authored look.
+  // A character with its own Roster override uses that skin; otherwise it
+  // follows the Paint Gallery's globally-equipped one, same as before
+  // per-character overrides existed.
+  const resolvedPaletteId = resolvePaletteIdForCharacter(meta, characterId);
   const character =
-    meta.activePaletteId === DEFAULT_PALETTE_ID
+    resolvedPaletteId === DEFAULT_PALETTE_ID
       ? baseCharacter
-      : { ...baseCharacter, palette: getActivePalette(meta.activePaletteId) ?? baseCharacter.palette };
+      : { ...baseCharacter, palette: getActivePalette(resolvedPaletteId) ?? baseCharacter.palette };
   const firstNightChapter = getFirstNightChapter(areaId);
   const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
@@ -224,7 +228,7 @@ export function RunScreen({
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
-        paletteEffect: prefersReducedMotion ? undefined : getThemePalette(meta.activePaletteId)?.effect,
+        paletteEffect: prefersReducedMotion ? undefined : getThemePalette(resolvedPaletteId)?.effect,
       },
     );
   }

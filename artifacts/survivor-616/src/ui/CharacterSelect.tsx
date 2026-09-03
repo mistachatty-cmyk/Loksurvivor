@@ -3,10 +3,12 @@
  * name and props stable.
  */
 import { Fragment } from 'react';
-import { BookOpen, LockKeyhole, Zap } from 'lucide-react';
+import { BookOpen, LockKeyhole, Palette as PaletteIcon, Zap } from 'lucide-react';
 
 import { describeUnlock, effectiveStats, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
+import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
+import { getThemePalette, resolvePaletteIdForCharacter, THEMED_PALETTES } from '@/game/data/themedPalettes';
 import type { CharacterDef, MetaState } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
@@ -35,17 +37,22 @@ function CharacterDetail({
   character,
   meta,
   onLaunchEpisode,
+  onSetPaletteOverride,
   inline = false,
 }: {
   character: CharacterDef;
   meta: MetaState;
   onLaunchEpisode?: (episodeId: string, areaId: string) => void;
+  onSetPaletteOverride: (characterId: string, id: string) => void;
   inline?: boolean;
 }) {
   const stats = effectiveStats(character, meta);
   const episode = CHARACTER_EPISODE_BY_CHARACTER_ID[character.id];
   const status = episode ? episodeStatus(episode.id, meta) : 'locked';
   const progress = episode ? episodeProgress(episode.id, meta) : 0;
+  const equippedPaletteId = resolvePaletteIdForCharacter(meta, character.id);
+  const resolvedPalette = getThemePalette(equippedPaletteId)?.palette ?? character.palette;
+  const ownedSkins = THEMED_PALETTES.filter((theme) => hasCatalogItem(meta, 'palettes', theme.id, meta.ownedPaletteIds));
 
   return (
     <div
@@ -54,13 +61,41 @@ function CharacterDetail({
     >
       <div className="flex shrink-0 items-center gap-3">
         <div className="terminal-frame grid h-16 w-16 shrink-0 place-items-center border border-primary/40 bg-black/40">
-          <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={56} />
+          <RigPortrait rig={character.rig} palette={resolvedPalette} anim="idle" size={56} />
         </div>
         <div className="min-w-0">
           <h3 className="terminal-glow truncate text-lg font-black uppercase leading-tight text-white">{character.name}</h3>
           <p className="truncate text-[11px] font-bold uppercase tracking-wider text-primary">{character.handle}</p>
         </div>
       </div>
+
+      {ownedSkins.length > 1 ? (
+        <div className={inline ? 'w-full' : ''}>
+          <div className="mb-1.5 flex items-center gap-2">
+            <PaletteIcon className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white">Skin for {character.name}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5" data-testid={`section-skin-picker-${character.id}`}>
+            {ownedSkins.map((theme) => {
+              const equipped = theme.id === equippedPaletteId;
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  title={theme.name}
+                  aria-pressed={equipped}
+                  onClick={() => onSetPaletteOverride(character.id, theme.id)}
+                  className={`h-7 w-7 border-2 transition-colors ${
+                    equipped ? 'border-primary' : 'border-white/15 opacity-70 hover:opacity-100'
+                  }`}
+                  style={{ backgroundColor: theme.palette.accent }}
+                  data-testid={`button-select-skin-${character.id}-${theme.id}`}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className={inline ? 'min-w-[14rem] flex-1' : ''}>
         <p className="text-xs italic text-muted-foreground">&ldquo;{character.tagline}&rdquo;</p>
@@ -122,13 +157,16 @@ function CharacterDetail({
 
 function CharacterTile({
   character,
+  meta,
   selected,
   onSelect,
 }: {
   character: CharacterDef;
+  meta: MetaState;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const resolvedPalette = getThemePalette(resolvePaletteIdForCharacter(meta, character.id))?.palette ?? character.palette;
   return (
     <button
       type="button"
@@ -140,7 +178,7 @@ function CharacterTile({
       data-testid={`button-character-${character.id}`}
     >
       <div className="grid h-14 w-14 place-items-center border border-border bg-black/40">
-        <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={48} />
+        <RigPortrait rig={character.rig} palette={resolvedPalette} anim="idle" size={48} />
       </div>
       <span className="w-full truncate text-[10px] font-black uppercase tracking-wide text-white">{character.name}</span>
     </button>
@@ -163,7 +201,7 @@ function LockedCharacterTile({ character }: { character: CharacterDef }) {
 }
 
 export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: CharacterSelectProps) {
-  const { unlockedCharacters, lockedCharacters, selectedCharacter, selectCharacter, meta } = useMeta();
+  const { unlockedCharacters, lockedCharacters, selectedCharacter, selectCharacter, setCharacterPaletteOverride, meta } = useMeta();
   const layout = meta.uiPanelLayout;
 
   return (
@@ -188,12 +226,18 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
 
         {layout === 'rail' ? (
           <div className="grid gap-4 lg:grid-cols-[20rem_1fr]" data-testid="section-roster-grid">
-            <CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} />
+            <CharacterDetail
+              character={selectedCharacter}
+              meta={meta}
+              onLaunchEpisode={onLaunchEpisode}
+              onSetPaletteOverride={setCharacterPaletteOverride}
+            />
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               {unlockedCharacters.map((character) => (
                 <CharacterTile
                   key={character.id}
                   character={character}
+                  meta={meta}
                   selected={character.id === selectedCharacter.id}
                   onSelect={() => selectCharacter(character.id)}
                 />
@@ -209,12 +253,19 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
               <Fragment key={character.id}>
                 <CharacterTile
                   character={character}
+                  meta={meta}
                   selected={character.id === selectedCharacter.id}
                   onSelect={() => selectCharacter(character.id)}
                 />
                 {character.id === selectedCharacter.id ? (
                   <div className="col-span-full">
-                    <CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} inline />
+                    <CharacterDetail
+                      character={selectedCharacter}
+                      meta={meta}
+                      onLaunchEpisode={onLaunchEpisode}
+                      onSetPaletteOverride={setCharacterPaletteOverride}
+                      inline
+                    />
                   </div>
                 ) : null}
               </Fragment>

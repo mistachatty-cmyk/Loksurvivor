@@ -1399,8 +1399,10 @@ export interface MetaState {
   uiThemeSwatchByTheme: Record<string, string>;
   /** Purchased themed palette ids. The 'default' palette is always included. */
   ownedPaletteIds: string[];
-  /** Currently active character/world color palette id. */
+  /** Currently active character/world color palette id. Fallback for any character without its own override below. */
   activePaletteId: string;
+  /** Per-character skin override, keyed by character id. Falls back to activePaletteId when a character has no entry. */
+  paletteOverrideByCharacter: Record<string, string>;
   /** Purchased procedural run aura ids. The street halo is always included. */
   ownedRunAuraIds: string[];
   /** Currently equipped procedural run aura id. */
