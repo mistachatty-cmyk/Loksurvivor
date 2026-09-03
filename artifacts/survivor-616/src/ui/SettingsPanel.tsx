@@ -65,6 +65,8 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setStudioPlugins,
     setWorldInvertEnabled,
     setPaletteInvertEnabled,
+    setPaletteAnimations,
+    setWorldPaletteBlend,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
   const effectiveUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
@@ -642,6 +644,26 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 Theme combinations: {ownedLookCount} owned
               </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2" data-testid="character-palette-behavior-settings">
+                <button
+                  type="button"
+                  onClick={() => setWorldPaletteBlend(!meta.worldPaletteBlendEnabled)}
+                  aria-pressed={meta.worldPaletteBlendEnabled}
+                  className={`border px-3 py-3 text-left transition-colors ${meta.worldPaletteBlendEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
+                >
+                  <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">World + personal skin</span>
+                  <span className="mt-1 block text-xs">{meta.worldPaletteBlendEnabled ? 'Blended together' : 'Personal skin only'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaletteAnimations(!meta.paletteAnimationsEnabled)}
+                  aria-pressed={meta.paletteAnimationsEnabled}
+                  className={`border px-3 py-3 text-left transition-colors ${meta.paletteAnimationsEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
+                >
+                  <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">Animated palette motion</span>
+                  <span className="mt-1 block text-xs">{meta.paletteAnimationsEnabled ? 'Effects moving' : 'Colors remain, motion off'}</span>
+                </button>
+              </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {UI_THEMES.map((theme) => {
                   const owned = hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds);

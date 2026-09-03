@@ -15,6 +15,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
+import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store';
 
@@ -60,6 +63,13 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun } = useMeta();
+  const { playTrackOnRepeat } = useMusicPlayer();
+  const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
+
+  const enterRoom = (nextRoomId: string) => {
+    onChangeRoom(nextRoomId);
+    if (nextRoomId === 'rooftop-perch') playTrackOnRepeat('rbm');
+  };
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
@@ -164,7 +174,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
                 <button
                   key={room.id}
                   type="button"
-                  onClick={() => onChangeRoom(room.id)}
+                  onClick={() => enterRoom(room.id)}
                   className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border ${
                     isActive 
                       ? 'bg-primary text-primary-foreground border-primary' 
@@ -345,7 +355,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
              </div>
              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                <HideoutVignette
-                 left={{ name: selectedCharacter.name, rig: selectedCharacter.rig, palette: selectedCharacter.palette }}
+                 left={{ name: selectedCharacter.name, rig: selectedCharacter.rig, palette: selectedCharacterPalette }}
                  right={{ name: newlyRescuedAlly.name, rig: allyRig(newlyRescuedAlly), palette: newlyRescuedAlly.palette }}
                  size={110}
                />
