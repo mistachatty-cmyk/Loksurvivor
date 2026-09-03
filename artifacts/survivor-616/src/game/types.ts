@@ -1355,6 +1355,10 @@ export interface MetaState {
   uiDensity: 'grid' | 'list';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
   musicReactiveEnabled: boolean;
+  /** Allows animated palette flourishes independently from the selected colors. */
+  paletteAnimationsEnabled: boolean;
+  /** Blends the global Artisan world palette over each character's personal skin. */
+  worldPaletteBlendEnabled: boolean;
   /** Whether device tilt steers the player on supported hardware. */
   gyroEnabled: boolean;
   /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */
@@ -1368,6 +1372,8 @@ export interface MetaState {
    */
   studioPluginsEnabled: boolean;
   selectedCharacterId: string;
+  /** Character id -> selected personal four-color skin id. */
+  characterSkinByCharacterId: Record<string, string>;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];
   rescuedAllyIds: string[];

@@ -435,7 +435,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-2" data-testid="section-vendor-categories">
+        <div className="sticky top-0 z-30 -mx-1 flex snap-x gap-2 overflow-x-auto border-y border-border bg-background/95 px-1 py-2 backdrop-blur [scrollbar-width:none] sm:static sm:mx-0 sm:flex-wrap sm:overflow-visible sm:border-0 sm:bg-transparent sm:p-0" data-testid="section-vendor-categories" aria-label="Quartermaster departments">
           {CATEGORY_CONFIG.map((category) => {
             const CategoryIcon = category.icon;
             const active = category.key === activeCategory;
@@ -445,7 +445,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
                 type="button"
                 onClick={() => selectCategory(category.key)}
                 aria-pressed={active}
-                className={`flex items-center gap-2 border px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                className={`flex shrink-0 snap-start items-center gap-2 border px-3 py-2.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors sm:px-4 sm:text-[11px] ${
                   active
                     ? 'border-primary bg-primary/10 text-primary'
                     : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'

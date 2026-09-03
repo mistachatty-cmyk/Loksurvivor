@@ -19,6 +19,7 @@ import {
 import { AREAS, getArea } from '@/game/data/areas';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
+import { getCharacterSkins } from '@/game/data/characterSkins';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
@@ -85,7 +86,7 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 14;
+const META_VERSION = 15;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 
@@ -153,11 +154,14 @@ export function createInitialMeta(): MetaState {
     paletteInvertEnabled: false,
     uiDensity: 'grid',
     musicReactiveEnabled: true,
+    paletteAnimationsEnabled: true,
+    worldPaletteBlendEnabled: true,
     gyroEnabled: false,
     studioPluginsEnabled: false,
     gyroSensitivity: 1,
     gyroInvertY: false,
     selectedCharacterId: 'shade',
+    characterSkinByCharacterId: {},
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
     rescuedAllyIds: [],
@@ -660,6 +664,17 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     crewActivitySeed,
   );
   const completedEpisodeIds = idList(parsed.completedEpisodeIds, episodeIds, []);
+  const characterSkinByCharacterId: Record<string, string> = {};
+  if (parsed.characterSkinByCharacterId && typeof parsed.characterSkinByCharacterId === 'object') {
+    for (const character of CHARACTERS) {
+      const requested = parsed.characterSkinByCharacterId[character.id];
+      const skin = getCharacterSkins(character).find((entry) => entry.id === requested);
+      const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
+      if (skin && (!skin.episodeRequired || Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)))) {
+        characterSkinByCharacterId[character.id] = skin.id;
+      }
+    }
+  }
   const episodeProgressById: Record<string, number> = {};
   if (parsed.episodeProgressById && typeof parsed.episodeProgressById === 'object') {
     for (const [episodeId, value] of Object.entries(parsed.episodeProgressById)) {
@@ -733,6 +748,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     paletteInvertEnabled: parsed.paletteInvertEnabled === true,
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
+    paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
+    worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
     gyroEnabled: parsed.gyroEnabled === true,
     // Defaults to false on every load, including projects saved before this
     // existed -- remote code is never enabled by an upgrade.
@@ -740,6 +757,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     gyroSensitivity: clampGyroSensitivity(parsed.gyroSensitivity),
     gyroInvertY: parsed.gyroInvertY === true,
     selectedCharacterId,
+    characterSkinByCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
     rescuedAllyIds,
@@ -803,7 +821,7 @@ export function loadMeta(): MetaState {
     if (!raw) return createInitialMeta();
     const parsed = JSON.parse(raw) as Partial<MetaState>;
     if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 13 && parsed.version !== 12 && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
+    if (parsed.version !== META_VERSION && parsed.version !== 14 && parsed.version !== 13 && parsed.version !== 12 && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
     // Hand-edited or half-written saves must never brick the game, so every
     // field is normalised against the defaults rather than merged blindly.
     return normalizeMeta(parsed);
@@ -1025,6 +1043,7 @@ interface StoreState {
 
 type Action =
   | { type: 'selectCharacter'; id: string }
+  | { type: 'selectCharacterSkin'; characterId: string; skinId: string }
   | { type: 'enterHideout' }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'toggleSavedLokPet'; id: string }
@@ -1060,6 +1079,8 @@ type Action =
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
+  | { type: 'setPaletteAnimations'; enabled: boolean }
+  | { type: 'setWorldPaletteBlend'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
   | { type: 'setStudioPlugins'; enabled: boolean }
   | { type: 'setGyroSensitivity'; value: number }
@@ -1088,6 +1109,21 @@ export function reducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
     case 'selectCharacter':
       return { ...state, meta: { ...state.meta, selectedCharacterId: action.id } };
+
+    case 'selectCharacterSkin': {
+      const character = CHARACTERS.find((entry) => entry.id === action.characterId);
+      if (!character) return state;
+      const skin = getCharacterSkins(character).find((entry) => entry.id === action.skinId);
+      const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
+      if (!skin || (skin.episodeRequired && (!characterEpisode || !state.meta.completedEpisodeIds.includes(characterEpisode.id)))) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          characterSkinByCharacterId: { ...state.meta.characterSkinByCharacterId, [character.id]: skin.id },
+        },
+      };
+    }
 
     case 'toggleSavedLokPet': {
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
@@ -1366,6 +1402,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setMusicReactive':
       return { ...state, meta: { ...state.meta, musicReactiveEnabled: action.enabled } };
+
+    case 'setPaletteAnimations':
+      return { ...state, meta: { ...state.meta, paletteAnimationsEnabled: action.enabled } };
+
+    case 'setWorldPaletteBlend':
+      return { ...state, meta: { ...state.meta, worldPaletteBlendEnabled: action.enabled } };
 
     case 'setGyroEnabled':
       return { ...state, meta: { ...state.meta, gyroEnabled: action.enabled } };
@@ -1665,6 +1707,7 @@ export interface MetaContextValue {
   dailyContracts: ReturnType<typeof dailyContractStatuses>;
   enterHideout: () => void;
   selectCharacter: (id: string) => void;
+  selectCharacterSkin: (characterId: string, skinId: string) => void;
   completeRun: (result: RunResult) => void;
   toggleSavedLokPet: (id: string) => void;
   restoreSavedLokPet: (id: string) => void;
@@ -1699,6 +1742,8 @@ export interface MetaContextValue {
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
+  setPaletteAnimations: (enabled: boolean) => void;
+  setWorldPaletteBlend: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
   setStudioPlugins: (enabled: boolean) => void;
   setGyroSensitivity: (value: number) => void;
@@ -1732,6 +1777,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   }, [state.meta]);
 
   const selectCharacter = useCallback((id: string) => dispatch({ type: 'selectCharacter', id }), []);
+  const selectCharacterSkin = useCallback((characterId: string, skinId: string) => dispatch({ type: 'selectCharacterSkin', characterId, skinId }), []);
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout' }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
@@ -1784,6 +1830,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setMusicReactive', enabled }),
     [],
   );
+  const setPaletteAnimations = useCallback((enabled: boolean) => dispatch({ type: 'setPaletteAnimations', enabled }), []);
+  const setWorldPaletteBlend = useCallback((enabled: boolean) => dispatch({ type: 'setWorldPaletteBlend', enabled }), []);
   const setStudioPlugins = useCallback(
     (enabled: boolean) => dispatch({ type: 'setStudioPlugins', enabled }),
     [],
@@ -1869,6 +1917,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       dailyContracts,
       enterHideout,
       selectCharacter,
+      selectCharacterSkin,
       completeRun,
       toggleSavedLokPet,
       restoreSavedLokPet,
@@ -1903,6 +1952,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setWildlifeSheltersInRain,
       setMinimapVisible,
       setMusicReactive,
+      setPaletteAnimations,
+      setWorldPaletteBlend,
       setGyroEnabled,
       setStudioPlugins,
       setGyroSensitivity,
@@ -1926,6 +1977,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     state,
     selectCharacter,
     enterHideout,
+    selectCharacterSkin,
     completeRun,
     toggleSavedLokPet,
     restoreSavedLokPet,
@@ -1960,6 +2012,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMusicReactive,
+    setPaletteAnimations,
+    setWorldPaletteBlend,
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,

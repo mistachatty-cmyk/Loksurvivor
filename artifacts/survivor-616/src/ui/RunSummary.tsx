@@ -14,6 +14,9 @@ import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
+import { useMeta } from '@/game/state/metaStore';
+import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 
 export interface RunSummaryProps {
   result: RunResult;
@@ -38,8 +41,15 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, areaOverride }: RunSummaryProps) {
+  const { meta } = useMeta();
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
+  const characterPalette = resolveCharacterCosmeticPalette(
+    character,
+    meta.characterSkinByCharacterId[character.id],
+    meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
+    meta.worldPaletteBlendEnabled,
+  );
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
   const lokPets = result.lokPets ?? [];
@@ -212,7 +222,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
         <div className="bg-card border border-border p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-black border border-border overflow-hidden shrink-0 flex items-end justify-center">
-              <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={64} />
+              <RigPortrait rig={character.rig} palette={characterPalette} anim="idle" size={64} />
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Operative</p>

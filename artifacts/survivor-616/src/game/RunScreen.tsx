@@ -10,6 +10,7 @@ import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
+import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
@@ -195,13 +196,15 @@ export function RunScreen({
 
   const area = areaOverride ?? getArea(areaId);
   const baseCharacter = getCharacter(characterId);
-  // A purchased palette recolors the character (and, via its glow/accent, the
-  // weapons/effects that key off it) without touching the shared data record
-  // -- everyone else selecting this character still gets the authored look.
-  const character =
-    meta.activePaletteId === DEFAULT_PALETTE_ID
-      ? baseCharacter
-      : { ...baseCharacter, palette: getActivePalette(meta.activePaletteId) ?? baseCharacter.palette };
+  const character = {
+    ...baseCharacter,
+    palette: resolveCharacterCosmeticPalette(
+      baseCharacter,
+      meta.characterSkinByCharacterId[baseCharacter.id],
+      meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
+      meta.worldPaletteBlendEnabled,
+    ),
+  };
   const firstNightChapter = getFirstNightChapter(areaId);
   const episode = episodeId ? CHARACTER_EPISODES_BY_ID[episodeId] : undefined;
   // Episodes have authored rescue objectives; their target takes priority
@@ -247,7 +250,7 @@ export function RunScreen({
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
         runAuraStyle: getRunAuraStyle(meta.activeRunAuraId),
         hatStyle: getHatStyle(meta.activeHatId),
-        paletteEffect: prefersReducedMotion ? undefined : getThemePalette(meta.activePaletteId)?.effect,
+        paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
       },

@@ -88,13 +88,13 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .cosmetic-aura-rain-signal::after { border-radius: 0; border-width: 0 2px; animation: cosmetic-rain 1s linear infinite; }
 .cosmetic-aura-glitch-echo::before { box-shadow: -10px 5px 0 -7px var(--accent), 10px -5px 0 -7px var(--aura); animation: cosmetic-glitch 1s steps(2) infinite; }
 .cosmetic-aura-mothlight::after { border-style: dotted; animation: cosmetic-spin 4s linear infinite; }
-.cosmetic-hat-top-hat { top: 18px; transform: scaleX(1.5); color: #16131c; text-shadow: 0 0 3px var(--primary); }
-.cosmetic-hat-halo { top: 14px; color: #fde68a; animation: cosmetic-float 1.8s ease-in-out infinite; }
-.cosmetic-hat-crown { top: 15px; color: #fbbf24; animation: cosmetic-float 1.6s ease-in-out infinite; }
-.cosmetic-hat-satellite, .cosmetic-hat-orbital-eye { top: 17px; color: #67e8f9; animation: cosmetic-orbit 2.2s linear infinite; }
-.cosmetic-hat-rain-cloud { top: 12px; color: #93c5fd; animation: cosmetic-float 1.3s ease-in-out infinite; }
-.cosmetic-hat-cone { top: 12px; color: #fb923c; animation: cosmetic-float 1.7s ease-in-out infinite; }
-.cosmetic-hat-moth-cap { top: 17px; color: #f0abfc; animation: cosmetic-float 1.5s ease-in-out infinite; }
+.cosmetic-hat-top-hat { top: 8px; transform: scaleX(1.5); color: #16131c; text-shadow: 0 0 3px var(--primary); }
+.cosmetic-hat-halo { top: 5px; color: #fde68a; animation: cosmetic-float 1.8s ease-in-out infinite; }
+.cosmetic-hat-crown { top: 6px; color: #fbbf24; animation: cosmetic-float 1.6s ease-in-out infinite; }
+.cosmetic-hat-satellite, .cosmetic-hat-orbital-eye { top: 8px; color: #67e8f9; animation: cosmetic-orbit 2.2s linear infinite; }
+.cosmetic-hat-rain-cloud { top: 4px; color: #93c5fd; animation: cosmetic-float 1.3s ease-in-out infinite; }
+.cosmetic-hat-cone { top: 4px; color: #fb923c; animation: cosmetic-float 1.7s ease-in-out infinite; }
+.cosmetic-hat-moth-cap { top: 8px; color: #f0abfc; animation: cosmetic-float 1.5s ease-in-out infinite; }
 .cosmetic-celebration { top: 28%; animation: cosmetic-celebrate 900ms ease-out both; }
 @keyframes cosmetic-spin { to { transform: rotate(360deg); } }
 @keyframes cosmetic-float { 50% { transform: translateY(-7px); } }

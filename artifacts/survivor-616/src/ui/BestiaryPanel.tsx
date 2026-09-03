@@ -10,6 +10,8 @@ import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
 import { motion } from 'framer-motion';
 import { Skull, Ghost, LockKeyhole, Sparkles, Users } from 'lucide-react';
+import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 
 export interface BestiaryPanelProps {
   onBack: () => void;
@@ -54,6 +56,12 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
           {CHARACTERS.map((character, i) => {
             const unlocked = unlockedIds.has(character.id);
+            const characterPalette = resolveCharacterCosmeticPalette(
+              character,
+              meta.characterSkinByCharacterId[character.id],
+              meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
+              meta.worldPaletteBlendEnabled,
+            );
             return (
               <motion.article
                 key={character.id}
@@ -65,7 +73,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
               >
                 <div className={`relative h-44 flex items-end justify-center border-b border-border ${unlocked ? 'bg-gradient-to-b from-primary/15 to-black' : 'bg-black/50'}`}>
                   {unlocked ? (
-                    <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={164} />
+                    <RigPortrait rig={character.rig} palette={characterPalette} anim="idle" size={164} />
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground/50">
                       <LockKeyhole className="h-8 w-8" />
@@ -91,7 +99,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
                     <p className="text-xs italic leading-relaxed text-muted-foreground">"{character.bio}"</p>
                     <div className="grid gap-3 border-t border-border/60 pt-3">
                       <div className="flex gap-3">
-                        <WeaponIcon weaponId={character.weapon.id} kind={character.weapon.kind} color={character.weapon.color ?? character.palette.accent} size={32} label={character.weapon.name} className="shrink-0" />
+                        <WeaponIcon weaponId={character.weapon.id} kind={character.weapon.kind} color={character.weapon.color ?? characterPalette.accent} size={32} label={character.weapon.name} className="shrink-0" />
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-white">{character.weapon.name}</p>
                           <p className="mt-1 text-xs text-muted-foreground">{character.weapon.description}</p>

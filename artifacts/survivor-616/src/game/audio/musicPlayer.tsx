@@ -94,6 +94,8 @@ export interface MusicPlayerValue {
   removeTrack: (id: string) => void;
   clearTracks: () => void;
   playTrack: (id: string) => void;
+  /** Starts a track and pins transport to single-track repeat (used by authored rooms). */
+  playTrackOnRepeat: (id: string) => void;
   togglePlay: () => void;
   next: () => void;
   previous: () => void;
@@ -751,6 +753,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [currentIndex, playIndex],
   );
 
+  const playTrackOnRepeat = useCallback((id: string) => {
+    const index = tracksRef.current.findIndex((track) => track.id === id);
+    if (index === -1) return;
+    setRepeat('one');
+    playIndex(index);
+  }, [playIndex]);
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -842,6 +851,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       removeTrack,
       clearTracks,
       playTrack,
+      playTrackOnRepeat,
       togglePlay,
       next,
       previous,
@@ -867,7 +877,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
       progressSec, durationSec, error, addFiles, addFromUrl, linkLoading, convertTrackToMp3,
       conversion, removeTrack, clearTracks, playTrack, togglePlay, next, previous, seek,
-      setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext,
+      setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext, playTrackOnRepeat,
       playlists, activePlaylistId, activePlaylist, setActivePlaylist, createPlaylist,
       renamePlaylist, deletePlaylist, addToPlaylist, removeFromPlaylist, reorderPlaylistTracks,
     ],

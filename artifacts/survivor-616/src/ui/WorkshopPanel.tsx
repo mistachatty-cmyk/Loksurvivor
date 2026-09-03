@@ -1,4 +1,5 @@
-import { CITY_RELICS, RELIC_RECIPES } from '@/game/data/relics';
+import { useState } from 'react';
+import { CITY_RELICS, CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
 import { useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
 import { WeaponIcon } from './WeaponIcon';
@@ -13,6 +14,8 @@ export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
   const isListView = meta.uiDensity === 'list';
   const knownRelicIds = new Set(meta.knownRelicIds);
   const knownRecipeCount = RELIC_RECIPES.filter((recipe) => knownRelicIds.has(recipe.relicId)).length;
+  const [recipeFilter, setRecipeFilter] = useState<'all' | 'known'>('all');
+  const visibleRecipes = recipeFilter === 'known' ? RELIC_RECIPES.filter((recipe) => knownRelicIds.has(recipe.relicId)) : RELIC_RECIPES;
 
   return (
     <div className={compact ? 'space-y-4' : 'space-y-8'} data-testid="section-relic-workshop">
@@ -21,8 +24,8 @@ export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-orange-300">City Relic Workshop</p>
           <h2 className="mt-1 text-2xl font-black uppercase tracking-tight text-white">Craft the city into an edge</h2>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
-            Relic knowledge is permanent. The weapon treatment is not inventory: bring the base weapon into a run,
-            level it, and choose the recipe from a normal level-up draft.
+            Recover a city relic, carry its matching weapon, reach the listed level, then choose the recipe card.
+            “Run edge” means the crafted weapon treatment lasts for that run; the recipe knowledge stays forever.
           </p>
         </div>
         <div className="shrink-0 font-mono text-xs font-bold uppercase tracking-widest text-orange-200">
@@ -68,13 +71,17 @@ export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Hammer className="h-4 w-4 text-orange-300" />
-          <h3 className="text-sm font-black uppercase tracking-widest text-white">Recipe board</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2"><Hammer className="h-4 w-4 text-orange-300" /><h3 className="text-sm font-black uppercase tracking-widest text-white">City recipe board</h3></div>
+          <div className="grid grid-cols-2 gap-1">
+            {(['all', 'known'] as const).map((filter) => <button key={filter} type="button" onClick={() => setRecipeFilter(filter)} aria-pressed={recipeFilter === filter} className={`border px-3 py-1.5 font-mono text-[9px] uppercase ${recipeFilter === filter ? 'border-orange-300 bg-orange-300/10 text-orange-200' : 'border-border text-muted-foreground'}`}>{filter === 'all' ? 'All recipes' : `Craftable ${knownRecipeCount}`}</button>)}
+          </div>
         </div>
+        <div className="grid grid-cols-3 gap-1 border border-orange-300/20 bg-orange-300/5 p-2 text-center font-mono text-[8px] uppercase tracking-wider text-orange-100/75"><span>1 · Find relic</span><span>2 · Level weapon</span><span>3 · Pick recipe</span></div>
         <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2'}`}>
-          {RELIC_RECIPES.map((recipe) => {
+          {visibleRecipes.map((recipe) => {
             const known = knownRelicIds.has(recipe.relicId);
+            const relic = CITY_RELICS_BY_ID[recipe.relicId];
             return (
               <article
                 key={recipe.id}
@@ -86,12 +93,12 @@ export function WorkshopOverview({ compact = false }: WorkshopOverviewProps) {
                     <p className="font-mono text-[9px] font-bold uppercase tracking-[0.2em]" style={{ color: recipe.color }}>
                       {recipe.identity}
                     </p>
-                    <h4 className="mt-1 text-base font-black uppercase text-white">{known ? recipe.name : 'Sealed recipe'}</h4>
+                    <h4 className="mt-1 text-base font-black uppercase text-white">{recipe.name}</h4>
                   </div>
                   {known ? <WeaponIcon weaponId={recipe.result.id} kind={recipe.result.kind} color={recipe.color} size={38} label={recipe.result.name} className="shrink-0" /> : <LockKeyhole className="h-5 w-5 shrink-0 text-muted-foreground" />}
                 </div>
                 <p className="mt-3 text-xs leading-relaxed text-white/75">
-                  {known ? recipe.description : 'Find the matching district relic to decode this treatment.'}
+                  {known ? recipe.description : `Sealed: ${relic?.sourceLabel ?? 'Find the matching district relic.'}`}
                 </p>
                 <p className="mt-3 border-t border-white/10 pt-3 font-mono text-[10px] uppercase leading-relaxed tracking-wider text-orange-100/75">
                   {known ? recipe.triggerLabel : 'Unavailable until relic knowledge is recovered.'}
