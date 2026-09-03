@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   DEV_ACCESS_TAPS_REQUIRED,
+  DEV_RUN_TOOL_REGISTRY,
   DEV_UNLOCK_REGISTRY,
   advanceDevAccessTap,
   effectiveCatalogIds,
@@ -21,7 +22,6 @@ test('four deliberate taps unlock developer access exactly once', () => {
   }
   assert.deepEqual(advanceDevAccessTap(taps), { taps: DEV_ACCESS_TAPS_REQUIRED, unlocked: true });
 });
-
 test('the registry includes every current customization catalog entry', () => {
   assert.deepEqual(DEV_UNLOCK_REGISTRY.uiThemes, UI_THEMES.map((item) => item.id));
   assert.deepEqual(DEV_UNLOCK_REGISTRY.palettes, THEMED_PALETTES.map((item) => item.id));
@@ -29,6 +29,12 @@ test('the registry includes every current customization catalog entry', () => {
   assert.ok(DEV_UNLOCK_REGISTRY.characters.length > 1);
   assert.ok(DEV_UNLOCK_REGISTRY.areas.length > 1);
   assert.ok(DEV_UNLOCK_REGISTRY.rooms.length > 1);
+});
+
+test('run diagnostics are typed, unique, and presentation-only', () => {
+  assert.ok(DEV_RUN_TOOL_REGISTRY.some((tool) => tool.id === 'run-hud-stress'));
+  assert.equal(new Set(DEV_RUN_TOOL_REGISTRY.map((tool) => tool.id)).size, DEV_RUN_TOOL_REGISTRY.length);
+  assert.ok(DEV_RUN_TOOL_REGISTRY.every((tool) => tool.presentationOnly));
 });
 
 test('Dev Mode derives ownership and disabling restores real equipped assets', () => {
