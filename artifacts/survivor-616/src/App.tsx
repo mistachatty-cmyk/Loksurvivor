@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
+import { AuthProvider } from '@/state/authStore';
 import { RunScreen } from '@/game/RunScreen';
 import {
   FATIGUE_PER_RUN_PCT,
@@ -27,6 +28,8 @@ import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { VendorPanel } from '@/ui/VendorPanel';
 import { WorkshopPanel } from '@/ui/WorkshopPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
+import { AccountPanel } from '@/ui/AccountPanel';
+import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
@@ -51,6 +54,8 @@ type Screen =
   | { name: 'vendor' }
   | { name: 'workshop' }
   | { name: 'settings' }
+  | { name: 'account' }
+  | { name: 'feedback' }
   | { name: 'map-editor' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
   | { name: 'summary'; result: RunResult };
@@ -79,7 +84,9 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'recovery' ||
       requested === 'vendor' ||
       requested === 'workshop' ||
-      requested === 'settings'
+      requested === 'settings' ||
+      requested === 'account' ||
+      requested === 'feedback'
     ) {
       return { name: requested };
     }
@@ -128,6 +135,12 @@ function Game() {
         break;
       case 'settings':
         setScreen({ name: 'settings' });
+        break;
+      case 'account':
+        setScreen({ name: 'account' });
+        break;
+      case 'feedback':
+        setScreen({ name: 'feedback' });
         break;
     }
   }, []);
@@ -209,6 +222,12 @@ function Game() {
     case 'settings':
       return <SettingsPanel onBack={goHub} />;
 
+    case 'account':
+      return <AccountPanel onBack={goHub} />;
+
+    case 'feedback':
+      return <FeedbackPanel onBack={goHub} />;
+
     case 'run':
       {
         const customMap = meta.customMaps.find((map) => map.id === screen.areaId);
@@ -264,12 +283,14 @@ function Game() {
 function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <MetaProvider>
-        <MusicProvider>
-          {children}
-          <MusicNowPlaying />
-        </MusicProvider>
-      </MetaProvider>
+      <AuthProvider>
+        <MetaProvider>
+          <MusicProvider>
+            {children}
+            <MusicNowPlaying />
+          </MusicProvider>
+        </MetaProvider>
+      </AuthProvider>
       <Toaster />
     </QueryClientProvider>
   );
