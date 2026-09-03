@@ -151,6 +151,9 @@ export function RunScreen({
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
+  const [reelTick, setReelTick] = useState(0);
+  const [chestFlight, setChestFlight] = useState(0);
+  const [celebration, setCelebration] = useState(false);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
@@ -473,6 +476,7 @@ export function RunScreen({
           if (presentationRef.current.liveModeEnabled || presentationRef.current.lootPresentation === 'queue') {
             const prizes = world.pendingReel.splice(0);
             setQueuedPrizes((current) => [...current, ...prizes]);
+            setChestFlight((flight) => flight + prizes.length);
           } else {
             const prize = world.pendingReel.shift()!;
             setReel({ prize, phase: 'spinning', faceIndex: prizeToFaceIndex(prize) });
@@ -575,6 +579,13 @@ export function RunScreen({
     });
   }, [meta.liveModeEnabled, setPhaseBoth]);
 
+  /** A real ticking reel, rather than a timestamp sampled only during unrelated renders. */
+  useEffect(() => {
+    if (reel?.phase !== 'spinning') return;
+    const interval = window.setInterval(() => setReelTick((tick) => tick + 1), prefersReducedMotion ? 260 : 85);
+    return () => window.clearInterval(interval);
+  }, [reel?.phase, prefersReducedMotion]);
+
   useEffect(() => {
     if (!randomUpgradeReveal) return;
     let frame = 0;
@@ -597,6 +608,7 @@ export function RunScreen({
       reelTimerRef.current = null;
     }
     setReel(null);
+    setCelebration(false);
     if (phaseRef.current === 'reel') setPhaseBoth('playing');
   }, [setPhaseBoth]);
 
@@ -606,6 +618,7 @@ export function RunScreen({
     if (reel.phase === 'spinning') {
       const t = window.setTimeout(() => {
         setReel((prev) => prev ? { ...prev, phase: 'landed' } : null);
+        setCelebration(true);
         // Auto-dismiss 2s after landing.
         reelTimerRef.current = window.setTimeout(() => {
           setReel(null);
@@ -616,6 +629,12 @@ export function RunScreen({
     }
     return undefined;
   }, [reel?.phase, setPhaseBoth]);
+
+  useEffect(() => {
+    if (!celebration) return;
+    const timer = window.setTimeout(() => setCelebration(false), prefersReducedMotion ? 500 : 1250);
+    return () => window.clearTimeout(timer);
+  }, [celebration, prefersReducedMotion]);
 
   /** End the run successfully ("head home"). Only available in endless mode. */
   const headHome = useCallback(() => {
@@ -638,6 +657,15 @@ export function RunScreen({
   const blocksWalked = hud?.endless?.blocksWalked ?? 0;
   const primaryHudSignal = selectPrimaryRunHudSignal(hud, challenges.map((challenge) => challenge.name));
   const hudIntelItems = runHudIntelCount(hud, challenges.length);
+  const celebrationMarks = (() => {
+    switch (getRunAuraStyle(meta.activeRunAuraId)) {
+      case 'rain-signal': return ['│', '╎', '✦', '│', '╎', '✦', '│'];
+      case 'mothlight': return ['◇', '◈', '✧', '◇', '◈', '✧', '◇'];
+      case 'glitch-echo': return ['▣', '▥', '✦', '▣', '▥', '✦', '▣'];
+      case 'ember-orbit': return ['✦', '•', '✹', '✦', '•', '✹', '✦'];
+      default: return ['✦', '✧', '•', '✦', '✧', '•', '✦'];
+    }
+  })();
 
   return (
     <div
@@ -969,15 +997,18 @@ export function RunScreen({
       </button>
 
       <ChestTally count={hud?.lootBoxesOpened ?? 0} />
+      {chestFlight > 0 ? (
+        <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
+      ) : null}
       <button
         type="button"
         onClick={openQueuedPrize}
         disabled={queuedPrizes.length === 0 || Boolean(reel)}
-        className="absolute bottom-2 left-1/2 z-40 h-7 -translate-x-1/2 border border-blue-300/50 bg-[#071225]/90 px-2 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40"
+        className="absolute bottom-[5.25rem] right-2 z-40 flex h-8 w-16 items-center justify-center border border-blue-300/50 bg-[#071225]/92 px-1 font-mono text-[8px] font-bold uppercase tracking-wider text-blue-100 shadow-[0_0_18px_rgba(96,165,250,.22)] disabled:opacity-40 sm:bottom-[6.5rem] sm:right-5"
         data-testid="button-loot-tray"
         aria-label={`Open queued loot boxes, ${queuedPrizes.length} waiting`}
       >
-        ◇ Loot tray · {queuedPrizes.length}
+        ▣ {queuedPrizes.length} · Open
       </button>
 
       {/* Virtual stick */}
@@ -1231,7 +1262,7 @@ export function RunScreen({
                     boxShadow: landed ? `0 0 24px ${face?.color ?? '#3b82f6'}66` : 'none',
                   }}
                 >
-                  {landed ? face?.symbol : REEL_FACES[(Math.floor(Date.now() / 120 + col) % REEL_FACES.length)]?.symbol ?? '?'}
+                  {landed ? face?.symbol : REEL_FACES[(reelTick + col) % REEL_FACES.length]?.symbol ?? '?'}
                   {landed && (
                     <span className="mt-1 font-mono text-[9px] uppercase tracking-widest opacity-70">
                       {face?.label}
@@ -1277,6 +1308,17 @@ export function RunScreen({
           >
             {reel.phase === 'landed' ? 'Continue' : 'Skip'}
           </button>
+        </div>
+      ) : null}
+
+      {celebration ? (
+        <div className="pointer-events-none absolute inset-0 z-[55] overflow-hidden" aria-hidden="true">
+          {celebrationMarks.map((mark, index) => (
+            <span key={`${chestFlight}-${index}`} className="absolute font-black" style={{
+              left: `${12 + index * 13}%`, top: `${32 + (index % 3) * 16}%`, color: [character.palette.accentBright, '#fde68a', '#67e8f9'][index % 3],
+              animation: `celebration-pop ${prefersReducedMotion ? 500 : 1050}ms ease-out ${index * 45}ms both`,
+            }}>{mark}</span>
+          ))}
         </div>
       ) : null}
 

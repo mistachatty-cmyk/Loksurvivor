@@ -69,6 +69,18 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   border: 0;
 }
 
+@keyframes chest-pocket-fly {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.55) rotate(-18deg); }
+  15% { opacity: 1; }
+  100% { opacity: .15; transform: translate(calc(50vw - 3.75rem), calc(50vh - 7.5rem)) scale(.42) rotate(20deg); }
+}
+
+@keyframes celebration-pop {
+  0% { opacity: 0; transform: scale(.25) translateY(10px); }
+  30% { opacity: 1; transform: scale(1.35) translateY(-8px); }
+  100% { opacity: 0; transform: scale(.7) translateY(-28px); }
+}
+
 :root, .dark {
   --background: 240 6% 6%;
   --foreground: 0 0% 90%;

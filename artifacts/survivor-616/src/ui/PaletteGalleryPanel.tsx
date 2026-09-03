@@ -49,7 +49,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
     <div className="grid grid-cols-2 gap-2" aria-label="Customization categories">
       {([
         ['palettes', 'World colors', Palette],
-        ['auras', 'Run auras', Sparkles],
+        ['auras', 'Run auras & celebrations', Sparkles],
       ] as const).map(([id, label, Icon]) => (
         <button
           key={id}

@@ -756,6 +756,28 @@ export const CHARACTERS: CharacterDef[] = [
     ultimate: { id: 'hold-the-hour', name: 'Hold the Hour', description: 'A city-sized chime grants invulnerability and breaks the crowd around you.', cooldownMs: 28500, durationMs: 3400, effect: { invulnerable: true, damageMult: 1.55, novaDamage: 110, novaRadius: 250 } },
     unlock: { kind: 'clearArea', areaId: 'back-alley' },
   },
+  {
+    id: 'afterimage', react: REACTION_PRESETS.playerBob, name: 'Afterimage', handle: 'Light Leak',
+    tagline: 'Leaves a safer version of the street behind her.',
+    bio: 'A transit photographer who learned that a long exposure can hold a door open for one more heartbeat.',
+    palette: { ink: '#0b0b19', body: '#2d2a70', bodyDark: '#17153d', accent: '#a5b4fc', accentBright: '#eef2ff', skin: '#9a5b48', glow: '#c084fc' },
+    rig: humanoidRig({ height: 20, width: 10, cap: true, torsoColor: 'body' }),
+    stats: { maxHp: 104, speed: 108, power: 1.08, area: 1.14, haste: 0.9, magnet: 62, armor: 0.07, crit: 0.14, lifesteal: 0 },
+    weapon: { id: 'exposure-flash', name: 'Exposure Flash', kind: 'nova', description: 'A rolling shutter flash marks a wide circle and pushes back the nearest crowd.', damage: 17, cooldownMs: 760, range: 96, levelDamageScale: 0.31, impactIntensity: 2, color: '#a5b4fc' },
+    ultimate: { id: 'long-exposure', name: 'Long Exposure', description: 'A bright afterimage holds the line while a rapid flash sequence clears space.', cooldownMs: 25000, durationMs: 4100, effect: { speedMult: 1.35, cooldownMult: 0.55, novaDamage: 82, novaRadius: 190 } },
+    unlock: { kind: 'rescue', allyId: 'morrow' },
+  },
+  {
+    id: 'harrow', react: REACTION_PRESETS.playerBob, name: 'Harrow', handle: 'The Quiet Engine',
+    tagline: 'Turns every close call into momentum.',
+    bio: 'A night mechanic with a pocketful of broken bearings and a talent for making the city’s noise work for him.',
+    palette: { ink: '#10100d', body: '#435143', bodyDark: '#20291f', accent: '#b8d66b', accentBright: '#f1ffd0', skin: '#81533b', glow: '#d8ff7a' },
+    rig: humanoidRig({ height: 21, width: 12, hood: true, torsoColor: 'bodyDark' }),
+    stats: { maxHp: 136, speed: 88, power: 1.22, area: 1.2, haste: 1, magnet: 44, armor: 0.18, crit: 0.06, lifesteal: 0.04 },
+    weapon: { id: 'bearing-scatter', name: 'Bearing Scatter', kind: 'projectile', description: 'Heavy steel bearings skip through a lane and return through the crowd.', damage: 21, cooldownMs: 920, range: 280, speed: 245, count: 3, lifetimeMs: 1500, levelDamageScale: 0.33, impactIntensity: 3, color: '#b8d66b', pierce: 1 },
+    ultimate: { id: 'idle-redline', name: 'Idle Redline', description: 'The engine catches: damage rises, cooldowns fall, and a shock clears the immediate lane.', cooldownMs: 28000, durationMs: 3600, effect: { damageMult: 1.65, cooldownMult: 0.5, novaDamage: 94, novaRadius: 170 } },
+    unlock: { kind: 'kills', count: 220 },
+  },
 ];
 
 export const CHARACTERS_BY_ID: Record<string, CharacterDef> = Object.fromEntries(
