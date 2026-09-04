@@ -425,6 +425,220 @@ export const AREAS: AreaDef[] = [
     ],
   },
 
+  /**
+   * Oddity flats -- see .agents/memory/oddity-arenas.md. Timed arenas with no
+   * wall/building obstacles at all: open ground, scattered attack-blocks,
+   * and ambient item drops instead of any loot from breakables.
+   */
+  {
+    id: 'flat-lot',
+    name: 'The Open Lot',
+    district: 'Flats -- no fixed address',
+    description:
+      'A gravel lot nobody claims on a map. Nothing to hide behind but the blocks that hide behind nothing either -- they just start shooting.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 940, h: 940 },
+    ground: { base: '#1a1712', tile: '#241f18', seam: '#0e0c09', glow: '#ff5c5c' },
+    sky: 'clear',
+    obstacles: [
+      { x: -300, y: -260, w: 60, h: 70, kind: 'attack-block' },
+      { x: 300, y: -260, w: 60, h: 70, kind: 'attack-block' },
+      { x: -300, y: 260, w: 60, h: 70, kind: 'attack-block' },
+      { x: 300, y: 260, w: 60, h: 70, kind: 'attack-block' },
+      { x: 0, y: 0, w: 60, h: 70, kind: 'attack-block' },
+      { x: -160, y: 40, w: 36, h: 44, kind: 'flora' },
+      { x: 160, y: -40, w: 36, h: 44, kind: 'flora' },
+      { x: 60, y: 220, w: 30, h: 42, kind: 'trash-can' },
+      { x: -60, y: -220, w: 30, h: 42, kind: 'trash-can' },
+    ],
+    durationSec: 150,
+    threat: 'rising',
+    randomDrops: { intervalMs: 5000 },
+    unlock: { kind: 'kills', count: 130 },
+    waves: [
+      { fromSec: 0, toSec: 60, enemyId: 'nightcrawler', ratePerSec: 1.3, burst: 2 },
+      { fromSec: 15, toSec: 90, enemyId: 'neon-leech', ratePerSec: 0.9, burst: 2 },
+      { fromSec: 50, toSec: 150, enemyId: 'bloodhound', ratePerSec: 0.5, burst: 1 },
+      { fromSec: 80, toSec: 150, enemyId: 'ring-runner', ratePerSec: 1.6, burst: 3, formation: 'ring' },
+    ],
+  },
+  {
+    id: 'flat-tarmac',
+    name: 'Runway Nine',
+    district: 'Flats -- no fixed address',
+    description:
+      'A stretch of airstrip nobody remembers approving. Dead flat in every direction, which just means the things that can shoot you can always see you.',
+    backdrop: 'art/rooftops.jpeg',
+    bounds: { w: 1120, h: 700 },
+    ground: { base: '#12161c', tile: '#1a2028', seam: '#090c10', glow: '#ff5c5c' },
+    sky: 'overcast',
+    obstacles: [
+      { x: -460, y: 0, w: 58, h: 68, kind: 'attack-block' },
+      { x: -230, y: -160, w: 58, h: 68, kind: 'attack-block' },
+      { x: -230, y: 160, w: 58, h: 68, kind: 'attack-block' },
+      { x: 230, y: -160, w: 58, h: 68, kind: 'attack-block' },
+      { x: 230, y: 160, w: 58, h: 68, kind: 'attack-block' },
+      { x: 460, y: 0, w: 58, h: 68, kind: 'attack-block' },
+      { x: 0, y: -220, w: 28, h: 34, kind: 'street-lamp' },
+      { x: 0, y: 220, w: 28, h: 34, kind: 'street-lamp' },
+      { x: -80, y: 0, w: 44, h: 44, kind: 'flora' },
+      { x: 80, y: 0, w: 44, h: 44, kind: 'flora' },
+    ],
+    durationSec: 165,
+    threat: 'rising',
+    randomDrops: { intervalMs: 4500 },
+    unlock: { kind: 'clearArea', areaId: 'flat-lot' },
+    waves: [
+      { fromSec: 0, toSec: 70, enemyId: 'neon-leech', ratePerSec: 1.5, burst: 2 },
+      { fromSec: 20, toSec: 100, enemyId: 'bloodhound', ratePerSec: 0.8, burst: 2 },
+      { fromSec: 60, toSec: 165, enemyId: 'corner-cutter', ratePerSec: 0.5, burst: 1, formation: 'pincer' },
+      { fromSec: 90, toSec: 165, enemyId: 'ring-runner', ratePerSec: 2.2, burst: 4, formation: 'ring' },
+    ],
+  },
+  {
+    id: 'flat-mall-roof',
+    name: 'Mall Roof Flats',
+    district: 'Flats -- no fixed address',
+    description:
+      'The old mall\'s roof, flat as a parking deck and just as empty. The AC units up here have started shooting back at whatever keeps landing on them.',
+    backdrop: 'art/rooftops.jpeg',
+    bounds: { w: 1000, h: 900 },
+    ground: { base: '#16141c', tile: '#211e2a', seam: '#0b0a10', glow: '#b58cff' },
+    sky: 'clear',
+    obstacles: [
+      { x: -340, y: -220, w: 50, h: 50, kind: 'ac-unit' },
+      { x: 340, y: -220, w: 50, h: 50, kind: 'ac-unit' },
+      { x: -340, y: 220, w: 50, h: 50, kind: 'ac-unit' },
+      { x: 340, y: 220, w: 50, h: 50, kind: 'ac-unit' },
+      { x: -180, y: 0, w: 58, h: 68, kind: 'attack-block' },
+      { x: 180, y: 0, w: 58, h: 68, kind: 'attack-block' },
+      { x: 0, y: -180, w: 58, h: 68, kind: 'attack-block' },
+      { x: 0, y: 180, w: 58, h: 68, kind: 'attack-block' },
+    ],
+    durationSec: 175,
+    threat: 'high',
+    randomDrops: { intervalMs: 4200 },
+    unlock: { kind: 'clearArea', areaId: 'flat-tarmac' },
+    waves: [
+      { fromSec: 0, toSec: 80, enemyId: 'corner-cutter', ratePerSec: 0.75, burst: 2, formation: 'pincer' },
+      { fromSec: 30, toSec: 120, enemyId: 'crypt-spitter', ratePerSec: 0.55, burst: 1 },
+      { fromSec: 70, toSec: 175, enemyId: 'crypt-bouncer', ratePerSec: 0.24, burst: 1 },
+      { fromSec: 100, toSec: 175, enemyId: 'ring-runner', ratePerSec: 2.6, burst: 5, formation: 'ring' },
+    ],
+  },
+
+  /**
+   * Oddity mini-maps -- see .agents/memory/oddity-arenas.md. Bigger than the
+   * usual district, each built around one unusual spawn pattern.
+   */
+  {
+    id: 'the-loop',
+    name: 'The Loop',
+    district: 'Flats -- no fixed address',
+    description:
+      'A traffic circle that keeps circling long after the traffic stopped. Everything out here runs in rings, and the rings only get wider.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 1200, h: 1100 },
+    ground: { base: '#151020', tile: '#211a30', seam: '#0b0815', glow: '#c4b5fd' },
+    sky: 'overcast',
+    obstacles: [
+      { x: -420, y: -340, w: 60, h: 70, kind: 'attack-block' },
+      { x: 420, y: -340, w: 60, h: 70, kind: 'attack-block' },
+      { x: -420, y: 340, w: 60, h: 70, kind: 'attack-block' },
+      { x: 420, y: 340, w: 60, h: 70, kind: 'attack-block' },
+      { x: 0, y: 0, w: 96, h: 24, kind: 'cover' },
+      { x: -220, y: 0, w: 54, h: 54, kind: 'crate-breakable' },
+      { x: 220, y: 0, w: 54, h: 54, kind: 'crate-breakable' },
+      { x: 0, y: -220, w: 44, h: 50, kind: 'flora' },
+      { x: 0, y: 220, w: 44, h: 50, kind: 'flora' },
+    ],
+    durationSec: 220,
+    threat: 'high',
+    unlock: { kind: 'clearArea', areaId: 'flat-mall-roof' },
+    waves: [
+      { fromSec: 0, toSec: 220, enemyId: 'nightcrawler', ratePerSec: 0.6, burst: 1 },
+      { fromSec: 10, toSec: 60, enemyId: 'ring-runner', ratePerSec: 1.0, burst: 8, formation: 'ring' },
+      { fromSec: 60, toSec: 120, enemyId: 'ring-runner', ratePerSec: 1.2, burst: 16, formation: 'ring' },
+      { fromSec: 120, toSec: 180, enemyId: 'ring-runner', ratePerSec: 1.4, burst: 24, formation: 'ring' },
+      // The Loop's climax: a single ring of a hundred, all at once.
+      { fromSec: 195, toSec: 196, enemyId: 'ring-runner', ratePerSec: 1, burst: 100, formation: 'ring' },
+      { fromSec: 100, toSec: 220, enemyId: 'bloodhound', ratePerSec: 0.3, burst: 1 },
+    ],
+  },
+  {
+    id: 'sporadic-ward',
+    name: 'Sporadic Ward',
+    district: 'Flats -- no fixed address',
+    description:
+      'A block with no schedule. Nothing here shows up when you would expect it to, and it never shows up the same way twice.',
+    backdrop: 'art/alley.jpeg',
+    bounds: { w: 1150, h: 1050 },
+    ground: { base: '#131418', tile: '#1b1d24', seam: '#0a0b0e', glow: '#4de1ff' },
+    sky: 'fog',
+    obstacles: [
+      { x: -380, y: -300, w: 58, h: 68, kind: 'attack-block' },
+      { x: 380, y: 300, w: 58, h: 68, kind: 'attack-block' },
+      { x: 380, y: -300, w: 58, h: 68, kind: 'attack-block' },
+      { x: -380, y: 300, w: 58, h: 68, kind: 'attack-block' },
+      { x: -140, y: 60, w: 54, h: 54, kind: 'crate' },
+      { x: 140, y: -60, w: 54, h: 54, kind: 'crate' },
+      { x: 0, y: 0, w: 60, h: 70, kind: 'metal-box', propVariant: 'heavy-metal' },
+    ],
+    durationSec: 200,
+    threat: 'high',
+    randomDrops: { intervalMs: 6000 },
+    unlock: { kind: 'clearArea', areaId: 'the-loop' },
+    // Deliberately irregular: short, offset windows across the whole run
+    // instead of the usual overlapping ramps, so nothing about the next
+    // spawn is predictable from the last one.
+    waves: [
+      { fromSec: 4, toSec: 9, enemyId: 'nightcrawler', ratePerSec: 2.4, burst: 3 },
+      { fromSec: 22, toSec: 24, enemyId: 'bloodhound', ratePerSec: 2, burst: 2 },
+      { fromSec: 31, toSec: 46, enemyId: 'neon-leech', ratePerSec: 0.6, burst: 1 },
+      { fromSec: 58, toSec: 61, enemyId: 'ring-runner', ratePerSec: 3, burst: 12, formation: 'ring' },
+      { fromSec: 70, toSec: 72, enemyId: 'corner-cutter', ratePerSec: 1.5, burst: 2, formation: 'pincer' },
+      { fromSec: 95, toSec: 133, enemyId: 'crypt-spitter', ratePerSec: 0.35, burst: 1 },
+      { fromSec: 110, toSec: 112, enemyId: 'nightcrawler', ratePerSec: 4, burst: 6 },
+      { fromSec: 140, toSec: 142, enemyId: 'ring-runner', ratePerSec: 3, burst: 20, formation: 'ring' },
+      { fromSec: 150, toSec: 188, enemyId: 'crypt-bouncer', ratePerSec: 0.16, burst: 1 },
+      { fromSec: 165, toSec: 167, enemyId: 'bloodhound', ratePerSec: 3, burst: 4 },
+      { fromSec: 185, toSec: 187, enemyId: 'neon-leech', ratePerSec: 2.5, burst: 5 },
+    ],
+  },
+  {
+    id: 'the-choir',
+    name: 'The Choir',
+    district: 'Flats -- no fixed address',
+    description:
+      'A resonance chamber under the city that nobody built and nobody maintains. Something rehearses down here for twenty seconds at a time, and it always starts on the beat you can\'t hear yet.',
+    backdrop: 'art/cellar.jpeg',
+    bounds: { w: 1300, h: 1200 },
+    ground: { base: '#0e0c14', tile: '#161320', seam: '#07060b', glow: '#e9d8ff' },
+    sky: 'roofed',
+    obstacles: [
+      { x: -480, y: -400, w: 58, h: 68, kind: 'attack-block' },
+      { x: 480, y: -400, w: 58, h: 68, kind: 'attack-block' },
+      { x: -480, y: 400, w: 58, h: 68, kind: 'attack-block' },
+      { x: 480, y: 400, w: 58, h: 68, kind: 'attack-block' },
+      { x: -260, y: 0, w: 64, h: 64, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 260, y: 0, w: 64, h: 64, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 0, y: -260, w: 112, h: 28, kind: 'bench', propVariant: 'fixed-bench' },
+      { x: 0, y: 260, w: 112, h: 28, kind: 'bench', propVariant: 'fixed-bench' },
+    ],
+    durationSec: 240,
+    threat: 'severe',
+    discoveryId: 'choir-hymn',
+    unlock: { kind: 'clearArea', areaId: 'haven-of-the-bubs' },
+    waves: [
+      { fromSec: 0, toSec: 240, enemyId: 'nightcrawler', ratePerSec: 0.5, burst: 1 },
+      { fromSec: 20, toSec: 200, enemyId: 'bloodhound', ratePerSec: 0.3, burst: 1 },
+      // The Choir: twenty invisible, effectively unkillable shooters that
+      // reveal after 20s, circle the player, and teleport. See oddity-arenas.md.
+      { fromSec: 60, toSec: 61, enemyId: 'choir-wraith', ratePerSec: 1, burst: 20, formation: 'ring' },
+      { fromSec: 150, toSec: 240, enemyId: 'crypt-bouncer', ratePerSec: 0.15, burst: 1 },
+    ],
+  },
+
   // Endless mode -- no time limit, no walls, procedurally generated world.
   {
     id: 'endless-streets',

@@ -150,6 +150,10 @@ export interface EnemyActor extends Actor {
   dying: boolean;
   deathAt: number;
   activeEffects: StatusEffectInstance[];
+  /** wraith: undamageable and unrendered while `w.now < invisibleUntil`. */
+  invisibleUntil: number;
+  /** wraith: w.now this circling phase ends and the next teleport fires. */
+  phaseUntil: number;
 }
 
 export interface Projectile {
@@ -444,6 +448,8 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'parking-meter': { variant: 'light-breakable', hp: 55 },
   /** Promoted from indestructible-by-omission so it can emit coolant on break. */
   'ac-unit': { variant: 'light-breakable', hp: 100 },
+  /** Wonky sentry block: tough, pushable, and armed. See oddity-arenas.md. */
+  'attack-block': { variant: 'heavy-metal', hp: 220 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
@@ -577,6 +583,8 @@ export interface World {
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
   potholes: PotholeObstacle[];
+  /** area.randomDrops: w.now the next ambient item spawns. Infinity when the area has no random drops. */
+  nextAmbientDropAt: number;
   /** Ground-hazard fluids spawned by breaking certain obstacles (fire hydrant, car-wreck, ac-unit, dumpster). */
   fluids: FluidTile[];
   bounds: { w: number; h: number };
@@ -861,6 +869,7 @@ export function createWorld(
       .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
     potholes: [],
+    nextAmbientDropAt: area.randomDrops ? 2500 : Number.POSITIVE_INFINITY,
     fluids: [],
     bounds: area.bounds,
     camera: { x: 0, y: 0 },
@@ -1269,6 +1278,8 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     activeEffects: [],
     falling: false,
     fallStartedAt: 0,
+    invisibleUntil: def.traits?.revealMs ? w.now + def.traits.revealMs : 0,
+    phaseUntil: 0,
   };
   w.enemies.push(enemy);
 
@@ -2070,6 +2081,8 @@ function damageEnemy(
   burstDepth = 0,
 ) {
   if (enemy.dying) return;
+  // Wraiths can't be hurt while lurking invisible -- see oddity-arenas.md.
+  if (w.now < enemy.invisibleUntil) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
   const isCrit = burstDepth === 0 && w.rng() < w.stats.crit;
   // Landing a hit on the beat is its own bonus, stacking with a rolled crit.
@@ -2338,6 +2351,7 @@ function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
     if (exclude?.has(enemy.uid)) continue;
+    if (w.now < enemy.invisibleUntil) continue;
     const d = dist2(enemy.x, enemy.y, x, y);
     if (d < bestDist) {
       bestDist = d;
@@ -3703,6 +3717,25 @@ function updateBreakables(w: World, dt: number) {
       }
       continue;
     }
+    // Attack blocks zap the player from range on a cadence while intact --
+    // shove them, break them, or eat the bolt. See oddity-arenas.md.
+    if (b.kind === 'attack-block' && w.now >= (b.hazardNextTickAt ?? 0)) {
+      b.hazardNextTickAt = w.now + 1400;
+      const range = 260;
+      if (dist2(w.player.x, w.player.y, b.x, b.y) <= range * range) {
+        const dx = w.player.x - b.x;
+        const dy = w.player.y - b.y;
+        const len = Math.hypot(dx, dy) || 1;
+        w.projectiles.push({
+          uid: uid(w), x: b.x, y: b.y - 6,
+          vx: (dx / len) * 240, vy: (dy / len) * 240,
+          radius: 8, damage: 10, impactIntensity: 1, fromPlayer: false,
+          expiresAt: w.now + 2600, targetUid: null, turnRate: 0,
+          color: '#ff5c5c', trail: [], pierce: 0, hitUids: new Set(),
+        });
+        spawnParticles(w, b.x, b.y, '#ff5c5c', 6, 90);
+      }
+    }
     if (b.landedHeatActive) {
       updateLandedHeat(w, b);
       continue;
@@ -4216,6 +4249,66 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'ringer': {
+        // Continuously circles the player instead of closing distance --
+        // masses of these read as a spinning ring around the arena. See oddity-arenas.md.
+        const radius = traits?.swayRadius ?? 150;
+        const angularSpeed = (enemy.speed / radius) * (enemy.uid % 2 === 0 ? 1 : -1);
+        enemy.weave += dt * angularSpeed;
+        const ringTargetX = trackX + Math.cos(enemy.weave) * radius;
+        const ringTargetY = trackY + Math.sin(enemy.weave) * radius;
+        enemy.x += (ringTargetX - enemy.x) * Math.min(1, dt * 4);
+        enemy.y += (ringTargetY - enemy.y) * Math.min(1, dt * 4);
+        speed = 0;
+        break;
+      }
+      case 'wraith': {
+        // Invisible + unhurtable until invisibleUntil (set at spawn from
+        // traits.revealMs), then circles the player firing shots and
+        // periodically teleports to a new angle. See oddity-arenas.md.
+        const radius = traits?.swayRadius ?? 190;
+        const phaseMs = traits?.swayMs ?? 6000;
+        const revealed = w.now >= enemy.invisibleUntil;
+        if (enemy.phaseUntil === 0) enemy.phaseUntil = w.now + phaseMs;
+        if (revealed && w.now >= enemy.phaseUntil) {
+          enemy.weave = w.rng() * Math.PI * 2;
+          enemy.phaseUntil = w.now + phaseMs;
+          enemy.x = trackX + Math.cos(enemy.weave) * radius;
+          enemy.y = trackY + Math.sin(enemy.weave) * radius;
+          spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 12, 110);
+        }
+        enemy.weave += dt * 0.5;
+        const wobble = Math.sin(w.now * 0.0018 + enemy.uid) * 24;
+        const wraithTargetX = trackX + Math.cos(enemy.weave) * (radius + wobble);
+        const wraithTargetY = trackY + Math.sin(enemy.weave) * (radius + wobble);
+        enemy.x += (wraithTargetX - enemy.x) * Math.min(1, dt * 2.4);
+        enemy.y += (wraithTargetY - enemy.y) * Math.min(1, dt * 2.4);
+        speed = 0;
+        // Faint static while lurking -- a fair, subtle warning before the reveal.
+        if (!revealed && w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 700;
+          spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 1, 20);
+        }
+        if (revealed && w.now >= enemy.fireReadyAt) {
+          const ranged = enemy.def.ranged;
+          if (ranged) {
+            enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.2);
+            const fdx = trackX - enemy.x;
+            const fdy = trackY - enemy.y;
+            const flen = Math.hypot(fdx, fdy) || 1;
+            w.projectiles.push({
+              uid: uid(w), x: enemy.x, y: enemy.y + 8,
+              vx: (fdx / flen) * ranged.projectileSpeed, vy: (fdy / flen) * ranged.projectileSpeed,
+              radius: 7, damage: ranged.damage, impactIntensity: 0, fromPlayer: false,
+              expiresAt: w.now + 3200, targetUid: null, turnRate: 0,
+              color: enemy.def.palette.accent, trail: [], pierce: 0, hitUids: new Set(),
+            });
+            enemy.anim = 'attack';
+            enemy.animStartedAt = w.now;
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
@@ -4261,7 +4354,7 @@ function updateEnemies(w: World, dt: number) {
 
     // Contact damage.
     const contact = enemy.radius + p.radius;
-    if (enemy.ghostUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
+    if (enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
       damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
     }
@@ -4575,6 +4668,36 @@ function updateRumorPulses(w: World) {
   spawnParticles(w, w.player.x, w.player.y, '#c4b5fd', 12, 110);
   pushAlert(w, 'RUMOR — MAGNET PARADE');
   w.rumorMagnetNextAt += 8500;
+}
+
+const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'health', 'cred', 'coin'];
+
+/**
+ * area.randomDrops: pickups appear at random arena points on a cadence,
+ * independent of kills or breakables -- "weird and wonky" item weather for
+ * open flat maps with nothing else dropping loot. See oddity-arenas.md.
+ */
+function updateAmbientDrops(w: World) {
+  if (w.now < w.nextAmbientDropAt) return;
+  const config = w.area.randomDrops;
+  if (!config) return;
+  w.nextAmbientDropAt = w.now + config.intervalMs * randRange(w.rng, 0.7, 1.3);
+  const halfW = w.bounds.w / 2 - 60;
+  const halfH = w.bounds.h / 2 - 60;
+  let x = 0;
+  let y = 0;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    x = randRange(w.rng, -halfW, halfW);
+    y = randRange(w.rng, -halfH, halfH);
+    if (dist2(x, y, w.player.x, w.player.y) > 160 * 160) break;
+  }
+  const kind = AMBIENT_DROP_KINDS[Math.floor(w.rng() * AMBIENT_DROP_KINDS.length)]!;
+  const value = kind === 'xp' ? Math.round(randRange(w.rng, 6, 14))
+    : kind === 'health' ? 18
+    : kind === 'cred' ? Math.round(randRange(w.rng, 4, 10))
+    : 1;
+  w.pickups.push({ uid: uid(w), kind, x, y, vx: 0, vy: 0, value, bornAt: w.now });
+  spawnParticles(w, x, y, '#ffe8a3', 6, 60);
 }
 
 function updatePickups(w: World, dt: number) {
@@ -5490,6 +5613,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updatePotholes(w);
   updateRumorPulses(w);
   updatePickups(w, dt);
+  updateAmbientDrops(w);
   updateObjectives(w);
   updateParticles(w, dt);
   updateRescue(w, dt);

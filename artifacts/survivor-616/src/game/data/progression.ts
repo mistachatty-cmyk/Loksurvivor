@@ -260,6 +260,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'northline-switch', name: 'Northline Switch', blurb: 'A rail switch marked with the Sanctum symbol. Someone has been moving supplies under the city.' },
   { id: 'civic-fountain', name: 'The Civic Fountain', blurb: 'The plaza fountain still runs red at midnight, carrying the Sire’s oldest route toward the river.' },
   { id: 'bubble-truce', name: 'The Bubble Truce', blurb: 'Two family lines, one rivalry passed down twice over, and one afternoon where nobody could remember why they were still fighting.' },
+  { id: 'choir-hymn', name: 'The Choir\'s Hymn', blurb: 'Twenty verses, one voice each, none of them singing anything you could ever hum back.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

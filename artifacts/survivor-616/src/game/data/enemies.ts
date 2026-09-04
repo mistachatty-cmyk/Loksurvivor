@@ -513,6 +513,50 @@ export const ENEMIES: EnemyDef[] = [
     role: 'flanker',
     lore: 'Bulbosa\'s second. Never takes the front line, always takes the credit.',
   },
+
+  /**
+   * Oddity-area specials -- see .agents/memory/oddity-arenas.md. Cheap fodder
+   * that orbits instead of closing distance, and a rare mass-spawn ghost
+   * squad that can't be touched until the reveal. Neither is meant to be
+   * farmed for XP; both are built to be dodged.
+   */
+  {
+    id: 'ring-runner',
+    name: 'Ring Runner',
+    family: 'Oddity',
+    behavior: 'ringer',
+    hp: 9,
+    speed: 96,
+    damage: 5,
+    radius: 8,
+    xp: 2,
+    mass: 0.5,
+    palette: { ink: '#0a0410', body: '#5b21b6', bodyDark: '#2e1065', accent: '#c4b5fd', accentBright: '#f5f3ff', skin: '#5b21b6', glow: '#c4b5fd' },
+    rig: blobRig({ height: 12, width: 10, tendrils: true, wings: true }),
+    faction: 'Loop Chorus',
+    role: 'swarm',
+    traits: { swayRadius: 150 },
+    lore: 'Never learned to walk in a straight line. Never needed to -- a hundred of them in a ring does the job a chase never could.',
+  },
+  {
+    id: 'choir-wraith',
+    name: 'Choir Wraith',
+    family: 'Oddity',
+    behavior: 'wraith',
+    hp: 420000,
+    speed: 40,
+    damage: 8,
+    radius: 11,
+    xp: 1,
+    mass: 1,
+    palette: { ink: '#05030a', body: '#312244', bodyDark: '#150f24', accent: '#e9d8ff', accentBright: '#ffffff', skin: '#150f24', glow: '#e9d8ff' },
+    rig: humanoidRig({ height: 22, width: 11, hood: true, halo: true, staff: true, headColor: 'bodyDark' }),
+    faction: 'Choir of Twenty',
+    role: 'sniper',
+    ranged: { cooldownMs: 1900, projectileSpeed: 190, damage: 9 },
+    traits: { revealMs: 20000, swayRadius: 210, swayMs: 6500 },
+    lore: 'Twenty voices arrived singing and never stopped. You will not see the first twenty seconds -- only feel the room get colder before the second verse starts.',
+  },
 ];
 
 export const ENEMIES_BY_ID: Record<string, EnemyDef> = Object.fromEntries(
