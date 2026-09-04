@@ -5702,6 +5702,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
+    hazardImmune: w.hazardImmune,
     loadout: {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),

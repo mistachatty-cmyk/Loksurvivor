@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -33,8 +33,31 @@ import {
 
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { useMeta } from '@/game/state/metaStore';
-import type { VendorItemCategory, VendorItemDef } from '@/game/types';
+import { humanoidRig } from '@/game/sprites/rigs';
+import type { AnimName, SpritePalette, VendorItemCategory, VendorItemDef } from '@/game/types';
+import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
+
+/** The Quartermaster's own look -- a bespoke portrait rig, not a playable character. */
+const QUARTERMASTER_RIG = humanoidRig({ height: 21, width: 12, bulk: true, cap: true });
+const QUARTERMASTER_PALETTE: SpritePalette = {
+  ink: '#0d1210',
+  body: '#3a453c',
+  bodyDark: '#232a25',
+  accent: '#8fae7a',
+  accentBright: '#c3d9a8',
+  skin: '#b98f68',
+  glow: '#8fae7a',
+};
+
+const QUARTERMASTER_QUIPS = [
+  "That'll do.",
+  "Don't lose it this time.",
+  "Kit's yours. Try not to need a refund.",
+  "Sign here. Kidding -- just go.",
+  "Comes off the books the second you walk out.",
+  "Use it well. I don't restock favorites.",
+];
 
 export interface VendorPanelProps {
   onBack: () => void;
@@ -338,6 +361,9 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
   const [selectedId, setSelectedId] = useState<string>(
     VENDOR_CATALOG.find((item) => item.category === 'stat')?.id ?? VENDOR_CATALOG[0].id,
   );
+  const [reactAnim, setReactAnim] = useState<AnimName>('idle');
+  const [line, setLine] = useState(QUARTERMASTER_QUIPS[0]);
+  const resetTimer = useRef<number | undefined>(undefined);
 
   const itemsInCategory = VENDOR_CATALOG.filter((item) => item.category === activeCategory);
   const selectedItem = itemsInCategory.find((item) => item.id === selectedId) ?? itemsInCategory[0];
@@ -352,6 +378,15 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
     setActiveCategory(category);
     const firstItem = VENDOR_CATALOG.find((item) => item.category === category);
     if (firstItem) setSelectedId(firstItem.id);
+  }
+
+  function handleBuy(id: string) {
+    buyVendorItem(id);
+    const clip = QUARTERMASTER_RIG.anims.attack;
+    setReactAnim('attack');
+    setLine(QUARTERMASTER_QUIPS[Math.floor(Math.random() * QUARTERMASTER_QUIPS.length)]!);
+    window.clearTimeout(resetTimer.current);
+    resetTimer.current = window.setTimeout(() => setReactAnim('idle'), clip.frames.length * clip.frameMs);
   }
 
   return (
@@ -393,7 +428,16 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
         </div>
       }
     >
-      <div className="mx-auto w-full max-w-6xl space-y-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex shrink-0 flex-col items-center gap-3 border border-border bg-card px-6 py-5 lg:w-64">
+          <RigPortrait rig={QUARTERMASTER_RIG} palette={QUARTERMASTER_PALETTE} anim={reactAnim} size={160} />
+          <p className="text-sm font-black uppercase tracking-wide text-white">Quartermaster</p>
+          <p className="min-h-[2.5rem] text-center text-xs italic leading-relaxed text-muted-foreground">
+            &ldquo;{line}&rdquo;
+          </p>
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-6">
         <section className="terminal-frame terminal-scanlines relative overflow-hidden border border-border bg-card p-5 sm:p-6" data-testid="section-vendor-ledger">
           <div className="pointer-events-none absolute -right-8 -top-14 font-display text-[11rem] font-black leading-none text-primary/[0.05]" aria-hidden="true">
             616
@@ -463,7 +507,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
           {selectedItem &&
             (layout === 'rail' ? (
               <div className="grid gap-4 lg:grid-cols-[16rem_1fr]" data-testid="section-vendor-grid">
-                <ItemDetail item={selectedItem} meta={meta} purchases={meta.vendorPurchases} onBuy={buyVendorItem} onRefund={refundVendorItem} />
+                <ItemDetail item={selectedItem} meta={meta} purchases={meta.vendorPurchases} onBuy={handleBuy} onRefund={refundVendorItem} />
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {itemsInCategory.map((item) => (
                     <ItemTile
@@ -494,7 +538,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
                           item={selectedItem}
                           meta={meta}
                           purchases={meta.vendorPurchases}
-                          onBuy={buyVendorItem}
+                          onBuy={handleBuy}
                           onRefund={refundVendorItem}
                           inline
                         />
@@ -512,6 +556,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
             <span className="font-bold uppercase tracking-widest text-primary/80">Quartermaster note:</span> Contracts stay active once
             bought &mdash; refund the base kit any time your build changes.
           </p>
+        </div>
         </div>
       </div>
     </ScreenLayout>
