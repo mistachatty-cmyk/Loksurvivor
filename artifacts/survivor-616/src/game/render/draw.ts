@@ -1454,6 +1454,7 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   mailbox: { top: '#1c3f66', side: '#0f2440', trim: '#4d8bd6' },
   'fire-hydrant': { top: '#8c1f1f', side: '#4a0f0f', trim: '#ffb3b3' },
   'parking-meter': { top: '#4a4a52', side: '#28282e', trim: '#c9c9d2' },
+  'attack-block': { top: '#3a1620', side: '#1e0b11', trim: '#ff5c5c' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -1870,12 +1871,14 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.save(); ctx.globalAlpha = Math.max(0, fade) * 0.32; ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
+  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block'].includes(b.kind));
   let dynamicCount = 0;
   for (const b of sources) {
     const isBarrel = b.kind === 'barrel';
-    const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10 : b.kind === 'neon-sign' ? 90 : 80;
-    const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'fuse-box' ? '#7ef0bd' : '#ffd166';
+    const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10
+      : b.kind === 'neon-sign' ? 90 : b.kind === 'attack-block' ? 100 + Math.sin(w.now / 140) * 18 : 80;
+    const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff'
+      : b.kind === 'fuse-box' ? '#7ef0bd' : b.kind === 'attack-block' ? '#ff5c5c' : '#ffd166';
     const pulse = b.kind === 'neon-sign' ? neonFlicker(w.now, b.uid) : 1;
     const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
     gradient.addColorStop(0, `${color}55`);
@@ -1910,7 +1913,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   // each nearby obstacle are projected away from the moving light source, so
   // shadows rotate, stretch, and vanish immediately when a breakable breaks.
   const shadowSources = sources.slice(0, 5);
-  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box'].includes(b.kind));
+  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block'].includes(b.kind));
   for (const source of shadowSources) {
     for (const object of shadowObjects) {
       const distance = Math.hypot(object.x - source.x, object.y - source.y);
@@ -2772,6 +2775,9 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     const fallProgress = enemy.falling ? clamp((w.now - enemy.fallStartedAt) / 620, 0, 1) : 0;
     const dissolve = enemy.dying && !enemy.falling ? Math.min(0.95, (w.now - enemy.deathAt) / 520) : fallProgress * 0.28;
     const ghosting = enemy.ghostUntil > w.now && !enemy.dying;
+    // Wraiths (see oddity-arenas.md): near-fully invisible while lurking, not
+    // literally alpha 0 -- a keen-eyed player can still catch a shimmer.
+    const hidden = enemy.invisibleUntil > w.now && !enemy.dying;
     const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
     if (converted) {
       const pulse = 0.72 + Math.sin(w.now / 130) * 0.18;
@@ -2816,7 +2822,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
     ctx.save();
-    ctx.globalAlpha = ghosting ? 0.22 : shadowed ? 0.4 : 1;
+    ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
     drawRig(
       ctx,
       enemy.def.rig,
@@ -2839,7 +2845,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     ctx.restore();
 
     // Health bar for anything meaningfully tough.
-    if (!enemy.dying && enemy.hp < enemy.maxHp && enemy.maxHp > 60) {
+    if (!hidden && !enemy.dying && enemy.hp < enemy.maxHp && enemy.maxHp > 60) {
       const width = Math.max(22, enemy.radius * 2.2);
       const top = enemy.y - enemy.radius * 2.6;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';

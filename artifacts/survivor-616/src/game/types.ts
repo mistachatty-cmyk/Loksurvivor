@@ -623,7 +623,12 @@ export type EnemyBehavior =
   | 'teleporter'
   | 'ghost'
   | 'shifter'
-  | 'orbit';
+  | 'orbit'
+  /** Continuously circles the player at `traits.swayRadius`; no special reveal gate. */
+  | 'ringer'
+  /** Invisible and unhurtable for `traits.revealMs`, then circles the player firing
+   *  ranged shots and periodically teleports to a new angle. See oddity-arenas.md. */
+  | 'wraith';
 
 export interface EnemyDef {
   id: string;
@@ -649,7 +654,19 @@ export interface EnemyDef {
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
   faction?: string;
   role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor';
-  traits?: { teleportMs?: number; ghostMs?: number; shiftMs?: number; shiftScale?: number; burstSpeed?: number };
+  traits?: {
+    teleportMs?: number;
+    ghostMs?: number;
+    shiftMs?: number;
+    shiftScale?: number;
+    burstSpeed?: number;
+    /** wraith/ringer: orbit radius around the player, in world units. */
+    swayRadius?: number;
+    /** wraith: how long each circling phase lasts before it teleports to a new angle. */
+    swayMs?: number;
+    /** wraith: invisible and undamageable window from spawn, in ms. */
+    revealMs?: number;
+  };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
 }
@@ -685,7 +702,9 @@ export interface ObstacleDef {
     | 'neon-sign' | 'barrel' | 'fuse-box' | 'street-lamp' | 'car-wreck'
     | 'crate-breakable' | 'security-camera' | 'cover' | 'reflective-surface' | 'flora'
      | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole'
-     | 'trash-can' | 'mailbox' | 'fire-hydrant' | 'parking-meter';
+     | 'trash-can' | 'mailbox' | 'fire-hydrant' | 'parking-meter'
+     /** A heavy, wonky sentry block: zaps the player with a short-range bolt on a cadence. See oddity-arenas.md. */
+     | 'attack-block';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
@@ -746,6 +765,11 @@ export interface AreaDef {
    * The world streams outward; the player ends by dying or heading home.
    */
   endless?: true;
+  /**
+   * When set, pickups spawn at random points in the arena on a cadence,
+   * independent of kills or breakables. See oddity-arenas.md.
+   */
+  randomDrops?: { intervalMs: number };
 }
 
 export type CustomMapAssetCategory = 'ground' | 'structure' | 'hazard' | 'landmark' | 'enemy' | 'encounter';
