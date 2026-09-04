@@ -30,7 +30,10 @@ function EnemyPreview({ enemy }: { enemy: (typeof ENEMIES)[number] }) {
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
   const isListView = meta.uiDensity === 'list';
-  const discovered = ENEMIES.filter((e) => (meta.bestiary[e.id] ?? 0) > 0).length;
+  // Enemies excluded from the ratio (e.g. Choir Wraith's HP is intentionally
+  // beyond a run's reach) so 100% stays a reachable goal.
+  const catalogueEnemies = ENEMIES.filter((e) => !e.excludeFromBestiary);
+  const discovered = catalogueEnemies.filter((e) => (meta.bestiary[e.id] ?? 0) > 0).length;
   const unlockedIds = new Set(unlockedCharacters.map((character) => character.id));
 
   return (
@@ -41,7 +44,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
       action={
         <div className="text-right">
           <p className="text-xs uppercase tracking-widest text-muted-foreground">Catalogued</p>
-          <p className="text-2xl font-black text-white">{discovered} <span className="text-muted-foreground text-sm">/ {ENEMIES.length}</span></p>
+          <p className="text-2xl font-black text-white">{discovered} <span className="text-muted-foreground text-sm">/ {catalogueEnemies.length}</span></p>
         </div>
       }
     >

@@ -555,6 +555,9 @@ export const ENEMIES: EnemyDef[] = [
     role: 'sniper',
     ranged: { cooldownMs: 1900, projectileSpeed: 190, damage: 9 },
     traits: { revealMs: 20000, swayRadius: 210, swayMs: 6500 },
+    // Not meant to be killed inside a run -- excluded from the Bestiary
+    // ratio so it can't cap completion below 100%. See oddity-arenas.md.
+    excludeFromBestiary: true,
     lore: 'Twenty voices arrived singing and never stopped. You will not see the first twenty seconds -- only feel the room get colder before the second verse starts.',
   },
 ];

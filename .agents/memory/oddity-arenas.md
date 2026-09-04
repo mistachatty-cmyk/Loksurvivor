@@ -98,6 +98,19 @@ XP or realistically killed inside the encounter window, just survived. If a
 future oddity enemy wants the same "unkillable spectacle" feel, keep HP
 finite for the same reason.
 
+**Bestiary gotcha:** `BestiaryPanel` shows a "caught / total" ratio over
+every entry in `ENEMIES` with at least one recorded kill
+(`meta.bestiary[id] > 0`, sourced from `w.killsByEnemy`, which only
+increments on an actual kill). An enemy that's realistically unkillable in a
+run -- which is the whole point of Choir Wraith -- can never contribute a
+kill, which silently makes 100% completion permanently unreachable for
+every player. `EnemyDef.excludeFromBestiary` exists for exactly this: set it
+on any enemy whose HP is intentionally out of a run's reach, and
+`BestiaryPanel` drops it from both sides of the ratio (it still appears in
+the grid as a locked entry, same as any other enemy nobody's killed yet --
+only the completion math is affected). Any new "spectacle, not a kill
+target" enemy needs this flag too.
+
 Two new `EnemyActor` fields carry this: `invisibleUntil` (also reused by
 `ringer`'s sibling, `ghostUntil`, semantics but gates damage/targeting/render
 rather than just contact damage) and `phaseUntil` (`w.now` the current sway
