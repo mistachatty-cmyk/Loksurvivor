@@ -669,6 +669,13 @@ export interface EnemyDef {
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
+  /**
+   * Excluded from the Bestiary's "caught / total" ratio and its own catalogue
+   * entry. For enemies (like the Choir Wraith) whose HP is intentionally far
+   * beyond what a run can realistically deal -- without this, 100% Bestiary
+   * completion becomes permanently unreachable. See oddity-arenas.md.
+   */
+  excludeFromBestiary?: true;
 }
 
 /* ------------------------------------------------------------------ */
