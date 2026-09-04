@@ -25,6 +25,23 @@ const SPRITE_SCALE = 2.05;
 /** LokPets read as small companions, a notch below full enemy scale. */
 const LOKPET_SPRITE_SCALE = SPRITE_SCALE * 0.82;
 
+/**
+ * Render-time size multiplier by `EnemyDef.sizeClass` -- a mini reads as
+ * visibly small fry, a giant fills the screen the way a boss always did.
+ * See run-presentation.md.
+ */
+const SIZE_CLASS_SCALE: Record<NonNullable<import('@/game/types').EnemyDef['sizeClass']>, number> = {
+  mini: 0.7,
+  standard: 1,
+  elite: 1.2,
+  giant: 1.55,
+};
+function sizeClassScale(def: import('@/game/types').EnemyDef): number {
+  if (def.sizeClass) return SIZE_CLASS_SCALE[def.sizeClass];
+  // Pre-existing content never set sizeClass; keep the old Boss-only bump.
+  return def.family === 'Boss' ? 1.55 : 1;
+}
+
 export interface Viewport {
   width: number;
   height: number;
@@ -1997,26 +2014,68 @@ function drawAwarenessArrow(ctx: CanvasRenderingContext2D, w: World) {
 /* Entities                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * XP gem tiers, keyed off pickup value so a bigger drop reads as a bigger,
+ * brighter, more insistent gem instead of the same dot regardless of worth.
+ * See run-presentation.md.
+ */
+interface XpGemTier {
+  color: string;
+  glow: string;
+  halfSize: number;
+  blur: number;
+  pulseAmp: number;
+  sparkle: boolean;
+}
+const XP_GEM_TIERS: readonly XpGemTier[] = [
+  { color: '#4fb3c9', glow: '#4fb3c9', halfSize: 4, blur: 6, pulseAmp: 0, sparkle: false }, // spark
+  { color: '#6ee7ff', glow: '#6ee7ff', halfSize: 6, blur: 10, pulseAmp: 0, sparkle: false }, // shard (original look)
+  { color: '#ffb347', glow: '#ffd166', halfSize: 8, blur: 15, pulseAmp: 0.1, sparkle: false }, // gem
+  { color: '#e879f9', glow: '#f5d0fe', halfSize: 11, blur: 22, pulseAmp: 0.18, sparkle: true }, // prism
+];
+function xpGemTier(value: number): XpGemTier {
+  if (value >= 20) return XP_GEM_TIERS[3]!;
+  if (value >= 10) return XP_GEM_TIERS[2]!;
+  if (value >= 4) return XP_GEM_TIERS[1]!;
+  return XP_GEM_TIERS[0]!;
+}
+
 function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
   for (const pickup of w.pickups) {
     const bob = Math.sin((w.now - pickup.bornAt) / 220) * 2;
     const x = pickup.x;
     const y = pickup.y + bob;
+    // A quick grow-in on spawn reads as a "pop" instead of appearing inert.
+    const age = w.now - pickup.bornAt;
+    const pop = age >= 180 ? 1 : 0.35 + 0.65 * (age / 180);
 
     ctx.save();
     switch (pickup.kind) {
-      case 'xp':
-        ctx.fillStyle = '#6ee7ff';
-        ctx.shadowColor = '#6ee7ff';
-        ctx.shadowBlur = 10;
+      case 'xp': {
+        const tier = xpGemTier(pickup.value);
+        const pulse = tier.pulseAmp > 0 ? 1 + Math.sin((w.now - pickup.bornAt) / 200) * tier.pulseAmp : 1;
+        const s = tier.halfSize * pop * pulse;
+        ctx.fillStyle = tier.color;
+        ctx.shadowColor = tier.glow;
+        ctx.shadowBlur = tier.blur * pulse;
         ctx.beginPath();
-        ctx.moveTo(x, y - 6);
-        ctx.lineTo(x + 5, y);
-        ctx.lineTo(x, y + 6);
-        ctx.lineTo(x - 5, y);
+        ctx.moveTo(x, y - s);
+        ctx.lineTo(x + s * 0.8, y);
+        ctx.lineTo(x, y + s);
+        ctx.lineTo(x - s * 0.8, y);
         ctx.closePath();
         ctx.fill();
+        if (tier.sparkle) {
+          ctx.globalAlpha = 0.8;
+          ctx.fillStyle = '#ffffff';
+          for (let i = 0; i < 2; i += 1) {
+            const angle = w.now / 260 + i * Math.PI;
+            ctx.fillRect(x + Math.cos(angle) * (s + 5) - 1, y + Math.sin(angle) * (s + 5) - 1, 2, 2);
+          }
+          ctx.globalAlpha = 1;
+        }
         break;
+      }
       case 'health':
         ctx.fillStyle = '#7dffb2';
         ctx.shadowColor = '#7dffb2';
@@ -2832,10 +2891,10 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.x,
       enemy.y + 2 + fallProgress * 10,
       enemy.facing,
-      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
+      SPRITE_SCALE * sizeClassScale(enemy.def) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
       {
         flash: w.now < enemy.hitFlashUntil,
-        outline: outlineEnemies || enemy.def.family === 'Boss',
+        outline: outlineEnemies || enemy.def.family === 'Boss' || enemy.def.sizeClass === 'giant',
         dissolve,
         tint: converted
           ? { color: '#65f6d1', alpha: 0.42 }

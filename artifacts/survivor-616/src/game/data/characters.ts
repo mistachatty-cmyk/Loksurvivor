@@ -1,4 +1,4 @@
-import { blobRig, eelRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, triangleRig } from '@/game/sprites/rigs';
+import { arachnidRig, blobRig, eelRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, serpentRig, triangleRig } from '@/game/sprites/rigs';
 import type { CharacterDef, SpriteRig } from '@/game/types';
 import { REACTION_PRESETS } from './reactivity';
 
@@ -777,6 +777,99 @@ export const CHARACTERS: CharacterDef[] = [
     weapon: { id: 'bearing-scatter', name: 'Bearing Scatter', kind: 'projectile', description: 'Heavy steel bearings skip through a lane and return through the crowd.', damage: 21, cooldownMs: 920, range: 280, speed: 245, count: 3, lifetimeMs: 1500, levelDamageScale: 0.33, impactIntensity: 3, color: '#b8d66b', pierce: 1 },
     ultimate: { id: 'idle-redline', name: 'Idle Redline', description: 'The engine catches: damage rises, cooldowns fall, and a shock clears the immediate lane.', cooldownMs: 28000, durationMs: 3600, effect: { damageMult: 1.65, cooldownMult: 0.5, novaDamage: 94, novaRadius: 170 } },
     unlock: { kind: 'kills', count: 220 },
+  },
+
+  /**
+   * First cold-biome wave: two silhouettes new to the roster entirely
+   * (arachnidRig, serpentRig -- see sprites/rigs.ts). More to come once the
+   * actual cold-biome area ships; these two stand on their own for now.
+   * See run-presentation.md.
+   */
+  {
+    id: 'hoarfrost', react: REACTION_PRESETS.playerBob, name: 'Hoarfrost', handle: 'The Ice Weaver',
+    tagline: 'Wove itself out of a frozen fire escape one January and never quite thawed.',
+    bio: 'Six legs, no hurry. Hoarfrost doesn\'t chase -- it lays a web across the block and waits for the cold to do the rest.',
+    referenceArt: 'original:ice-weaver',
+    // Bone-white and silver, not blue -- Glacier Warden and Glass Eel already
+    // own saturated ice-cyan, so Hoarfrost reads as rime-glazed frost instead
+    // of "another blue ice character." See run-presentation.md.
+    palette: {
+      ink: '#0a0a0d',
+      body: '#d9dde3',
+      bodyDark: '#8b93a1',
+      accent: '#c9e8e0',
+      accentBright: '#ffffff',
+      skin: '#8b93a1',
+      glow: '#e4f2ee',
+    },
+    rig: arachnidRig({ height: 10, span: 16, legPairs: 3 }),
+    stats: { maxHp: 108, speed: 84, power: 1.02, area: 1.16, haste: 0.94, magnet: 50, armor: 0.16, crit: 0.05, lifesteal: 0 },
+    weapon: {
+      id: 'rime-web',
+      name: 'Rime Web',
+      kind: 'wave',
+      description: 'Frost strands fan out and lock anything they cross in place.',
+      damage: 14,
+      cooldownMs: 820,
+      range: 165,
+      levelDamageScale: 0.27,
+      count: 1,
+      impactIntensity: 2,
+      color: '#c9e8e0',
+      statusEffectId: 'freeze',
+    },
+    ultimate: {
+      id: 'deep-frost',
+      name: 'Deep Frost',
+      description: 'The whole web goes rigid at once -- everything touching a strand locks solid.',
+      cooldownMs: 26000,
+      durationMs: 3800,
+      effect: { novaDamage: 70, novaRadius: 195, damageMult: 1.3 },
+    },
+    unlock: { kind: 'kills', count: 120 },
+  },
+  {
+    id: 'sleet', react: REACTION_PRESETS.playerBob, name: 'Sleet', handle: 'Downed Line',
+    tagline: 'Ice storm took the power out for six blocks. This is what came down with the wire.',
+    bio: 'A live line iced over mid-arc, still sparking under the frost. Sleet moves like a whip and hits like a breaker flipping.',
+    referenceArt: 'original:downed-line',
+    // Electric violet, not blue -- differentiates from Glacier Warden and
+    // Glass Eel's ice-cyan on sight. See run-presentation.md.
+    palette: {
+      ink: '#0a0612',
+      body: '#3d2a5c',
+      bodyDark: '#1f1533',
+      accent: '#c9a6ff',
+      accentBright: '#ffffff',
+      skin: '#1f1533',
+      glow: '#c9a6ff',
+    },
+    rig: serpentRig({ length: 28, segments: 5 }),
+    stats: { maxHp: 82, speed: 138, power: 1.05, area: 0.92, haste: 1.14, magnet: 66, armor: 0.02, crit: 0.1, lifesteal: 0 },
+    weapon: {
+      id: 'arc-sleet',
+      name: 'Arc Sleet',
+      kind: 'laser',
+      // No status effect -- Hoarfrost already covers freeze/crowd-lock, so
+      // Sleet stays a pure glass-cannon burst line instead of a third freeze
+      // source. See run-presentation.md.
+      description: 'A violet arc snaps out in a line, hard enough to skip the crowd-control.',
+      damage: 23,
+      cooldownMs: 900,
+      range: 260,
+      levelDamageScale: 0.3,
+      impactIntensity: 2,
+      color: '#c9a6ff',
+    },
+    ultimate: {
+      id: 'brownout',
+      name: 'Brownout',
+      description: 'Every line arcs at once. The block goes dark, then very, very cold.',
+      cooldownMs: 24000,
+      durationMs: 3500,
+      effect: { speedMult: 1.5, cooldownMult: 0.5, novaDamage: 58, novaRadius: 170 },
+    },
+    unlock: { kind: 'kills', count: 190 },
   },
 ];
 

@@ -654,6 +654,14 @@ export interface EnemyDef {
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
   faction?: string;
   role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor';
+  /**
+   * Visual scale tier, independent of `radius` (which still drives collision).
+   * Feeds a render-time size multiplier -- see `SIZE_CLASS_SCALE` in draw.ts.
+   * Omitted reads as 'standard' except that a literal `family === 'Boss'`
+   * still gets the old giant bump for pre-existing content that never set
+   * this. See run-presentation.md.
+   */
+  sizeClass?: 'mini' | 'standard' | 'elite' | 'giant';
   traits?: {
     teleportMs?: number;
     ghostMs?: number;
