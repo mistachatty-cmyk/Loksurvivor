@@ -1643,6 +1643,8 @@ export interface HudSnapshot {
   ultimateReadyPct: number;
   ultimateActive: boolean;
   weaponLevel: number;
+  /** True once "Let Me Hold This" is unlocked -- hazard weapons never hurt whoever's holding them. */
+  hazardImmune: boolean;
   loadout: {
     weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;
     passives: Array<{ id: string; name: string; stacks: number }>;
