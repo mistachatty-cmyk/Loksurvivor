@@ -193,7 +193,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'settings', 'palette-store'],
+    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'settings', 'palette-store', 'account', 'feedback'],
   },
   {
     id: 'rooftop-perch',
@@ -204,7 +204,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/rooftops.jpeg',
     biome: 'rooftop',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
-    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings', 'palette-store'],
+    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
   },
   {
     id: 'the-cellar',
@@ -215,7 +215,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/cellar.jpeg',
     biome: 'cellar',
     unlock: { kind: 'discovery', discoveryId: 'lantern-shard' },
-    features: ['music', 'bestiary', 'allies', 'unlocks', 'settings', 'palette-store'],
+    features: ['music', 'bestiary', 'allies', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
   },
   {
     id: 'the-alley',
@@ -226,7 +226,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/alley.jpeg',
     biome: 'alley',
     unlock: { kind: 'discovery', discoveryId: 'floodwall-mark' },
-    features: ['vendor', 'workshop', 'allies', 'settings', 'palette-store'],
+    features: ['vendor', 'workshop', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
   },
   {
     id: 'the-storefront',
@@ -237,7 +237,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/street.jpeg',
     biome: 'archive',
     unlock: { kind: 'discovery', discoveryId: 'sire-ledger' },
-    features: ['bestiary', 'unlocks', 'allies', 'settings', 'palette-store'],
+    features: ['bestiary', 'unlocks', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
   },
 ];
 
