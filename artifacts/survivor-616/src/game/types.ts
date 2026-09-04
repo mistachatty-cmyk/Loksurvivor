@@ -364,7 +364,10 @@ export type WeaponKind =
   | 'teleport'
   | 'convert'
   | 'punch'
-  | 'follower';
+  | 'follower'
+  /** Telegraphs a ground reticle on a nearby enemy, then a comet drops from
+   *  off-screen and strikes it. See run-presentation.md. */
+  | 'meteor';
 
 /**
  * Shared physical-impact spectrum for authored attacks.
@@ -424,6 +427,14 @@ export interface WeaponDef {
    *  from it, unless the "Let Me Hold This" Quartermaster ability is
    *  unlocked. */
   nativeCharacterId?: string;
+  /**
+   * Elemental synergy: this weapon's slash/wave/laser/impact hits deal
+   * `bonusVsStatusMult`x damage against a target that already carries
+   * `bonusVsStatusId`. E.g. an electric weapon hitting a target already
+   * `wet`. See run-presentation.md.
+   */
+  bonusVsStatusId?: string;
+  bonusVsStatusMult?: number;
 }
 
 /** Designer-facing metadata for a combat status effect. */
@@ -604,6 +615,31 @@ export interface CharacterDef {
   referenceArt?: string;
   /** How this character moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
+  /**
+   * Grants a draggable elemental cloud companion (Storm Chaser). Optional --
+   * any future character could opt in the same way. See run-presentation.md.
+   */
+  stormCloud?: StormCloudConfig;
+}
+
+/**
+ * Storm Chaser's cloud: floats near the player by default, or the player
+ * can drag it anywhere on screen for precision play. Cycles automatically
+ * through its elemental modes on a timer -- not by tap count -- so it
+ * behaves identically on touch, mouse, and keyboard-only input.
+ */
+export interface StormCloudConfig {
+  /** Hit-test radius for grabbing the cloud with a pointer, in world units. */
+  grabRadius: number;
+  /** Damage/status application radius. */
+  effectRadius: number;
+  /** How often each mode ticks damage/status to anything underneath. */
+  tickMs: number;
+  /** How long each mode lasts before cycling to the next. */
+  cycleMs: number;
+  rainDamage: number;
+  fireRainDamage: number;
+  acidRainDamage: number;
 }
 
 /* ------------------------------------------------------------------ */

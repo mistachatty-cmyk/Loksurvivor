@@ -81,7 +81,7 @@ interface StickState {
   dy: number;
 }
 
-type PointerMode = 'none' | 'stick' | 'object';
+type PointerMode = 'none' | 'stick' | 'object' | 'cloud';
 
 interface TapRecord {
   time: number;
@@ -148,6 +148,7 @@ export function RunScreen({
     dy: 0,
   });
   const pointerModeRef = useRef<PointerMode>('none');
+  const cloudPointerIdRef = useRef<number | null>(null);
   const lastTapRef = useRef<TapRecord | null>(null);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
@@ -332,6 +333,29 @@ export function RunScreen({
       return;
     }
     lastTapRef.current = null;
+
+    // Storm Chaser: grab the cloud directly instead of moving, if the
+    // pointer came down within its grab radius. Everyone else has no
+    // world.stormCloud, so this is a no-op for the rest of the roster.
+    if (canvas && world && world.stormCloud) {
+      const config = world.character.stormCloud;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      const grabRadius = config?.grabRadius ?? 70;
+      if (Math.hypot(worldX - world.stormCloud.x, worldY - world.stormCloud.y) <= grabRadius) {
+        world.stormCloud.dragging = true;
+        world.stormCloud.targetX = worldX;
+        world.stormCloud.targetY = worldY;
+        pointerModeRef.current = 'cloud';
+        cloudPointerIdRef.current = event.pointerId;
+        return;
+      }
+    }
+
     if (physicsObjectClicksEnabled && canvas && world) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
@@ -362,6 +386,18 @@ export function RunScreen({
   }, [dungeonTransition, physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerModeRef.current === 'cloud') {
+      const canvas = canvasRef.current;
+      const world = worldRef.current;
+      if (!canvas || !world || !world.stormCloud || cloudPointerIdRef.current !== event.pointerId) return;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      world.stormCloud.targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      world.stormCloud.targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      return;
+    }
     const stick = stickRef.current;
     if (pointerModeRef.current !== 'stick' || !stick.active || stick.pointerId !== event.pointerId) return;
     let dx = event.clientX - stick.originX;
@@ -378,6 +414,13 @@ export function RunScreen({
 
   const endPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
+    if (pointerModeRef.current === 'cloud') {
+      pointerModeRef.current = 'none';
+      cloudPointerIdRef.current = null;
+      const world = worldRef.current;
+      if (world?.stormCloud) world.stormCloud.dragging = false;
+      return;
+    }
     if (pointerModeRef.current === 'object') {
       pointerModeRef.current = 'none';
       if (event.type !== 'pointercancel') {

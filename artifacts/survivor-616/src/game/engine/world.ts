@@ -186,7 +186,9 @@ export interface Projectile {
   evolutionBehavior?: EvolutionBehavior;
 }
 
-export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact';
+export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact'
+  /** A thin ambient connector line between two points -- no damage, purely a "you're webbed in" visual. */
+  | 'web';
 
 export interface Effect {
   uid: number;
@@ -210,6 +212,9 @@ export interface Effect {
   hurtsPlayer?: boolean;
   statusEffectId?: string;
   evolutionBehavior?: EvolutionBehavior;
+  /** Elemental-synergy bonus: extra damage when the target already carries this status. */
+  bonusVsStatusId?: string;
+  bonusVsStatusMult?: number;
 }
 
 export interface Orbiter {
@@ -229,6 +234,27 @@ export interface PendingLandExplosion {
   readyAt: number;
   damage: number;
   radius: number;
+}
+
+/**
+ * A telegraphed strike queued to land on the ground later -- the 'meteor'
+ * weapon kind. Purely data; `drawPendingMeteors` derives the warning
+ * reticle and falling comet from these timestamps with no separate visual
+ * entity to keep in sync. See run-presentation.md.
+ */
+export interface PendingMeteor {
+  uid: number;
+  x: number;
+  y: number;
+  /** w.now when the warning reticle first appeared. */
+  telegraphAt: number;
+  /** w.now the strike actually lands. */
+  impactAt: number;
+  radius: number;
+  damage: number;
+  impactIntensity: ImpactIntensity;
+  statusEffectId?: string;
+  color: string;
 }
 
 /** Per-run bookkeeping for a character's `dashSkill`. */
@@ -381,6 +407,27 @@ export interface BreakableObstacle extends Aabb {
 }
 
 /** Ground-hazard liquids spawned by breaking certain obstacles. Never solid — always kept out of `w.obstacles`. */
+export type StormCloudMode = 'rain' | 'fire-rain' | 'acid-rain';
+
+/**
+ * Storm Chaser's draggable elemental cloud. `x`/`y` is where it's actually
+ * drawn and where its effect radius applies; `targetX`/`targetY` is where
+ * it's headed -- either a hover offset near the player (default) or wherever
+ * the player last dragged it to (`dragging`). Position always lerps toward
+ * the target rather than snapping, so a drag release doesn't teleport it.
+ * See run-presentation.md.
+ */
+export interface StormCloud {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  dragging: boolean;
+  mode: StormCloudMode;
+  modeStartedAt: number;
+  nextTickAt: number;
+}
+
 export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff';
 
 export interface FluidTile {
@@ -558,6 +605,10 @@ export interface World {
   enemies: EnemyActor[];
   projectiles: Projectile[];
   effects: Effect[];
+  /** 'meteor' weapon kind: telegraphed strikes queued to land later. */
+  pendingMeteors: PendingMeteor[];
+  /** Storm Chaser's draggable cloud; null for every other character. */
+  stormCloud: StormCloud | null;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
   /** Runtime bookkeeping for the character's dash skill, when it has one. */
@@ -849,6 +900,13 @@ export function createWorld(
     enemies: [],
     projectiles: [],
     effects: [],
+    pendingMeteors: [],
+    stormCloud: character.stormCloud
+      ? {
+          x: player.x, y: player.y - 50, targetX: player.x, targetY: player.y - 50,
+          dragging: false, mode: 'rain', modeStartedAt: 0, nextTickAt: 0,
+        }
+      : null,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -2509,21 +2567,52 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
          damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
         evolutionBehavior: behavior,
+        bonusVsStatusId: weapon.bonusVsStatusId,
+        bonusVsStatusMult: weapon.bonusVsStatusMult,
       });
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
 
     case 'hazard': {
-      w.effects.push({
-        uid: uid(w), kind: 'hazard', x: p.x, y: p.y, radius: reach, angle: 0, spread: Math.PI * 2,
-        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
-        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
-        hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
-        statusEffectId: weapon.statusEffectId,
-        evolutionBehavior: behavior,
-      });
-      pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+      // count === 1 (the default): a single field at the player's feet, same
+      // as always. count > 1: spread that many fields into a ring around the
+      // player instead of stacking them on top of each other, connected by
+      // ambient 'web' strand effects. See run-presentation.md.
+      const nodeCount = Math.max(1, runWeapon.count);
+      const ringRadius = nodeCount > 1 ? reach : 0;
+      const nodeRadius = nodeCount > 1 ? reach * 0.4 : reach;
+      const nodePositions: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < nodeCount; i += 1) {
+        const nodeAngle = (Math.PI * 2 * i) / nodeCount;
+        const nx = p.x + Math.cos(nodeAngle) * ringRadius;
+        const ny = p.y + Math.sin(nodeAngle) * ringRadius;
+        nodePositions.push({ x: nx, y: ny });
+        w.effects.push({
+          uid: uid(w), kind: 'hazard', x: nx, y: ny, radius: nodeRadius, angle: 0, spread: Math.PI * 2,
+          bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
+          damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+          hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
+          statusEffectId: weapon.statusEffectId,
+          evolutionBehavior: behavior,
+        });
+      }
+      if (nodeCount > 1) {
+        for (let i = 0; i < nodeCount; i += 1) {
+          const a = nodePositions[i]!;
+          const b = nodePositions[(i + 1) % nodeCount]!;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          w.effects.push({
+            uid: uid(w), kind: 'web', x: a.x, y: a.y, radius: Math.hypot(dx, dy), angle: Math.atan2(dy, dx), spread: 0,
+            bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
+            damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+          });
+        }
+        pushAlert(w, 'WEB ANCHORS SET');
+      } else {
+        pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+      }
       break;
     }
 
@@ -2644,6 +2733,39 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       });
       pushAlert(w, 'The Bus');
       w.shake = Math.max(w.shake, 5);
+      break;
+    }
+
+    case 'meteor': {
+      // Telegraph a ground reticle on a nearby enemy (or a point near the
+      // player if the block is empty, so the weapon is never a no-op), then
+      // queue the actual strike to resolve later in updateMeteors. The
+      // falling-comet visual is derived entirely from this queued data --
+      // see drawPendingMeteors. See run-presentation.md.
+      const strikeCount = Math.max(1, runWeapon.count);
+      const candidates = w.enemies.filter((e) => !e.dying && dist2(e.x, e.y, p.x, p.y) <= reach * reach);
+      for (let i = 0; i < strikeCount; i += 1) {
+        let tx: number;
+        let ty: number;
+        if (candidates.length > 0) {
+          const target = candidates[Math.floor(w.rng() * candidates.length)]!;
+          tx = target.x;
+          ty = target.y;
+        } else {
+          const strikeAngle = w.rng() * Math.PI * 2;
+          tx = p.x + Math.cos(strikeAngle) * reach * 0.6;
+          ty = p.y + Math.sin(strikeAngle) * reach * 0.6;
+        }
+        w.pendingMeteors.push({
+          uid: uid(w), x: tx, y: ty,
+          telegraphAt: w.now, impactAt: w.now + (weapon.durationMs ?? 650) + i * 180,
+          radius: weapon.range * 0.42 * areaMult(w),
+          damage, impactIntensity: weaponImpact(weapon),
+          statusEffectId: weapon.statusEffectId,
+          color: weapon.color ?? palette.accent,
+        });
+      }
+      p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
   }
@@ -4530,6 +4652,64 @@ function updateProjectiles(w: World, dt: number) {
   }
 }
 
+/**
+ * Storm Chaser's cloud: drifts near the player by default, or tracks
+ * wherever the player last dragged it (see RunScreen's pointer handling).
+ * Cycles rain -> fire-rain -> acid-rain automatically on `cycleMs`, ticking
+ * the matching status/damage into anything underneath on `tickMs`. This
+ * works identically whether the player ever touches the drag gesture or
+ * not -- dragging is precision, not a requirement. See run-presentation.md.
+ */
+function updateStormCloud(w: World, dt: number) {
+  const cloud = w.stormCloud;
+  const config = w.character.stormCloud;
+  if (!cloud || !config) return;
+  const p = w.player;
+
+  if (!cloud.dragging) {
+    cloud.targetX = p.x + Math.sin(w.now / 900) * 34;
+    cloud.targetY = p.y - 58 + Math.cos(w.now / 700) * 12;
+  }
+  cloud.x += (cloud.targetX - cloud.x) * Math.min(1, dt * 4);
+  cloud.y += (cloud.targetY - cloud.y) * Math.min(1, dt * 4);
+
+  if (cloud.modeStartedAt === 0) cloud.modeStartedAt = w.now;
+  if (w.now - cloud.modeStartedAt >= config.cycleMs) {
+    cloud.mode = cloud.mode === 'rain' ? 'fire-rain' : cloud.mode === 'fire-rain' ? 'acid-rain' : 'rain';
+    cloud.modeStartedAt = w.now;
+  }
+
+  if (w.now >= cloud.nextTickAt) {
+    cloud.nextTickAt = w.now + config.tickMs;
+    const statusEffectId = cloud.mode === 'rain' ? 'slow' : cloud.mode === 'fire-rain' ? 'burning' : 'acid';
+    const dmg = cloud.mode === 'rain' ? config.rainDamage : cloud.mode === 'fire-rain' ? config.fireRainDamage : config.acidRainDamage;
+    forEachNearby(w, cloud.x, cloud.y, config.effectRadius + 30, (enemy) => {
+      if (enemy.dying) return;
+      const reach = config.effectRadius + enemy.radius;
+      if (dist2(enemy.x, enemy.y, cloud.x, cloud.y) > reach * reach) return;
+      damageEnemy(w, enemy, dmg * w.stats.power, 0, cloud.x, cloud.y, statusEffectId);
+    });
+  }
+}
+
+/** Resolves 'meteor' weapon strikes once their telegraph window elapses. See run-presentation.md. */
+function updateMeteors(w: World) {
+  for (let i = w.pendingMeteors.length - 1; i >= 0; i -= 1) {
+    const m = w.pendingMeteors[i]!;
+    if (w.now < m.impactAt) continue;
+    novaDamage(w, m.x, m.y, m.radius, m.damage, m.impactIntensity, m.statusEffectId);
+    damageBreakable(w, m.x, m.y, m.radius, m.damage, m.impactIntensity, m.x, m.y);
+    w.effects.push({
+      uid: uid(w), kind: 'nova', x: m.x, y: m.y, radius: m.radius, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 420, color: m.color, damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, m.x, m.y, m.color, 16, 160);
+    w.shake = Math.max(w.shake, 10);
+    w.pendingMeteors.splice(i, 1);
+  }
+}
+
 function updateEffects(w: World) {
   const p = w.player;
 
@@ -4551,13 +4731,16 @@ function updateEffects(w: World) {
         while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
         if (diff > effect.spread) return;
         effect.hitUids.add(enemy.uid);
-        damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId);
+        const hasBonusStatus = effect.bonusVsStatusId && enemy.activeEffects.some((e) => e.id === effect.bonusVsStatusId);
+        const dealt = hasBonusStatus ? effect.damage * (effect.bonusVsStatusMult ?? 1) : effect.damage;
+        if (hasBonusStatus) spawnParticles(w, enemy.x, enemy.y, '#ffffff', 6, 100);
+        damageEnemy(w, enemy, dealt, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId);
         triggerEvolutionHit(
           w,
           effect.evolutionBehavior,
           enemy.x,
           enemy.y,
-          effect.damage,
+          dealt,
           effect.color,
           effect.impactIntensity,
           effect.statusEffectId,
@@ -5593,6 +5776,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateAmbient(w, dt);
   updateLokPets(w, dt);
   updateFollowers(w, dt);
+  updateStormCloud(w, dt);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
@@ -5609,6 +5793,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   updateProjectiles(w, dt);
   updateEffects(w);
+  updateMeteors(w);
   updateDashSkill(w);
   updatePotholes(w);
   updateRumorPulses(w);

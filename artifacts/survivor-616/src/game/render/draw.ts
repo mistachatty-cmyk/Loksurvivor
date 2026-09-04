@@ -2128,6 +2128,120 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
+const STORM_CLOUD_COLORS: Record<import('@/game/engine/world').StormCloudMode, { core: string; fx: string }> = {
+  rain: { core: '#7fb3e0', fx: '#bcdcff' },
+  'fire-rain': { core: '#ff6b35', fx: '#ffd166' },
+  'acid-rain': { core: '#8fce4a', fx: '#dfffa0' },
+};
+
+/**
+ * Storm Chaser's cloud: a soft drifting mass overhead, a dashed ground
+ * reticle showing its effect radius, and a handful of mode-colored falling
+ * marks (rain / embers / acid drips) -- purely time-derived, no particle
+ * array to manage. Drawn slightly larger and steadier while being dragged
+ * as a "you've got hold of it" cue. See run-presentation.md.
+ */
+function drawStormCloud(ctx: CanvasRenderingContext2D, w: World) {
+  const cloud = w.stormCloud;
+  if (!cloud) return;
+  const colors = STORM_CLOUD_COLORS[cloud.mode];
+  const bob = Math.sin(w.now / 500) * 4;
+  const holdPulse = cloud.dragging ? 1.15 : 1 + Math.sin(w.now / 260) * 0.05;
+  const config = w.character.stormCloud;
+  const effectRadius = (config?.effectRadius ?? 90);
+
+  ctx.save();
+  ctx.strokeStyle = colors.core;
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.arc(cloud.x, cloud.y, effectRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  for (let i = 0; i < 5; i += 1) {
+    const seed = i * 0.62;
+    const fall = (w.now / 3.2 + seed * 900) % 260;
+    const fx = cloud.x + Math.sin(seed * 7) * effectRadius * 0.6;
+    const fy = cloud.y + 14 + fall;
+    if (fy > cloud.y + effectRadius * 0.75) continue;
+    ctx.save();
+    ctx.globalAlpha = 0.7 * (1 - fall / 260);
+    ctx.strokeStyle = colors.fx;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx, fy + 9);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  const cy = cloud.y - 32 + bob;
+  ctx.translate(cloud.x, cy);
+  ctx.scale(holdPulse, holdPulse);
+  ctx.shadowColor = colors.core;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = colors.core;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 26, 13, 0, 0, Math.PI * 2);
+  ctx.ellipse(-14, 4, 15, 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(14, 4, 15, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = colors.fx;
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.ellipse(-4, -4, 12, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A ground reticle that pulses faster as impact nears, plus a comet that
+ * streaks down from off-screen for the final stretch before it. Purely
+ * derived from `PendingMeteor` timestamps -- no separate visual entity to
+ * keep in sync. See run-presentation.md.
+ */
+function drawPendingMeteors(ctx: CanvasRenderingContext2D, w: World) {
+  for (const m of w.pendingMeteors) {
+    const remaining = m.impactAt - w.now;
+    const total = Math.max(1, m.impactAt - m.telegraphAt);
+    const urgency = clamp(1 - remaining / total, 0, 1);
+    ctx.save();
+    ctx.strokeStyle = m.color;
+    ctx.globalAlpha = 0.3 + 0.35 * Math.abs(Math.sin(w.now / (140 - urgency * 90)));
+    ctx.lineWidth = 2 + urgency * 2.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.radius * (0.85 + Math.sin(w.now / 100) * 0.05), 0, Math.PI * 2);
+    ctx.stroke();
+
+    const fallWindow = 260;
+    if (remaining <= fallWindow) {
+      const fallT = clamp(1 - remaining / fallWindow, 0, 1);
+      const startY = m.y - 420;
+      const cy = startY + (m.y - startY) * fallT;
+      const cx = m.x + (1 - fallT) * 36;
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + (1 - fallT) * 16, cy - 55 - (1 - fallT) * 35);
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = m.color;
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
   for (const effect of w.effects) {
     const life = (w.now - effect.bornAt) / Math.max(1, effect.expiresAt - effect.bornAt);
@@ -2252,6 +2366,22 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.stroke();
         ctx.globalAlpha *= 0.12;
         ctx.fill();
+        break;
+      }
+      case 'web': {
+        // Ambient connector between two hazard nodes -- thin, faint, no hit
+        // detection. Reads as "you're standing inside a web" between the
+        // anchor points that actually do the freezing. See run-presentation.md.
+        const endX = effect.x + Math.cos(effect.angle) * effect.radius;
+        const endY = effect.y + Math.sin(effect.angle) * effect.radius;
+        ctx.strokeStyle = effect.color;
+        ctx.globalAlpha *= 0.5 + Math.sin(w.now / 220) * 0.15;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
         break;
       }
       case 'teleport': {
@@ -3017,9 +3147,11 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);
+  drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
   drawEffects(ctx, w);
   drawProjectiles(ctx, w);
+  drawPendingMeteors(ctx, w);
   drawParticles(ctx, w);
   drawPopups(ctx, w);
   if (sky !== 'roofed') {

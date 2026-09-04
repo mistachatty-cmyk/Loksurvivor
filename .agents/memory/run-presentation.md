@@ -1,6 +1,6 @@
 ---
-name: Run presentation layer -- pickups, enemy scale, new silhouettes
-description: Value-tiered XP gems, the EnemyDef.sizeClass render hook, and the arachnidRig/serpentRig factories -- plus the palette-collision check every new "themed" character needs before it ships.
+name: Run presentation layer -- pickups, enemy scale, new silhouettes, weapon design
+description: Value-tiered XP gems, the EnemyDef.sizeClass render hook, the arachnidRig/serpentRig factories, the palette-collision check every new "themed" character needs, and three new weapon mechanics -- multi-node hazard rings, elemental-synergy bonus damage, telegraphed sky strikes, and a draggable cycling-element cloud companion.
 ---
 
 ## Value-tiered XP gems (`draw.ts`)
@@ -89,11 +89,112 @@ exists, so the existing roster has to be checked, not just the new record.
 
 ## Cold-biome roster, wave one
 
-`hoarfrost` (arachnidRig, 6 legs, bone-white, `wave`-kind AoE crowd-lock,
-`kills: 120` unlock) and `sleet` (serpentRig, violet, `laser`-kind burst
-damage, `kills: 190` unlock) are the first two characters in what's meant to
+`hoarfrost` (arachnidRig, 6 legs, bone-white, `hazard`-kind ring-of-anchors,
+`kills: 120` unlock) and `sleet` (serpentRig, violet, `laser`-kind wet/arc
+combo, `kills: 190` unlock) are the first two characters in what's meant to
 be an eventual cold-biome area's cast -- no area/biome data shipped yet,
 this pass was silhouettes and mechanics only. The next pass (an actual cold
 biome `AreaDef`, its own enemy roster, ground/sky treatment) should read
 this file's palette-collision section again before adding a third
 character to the set.
+
+## Weapon design pass: three new mechanics, not skins
+
+A follow-up request explicitly asked for better *weapon design* (mechanics,
+FX, telegraph) rather than cosmetic skins, and for `hoarfrost`/`sleet`'s
+original weapons specifically to be reworked as part of it. Two lessons and
+three new systems came out of it.
+
+**Niche-collision check applies to weapon mechanics too, not just palette.**
+The first draft of a "meteor from the sky" character was an astronomer --
+until a grep of `characters.ts` turned up `orbitanchor` ("a compact
+astronomer with a pocket-sized sky", gold-violet, `expressiveRig('astral')`)
+already owns that exact archetype. Rebuilt as `foreman`, a demolition
+foreman who drops debris from an unseen crane instead -- same weapon
+mechanic, unrelated lore and silhouette. The rule from the palette section
+above generalizes: grep for a concept's obvious keywords before committing
+to it, whether the collision risk is color, status effect, or archetype/lore.
+
+### Hoarfrost's redesign: hazard rings + `web` connector effects
+
+`hazard`-kind weapons (`fireWeapon`'s `case 'hazard':`) now read
+`runWeapon.count`: `count` 1 (the default, and every pre-existing hazard
+weapon -- Emberback, Acid Botanist, the Crystal Lattice relic evolution --
+is unaffected) places a single field at the player's feet exactly as
+before; `count > 1` spreads that many fields into a ring around the player
+instead of stacking them on top of each other, and connects adjacent nodes
+with new `'web'` effects (a thin ambient line, `EffectKind` -- `x`/`y` is
+the start point, `angle`+`radius` gives the end point, same convention
+`'laser'` already uses). `rime-web` sets `count: 3` for exactly this: three
+freeze anchor nodes linked by visible strands, "lays a web across the
+block" made literal. Any future ring/web-style hazard weapon gets this for
+free by just setting `count`.
+
+### Sleet's redesign: elemental-synergy bonus damage
+
+New `Effect`/`WeaponDef` fields: `bonusVsStatusId` + `bonusVsStatusMult`.
+Applied in the single shared hit-application block in `updateEffects` (the
+one that already handles `slash`/`wave`/`laser`/`impact` — see
+`damageEnemy()`'s status as the *other* single choke point noted in
+`types.ts`'s header comment) — if the target already carries
+`bonusVsStatusId`, the hit's damage is multiplied by `bonusVsStatusMult`
+before `damageEnemy` is called, and a white spark burst marks the proc.
+`arc-sleet` applies `wet` on hit *and* checks `bonusVsStatusId: 'wet'`
+(mult 1.9): the first hit on a dry target just wets it, a hit on an
+already-wet target detonates. This is a real elemental combo instead of a
+flat status tag, reads as "electricity conducts through water" without any
+narrower special-casing, and doesn't compete with Hoarfrost's freeze --
+distinct crowd-control niches on purpose.
+
+### `'meteor'` weapon kind -- telegraph, then a strike from off-screen
+
+New `World.pendingMeteors: PendingMeteor[]` (`{ x, y, telegraphAt, impactAt,
+radius, damage, impactIntensity, statusEffectId, color }`). `case 'meteor':`
+in `fireWeapon` picks a target (a random enemy in range, or a point near the
+player if the block is empty -- never a no-op) and queues a strike;
+`updateMeteors` (called from `stepWorld` alongside `updateEffects`) resolves
+it once `w.now >= impactAt` via the existing `novaDamage`/`damageBreakable`
+helpers, same as any other AoE. The entire visual -- ground reticle, then a
+falling comet streak for the final 260ms -- is derived purely from those
+timestamps in `drawPendingMeteors`; there's no separate visual entity to
+desync. `foreman`'s `drop-zone` weapon uses it. A character's `ultimate`
+cannot spawn meteors the same way: `activateUltimate` is 100% generic
+(every character's ultimate uses only the shared `effect` shape --
+`damageMult`/`speedMult`/`cooldownMult`/`invulnerable`/`novaDamage`/
+`novaRadius`, no character-id branches anywhere in it) and adding a
+special case there would break that invariant, so `foreman`'s ultimate is
+a standard nova+buff instead of a literal "meteor shower."
+
+### `CharacterDef.stormCloud` -- a draggable, auto-cycling companion
+
+The one genuinely new *input* surface this pass, not just a new weapon
+case. `StormCloudConfig` (`grabRadius`, `effectRadius`, `tickMs`, `cycleMs`,
+`rainDamage`/`fireRainDamage`/`acidRainDamage`) is an opt-in `CharacterDef`
+field; `World.stormCloud` is the runtime instance (`null` for every
+character that doesn't set it). Two independent halves:
+
+- **Passive (always works, every input method):** `updateStormCloud`
+  cycles `rain -> fire-rain -> acid-rain` automatically on `cycleMs` --
+  *not* by tap count, deliberately, so it behaves identically on
+  keyboard-only play as on touch. Each mode ticks its own status
+  (`slow`/`burning`/`acid`) and damage into anything under the cloud on
+  `tickMs`. When not being dragged, the cloud drifts in a lazy Lissajous
+  orbit near the player (`sin`/`cos` of `w.now` at different periods) so it
+  reads as floating, not clamped to a fixed offset.
+- **Active (optional, precision play):** `RunScreen`'s pointer handling
+  gained a fourth `PointerMode`, `'cloud'`, alongside the existing
+  `'none'`/`'stick'`/`'object'`. `handlePointerDown` checks -- *before* the
+  movement-stick fallback, using the same screen-to-world conversion the
+  physics-object-priming branch already does -- whether the pointer landed
+  within `grabRadius` of `world.stormCloud`'s current position; if so it
+  sets `dragging = true` and mode `'cloud'` instead of starting the
+  movement stick. `handlePointerMove` then writes `targetX`/`targetY`
+  directly onto `world.stormCloud` (mutating the ref'd world object is the
+  established pattern here -- `dashPlayer` already does the same); the
+  cloud's position always *lerps* toward that target in `updateStormCloud`
+  rather than snapping, so a drag never teleports it and releasing leaves
+  it drifting smoothly from wherever it was let go.
+
+`storm-chaser` is the first character to use it. Any future character
+could opt in by setting `stormCloud` on their `CharacterDef` -- the whole
+mechanic is generic, not hardcoded to this one character.
