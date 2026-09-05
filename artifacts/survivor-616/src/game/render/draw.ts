@@ -1492,6 +1492,7 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'parking-meter': { top: '#4a4a52', side: '#28282e', trim: '#c9c9d2' },
   'attack-block': { top: '#3a1620', side: '#1e0b11', trim: '#ff5c5c' },
   'gas-tank': { top: '#8a5a12', side: '#4a2f08', trim: '#ffb020' },
+  'aegis-slab': { top: '#1f2b3d', side: '#101724', trim: '#8ab4ff' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -1609,10 +1610,8 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
   const height = 16;
   // Draw the live prop records so streamed chunks and moving props share the
   // same authored silhouette and profile.
-  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> =
-    w.area.endless
-      ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
-      : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
+  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind']; sealed: boolean }> =
+    w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind, sealed: o.sealed }));
 
   for (const obstacle of obstacleList) {
     const colors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
@@ -1631,6 +1630,39 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
     ctx.strokeStyle = colors.trim;
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y - height + 1, obstacle.w - 2, obstacle.h - 2);
+
+    // Null alloy reads as a material, not a colour: a cold sheen across the face
+    // so the player can tell at a glance which cover actually stops shots.
+    if (obstacle.kind === 'aegis-slab') {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#cfe0ff';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < obstacle.w + obstacle.h; i += 12) {
+        ctx.beginPath();
+        ctx.moveTo(x + Math.min(i, obstacle.w), y - height + Math.max(0, i - obstacle.w));
+        ctx.lineTo(x + Math.max(0, i - obstacle.h), y - height + Math.min(i, obstacle.h));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Sealed props wear welded bands and a rivet: click them to crack the seal.
+    if (obstacle.sealed) {
+      ctx.save();
+      const pulse = 0.55 + Math.sin(w.now / 320) * 0.25;
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x + 2, y - height + 2, obstacle.w - 4, obstacle.h - 4);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(x + 2, y - height + obstacle.h * 0.42, obstacle.w - 4, 3);
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(obstacle.x, y - height + obstacle.h * 0.42 + 1.5, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     // Combat props get a strong, readable symbol in addition to their silhouette.
     if (obstacle.kind === 'cover') {

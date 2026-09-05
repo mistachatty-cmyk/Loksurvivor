@@ -395,9 +395,10 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Physics interaction</p>
                   <h2 className="mt-1 text-xl font-black uppercase text-white">Clickable prop launches</h2>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Tap or click a movable object to prime it. Your next hit launches it at 6× its normal impact velocity,
-                    the way your hit sent it, and lets it plow through enemies. A launched object shoves you around too —
-                    it never damages you.
+                    Tap or click a movable object to prime it. Your next hit launches it at a rolled 5–9× its normal impact
+                    velocity, the way your hit sent it, and lets it plow through enemies. A launched object shoves you around
+                    too — it never damages you. Clicking also cracks the seal on armoured props that shrug off every hit
+                    until someone opens them by hand.
                   </p>
                 </div>
                 <button
@@ -430,7 +431,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     <p className="text-sm font-bold uppercase tracking-wide text-white">Backspin Rig</p>
                     <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted-foreground">
                       Off: a primed object flies the way you hit it. On: it launches back the other way, toward whoever
-                      swung at it.
+                      swung at it — at a rolled 10–18×, since reversing a hit has to beat the object's own momentum.
                     </p>
                   </div>
                   <button

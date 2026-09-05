@@ -19,6 +19,7 @@ import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
+import { PREFABS } from '@/game/data/prefabs';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
@@ -362,7 +363,12 @@ export interface BreakableObstacle extends Aabb {
   /** The most recent direction this prop was hit from by the player. */
   lastPlayerImpactX: number;
   lastPlayerImpactY: number;
-  /** A click primes the next player hit for a boosted reverse launch. */
+  /**
+   * Sealed props take no damage at all until a tap/click cracks the seal. For a
+   * gas tank that is the whole encounter: unhittable armour, then one hit.
+   */
+  sealed: boolean;
+  /** A click primes the next player hit for a boosted launch. */
   clickPrimed: boolean;
   clickPrimedAt: number;
   impactVelocityMultiplier: number;
@@ -455,9 +461,13 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'attack-block': { variant: 'heavy-metal', hp: 220 },
   /** 1 HP on purpose: anything that touches it at all sets it off. */
   'gas-tank': { variant: 'medium-movable', hp: 1 },
+  /** Null alloy: no hp entry, so it never breaks -- it exists to eat shots. */
+  'aegis-slab': { variant: 'heavy-metal' },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
+  // Null alloy is the one material shots simply do not get through.
+  'aegis-slab',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -593,6 +603,8 @@ export interface World {
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
   potholes: PotholeObstacle[];
+  /** Instant Transmission charges in hand; spent from the pause screen, never automatically. */
+  teleportCharges: number;
   /** area.randomDrops: w.now the next ambient item spawns. Infinity when the area has no random drops. */
   nextAmbientDropAt: number;
   /** Ground-hazard fluids spawned by breaking certain obstacles (fire hydrant, car-wreck, ac-unit, dumpster). */
@@ -649,6 +661,12 @@ export interface World {
    * background life never shifts wave/objective/loot rolls for a given seed.
    */
   ambientRng: () => number;
+  /**
+   * Separate stream for prop layout (seal rolls, prefab scatter). Kept off
+   * `rng` so adding or tuning scenery can never shift combat/loot rolls -- the
+   * same reason `ambientRng` exists.
+   */
+  propRng: () => number;
   /** Rebuilt every frame for enemy separation. */
   grid: Map<number, EnemyActor[]>;
 
@@ -886,6 +904,7 @@ export function createWorld(
     particles: [],
     followers: [],
     ambient: [],
+    teleportCharges: 0,
     lokPets: [],
     lokPetHistory: [],
     obstacles: area.obstacles
@@ -932,6 +951,7 @@ export function createWorld(
     nextUid: 100,
     rng,
     ambientRng: createRng(seed + 0x5eed),
+    propRng: createRng(seed + 0x9f0b),
     grid: new Map(),
     rngSeed: seed,
     endless: undefined,
@@ -1015,6 +1035,7 @@ export function createWorld(
   };
 
   world.breakables = area.obstacles.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
+  scatterPrefabs(world);
   world.potholes = area.obstacles.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
 
   if (area.endless) {
@@ -1074,6 +1095,22 @@ function uid(w: World): number {
   return w.nextUid;
 }
 
+/** Kinds that may turn up sealed when the author didn't say either way. */
+const SEALABLE_KINDS: Partial<Record<ObstacleDef['kind'], number>> = {
+  'gas-tank': 0.4,
+  barrel: 0.2,
+  'fuse-box': 0.2,
+  'metal-box': 0.15,
+  'attack-block': 0.25,
+};
+
+/** Rolls the run's own seal placement, so the same yard reads differently each time. */
+function rollSealed(w: World, kind: ObstacleDef['kind']): boolean {
+  const chance = SEALABLE_KINDS[kind];
+  if (chance === undefined) return false;
+  return w.propRng() < chance;
+}
+
 function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
   const profile = propProfile(obstacle);
   const hp = profile.breakable ? (OBSTACLE_WEIGHT_PROFILES[obstacle.kind]?.hp ?? 60) : Number.POSITIVE_INFINITY;
@@ -1097,6 +1134,7 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     contacts: 0,
     lastPlayerImpactX: 0,
     lastPlayerImpactY: 0,
+    sealed: obstacle.sealed ?? rollSealed(w, obstacle.kind),
     clickPrimed: false,
     clickPrimedAt: 0,
     impactVelocityMultiplier: 1,
@@ -1110,6 +1148,39 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     landedHeatActive: false,
     heatNextTickAt: 0,
   };
+}
+
+/**
+ * Drops `area.randomPrefabs.count` prefabs at rolled positions, rejecting any
+ * spot that would overlap something already placed or crowd the player's spawn.
+ * Everything comes off `w.rng`, so a seed reproduces the same yard exactly.
+ */
+function scatterPrefabs(w: World) {
+  const config = w.area.randomPrefabs;
+  if (!config || w.area.endless) return;
+  const totalWeight = PREFABS.reduce((total, prefab) => total + prefab.weight, 0);
+  if (totalWeight <= 0) return;
+  const halfW = w.bounds.w / 2;
+  const halfH = w.bounds.h / 2;
+  const placed: Array<{ x: number; y: number; radius: number }> = [{ x: 0, y: 0, radius: 190 }];
+
+  for (let i = 0; i < config.count; i += 1) {
+    let roll = w.propRng() * totalWeight;
+    const prefab = PREFABS.find((candidate) => (roll -= candidate.weight) <= 0) ?? PREFABS[0]!;
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      const x = randRange(w.propRng, -halfW + prefab.radius, halfW - prefab.radius);
+      const y = randRange(w.propRng, -halfH + prefab.radius, halfH - prefab.radius);
+      if (placed.some((other) => dist2(x, y, other.x, other.y) < (prefab.radius + other.radius) ** 2)) continue;
+      if (w.breakables.some((b) => Math.abs(x - b.x) < prefab.radius + b.w / 2 && Math.abs(y - b.y) < prefab.radius + b.h / 2)) continue;
+      placed.push({ x, y, radius: prefab.radius });
+      for (const part of prefab.parts) {
+        const { dx, dy, ...rest } = part;
+        w.breakables.push(createBreakable(w, { ...rest, x: x + dx, y: y + dy }));
+      }
+      break;
+    }
+  }
+  syncObstacleAabbs(w);
 }
 
 function createPothole(w: World, obstacle: ObstacleDef): PotholeObstacle {
@@ -3148,10 +3219,17 @@ function activatePotholes(w: World, x: number, y: number, radius: number, trigge
   }
 }
 
-/** How much faster a primed prop leaves the impact than an ordinary shove. */
-const PRIMED_LAUNCH_VELOCITY_MULT = 6;
-/** Floor speed for a primed launch, so heavy props still visibly fly. */
-const PRIMED_LAUNCH_MIN_SPEED = 520;
+/**
+ * A primed launch rolls its own velocity multiplier, so no two shots off the
+ * same prop travel the same distance. Backspin sits in a higher band on purpose
+ * -- reversing a hit fights the prop's own momentum, so it needs the extra kick
+ * to actually go somewhere.
+ */
+const PRIMED_LAUNCH_MULT_RANGE: readonly [number, number] = [5, 9];
+const BACKSPIN_LAUNCH_MULT_RANGE: readonly [number, number] = [10, 18];
+/** Floor speeds for a primed launch, so heavy props still visibly fly. */
+const PRIMED_LAUNCH_MIN_SPEED = 560;
+const BACKSPIN_LAUNCH_MIN_SPEED = 980;
 /** Speed a flying prop must carry before it can shove the player around. */
 const PROP_SHOVE_MIN_SPEED = 150;
 
@@ -3160,10 +3238,26 @@ export function primePhysicsObject(w: World, x: number, y: number): BreakableObs
   if (!w.physicsObjectClicksEnabled) return null;
   const reach = 12 + w.physicsObjectClickRadiusBonus;
   const target = w.breakables
-    .filter((b) => !b.broken && b.movable)
+    // Sealed props are clickable even when they cannot be launched: cracking the
+    // seal is what the click is for.
+    .filter((b) => !b.broken && (b.movable || b.sealed))
     .filter((b) => Math.abs(x - b.x) <= b.w / 2 + reach && Math.abs(y - b.y) <= b.h / 2 + reach)
     .sort((a, b) => (a.x - x) ** 2 + (a.y - y) ** 2 - ((b.x - x) ** 2 + (b.y - y) ** 2))[0];
   if (!target) return null;
+  if (target.sealed) {
+    target.sealed = false;
+    spawnParticles(w, target.x, target.y, '#e2e8f0', 12, 120);
+    w.shake = Math.max(w.shake, 4);
+    w.popups.push({
+      x: target.x,
+      y: target.y - target.h / 2 - 14,
+      text: target.kind === 'gas-tank' ? 'SEAL CRACKED — ONE HIT' : 'SEAL CRACKED',
+      color: '#e2e8f0',
+      bornAt: w.now,
+      vy: 22,
+    });
+    if (!target.movable) return target;
+  }
   target.clickPrimed = true;
   target.clickPrimedAt = w.now;
   w.popups.push({
@@ -3303,7 +3397,8 @@ function applyPropImpact(
     const reverseLaunch = primedLaunch && w.physicsObjectReverseLaunch;
     const launchDirectionX = reverseLaunch ? -b.lastPlayerImpactX : dx;
     const launchDirectionY = reverseLaunch ? -b.lastPlayerImpactY : dy;
-    const velocityMultiplier = primedLaunch ? PRIMED_LAUNCH_VELOCITY_MULT : 1;
+    const multRange = reverseLaunch ? BACKSPIN_LAUNCH_MULT_RANGE : PRIMED_LAUNCH_MULT_RANGE;
+    const velocityMultiplier = primedLaunch ? randRange(w.rng, multRange[0], multRange[1]) : 1;
     if (primedLaunch) b.clickPrimed = false;
     b.impactVelocityMultiplier = velocityMultiplier;
     const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier;
@@ -3313,17 +3408,18 @@ function applyPropImpact(
     if (primedLaunch) {
       // A primed launch has to read as a launch even off a light tap on a heavy
       // prop, so floor it at a speed that visibly clears the block.
+      const floorSpeed = reverseLaunch ? BACKSPIN_LAUNCH_MIN_SPEED : PRIMED_LAUNCH_MIN_SPEED;
       const speed = Math.hypot(b.vx, b.vy);
-      if (speed < PRIMED_LAUNCH_MIN_SPEED) {
-        b.vx = launchDirectionX * PRIMED_LAUNCH_MIN_SPEED;
-        b.vy = launchDirectionY * PRIMED_LAUNCH_MIN_SPEED;
+      if (speed < floorSpeed) {
+        b.vx = launchDirectionX * floorSpeed;
+        b.vy = launchDirectionY * floorSpeed;
       }
       spawnParticles(w, b.x, b.y, '#7dd3fc', 10, 130);
       w.shake = Math.max(w.shake, 6);
       w.popups.push({
         x: b.x,
         y: b.y - b.h / 2 - 12,
-        text: reverseLaunch ? 'BACKSPIN!' : 'LAUNCH!',
+        text: `${reverseLaunch ? 'BACKSPIN' : 'LAUNCH'} x${velocityMultiplier.toFixed(1)}`,
         color: '#7dd3fc',
         bornAt: w.now,
         vy: 26,
@@ -3407,6 +3503,14 @@ function damageBreakable(
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
+    // Sealed: the hit lands, sparks, and does nothing. Crack the seal first.
+    if (b.sealed) {
+      if (w.now >= b.nextImpactDamageAt) {
+        b.nextImpactDamageAt = w.now + 220;
+        spawnParticles(w, b.x, b.y, '#cbd5e1', 3, 45);
+      }
+      continue;
+    }
     b.hp -= Math.max(1, amount);
     if (b.hp > 0) {
       if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
@@ -3695,6 +3799,11 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
     }
     if (b.kind === 'reflective-surface') {
       spawnParticles(w, proj.x, proj.y, '#d8b4fe', 3, 45);
+      return true;
+    }
+    if (b.kind === 'aegis-slab') {
+      // Null alloy: the shot stops dead, no damage to pass on, no ricochet.
+      spawnParticles(w, proj.x, proj.y, '#8ab4ff', 4, 55);
       return true;
     }
     if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp' || b.kind === 'metal-box' || b.kind === 'bench') {
@@ -4845,6 +4954,8 @@ function updateRumorPulses(w: World) {
 /** Weighted bag: the Instant Transmission charge is the rare entry in it. */
 const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'xp', 'xp', 'health', 'health', 'cred', 'coin', 'teleport'];
 
+/** Most Instant Transmission charges the player can carry at once. */
+export const TELEPORT_CHARGE_CAP = 3;
 const INSTANT_TRANSMISSION_MIN_RANGE = 260;
 const INSTANT_TRANSMISSION_MAX_RANGE = 520;
 const INSTANT_TRANSMISSION_INVULN_MS = 900;
@@ -4883,6 +4994,18 @@ function updateAmbientDrops(w: World) {
  * window of invulnerability. Candidate points are scored by how far the nearest
  * enemy is, so it always reads as an escape rather than a random dice roll.
  */
+/**
+ * Spends one held charge. Safe to call from the pause overlay: it refuses when
+ * the run is over or the player has nothing in hand, and reports what happened
+ * so the UI never has to reach into world state itself.
+ */
+export function useTeleportCharge(w: World): boolean {
+  if (w.outcome !== 'running' || w.teleportCharges <= 0 || w.player.falling) return false;
+  w.teleportCharges -= 1;
+  instantTransmission(w);
+  return true;
+}
+
 export function instantTransmission(w: World) {
   const p = w.player;
   const fromX = p.x;
@@ -4995,7 +5118,11 @@ function updatePickups(w: World, dt: number) {
           break;
         }
         case 'teleport': {
-          instantTransmission(w);
+          // Held, not spent: the player picks the moment from the pause screen.
+          w.teleportCharges = Math.min(TELEPORT_CHARGE_CAP, w.teleportCharges + 1);
+          w.popups.push({ x: p.x, y: p.y - 24, text: 'INSTANT TRANSMISSION STORED', color: '#a5f3fc', bornAt: w.now, vy: 32 });
+          pushAlert(w, `Instant Transmission ready (${w.teleportCharges})`);
+          spawnParticles(w, p.x, p.y, '#a5f3fc', 10, 110);
           break;
         }
         case 'sweep': {
@@ -5941,6 +6068,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
     hazardImmune: w.hazardImmune,
+    teleportCharges: w.teleportCharges,
     loadout: {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),

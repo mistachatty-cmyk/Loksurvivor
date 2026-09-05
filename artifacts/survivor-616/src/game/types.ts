@@ -719,9 +719,17 @@ export interface ObstacleDef {
      /** A heavy, wonky sentry block: zaps the player with a short-range bolt on a cadence. See oddity-arenas.md. */
      | 'attack-block'
      /** Volatile fuel drum: 1 HP, so any hit at all detonates it and chains into its neighbours. */
-     | 'gas-tank';
+     | 'gas-tank'
+     /** Null-alloy slab: indestructible cover made of the one resource that stops shots dead. */
+     | 'aegis-slab';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
+  /**
+   * Sealed props shrug off every hit until a tap/click cracks the seal; after
+   * that they take damage normally (which, for a gas tank, means the next hit
+   * detonates it). Omit to let volatile kinds roll for it at world creation.
+   */
+  sealed?: boolean;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
   pothole?: {
     trigger: PotholeTrigger;
@@ -785,6 +793,11 @@ export interface AreaDef {
    * independent of kills or breakables. See oddity-arenas.md.
    */
   randomDrops?: { intervalMs: number };
+  /**
+   * When set, this many prefabs from `data/prefabs.ts` are scattered through the
+   * arena at world creation -- different every run, from the run's own seed.
+   */
+  randomPrefabs?: { count: number };
 }
 
 export type CustomMapAssetCategory = 'ground' | 'structure' | 'hazard' | 'landmark' | 'enemy' | 'encounter';
@@ -1644,6 +1657,18 @@ export interface RunResult {
   };
 }
 
+/** A reusable clump of props scattered into an arena by `AreaDef.randomPrefabs`. */
+export interface PrefabDef {
+  id: string;
+  name: string;
+  /** Relative weight in the scatter roll. */
+  weight: number;
+  /** Clear radius the prefab needs, in world units. */
+  radius: number;
+  /** Props relative to the prefab's origin. */
+  parts: Array<Omit<ObstacleDef, 'x' | 'y'> & { dx: number; dy: number }>;
+}
+
 export interface HudSnapshot {
   hp: number;
   maxHp: number;
@@ -1659,6 +1684,8 @@ export interface HudSnapshot {
   weaponLevel: number;
   /** True once "Let Me Hold This" is unlocked -- hazard weapons never hurt whoever's holding them. */
   hazardImmune: boolean;
+  /** Instant Transmission charges in hand, spendable from the pause screen. */
+  teleportCharges: number;
   loadout: {
     weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;
     passives: Array<{ id: string; name: string; stacks: number }>;

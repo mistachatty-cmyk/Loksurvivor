@@ -28,6 +28,7 @@ import {
   dashPlayer,
   hudSnapshot,
   primePhysicsObject,
+  useTeleportCharge,
   rollUpgradeChoices,
   stepWorld,
   type World,
@@ -52,6 +53,7 @@ import {
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
 import { ChestTally } from '@/ui/ChestTally';
 import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
+import { TeleportChargeBadge } from '@/ui/TeleportChargeBadge';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
@@ -692,6 +694,15 @@ export function RunScreen({
   }, [celebration, prefersReducedMotion]);
 
   /** End the run successfully ("head home"). Only available in endless mode. */
+  /** Spend a held Instant Transmission charge from the pause screen and resume. */
+  const spendTeleportCharge = useCallback(() => {
+    const world = worldRef.current;
+    if (!world || !useTeleportCharge(world)) return;
+    setHud(hudSnapshot(world));
+    setLiveDashboardOpen(false);
+    setPhaseBoth('playing');
+  }, [setPhaseBoth]);
+
   const headHome = useCallback(() => {
     const world = worldRef.current;
     if (!world || world.outcome !== 'running' || world.player.falling) return;
@@ -1053,6 +1064,7 @@ export function RunScreen({
 
       <ChestTally count={hud?.lootBoxesOpened ?? 0} />
       <HazardImmuneBadge active={hud?.hazardImmune ?? false} />
+      <TeleportChargeBadge charges={hud?.teleportCharges ?? 0} />
       {chestFlight > 0 ? (
         <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
       ) : null}
@@ -1285,6 +1297,16 @@ export function RunScreen({
             >
               Settings
             </button>
+            {(hud?.teleportCharges ?? 0) > 0 ? (
+              <button
+                type="button"
+                onClick={spendTeleportCharge}
+                className="w-full rounded-sm border border-cyan-300/60 bg-cyan-300/15 px-4 py-3 font-bold uppercase tracking-widest text-cyan-100 shadow-[0_0_18px_rgba(103,232,249,.25)]"
+                data-testid="button-instant-transmission"
+              >
+                Instant Transmission ×{hud?.teleportCharges ?? 0}
+              </button>
+            ) : null}
             {area.endless && !liveDashboardOpen && (
               <button
                 type="button"

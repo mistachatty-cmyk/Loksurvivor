@@ -455,6 +455,8 @@ export const AREAS: AreaDef[] = [
     threat: 'rising',
     randomDrops: { intervalMs: 5000 },
     unlock: { kind: 'kills', count: 130 },
+    // Open ground with no walls: prefab cover is the only thing to hide behind.
+    randomPrefabs: { count: 5 },
     waves: [
       { fromSec: 0, toSec: 60, enemyId: 'nightcrawler', ratePerSec: 1.3, burst: 2 },
       { fromSec: 15, toSec: 90, enemyId: 'neon-leech', ratePerSec: 0.9, burst: 2 },
@@ -488,6 +490,8 @@ export const AREAS: AreaDef[] = [
     threat: 'rising',
     randomDrops: { intervalMs: 4500 },
     unlock: { kind: 'clearArea', areaId: 'flat-lot' },
+    // Open ground with no walls: prefab cover is the only thing to hide behind.
+    randomPrefabs: { count: 6 },
     waves: [
       { fromSec: 0, toSec: 70, enemyId: 'neon-leech', ratePerSec: 1.5, burst: 2 },
       { fromSec: 20, toSec: 100, enemyId: 'bloodhound', ratePerSec: 0.8, burst: 2 },
@@ -519,6 +523,8 @@ export const AREAS: AreaDef[] = [
     threat: 'high',
     randomDrops: { intervalMs: 4200 },
     unlock: { kind: 'clearArea', areaId: 'flat-tarmac' },
+    // Open ground with no walls: prefab cover is the only thing to hide behind.
+    randomPrefabs: { count: 4 },
     waves: [
       { fromSec: 0, toSec: 80, enemyId: 'corner-cutter', ratePerSec: 0.75, burst: 2, formation: 'pincer' },
       { fromSec: 30, toSec: 120, enemyId: 'crypt-spitter', ratePerSec: 0.55, burst: 1 },
@@ -708,6 +714,8 @@ export const AREAS: AreaDef[] = [
     // The yard has almost nothing worth breaking for loot, so it rains its own --
     // including the rare Instant Transmission charge.
     randomDrops: { intervalMs: 5200 },
+    // Null-alloy cover and sealed fuel, laid out differently every run.
+    randomPrefabs: { count: 7 },
     waves: [
       { fromSec: 0, toSec: 260, enemyId: 'static-mote', ratePerSec: 1.1, burst: 3, formation: 'ring' },
       { fromSec: 8, toSec: 240, enemyId: 'fence-hound', ratePerSec: 0.34, burst: 1 },

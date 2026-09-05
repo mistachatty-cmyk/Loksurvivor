@@ -510,6 +510,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       'parking-meter': [14, 20, 46, 58],
       'attack-block': [50, 70, 50, 70],
       'gas-tank': [34, 44, 40, 52],
+      'aegis-slab': [24, 30, 90, 120],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);

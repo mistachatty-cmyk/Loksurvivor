@@ -30,6 +30,7 @@ import {
   episodeSnapshot,
   hudSnapshot,
   primePhysicsObject,
+  useTeleportCharge,
   spawnLokPet,
   resolveImpactTravel,
   relicRecipeEligibility,
@@ -718,6 +719,28 @@ test('backspin mode sends the primed launch back toward the hit instead', () => 
   addShockEffect(world, prop.x);
   stepWorld(world, 1 / 60, neutralInput);
   assert.ok(prop.vx < 0, 'backspin should reverse the previous rightward impact');
+  // Backspin fights the prop's own momentum, so it rolls from a higher band and
+  // is floored well above an ordinary primed launch -- otherwise it barely moves.
+  assert.ok(Math.abs(prop.vx) > 900, `backspin should still travel hard, got ${prop.vx}`);
+});
+
+test('primed launches roll a different velocity multiplier each time', () => {
+  const speeds = new Set<number>();
+  for (let seed = 0; seed < 6; seed += 1) {
+    const world = createWorld(
+      testArea({ x: 80, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+      testCharacter('chain-whip'),
+      CHARACTERS[0].stats,
+      seed * 977 + 5,
+    );
+    world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+    const prop = world.breakables[0]!;
+    primePhysicsObject(world, prop.x, prop.y);
+    addShockEffect(world, prop.x);
+    stepWorld(world, 1 / 60, neutralInput);
+    speeds.add(Math.round(Math.hypot(prop.vx, prop.vy)));
+  }
+  assert.ok(speeds.size > 1, 'the launch multiplier should vary run to run');
 });
 
 test('a launched prop shoves the player without damaging them', () => {
@@ -812,7 +835,7 @@ test('radialShots turns one shooter volley into a full circle of shots', () => {
   assert.equal(angles.size, 8, 'every shot should leave on its own heading');
 });
 
-test('the Instant Transmission pickup blinks the player clear of the crowd', () => {
+test('an Instant Transmission charge is held and spent from the pause screen', () => {
   const world = createWorld(testArea({ x: 900, y: 900, w: 30, h: 30, kind: 'crate' }), testCharacter('chain-whip'), CHARACTERS[0].stats, 5);
   world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
   const enemy = addEnemy(world, 'nightcrawler', world.player.x + 24, world.player.y);
@@ -820,16 +843,85 @@ test('the Instant Transmission pickup blinks the player clear of the crowd', () 
   const startingHp = world.player.hp;
   const distanceSq = (ax: number, ay: number, bx: number, by: number) => (ax - bx) ** 2 + (ay - by) ** 2;
   const before = distanceSq(world.player.x, world.player.y, enemy.x, enemy.y);
+  const startX = world.player.x;
+  const startY = world.player.y;
 
   world.pickups.push({ uid: 5150, kind: 'teleport', x: world.player.x, y: world.player.y, vx: 0, vy: 0, value: 1, bornAt: world.now });
   stepWorld(world, 1 / 60, neutralInput);
 
-  assert.equal(world.pickups.length, 0, 'the charge is consumed on pickup');
+  assert.equal(world.pickups.length, 0, 'the charge is collected');
+  assert.equal(world.teleportCharges, 1, 'and held rather than spent on pickup');
+  assert.equal(world.player.x, startX, 'picking it up must not move the player');
+  assert.equal(world.player.y, startY);
+
+  assert.equal(useTeleportCharge(world), true);
+  assert.equal(world.teleportCharges, 0, 'spending consumes the charge');
   assert.ok(distanceSq(world.player.x, world.player.y, enemy.x, enemy.y) > before, 'it should put distance between them');
   assert.ok(world.player.invulnUntil > world.now, 'the arrival grants a brief window of safety');
   assert.equal(world.player.hp, startingHp, 'and costs nothing to use');
+  assert.equal(useTeleportCharge(world), false, 'an empty pocket does nothing');
 });
 
+test('a sealed prop ignores damage until a click cracks the seal', () => {
+  const world = createWorld(
+    testArea({ x: 90, y: 0, w: 38, h: 46, kind: 'gas-tank', sealed: true }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    31,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const tank = world.breakables[0]!;
+  assert.equal(tank.sealed, true);
+
+  addShockEffect(world, tank.x);
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(tank.broken, false, 'the seal should eat the hit entirely');
+  assert.equal(tank.hp, tank.maxHp);
+
+  primePhysicsObject(world, tank.x, tank.y);
+  assert.equal(tank.sealed, false, 'a click cracks the seal');
+
+  addShockEffect(world, tank.x);
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(tank.broken, true, 'and the next hit sets it off');
+});
+
+test('null-alloy slabs stop enemy shots that other ground would not', () => {
+  const world = createWorld(
+    testArea({ x: 60, y: 0, w: 26, h: 108, kind: 'aegis-slab' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    13,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const slab = world.breakables[0]!;
+  assert.equal(slab.breakable, false, 'null alloy never breaks');
+
+  world.projectiles.push({
+    uid: 4242, x: slab.x - 40, y: 0, vx: 600, vy: 0, radius: 6, damage: 9, impactIntensity: 0,
+    fromPlayer: false, expiresAt: world.now + 3000, targetUid: null, turnRate: 0,
+    color: '#fff', trail: [], pierce: 0, hitUids: new Set(),
+  });
+  for (let i = 0; i < 10; i += 1) stepWorld(world, 1 / 60, neutralInput);
+  assert.ok(
+    world.projectiles.every((projectile) => projectile.uid !== 4242 || projectile.x <= slab.x + slab.w / 2),
+    'the shot must not pass through the slab',
+  );
+});
+
+test('random prefabs scatter from the run seed and stay reproducible', () => {
+  const base = AREAS.find((candidate) => candidate.id === 'beyond-the-fence')!;
+  const authored = base.obstacles.length;
+  const first = createWorld(base, CHARACTERS[0]!, CHARACTERS[0]!.stats, 4242);
+  const same = createWorld(base, CHARACTERS[0]!, CHARACTERS[0]!.stats, 4242);
+  const other = createWorld(base, CHARACTERS[0]!, CHARACTERS[0]!.stats, 99);
+
+  assert.ok(first.breakables.length > authored, 'the scatter should add props beyond the authored list');
+  assert.ok(first.breakables.some((b) => b.kind === 'aegis-slab'), 'and include shot-blocking null alloy');
+  const layout = (world: typeof first) => world.breakables.map((b) => `${b.kind}:${Math.round(b.x)}:${Math.round(b.y)}`).join('|');
+  assert.equal(layout(first), layout(same), 'the same seed must rebuild the same yard');
+  assert.notEqual(layout(first), layout(other), 'a different seed should lay it out differently');
+});
 test('enemy contact launches an impact chain and lethal hits accelerate the follow-through', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),

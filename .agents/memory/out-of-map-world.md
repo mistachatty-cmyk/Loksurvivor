@@ -57,9 +57,29 @@ value, and no new case in the movement switch.
 behavior-independent, while `spitter` is what keeps an enemy at the range its
 radial volleys need.
 
+## Null alloy and random prefabs
+
+`aegis-slab` is the one material projectiles do not get through: no `hp` entry
+in `OBSTACLE_WEIGHT_PROFILES` (so it is indestructible), in
+`PROJECTILE_BLOCKING_KINDS`, and handled in `collideProjectileObstacle` before
+the breakable branch so a shot stops dead rather than passing damage to a prop
+that cannot take it.
+
+Prefabs built from it live in `data/prefabs.ts` and are scattered by
+`AreaDef.randomPrefabs: { count }`. `scatterPrefabs` runs once at world
+creation, rejects placements that overlap authored props, other prefabs, or the
+player's spawn circle, and draws every roll from `w.propRng` -- the same
+separate stream the seal rolls use, so a map's furniture can be re-tuned without
+shifting any combat or loot roll. A seed reproduces a layout exactly. Adding a
+prefab is a record in `data/prefabs.ts`, never a change to the scatter code.
+
 ## Instant Transmission (`PickupKind === 'teleport'`)
 
-A findable escape charge, not a weapon. On pickup, `instantTransmission` scores
+A findable escape charge, not a weapon. It is **held, not spent on pickup**:
+collecting one increments `World.teleportCharges` (capped at
+`TELEPORT_CHARGE_CAP`), a HUD badge shows the count, and the player spends it
+from the pause screen through `useTeleportCharge` -- the single guarded entry
+point, so the UI never touches world state itself. On spend, `instantTransmission` scores
 16 candidate points in a ring 260-520 units out by distance to the nearest
 enemy, blinks the player to the best one, clears their knockback, grants
 `INSTANT_TRANSMISSION_INVULN_MS` of invulnerability and shoves the arrival zone
