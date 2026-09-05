@@ -152,7 +152,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const previewPaletteEffect = meta.paletteAnimationsEnabled ? THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.effect?.kind : undefined;
   const previewPalette = primeShowing
     ? resolveCharacterCosmeticPalette(PRIME, meta.characterSkinByCharacterId[PRIME.id], previewWorldPalette, meta.worldPaletteBlendEnabled)
-    : ARTISAN_VALOR_PALETTE;
+    : (previewWorldPalette || ARTISAN_VALOR_PALETTE);
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);
