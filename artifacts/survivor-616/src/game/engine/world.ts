@@ -120,6 +120,8 @@ export interface PlayerActor extends Actor {
   dashReadyAt: number;
   dashStartedAt: number;
   dashHitUids: Set<number>;
+  /** Props already bounced by the current dash, so one pass shoves each once. */
+  dashPropUids: Set<number>;
 }
 
 export interface EnemyActor extends Actor {
@@ -247,7 +249,8 @@ function createDashSkillRuntime(def: DashSkillDef | undefined): DashSkillRuntime
   return { def, slotReadyAt: [0], wallReadyAt: 0, pendingLandings: [] };
 }
 
-export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'coin';
+/** `teleport` is the findable Instant Transmission charge -- see `instantTransmission`. */
+export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'coin' | 'teleport';
 
 export interface Pickup {
   uid: number;
@@ -450,6 +453,8 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'ac-unit': { variant: 'light-breakable', hp: 100 },
   /** Wonky sentry block: tough, pushable, and armed. See oddity-arenas.md. */
   'attack-block': { variant: 'heavy-metal', hp: 220 },
+  /** 1 HP on purpose: anything that touches it at all sets it off. */
+  'gas-tank': { variant: 'medium-movable', hp: 1 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
@@ -655,6 +660,13 @@ export interface World {
   physicsObjectClicksEnabled: boolean;
   /** Extra world units added to the physics-object click/tap radius, from Grabby Hands stacks. */
   physicsObjectClickRadiusBonus: number;
+  /**
+   * Off by default: a primed prop launches the way the hit sent it. On, it
+   * launches back toward whoever hit it ("Backspin Rig" + the Settings toggle).
+   */
+  physicsObjectReverseLaunch: boolean;
+  /** "Through Traffic" owned: the dash phases through solid props and shoulder-checks movable ones. */
+  dashThroughBlocks: boolean;
   /** 2 once Colossus Frame is owned; scales the player's collision radius and sprite. */
   playerSizeMult: number;
   /** Resolved Ghost Cloak config from the vendor tree, or null when the ability isn't owned. */
@@ -793,6 +805,8 @@ export function createWorld(
     districtIncursionId?: string;
     wildlifeSheltersInRain?: boolean;
     physicsObjectClickRadiusBonus?: number;
+    physicsObjectReverseLaunch?: boolean;
+    dashThroughBlocks?: boolean;
     sizeMult?: number;
     stealth?: StealthAbilityConfig | null;
     hazardImmune?: boolean;
@@ -833,6 +847,7 @@ export function createWorld(
     dashReadyAt: 0,
     dashStartedAt: 0,
     dashHitUids: new Set(),
+    dashPropUids: new Set(),
   };
 
   const rng = createRng(seed);
@@ -922,6 +937,8 @@ export function createWorld(
     endless: undefined,
     physicsObjectClicksEnabled,
     physicsObjectClickRadiusBonus: setup.physicsObjectClickRadiusBonus ?? 0,
+    physicsObjectReverseLaunch: setup.physicsObjectReverseLaunch ?? false,
+    dashThroughBlocks: setup.dashThroughBlocks ?? false,
     playerSizeMult: sizeMult,
     stealthConfig: setup.stealth ?? null,
     hazardImmune: setup.hazardImmune ?? false,
@@ -2322,6 +2339,43 @@ function damagePlayer(
 }
 
 /** Damage every enemy inside a circle once. */
+/**
+ * One enemy ranged volley. `traits.radialShots` turns any shooter into an
+ * omnidirectional one -- N evenly-spaced shots covering the full circle, with
+ * the aimed direction as the first spoke -- so "shoots in every direction" is a
+ * data flag on the enemy record, not another behavior case.
+ */
+function fireEnemyShot(w: World, enemy: EnemyActor, dirX: number, dirY: number, offsetY = 8) {
+  const ranged = enemy.def.ranged;
+  if (!ranged) return;
+  const shots = Math.max(1, Math.floor(enemy.def.traits?.radialShots ?? 1));
+  const baseAngle = Math.atan2(dirY, dirX);
+  for (let i = 0; i < shots; i += 1) {
+    const angle = baseAngle + (Math.PI * 2 * i) / shots;
+    w.projectiles.push({
+      uid: uid(w),
+      x: enemy.x,
+      y: enemy.y + offsetY,
+      vx: Math.cos(angle) * ranged.projectileSpeed,
+      vy: Math.sin(angle) * ranged.projectileSpeed,
+      radius: 7,
+      damage: ranged.damage,
+      impactIntensity: 0,
+      fromPlayer: false,
+      expiresAt: w.now + 3200,
+      targetUid: null,
+      turnRate: 0,
+      color: enemy.def.palette.accent,
+      trail: [],
+      pierce: 0,
+      hitUids: new Set(),
+    });
+  }
+  if (shots > 1) spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accentBright, 6, 90);
+  enemy.anim = 'attack';
+  enemy.animStartedAt = w.now;
+}
+
 function novaDamage(w: World, x: number, y: number, radius: number, damage: number, impactIntensity: ImpactIntensity, statusEffectId?: string) {
   forEachNearby(w, x, y, radius + 40, (enemy) => {
     if (enemy.dying) return;
@@ -3094,7 +3148,14 @@ function activatePotholes(w: World, x: number, y: number, radius: number, trigge
   }
 }
 
-/** Prime the nearest movable prop for a single, boosted reverse launch. */
+/** How much faster a primed prop leaves the impact than an ordinary shove. */
+const PRIMED_LAUNCH_VELOCITY_MULT = 6;
+/** Floor speed for a primed launch, so heavy props still visibly fly. */
+const PRIMED_LAUNCH_MIN_SPEED = 520;
+/** Speed a flying prop must carry before it can shove the player around. */
+const PROP_SHOVE_MIN_SPEED = 150;
+
+/** Prime the nearest movable prop for a single, boosted launch on the next player hit. */
 export function primePhysicsObject(w: World, x: number, y: number): BreakableObstacle | null {
   if (!w.physicsObjectClicksEnabled) return null;
   const reach = 12 + w.physicsObjectClickRadiusBonus;
@@ -3105,7 +3166,14 @@ export function primePhysicsObject(w: World, x: number, y: number): BreakableObs
   if (!target) return null;
   target.clickPrimed = true;
   target.clickPrimedAt = w.now;
-  w.popups.push({ x: target.x, y: target.y - target.h / 2 - 14, text: 'NEXT HIT: REVERSE LAUNCH', color: '#7dd3fc', bornAt: w.now, vy: 20 });
+  w.popups.push({
+    x: target.x,
+    y: target.y - target.h / 2 - 14,
+    text: w.physicsObjectReverseLaunch ? 'NEXT HIT: BACKSPIN LAUNCH' : 'NEXT HIT: LAUNCH',
+    color: '#7dd3fc',
+    bornAt: w.now,
+    vy: 20,
+  });
   return target;
 }
 
@@ -3228,16 +3296,39 @@ function applyPropImpact(
     }
     if (intensity < requiredIntensity) continue;
     if (b.landedHeatActive) resetPropChain(b);
-    const reverseLaunch = fromPlayer && b.clickPrimed;
+    // A primed prop launches the way the hit sent it -- away from the impact
+    // point. Reversing that (back toward whoever hit it) is the opt-in
+    // "Backspin Rig" mode, not the default. See impact-physics.md.
+    const primedLaunch = fromPlayer && b.clickPrimed;
+    const reverseLaunch = primedLaunch && w.physicsObjectReverseLaunch;
     const launchDirectionX = reverseLaunch ? -b.lastPlayerImpactX : dx;
     const launchDirectionY = reverseLaunch ? -b.lastPlayerImpactY : dy;
-    const velocityMultiplier = reverseLaunch ? 4 : 1;
-    if (reverseLaunch) b.clickPrimed = false;
+    const velocityMultiplier = primedLaunch ? PRIMED_LAUNCH_VELOCITY_MULT : 1;
+    if (primedLaunch) b.clickPrimed = false;
     b.impactVelocityMultiplier = velocityMultiplier;
     const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier;
     const pushScale = b.propVariant === 'heavy-metal' ? 0.62 : 0.78;
     b.vx += launchDirectionX * launchSpeed * pushScale;
     b.vy += launchDirectionY * launchSpeed * pushScale;
+    if (primedLaunch) {
+      // A primed launch has to read as a launch even off a light tap on a heavy
+      // prop, so floor it at a speed that visibly clears the block.
+      const speed = Math.hypot(b.vx, b.vy);
+      if (speed < PRIMED_LAUNCH_MIN_SPEED) {
+        b.vx = launchDirectionX * PRIMED_LAUNCH_MIN_SPEED;
+        b.vy = launchDirectionY * PRIMED_LAUNCH_MIN_SPEED;
+      }
+      spawnParticles(w, b.x, b.y, '#7dd3fc', 10, 130);
+      w.shake = Math.max(w.shake, 6);
+      w.popups.push({
+        x: b.x,
+        y: b.y - b.h / 2 - 12,
+        text: reverseLaunch ? 'BACKSPIN!' : 'LAUNCH!',
+        color: '#7dd3fc',
+        bornAt: w.now,
+        vy: 26,
+      });
+    }
     b.impactIntensity = intensity > b.impactIntensity ? intensity : b.impactIntensity;
     if (intensity >= 3) {
       spawnParticles(w, b.x, b.y, b.propVariant === 'heavy-metal' ? '#cbd5e1' : '#ffd166', 4, 65);
@@ -3250,6 +3341,54 @@ function syncObstacleAabbs(w: World) {
   w.obstacles = w.breakables
     .filter((b) => !b.broken)
     .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+}
+
+/** Odds any broken crate/barrel coughs up an Instant Transmission charge. */
+const TELEPORT_CHARGE_CRATE_CHANCE = 0.03;
+
+const GAS_TANK_BLAST_RADIUS = 190;
+const GAS_TANK_ENEMY_DAMAGE = 120;
+const GAS_TANK_PLAYER_DAMAGE = 26;
+/** How many tanks one spark may set off, so a fuel yard can't recurse forever. */
+const GAS_TANK_MAX_CHAIN = 12;
+
+/**
+ * A gas tank has 1 HP, so every hit is a kill and every kill is a blast: a wide
+ * nova that hurts everyone standing in it (the player included), throws nearby
+ * props, leaves burning oil behind, and lights off any tank caught in the ring.
+ * The chain is a bounded queue rather than recursion through `damageBreakable`.
+ */
+function detonateGasTank(w: World, source: BreakableObstacle) {
+  const queue: BreakableObstacle[] = [source];
+  for (let index = 0; index < queue.length && index < GAS_TANK_MAX_CHAIN; index += 1) {
+    const tank = queue[index]!;
+    novaDamage(w, tank.x, tank.y, GAS_TANK_BLAST_RADIUS, GAS_TANK_ENEMY_DAMAGE * w.stats.power, 5, 'burning');
+    if (dist2(w.player.x, w.player.y, tank.x, tank.y) <= (GAS_TANK_BLAST_RADIUS + w.player.radius) ** 2) {
+      damagePlayer(w, GAS_TANK_PLAYER_DAMAGE, tank.x, tank.y);
+    }
+    // Force only -- the props thrown here take no damage, so a blast can't
+    // recurse back into damageBreakable and re-enter this chain.
+    applyPropImpact(w, tank.x, tank.y, GAS_TANK_BLAST_RADIUS, 5, tank.x, tank.y, undefined, false);
+    spawnFluidTile(w, tank.x, tank.y, 'burning-oil', tank.uid);
+    spawnParticles(w, tank.x, tank.y, '#ff9f43', 26, 210);
+    spawnParticles(w, tank.x, tank.y, '#ffe08a', 14, 150);
+    w.shake = Math.max(w.shake, 12);
+    w.effects.push({
+      uid: uid(w), kind: 'ring', x: tank.x, y: tank.y, radius: GAS_TANK_BLAST_RADIUS,
+      angle: 0, spread: 0, bornAt: w.now, expiresAt: w.now + 420,
+      color: '#ff9f43', damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+    });
+
+    for (const other of w.breakables) {
+      if (other.broken || other.kind !== 'gas-tank' || queue.includes(other)) continue;
+      if (dist2(other.x, other.y, tank.x, tank.y) > (GAS_TANK_BLAST_RADIUS + Math.max(other.w, other.h) / 2) ** 2) continue;
+      other.broken = true;
+      other.brokenAt = w.now;
+      other.hp = 0;
+      queue.push(other);
+    }
+  }
+  pushAlert(w, 'FUEL COOKED OFF');
 }
 
 function damageBreakable(
@@ -3286,6 +3425,11 @@ function damageBreakable(
     }
     if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel') {
       w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : 6, bornAt: w.now });
+      // Rare enough to stay a find: the Instant Transmission charge can turn up
+      // in any crate on any block, not only in areas with ambient drops.
+      if (w.rng() < TELEPORT_CHARGE_CRATE_CHANCE) {
+        w.pickups.push({ uid: uid(w), kind: 'teleport', x: b.x, y: b.y - 12, vx: 0, vy: 0, value: 1, bornAt: w.now });
+      }
       if (b.kind === 'crate-breakable' && w.rng() > 0.45) {
         w.pickups.push({
           uid: uid(w),
@@ -3299,6 +3443,7 @@ function damageBreakable(
         });
       }
     }
+    if (b.kind === 'gas-tank') detonateGasTank(w, b);
     if (b.kind === 'street-lamp') {
       b.hazardUntil = w.now + 5200;
       b.hazardNextTickAt = w.now;
@@ -3696,6 +3841,24 @@ function damageEnemiesFromMovingProp(w: World, prop: BreakableObstacle, previous
   });
 }
 
+/**
+ * A prop in flight shoves the player instead of hurting them: launching your own
+ * scenery is a mobility tool, so it moves you around and never chips your health.
+ */
+function shovePlayerFromMovingProp(w: World, prop: BreakableObstacle, previousX: number, previousY: number) {
+  const p = w.player;
+  const speed = Math.hypot(prop.vx, prop.vy);
+  if (speed < PROP_SHOVE_MIN_SPEED) return;
+  const hitRadius = Math.max(prop.w, prop.h) / 2 + p.radius;
+  if (pointToSegmentDistanceSq(p.x, p.y, previousX, previousY, prop.x, prop.y) > hitRadius * hitRadius) return;
+  const length = speed || 1;
+  const impulse = Math.min(620, speed * 0.7);
+  p.kx += (prop.vx / length) * impulse;
+  p.ky += (prop.vy / length) * impulse;
+  spawnParticles(w, p.x, p.y, '#7dd3fc', 4, 70);
+  w.shake = Math.max(w.shake, 3);
+}
+
 function updateBreakables(w: World, dt: number) {
   for (const b of w.breakables) {
     if (b.broken) {
@@ -3757,6 +3920,7 @@ function updateBreakables(w: World, dt: number) {
       resolveMovingPropCollisions(w, b);
       resolvePropArenaWalls(w, b);
       damageEnemiesFromMovingProp(w, b, previousX, previousY);
+      shovePlayerFromMovingProp(w, b, previousX, previousY);
       const friction = b.chainActive ? Math.max(b.friction, PROP_CHAIN_FRICTION) : b.friction;
       b.vx *= Math.pow(friction, dt * 60);
       b.vy *= Math.pow(friction, dt * 60);
@@ -3826,6 +3990,32 @@ function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
   }
 }
 
+/**
+ * "Through Traffic" dash: every movable prop the dash passes through is
+ * shoulder-checked along the dash direction. No damage of its own -- the prop's
+ * own flight does whatever damage happens, exactly like a launched prop.
+ */
+function bounceBlocksAlongDash(w: World, previousX: number, previousY: number) {
+  const p = w.player;
+  for (const b of w.breakables) {
+    if (b.broken || !b.movable || p.dashPropUids.has(b.uid)) continue;
+    const hitRadius = Math.max(b.w, b.h) / 2 + p.radius;
+    if (pointToSegmentDistanceSq(b.x, b.y, previousX, previousY, p.x, p.y) > hitRadius * hitRadius) continue;
+    p.dashPropUids.add(b.uid);
+    b.lastPlayerImpactX = p.dashDirectionX;
+    b.lastPlayerImpactY = p.dashDirectionY;
+    const launchSpeed = Math.max(
+      DASH_BLOCK_MIN_SPEED,
+      resolveImpactTravel(4, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * 2.4,
+    );
+    b.vx += p.dashDirectionX * launchSpeed;
+    b.vy += p.dashDirectionY * launchSpeed;
+    b.impactIntensity = Math.max(b.impactIntensity, 3) as ImpactIntensity;
+    spawnParticles(w, b.x, b.y, '#a5f3fc', 8, 110);
+    w.shake = Math.max(w.shake, 5);
+  }
+}
+
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
@@ -3854,9 +4044,14 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
     p.facing = nx > 0 ? 1 : -1;
   }
 
-  collideObstacles(w, p);
+  // "Through Traffic": a dash phases straight through solid props -- walls,
+  // barriers, buildings -- instead of being stopped by them, and bounces the
+  // movable ones out of the way. Arena bounds still hold.
+  const phasing = dashing && w.dashThroughBlocks;
+  if (!phasing) collideObstacles(w, p);
   clampToArena(w, p);
   if (dashing) knockEnemiesAlongDash(w, previousX, previousY);
+  if (phasing) bounceBlocksAlongDash(w, previousX, previousY);
   for (const b of w.breakables) {
     if (b.broken || !b.movable) continue;
     if (Math.abs(p.x - b.x) < b.w / 2 + p.radius && Math.abs(p.y - b.y) < b.h / 2 + p.radius) {
@@ -3886,6 +4081,8 @@ const DASH_SPEED = 760;
 const DASH_DURATION_MS = 180;
 const DASH_COOLDOWN_MS = 820;
 const DASH_KNOCKBACK_MULTIPLIER = 1.8;
+/** Floor speed a "Through Traffic" dash gives every block it shoulder-checks. */
+const DASH_BLOCK_MIN_SPEED = 460;
 
 export function dashPlayer(w: World, directionX: number, directionY: number): boolean {
   if (
@@ -3906,6 +4103,7 @@ export function dashPlayer(w: World, directionX: number, directionY: number): bo
   w.player.dashReadyAt = w.now + DASH_COOLDOWN_MS;
   w.player.dashStartedAt = w.now;
   w.player.dashHitUids.clear();
+  w.player.dashPropUids.clear();
   w.player.vx = w.player.dashDirectionX * DASH_SPEED;
   w.player.vy = w.player.dashDirectionY * DASH_SPEED;
   w.shake = Math.max(w.shake, 9);
@@ -4162,26 +4360,7 @@ function updateEnemies(w: World, dt: number) {
           const ranged = enemy.def.ranged;
           if (ranged) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.2);
-            w.projectiles.push({
-              uid: uid(w),
-              x: enemy.x,
-              y: enemy.y + 8,
-              vx: dirX * ranged.projectileSpeed,
-              vy: dirY * ranged.projectileSpeed,
-              radius: 7,
-              damage: ranged.damage,
-          impactIntensity: 0,
-              fromPlayer: false,
-              expiresAt: w.now + 3200,
-              targetUid: null,
-              turnRate: 0,
-              color: enemy.def.palette.accent,
-              trail: [],
-              pierce: 0,
-              hitUids: new Set(),
-            });
-            enemy.anim = 'attack';
-            enemy.animStartedAt = w.now;
+            fireEnemyShot(w, enemy, dirX, dirY);
           }
         }
         break;
@@ -4211,15 +4390,7 @@ function updateEnemies(w: World, dt: number) {
           const ranged = enemy.def.ranged;
           if (ranged) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.15);
-            w.projectiles.push({
-              uid: uid(w), x: enemy.x, y: enemy.y + 8,
-              vx: dirX * ranged.projectileSpeed, vy: dirY * ranged.projectileSpeed,
-              radius: 7, damage: ranged.damage, impactIntensity: 0, fromPlayer: false,
-              expiresAt: w.now + 3200, targetUid: null, turnRate: 0,
-              color: enemy.def.palette.accent, trail: [], pierce: 0, hitUids: new Set(),
-            });
-            enemy.anim = 'attack';
-            enemy.animStartedAt = w.now;
+            fireEnemyShot(w, enemy, dirX, dirY);
             enemy.kx -= dirX * 42;
             enemy.ky -= dirY * 42;
           }
@@ -4305,15 +4476,7 @@ function updateEnemies(w: World, dt: number) {
             const fdx = trackX - enemy.x;
             const fdy = trackY - enemy.y;
             const flen = Math.hypot(fdx, fdy) || 1;
-            w.projectiles.push({
-              uid: uid(w), x: enemy.x, y: enemy.y + 8,
-              vx: (fdx / flen) * ranged.projectileSpeed, vy: (fdy / flen) * ranged.projectileSpeed,
-              radius: 7, damage: ranged.damage, impactIntensity: 0, fromPlayer: false,
-              expiresAt: w.now + 3200, targetUid: null, turnRate: 0,
-              color: enemy.def.palette.accent, trail: [], pierce: 0, hitUids: new Set(),
-            });
-            enemy.anim = 'attack';
-            enemy.animStartedAt = w.now;
+            fireEnemyShot(w, enemy, fdx / flen, fdy / flen);
           }
         }
         break;
@@ -4679,7 +4842,12 @@ function updateRumorPulses(w: World) {
   w.rumorMagnetNextAt += 8500;
 }
 
-const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'health', 'cred', 'coin'];
+/** Weighted bag: the Instant Transmission charge is the rare entry in it. */
+const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'xp', 'xp', 'health', 'health', 'cred', 'coin', 'teleport'];
+
+const INSTANT_TRANSMISSION_MIN_RANGE = 260;
+const INSTANT_TRANSMISSION_MAX_RANGE = 520;
+const INSTANT_TRANSMISSION_INVULN_MS = 900;
 
 /**
  * area.randomDrops: pickups appear at random arena points on a cadence,
@@ -4707,6 +4875,72 @@ function updateAmbientDrops(w: World) {
     : 1;
   w.pickups.push({ uid: uid(w), kind, x, y, vx: 0, vy: 0, value, bornAt: w.now });
   spawnParticles(w, x, y, '#ffe8a3', 6, 60);
+}
+
+/**
+ * Instant Transmission: the player blinks to the emptiest spot in a wide ring
+ * around them, arriving with a shove that clears the landing zone and a short
+ * window of invulnerability. Candidate points are scored by how far the nearest
+ * enemy is, so it always reads as an escape rather than a random dice roll.
+ */
+export function instantTransmission(w: World) {
+  const p = w.player;
+  const fromX = p.x;
+  const fromY = p.y;
+  let bestX = p.x;
+  let bestY = p.y;
+  let bestScore = -1;
+  for (let i = 0; i < 16; i += 1) {
+    const angle = w.rng() * Math.PI * 2;
+    const radius = randRange(w.rng, INSTANT_TRANSMISSION_MIN_RANGE, INSTANT_TRANSMISSION_MAX_RANGE);
+    const candidate = { x: p.x + Math.cos(angle) * radius, y: p.y + Math.sin(angle) * radius, radius: p.radius };
+    clampToArena(w, candidate as Actor);
+    let nearest = Number.POSITIVE_INFINITY;
+    for (const enemy of w.enemies) {
+      if (enemy.dying) continue;
+      nearest = Math.min(nearest, dist2(candidate.x, candidate.y, enemy.x, enemy.y));
+    }
+    if (nearest > bestScore) {
+      bestScore = nearest;
+      bestX = candidate.x;
+      bestY = candidate.y;
+    }
+  }
+
+  spawnParticles(w, fromX, fromY, '#a5f3fc', 18, 170);
+  w.effects.push({
+    uid: uid(w), kind: 'teleport', x: fromX, y: fromY, radius: 42, angle: 0, spread: 0,
+    bornAt: w.now, expiresAt: w.now + 340, color: '#a5f3fc', damage: 0, impactIntensity: 0,
+    hitUids: new Set(), followPlayer: false,
+  });
+  p.x = bestX;
+  p.y = bestY;
+  p.kx = 0;
+  p.ky = 0;
+  collideObstacles(w, p);
+  clampToArena(w, p);
+  p.invulnUntil = Math.max(p.invulnUntil, w.now + INSTANT_TRANSMISSION_INVULN_MS);
+  // The arrival shove is force only: Instant Transmission is an escape, not a weapon.
+  forEachNearby(w, p.x, p.y, 150, (enemy) => {
+    if (enemy.dying) return;
+    let dx = enemy.x - p.x;
+    let dy = enemy.y - p.y;
+    const length = Math.hypot(dx, dy) || 1;
+    dx /= length;
+    dy /= length;
+    const impulse = resolveImpactTravel(4, enemy.mass, enemyImpactResistance(enemy));
+    enemy.kx += dx * impulse;
+    enemy.ky += dy * impulse;
+  });
+  spawnParticles(w, p.x, p.y, '#a5f3fc', 22, 190);
+  w.effects.push({
+    uid: uid(w), kind: 'teleport', x: p.x, y: p.y, radius: 42, angle: 0, spread: 0,
+    bornAt: w.now, expiresAt: w.now + 340, color: '#a5f3fc', damage: 0, impactIntensity: 0,
+    hitUids: new Set(), followPlayer: false,
+  });
+  w.shake = Math.max(w.shake, 7);
+  w.popups.push({ x: p.x, y: p.y - 30, text: 'INSTANT TRANSMISSION', color: '#a5f3fc', bornAt: w.now, vy: 34 });
+  pushAlert(w, 'INSTANT TRANSMISSION');
 }
 
 function updatePickups(w: World, dt: number) {
@@ -4758,6 +4992,10 @@ function updatePickups(w: World, dt: number) {
           spawnParticles(w, p.x, p.y + 10, '#3b82f6', 14, 120);
           w.shake = Math.max(w.shake, 8);
           pushAlert(w, `Box — ${prize.label}`);
+          break;
+        }
+        case 'teleport': {
+          instantTransmission(w);
           break;
         }
         case 'sweep': {

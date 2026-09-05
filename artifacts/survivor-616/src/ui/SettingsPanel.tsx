@@ -33,6 +33,7 @@ import {
   hasCatalogItem,
 } from '@/game/data/devUnlockRegistry';
 import { vendorPurchaseCount } from '@/game/data/vendor';
+import { reverseLaunchUnlocked } from '@/game/state/metaStore';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 
@@ -43,6 +44,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
   const {
     meta,
     setPhysicsObjectClicks,
+    setPhysicsReverseLaunch,
     setLiveMode,
     setLootPresentation,
     setLevelUpPresentation,
@@ -393,8 +395,9 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Physics interaction</p>
                   <h2 className="mt-1 text-xl font-black uppercase text-white">Clickable prop launches</h2>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Tap or click a movable object to prime it. Your next hit launches it at 4× its normal impact velocity,
-                    in the opposite direction from its last hit, and lets it plow through enemies.
+                    Tap or click a movable object to prime it. Your next hit launches it at 6× its normal impact velocity,
+                    the way your hit sent it, and lets it plow through enemies. A launched object shoves you around too —
+                    it never damages you.
                   </p>
                 </div>
                 <button
@@ -421,6 +424,30 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <span>Tap targets on mobile; drag elsewhere to steer.</span>
                 </div>
               </div>
+              {reverseLaunchUnlocked(meta) ? (
+                <div className="mt-5 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-wide text-white">Backspin Rig</p>
+                    <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted-foreground">
+                      Off: a primed object flies the way you hit it. On: it launches back the other way, toward whoever
+                      swung at it.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPhysicsReverseLaunch(!meta.physicsObjectReverseLaunchEnabled)}
+                    aria-pressed={meta.physicsObjectReverseLaunchEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.physicsObjectReverseLaunchEnabled
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                    }`}
+                    data-testid="button-toggle-physics-reverse-launch"
+                  >
+                    {meta.physicsObjectReverseLaunchEnabled ? 'Backspin on' : 'Backspin off'}
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </section>

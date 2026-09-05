@@ -639,6 +639,88 @@ export const AREAS: AreaDef[] = [
     ],
   },
 
+  // -- Out of the map: the fenced yard the city never finished drawing. --
+  // Reached by dashing the perimeter walls with "Through Traffic"; see
+  // .agents/memory/out-of-map-world.md.
+  {
+    id: 'beyond-the-fence',
+    name: 'Beyond the Fence',
+    district: 'Outside 616',
+    description:
+      'Dash the wrong wall at the edge of the block and you land here: a fuel yard on ground the city never finished drawing. The tanks go up if you look at them hard. Something keeps the grass cut anyway.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 1700, h: 1500 },
+    ground: { base: '#12110c', tile: '#1b1913', seam: '#080705', glow: '#ffb020' },
+    sky: 'fog',
+    obstacles: [
+      // The fence line. Each side keeps one narrow gate so the yard's own
+      // residents can still walk in; dashing straight through the panels is the
+      // fast way out to the strip of unfinished ground behind them.
+      { x: -430, y: -720, w: 640, h: 26, kind: 'barrier' },
+      { x: 430, y: -720, w: 640, h: 26, kind: 'barrier' },
+      { x: -430, y: 720, w: 640, h: 26, kind: 'barrier' },
+      { x: 430, y: 720, w: 640, h: 26, kind: 'barrier' },
+      { x: -820, y: -370, w: 26, h: 640, kind: 'barrier' },
+      { x: -820, y: 370, w: 26, h: 640, kind: 'barrier' },
+      { x: 820, y: -370, w: 26, h: 640, kind: 'barrier' },
+      { x: 820, y: 370, w: 26, h: 640, kind: 'barrier' },
+      // Fuel farm: one hit each, and they set each other off.
+      { x: -420, y: -300, w: 38, h: 46, kind: 'gas-tank' },
+      { x: -360, y: -300, w: 38, h: 46, kind: 'gas-tank' },
+      { x: -300, y: -300, w: 38, h: 46, kind: 'gas-tank' },
+      { x: -390, y: -240, w: 38, h: 46, kind: 'gas-tank' },
+      { x: 380, y: 260, w: 38, h: 46, kind: 'gas-tank' },
+      { x: 440, y: 260, w: 38, h: 46, kind: 'gas-tank' },
+      { x: 410, y: 320, w: 38, h: 46, kind: 'gas-tank' },
+      { x: -60, y: 420, w: 38, h: 46, kind: 'gas-tank' },
+      { x: 0, y: 440, w: 38, h: 46, kind: 'gas-tank' },
+      { x: 60, y: 420, w: 38, h: 46, kind: 'gas-tank' },
+      { x: 520, y: -420, w: 38, h: 46, kind: 'gas-tank' },
+      { x: -560, y: 460, w: 38, h: 46, kind: 'gas-tank' },
+      // Yard furniture: sentry blocks, shoveable steel, cover to hide the tanks behind.
+      { x: -640, y: -520, w: 58, h: 68, kind: 'attack-block' },
+      { x: 640, y: -520, w: 58, h: 68, kind: 'attack-block' },
+      { x: -640, y: 520, w: 58, h: 68, kind: 'attack-block' },
+      { x: 640, y: 520, w: 58, h: 68, kind: 'attack-block' },
+      { x: -200, y: 0, w: 64, h: 64, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 200, y: 0, w: 64, h: 64, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 0, y: -160, w: 120, h: 26, kind: 'cover' },
+      { x: 0, y: 160, w: 120, h: 26, kind: 'cover' },
+      { x: -500, y: 120, w: 34, h: 40, kind: 'trash-can' },
+      { x: 500, y: -120, w: 34, h: 40, kind: 'trash-can' },
+      { x: -300, y: 540, w: 44, h: 52, kind: 'flora' },
+      { x: 320, y: -560, w: 44, h: 52, kind: 'flora' },
+      { x: -700, y: -80, w: 22, h: 96, kind: 'street-lamp' },
+      { x: 700, y: 80, w: 22, h: 96, kind: 'street-lamp' },
+    ],
+    landmark: {
+      name: 'The Unfinished Lot',
+      description: 'Survey stakes, a fuel farm nobody signed for, and grass cut to the inch.',
+      kind: 'rail-yard',
+      accent: '#ffb020',
+    },
+    durationSec: 260,
+    threat: 'severe',
+    discoveryId: 'edge-of-the-map',
+    // Side content, like the flat maps: chained off total kills rather than the
+    // story clear chain, so it never gates district progress.
+    unlock: { kind: 'kills', count: 260 },
+    // The yard has almost nothing worth breaking for loot, so it rains its own --
+    // including the rare Instant Transmission charge.
+    randomDrops: { intervalMs: 5200 },
+    waves: [
+      { fromSec: 0, toSec: 260, enemyId: 'static-mote', ratePerSec: 1.1, burst: 3, formation: 'ring' },
+      { fromSec: 8, toSec: 240, enemyId: 'fence-hound', ratePerSec: 0.34, burst: 1 },
+      { fromSec: 22, toSec: 250, enemyId: 'scrap-popper', ratePerSec: 0.3, burst: 1 },
+      { fromSec: 60, toSec: 61, enemyId: 'static-mote', ratePerSec: 1, burst: 60, formation: 'ring' },
+      { fromSec: 75, toSec: 230, enemyId: 'valve-choir', ratePerSec: 0.12, burst: 1 },
+      { fromSec: 120, toSec: 200, enemyId: 'scrap-popper', ratePerSec: 0.35, burst: 2, formation: 'pincer' },
+      { fromSec: 150, toSec: 152, enemyId: 'the-groundskeeper', ratePerSec: 0.5, burst: 1 },
+      { fromSec: 190, toSec: 260, enemyId: 'fence-hound', ratePerSec: 0.5, burst: 2, formation: 'wedge' },
+      { fromSec: 230, toSec: 232, enemyId: 'the-groundskeeper', ratePerSec: 0.5, burst: 1 },
+    ],
+  },
+
   // Endless mode -- no time limit, no walls, procedurally generated world.
   {
     id: 'endless-streets',

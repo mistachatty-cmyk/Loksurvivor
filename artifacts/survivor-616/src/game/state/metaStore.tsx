@@ -141,6 +141,7 @@ export function createInitialMeta(): MetaState {
     devModeAccessUnlocked: false,
     devModeAllUnlocks: false,
     physicsObjectClicksEnabled: true,
+    physicsObjectReverseLaunchEnabled: false,
     levelUpPausesEnabled: true,
     liveModeEnabled: false,
     lootPresentation: 'auto-pause',
@@ -732,6 +733,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     devModeAccessUnlocked: parsed.devModeAccessUnlocked === true,
     devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
+    physicsObjectReverseLaunchEnabled: parsed.physicsObjectReverseLaunchEnabled === true,
     levelUpPausesEnabled: !liveModeEnabled && parsed.levelUpPausesEnabled !== false,
     liveModeEnabled,
     lootPresentation: liveModeEnabled || parsed.lootPresentation === 'queue' ? 'queue' : 'auto-pause',
@@ -982,6 +984,21 @@ export function physicsObjectClickRadiusBonus(meta: MetaState): number {
   return vendorPurchaseCount(meta, 'grabby-hands') * 18;
 }
 
+/** "Backspin Rig" owned: unlocks the Settings toggle that reverses a primed prop's launch. */
+export function reverseLaunchUnlocked(meta: MetaState): boolean {
+  return vendorPurchaseCount(meta, 'backspin-rig') > 0;
+}
+
+/** Whether a primed prop should launch back toward the hit -- owned *and* switched on. */
+export function reverseLaunchActive(meta: MetaState): boolean {
+  return reverseLaunchUnlocked(meta) && meta.physicsObjectReverseLaunchEnabled;
+}
+
+/** "Through Traffic" owned: the dash phases through solid blocks and bounces movable ones. */
+export function dashThroughBlocksUnlocked(meta: MetaState): boolean {
+  return vendorPurchaseCount(meta, 'through-traffic') > 0;
+}
+
 /** 2 once Colossus Frame is owned (player renders and collides twice as large), else 1. */
 export function giantSizeMult(meta: MetaState): number {
   return vendorPurchaseCount(meta, 'colossus-frame') > 0 ? 2 : 1;
@@ -1071,6 +1088,7 @@ type Action =
   | { type: 'unlockDevModeAccess' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
+  | { type: 'setPhysicsReverseLaunch'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
   | { type: 'setLiveMode'; enabled: boolean }
   | { type: 'setLootPresentation'; value: MetaState['lootPresentation'] }
@@ -1371,6 +1389,15 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, physicsObjectClicksEnabled: action.enabled },
+      };
+
+    case 'setPhysicsReverseLaunch':
+      // Backspin is a purchased option, not a free setting: without the rig the
+      // toggle is inert, so the state can never disagree with what the run does.
+      if (!reverseLaunchUnlocked(state.meta)) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, physicsObjectReverseLaunchEnabled: action.enabled },
       };
 
     case 'setLevelUpPauses':
@@ -1734,6 +1761,7 @@ export interface MetaContextValue {
   unlockDevModeAccess: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
+  setPhysicsReverseLaunch: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
   setLiveMode: (enabled: boolean) => void;
   setLootPresentation: (value: MetaState['lootPresentation']) => void;
@@ -1812,6 +1840,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setPhysicsObjectClicks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setPhysicsObjectClicks', enabled }),
+    [],
+  );
+  const setPhysicsReverseLaunch = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setPhysicsReverseLaunch', enabled }),
     [],
   );
   const setLevelUpPauses = useCallback(
@@ -1944,6 +1976,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       unlockDevModeAccess,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
+      setPhysicsReverseLaunch,
       setLevelUpPauses,
       setLiveMode,
       setLootPresentation,
@@ -2004,6 +2037,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     unlockDevModeAccess,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
+    setPhysicsReverseLaunch,
     setLevelUpPauses,
     setLiveMode,
     setLootPresentation,

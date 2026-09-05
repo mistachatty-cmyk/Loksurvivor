@@ -37,11 +37,13 @@ import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld } from '@/game/render/draw';
 import {
+  dashThroughBlocksUnlocked,
   effectiveStats,
   giantSizeMult,
   hazardImmunityUnlocked,
   minimapUnlockTiers,
   physicsObjectClickRadiusBonus,
+  reverseLaunchActive,
   rewardCredMultiplier,
   startingWeaponLevel,
   stealthConfig,
@@ -243,6 +245,8 @@ export function RunScreen({
         episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
         wildlifeSheltersInRain: meta.wildlifeSheltersInRain,
         physicsObjectClickRadiusBonus: physicsObjectClickRadiusBonus(meta),
+        physicsObjectReverseLaunch: reverseLaunchActive(meta),
+        dashThroughBlocks: dashThroughBlocksUnlocked(meta),
         sizeMult: giantSizeMult(meta),
         stealth: stealthConfig(meta),
         hazardImmune: hazardImmunityUnlocked(meta),

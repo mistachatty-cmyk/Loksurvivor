@@ -664,7 +664,7 @@ test('a launched prop bounces off the arena wall instead of flying through it', 
   assert.ok(sawNegativeVx, 'the wall should bounce the prop back with reversed velocity');
 });
 
-test('clicking a movable prop primes one reverse launch and gives it a damaging path', () => {
+test('a primed prop launches the way the hit sent it and gives it a damaging path', () => {
   const world = createWorld(
     testArea({ x: 80, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
     testCharacter('chain-whip'),
@@ -691,11 +691,143 @@ test('clicking a movable prop primes one reverse launch and gives it a damaging 
   addShockEffect(world, prop.x);
   stepWorld(world, 1 / 60, neutralInput);
   assert.equal(prop.clickPrimed, false);
-  assert.ok(prop.vx < 0, 'the boosted launch should reverse the previous rightward impact');
+  assert.ok(prop.vx > 0, 'the launch should continue the way the rightward hit sent it');
   assert.ok(Math.abs(prop.vx) > ordinarySpeed * 3);
 
   for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 60, neutralInput);
   assert.ok(enemy.hp < enemy.maxHp, 'the moving prop should damage an enemy along its travel path');
+});
+
+test('backspin mode sends the primed launch back toward the hit instead', () => {
+  const world = createWorld(
+    testArea({ x: 80, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    623,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  world.physicsObjectReverseLaunch = true;
+  const prop = world.breakables[0]!;
+
+  addShockEffect(world, prop.x);
+  stepWorld(world, 1 / 60, neutralInput);
+  prop.vx = 0;
+  prop.vy = 0;
+
+  primePhysicsObject(world, prop.x, prop.y);
+  addShockEffect(world, prop.x);
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.ok(prop.vx < 0, 'backspin should reverse the previous rightward impact');
+});
+
+test('a launched prop shoves the player without damaging them', () => {
+  const world = createWorld(
+    testArea({ x: 120, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    623,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const prop = world.breakables[0]!;
+  const startingHp = world.player.hp;
+
+  // Fire the prop straight back through the player's position.
+  prop.vx = -900;
+  prop.impactIntensity = 4;
+  for (let i = 0; i < 12; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.player.hp, startingHp, 'a flying prop must never damage the player');
+  assert.ok(Math.abs(world.player.kx) + Math.abs(world.player.ky) > 0, 'it should shove the player instead');
+});
+
+test('through-traffic dash phases through a solid block and bounces movable ones', () => {
+  const wallArea = testArea({ x: 120, y: 0, w: 60, h: 240, kind: 'barrier' });
+  const blocked = createWorld(wallArea, testCharacter('chain-whip'), CHARACTERS[0].stats, 7);
+  blocked.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  dashPlayer(blocked, 1, 0);
+  for (let i = 0; i < 12; i += 1) stepWorld(blocked, 1 / 60, neutralInput);
+  assert.ok(blocked.player.x < 120, 'without the unlock the wall still stops the dash');
+
+  const phasing = createWorld(wallArea, testCharacter('chain-whip'), CHARACTERS[0].stats, 7, [], 1, true, null, {
+    dashThroughBlocks: true,
+  });
+  phasing.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  dashPlayer(phasing, 1, 0);
+  for (let i = 0; i < 12; i += 1) stepWorld(phasing, 1 / 60, neutralInput);
+  assert.ok(phasing.player.x > 150, 'the dash should carry the player past the wall');
+
+  const propWorld = createWorld(
+    testArea({ x: 90, y: 0, w: 56, h: 42, kind: 'car', propVariant: 'medium-movable' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    7,
+    [],
+    1,
+    true,
+    null,
+    { dashThroughBlocks: true },
+  );
+  propWorld.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const prop = propWorld.breakables[0]!;
+  dashPlayer(propWorld, 1, 0);
+  for (let i = 0; i < 8; i += 1) stepWorld(propWorld, 1 / 60, neutralInput);
+  assert.ok(prop.vx > 200, 'the dash should shoulder-check the block along the dash direction');
+});
+
+test('a gas tank goes off on one hit and chains into its neighbours', () => {
+  const world = createWorld(
+    testArea({ x: 200, y: 0, w: 38, h: 46, kind: 'gas-tank' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0].stats,
+    11,
+  );
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const first = world.breakables[0]!;
+  assert.equal(first.maxHp, 1, 'a gas tank must die to any hit at all');
+  const neighbour = { ...first, uid: first.uid + 1, x: first.x + 120, contacts: 0,
+    chainContactUids: new Set<number>(), chainHitUids: new Set<number>() };
+  world.breakables.push(neighbour);
+
+  const enemy = addEnemy(world, 'nightcrawler', first.x + 30, 0);
+  enemy.speed = 0;
+  addShockEffect(world, first.x);
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(first.broken, true);
+  assert.equal(neighbour.broken, true, 'the blast should cook off the tank next to it');
+  assert.ok(enemy.hp < enemy.maxHp, 'the blast should hurt whatever is standing in it');
+});
+
+test('radialShots turns one shooter volley into a full circle of shots', () => {
+  const world = createWorld(testArea({ x: 600, y: 600, w: 30, h: 30, kind: 'crate' }), testCharacter('chain-whip'), CHARACTERS[0].stats, 3);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const popper = addEnemy(world, 'scrap-popper', 300, 0);
+  popper.speed = 0;
+  popper.fireReadyAt = 0;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  const shots = world.projectiles.filter((projectile) => !projectile.fromPlayer);
+  assert.equal(shots.length, 8, 'Scrap Popper fires its whole ring at once');
+  const angles = new Set(shots.map((shot) => Math.round(Math.atan2(shot.vy, shot.vx) * 100)));
+  assert.equal(angles.size, 8, 'every shot should leave on its own heading');
+});
+
+test('the Instant Transmission pickup blinks the player clear of the crowd', () => {
+  const world = createWorld(testArea({ x: 900, y: 900, w: 30, h: 30, kind: 'crate' }), testCharacter('chain-whip'), CHARACTERS[0].stats, 5);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'nightcrawler', world.player.x + 24, world.player.y);
+  enemy.speed = 0;
+  const startingHp = world.player.hp;
+  const distanceSq = (ax: number, ay: number, bx: number, by: number) => (ax - bx) ** 2 + (ay - by) ** 2;
+  const before = distanceSq(world.player.x, world.player.y, enemy.x, enemy.y);
+
+  world.pickups.push({ uid: 5150, kind: 'teleport', x: world.player.x, y: world.player.y, vx: 0, vy: 0, value: 1, bornAt: world.now });
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.pickups.length, 0, 'the charge is consumed on pickup');
+  assert.ok(distanceSq(world.player.x, world.player.y, enemy.x, enemy.y) > before, 'it should put distance between them');
+  assert.ok(world.player.invulnUntil > world.now, 'the arrival grants a brief window of safety');
+  assert.equal(world.player.hp, startingHp, 'and costs nothing to use');
 });
 
 test('enemy contact launches an impact chain and lethal hits accelerate the follow-through', () => {

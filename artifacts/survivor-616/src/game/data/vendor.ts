@@ -180,6 +180,24 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     maxStacks: 3,
   },
   {
+    id: 'through-traffic',
+    name: 'Through Traffic',
+    description:
+      'Your dash goes through blocks instead of into them — walls, barriers, whole buildings — and every loose object you pass through gets shoulder-checked across the block. Dash the fence, find what is on the other side.',
+    category: 'ability',
+    cost: 340,
+    maxStacks: 1,
+  },
+  {
+    id: 'backspin-rig',
+    name: 'Backspin Rig',
+    description:
+      'Unlocks a Settings toggle for primed objects. Off (default) they fly the way you hit them; on, they come back the other way, toward whoever swung.',
+    category: 'ability',
+    cost: 120,
+    maxStacks: 1,
+  },
+  {
     id: 'colossus-frame',
     name: 'Colossus Frame',
     description: 'Double your size, hit 20% harder, and add 5% more damage on top. You are now, functionally, a problem.',

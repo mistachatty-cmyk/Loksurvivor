@@ -55,6 +55,30 @@ export const AMBIENT_KINDS: AmbientKindDef[] = [
     fleeSpeedMult: 1.4,
     fleeRadius: 40,
   },
+  {
+    id: 'yard-moth',
+    name: 'Yard Moth',
+    palette: {
+      ink: '#0b0a06', body: '#8a7a4a', bodyDark: '#4a4126', accent: '#ffe8a3',
+      accentBright: '#fffaf0', skin: '#8a7a4a', glow: '#ffd88a',
+    },
+    rig: blobRig({ height: 6, width: 8, wings: true }),
+    speed: 26,
+    fleeSpeedMult: 2.6,
+    fleeRadius: 55,
+  },
+  {
+    id: 'tumble-bag',
+    name: 'Tumble Bag',
+    palette: {
+      ink: '#0a0a0c', body: '#4b4b52', bodyDark: '#26262b', accent: '#8b8b96',
+      accentBright: '#d7d7de', skin: '#4b4b52', glow: '#9a9aa6',
+    },
+    rig: blobRig({ height: 9, width: 12 }),
+    speed: 16,
+    fleeSpeedMult: 3.8,
+    fleeRadius: 75,
+  },
 ];
 
 export const AMBIENT_KINDS_BY_ID: Record<string, AmbientKindDef> = Object.fromEntries(

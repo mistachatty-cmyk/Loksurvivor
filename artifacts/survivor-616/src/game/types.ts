@@ -666,6 +666,12 @@ export interface EnemyDef {
     swayMs?: number;
     /** wraith: invisible and undamageable window from spawn, in ms. */
     revealMs?: number;
+    /**
+     * Any enemy with `ranged`: fire this many evenly-spaced shots covering the
+     * full circle instead of one aimed shot. Purely a firing-shape modifier, so
+     * it stacks onto whichever behavior already shoots (spitter, lookout, wraith).
+     */
+    radialShots?: number;
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
@@ -711,7 +717,9 @@ export interface ObstacleDef {
      | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole'
      | 'trash-can' | 'mailbox' | 'fire-hydrant' | 'parking-meter'
      /** A heavy, wonky sentry block: zaps the player with a short-range bolt on a cadence. See oddity-arenas.md. */
-     | 'attack-block';
+     | 'attack-block'
+     /** Volatile fuel drum: 1 HP, so any hit at all detonates it and chains into its neighbours. */
+     | 'gas-tank';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
@@ -1360,6 +1368,12 @@ export interface MetaState {
   devModeAllUnlocks: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
+  /**
+   * Primed props launch *away* from the hit by default. When this is on they
+   * launch back the way the hit came from instead. Off unless the Quartermaster's
+   * "Backspin Rig" is owned and the player flips it on in Settings.
+   */
+  physicsObjectReverseLaunchEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */
   levelUpPausesEnabled: boolean;
   /** Master preset that keeps reward and menu interactions from pausing simulation. */
