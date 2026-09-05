@@ -518,7 +518,13 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .hideout-weather-particles { position: absolute; inset: 0; opacity: .3; }
 .hideout-weather-rain .hideout-weather-particles {
   background-image: repeating-linear-gradient(105deg, transparent 0 1.5rem, rgba(125, 211, 252, .28) 1.55rem 1.62rem, transparent 1.67rem 3.5rem);
-  background-size: 100% 8rem; animation: hideout-rain .8s linear infinite;
+  /* Width must stay a fixed size, not 100%: the animation drifts background-position by a
+     fixed -3rem per loop, but a "100%" width stretches this gradient's own 3.5rem repeat
+     unit to fill the container -- on a wide desktop viewport that stretch makes -3rem an
+     imperceptible fraction of the (now much wider) pattern, so the rain reads as frozen.
+     A fixed width keeps the stripe density -- and the animation's apparent speed --
+     identical at every screen size, same as .hideout-weather-snow's fixed background-size. */
+  background-size: 3.5rem 8rem; animation: hideout-rain .8s linear infinite;
 }
 .hideout-weather-fog .hideout-weather-particles { background: linear-gradient(90deg, transparent, rgba(203, 213, 225, .16), transparent); animation: hideout-drift-two 22s linear infinite; }
 .hideout-weather-heat .hideout-weather-particles { background: radial-gradient(ellipse at 42% 70%, rgba(45, 212, 191, .18), transparent 34%); filter: blur(12px); }
