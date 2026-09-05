@@ -1,8 +1,10 @@
 import type { AreaDef } from '@/game/types';
+import { AREAS_2X } from './areas-2x';
 
 /**
  * Explorable arenas. Each one owns its own layout, obstacle set, wave table
- * and unlock condition, so new districts are pure data.
+ * and unlock condition, so new districts are pure data. The 2x areas provide
+ * extreme-difficulty versions with doubled map sizes and spawn rates.
  */
 export const AREAS: AreaDef[] = [
   {
@@ -663,6 +665,7 @@ export const AREAS: AreaDef[] = [
     waves: [], // spawning is procedural
     endless: true,
   },
+  ...AREAS_2X,
 ];
 
 export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(
