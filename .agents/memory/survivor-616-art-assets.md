@@ -38,3 +38,20 @@ catalog and never claims a track is licensed.
 The user separately shared several sexualized reference images (pin-up/pinup-style character
 art) across multiple messages. Those were **not** saved, wired to any character, or used as
 design inspiration in any way -- flag this again if asked to revisit that request.
+
+
+## Reference art is painted as a CSS background, never an `<img>`
+
+`HubScreen.tsx` and `ScreenLayout.tsx` used to render their room/area backdrop
+as an `<img>` sitting under a stack of absolutely-positioned overlay divs. That
+looks right only while the stylesheet is loaded. When the built CSS failed to
+load (reported from a phone: the whole hideout rendered as a white serif
+document), every overlay collapsed and the `<img>` rendered full-bleed at the
+top of the page -- raw user-supplied art shown as page content, the exact thing
+the rule above forbids.
+
+Both now use a `<div>` with `style={{ backgroundImage: url(...) }}`, which
+renders *nothing* without CSS. `index.html` also carries a small inline
+critical block (dark ground, sans-serif stack, `#root` min-height) so a missing
+stylesheet degrades to a dark, readable shell instead of a default browser
+document. Any new backdrop surface should copy this, not reintroduce an `<img>`.

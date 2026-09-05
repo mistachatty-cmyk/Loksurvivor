@@ -66,6 +66,30 @@ The user's stated intent is for this to eventually split into three:
    note for now," so do not invent a shop/unlock mechanic for it without
    asking again when this is actually picked up.
 
+## Procedural room audio (`src/game/audio/ambience.ts`) -- opt-in, asset-free
+
+`startHideoutAmbience(context, scene, level)` synthesizes a per-room bed from
+filtered noise plus a drone and scheduled one-shot accents: rain hiss upstairs,
+a low fog drone on the perch, and a dedicated cellar bed (pipe hum + slow
+drips) because the record grotto is the room the player is invited to sit in.
+Nothing ships as an audio file and nothing is fetched.
+
+Three constraints worth keeping:
+- **It reuses the music player's single `AudioContext`** (`ensureAudioContext`,
+  newly exposed on `MusicPlayerValue`) -- a second context fights over the
+  output device and iOS suspends one of them, the same rule `studio-engine.md`
+  records.
+- **`meta.hideoutAmbienceEnabled` defaults to `false`**, unlike the other audio
+  toggles, and an old save without the key stays off (`=== true`, not
+  `!== false`): a returning player must never be surprised by new noise.
+- **Accents are chained `setTimeout`s, not an interval** -- a throttled
+  background tab then just gets fewer of them rather than a burst on return.
+  The bed is also torn down entirely while the tab is hidden and on every room
+  change, so two beds can never overlap.
+
+This is the "toggleable ambiance" the roadmap note below asked for, on the
+audio side; the CSS weather variety part of that note is still open.
+
 ### Hideout room ambiance: more variety, toggleable
 
 Beyond the rain bug fix above, there's a stated intent for more per-room

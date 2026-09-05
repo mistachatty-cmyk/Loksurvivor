@@ -16,6 +16,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      /* Critical baseline, inline on purpose: if the built stylesheet fails to
+         load (flaky network, a cold CDN edge), the app previously fell back to
+         the browser's default white serif document with every decorative
+         element rendered raw. This keeps the shell dark, sans-serif and
+         scroll-locked no matter what, and hides purely decorative layers. */
+      html, body { margin: 0; background: #0a0a0b; color: #e7e7ea; }
+      body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+      #root { min-height: 100dvh; }
+      [aria-hidden="true"] { pointer-events: none; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

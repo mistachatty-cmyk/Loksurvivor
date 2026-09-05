@@ -31,9 +31,13 @@ Run from the repo root unless noted:
   fail without it — this is a pre-existing quirk of that package, unrelated
   to the game; if you just need the game to build, run the survivor-616
   commands directly instead (below).
-- No unit test runner exists anywhere in this repo (script lists are always
-  dev/build/serve/typecheck) — don't introduce one as a side effect of an
-  unrelated task.
+- `pnpm test` (from `artifacts/survivor-616/`) runs the game's `node:test`
+  suites — engine, data and audio-studio tests, ~170 cases. Run it alongside
+  `typecheck` after any engine or data change. Note the hand-built fixtures in
+  `world.test.ts`: an enemy literal there must set *every* `EnemyActor` field
+  (a missing `invisibleUntil`/`ghostUntil` silently disables contact damage,
+  because `w.now >= undefined` is false). No other workspace package has tests
+  — don't add a second runner as a side effect of an unrelated task.
 
 For the game itself, run from `artifacts/survivor-616/`:
 - `PORT=5173 BASE_PATH=/ pnpm dev` — Vite dev server. `PORT` and `BASE_PATH`
