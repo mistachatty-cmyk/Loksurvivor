@@ -618,6 +618,11 @@ export interface World {
   time: number;
   /** Milliseconds since the run started -- used for all timers. */
   now: number;
+  /**
+   * Day/night clock. `phase` is 0..1 and driven purely by `now` (no
+   * wall-clock) -- 0/1 is midnight, 0.5 is neutral daylight.
+   */
+  cycle: { phase: number; cycleMs: number };
 
   player: PlayerActor;
   enemies: EnemyActor[];
@@ -914,6 +919,10 @@ export function createWorld(
     stats: { ...stats },
     time: 0,
     now: 0,
+    // Start at the neutral midpoint so a fresh run looks like it always
+    // did; cycleMs (~7 real minutes) is long relative to a typical timed
+    // run, so most runs see at most one transition.
+    cycle: { phase: 0.5, cycleMs: 420000 },
     player,
     enemies: [],
     projectiles: [],
@@ -5226,6 +5235,19 @@ function endlessDiffTier(e: EndlessState): number {
   return Math.min(12, Math.floor(e.maxDistancePx / 800) + Math.floor(e.dungeonDepth / 2));
 }
 
+/**
+ * Deep night pushes endless-mode difficulty up slightly. Distance-from-
+ * midnight on the 0..1 cycle (0/1 = midnight, 0.5 = neutral), so this is
+ * 1.0 in daylight and rises to a hard 1.15 ceiling at true midnight --
+ * multiplied *inside* updateEndlessSpawning's existing Math.min() caps
+ * below, never stacked on top of them.
+ */
+function nightDifficultyMult(cyclePhase: number): number {
+  const distFromMidnight = Math.min(cyclePhase, 1 - cyclePhase);
+  const nightIntensity = clamp(1 - distFromMidnight / 0.5, 0, 1);
+  return 1 + nightIntensity * 0.15;
+}
+
 function updateEndlessRoute(w: World) {
   const e = w.endless!;
   if (e.inDungeon || e.inBuilding) return;
@@ -5715,12 +5737,18 @@ const ENDLESS_ENEMY_POOLS: string[][] = [
   ['bass-bruiser', 'bridge-lookout', 'river-wraith', 'lightless-prowler'],
 ];
 
+/** Fixed cadence for the enemy-burst "surge" event -- deliberately not
+ * tier-scaled, so its frequency can't run away as tier climbs. */
+const SURGE_CYCLE_SEC = 20;
+const ELITE_ROTATION = ['crypt-bouncer', 'smoke-horn'];
+
 function updateEndlessSpawning(w: World, dt: number) {
   const e = w.endless!;
   const tier = endlessDiffTier(e);
   const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
-  const spawnRate = Math.min(3.2, (0.8 + tier * 0.14) * contractSpawnMultiplier);
-  const hpMult = Math.min(1.7, 1 + tier * 0.07);
+  const nightMult = nightDifficultyMult(w.cycle.phase);
+  const spawnRate = Math.min(3.2, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier);
+  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
   const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
   const pool = bandPool?.length
@@ -5734,11 +5762,24 @@ function updateEndlessSpawning(w: World, dt: number) {
     spawnEnemy(w, getEnemy(enemyId), hpMult);
   }
 
+  // Periodic multi-enemy surge -- the "wave" endless mode is otherwise
+  // missing next to authored timed-area bursts. Fixed cadence, bounded
+  // burst size; spawnEnemy's own MAX_ENEMIES guard keeps it in check.
+  if (w.time > 0 && Math.floor((w.time - dt) / SURGE_CYCLE_SEC) < Math.floor(w.time / SURGE_CYCLE_SEC)) {
+    const surgeCount = 4 + Math.floor(w.rng() * 3);
+    for (let i = 0; i < surgeCount; i += 1) {
+      const enemyId = pool[Math.floor(w.rng() * pool.length)]!;
+      spawnEnemy(w, getEnemy(enemyId), hpMult);
+    }
+    pushAlert(w, 'Surge incoming');
+  }
+
   // Periodic elite wave at higher tiers.
   if (tier >= 5) {
     const bossCycle = Math.max(30, 60 - tier * 2);
     if (w.time > 0 && Math.floor((w.time - dt) / bossCycle) < Math.floor(w.time / bossCycle)) {
-      spawnEnemy(w, getEnemy('crypt-bouncer'), hpMult * 1.4);
+      const eliteId = ELITE_ROTATION[Math.floor(w.time / bossCycle) % ELITE_ROTATION.length]!;
+      spawnEnemy(w, getEnemy(eliteId), hpMult * 1.4);
       pushAlert(w, 'Elite incoming');
     }
   }
@@ -5830,6 +5871,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   const dt = Math.min(dtSeconds, 1 / 30);
   w.time += dt;
   w.now += dt * 1000;
+  w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
 
@@ -5934,6 +5976,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
     stormCloud: w.stormCloud ? { mode: w.stormCloud.mode, autoCycle: w.stormCloud.autoCycle } : undefined,
+    hazardImmune: w.hazardImmune,
     loadout: {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),

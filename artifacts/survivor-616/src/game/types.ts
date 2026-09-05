@@ -1745,6 +1745,8 @@ export interface HudSnapshot {
   weaponLevel: number;
   /** Storm Chaser only: the weather cloud's current mode and whether the player has taken manual control of it. */
   stormCloud?: { mode: StormCloudMode; autoCycle: boolean };
+  /** True once "Let Me Hold This" is unlocked -- hazard weapons never hurt whoever's holding them. */
+  hazardImmune: boolean;
   loadout: {
     weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;
     passives: Array<{ id: string; name: string; stacks: number }>;
