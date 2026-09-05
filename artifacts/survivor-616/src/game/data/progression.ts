@@ -369,6 +369,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'civic-fountain', name: 'The Civic Fountain', blurb: 'The plaza fountain still runs red at midnight, carrying the Sire’s oldest route toward the river.' },
   { id: 'bubble-truce', name: 'The Bubble Truce', blurb: 'Two family lines, one rivalry passed down twice over, and one afternoon where nobody could remember why they were still fighting.' },
   { id: 'choir-hymn', name: 'The Choir\'s Hymn', blurb: 'Twenty verses, one voice each, none of them singing anything you could ever hum back.' },
+  { id: 'arcade-high-score', name: 'The High Score', blurb: 'A cabinet screen still glowing under the dust, top of the board initials burned into the phosphor.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(
