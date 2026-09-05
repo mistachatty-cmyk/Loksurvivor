@@ -85,6 +85,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#ff2ec4',
     roster: ['pixel-wraith', 'token-golem', 'high-score-phantom', 'static-swarm', 'claw-machine-menace'],
   },
+  {
+    id: 'high-roller-syndicate',
+    name: 'High Roller Syndicate',
+    description: 'The Neon Overflow stock room. One name, spelled out in bulbs, still walking.',
+    accent: '#fde047',
+    roster: ['marquee-reaper'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

@@ -1,5 +1,6 @@
 import type { AreaDef } from '@/game/types';
 import { AREAS_2X } from './areas-2x';
+import { squadWave } from './authoring';
 
 /**
  * Explorable arenas. Each one owns its own layout, obstacle set, wave table
@@ -325,6 +326,7 @@ export const AREAS: AreaDef[] = [
     ],
     durationSec: 170,
     threat: 'severe',
+    rescueAllyId: 'otis',
     discoveryId: 'arcade-high-score',
     unlock: { kind: 'clearArea', areaId: 'old-market' },
     waves: [
@@ -334,6 +336,41 @@ export const AREAS: AreaDef[] = [
       { fromSec: 60, toSec: 170, enemyId: 'high-score-phantom', ratePerSec: 0.4, burst: 1 },
       { fromSec: 90, toSec: 170, enemyId: 'token-golem', ratePerSec: 0.18, burst: 1 },
       { fromSec: 140, toSec: 141, enemyId: 'claw-machine-menace', ratePerSec: 1, burst: 1 },
+    ],
+  },
+  {
+    id: 'neon-overflow',
+    name: 'Neon Overflow',
+    district: 'Under Old Market Hall',
+    description:
+      'The arcade\'s stock room, one aisle over. Whatever is wrong with the cabinets out front started back here.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 700, h: 600 },
+    ground: { base: '#120818', tile: '#1e0e2c', seam: '#0a0512', glow: '#fde047' },
+    sky: 'roofed',
+    obstacles: [
+      { x: -260, y: -180, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 260, y: 180, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -240, y: 170, w: 44, h: 44, kind: 'reflective-surface' },
+      { x: 240, y: -170, w: 44, h: 44, kind: 'reflective-surface' },
+      { x: 0, y: -220, w: 140, h: 32, kind: 'barrier' },
+      { x: 0, y: 220, w: 140, h: 32, kind: 'barrier' },
+      { x: -80, y: 0, w: 40, h: 40, kind: 'attack-block' },
+      { x: 80, y: 0, w: 40, h: 40, kind: 'attack-block' },
+      { x: 0, y: 0, w: 70, h: 54, kind: 'cover' },
+    ],
+    durationSec: 140,
+    threat: 'severe',
+    discoveryId: 'overflow-manual',
+    unlock: { kind: 'clearArea', areaId: 'neon-arcade' },
+    waves: [
+      { fromSec: 0, toSec: 60, enemyId: 'pixel-wraith', ratePerSec: 1.4, burst: 2, hpMult: 1.2 },
+      // The whole Cabinet Rot crew arrives together, once, as a set-piece --
+      // squadWave's own `burst` still multiplies the *entire* roster, so this
+      // stays a single one-time entrance rather than a repeating spawn credit.
+      squadWave({ fromSec: 40, toSec: 41, factionId: 'cabinet-rot', ratePerSec: 1, burst: 1, formation: 'ring' }),
+      { fromSec: 70, toSec: 140, enemyId: 'token-golem', ratePerSec: 0.22, burst: 1, hpMult: 1.15 },
+      { fromSec: 110, toSec: 111, enemyId: 'marquee-reaper', ratePerSec: 1, burst: 1 },
     ],
   },
   {

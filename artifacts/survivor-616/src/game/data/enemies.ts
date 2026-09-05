@@ -1,4 +1,4 @@
-import { arachnidRig, blobRig, expressiveRig, humanoidRig } from '@/game/sprites/rigs';
+import { arachnidRig, blobRig, expressiveRig, giantRig, humanoidRig } from '@/game/sprites/rigs';
 import type { EnemyDef } from '@/game/types';
 import { REACTION_PRESETS } from './reactivity';
 
@@ -697,6 +697,34 @@ export const ENEMIES: EnemyDef[] = [
     faction: 'Cabinet Rot',
     role: 'anchor',
     lore: 'The prize was never in reach. Now it does not need one to close the claw on you.',
+  },
+  // Neon Overflow -- the arcade's back stock room, one aisle over from Cabinet Rot.
+  {
+    id: 'marquee-reaper',
+    name: 'Marquee Reaper',
+    family: 'Boss',
+    behavior: 'charger',
+    hp: 360,
+    speed: 34,
+    damage: 26,
+    radius: 24,
+    xp: 40,
+    mass: 5,
+    sizeClass: 'giant',
+    palette: {
+      ink: '#140316',
+      body: '#7e22ce',
+      bodyDark: '#3b0764',
+      accent: '#fde047',
+      accentBright: '#fff9c4',
+      skin: '#a855f7',
+      glow: '#fde047',
+    },
+    rig: giantRig(32),
+    faction: 'High Roller Syndicate',
+    role: 'anchor',
+    traits: { shiftMs: 2400, shiftScale: 1.3 },
+    lore: 'The marquee out front spelled a name nobody could remember choosing. It walks now, still spelling it, one bulb at a time.',
   },
 ];
 

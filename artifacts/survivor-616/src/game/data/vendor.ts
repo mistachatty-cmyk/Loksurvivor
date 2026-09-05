@@ -51,6 +51,15 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     effects: [{ kind: 'stat', stat: 'magnet', add: 20, cap: 240 }],
   },
   {
+    id: 'house-credit',
+    name: 'House Credit',
+    description: '+2% crit chance per stack. Otis says the machines pay out better once they know you.',
+    category: 'stat',
+    cost: 150,
+    maxStacks: 4,
+    effects: [{ kind: 'stat', stat: 'crit', add: 0.02, cap: 0.4 }],
+  },
+  {
     id: 'starting-edge',
     name: 'Starting Edge',
     description: 'Begin every run with one extra signature weapon level per stack.',

@@ -1121,7 +1121,10 @@ export type CrewActivityId =
   | 'file-the-ledgers'
   | 'walk-the-block'
   | 'keep-the-lookbook'
-  | 'mind-the-register';
+  | 'mind-the-register'
+  // The back room
+  | 'rewire-the-cabinets'
+  | 'run-the-high-score-board';
 
 export type CrewActivityIcon =
   | 'utensils'

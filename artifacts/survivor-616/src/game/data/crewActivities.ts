@@ -227,6 +227,24 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
     icon: 'shopping-bag',
     effects: [{ stat: 'armor', add: 0.02 }],
   },
+  {
+    id: 'rewire-the-cabinets',
+    roomId: 'the-back-room',
+    name: 'Rewire the cabinets',
+    description: 'Otis traces a short from the marquee lights to a busted power strip. The whole row hums a little brighter.',
+    benefitLabel: '+3% attack speed',
+    icon: 'zap',
+    effects: [{ stat: 'haste', mult: 0.97 }],
+  },
+  {
+    id: 'run-the-high-score-board',
+    roomId: 'the-back-room',
+    name: 'Run the high score board',
+    description: 'A tally of every run that made it out, chalked next to the machines that never will.',
+    benefitLabel: '+3% crit chance',
+    icon: 'calculator',
+    effects: [{ stat: 'crit', add: 0.03 }],
+  },
 ];
 
 export const CREW_ACTIVITIES_BY_ID: Record<CrewActivityId, CrewActivityDef> =
