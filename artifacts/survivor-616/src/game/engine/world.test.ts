@@ -33,6 +33,7 @@ import {
   spawnLokPet,
   resolveImpactTravel,
   relicRecipeEligibility,
+  setStormCloudMode,
   type EnemyActor,
   type Projectile,
   stepWorld,
@@ -2352,4 +2353,60 @@ test("Ember Ascetic's directional wall deals bonus damage on a dash push and det
 
   assert.ok(enemy.hp < hpAfterPush, 'the delayed landing explosion should deal further damage');
   assert.equal(world.dashSkill?.pendingLandings.length, 0, 'the landing explosion should have resolved and cleared');
+});
+
+test("Storm Chaser's weather cloud can be locked to a mode manually, overriding the auto-cycle", () => {
+  const character = getCharacter('storm-chaser');
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 810);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'nightcrawler', 0, -50);
+  // High HP so repeated frost-rain ticks over two full cycles can't kill it before the assertion.
+  enemy.hp = 5000;
+  enemy.maxHp = 5000;
+
+  setStormCloudMode(world, 'frost-rain');
+  assert.equal(world.stormCloud?.mode, 'frost-rain');
+  assert.equal(world.stormCloud?.autoCycle, false);
+
+  const stepsPastTwoCycles = Math.ceil((character.stormCloud!.cycleMs * 2) / (1000 / 30));
+  for (let i = 0; i < stepsPastTwoCycles; i += 1) stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.stormCloud?.mode, 'frost-rain', 'manual selection should survive well past cycleMs without auto-cycling away');
+  assert.ok(enemy.activeEffects.some((effect) => effect.id === 'freeze'), 'frost-rain should apply freeze to anything underneath');
+});
+
+test("Storm Chaser's cloud paints a lingering ground stain that still affects an enemy who arrives after it moves on", () => {
+  const character = getCharacter('storm-chaser');
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 811);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  setStormCloudMode(world, 'fire-rain');
+
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+
+  const stain = world.fluids.find((tile) => tile.kind === 'fire-storm');
+  assert.ok(stain, 'fire-rain mode should paint a fire-storm ground stain near the cloud');
+
+  const enemy = addEnemy(world, 'nightcrawler', stain!.x, stain!.y);
+  for (let i = 0; i < 15; i += 1) stepWorld(world, 1 / 30, neutralInput);
+
+  assert.ok(enemy.activeEffects.some((effect) => effect.id === 'burning'), 'walking into the painted stain later should still catch fire, with no cloud tick required');
+});
+
+test('switching Storm Chaser to rain washes an existing fire/acid/frost ground stain and its status off enemies', () => {
+  const character = getCharacter('storm-chaser');
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 812);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const enemy = addEnemy(world, 'nightcrawler', 0, -50);
+
+  setStormCloudMode(world, 'acid-rain');
+  for (let i = 0; i < 40; i += 1) stepWorld(world, 1 / 30, neutralInput);
+
+  assert.ok(world.fluids.some((tile) => tile.kind === 'acid-storm'), 'acid-rain should have painted an acid-storm stain');
+  assert.ok(enemy.activeEffects.some((effect) => effect.id === 'acid'), 'the enemy under the cloud should have picked up acid');
+
+  setStormCloudMode(world, 'rain');
+  for (let i = 0; i < 40; i += 1) stepWorld(world, 1 / 30, neutralInput);
+
+  assert.ok(!world.fluids.some((tile) => tile.kind === 'acid-storm'), 'rain should wash the acid-storm stain off the ground');
+  assert.ok(!enemy.activeEffects.some((effect) => effect.id === 'acid'), 'rain should also wash the acid status off the enemy standing in it');
 });

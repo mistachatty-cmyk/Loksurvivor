@@ -966,7 +966,10 @@ export const CHARACTERS: CharacterDef[] = [
     },
     // Drag the cloud (grabRadius) anywhere on screen for precision, or leave
     // it -- it drifts near the player by default and cycles rain -> fire
-    // rain -> acid rain every cycleMs regardless of whether it's ever touched.
+    // rain -> acid rain -> frost rain every cycleMs regardless of whether
+    // it's ever touched, until the HUD weather picker hands over manual
+    // control (see setStormCloudMode). Whatever mode is active also paints
+    // a matching ground stain wherever the cloud lingers.
     stormCloud: {
       grabRadius: 70,
       effectRadius: 95,
@@ -975,6 +978,7 @@ export const CHARACTERS: CharacterDef[] = [
       rainDamage: 5,
       fireRainDamage: 9,
       acidRainDamage: 7,
+      frostRainDamage: 8,
     },
     ultimate: {
       id: 'squall-line',

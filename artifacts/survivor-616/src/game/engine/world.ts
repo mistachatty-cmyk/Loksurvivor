@@ -62,6 +62,7 @@ import type {
   PropVariant,
   RelicRecipeDef,
   StealthAbilityConfig,
+  StormCloudMode,
 } from '@/game/types';
 
 import {
@@ -406,15 +407,15 @@ export interface BreakableObstacle extends Aabb {
   hazardNextTickAt?: number;
 }
 
-/** Ground-hazard liquids spawned by breaking certain obstacles. Never solid — always kept out of `w.obstacles`. */
-export type StormCloudMode = 'rain' | 'fire-rain' | 'acid-rain';
-
 /**
  * Storm Chaser's draggable elemental cloud. `x`/`y` is where it's actually
  * drawn and where its effect radius applies; `targetX`/`targetY` is where
  * it's headed -- either a hover offset near the player (default) or wherever
  * the player last dragged it to (`dragging`). Position always lerps toward
  * the target rather than snapping, so a drag release doesn't teleport it.
+ * `autoCycle` starts true (cycles rain -> fire -> acid -> frost on its own)
+ * and flips permanently false the moment the player picks a mode directly
+ * via `setStormCloudMode` -- manual choice always wins over the timer.
  * See run-presentation.md.
  */
 export interface StormCloud {
@@ -426,9 +427,19 @@ export interface StormCloud {
   mode: StormCloudMode;
   modeStartedAt: number;
   nextTickAt: number;
+  autoCycle: boolean;
 }
 
-export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff';
+/**
+ * Ground-hazard liquids. Never solid -- always kept out of `w.obstacles`.
+ * `water`/`oil`/`coolant`/`runoff` spawn from breaking certain obstacles
+ * (fire hydrant, car-wreck, ac-unit, dumpster); `fire-storm`/`acid-storm`/
+ * `frost` are Storm Chaser's painted weather stains (see `StormCloudMode`)
+ * -- the ground-level record of "what's been painted here", separate from
+ * the status effect a standing enemy carries. `water` washes the latter
+ * three away wherever it overlaps them, and off any enemy standing in it.
+ */
+export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff' | 'fire-storm' | 'acid-storm' | 'frost';
 
 export interface FluidTile {
   uid: number;
@@ -517,6 +528,9 @@ const FLUID_LIFETIMES: Record<FluidKind, number> = {
   'burning-oil': 5000,
   coolant: 8000,
   runoff: 10000,
+  'fire-storm': 6000,
+  'acid-storm': 7000,
+  frost: 7000,
 };
 const FLUID_MAX_RADIUS: Record<FluidKind, number> = {
   water: 84,
@@ -524,13 +538,17 @@ const FLUID_MAX_RADIUS: Record<FluidKind, number> = {
   'burning-oil': 78,
   coolant: 70,
   runoff: 82,
+  'fire-storm': 74,
+  'acid-storm': 74,
+  frost: 74,
 };
-/** Immediate, position-based speed multiplier per fluid kind. Omitted kinds (runoff) don't change speed directly. */
+/** Immediate, position-based speed multiplier per fluid kind. Omitted kinds (runoff, fire-storm, acid-storm) don't change speed directly. */
 const FLUID_SPEED_MULTIPLIERS: Partial<Record<FluidKind, number>> = {
   water: 0.85,
   oil: 1.12,
   'burning-oil': 1.12,
   coolant: 0.4,
+  frost: 0.45,
 };
 
 interface PropPhysicsProfile {
@@ -904,7 +922,7 @@ export function createWorld(
     stormCloud: character.stormCloud
       ? {
           x: player.x, y: player.y - 50, targetX: player.x, targetY: player.y - 50,
-          dragging: false, mode: 'rain', modeStartedAt: 0, nextTickAt: 0,
+          dragging: false, mode: 'rain', modeStartedAt: 0, nextTickAt: 0, autoCycle: true,
         }
       : null,
     orbiters: [],
@@ -3541,6 +3559,8 @@ function updateFluids(w: World) {
     if (playerInside && !dashing) {
       if (tile.kind === 'runoff') damagePlayer(w, 5, tile.x, tile.y);
       else if (tile.kind === 'burning-oil') damagePlayer(w, 6, tile.x, tile.y);
+      else if (tile.kind === 'fire-storm') damagePlayer(w, 6, tile.x, tile.y);
+      else if (tile.kind === 'acid-storm') damagePlayer(w, 4, tile.x, tile.y);
     }
 
     if (tile.kind === 'oil') {
@@ -3561,17 +3581,38 @@ function updateFluids(w: World) {
       if (dist2(enemy.x, enemy.y, tile.x, tile.y) > (tile.radius + enemy.radius) ** 2) continue;
       if (tile.kind === 'water') {
         applyStatusEffect(w, enemy, 'wet');
+        // Water washes away every weather-cloud stain, not just its own oil/coolant/runoff neighbors.
         enemy.activeEffects = enemy.activeEffects.filter(
-          (effect) => effect.id !== 'chilled' && effect.id !== 'irradiated' && effect.id !== 'burning',
+          (effect) =>
+            effect.id !== 'chilled' && effect.id !== 'irradiated' && effect.id !== 'burning' &&
+            effect.id !== 'acid' && effect.id !== 'freeze',
         );
       } else if (tile.kind === 'coolant') {
         applyStatusEffect(w, enemy, 'chilled');
       } else if (tile.kind === 'runoff') {
         applyStatusEffect(w, enemy, 'irradiated');
-      } else if (tile.kind === 'burning-oil') {
+      } else if (tile.kind === 'burning-oil' || tile.kind === 'fire-storm') {
         applyStatusEffect(w, enemy, 'burning');
+      } else if (tile.kind === 'acid-storm') {
+        applyStatusEffect(w, enemy, 'acid');
+      } else if (tile.kind === 'frost') {
+        applyStatusEffect(w, enemy, 'freeze');
       }
     }
+  }
+
+  // A second pass: any water tile erases weather-cloud stains it overlaps,
+  // so painting "rain" over a fire/acid/frost patch clears it from the
+  // ground itself, not just the status it was applying. Kept separate from
+  // the tick loop above so it isn't gated behind FLUID_TICK_MS or a live
+  // enemy standing in the stain -- washing the ground works even if nothing
+  // is there to notice.
+  const waterTiles = w.fluids.filter((tile) => tile.kind === 'water');
+  if (waterTiles.length > 0) {
+    w.fluids = w.fluids.filter((tile) => {
+      if (tile.kind !== 'fire-storm' && tile.kind !== 'acid-storm' && tile.kind !== 'frost') return true;
+      return !waterTiles.some((water) => dist2(water.x, water.y, tile.x, tile.y) <= (water.radius + tile.radius) ** 2);
+    });
   }
 }
 
@@ -4652,13 +4693,46 @@ function updateProjectiles(w: World, dt: number) {
   }
 }
 
+const STORM_CLOUD_MODE_ORDER: StormCloudMode[] = ['rain', 'fire-rain', 'acid-rain', 'frost-rain'];
+const STORM_CLOUD_STATUS_BY_MODE: Record<StormCloudMode, string> = {
+  rain: 'slow',
+  'fire-rain': 'burning',
+  'acid-rain': 'acid',
+  'frost-rain': 'freeze',
+};
+/** The ground stain each mode paints wherever the cloud lingers. `rain` paints water, which washes the other three away. */
+const STORM_CLOUD_PAINT_KIND: Record<StormCloudMode, FluidKind> = {
+  rain: 'water',
+  'fire-rain': 'fire-storm',
+  'acid-rain': 'acid-storm',
+  'frost-rain': 'frost',
+};
+
+/**
+ * Hands the cloud's mode over to the player, permanently disabling
+ * auto-cycling for the rest of the run -- manual choice always wins. A
+ * no-op for every character without a cloud (everyone but Storm Chaser).
+ */
+export function setStormCloudMode(w: World, mode: StormCloudMode) {
+  if (!w.stormCloud) return;
+  w.stormCloud.mode = mode;
+  w.stormCloud.modeStartedAt = w.now;
+  w.stormCloud.autoCycle = false;
+}
+
 /**
  * Storm Chaser's cloud: drifts near the player by default, or tracks
  * wherever the player last dragged it (see RunScreen's pointer handling).
- * Cycles rain -> fire-rain -> acid-rain automatically on `cycleMs`, ticking
- * the matching status/damage into anything underneath on `tickMs`. This
- * works identically whether the player ever touches the drag gesture or
- * not -- dragging is precision, not a requirement. See run-presentation.md.
+ * Cycles rain -> fire-rain -> acid-rain -> frost-rain automatically on
+ * `cycleMs` until the player picks a mode directly via `setStormCloudMode`,
+ * ticking the matching status/damage into anything underneath on `tickMs`.
+ * Auto-cycling works identically whether the player ever touches the drag
+ * gesture or not -- dragging is precision, not a requirement.
+ *
+ * Each tick also paints (or refreshes) a matching ground `FluidTile` at the
+ * cloud's position -- `updateFluids` carries the stain after the cloud
+ * moves on, and its own water-washes-stains pass handles `rain` clearing
+ * fire/acid/frost off the ground and off enemies. See run-presentation.md.
  */
 function updateStormCloud(w: World, dt: number) {
   const cloud = w.stormCloud;
@@ -4674,21 +4748,35 @@ function updateStormCloud(w: World, dt: number) {
   cloud.y += (cloud.targetY - cloud.y) * Math.min(1, dt * 4);
 
   if (cloud.modeStartedAt === 0) cloud.modeStartedAt = w.now;
-  if (w.now - cloud.modeStartedAt >= config.cycleMs) {
-    cloud.mode = cloud.mode === 'rain' ? 'fire-rain' : cloud.mode === 'fire-rain' ? 'acid-rain' : 'rain';
+  if (cloud.autoCycle && w.now - cloud.modeStartedAt >= config.cycleMs) {
+    const nextIndex = (STORM_CLOUD_MODE_ORDER.indexOf(cloud.mode) + 1) % STORM_CLOUD_MODE_ORDER.length;
+    cloud.mode = STORM_CLOUD_MODE_ORDER[nextIndex]!;
     cloud.modeStartedAt = w.now;
   }
 
   if (w.now >= cloud.nextTickAt) {
     cloud.nextTickAt = w.now + config.tickMs;
-    const statusEffectId = cloud.mode === 'rain' ? 'slow' : cloud.mode === 'fire-rain' ? 'burning' : 'acid';
-    const dmg = cloud.mode === 'rain' ? config.rainDamage : cloud.mode === 'fire-rain' ? config.fireRainDamage : config.acidRainDamage;
+    const statusEffectId = STORM_CLOUD_STATUS_BY_MODE[cloud.mode];
+    const dmg = cloud.mode === 'rain' ? config.rainDamage
+      : cloud.mode === 'fire-rain' ? config.fireRainDamage
+      : cloud.mode === 'acid-rain' ? config.acidRainDamage
+      : config.frostRainDamage;
     forEachNearby(w, cloud.x, cloud.y, config.effectRadius + 30, (enemy) => {
       if (enemy.dying) return;
       const reach = config.effectRadius + enemy.radius;
       if (dist2(enemy.x, enemy.y, cloud.x, cloud.y) > reach * reach) return;
       damageEnemy(w, enemy, dmg * w.stats.power, 0, cloud.x, cloud.y, statusEffectId);
     });
+
+    // Paint the ground: refresh a patch already under the cloud (so holding
+    // it in place is how the player controls how long a stain lasts),
+    // otherwise lay a fresh one where the cloud has drifted to.
+    const paintKind = STORM_CLOUD_PAINT_KIND[cloud.mode];
+    const painted = w.fluids.find(
+      (tile) => tile.kind === paintKind && dist2(tile.x, tile.y, cloud.x, cloud.y) <= (tile.radius * 0.5) ** 2,
+    );
+    if (painted) painted.expiresAt = w.now + FLUID_LIFETIMES[paintKind];
+    else spawnFluidTile(w, cloud.x, cloud.y, paintKind);
   }
 }
 
@@ -5845,6 +5933,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
+    stormCloud: w.stormCloud ? { mode: w.stormCloud.mode, autoCycle: w.stormCloud.autoCycle } : undefined,
     loadout: {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),

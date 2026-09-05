@@ -625,8 +625,15 @@ export interface CharacterDef {
 /**
  * Storm Chaser's cloud: floats near the player by default, or the player
  * can drag it anywhere on screen for precision play. Cycles automatically
- * through its elemental modes on a timer -- not by tap count -- so it
- * behaves identically on touch, mouse, and keyboard-only input.
+ * through its elemental modes on a timer by default -- not by tap count, so
+ * it behaves identically on touch, mouse, and keyboard-only input -- but a
+ * HUD control lets the player pick a mode directly, which hands over full
+ * manual control (see `setStormCloudMode` in `engine/world.ts`). Whatever
+ * mode is active also paints a matching ground `FluidTile` wherever the
+ * cloud lingers -- fire/acid/frost stains that keep affecting anything that
+ * walks over them after the cloud moves on, and `rain` paints water, which
+ * washes those stains (and their status effects) off the ground and off
+ * enemies standing in it. See run-presentation.md.
  */
 export interface StormCloudConfig {
   /** Hit-test radius for grabbing the cloud with a pointer, in world units. */
@@ -635,12 +642,16 @@ export interface StormCloudConfig {
   effectRadius: number;
   /** How often each mode ticks damage/status to anything underneath. */
   tickMs: number;
-  /** How long each mode lasts before cycling to the next. */
+  /** How long each mode lasts before cycling to the next, while auto-cycling. */
   cycleMs: number;
   rainDamage: number;
   fireRainDamage: number;
   acidRainDamage: number;
+  frostRainDamage: number;
 }
+
+/** The weather-cloud's current elemental mode. See `StormCloudConfig`. */
+export type StormCloudMode = 'rain' | 'fire-rain' | 'acid-rain' | 'frost-rain';
 
 /* ------------------------------------------------------------------ */
 /* Enemies                                                             */
@@ -1732,6 +1743,8 @@ export interface HudSnapshot {
   ultimateReadyPct: number;
   ultimateActive: boolean;
   weaponLevel: number;
+  /** Storm Chaser only: the weather cloud's current mode and whether the player has taken manual control of it. */
+  stormCloud?: { mode: StormCloudMode; autoCycle: boolean };
   loadout: {
     weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;
     passives: Array<{ id: string; name: string; stacks: number }>;

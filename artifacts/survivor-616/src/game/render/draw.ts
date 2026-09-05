@@ -13,7 +13,7 @@ import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { ALLIES_BY_ID } from '@/game/data/progression';
-import type { AreaSky, ObstacleDef } from '@/game/types';
+import type { AreaSky, ObstacleDef, StormCloudMode } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
 
 import { drawRig, drawShadow } from './sprite';
@@ -1480,6 +1480,9 @@ const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: st
   'burning-oil': { base: '#3a1408', rim: '#ff6b35', glow: '#ffd166' },
   coolant: { base: '#8fd0e8', rim: '#bfe9ff', glow: '#eaf9ff' },
   runoff: { base: '#5a6a1a', rim: '#6b7a1f', glow: '#b6ff2e' },
+  'fire-storm': { base: '#4a1206', rim: '#ff7a3d', glow: '#ffcf7a' },
+  'acid-storm': { base: '#33430f', rim: '#b8ff5c', glow: '#e9ffb0' },
+  frost: { base: '#274a56', rim: '#bfe9ff', glow: '#eaffff' },
 };
 
 function drawFluids(ctx: CanvasRenderingContext2D, w: World) {
@@ -1502,7 +1505,10 @@ function drawFluids(ctx: CanvasRenderingContext2D, w: World) {
     ctx.ellipse(tile.x, tile.y + 4, tile.radius * 0.92, tile.radius * 0.57, 0, 0, Math.PI * 2);
     ctx.stroke();
 
-    if (tile.kind === 'burning-oil' || tile.kind === 'coolant' || tile.kind === 'runoff') {
+    if (
+      tile.kind === 'burning-oil' || tile.kind === 'coolant' || tile.kind === 'runoff' ||
+      tile.kind === 'fire-storm' || tile.kind === 'acid-storm' || tile.kind === 'frost'
+    ) {
       const pulse = 0.5 + Math.sin(w.now / 140 + tile.uid) * 0.3;
       ctx.globalAlpha = pulse * 0.4 * fadeAlpha;
       ctx.fillStyle = colors.glow;
@@ -2128,10 +2134,11 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-const STORM_CLOUD_COLORS: Record<import('@/game/engine/world').StormCloudMode, { core: string; fx: string }> = {
+const STORM_CLOUD_COLORS: Record<StormCloudMode, { core: string; fx: string }> = {
   rain: { core: '#7fb3e0', fx: '#bcdcff' },
   'fire-rain': { core: '#ff6b35', fx: '#ffd166' },
   'acid-rain': { core: '#8fce4a', fx: '#dfffa0' },
+  'frost-rain': { core: '#8fd9f0', fx: '#eaffff' },
 };
 
 /**

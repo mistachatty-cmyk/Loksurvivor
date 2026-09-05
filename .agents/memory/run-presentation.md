@@ -198,3 +198,73 @@ character that doesn't set it). Two independent halves:
 `storm-chaser` is the first character to use it. Any future character
 could opt in by setting `stormCloud` on their `CharacterDef` -- the whole
 mechanic is generic, not hardcoded to this one character.
+
+#### Follow-up pass: manual mode control, `frost-rain`, and ground painting
+
+A later request wanted the player to actually *control* what the cloud is
+doing rather than only wait on the auto-cycle timer, wanted a third
+element (frost/snow, alongside fire/acid), and wanted the weather to leave
+something behind on the ground -- paintable, and washable -- rather than
+being a pure instant-tick-to-whatever's-underneath effect. Three additions,
+all layered onto the existing two-half design above rather than replacing
+it:
+
+- **Manual override, not a replacement for auto-cycle.** `StormCloud` grew
+  `autoCycle: boolean` (starts `true`). `setStormCloudMode(w, mode)` is a
+  new exported `world.ts` function that sets the mode, resets
+  `modeStartedAt`, and flips `autoCycle` permanently `false` -- manual
+  choice always wins, for the rest of the run, once taken. `updateStormCloud`
+  only advances `STORM_CLOUD_MODE_ORDER` on `cycleMs` `if (cloud.autoCycle)`.
+  `RunScreen` renders a small HUD button cluster (`STORM_CLOUD_OPTIONS`:
+  Wash/Fire/Acid/Frost, `data-testid="storm-cloud-picker"`), visible only
+  when `hud.stormCloud` is set (i.e. only for Storm Chaser), each button
+  calling `setStormCloudMode` directly -- a plain DOM button click, so it
+  behaves identically across mouse, touch, and keyboard focus+Enter, the
+  same input-parity goal the original auto-cycle comment was protecting.
+  Players who never touch the picker get the exact original auto-cycling
+  behavior; touching it hands over permanent manual control.
+- **`frost-rain`:** a fourth `StormCloudMode`, added to
+  `STORM_CLOUD_MODE_ORDER` between `acid-rain` and wrapping back to `rain`.
+  Applies the existing generic `freeze` status (already used by several
+  other weapons/relics -- status effects are shared building blocks, not
+  per-character identity, unlike palette/archetype/lore niches) rather than
+  inventing a new status. `StormCloudConfig` grew `frostRainDamage` to match
+  the existing `rainDamage`/`fireRainDamage`/`acidRainDamage` fields.
+- **Ground painting, built on the pre-existing `FluidTile` system** (the
+  ground-hazard puddles that already spawn from breaking a fire hydrant,
+  car-wreck, ac-unit, or dumpster -- `water`/`oil`/`burning-oil`/`coolant`/
+  `runoff`). `FluidKind` gained three modes-as-stains: `fire-storm`,
+  `acid-storm`, `frost`. Every `updateStormCloud` tick now *also* paints
+  (or refreshes) a matching tile at the cloud's current position via
+  `STORM_CLOUD_PAINT_KIND` -- `rain` paints `water`, the other three paint
+  their matching stain. The paint step first looks for an existing tile of
+  that kind within `tile.radius * 0.5` of the cloud and refreshes its
+  `expiresAt` instead of stacking a duplicate; holding the cloud in one
+  spot is therefore *how the player controls how long a stain (and the
+  damage anything standing in it keeps taking) lasts* -- keep painting it
+  and it keeps refreshing, move on and it decays on its own `FLUID_LIFETIMES`
+  entry like every other fluid kind. This is also what makes the stain
+  outlive the cloud: an enemy that wanders into a scorch mark two seconds
+  after the cloud moved on still catches fire, with no cloud tick involved
+  at all -- `updateFluids`' existing per-tile enemy loop handles it exactly
+  like it already handled `burning-oil`/`coolant`/`runoff`.
+- **Washing.** `water` already stripped `chilled`/`irradiated`/`burning`
+  off any enemy standing in it (the pre-existing "water washes away other
+  ground effects" comment on `fluidSpeedMultiplierAt`) -- that filter list
+  grew `acid` and `freeze` too, so painting `rain` over an afflicted enemy
+  strips whichever of the three new statuses they're carrying. That only
+  cleans the *enemy*, not the *ground* -- so `updateFluids` grew a second
+  pass after its main per-tile loop: every `water` tile erases any
+  `fire-storm`/`acid-storm`/`frost` tile it overlaps, splicing it out of
+  `w.fluids` outright. Deliberately a separate pass rather than folded into
+  the per-tile tick loop above it -- it isn't gated behind `FLUID_TICK_MS`
+  or a live enemy standing in the stain, so washing the ground works even
+  when nothing is there to notice, and it isn't scoped to `oil`/`runoff`
+  (those keep their existing, unrelated behavior; only the three new
+  weather-stain kinds are washable this way).
+
+`HudSnapshot.stormCloud` (`{ mode, autoCycle }`) is the new read model the
+picker UI needs; `StormCloudMode` moved from `engine/world.ts` to
+`types.ts` (alongside `StormCloudConfig`) so `HudSnapshot` could reference
+it without `types.ts` reaching into the engine layer -- `types.ts` has zero
+engine imports anywhere else, and this shouldn't be the first.

@@ -29,6 +29,7 @@ import {
   hudSnapshot,
   primePhysicsObject,
   rollUpgradeChoices,
+  setStormCloudMode,
   stepWorld,
   type World,
 } from '@/game/engine/world';
@@ -47,7 +48,7 @@ import {
   stealthConfig,
   useMeta,
 } from '@/game/state/metaStore';
-import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, StormCloudMode, UpgradeDef } from '@/game/types';
 import { ChestTally } from '@/ui/ChestTally';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
@@ -104,6 +105,14 @@ interface RandomUpgradeReveal {
 }
 
 const STICK_RADIUS = 54;
+
+/** Storm Chaser's weather picker: label/color per mode, matching the cloud's own on-canvas colors. */
+const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: string }> = [
+  { mode: 'rain', label: 'Wash', color: '#7fb3e0' },
+  { mode: 'fire-rain', label: 'Fire', color: '#ff6b35' },
+  { mode: 'acid-rain', label: 'Acid', color: '#8fce4a' },
+  { mode: 'frost-rain', label: 'Frost', color: '#8fd9f0' },
+];
 /** Simulation timestep. */
 const FIXED_STEP = 1 / 60;
 /** Most catch-up steps allowed in one frame before time is dropped. */
@@ -1070,6 +1079,32 @@ export function RunScreen({
           onPositionChange={setMinimapPosition}
           onToggleExpanded={() => setMinimapExpanded(!meta.minimapExpanded)}
         />
+      ) : null}
+
+      {/* Storm Chaser: pick the cloud's weather directly instead of waiting on the auto-cycle.
+          Absent for every other character, since hud.stormCloud is only ever set when
+          world.stormCloud is (see hudSnapshot). */}
+      {hud?.stormCloud ? (
+        <div className="absolute bottom-5 left-3 z-40 flex flex-col gap-1 sm:bottom-8 sm:left-6" data-testid="storm-cloud-picker">
+          {STORM_CLOUD_OPTIONS.map(({ mode, label, color }) => {
+            const active = hud.stormCloud!.mode === mode && !hud.stormCloud!.autoCycle;
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => { if (worldRef.current) setStormCloudMode(worldRef.current, mode); }}
+                className="h-9 w-9 rounded-full border-2 bg-black/75 font-mono text-[7px] uppercase leading-none tracking-wider text-white sm:h-11 sm:w-11 sm:text-[8px]"
+                style={{
+                  borderColor: active ? color : 'rgba(255,255,255,0.25)',
+                  boxShadow: active ? `0 0 10px ${color}` : 'none',
+                }}
+                data-testid={`button-storm-${mode}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       ) : null}
 
       {/* Ultimate */}
