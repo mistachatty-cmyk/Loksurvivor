@@ -32,12 +32,18 @@ Run from the repo root unless noted:
   to the game; if you just need the game to build, run the survivor-616
   commands directly instead (below).
 - `pnpm test` (from `artifacts/survivor-616/`) runs the game's `node:test`
-  suites — engine, data and audio-studio tests, ~170 cases. Run it alongside
-  `typecheck` after any engine or data change. Note the hand-built fixtures in
-  `world.test.ts`: an enemy literal there must set *every* `EnemyActor` field
-  (a missing `invisibleUntil`/`ghostUntil` silently disables contact damage,
-  because `w.now >= undefined` is false). No other workspace package has tests
-  — don't add a second runner as a side effect of an unrelated task.
+  suites — engine, data and audio-studio tests, ~174 cases. Run it alongside
+  `typecheck` after any engine or data change. The script globs
+  `src/**/*.test.ts` (see `package.json`), so **a new `*.test.ts` file is
+  picked up automatically** — nothing else to wire up. (This used to be a
+  hardcoded file list in the `test` script; a file left off it ran locally
+  but never in CI, silently. If you ever see the test script name files
+  explicitly again, that regression is worth fixing the same way.) Note the
+  hand-built fixtures in `world.test.ts`: an enemy literal there must set
+  *every* `EnemyActor` field (a missing `invisibleUntil`/`ghostUntil`
+  silently disables contact damage, because `w.now >= undefined` is false).
+  No other workspace package has tests — don't add a second runner as a side
+  effect of an unrelated task.
 
 For the game itself, run from `artifacts/survivor-616/`:
 - `PORT=5173 BASE_PATH=/ pnpm dev` — Vite dev server. `PORT` and `BASE_PATH`
@@ -74,10 +80,32 @@ almost always be a new entry in `data/*.ts`, not a change to `engine/world.ts`.
 - `data/characters.ts`, `data/enemies.ts`, `data/areas.ts`, `data/weapons.ts`,
   `data/evolutions.ts`, `data/passives.ts`, `data/progression.ts` (allies,
   hub rooms, discoveries, level-up upgrades), `data/ambient.ts` (non-combat
-  background actors) — all plain-record content. `characters.ts` has small
-  `palette()` / `BASE_STATS_DEFAULTS` authoring helpers to cut down per-record
-  boilerplate; use them for new characters rather than repeating the full
-  `SpritePalette`/`BaseStats` shape by hand.
+  background actors), `data/factions.ts` (named enemy rosters) — all
+  plain-record content.
+- `data/authoring.ts` — shared content-authoring helpers, used across
+  `characters.ts`/`enemies.ts`/`areas.ts` rather than duplicated per file:
+  - `palette(seed)` fills a full `SpritePalette` from the 4 colors that
+    actually vary per record (`ink`/`body`/`bodyDark`/`accent`);
+    `accentBright`/`skin`/`glow` default to `accent`/`body`/`accent` and are
+    only worth overriding when a record wants them visibly distinct (most
+    humanoid characters do, most enemies don't). Existing records were not
+    mass-migrated to it — use it for new ones, hand-write the full object
+    only when every field genuinely differs.
+  - `squadWave(seed)` builds a `WaveDef` that spawns an entire faction's
+    roster (see `data/factions.ts` below) together each spawn tick — the
+    ergonomic path to "a bigger group" instead of typing out `enemyId` +
+    `group: [...]` by hand and risking an id typo nothing catches. See
+    "Spawning a larger group" below.
+- `data/factions.ts` — registry of named enemy rosters (`Afterimage Choir`,
+  `Cabinet Rot`, etc.). An enemy's own `faction` field and every
+  `squadWave()` roster are checked against this registry by
+  `factions.test.ts`, so a typo on either side fails the test suite instead
+  of silently drifting. (A `WaveDef.faction` label — the flavor string shown
+  on a wave banner — is looser and *not* checked here: it's fine for one
+  burst of a single enemy id to be labeled with a faction name for mood, the
+  way `back-alley`'s corner-cutter wave is labeled "Afterimage Choir" without
+  corner-cutter itself belonging to that faction.) Adding a new faction means
+  adding one `FactionDef` here, not touching the engine.
 - `sprites/rigs.ts` — procedural pixel-rig factories (`humanoidRig`,
   `quadrupedRig`, `blobRig`). Characters/enemies are built from a handful of
   parameters (height, width, `bulk`/`hunched`/`seated`/`hood`/`cap`/etc.), not
@@ -97,6 +125,56 @@ almost always be a new entry in `data/*.ts`, not a change to `engine/world.ts`.
   character's base stats — every `BaseStats` field must be a concrete number
   (not optional) or this arithmetic produces `NaN`.
 
+### Enemy `behavior` and `traits` are orthogonal, not alternatives
+
+`EnemyDef.behavior` (`chase`/`charger`/`spitter`/`drifter`/`flanker`/
+`shockwave`/`prowler`/`lookout`/`current`/`ringer`/`wraith`/...) selects the
+per-frame movement routine in `updateEnemyAI` in `world.ts` — this is a
+`switch` with one case per behavior, `chase` being the implicit default when
+a behavior has no case.
+
+`EnemyDef.traits` (`teleportMs`, `ghostMs`, `shiftMs`/`shiftScale`,
+`burstSpeed`, `swayRadius`/`swayMs`, `revealMs`) are checked *before* that
+switch and apply regardless of which `behavior` is selected: any behavior
+can teleport periodically (`teleportMs`), go briefly untargetable
+(`ghostMs`), or pulse its collision radius (`shiftMs`/`shiftScale`). Despite
+`EnemyBehavior` also listing `teleporter`/`ghost`/`shifter` as literal
+values, no case in the switch handles them — they read as pure labels and
+fall through to `chase`. **Don't set `behavior: 'teleporter'` expecting a
+teleport effect; set `behavior: 'chase'` (or any real movement behavior) and
+add `traits: { teleportMs: ... }` instead.** Every existing enemy that
+teleports/ghosts/shifts follows this pattern — e.g. `spiral-moth` is
+`behavior: 'flanker'` with `traits: { teleportMs: 4200, ghostMs: 520 }` — so
+grep `enemies.ts` for `traits:` before inventing a new combination.
+
+`ringer` and `wraith` are the two behaviors that *do* fully own an enemy's
+movement (constant orbit around the player, and invisible-then-orbiting
+respectively) — pairing a `swayRadius` trait with a different behavior does
+nothing, since only the `ringer`/`wraith` switch cases read it.
+
+### Spawning a larger group
+
+A `WaveDef` already spawns more than one enemy per tick, two ways that
+compose:
+- `burst` — copies spawned together each time the wave's `ratePerSec` credit
+  fires.
+- `group` — additional enemy ids spawned alongside `enemyId` in the *same*
+  tick, one of each per `burst` copy.
+
+So `{ enemyId: 'a', burst: 3, group: ['b', 'c'] }` spawns 9 enemies per
+tick (3 of `a`, 3 of `b`, 3 of `c`), not 3. `formation`
+(`ring`/`wedge`/`wall`/`escort`/`pincer`/`file`/`bait`) then places that
+tick's whole batch geometrically around the player instead of stacking them
+on one point — see `formationPositions` in `world.ts`.
+
+For a *named* group (a faction's whole roster arriving together, not an ad
+hoc id list), use `squadWave()` from `data/authoring.ts` instead of writing
+`enemyId`/`group` by hand — it pulls the roster from `data/factions.ts`, so
+adding a member to a faction automatically makes every `squadWave()` call
+for that faction spawn one more enemy, and `factions.test.ts` catches a
+roster id that no longer exists. `squadWave`'s own `burst` still means
+"copies of the whole roster," same multiplication as above.
+
 ### Cross-cutting rules to respect when adding an `ObstacleDef` kind
 
 Adding a new obstacle kind touches several exhaustive/lookup structures at
@@ -108,6 +186,41 @@ light-source/shadow-exclusion filters if it glows), and `chunks.ts` (the
 `sizes` record is an exhaustive `Record<ObstacleDef['kind'], ...>` for
 endless-mode chunk generation, even if the kind isn't added to `KINDS`/the
 per-variant weight tables).
+
+### Adding an enemy, checklist
+
+1. `data/enemies.ts` — new `EnemyDef`: pick a real `behavior` for movement
+   (default to `chase` if none of the specialized ones fit) and layer
+   `traits` on top for teleport/ghost/shift, per the section above. Use
+   `palette()` from `data/authoring.ts` unless every color genuinely differs
+   from its default.
+2. If it belongs to a named group, either add its id to an existing
+   `FactionDef.roster` in `data/factions.ts`, or add a new `FactionDef` —
+   don't just set `faction: '...'` on the `EnemyDef` to a string that isn't
+   registered; `factions.test.ts` will fail.
+3. Reference the new enemy id from at least one `AreaDef.waves` entry (by
+   hand, or via `squadWave()` for a whole faction) — an enemy nothing spawns
+   is dead content.
+4. `pnpm typecheck` (catches a malformed `EnemyDef` or a `WaveDef.enemyId`
+   that doesn't type-check) and `pnpm test` (catches a `faction`/roster typo
+   and any `world.test.ts` fixture affected).
+
+### Adding an area, checklist
+
+1. `data/areas.ts` (or a themed sibling file spread into `AREAS`, like
+   `areas-2x.ts`) — new `AreaDef`: `bounds`, `obstacles` (existing
+   `ObstacleDef['kind']` values unless you're also doing the cross-cutting
+   work below), `waves`, `unlock`. Chain `unlock: { kind: 'clearArea', areaId: '<previous>' }`
+   to the area that should precede it, or `{ kind: 'default' }` only for a
+   true entry point.
+2. Add a `DISCOVERIES` entry in `data/progression.ts` if `discoveryId` is
+   set — the id is a plain string, not validated by the type system, so a
+   typo there silently shows no discovery text in the UI.
+3. If introducing a new ally rescue, add the `AllyDef` in `data/progression.ts`
+   before setting `rescueAllyId`.
+4. `pnpm typecheck` then `pnpm dev` and playtest the new area's wave
+   pacing — `durationSec` and `ratePerSec` values aren't checked for being
+   survivable by anything automated.
 
 ### Durable decisions in `.agents/memory/`
 
