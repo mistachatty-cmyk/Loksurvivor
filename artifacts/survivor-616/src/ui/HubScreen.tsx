@@ -13,7 +13,7 @@ import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
@@ -54,6 +54,23 @@ const ACTIVITY_ICONS = {
   map: MapIcon,
   radio: Radio,
   sparkles: Sparkles,
+  music: Music,
+  droplet: Droplet,
+  coffee: Coffee,
+  heart: Heart,
+  camera: Camera,
+  sunrise: Sunrise,
+  disc: Disc,
+  flame: Flame,
+  book: Book,
+  wrench: Wrench,
+  zap: Zap,
+  calculator: Calculator,
+  paintbrush: Paintbrush,
+  scroll: Scroll,
+  footprints: Footprints,
+  'shopping-bag': ShoppingBag,
+  'book-open': BookOpen,
 } satisfies Record<CrewActivityIcon, typeof Utensils>;
 const RUMOR_ICONS: Record<string, typeof Bell> = {
   bell: Bell,

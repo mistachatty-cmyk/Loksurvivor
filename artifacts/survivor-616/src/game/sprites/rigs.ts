@@ -447,6 +447,97 @@ export function eelRig(height = 16): SpriteRig {
   return { pixelHeight: height, parts, anims };
 }
 
+interface ArachnidOptions {
+  /** Body block height in sprite pixels. */
+  height?: number;
+  /** How far the legs reach from the body center. */
+  span?: number;
+  /** Legs per side -- 3 = six legs, 4 = eight legs. Both sides push extra
+   *  parts onto the same `legL`/`legR` keys, so they all animate together;
+   *  the walk clip only needs to know about two sides, not N legs. */
+  legPairs?: number;
+}
+
+/**
+ * Many-legged, low, wide silhouette -- built entirely from the same limb
+ * keys a two-legged rig uses (`legL`/`legR`), just with several parts
+ * stacked on each key. Reads as unmistakably non-human at a glance without
+ * needing new animation plumbing. See run-presentation.md.
+ */
+export function arachnidRig(options: ArachnidOptions = {}): SpriteRig {
+  const { height = 9, span = 13, legPairs = 3 } = options;
+  const bodyW = 11;
+  const half = Math.floor(bodyW / 2);
+  const parts: SpritePart[] = [
+    { key: 'shadow', x: -span, y: 0, w: span * 2, h: 2, color: 'ink', z: 0 },
+    { key: 'torso', x: -half, y: 2, w: bodyW, h: height, color: 'body', z: 3 },
+    { key: 'head', x: -half + 2, y: height + 1, w: bodyW - 4, h: 4, color: 'bodyDark', z: 4 },
+    { key: 'face', x: -half + 3, y: height + 2, w: bodyW - 6, h: 2, color: 'accentBright', z: 5 },
+    { key: 'crest', x: -half - 2, y: height + 1, w: 2, h: 3, color: 'accent', z: 4 },
+    { key: 'crest', x: half, y: height + 1, w: 2, h: 3, color: 'accent', z: 4 },
+  ];
+  for (let i = 0; i < legPairs; i += 1) {
+    const t = legPairs === 1 ? 0.5 : i / (legPairs - 1);
+    const y = 1 + t * (height - 2);
+    const reach = span * (0.55 + t * 0.45);
+    parts.push({ key: 'legL', x: -reach, y, w: reach - half, h: 2, color: 'bodyDark', z: 1 });
+    parts.push({ key: 'legR', x: half, y, w: reach - half, h: 2, color: 'bodyDark', z: 1 });
+  }
+  return { pixelHeight: height + 5, parts, anims: baseAnims(false, 1.1) };
+}
+
+interface SerpentOptions {
+  /** Overall body length, nose to tail, in sprite pixels. */
+  length?: number;
+  /** Visible body segments; alternating segments animate on opposite phase
+   *  (reusing `legL`/`legR` as the two phase groups) for a real slither
+   *  instead of one rigid block bobbing. */
+  segments?: number;
+}
+
+/**
+ * A tapering chain of segments -- no legs, no arms, no torso block. Drifts
+ * and winds rather than walks. Distinct from `eelRig` (one flat ribbon +
+ * head) and `blobRig` (round, static): this one visibly undulates.
+ * See run-presentation.md.
+ */
+export function serpentRig(options: SerpentOptions = {}): SpriteRig {
+  const { length = 26, segments = 5 } = options;
+  const segLen = length / segments;
+  const half = length / 2;
+  const parts: SpritePart[] = [
+    { key: 'shadow', x: -half, y: 0, w: length, h: 2, color: 'ink', z: 0 },
+  ];
+  for (let i = 0; i < segments; i += 1) {
+    const t = segments === 1 ? 1 : i / (segments - 1); // 0 tail .. 1 head
+    const segH = 3 + t * 5; // tapers narrow at the tail, wide near the head
+    const isHead = i === segments - 1;
+    parts.push({
+      key: isHead ? 'head' : i % 2 === 0 ? 'legL' : 'legR',
+      x: -half + i * segLen,
+      y: 3,
+      w: segLen + 1,
+      h: segH,
+      color: isHead ? 'bodyDark' : 'body',
+      z: 2 + i,
+    });
+  }
+  parts.push({ key: 'face', x: half - 4, y: 5, w: 3, h: 2, color: 'accentBright', z: 9 });
+  parts.push({ key: 'crest', x: -half - 2, y: 3, w: 3, h: 4, color: 'accent', z: 1 });
+
+  const anims = baseAnims(false, 0.85);
+  anims.idle = bobClip(1, 170);
+  anims.walk = {
+    frameMs: 110,
+    loop: true,
+    frames: [
+      { legL: { dy: 2 }, legR: { dy: -2 }, head: { dy: 1 }, crest: { dy: -1 } },
+      { legL: { dy: -2 }, legR: { dy: 2 }, head: { dy: -1 }, crest: { dy: 1 } },
+    ],
+  };
+  return { pixelHeight: 12, parts, anims };
+}
+
 /** Oversized mascot silhouette with a readable wind-up and impact pose. */
 export function giantRig(height = 28): SpriteRig {
   const rig = humanoidRig({ height, width: 18, headColor: 'bodyDark', torsoColor: 'body' });

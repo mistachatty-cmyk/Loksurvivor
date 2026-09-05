@@ -265,6 +265,7 @@ export const ENEMIES: EnemyDef[] = [
       glow: '#c4b5fd',
     },
     rig: blobRig({ height: 9, width: 11, spikes: true }),
+    sizeClass: 'mini',
     lore: 'Nests in the old bell tower. Comes down in sheets when the bell is rung.',
   },
   {
@@ -279,6 +280,7 @@ export const ENEMIES: EnemyDef[] = [
     radius: 15,
     xp: 18,
     mass: 3.2,
+    sizeClass: 'elite',
     palette: {
       ink: '#0c0a09',
       body: '#44403c',
@@ -313,6 +315,7 @@ export const ENEMIES: EnemyDef[] = [
       glow: '#ef4444',
     },
     rig: humanoidRig({ height: 34, width: 18, hood: true, halo: true }),
+    sizeClass: 'giant',
     lore: 'The one who turned the rest. Owns half the block on paper.',
   },
   {
@@ -367,6 +370,7 @@ export const ENEMIES: EnemyDef[] = [
     rig: expressiveRig('flame', 28),
     faction: 'Cinder Procession',
     role: 'anchor',
+    sizeClass: 'elite',
     traits: { shiftMs: 2600, shiftScale: 1.35, burstSpeed: 1.6 },
     lore: 'An armored argument that exhales magenta smoke before it charges.',
   },
@@ -535,6 +539,7 @@ export const ENEMIES: EnemyDef[] = [
     rig: blobRig({ height: 12, width: 10, tendrils: true, wings: true }),
     faction: 'Loop Chorus',
     role: 'swarm',
+    sizeClass: 'mini',
     traits: { swayRadius: 150 },
     lore: 'Never learned to walk in a straight line. Never needed to -- a hundred of them in a ring does the job a chase never could.',
   },

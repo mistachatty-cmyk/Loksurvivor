@@ -1,4 +1,4 @@
-import { blobRig, eelRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, triangleRig } from '@/game/sprites/rigs';
+import { arachnidRig, blobRig, eelRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, serpentRig, triangleRig } from '@/game/sprites/rigs';
 import type { CharacterDef, SpriteRig } from '@/game/types';
 import { REACTION_PRESETS } from './reactivity';
 
@@ -777,6 +777,218 @@ export const CHARACTERS: CharacterDef[] = [
     weapon: { id: 'bearing-scatter', name: 'Bearing Scatter', kind: 'projectile', description: 'Heavy steel bearings skip through a lane and return through the crowd.', damage: 21, cooldownMs: 920, range: 280, speed: 245, count: 3, lifetimeMs: 1500, levelDamageScale: 0.33, impactIntensity: 3, color: '#b8d66b', pierce: 1 },
     ultimate: { id: 'idle-redline', name: 'Idle Redline', description: 'The engine catches: damage rises, cooldowns fall, and a shock clears the immediate lane.', cooldownMs: 28000, durationMs: 3600, effect: { damageMult: 1.65, cooldownMult: 0.5, novaDamage: 94, novaRadius: 170 } },
     unlock: { kind: 'kills', count: 220 },
+  },
+
+  /**
+   * First cold-biome wave: two silhouettes new to the roster entirely
+   * (arachnidRig, serpentRig -- see sprites/rigs.ts). More to come once the
+   * actual cold-biome area ships; these two stand on their own for now.
+   * See run-presentation.md.
+   */
+  {
+    id: 'hoarfrost', react: REACTION_PRESETS.playerBob, name: 'Hoarfrost', handle: 'The Ice Weaver',
+    tagline: 'Wove itself out of a frozen fire escape one January and never quite thawed.',
+    bio: 'Six legs, no hurry. Hoarfrost doesn\'t chase -- it lays a web across the block and waits for the cold to do the rest.',
+    referenceArt: 'original:ice-weaver',
+    // Bone-white and silver, not blue -- Glacier Warden and Glass Eel already
+    // own saturated ice-cyan, so Hoarfrost reads as rime-glazed frost instead
+    // of "another blue ice character." See run-presentation.md.
+    palette: {
+      ink: '#0a0a0d',
+      body: '#d9dde3',
+      bodyDark: '#8b93a1',
+      accent: '#c9e8e0',
+      accentBright: '#ffffff',
+      skin: '#8b93a1',
+      glow: '#e4f2ee',
+    },
+    rig: arachnidRig({ height: 10, span: 16, legPairs: 3 }),
+    stats: { maxHp: 108, speed: 84, power: 1.02, area: 1.16, haste: 0.94, magnet: 50, armor: 0.16, crit: 0.05, lifesteal: 0 },
+    // Not a generic aimed pulse -- three anchor nodes drop into a ring around
+    // Hoarfrost, linked by visible frost strands, and sit there freezing
+    // whatever wanders across a strand. "Lays a web across the block" made
+    // literal instead of described. See run-presentation.md.
+    weapon: {
+      id: 'rime-web',
+      name: 'Rime Web',
+      kind: 'hazard',
+      description: 'Drops three anchor nodes in a ring, webbed together -- anything crossing a strand locks solid.',
+      damage: 9,
+      cooldownMs: 2400,
+      range: 128,
+      durationMs: 4600,
+      levelDamageScale: 0.24,
+      count: 3,
+      impactIntensity: 1,
+      color: '#c9e8e0',
+      statusEffectId: 'freeze',
+    },
+    ultimate: {
+      id: 'deep-frost',
+      name: 'Deep Frost',
+      description: 'The whole web goes rigid at once -- everything touching a strand locks solid.',
+      cooldownMs: 26000,
+      durationMs: 3800,
+      effect: { novaDamage: 70, novaRadius: 195, damageMult: 1.3 },
+    },
+    unlock: { kind: 'kills', count: 120 },
+  },
+  {
+    id: 'sleet', react: REACTION_PRESETS.playerBob, name: 'Sleet', handle: 'Downed Line',
+    tagline: 'Ice storm took the power out for six blocks. This is what came down with the wire.',
+    bio: 'A live line iced over mid-arc, still sparking under the frost. Sleet moves like a whip and hits like a breaker flipping.',
+    referenceArt: 'original:downed-line',
+    // Electric violet, not blue -- differentiates from Glacier Warden and
+    // Glass Eel's ice-cyan on sight. See run-presentation.md.
+    palette: {
+      ink: '#0a0612',
+      body: '#3d2a5c',
+      bodyDark: '#1f1533',
+      accent: '#c9a6ff',
+      accentBright: '#ffffff',
+      skin: '#1f1533',
+      glow: '#c9a6ff',
+    },
+    rig: serpentRig({ length: 28, segments: 5 }),
+    stats: { maxHp: 82, speed: 138, power: 1.05, area: 0.92, haste: 1.14, magnet: 66, armor: 0.02, crit: 0.1, lifesteal: 0 },
+    // Leaves the ground wet on hit -- then the *next* arc through a wet
+    // target detonates for a hard bonus, since electricity conducts through
+    // water. A real elemental combo instead of a flat status tag, and it
+    // doesn't compete with Hoarfrost's freeze niche. See run-presentation.md.
+    weapon: {
+      id: 'arc-sleet',
+      name: 'Arc Sleet',
+      kind: 'laser',
+      description: 'A violet arc snaps out in a line and leaves the ground slicked. Hit something already wet and the arc jumps -- hard.',
+      damage: 17,
+      cooldownMs: 900,
+      range: 260,
+      levelDamageScale: 0.28,
+      impactIntensity: 2,
+      color: '#c9a6ff',
+      statusEffectId: 'wet',
+      bonusVsStatusId: 'wet',
+      bonusVsStatusMult: 1.9,
+    },
+    ultimate: {
+      id: 'brownout',
+      name: 'Brownout',
+      description: 'Every line arcs at once. The block goes dark, then very, very cold.',
+      cooldownMs: 24000,
+      durationMs: 3500,
+      effect: { speedMult: 1.5, cooldownMult: 0.5, novaDamage: 58, novaRadius: 170 },
+    },
+    unlock: { kind: 'kills', count: 190 },
+  },
+
+  /**
+   * First 'meteor' weapon kind character -- telegraph reticle, then a
+   * strike drops from off-screen. See run-presentation.md for the full
+   * mechanic writeup, including why this is a demolition foreman and not
+   * another astronomer (Orbit Anchor already owns that niche).
+   */
+  {
+    id: 'foreman', react: REACTION_PRESETS.playerBob, name: 'The Foreman', handle: 'Condemned Block',
+    tagline: 'Every building he\'s ever worked on is still coming down.',
+    bio: 'Doesn\'t carry tools anymore. Points at a spot, and whatever the crane was holding lets go of it.',
+    referenceArt: 'original:condemned-block',
+    palette: {
+      ink: '#0a0a0a',
+      body: '#4b5563',
+      bodyDark: '#1f2937',
+      accent: '#fde047',
+      accentBright: '#fff9c4',
+      skin: '#c2703a',
+      glow: '#fde047',
+    },
+    rig: humanoidRig({ height: 22, width: 13, bulk: true, cap: true, torsoColor: 'bodyDark' }),
+    stats: { maxHp: 148, speed: 78, power: 1.14, area: 1.1, haste: 0.9, magnet: 46, armor: 0.2, crit: 0.04, lifesteal: 0 },
+    weapon: {
+      id: 'drop-zone',
+      name: 'Drop Zone',
+      kind: 'meteor',
+      description: 'Marks a spot with a reticle -- half a second later, something heavy lands on it.',
+      damage: 46,
+      cooldownMs: 1900,
+      range: 340,
+      durationMs: 650,
+      levelDamageScale: 0.34,
+      count: 1,
+      impactIntensity: 4,
+      color: '#fde047',
+    },
+    ultimate: {
+      id: 'structural-failure',
+      name: 'Structural Failure',
+      description: 'The whole site lets go at once.',
+      cooldownMs: 27000,
+      durationMs: 4000,
+      effect: { novaDamage: 105, novaRadius: 210, damageMult: 1.4, invulnerable: true },
+    },
+    unlock: { kind: 'kills', count: 150 },
+  },
+
+  /**
+   * First stormCloud character -- a draggable companion cloud, cycling
+   * elements automatically so it works with or without ever touching the
+   * drag gesture. See run-presentation.md for the full mechanic writeup.
+   */
+  {
+    id: 'storm-chaser', react: REACTION_PRESETS.playerBob, name: 'Storm Chaser', handle: 'Weather Eye',
+    tagline: 'Doesn\'t run from the front. Brings a piece of it with her.',
+    bio: 'Chases whatever 616\'s weird microclimates are doing this week and keeps a piece of it on a leash. It doesn\'t always listen.',
+    referenceArt: 'original:weather-eye',
+    palette: {
+      ink: '#0a0d0c',
+      body: '#374151',
+      bodyDark: '#1b2129',
+      accent: '#5eead4',
+      accentBright: '#d1fae5',
+      skin: '#c2a37a',
+      glow: '#a7f3d0',
+    },
+    rig: humanoidRig({ height: 20, width: 10, hood: true, torsoColor: 'bodyDark' }),
+    stats: { maxHp: 106, speed: 96, power: 1.0, area: 1.08, haste: 1, magnet: 58, armor: 0.08, crit: 0.05, lifesteal: 0 },
+    weapon: {
+      id: 'hail-pelt',
+      name: 'Hail Pelt',
+      kind: 'projectile',
+      description: 'A handful of ice flung hard while the real weather does its work overhead.',
+      damage: 9,
+      cooldownMs: 620,
+      range: 260,
+      speed: 260,
+      count: 2,
+      lifetimeMs: 1400,
+      levelDamageScale: 0.22,
+      impactIntensity: 1,
+      color: '#5eead4',
+    },
+    // Drag the cloud (grabRadius) anywhere on screen for precision, or leave
+    // it -- it drifts near the player by default and cycles rain -> fire
+    // rain -> acid rain -> frost rain every cycleMs regardless of whether
+    // it's ever touched, until the HUD weather picker hands over manual
+    // control (see setStormCloudMode). Whatever mode is active also paints
+    // a matching ground stain wherever the cloud lingers.
+    stormCloud: {
+      grabRadius: 70,
+      effectRadius: 95,
+      tickMs: 500,
+      cycleMs: 4200,
+      rainDamage: 5,
+      fireRainDamage: 9,
+      acidRainDamage: 7,
+      frostRainDamage: 8,
+    },
+    ultimate: {
+      id: 'squall-line',
+      name: 'Squall Line',
+      description: 'The whole front moves in at once.',
+      cooldownMs: 25000,
+      durationMs: 4200,
+      effect: { novaDamage: 64, novaRadius: 200, speedMult: 1.3, cooldownMult: 0.6 },
+    },
+    unlock: { kind: 'kills', count: 170 },
   },
 ];
 

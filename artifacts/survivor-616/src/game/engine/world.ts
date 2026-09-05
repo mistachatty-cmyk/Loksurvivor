@@ -62,6 +62,7 @@ import type {
   PropVariant,
   RelicRecipeDef,
   StealthAbilityConfig,
+  StormCloudMode,
 } from '@/game/types';
 
 import {
@@ -186,7 +187,9 @@ export interface Projectile {
   evolutionBehavior?: EvolutionBehavior;
 }
 
-export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact';
+export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact'
+  /** A thin ambient connector line between two points -- no damage, purely a "you're webbed in" visual. */
+  | 'web';
 
 export interface Effect {
   uid: number;
@@ -210,6 +213,9 @@ export interface Effect {
   hurtsPlayer?: boolean;
   statusEffectId?: string;
   evolutionBehavior?: EvolutionBehavior;
+  /** Elemental-synergy bonus: extra damage when the target already carries this status. */
+  bonusVsStatusId?: string;
+  bonusVsStatusMult?: number;
 }
 
 export interface Orbiter {
@@ -229,6 +235,27 @@ export interface PendingLandExplosion {
   readyAt: number;
   damage: number;
   radius: number;
+}
+
+/**
+ * A telegraphed strike queued to land on the ground later -- the 'meteor'
+ * weapon kind. Purely data; `drawPendingMeteors` derives the warning
+ * reticle and falling comet from these timestamps with no separate visual
+ * entity to keep in sync. See run-presentation.md.
+ */
+export interface PendingMeteor {
+  uid: number;
+  x: number;
+  y: number;
+  /** w.now when the warning reticle first appeared. */
+  telegraphAt: number;
+  /** w.now the strike actually lands. */
+  impactAt: number;
+  radius: number;
+  damage: number;
+  impactIntensity: ImpactIntensity;
+  statusEffectId?: string;
+  color: string;
 }
 
 /** Per-run bookkeeping for a character's `dashSkill`. */
@@ -380,8 +407,39 @@ export interface BreakableObstacle extends Aabb {
   hazardNextTickAt?: number;
 }
 
-/** Ground-hazard liquids spawned by breaking certain obstacles. Never solid — always kept out of `w.obstacles`. */
-export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff';
+/**
+ * Storm Chaser's draggable elemental cloud. `x`/`y` is where it's actually
+ * drawn and where its effect radius applies; `targetX`/`targetY` is where
+ * it's headed -- either a hover offset near the player (default) or wherever
+ * the player last dragged it to (`dragging`). Position always lerps toward
+ * the target rather than snapping, so a drag release doesn't teleport it.
+ * `autoCycle` starts true (cycles rain -> fire -> acid -> frost on its own)
+ * and flips permanently false the moment the player picks a mode directly
+ * via `setStormCloudMode` -- manual choice always wins over the timer.
+ * See run-presentation.md.
+ */
+export interface StormCloud {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  dragging: boolean;
+  mode: StormCloudMode;
+  modeStartedAt: number;
+  nextTickAt: number;
+  autoCycle: boolean;
+}
+
+/**
+ * Ground-hazard liquids. Never solid -- always kept out of `w.obstacles`.
+ * `water`/`oil`/`coolant`/`runoff` spawn from breaking certain obstacles
+ * (fire hydrant, car-wreck, ac-unit, dumpster); `fire-storm`/`acid-storm`/
+ * `frost` are Storm Chaser's painted weather stains (see `StormCloudMode`)
+ * -- the ground-level record of "what's been painted here", separate from
+ * the status effect a standing enemy carries. `water` washes the latter
+ * three away wherever it overlaps them, and off any enemy standing in it.
+ */
+export type FluidKind = 'water' | 'oil' | 'burning-oil' | 'coolant' | 'runoff' | 'fire-storm' | 'acid-storm' | 'frost';
 
 export interface FluidTile {
   uid: number;
@@ -470,6 +528,9 @@ const FLUID_LIFETIMES: Record<FluidKind, number> = {
   'burning-oil': 5000,
   coolant: 8000,
   runoff: 10000,
+  'fire-storm': 6000,
+  'acid-storm': 7000,
+  frost: 7000,
 };
 const FLUID_MAX_RADIUS: Record<FluidKind, number> = {
   water: 84,
@@ -477,13 +538,17 @@ const FLUID_MAX_RADIUS: Record<FluidKind, number> = {
   'burning-oil': 78,
   coolant: 70,
   runoff: 82,
+  'fire-storm': 74,
+  'acid-storm': 74,
+  frost: 74,
 };
-/** Immediate, position-based speed multiplier per fluid kind. Omitted kinds (runoff) don't change speed directly. */
+/** Immediate, position-based speed multiplier per fluid kind. Omitted kinds (runoff, fire-storm, acid-storm) don't change speed directly. */
 const FLUID_SPEED_MULTIPLIERS: Partial<Record<FluidKind, number>> = {
   water: 0.85,
   oil: 1.12,
   'burning-oil': 1.12,
   coolant: 0.4,
+  frost: 0.45,
 };
 
 interface PropPhysicsProfile {
@@ -563,6 +628,10 @@ export interface World {
   enemies: EnemyActor[];
   projectiles: Projectile[];
   effects: Effect[];
+  /** 'meteor' weapon kind: telegraphed strikes queued to land later. */
+  pendingMeteors: PendingMeteor[];
+  /** Storm Chaser's draggable cloud; null for every other character. */
+  stormCloud: StormCloud | null;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
   /** Runtime bookkeeping for the character's dash skill, when it has one. */
@@ -858,6 +927,13 @@ export function createWorld(
     enemies: [],
     projectiles: [],
     effects: [],
+    pendingMeteors: [],
+    stormCloud: character.stormCloud
+      ? {
+          x: player.x, y: player.y - 50, targetX: player.x, targetY: player.y - 50,
+          dragging: false, mode: 'rain', modeStartedAt: 0, nextTickAt: 0, autoCycle: true,
+        }
+      : null,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -2518,21 +2594,52 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
          damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
         evolutionBehavior: behavior,
+        bonusVsStatusId: weapon.bonusVsStatusId,
+        bonusVsStatusMult: weapon.bonusVsStatusMult,
       });
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
 
     case 'hazard': {
-      w.effects.push({
-        uid: uid(w), kind: 'hazard', x: p.x, y: p.y, radius: reach, angle: 0, spread: Math.PI * 2,
-        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
-        damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
-        hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
-        statusEffectId: weapon.statusEffectId,
-        evolutionBehavior: behavior,
-      });
-      pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+      // count === 1 (the default): a single field at the player's feet, same
+      // as always. count > 1: spread that many fields into a ring around the
+      // player instead of stacking them on top of each other, connected by
+      // ambient 'web' strand effects. See run-presentation.md.
+      const nodeCount = Math.max(1, runWeapon.count);
+      const ringRadius = nodeCount > 1 ? reach : 0;
+      const nodeRadius = nodeCount > 1 ? reach * 0.4 : reach;
+      const nodePositions: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < nodeCount; i += 1) {
+        const nodeAngle = (Math.PI * 2 * i) / nodeCount;
+        const nx = p.x + Math.cos(nodeAngle) * ringRadius;
+        const ny = p.y + Math.sin(nodeAngle) * ringRadius;
+        nodePositions.push({ x: nx, y: ny });
+        w.effects.push({
+          uid: uid(w), kind: 'hazard', x: nx, y: ny, radius: nodeRadius, angle: 0, spread: Math.PI * 2,
+          bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
+          damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+          hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
+          statusEffectId: weapon.statusEffectId,
+          evolutionBehavior: behavior,
+        });
+      }
+      if (nodeCount > 1) {
+        for (let i = 0; i < nodeCount; i += 1) {
+          const a = nodePositions[i]!;
+          const b = nodePositions[(i + 1) % nodeCount]!;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          w.effects.push({
+            uid: uid(w), kind: 'web', x: a.x, y: a.y, radius: Math.hypot(dx, dy), angle: Math.atan2(dy, dx), spread: 0,
+            bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
+            damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+          });
+        }
+        pushAlert(w, 'WEB ANCHORS SET');
+      } else {
+        pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+      }
       break;
     }
 
@@ -2653,6 +2760,39 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       });
       pushAlert(w, 'The Bus');
       w.shake = Math.max(w.shake, 5);
+      break;
+    }
+
+    case 'meteor': {
+      // Telegraph a ground reticle on a nearby enemy (or a point near the
+      // player if the block is empty, so the weapon is never a no-op), then
+      // queue the actual strike to resolve later in updateMeteors. The
+      // falling-comet visual is derived entirely from this queued data --
+      // see drawPendingMeteors. See run-presentation.md.
+      const strikeCount = Math.max(1, runWeapon.count);
+      const candidates = w.enemies.filter((e) => !e.dying && dist2(e.x, e.y, p.x, p.y) <= reach * reach);
+      for (let i = 0; i < strikeCount; i += 1) {
+        let tx: number;
+        let ty: number;
+        if (candidates.length > 0) {
+          const target = candidates[Math.floor(w.rng() * candidates.length)]!;
+          tx = target.x;
+          ty = target.y;
+        } else {
+          const strikeAngle = w.rng() * Math.PI * 2;
+          tx = p.x + Math.cos(strikeAngle) * reach * 0.6;
+          ty = p.y + Math.sin(strikeAngle) * reach * 0.6;
+        }
+        w.pendingMeteors.push({
+          uid: uid(w), x: tx, y: ty,
+          telegraphAt: w.now, impactAt: w.now + (weapon.durationMs ?? 650) + i * 180,
+          radius: weapon.range * 0.42 * areaMult(w),
+          damage, impactIntensity: weaponImpact(weapon),
+          statusEffectId: weapon.statusEffectId,
+          color: weapon.color ?? palette.accent,
+        });
+      }
+      p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
   }
@@ -3428,6 +3568,8 @@ function updateFluids(w: World) {
     if (playerInside && !dashing) {
       if (tile.kind === 'runoff') damagePlayer(w, 5, tile.x, tile.y);
       else if (tile.kind === 'burning-oil') damagePlayer(w, 6, tile.x, tile.y);
+      else if (tile.kind === 'fire-storm') damagePlayer(w, 6, tile.x, tile.y);
+      else if (tile.kind === 'acid-storm') damagePlayer(w, 4, tile.x, tile.y);
     }
 
     if (tile.kind === 'oil') {
@@ -3448,17 +3590,38 @@ function updateFluids(w: World) {
       if (dist2(enemy.x, enemy.y, tile.x, tile.y) > (tile.radius + enemy.radius) ** 2) continue;
       if (tile.kind === 'water') {
         applyStatusEffect(w, enemy, 'wet');
+        // Water washes away every weather-cloud stain, not just its own oil/coolant/runoff neighbors.
         enemy.activeEffects = enemy.activeEffects.filter(
-          (effect) => effect.id !== 'chilled' && effect.id !== 'irradiated' && effect.id !== 'burning',
+          (effect) =>
+            effect.id !== 'chilled' && effect.id !== 'irradiated' && effect.id !== 'burning' &&
+            effect.id !== 'acid' && effect.id !== 'freeze',
         );
       } else if (tile.kind === 'coolant') {
         applyStatusEffect(w, enemy, 'chilled');
       } else if (tile.kind === 'runoff') {
         applyStatusEffect(w, enemy, 'irradiated');
-      } else if (tile.kind === 'burning-oil') {
+      } else if (tile.kind === 'burning-oil' || tile.kind === 'fire-storm') {
         applyStatusEffect(w, enemy, 'burning');
+      } else if (tile.kind === 'acid-storm') {
+        applyStatusEffect(w, enemy, 'acid');
+      } else if (tile.kind === 'frost') {
+        applyStatusEffect(w, enemy, 'freeze');
       }
     }
+  }
+
+  // A second pass: any water tile erases weather-cloud stains it overlaps,
+  // so painting "rain" over a fire/acid/frost patch clears it from the
+  // ground itself, not just the status it was applying. Kept separate from
+  // the tick loop above so it isn't gated behind FLUID_TICK_MS or a live
+  // enemy standing in the stain -- washing the ground works even if nothing
+  // is there to notice.
+  const waterTiles = w.fluids.filter((tile) => tile.kind === 'water');
+  if (waterTiles.length > 0) {
+    w.fluids = w.fluids.filter((tile) => {
+      if (tile.kind !== 'fire-storm' && tile.kind !== 'acid-storm' && tile.kind !== 'frost') return true;
+      return !waterTiles.some((water) => dist2(water.x, water.y, tile.x, tile.y) <= (water.radius + tile.radius) ** 2);
+    });
   }
 }
 
@@ -4539,6 +4702,111 @@ function updateProjectiles(w: World, dt: number) {
   }
 }
 
+const STORM_CLOUD_MODE_ORDER: StormCloudMode[] = ['rain', 'fire-rain', 'acid-rain', 'frost-rain'];
+const STORM_CLOUD_STATUS_BY_MODE: Record<StormCloudMode, string> = {
+  rain: 'slow',
+  'fire-rain': 'burning',
+  'acid-rain': 'acid',
+  'frost-rain': 'freeze',
+};
+/** The ground stain each mode paints wherever the cloud lingers. `rain` paints water, which washes the other three away. */
+const STORM_CLOUD_PAINT_KIND: Record<StormCloudMode, FluidKind> = {
+  rain: 'water',
+  'fire-rain': 'fire-storm',
+  'acid-rain': 'acid-storm',
+  'frost-rain': 'frost',
+};
+
+/**
+ * Hands the cloud's mode over to the player, permanently disabling
+ * auto-cycling for the rest of the run -- manual choice always wins. A
+ * no-op for every character without a cloud (everyone but Storm Chaser).
+ */
+export function setStormCloudMode(w: World, mode: StormCloudMode) {
+  if (!w.stormCloud) return;
+  w.stormCloud.mode = mode;
+  w.stormCloud.modeStartedAt = w.now;
+  w.stormCloud.autoCycle = false;
+}
+
+/**
+ * Storm Chaser's cloud: drifts near the player by default, or tracks
+ * wherever the player last dragged it (see RunScreen's pointer handling).
+ * Cycles rain -> fire-rain -> acid-rain -> frost-rain automatically on
+ * `cycleMs` until the player picks a mode directly via `setStormCloudMode`,
+ * ticking the matching status/damage into anything underneath on `tickMs`.
+ * Auto-cycling works identically whether the player ever touches the drag
+ * gesture or not -- dragging is precision, not a requirement.
+ *
+ * Each tick also paints (or refreshes) a matching ground `FluidTile` at the
+ * cloud's position -- `updateFluids` carries the stain after the cloud
+ * moves on, and its own water-washes-stains pass handles `rain` clearing
+ * fire/acid/frost off the ground and off enemies. See run-presentation.md.
+ */
+function updateStormCloud(w: World, dt: number) {
+  const cloud = w.stormCloud;
+  const config = w.character.stormCloud;
+  if (!cloud || !config) return;
+  const p = w.player;
+
+  if (!cloud.dragging) {
+    cloud.targetX = p.x + Math.sin(w.now / 900) * 34;
+    cloud.targetY = p.y - 58 + Math.cos(w.now / 700) * 12;
+  }
+  cloud.x += (cloud.targetX - cloud.x) * Math.min(1, dt * 4);
+  cloud.y += (cloud.targetY - cloud.y) * Math.min(1, dt * 4);
+
+  if (cloud.modeStartedAt === 0) cloud.modeStartedAt = w.now;
+  if (cloud.autoCycle && w.now - cloud.modeStartedAt >= config.cycleMs) {
+    const nextIndex = (STORM_CLOUD_MODE_ORDER.indexOf(cloud.mode) + 1) % STORM_CLOUD_MODE_ORDER.length;
+    cloud.mode = STORM_CLOUD_MODE_ORDER[nextIndex]!;
+    cloud.modeStartedAt = w.now;
+  }
+
+  if (w.now >= cloud.nextTickAt) {
+    cloud.nextTickAt = w.now + config.tickMs;
+    const statusEffectId = STORM_CLOUD_STATUS_BY_MODE[cloud.mode];
+    const dmg = cloud.mode === 'rain' ? config.rainDamage
+      : cloud.mode === 'fire-rain' ? config.fireRainDamage
+      : cloud.mode === 'acid-rain' ? config.acidRainDamage
+      : config.frostRainDamage;
+    forEachNearby(w, cloud.x, cloud.y, config.effectRadius + 30, (enemy) => {
+      if (enemy.dying) return;
+      const reach = config.effectRadius + enemy.radius;
+      if (dist2(enemy.x, enemy.y, cloud.x, cloud.y) > reach * reach) return;
+      damageEnemy(w, enemy, dmg * w.stats.power, 0, cloud.x, cloud.y, statusEffectId);
+    });
+
+    // Paint the ground: refresh a patch already under the cloud (so holding
+    // it in place is how the player controls how long a stain lasts),
+    // otherwise lay a fresh one where the cloud has drifted to.
+    const paintKind = STORM_CLOUD_PAINT_KIND[cloud.mode];
+    const painted = w.fluids.find(
+      (tile) => tile.kind === paintKind && dist2(tile.x, tile.y, cloud.x, cloud.y) <= (tile.radius * 0.5) ** 2,
+    );
+    if (painted) painted.expiresAt = w.now + FLUID_LIFETIMES[paintKind];
+    else spawnFluidTile(w, cloud.x, cloud.y, paintKind);
+  }
+}
+
+/** Resolves 'meteor' weapon strikes once their telegraph window elapses. See run-presentation.md. */
+function updateMeteors(w: World) {
+  for (let i = w.pendingMeteors.length - 1; i >= 0; i -= 1) {
+    const m = w.pendingMeteors[i]!;
+    if (w.now < m.impactAt) continue;
+    novaDamage(w, m.x, m.y, m.radius, m.damage, m.impactIntensity, m.statusEffectId);
+    damageBreakable(w, m.x, m.y, m.radius, m.damage, m.impactIntensity, m.x, m.y);
+    w.effects.push({
+      uid: uid(w), kind: 'nova', x: m.x, y: m.y, radius: m.radius, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 420, color: m.color, damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, m.x, m.y, m.color, 16, 160);
+    w.shake = Math.max(w.shake, 10);
+    w.pendingMeteors.splice(i, 1);
+  }
+}
+
 function updateEffects(w: World) {
   const p = w.player;
 
@@ -4560,13 +4828,16 @@ function updateEffects(w: World) {
         while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
         if (diff > effect.spread) return;
         effect.hitUids.add(enemy.uid);
-        damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId);
+        const hasBonusStatus = effect.bonusVsStatusId && enemy.activeEffects.some((e) => e.id === effect.bonusVsStatusId);
+        const dealt = hasBonusStatus ? effect.damage * (effect.bonusVsStatusMult ?? 1) : effect.damage;
+        if (hasBonusStatus) spawnParticles(w, enemy.x, enemy.y, '#ffffff', 6, 100);
+        damageEnemy(w, enemy, dealt, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId);
         triggerEvolutionHit(
           w,
           effect.evolutionBehavior,
           enemy.x,
           enemy.y,
-          effect.damage,
+          dealt,
           effect.color,
           effect.impactIntensity,
           effect.statusEffectId,
@@ -5635,6 +5906,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateAmbient(w, dt);
   updateLokPets(w, dt);
   updateFollowers(w, dt);
+  updateStormCloud(w, dt);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
@@ -5651,6 +5923,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 
   updateProjectiles(w, dt);
   updateEffects(w);
+  updateMeteors(w);
   updateDashSkill(w);
   updatePotholes(w);
   updateRumorPulses(w);
@@ -5702,6 +5975,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
+    stormCloud: w.stormCloud ? { mode: w.stormCloud.mode, autoCycle: w.stormCloud.autoCycle } : undefined,
     hazardImmune: w.hazardImmune,
     loadout: {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),

@@ -13,7 +13,7 @@ import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { ALLIES_BY_ID } from '@/game/data/progression';
-import type { AreaSky, ObstacleDef } from '@/game/types';
+import type { AreaSky, ObstacleDef, StormCloudMode } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
 
 import { drawRig, drawShadow } from './sprite';
@@ -24,6 +24,23 @@ import { clamp } from '@/game/engine/math';
 const SPRITE_SCALE = 2.05;
 /** LokPets read as small companions, a notch below full enemy scale. */
 const LOKPET_SPRITE_SCALE = SPRITE_SCALE * 0.82;
+
+/**
+ * Render-time size multiplier by `EnemyDef.sizeClass` -- a mini reads as
+ * visibly small fry, a giant fills the screen the way a boss always did.
+ * See run-presentation.md.
+ */
+const SIZE_CLASS_SCALE: Record<NonNullable<import('@/game/types').EnemyDef['sizeClass']>, number> = {
+  mini: 0.7,
+  standard: 1,
+  elite: 1.2,
+  giant: 1.55,
+};
+function sizeClassScale(def: import('@/game/types').EnemyDef): number {
+  if (def.sizeClass) return SIZE_CLASS_SCALE[def.sizeClass];
+  // Pre-existing content never set sizeClass; keep the old Boss-only bump.
+  return def.family === 'Boss' ? 1.55 : 1;
+}
 
 export interface Viewport {
   width: number;
@@ -1499,6 +1516,9 @@ const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: st
   'burning-oil': { base: '#3a1408', rim: '#ff6b35', glow: '#ffd166' },
   coolant: { base: '#8fd0e8', rim: '#bfe9ff', glow: '#eaf9ff' },
   runoff: { base: '#5a6a1a', rim: '#6b7a1f', glow: '#b6ff2e' },
+  'fire-storm': { base: '#4a1206', rim: '#ff7a3d', glow: '#ffcf7a' },
+  'acid-storm': { base: '#33430f', rim: '#b8ff5c', glow: '#e9ffb0' },
+  frost: { base: '#274a56', rim: '#bfe9ff', glow: '#eaffff' },
 };
 
 function drawFluids(ctx: CanvasRenderingContext2D, w: World) {
@@ -1521,7 +1541,10 @@ function drawFluids(ctx: CanvasRenderingContext2D, w: World) {
     ctx.ellipse(tile.x, tile.y + 4, tile.radius * 0.92, tile.radius * 0.57, 0, 0, Math.PI * 2);
     ctx.stroke();
 
-    if (tile.kind === 'burning-oil' || tile.kind === 'coolant' || tile.kind === 'runoff') {
+    if (
+      tile.kind === 'burning-oil' || tile.kind === 'coolant' || tile.kind === 'runoff' ||
+      tile.kind === 'fire-storm' || tile.kind === 'acid-storm' || tile.kind === 'frost'
+    ) {
       const pulse = 0.5 + Math.sin(w.now / 140 + tile.uid) * 0.3;
       ctx.globalAlpha = pulse * 0.4 * fadeAlpha;
       ctx.fillStyle = colors.glow;
@@ -2033,26 +2056,68 @@ function drawAwarenessArrow(ctx: CanvasRenderingContext2D, w: World) {
 /* Entities                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * XP gem tiers, keyed off pickup value so a bigger drop reads as a bigger,
+ * brighter, more insistent gem instead of the same dot regardless of worth.
+ * See run-presentation.md.
+ */
+interface XpGemTier {
+  color: string;
+  glow: string;
+  halfSize: number;
+  blur: number;
+  pulseAmp: number;
+  sparkle: boolean;
+}
+const XP_GEM_TIERS: readonly XpGemTier[] = [
+  { color: '#4fb3c9', glow: '#4fb3c9', halfSize: 4, blur: 6, pulseAmp: 0, sparkle: false }, // spark
+  { color: '#6ee7ff', glow: '#6ee7ff', halfSize: 6, blur: 10, pulseAmp: 0, sparkle: false }, // shard (original look)
+  { color: '#ffb347', glow: '#ffd166', halfSize: 8, blur: 15, pulseAmp: 0.1, sparkle: false }, // gem
+  { color: '#e879f9', glow: '#f5d0fe', halfSize: 11, blur: 22, pulseAmp: 0.18, sparkle: true }, // prism
+];
+function xpGemTier(value: number): XpGemTier {
+  if (value >= 20) return XP_GEM_TIERS[3]!;
+  if (value >= 10) return XP_GEM_TIERS[2]!;
+  if (value >= 4) return XP_GEM_TIERS[1]!;
+  return XP_GEM_TIERS[0]!;
+}
+
 function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
   for (const pickup of w.pickups) {
     const bob = Math.sin((w.now - pickup.bornAt) / 220) * 2;
     const x = pickup.x;
     const y = pickup.y + bob;
+    // A quick grow-in on spawn reads as a "pop" instead of appearing inert.
+    const age = w.now - pickup.bornAt;
+    const pop = age >= 180 ? 1 : 0.35 + 0.65 * (age / 180);
 
     ctx.save();
     switch (pickup.kind) {
-      case 'xp':
-        ctx.fillStyle = '#6ee7ff';
-        ctx.shadowColor = '#6ee7ff';
-        ctx.shadowBlur = 10;
+      case 'xp': {
+        const tier = xpGemTier(pickup.value);
+        const pulse = tier.pulseAmp > 0 ? 1 + Math.sin((w.now - pickup.bornAt) / 200) * tier.pulseAmp : 1;
+        const s = tier.halfSize * pop * pulse;
+        ctx.fillStyle = tier.color;
+        ctx.shadowColor = tier.glow;
+        ctx.shadowBlur = tier.blur * pulse;
         ctx.beginPath();
-        ctx.moveTo(x, y - 6);
-        ctx.lineTo(x + 5, y);
-        ctx.lineTo(x, y + 6);
-        ctx.lineTo(x - 5, y);
+        ctx.moveTo(x, y - s);
+        ctx.lineTo(x + s * 0.8, y);
+        ctx.lineTo(x, y + s);
+        ctx.lineTo(x - s * 0.8, y);
         ctx.closePath();
         ctx.fill();
+        if (tier.sparkle) {
+          ctx.globalAlpha = 0.8;
+          ctx.fillStyle = '#ffffff';
+          for (let i = 0; i < 2; i += 1) {
+            const angle = w.now / 260 + i * Math.PI;
+            ctx.fillRect(x + Math.cos(angle) * (s + 5) - 1, y + Math.sin(angle) * (s + 5) - 1, 2, 2);
+          }
+          ctx.globalAlpha = 1;
+        }
         break;
+      }
       case 'health':
         ctx.fillStyle = '#7dffb2';
         ctx.shadowColor = '#7dffb2';
@@ -2100,6 +2165,121 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
         ctx.fillRect(x - 2, y + 1, 4, 4);
         break;
       }
+    }
+    ctx.restore();
+  }
+}
+
+const STORM_CLOUD_COLORS: Record<StormCloudMode, { core: string; fx: string }> = {
+  rain: { core: '#7fb3e0', fx: '#bcdcff' },
+  'fire-rain': { core: '#ff6b35', fx: '#ffd166' },
+  'acid-rain': { core: '#8fce4a', fx: '#dfffa0' },
+  'frost-rain': { core: '#8fd9f0', fx: '#eaffff' },
+};
+
+/**
+ * Storm Chaser's cloud: a soft drifting mass overhead, a dashed ground
+ * reticle showing its effect radius, and a handful of mode-colored falling
+ * marks (rain / embers / acid drips) -- purely time-derived, no particle
+ * array to manage. Drawn slightly larger and steadier while being dragged
+ * as a "you've got hold of it" cue. See run-presentation.md.
+ */
+function drawStormCloud(ctx: CanvasRenderingContext2D, w: World) {
+  const cloud = w.stormCloud;
+  if (!cloud) return;
+  const colors = STORM_CLOUD_COLORS[cloud.mode];
+  const bob = Math.sin(w.now / 500) * 4;
+  const holdPulse = cloud.dragging ? 1.15 : 1 + Math.sin(w.now / 260) * 0.05;
+  const config = w.character.stormCloud;
+  const effectRadius = (config?.effectRadius ?? 90);
+
+  ctx.save();
+  ctx.strokeStyle = colors.core;
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.arc(cloud.x, cloud.y, effectRadius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  for (let i = 0; i < 5; i += 1) {
+    const seed = i * 0.62;
+    const fall = (w.now / 3.2 + seed * 900) % 260;
+    const fx = cloud.x + Math.sin(seed * 7) * effectRadius * 0.6;
+    const fy = cloud.y + 14 + fall;
+    if (fy > cloud.y + effectRadius * 0.75) continue;
+    ctx.save();
+    ctx.globalAlpha = 0.7 * (1 - fall / 260);
+    ctx.strokeStyle = colors.fx;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx, fy + 9);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  const cy = cloud.y - 32 + bob;
+  ctx.translate(cloud.x, cy);
+  ctx.scale(holdPulse, holdPulse);
+  ctx.shadowColor = colors.core;
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = colors.core;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 26, 13, 0, 0, Math.PI * 2);
+  ctx.ellipse(-14, 4, 15, 10, 0, 0, Math.PI * 2);
+  ctx.ellipse(14, 4, 15, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = colors.fx;
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.ellipse(-4, -4, 12, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A ground reticle that pulses faster as impact nears, plus a comet that
+ * streaks down from off-screen for the final stretch before it. Purely
+ * derived from `PendingMeteor` timestamps -- no separate visual entity to
+ * keep in sync. See run-presentation.md.
+ */
+function drawPendingMeteors(ctx: CanvasRenderingContext2D, w: World) {
+  for (const m of w.pendingMeteors) {
+    const remaining = m.impactAt - w.now;
+    const total = Math.max(1, m.impactAt - m.telegraphAt);
+    const urgency = clamp(1 - remaining / total, 0, 1);
+    ctx.save();
+    ctx.strokeStyle = m.color;
+    ctx.globalAlpha = 0.3 + 0.35 * Math.abs(Math.sin(w.now / (140 - urgency * 90)));
+    ctx.lineWidth = 2 + urgency * 2.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.radius * (0.85 + Math.sin(w.now / 100) * 0.05), 0, Math.PI * 2);
+    ctx.stroke();
+
+    const fallWindow = 260;
+    if (remaining <= fallWindow) {
+      const fallT = clamp(1 - remaining / fallWindow, 0, 1);
+      const startY = m.y - 420;
+      const cy = startY + (m.y - startY) * fallT;
+      const cx = m.x + (1 - fallT) * 36;
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = m.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + (1 - fallT) * 16, cy - 55 - (1 - fallT) * 35);
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = m.color;
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -2229,6 +2409,22 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.stroke();
         ctx.globalAlpha *= 0.12;
         ctx.fill();
+        break;
+      }
+      case 'web': {
+        // Ambient connector between two hazard nodes -- thin, faint, no hit
+        // detection. Reads as "you're standing inside a web" between the
+        // anchor points that actually do the freezing. See run-presentation.md.
+        const endX = effect.x + Math.cos(effect.angle) * effect.radius;
+        const endY = effect.y + Math.sin(effect.angle) * effect.radius;
+        ctx.strokeStyle = effect.color;
+        ctx.globalAlpha *= 0.5 + Math.sin(w.now / 220) * 0.15;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
         break;
       }
       case 'teleport': {
@@ -2868,10 +3064,10 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.x,
       enemy.y + 2 + fallProgress * 10,
       enemy.facing,
-      SPRITE_SCALE * (enemy.def.family === 'Boss' ? 1.55 : 1) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
+      SPRITE_SCALE * sizeClassScale(enemy.def) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
       {
         flash: w.now < enemy.hitFlashUntil,
-        outline: outlineEnemies || enemy.def.family === 'Boss',
+        outline: outlineEnemies || enemy.def.family === 'Boss' || enemy.def.sizeClass === 'giant',
         dissolve,
         tint: converted
           ? { color: '#65f6d1', alpha: 0.42 }
@@ -2999,9 +3195,11 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w);
+  drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
   drawEffects(ctx, w);
   drawProjectiles(ctx, w);
+  drawPendingMeteors(ctx, w);
   drawParticles(ctx, w);
   drawPopups(ctx, w);
   if (sky !== 'roofed') {

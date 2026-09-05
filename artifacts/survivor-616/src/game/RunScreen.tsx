@@ -29,6 +29,7 @@ import {
   hudSnapshot,
   primePhysicsObject,
   rollUpgradeChoices,
+  setStormCloudMode,
   stepWorld,
   type World,
 } from '@/game/engine/world';
@@ -47,7 +48,7 @@ import {
   stealthConfig,
   useMeta,
 } from '@/game/state/metaStore';
-import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, UpgradeDef } from '@/game/types';
+import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, StormCloudMode, UpgradeDef } from '@/game/types';
 import { ChestTally } from '@/ui/ChestTally';
 import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
 import { Minimap } from '@/ui/Minimap';
@@ -82,7 +83,7 @@ interface StickState {
   dy: number;
 }
 
-type PointerMode = 'none' | 'stick' | 'object';
+type PointerMode = 'none' | 'stick' | 'object' | 'cloud';
 
 interface TapRecord {
   time: number;
@@ -105,6 +106,14 @@ interface RandomUpgradeReveal {
 }
 
 const STICK_RADIUS = 54;
+
+/** Storm Chaser's weather picker: label/color per mode, matching the cloud's own on-canvas colors. */
+const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: string }> = [
+  { mode: 'rain', label: 'Wash', color: '#7fb3e0' },
+  { mode: 'fire-rain', label: 'Fire', color: '#ff6b35' },
+  { mode: 'acid-rain', label: 'Acid', color: '#8fce4a' },
+  { mode: 'frost-rain', label: 'Frost', color: '#8fd9f0' },
+];
 /** Simulation timestep. */
 const FIXED_STEP = 1 / 60;
 /** Most catch-up steps allowed in one frame before time is dropped. */
@@ -149,6 +158,7 @@ export function RunScreen({
     dy: 0,
   });
   const pointerModeRef = useRef<PointerMode>('none');
+  const cloudPointerIdRef = useRef<number | null>(null);
   const lastTapRef = useRef<TapRecord | null>(null);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
@@ -333,6 +343,29 @@ export function RunScreen({
       return;
     }
     lastTapRef.current = null;
+
+    // Storm Chaser: grab the cloud directly instead of moving, if the
+    // pointer came down within its grab radius. Everyone else has no
+    // world.stormCloud, so this is a no-op for the rest of the roster.
+    if (canvas && world && world.stormCloud) {
+      const config = world.character.stormCloud;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      const grabRadius = config?.grabRadius ?? 70;
+      if (Math.hypot(worldX - world.stormCloud.x, worldY - world.stormCloud.y) <= grabRadius) {
+        world.stormCloud.dragging = true;
+        world.stormCloud.targetX = worldX;
+        world.stormCloud.targetY = worldY;
+        pointerModeRef.current = 'cloud';
+        cloudPointerIdRef.current = event.pointerId;
+        return;
+      }
+    }
+
     if (physicsObjectClicksEnabled && canvas && world) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
@@ -363,6 +396,18 @@ export function RunScreen({
   }, [dungeonTransition, physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerModeRef.current === 'cloud') {
+      const canvas = canvasRef.current;
+      const world = worldRef.current;
+      if (!canvas || !world || !world.stormCloud || cloudPointerIdRef.current !== event.pointerId) return;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      world.stormCloud.targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      world.stormCloud.targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      return;
+    }
     const stick = stickRef.current;
     if (pointerModeRef.current !== 'stick' || !stick.active || stick.pointerId !== event.pointerId) return;
     let dx = event.clientX - stick.originX;
@@ -379,6 +424,13 @@ export function RunScreen({
 
   const endPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
+    if (pointerModeRef.current === 'cloud') {
+      pointerModeRef.current = 'none';
+      cloudPointerIdRef.current = null;
+      const world = worldRef.current;
+      if (world?.stormCloud) world.stormCloud.dragging = false;
+      return;
+    }
     if (pointerModeRef.current === 'object') {
       pointerModeRef.current = 'none';
       if (event.type !== 'pointercancel') {
@@ -1028,6 +1080,32 @@ export function RunScreen({
           onPositionChange={setMinimapPosition}
           onToggleExpanded={() => setMinimapExpanded(!meta.minimapExpanded)}
         />
+      ) : null}
+
+      {/* Storm Chaser: pick the cloud's weather directly instead of waiting on the auto-cycle.
+          Absent for every other character, since hud.stormCloud is only ever set when
+          world.stormCloud is (see hudSnapshot). */}
+      {hud?.stormCloud ? (
+        <div className="absolute bottom-5 left-3 z-40 flex flex-col gap-1 sm:bottom-8 sm:left-6" data-testid="storm-cloud-picker">
+          {STORM_CLOUD_OPTIONS.map(({ mode, label, color }) => {
+            const active = hud.stormCloud!.mode === mode && !hud.stormCloud!.autoCycle;
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => { if (worldRef.current) setStormCloudMode(worldRef.current, mode); }}
+                className="h-9 w-9 rounded-full border-2 bg-black/75 font-mono text-[7px] uppercase leading-none tracking-wider text-white sm:h-11 sm:w-11 sm:text-[8px]"
+                style={{
+                  borderColor: active ? color : 'rgba(255,255,255,0.25)',
+                  boxShadow: active ? `0 0 10px ${color}` : 'none',
+                }}
+                data-testid={`button-storm-${mode}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       ) : null}
 
       {/* Ultimate */}

@@ -364,7 +364,10 @@ export type WeaponKind =
   | 'teleport'
   | 'convert'
   | 'punch'
-  | 'follower';
+  | 'follower'
+  /** Telegraphs a ground reticle on a nearby enemy, then a comet drops from
+   *  off-screen and strikes it. See run-presentation.md. */
+  | 'meteor';
 
 /**
  * Shared physical-impact spectrum for authored attacks.
@@ -424,6 +427,14 @@ export interface WeaponDef {
    *  from it, unless the "Let Me Hold This" Quartermaster ability is
    *  unlocked. */
   nativeCharacterId?: string;
+  /**
+   * Elemental synergy: this weapon's slash/wave/laser/impact hits deal
+   * `bonusVsStatusMult`x damage against a target that already carries
+   * `bonusVsStatusId`. E.g. an electric weapon hitting a target already
+   * `wet`. See run-presentation.md.
+   */
+  bonusVsStatusId?: string;
+  bonusVsStatusMult?: number;
 }
 
 /** Designer-facing metadata for a combat status effect. */
@@ -604,7 +615,43 @@ export interface CharacterDef {
   referenceArt?: string;
   /** How this character moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
+  /**
+   * Grants a draggable elemental cloud companion (Storm Chaser). Optional --
+   * any future character could opt in the same way. See run-presentation.md.
+   */
+  stormCloud?: StormCloudConfig;
 }
+
+/**
+ * Storm Chaser's cloud: floats near the player by default, or the player
+ * can drag it anywhere on screen for precision play. Cycles automatically
+ * through its elemental modes on a timer by default -- not by tap count, so
+ * it behaves identically on touch, mouse, and keyboard-only input -- but a
+ * HUD control lets the player pick a mode directly, which hands over full
+ * manual control (see `setStormCloudMode` in `engine/world.ts`). Whatever
+ * mode is active also paints a matching ground `FluidTile` wherever the
+ * cloud lingers -- fire/acid/frost stains that keep affecting anything that
+ * walks over them after the cloud moves on, and `rain` paints water, which
+ * washes those stains (and their status effects) off the ground and off
+ * enemies standing in it. See run-presentation.md.
+ */
+export interface StormCloudConfig {
+  /** Hit-test radius for grabbing the cloud with a pointer, in world units. */
+  grabRadius: number;
+  /** Damage/status application radius. */
+  effectRadius: number;
+  /** How often each mode ticks damage/status to anything underneath. */
+  tickMs: number;
+  /** How long each mode lasts before cycling to the next, while auto-cycling. */
+  cycleMs: number;
+  rainDamage: number;
+  fireRainDamage: number;
+  acidRainDamage: number;
+  frostRainDamage: number;
+}
+
+/** The weather-cloud's current elemental mode. See `StormCloudConfig`. */
+export type StormCloudMode = 'rain' | 'fire-rain' | 'acid-rain' | 'frost-rain';
 
 /* ------------------------------------------------------------------ */
 /* Enemies                                                             */
@@ -654,6 +701,14 @@ export interface EnemyDef {
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
   faction?: string;
   role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor';
+  /**
+   * Visual scale tier, independent of `radius` (which still drives collision).
+   * Feeds a render-time size multiplier -- see `SIZE_CLASS_SCALE` in draw.ts.
+   * Omitted reads as 'standard' except that a literal `family === 'Boss'`
+   * still gets the old giant bump for pre-existing content that never set
+   * this. See run-presentation.md.
+   */
+  sizeClass?: 'mini' | 'standard' | 'elite' | 'giant';
   traits?: {
     teleportMs?: number;
     ghostMs?: number;
@@ -1044,7 +1099,29 @@ export type CrewActivityId =
   | 'scout-routes'
   | 'mark-approach-lanes'
   | 'tune-the-rig'
-  | 'study-anomalies';
+  | 'study-anomalies'
+  // Main floor
+  | 'spin-the-jukebox'
+  | 'polish-the-bar'
+  | 'count-the-register'
+  // Rooftop perch
+  | 'trade-war-stories'
+  | 'watch-the-skyline'
+  | 'stretch-before-dawn'
+  // The cellar
+  | 'press-new-records'
+  | 'brew-something-strong'
+  | 'catalog-the-vinyl'
+  // The alley annex (previously had no activities at all)
+  | 'weld-a-brace'
+  | 'sharpen-the-edges'
+  | 'run-the-numbers'
+  | 'paint-a-mural'
+  // The storefront (previously had no activities at all)
+  | 'file-the-ledgers'
+  | 'walk-the-block'
+  | 'keep-the-lookbook'
+  | 'mind-the-register';
 
 export type CrewActivityIcon =
   | 'utensils'
@@ -1053,7 +1130,24 @@ export type CrewActivityIcon =
   | 'compass'
   | 'map'
   | 'radio'
-  | 'sparkles';
+  | 'sparkles'
+  | 'music'
+  | 'droplet'
+  | 'coffee'
+  | 'heart'
+  | 'camera'
+  | 'sunrise'
+  | 'disc'
+  | 'flame'
+  | 'book'
+  | 'wrench'
+  | 'zap'
+  | 'calculator'
+  | 'paintbrush'
+  | 'scroll'
+  | 'footprints'
+  | 'shopping-bag'
+  | 'book-open';
 
 export interface CrewActivityEffect {
   stat: keyof BaseStats;
@@ -1110,6 +1204,12 @@ export interface AllyDef {
   /** Room activities this ally enjoys choosing between autonomously. */
   preferredActivityIds: CrewActivityId[];
   palette: SpritePalette;
+  /**
+   * Optional silhouette flourish for `allyRig()` -- without one, an ally's
+   * rig is auto-derived purely from `id.length`, which gives little real
+   * variety. See crew-feature.md.
+   */
+  rigHint?: 'seated' | 'hood' | 'cap' | 'bulk' | 'hunched' | 'wings' | 'staff' | 'puffs' | 'halo' | 'cloudHair' | 'flarePants';
 }
 
 /** Non-combat background life (civilians, cats) -- cosmetic, never touched by collision/damage code. */
@@ -1643,6 +1743,8 @@ export interface HudSnapshot {
   ultimateReadyPct: number;
   ultimateActive: boolean;
   weaponLevel: number;
+  /** Storm Chaser only: the weather cloud's current mode and whether the player has taken manual control of it. */
+  stormCloud?: { mode: StormCloudMode; autoCycle: boolean };
   /** True once "Let Me Hold This" is unlocked -- hazard weapons never hurt whoever's holding them. */
   hazardImmune: boolean;
   loadout: {
