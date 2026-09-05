@@ -11,9 +11,30 @@ import type {
  * Small rig built on the fly for a rescued ally -- AllyDef only carries a
  * palette, not a full rig, so every crew portrait (hideout room, archive)
  * derives its silhouette from this instead of showing raw reference art.
+ * Base proportions still vary by `id.length` (kept for allies authored
+ * before `rigHint` existed); `rigHint` layers one real silhouette flourish
+ * on top so new crew don't all read as the same generic figure.
+ * See crew-feature.md.
  */
 export function allyRig(ally: AllyDef): SpriteRig {
-  return humanoidRig({ height: 18 + (ally.id.length % 4), width: 9 + (ally.id.length % 3), seated: ally.id === 'sable' });
+  const height = 18 + (ally.id.length % 4);
+  const width = 9 + (ally.id.length % 3);
+  const seated = ally.rigHint === 'seated' || (!ally.rigHint && ally.id === 'sable');
+  return humanoidRig({
+    height,
+    width,
+    seated,
+    hood: ally.rigHint === 'hood',
+    cap: ally.rigHint === 'cap',
+    bulk: ally.rigHint === 'bulk',
+    hunched: ally.rigHint === 'hunched',
+    wings: ally.rigHint === 'wings',
+    staff: ally.rigHint === 'staff',
+    puffs: ally.rigHint === 'puffs',
+    halo: ally.rigHint === 'halo',
+    cloudHair: ally.rigHint === 'cloudHair',
+    flarePants: ally.rigHint === 'flarePants',
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -151,6 +172,88 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#fff0f4', skin: '#a85b43', glow: '#ff7ab8',
     },
   },
+
+  /**
+   * Second wave. `denny` also fixes a latent content bug: `riverfront`
+   * listed `rescueAllyId: 'sable'`, duplicating crystal-cellar's rescue --
+   * clearing whichever of the two second granted nothing new. See
+   * crew-feature.md.
+   */
+  {
+    id: 'denny',
+    name: 'Denny Locke',
+    role: 'Ferry hand',
+    blurb: 'Still runs the crossing by hand-crank when the current gets weird, which is most nights now. Keeps a log of who came back and who didn\'t bother waiting for the ferry at all.',
+    room: 'the-storefront',
+    boost: { crit: 0.05 },
+    boostLabel: '+5% crit',
+    preferredActivityIds: ['walk-the-block', 'keep-the-lookbook'],
+    rigHint: 'cap',
+    palette: {
+      ink: '#040d1a', body: '#1d4ed8', bodyDark: '#1e3a8a', accent: '#60a5fa',
+      accentBright: '#dbeafe', skin: '#3b6ea5', glow: '#93c5fd',
+    },
+  },
+  {
+    id: 'ruth',
+    name: 'Ruth Okafor',
+    role: 'Market stall keeper',
+    blurb: 'Ran the last honest stall in the old market and still does the books from memory. Knows every trade the block has made since before you got here.',
+    room: 'the-alley',
+    boost: { magnet: 16 },
+    boostLabel: '+16 pickup range',
+    preferredActivityIds: ['run-the-numbers', 'paint-a-mural'],
+    rigHint: 'bulk',
+    palette: {
+      ink: '#171203', body: '#a16207', bodyDark: '#422006', accent: '#facc15',
+      accentBright: '#fef9c3', skin: '#854d0e', glow: '#eab308',
+    },
+  },
+  {
+    id: 'frankie',
+    name: 'Frankie Reyes',
+    role: 'Rail yard signalman',
+    blurb: 'Worked the switch by lantern long after the yard stopped running trains on schedule. Still logs every arrival, real or otherwise.',
+    room: 'the-cellar',
+    boost: { haste: -0.04 },
+    boostLabel: '4% faster cooldowns',
+    preferredActivityIds: ['catalog-the-vinyl', 'tune-the-rig'],
+    rigHint: 'staff',
+    palette: {
+      ink: '#150e08', body: '#7c4a2d', bodyDark: '#3f2815', accent: '#d97757',
+      accentBright: '#fde4d0', skin: '#8a5a3a', glow: '#e8926a',
+    },
+  },
+  {
+    id: 'constance',
+    name: 'Sister Constance',
+    role: 'Courthouse clerk',
+    blurb: 'Kept the civic plaza\'s records straight through everything that happened there. Says the fountain remembers more than the ledgers do.',
+    room: 'the-storefront',
+    boost: { armor: 0.05 },
+    boostLabel: '+5% armor',
+    preferredActivityIds: ['file-the-ledgers', 'mind-the-register'],
+    rigHint: 'halo',
+    palette: {
+      ink: '#1a170f', body: '#d4c19c', bodyDark: '#8a7550', accent: '#f5e6c8',
+      accentBright: '#fffdf5', skin: '#c9a876', glow: '#f0dfb0',
+    },
+  },
+  {
+    id: 'theo',
+    name: 'Theo Marsh',
+    role: 'Fire-escape locksmith',
+    blurb: 'Can open anything on Monroe with a bent wire and enough patience. Started teaching the trick to whoever asks nicely.',
+    room: 'the-alley',
+    boost: { power: 0.07 },
+    boostLabel: '+7% damage',
+    preferredActivityIds: ['weld-a-brace', 'sharpen-the-edges'],
+    rigHint: 'hunched',
+    palette: {
+      ink: '#0a140d', body: '#166534', bodyDark: '#14532d', accent: '#4ade80',
+      accentBright: '#dcfce7', skin: '#5c4033', glow: '#4ade80',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
@@ -163,10 +266,15 @@ export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
  * adding inaccessible records to the archive.
  */
 export const RESCUE_ROUTE_BY_AREA: Record<string, string[]> = {
-  'monroe-strip': ['vee', 'pippa'],
+  'monroe-strip': ['vee', 'pippa', 'theo'],
   rooftops: ['nyx', 'morrow'],
   'crystal-cellar': ['sable', 'cinder'],
 };
+// riverfront/old-market/northline-yard/civic-plaza each grant exactly one
+// ally via their own `AreaDef.rescueAllyId` (denny/ruth/frankie/constance)
+// -- same single-rescue pattern as back-alley/bar-siege/haven-of-the-bubs,
+// which is why they're not listed here. Only areas with a genuine replay
+// chain (more than one ally) belong in this table.
 
 export function nextRescueAllyId(
   areaId: string,

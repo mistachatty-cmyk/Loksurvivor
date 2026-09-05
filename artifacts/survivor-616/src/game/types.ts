@@ -1088,7 +1088,29 @@ export type CrewActivityId =
   | 'scout-routes'
   | 'mark-approach-lanes'
   | 'tune-the-rig'
-  | 'study-anomalies';
+  | 'study-anomalies'
+  // Main floor
+  | 'spin-the-jukebox'
+  | 'polish-the-bar'
+  | 'count-the-register'
+  // Rooftop perch
+  | 'trade-war-stories'
+  | 'watch-the-skyline'
+  | 'stretch-before-dawn'
+  // The cellar
+  | 'press-new-records'
+  | 'brew-something-strong'
+  | 'catalog-the-vinyl'
+  // The alley annex (previously had no activities at all)
+  | 'weld-a-brace'
+  | 'sharpen-the-edges'
+  | 'run-the-numbers'
+  | 'paint-a-mural'
+  // The storefront (previously had no activities at all)
+  | 'file-the-ledgers'
+  | 'walk-the-block'
+  | 'keep-the-lookbook'
+  | 'mind-the-register';
 
 export type CrewActivityIcon =
   | 'utensils'
@@ -1097,7 +1119,24 @@ export type CrewActivityIcon =
   | 'compass'
   | 'map'
   | 'radio'
-  | 'sparkles';
+  | 'sparkles'
+  | 'music'
+  | 'droplet'
+  | 'coffee'
+  | 'heart'
+  | 'camera'
+  | 'sunrise'
+  | 'disc'
+  | 'flame'
+  | 'book'
+  | 'wrench'
+  | 'zap'
+  | 'calculator'
+  | 'paintbrush'
+  | 'scroll'
+  | 'footprints'
+  | 'shopping-bag'
+  | 'book-open';
 
 export interface CrewActivityEffect {
   stat: keyof BaseStats;
@@ -1154,6 +1193,12 @@ export interface AllyDef {
   /** Room activities this ally enjoys choosing between autonomously. */
   preferredActivityIds: CrewActivityId[];
   palette: SpritePalette;
+  /**
+   * Optional silhouette flourish for `allyRig()` -- without one, an ally's
+   * rig is auto-derived purely from `id.length`, which gives little real
+   * variety. See crew-feature.md.
+   */
+  rigHint?: 'seated' | 'hood' | 'cap' | 'bulk' | 'hunched' | 'wings' | 'staff' | 'puffs' | 'halo' | 'cloudHair' | 'flarePants';
 }
 
 /** Non-combat background life (civilians, cats) -- cosmetic, never touched by collision/damage code. */

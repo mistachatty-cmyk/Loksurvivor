@@ -224,7 +224,10 @@ export const AREAS: AreaDef[] = [
     ],
     durationSec: 175,
     threat: 'severe',
-    rescueAllyId: 'sable',
+    // Was 'sable' -- duplicated crystal-cellar's rescue, so whichever area
+    // got cleared second granted nothing new. Denny is riverfront's own
+    // rescue now. See crew-feature.md.
+    rescueAllyId: 'denny',
     discoveryId: 'floodwall-mark',
     landmark: {
       name: 'The Floodgate',
@@ -272,6 +275,7 @@ export const AREAS: AreaDef[] = [
     ],
     durationSec: 175,
     threat: 'high',
+    rescueAllyId: 'ruth',
     discoveryId: 'market-bell',
     landmark: {
       name: 'Market Bell',
@@ -315,6 +319,7 @@ export const AREAS: AreaDef[] = [
     ],
     durationSec: 190,
     threat: 'severe',
+    rescueAllyId: 'frankie',
     discoveryId: 'northline-switch',
     landmark: {
       name: 'Northline Switch',
@@ -357,6 +362,7 @@ export const AREAS: AreaDef[] = [
     ],
     durationSec: 205,
     threat: 'severe',
+    rescueAllyId: 'constance',
     discoveryId: 'civic-fountain',
     landmark: {
       name: 'Civic Fountain',
