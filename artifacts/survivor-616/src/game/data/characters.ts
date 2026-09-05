@@ -583,7 +583,7 @@ export const CHARACTERS: CharacterDef[] = [
   {
     id: 'artisanvalor',
     react: REACTION_PRESETS.playerBob,
-    name: 'Artisan Valor',
+    name: 'Artisan Valor Prime',
     handle: 'The Curator',
     tagline: "The quiet custodian of the city's final gallery.",
     bio: "He doesn't just preserve the art; he weaves the visual fabric of the world itself. Tech-wear armor under a heavy hood, a hard-light blade slung like a tonearm.",

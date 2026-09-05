@@ -1555,6 +1555,12 @@ export interface MetaState {
   crewActivitySeed: number;
   /** One autonomous crew rumor held for the next completed run. */
   activeCrewRumor: ActiveCrewRumor | null;
+  /** Total number of times the player has returned to the hideout; drives the Artisan Valor Prime takeover cadence. */
+  hideoutVisitCount: number;
+  /** Hideout visits (including the current one) left in an active Prime takeover; 0 when none is running this way. */
+  primeTakeoverVisitsRemaining: number;
+  /** Timestamp (ms) an active timed Prime takeover ends at; 0 when none is running this way. */
+  primeTakeoverUntil: number;
   /** Episodes completed account-wide. */
   completedEpisodeIds: string[];
   /** Signature evolutions earned account-wide. */

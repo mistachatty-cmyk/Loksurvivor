@@ -191,6 +191,9 @@ export function createInitialMeta(): MetaState {
     crewActivityByAlly: {},
     crewActivitySeed: 0,
     activeCrewRumor: null,
+    hideoutVisitCount: 0,
+    primeTakeoverVisitsRemaining: 0,
+    primeTakeoverUntil: 0,
     completedEpisodeIds: [],
     unlockedEvolutionIds: [],
     episodeProgressById: {},
@@ -791,6 +794,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       crewActivityByAlly,
       crewActivitySeed,
     ),
+    hideoutVisitCount: counter(parsed.hideoutVisitCount),
+    primeTakeoverVisitsRemaining: counter(parsed.primeTakeoverVisitsRemaining),
+    primeTakeoverUntil: counter(parsed.primeTakeoverUntil),
     completedEpisodeIds,
     unlockedEvolutionIds,
     episodeProgressById,
@@ -1006,6 +1012,16 @@ export function hazardImmunityUnlocked(meta: MetaState): boolean {
   return vendorPurchaseCount(meta, 'hazard-handler') > 0;
 }
 
+/** True while Artisan Valor Prime is fronting the Paint Gallery and re-theming the hideout (every 14th hideout visit, for a few visits or occasionally a real 24h window). */
+export function isPrimeTakeoverActive(meta: MetaState, now: number): boolean {
+  return meta.primeTakeoverVisitsRemaining > 0 || now < meta.primeTakeoverUntil;
+}
+
+/** True on the single hideout visit where Prime briefly flickers into the Paint Gallery as a tease (every 4th visit that isn't also a full 14th-visit takeover). */
+export function isPrimeFlickerVisit(meta: MetaState): boolean {
+  return meta.hideoutVisitCount % 4 === 0 && meta.hideoutVisitCount % 14 !== 0;
+}
+
 /** Which minimap recon tiers are unlocked, in purchase order. */
 export function minimapUnlockTiers(meta: MetaState): {
   enemyRadar: boolean;
@@ -1044,7 +1060,7 @@ interface StoreState {
 type Action =
   | { type: 'selectCharacter'; id: string }
   | { type: 'selectCharacterSkin'; characterId: string; skinId: string }
-  | { type: 'enterHideout' }
+  | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
@@ -1151,6 +1167,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'enterHideout': {
       const crewActivitySeed = state.meta.crewActivitySeed + 1;
       const crewActivityByAlly = rollCrewActivities(state.meta.rescuedAllyIds, crewActivitySeed);
+      const hideoutVisitCount = state.meta.hideoutVisitCount + 1;
+      let primeTakeoverVisitsRemaining = Math.max(0, state.meta.primeTakeoverVisitsRemaining - 1);
+      let primeTakeoverUntil = state.meta.primeTakeoverUntil;
+      if (hideoutVisitCount % 14 === 0) {
+        if (Math.random() < 0.25) {
+          primeTakeoverUntil = action.now + 24 * 60 * 60 * 1000;
+          primeTakeoverVisitsRemaining = 0;
+        } else {
+          primeTakeoverVisitsRemaining = 3;
+          primeTakeoverUntil = 0;
+        }
+      }
       return {
         ...state,
         meta: {
@@ -1162,6 +1190,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
             crewActivityByAlly,
             crewActivitySeed,
           ),
+          hideoutVisitCount,
+          primeTakeoverVisitsRemaining,
+          primeTakeoverUntil,
         },
       };
     }
@@ -1778,7 +1809,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
 
   const selectCharacter = useCallback((id: string) => dispatch({ type: 'selectCharacter', id }), []);
   const selectCharacterSkin = useCallback((characterId: string, skinId: string) => dispatch({ type: 'selectCharacterSkin', characterId, skinId }), []);
-  const enterHideout = useCallback(() => dispatch({ type: 'enterHideout' }), []);
+  const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
