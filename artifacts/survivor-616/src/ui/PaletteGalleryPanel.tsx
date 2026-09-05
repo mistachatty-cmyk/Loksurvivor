@@ -8,12 +8,30 @@ import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { getCharacter } from '@/game/data/characters';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
-import { useMeta } from '@/game/state/metaStore';
-import type { AnimName, CosmeticTier, PaletteEffectKind, RunAuraStyle } from '@/game/types';
+import { humanoidRig } from '@/game/sprites/rigs';
+import { isPrimeFlickerVisit, isPrimeTakeoverActive, useMeta } from '@/game/state/metaStore';
+import type { AnimName, CosmeticTier, PaletteEffectKind, RunAuraStyle, SpritePalette } from '@/game/types';
 import { CosmeticPreview } from './CosmeticPreview';
 import { ScreenLayout } from './ScreenLayout';
 
-const ARTISAN_VALOR = getCharacter('artisanvalor');
+/** The roster hero -- red/black, full stats/weapon/ultimate -- who occasionally takes over the shop as "Artisan Valor Prime". */
+const PRIME = getCharacter('artisanvalor');
+
+/**
+ * The Paint Gallery's everyday shopkeeper: a simple NPC-only look, not part
+ * of the playable roster. Kept a fixed brown palette (no skin resolution)
+ * so it never changes regardless of what the player has equipped.
+ */
+const ARTISAN_VALOR_RIG = humanoidRig({ height: 20, width: 10, hood: true });
+const ARTISAN_VALOR_PALETTE: SpritePalette = {
+  ink: '#1a1410',
+  body: '#3d2b1f',
+  bodyDark: '#241a12',
+  accent: '#d4a373',
+  accentBright: '#f4c78a',
+  skin: '#c9986b',
+  glow: '#e8b04b',
+};
 
 const VENDOR_QUIPS = [
   'Mm. A worthy commission.', 'Every stroke of this is mine, you know.',
@@ -89,10 +107,25 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const [notice, setNotice] = useState('Choose a commission. Every item is cosmetic-only.');
   const resetTimer = useRef<number | undefined>(undefined);
 
+  const takeoverActive = isPrimeTakeoverActive(meta, Date.now());
+  const [flickerActive, setFlickerActive] = useState(() => !takeoverActive && isPrimeFlickerVisit(meta));
+  const flickerTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!flickerActive) return;
+    flickerTimer.current = window.setTimeout(() => setFlickerActive(false), 1500);
+    return () => window.clearTimeout(flickerTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 
+  const primeShowing = takeoverActive || flickerActive;
+  const vendorRig = primeShowing ? PRIME.rig : ARTISAN_VALOR_RIG;
+  const vendorName = primeShowing ? PRIME.name : 'Artisan Valor';
+
   const triggerReaction = (message: string) => {
-    const clip = ARTISAN_VALOR.rig.anims.attack;
+    const clip = vendorRig.anims.attack;
     setReactAnim('attack');
     setLine(VENDOR_QUIPS[Math.floor(Math.random() * VENDOR_QUIPS.length)]!);
     setNotice(message);
@@ -117,19 +150,23 @@ export function PaletteGalleryPanel({ onBack }: Props) {
 
   const previewWorldPalette = previewPaletteId === 'default' ? undefined : THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette;
   const previewPaletteEffect = meta.paletteAnimationsEnabled ? THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.effect?.kind : undefined;
-  const previewPalette = resolveCharacterCosmeticPalette(ARTISAN_VALOR, meta.characterSkinByCharacterId[ARTISAN_VALOR.id], previewWorldPalette, meta.worldPaletteBlendEnabled);
+  const previewPalette = primeShowing
+    ? resolveCharacterCosmeticPalette(PRIME, meta.characterSkinByCharacterId[PRIME.id], previewWorldPalette, meta.worldPaletteBlendEnabled)
+    : ARTISAN_VALOR_PALETTE;
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);
   const categoryLength = category === 'palettes' ? THEMED_PALETTES.length : category === 'auras' ? RUN_AURAS.length : category === 'hats' ? HATS.length : CELEBRATIONS.length;
 
   return (
-    <ScreenLayout title="Customization Shop" subtitle="Artisan Valor — Paint Gallery" onBack={onBack}>
+    <ScreenLayout title="Customization Shop" subtitle={`${vendorName} — Paint Gallery`} onBack={onBack}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <aside className="flex shrink-0 flex-col items-center gap-3 border border-border bg-card px-6 py-5 lg:sticky lg:top-4 lg:w-72">
-          <CosmeticPreview rig={ARTISAN_VALOR.rig} palette={previewPalette} aura={previewAura} hat={previewHat} celebration={previewCelebration} celebrationKey={celebrationKey} anim={reactAnim} paletteEffect={previewPaletteEffect} />
-          <p className="text-sm font-black uppercase tracking-wide text-white">Artisan Valor</p>
-          <p className="-mt-2 text-center font-mono text-[8px] uppercase tracking-widest text-primary">Tap any cosmetic card to preview it on Valor</p>
+          <div className={flickerActive ? 'palette-preview-flicker' : ''}>
+            <CosmeticPreview rig={vendorRig} palette={previewPalette} aura={previewAura} hat={previewHat} celebration={previewCelebration} celebrationKey={celebrationKey} anim={reactAnim} paletteEffect={previewPaletteEffect} />
+          </div>
+          <p className="text-sm font-black uppercase tracking-wide text-white">{vendorName}</p>
+          <p className="-mt-2 text-center font-mono text-[8px] uppercase tracking-widest text-primary">Tap any cosmetic card to preview it on {primeShowing ? 'Prime' : 'Valor'}</p>
           <p className="min-h-[2.5rem] text-center text-xs italic leading-relaxed text-muted-foreground">&ldquo;{line}&rdquo;</p>
           <div className="w-full border border-primary/30 bg-primary/5 px-3 py-2 text-center">
             <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Wallet</p>

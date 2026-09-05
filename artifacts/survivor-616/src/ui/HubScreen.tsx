@@ -2,9 +2,10 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { useMeta, describeUnlock } from '@/game/state/metaStore';
+import { isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
+import { getCharacter } from '@/game/data/characters';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { allyRig } from '@/game/data/progression';
 import { RigPortrait } from './RigPortrait';
@@ -101,6 +102,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
     : undefined;
   const RumorIcon = activeRumor ? (RUMOR_ICONS[activeRumor.icon] ?? Radio) : Radio;
   const scene = getHideoutScene(activeRoom?.id ?? roomId);
+  const primeTakeoverActive = isPrimeTakeoverActive(meta, Date.now());
+  const primePalette = primeTakeoverActive ? getCharacter('artisanvalor').palette : null;
   const [isPageVisible, setIsPageVisible] = useState(true);
 
   useEffect(() => {
@@ -137,8 +140,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent z-10" />
           <img src={`${import.meta.env.BASE_URL}${activeRoom.backdrop}`} className="w-full h-full object-cover opacity-40 mix-blend-luminosity grayscale" alt="" />
            <div
-             className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)}`}
-             style={{ '--scene-accent': scene.homeAccent, '--scene-sky': scene.skyAccent, animationPlayState: isPageVisible ? 'running' : 'paused' } as React.CSSProperties}
+             className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)} ${primeTakeoverActive ? 'palette-preview-pulse' : ''}`}
+             style={{
+               '--scene-accent': primePalette?.accent ?? scene.homeAccent,
+               '--scene-sky': primePalette?.bodyDark ?? scene.skyAccent,
+               animationPlayState: isPageVisible ? 'running' : 'paused',
+             } as React.CSSProperties}
              aria-hidden="true"
            >
              <div className="hideout-sky-glow" />
