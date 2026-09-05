@@ -254,6 +254,21 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#dcfce7', skin: '#5c4033', glow: '#4ade80',
     },
   },
+  {
+    id: 'otis',
+    name: 'Otis',
+    role: 'Arcade repairman',
+    blurb: 'Kept the Neon Arcade cabinets running years past when anyone should have. Says the machines still owe him a rematch.',
+    room: 'the-back-room',
+    boost: { crit: 0.05 },
+    boostLabel: '+5% crit chance',
+    preferredActivityIds: ['rewire-the-cabinets', 'run-the-high-score-board'],
+    rigHint: 'cap',
+    palette: {
+      ink: '#1a0e00', body: '#b45309', bodyDark: '#78350f', accent: '#fde047',
+      accentBright: '#fef9c3', skin: '#c2410c', glow: '#fde047',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
@@ -347,6 +362,17 @@ export const HUB_ROOMS: HubRoomDef[] = [
     unlock: { kind: 'discovery', discoveryId: 'sire-ledger' },
     features: ['bestiary', 'unlocks', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
   },
+  {
+    id: 'the-back-room',
+    name: 'The Back Room',
+    subtitle: 'Salvaged cabinet row',
+    description:
+      'Otis dragged three dead cabinets up from the arcade and got two of them glowing again. Nobody has beaten his high score yet.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    unlock: { kind: 'discovery', discoveryId: 'arcade-high-score' },
+    features: ['allies', 'vendor', 'settings', 'palette-store', 'account', 'feedback'],
+  },
 ];
 
 export const HUB_ROOMS_BY_ID: Record<string, HubRoomDef> = Object.fromEntries(
@@ -369,6 +395,8 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'civic-fountain', name: 'The Civic Fountain', blurb: 'The plaza fountain still runs red at midnight, carrying the Sire’s oldest route toward the river.' },
   { id: 'bubble-truce', name: 'The Bubble Truce', blurb: 'Two family lines, one rivalry passed down twice over, and one afternoon where nobody could remember why they were still fighting.' },
   { id: 'choir-hymn', name: 'The Choir\'s Hymn', blurb: 'Twenty verses, one voice each, none of them singing anything you could ever hum back.' },
+  { id: 'arcade-high-score', name: 'The High Score', blurb: 'A cabinet screen still glowing under the dust, top of the board initials burned into the phosphor.' },
+  { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

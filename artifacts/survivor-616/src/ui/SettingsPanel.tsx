@@ -59,6 +59,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     unlockDevModeAccess,
     setDevModeAllUnlocks,
     setMusicReactive,
+    setHideoutAmbience,
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,
@@ -224,6 +225,31 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
                   <Settings2 className="h-4 w-4 text-fuchsia-200" />
                   <span>Turn this off and the run plays exactly as it does in silence.</span>
+                </div>
+              </div>
+              <div className="mt-5 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout ambience</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Optional room sound in the hideout, synthesized in your browser -- rain on the awning upstairs,
+                      river fog on the perch, and the cellar's pipe hum and slow drips. It sits well under whatever
+                      you have playing, and stops when you leave the tab.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHideoutAmbience(!meta.hideoutAmbienceEnabled)}
+                    aria-pressed={meta.hideoutAmbienceEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.hideoutAmbienceEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-hideout-ambience"
+                  >
+                    {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
+                  </button>
                 </div>
               </div>
             </div>

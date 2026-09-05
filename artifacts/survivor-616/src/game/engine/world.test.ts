@@ -118,6 +118,16 @@ function addEnemy(
     dying: false,
     deathAt: 0,
     activeEffects: [],
+    // These five default to 0 on every real spawn. Leaving them off made
+    // `w.now >= enemy.invisibleUntil` compare against undefined, which is
+    // false, so a fixture enemy could never land contact damage -- the
+    // reason the bell-shock rumor looked broken in tests while working in
+    // the actual game.
+    ghostUntil: 0,
+    invisibleUntil: 0,
+    phaseUntil: 0,
+    burstUntil: 0,
+    baseRadius: def.radius,
   };
   world.enemies.push(enemy);
   return enemy;
@@ -429,7 +439,10 @@ test('native characters take no self-damage from their own hazard weapon', () =>
       CHARACTERS[0]!.stats,
       8,
     );
-    addEnemy(world, 34, 0);
+    // Far enough that the enemy cannot close to contact range inside the 25
+    // steps below: this test is about hazard *self*-damage, so contact damage
+    // from the target must not muddy the reading.
+    addEnemy(world, 'nightcrawler', 220, 0);
     world.weapons[0]!.readyAt = 0;
     for (let i = 0; i < 25; i += 1) stepWorld(world, 1 / 30, neutralInput);
     assert.ok(world.effects.some((effect) => effect.kind === 'hazard'));

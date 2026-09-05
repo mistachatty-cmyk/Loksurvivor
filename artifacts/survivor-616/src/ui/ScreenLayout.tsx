@@ -29,7 +29,15 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
         <div className="absolute inset-0 z-0 pointer-events-none">
           <div className="absolute inset-0 bg-background/90 z-10" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent z-10" />
-          <img src={`${import.meta.env.BASE_URL}${backdrop}`} className="w-full h-full object-cover opacity-30 mix-blend-luminosity grayscale" alt="" />
+          {/* Reference art is a *backdrop*, never a document image: painted as a
+              CSS background so a stylesheet that fails to load can't leave a
+              raw full-bleed photo sitting in the page. See
+              .agents/memory/survivor-616-art-assets.md. */}
+          <div
+            className="h-full w-full bg-cover bg-center opacity-30 mix-blend-luminosity grayscale"
+            style={{ backgroundImage: `url(${import.meta.env.BASE_URL}${backdrop})` }}
+            aria-hidden="true"
+          />
         </div>
       )}
 

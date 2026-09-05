@@ -13,10 +13,11 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
+import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 
@@ -83,7 +84,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun } = useMeta();
-  const { playTrackOnRepeat } = useMusicPlayer();
+  const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
 
   const enterRoom = (nextRoomId: string) => {
@@ -113,6 +114,23 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
     return () => document.removeEventListener('visibilitychange', updateVisibility);
   }, []);
 
+  /**
+   * Optional procedural ambience for the room you are standing in. Off unless
+   * the player turned it on, silent while the tab is hidden, and torn down on
+   * every room change so two beds can never overlap.
+   */
+  const ambienceRef = useRef<AmbienceHandle | null>(null);
+  useEffect(() => {
+    if (!meta.hideoutAmbienceEnabled || !isPageVisible) return;
+    const handle = startHideoutAmbience(ensureAudioContext(), scene, 0.35);
+    if (!handle) return;
+    ambienceRef.current = handle;
+    return () => {
+      handle.stop();
+      ambienceRef.current = null;
+    };
+  }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext]);
+
   const weatherIcon = WEATHER_ICONS[scene.weather];
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
@@ -138,7 +156,13 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
         >
           <div className="absolute inset-0 bg-background/90 z-10" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent z-10" />
-          <img src={`${import.meta.env.BASE_URL}${activeRoom.backdrop}`} className="w-full h-full object-cover opacity-40 mix-blend-luminosity grayscale" alt="" />
+          {/* CSS background, not an <img>: reference art must never render as a
+              raw document image if the stylesheet is missing. */}
+          <div
+            className="h-full w-full bg-cover bg-center opacity-40 mix-blend-luminosity grayscale"
+            style={{ backgroundImage: `url(${import.meta.env.BASE_URL}${activeRoom.backdrop})` }}
+            aria-hidden="true"
+          />
            <div
              className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)} ${primeTakeoverActive ? 'palette-preview-pulse' : ''}`}
              style={{

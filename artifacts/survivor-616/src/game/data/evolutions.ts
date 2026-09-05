@@ -12,6 +12,7 @@ export const EVOLUTIONS: EvolutionDef[] = [
   evolved('gold-mic', 'Gold Mic', 'A plated shockwave that hits hard and reaches further.', 'freestyle-mic', 'gold-chain', 34, 102, 660),
   evolved('block-party', 'Block Party', 'The whole block becomes a bass-heavy danger zone.', 'boombox', 'subwoofer', 17, 140, 720),
   evolved('double-deck', 'Double Deck', 'Twin vinyl blades spin twice as fast.', 'turntable', 'vinyl-record', 24, 72, 0),
+  evolved('mirror-ball', 'Mirror Ball', 'The disc never stops rebounding, filling the room with hard light.', 'riot-disc', 'disco-ball', 22, 480, 680),
   {
     id: 'void-echo',
     name: 'Void Echo',

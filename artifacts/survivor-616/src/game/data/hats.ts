@@ -10,6 +10,7 @@ export const HATS: HatDef[] = [
   { id: 'safety-cone', name: 'Safety Cone', description: 'Caution: style event in progress.', cost: 2, tier: 'uncommon', style: 'cone' },
   { id: 'orbital-eye', name: 'Orbital Eye', description: 'An interested eye watches from a small orbit.', cost: 4, tier: 'legendary', style: 'orbital-eye' },
   { id: 'moth-cap', name: 'Moth Cap', description: 'A soft nocturnal cap with a little living light.', cost: 4, tier: 'legendary', style: 'moth-cap' },
+  { id: 'prize-cone', name: 'Prize Cone', description: 'Redeemed for exactly nine hundred tickets. Worth every one, according to Otis.', cost: 3, tier: 'rare', style: 'cone' },
 ];
 export const HATS_BY_ID: Record<string, HatDef> = Object.fromEntries(HATS.map((hat) => [hat.id, hat]));
 export const DEFAULT_HAT_ID = 'no-hat';

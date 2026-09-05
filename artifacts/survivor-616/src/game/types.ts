@@ -1121,7 +1121,10 @@ export type CrewActivityId =
   | 'file-the-ledgers'
   | 'walk-the-block'
   | 'keep-the-lookbook'
-  | 'mind-the-register';
+  | 'mind-the-register'
+  // The back room
+  | 'rewire-the-cabinets'
+  | 'run-the-high-score-board';
 
 export type CrewActivityIcon =
   | 'utensils'
@@ -1486,6 +1489,8 @@ export interface MetaState {
   uiDensity: 'grid' | 'list';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
   musicReactiveEnabled: boolean;
+  /** Optional procedural room ambience in the hideout (rain, pipe hum, cellar drips). Off by default. */
+  hideoutAmbienceEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */

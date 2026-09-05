@@ -111,6 +111,13 @@ export interface MusicPlayerValue {
    * contexts fight over the output device and iOS suspends one of them.
    */
   getAudioContext: () => AudioContext | null;
+  /**
+   * Creates the shared `AudioContext` if it does not exist yet and returns it.
+   * For features that make their own sound (hideout ambience) and must not
+   * open a second context to do it. Call it from a user gesture -- browsers
+   * start a fresh context suspended otherwise.
+   */
+  ensureAudioContext: () => AudioContext | null;
 
   /* -------------------------- playlists -------------------------- */
   playlists: Playlist[];
@@ -333,8 +340,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       const ids = activeQueueIds();
       if (ids.length === 0) return -1;
       if (shuffle && ids.length > 1) {
-        let pick = currentId;
-        while (pick === currentId) {
+        // Bounded: a queue whose every entry resolves to the current track
+        // (duplicate ids) would spin this forever, hanging the tab.
+        let pick = ids[Math.floor(Math.random() * ids.length)]!;
+        for (let attempt = 0; attempt < 8 && pick === currentId; attempt += 1) {
           pick = ids[Math.floor(Math.random() * ids.length)]!;
         }
         return tracksRef.current.findIndex((t) => t.id === pick);
@@ -356,6 +365,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const audio = audioRef.current;
     const track = tracksRef.current[index];
     if (!audio || !track) return;
+    if (!track.url) {
+      setError(`"${track.title}" is no longer available -- add the file again.`);
+      return;
+    }
     setCurrentIndex(index);
     audio.src = track.url;
     audio.currentTime = 0;
@@ -456,7 +469,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       stopEnergyMeter();
       analysisRef.current = null;
       beatBus.reset();
-      void audioContextRef.current?.close();
+      // close() throws synchronously on an already-closed context, and a
+      // throw inside an effect cleanup takes the whole tree down with it.
+      try {
+        const context = audioContextRef.current;
+        if (context && context.state !== 'closed') void context.close().catch(() => {});
+      } catch {
+        // Nothing left to release.
+      }
     };
   }, [stopEnergyMeter]);
 
@@ -560,11 +580,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       for (const track of accepted) {
         const probe = new Audio();
         probe.preload = 'metadata';
-        probe.src = track.url;
-        probe.addEventListener('loadedmetadata', () => {
+        // A probe that never fires either event would otherwise hold its
+        // decoder and the object URL alive for the life of the tab.
+        const release = () => {
+          probe.removeEventListener('loadedmetadata', onProbeMeta);
+          probe.removeEventListener('error', release);
+          probe.removeAttribute('src');
+          probe.load();
+        };
+        const onProbeMeta = () => {
           const seconds = Number.isFinite(probe.duration) ? probe.duration : null;
           setTracks((prev) => prev.map((t) => (t.id === track.id ? { ...t, duration: seconds } : t)));
-        });
+          release();
+        };
+        probe.addEventListener('loadedmetadata', onProbeMeta);
+        probe.addEventListener('error', release);
+        probe.src = track.url;
       }
     }
 
@@ -697,26 +728,33 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
   const removeTrack = useCallback(
     (id: string) => {
-      setTracks((prev) => {
-        const index = prev.findIndex((t) => t.id === id);
-        if (index === -1) return prev;
-        if (prev[index]!.source === 'bundled') return prev;
-        if (prev[index]!.source === 'local') URL.revokeObjectURL(prev[index]!.url);
-        const next = prev.filter((t) => t.id !== id);
-        tracksRef.current = next;
+      // Everything here happens outside the state updater on purpose: React
+      // may invoke an updater twice (StrictMode, a re-render race), and the
+      // old in-updater version double-decremented `currentIndex` and revoked
+      // the object URL twice, leaving the player pointed at a dead track.
+      const prev = tracksRef.current;
+      const index = prev.findIndex((t) => t.id === id);
+      if (index === -1) return;
+      const track = prev[index]!;
+      if (track.source === 'bundled') return;
+      if (track.source === 'local') URL.revokeObjectURL(track.url);
 
-        if (index === currentIndex) {
-          audioRef.current?.pause();
-          setIsPlaying(false);
-          setCurrentIndex(-1);
-          setProgressSec(0);
-          setDurationSec(0);
-        } else if (index < currentIndex) {
-          setCurrentIndex((i) => i - 1);
-        }
-        return next;
-      });
-      setPlaylists((prev) => prev.map((p) => ({ ...p, trackIds: p.trackIds.filter((tid) => tid !== id) })));
+      const next = prev.filter((t) => t.id !== id);
+      tracksRef.current = next;
+      setTracks(next);
+
+      if (index === currentIndex) {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+        setCurrentIndex(-1);
+        setProgressSec(0);
+        setDurationSec(0);
+      } else if (index < currentIndex) {
+        setCurrentIndex(currentIndex - 1);
+      }
+      setPlaylists((prevLists) =>
+        prevLists.map((p) => ({ ...p, trackIds: p.trackIds.filter((tid) => tid !== id) })),
+      );
     },
     [currentIndex],
   );
@@ -862,6 +900,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       cycleRepeat,
       dismissError,
       getAudioContext,
+      ensureAudioContext,
       playlists,
       activePlaylistId,
       activePlaylist,
@@ -877,7 +916,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
       progressSec, durationSec, error, addFiles, addFromUrl, linkLoading, convertTrackToMp3,
       conversion, removeTrack, clearTracks, playTrack, togglePlay, next, previous, seek,
-      setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext, playTrackOnRepeat,
+      setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext, ensureAudioContext,
+      playTrackOnRepeat,
       playlists, activePlaylistId, activePlaylist, setActivePlaylist, createPlaylist,
       renamePlaylist, deletePlaylist, addToPlaylist, removeFromPlaylist, reorderPlaylistTracks,
     ],

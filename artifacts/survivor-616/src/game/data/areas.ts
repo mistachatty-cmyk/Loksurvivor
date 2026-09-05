@@ -1,8 +1,11 @@
 import type { AreaDef } from '@/game/types';
+import { AREAS_2X } from './areas-2x';
+import { squadWave } from './authoring';
 
 /**
  * Explorable arenas. Each one owns its own layout, obstacle set, wave table
- * and unlock condition, so new districts are pure data.
+ * and unlock condition, so new districts are pure data. The 2x areas provide
+ * extreme-difficulty versions with doubled map sizes and spawn rates.
  */
 export const AREAS: AreaDef[] = [
   {
@@ -290,6 +293,84 @@ export const AREAS: AreaDef[] = [
       { fromSec: 48, toSec: 175, enemyId: 'bloodhound', ratePerSec: 0.75, burst: 2, hpMult: 1.25 },
       { fromSec: 70, toSec: 175, enemyId: 'crypt-spitter', ratePerSec: 0.55, burst: 2 },
       { fromSec: 105, toSec: 175, enemyId: 'bass-bruiser', ratePerSec: 0.25, burst: 1, hpMult: 1.25 },
+    ],
+  },
+  {
+    id: 'neon-arcade',
+    name: 'Neon Arcade',
+    district: 'Under Old Market Hall',
+    description:
+      'The shuttered arcade beneath the market, dead for a decade. The cabinets are glowing again, and none of them are plugged in.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 780, h: 640 },
+    ground: { base: '#0e0620', tile: '#190b34', seam: '#08031a', glow: '#ff2ec4' },
+    sky: 'roofed',
+    obstacles: [
+      { x: -280, y: -200, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 260, y: -190, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -260, y: 190, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 280, y: 200, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 0, y: -240, w: 160, h: 34, kind: 'barrier' },
+      { x: 0, y: 240, w: 160, h: 34, kind: 'barrier' },
+      { x: -140, y: 0, w: 46, h: 46, kind: 'neon-sign' },
+      { x: 140, y: 0, w: 46, h: 46, kind: 'neon-sign' },
+      { x: -90, y: -90, w: 40, h: 40, kind: 'attack-block' },
+      { x: 90, y: 90, w: 40, h: 40, kind: 'attack-block' },
+      { x: -340, y: 60, w: 44, h: 44, kind: 'reflective-surface' },
+      { x: 340, y: -60, w: 44, h: 44, kind: 'reflective-surface' },
+      { x: -60, y: 250, w: 48, h: 48, kind: 'fuse-box' },
+      { x: 60, y: -250, w: 48, h: 48, kind: 'fuse-box' },
+      { x: -320, y: -160, w: 40, h: 40, kind: 'security-camera' },
+      { x: 320, y: 160, w: 40, h: 40, kind: 'security-camera' },
+      { x: 0, y: 0, w: 70, h: 54, kind: 'cover' },
+    ],
+    durationSec: 170,
+    threat: 'severe',
+    rescueAllyId: 'otis',
+    discoveryId: 'arcade-high-score',
+    unlock: { kind: 'clearArea', areaId: 'old-market' },
+    waves: [
+      { fromSec: 0, toSec: 45, enemyId: 'pixel-wraith', ratePerSec: 1.3, burst: 2 },
+      { fromSec: 20, toSec: 90, enemyId: 'static-swarm', ratePerSec: 1.8, burst: 3, formation: 'ring' },
+      { fromSec: 45, toSec: 170, enemyId: 'pixel-wraith', ratePerSec: 1.6, burst: 2, hpMult: 1.2 },
+      { fromSec: 60, toSec: 170, enemyId: 'high-score-phantom', ratePerSec: 0.4, burst: 1 },
+      { fromSec: 90, toSec: 170, enemyId: 'token-golem', ratePerSec: 0.18, burst: 1 },
+      { fromSec: 140, toSec: 141, enemyId: 'claw-machine-menace', ratePerSec: 1, burst: 1 },
+    ],
+  },
+  {
+    id: 'neon-overflow',
+    name: 'Neon Overflow',
+    district: 'Under Old Market Hall',
+    description:
+      'The arcade\'s stock room, one aisle over. Whatever is wrong with the cabinets out front started back here.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 700, h: 600 },
+    ground: { base: '#120818', tile: '#1e0e2c', seam: '#0a0512', glow: '#fde047' },
+    sky: 'roofed',
+    obstacles: [
+      { x: -260, y: -180, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 260, y: 180, w: 60, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -240, y: 170, w: 44, h: 44, kind: 'reflective-surface' },
+      { x: 240, y: -170, w: 44, h: 44, kind: 'reflective-surface' },
+      { x: 0, y: -220, w: 140, h: 32, kind: 'barrier' },
+      { x: 0, y: 220, w: 140, h: 32, kind: 'barrier' },
+      { x: -80, y: 0, w: 40, h: 40, kind: 'attack-block' },
+      { x: 80, y: 0, w: 40, h: 40, kind: 'attack-block' },
+      { x: 0, y: 0, w: 70, h: 54, kind: 'cover' },
+    ],
+    durationSec: 140,
+    threat: 'severe',
+    discoveryId: 'overflow-manual',
+    unlock: { kind: 'clearArea', areaId: 'neon-arcade' },
+    waves: [
+      { fromSec: 0, toSec: 60, enemyId: 'pixel-wraith', ratePerSec: 1.4, burst: 2, hpMult: 1.2 },
+      // The whole Cabinet Rot crew arrives together, once, as a set-piece --
+      // squadWave's own `burst` still multiplies the *entire* roster, so this
+      // stays a single one-time entrance rather than a repeating spawn credit.
+      squadWave({ fromSec: 40, toSec: 41, factionId: 'cabinet-rot', ratePerSec: 1, burst: 1, formation: 'ring' }),
+      { fromSec: 70, toSec: 140, enemyId: 'token-golem', ratePerSec: 0.22, burst: 1, hpMult: 1.15 },
+      { fromSec: 110, toSec: 111, enemyId: 'marquee-reaper', ratePerSec: 1, burst: 1 },
     ],
   },
   {
@@ -663,6 +744,7 @@ export const AREAS: AreaDef[] = [
     waves: [], // spawning is procedural
     endless: true,
   },
+  ...AREAS_2X,
 ];
 
 export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(
