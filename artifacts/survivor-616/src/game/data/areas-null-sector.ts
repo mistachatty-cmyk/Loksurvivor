@@ -92,6 +92,7 @@ export const AREAS_NULL_SECTOR: AreaDef[] = [
     ],
     durationSec: 600,
     threat: 'severe',
+    rescueAllyId: 'archivist',
     discoveryId: 'null-sector-log',
     unlock: { kind: 'clearArea', areaId: 'the-choir' },
     waves: [

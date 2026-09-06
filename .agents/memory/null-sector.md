@@ -71,6 +71,42 @@ exactly covering the 600-second (10-minute) match.
   than a discovery gate, so it reads as a true "there's something underneath
   even that" finale-plus area.
 
+## 5 bonus items (Phase 4)
+1. **Fragmented Backup** (`data/vendor.ts`) — a permanent vendor purchase.
+   No on-death-save hook existed anywhere in the codebase, so this needed a
+   small, genuinely new engine touch: a new `VendorEffect` utility kind
+   (`'extra-life'`), a `hasExtraLife(meta)` helper in `metaStore.tsx`
+   mirroring the existing `startingWeaponLevel`/`rewardCredMultiplier`
+   pattern exactly, and two new `World` fields (`extraLifeAvailable`,
+   `extraLifeUsed`) consumed by one guard clause at the top of
+   `damagePlayer`'s death branch. Deliberately does **not** intercept the
+   separate lethal-pothole insta-kill path (`startPotholeFall`) — that
+   hazard is designed as an unconditional trap per `potholes.md`, and
+   extending extra-life to bypass it would undermine that design without
+   being asked to.
+2. **Null Sector Access Badge** (`data/hats.ts`) — a cosmetic hat. `HatDef`
+   has no unlock-gate field at all (hats are purchase-only via loot tokens),
+   so "unlocked by clearing Null Sector" isn't representable without adding
+   a new gating field across the hat system. Shipped as a legendary-cost
+   purchasable hat instead, honestly matching how every other hat works,
+   rather than promising a gate the data model can't express.
+3. **Corrupted status** (`data/statusEffects.ts` + `updateStatusEffects` in
+   `world.ts`) — a new per-tick branch alongside the existing `burning`/
+   `acid` DOT branches, reusing `StatusEffectInstance.nextTickAt` the same
+   way: every 900ms, nudges the afflicted enemy a random `±60` unit offset.
+   Guarded against frozen (Zero Day "stone") enemies so a selected target
+   can't teleport out from under a drag-select mid-throw setup.
+4. **Archivist** (`data/progression.ts`) — a rescuable ally (small permanent
+   crit boost), rescued in `null-sector` (which previously had a discovery
+   but no `rescueAllyId`, same gap Otis filled for Neon Arcade). Lives in
+   `the-cellar` reusing its existing `study-anomalies`/`press-new-records`
+   activities rather than needing a dedicated new hub room.
+5. **Data Wipe** (`data/evolutions.ts` + `backup-drive` passive in
+   `data/passives.ts`) — evolves `the-bus` (previously unused by any
+   evolution or relic recipe) into a sweep that applies Corrupted on hit.
+   Written by hand rather than via the `evolved()` authoring helper, since
+   that helper's signature doesn't expose `statusEffectId` on the result.
+
 ## See also
 `CLAUDE.md`'s "Spawning a larger group" and "Adding an enemy/area,
 checklist" sections; `content-authoring-system.md` for `squadWave()`'s

@@ -11,6 +11,7 @@ export const HATS: HatDef[] = [
   { id: 'orbital-eye', name: 'Orbital Eye', description: 'An interested eye watches from a small orbit.', cost: 4, tier: 'legendary', style: 'orbital-eye' },
   { id: 'moth-cap', name: 'Moth Cap', description: 'A soft nocturnal cap with a little living light.', cost: 4, tier: 'legendary', style: 'moth-cap' },
   { id: 'prize-cone', name: 'Prize Cone', description: 'Redeemed for exactly nine hundred tickets. Worth every one, according to Otis.', cost: 3, tier: 'rare', style: 'cone' },
+  { id: 'null-sector-badge', name: 'Null Sector Access Badge', description: 'A cracked ID card for a server room that was decommissioned before the badge was printed. It still gets you in.', cost: 4, tier: 'legendary', style: 'orbital-eye' },
 ];
 export const HATS_BY_ID: Record<string, HatDef> = Object.fromEntries(HATS.map((hat) => [hat.id, hat]));
 export const DEFAULT_HAT_ID = 'no-hat';

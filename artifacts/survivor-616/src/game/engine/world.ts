@@ -655,6 +655,9 @@ export interface World {
   stormCloud: StormCloud | null;
   /** Zero Day's freeze-then-throw runtime state; null for every other character. */
   freezeThrow: FreezeThrowState | null;
+  /** Fragmented Backup vendor item: a lethal hit restores 25% HP once per run instead of ending it. */
+  extraLifeAvailable: boolean;
+  extraLifeUsed: boolean;
   /** Active world-color theme, when full recolor is enabled; undefined otherwise. */
   worldColorPalette?: SpritePalette;
   /** Settings toggle: also blend `worldColorPalette` into enemy sprites and environment colors, not just the player's own sprite. */
@@ -903,6 +906,7 @@ export function createWorld(
     startingLokPets?: LokPetRoll[];
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
+    extraLifeAvailable?: boolean;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -966,6 +970,8 @@ export function createWorld(
     freezeThrow: character.freezeThrow
       ? { lastCastAt: Number.NEGATIVE_INFINITY, selecting: false, selectionStart: null, selectionEnd: null, selectedUids: [] }
       : null,
+    extraLifeAvailable: setup.extraLifeAvailable ?? false,
+    extraLifeUsed: false,
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
     orbiters: [],
@@ -2271,6 +2277,13 @@ function updateStatusEffects(w: World) {
         effect.nextTickAt = w.now + 520;
         damageEnemy(w, enemy, tick * effect.stacks, 0, enemy.x, enemy.y);
       }
+      if (effect.id === 'corrupted' && w.now >= (effect.nextTickAt ?? effect.appliedAt) && !enemy.dying && w.now >= enemy.frozenUntil) {
+        effect.nextTickAt = w.now + 900;
+        spawnParticles(w, enemy.x, enemy.y, '#ff2fd0', 6, 90);
+        enemy.x += randRange(w.rng, -60, 60);
+        enemy.y += randRange(w.rng, -60, 60);
+        spawnParticles(w, enemy.x, enemy.y, '#ff2fd0', 6, 90);
+      }
     }
     enemy.activeEffects = enemy.activeEffects.filter((effect) => effect.expiresAt > w.now);
   }
@@ -2428,6 +2441,14 @@ function damagePlayer(
   spawnParticles(w, p.x, p.y + 14, '#ff5f6d', 6, 80);
 
   if (p.hp <= 0) {
+    if (w.extraLifeAvailable && !w.extraLifeUsed) {
+      w.extraLifeUsed = true;
+      p.hp = p.maxHp * 0.25;
+      p.invulnUntil = w.now + 1200;
+      spawnParticles(w, p.x, p.y, '#4ade80', 16, 140);
+      pushAlert(w, 'FRAGMENTED BACKUP RESTORED');
+      return;
+    }
     p.hp = 0;
     w.outcome = 'dead';
     w.deathCause = 'ordinary-hazard';

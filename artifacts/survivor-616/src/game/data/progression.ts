@@ -269,6 +269,20 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#fef9c3', skin: '#c2410c', glow: '#fde047',
     },
   },
+  {
+    id: 'archivist',
+    name: 'Archivist',
+    role: 'Rogue process',
+    blurb: 'Something in Null Sector that kept a log nobody asked it to. Followed the exit route out and never stopped indexing the hideout.',
+    room: 'the-cellar',
+    boost: { crit: 0.04 },
+    boostLabel: '+4% crit chance',
+    preferredActivityIds: ['study-anomalies', 'press-new-records'],
+    palette: {
+      ink: '#020617', body: '#052e1a', bodyDark: '#031a0f', accent: '#22c55e',
+      accentBright: '#bbf7d0', skin: '#0f3d24', glow: '#4ade80',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(

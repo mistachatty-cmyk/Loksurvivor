@@ -980,6 +980,15 @@ export function startingWeaponLevel(meta: MetaState): number {
   return Math.min(8, 1 + levelBoost);
 }
 
+/** Whether the player owns the "extra life" vendor item for this run. */
+export function hasExtraLife(meta: MetaState): boolean {
+  return VENDOR_CATALOG.some((item) => {
+    const stacks = Math.min(item.maxStacks, Math.max(0, Math.floor(meta.vendorPurchases[item.id] ?? 0)));
+    if (stacks <= 0) return false;
+    return (item.effects ?? []).some((effect) => effect.kind === 'utility' && effect.utility === 'extra-life');
+  });
+}
+
 /** Permanent utility bonuses applied to the final cred payout. */
 export function rewardCredMultiplier(meta: MetaState): number {
   const bonus = VENDOR_CATALOG.reduce((total, item) => {

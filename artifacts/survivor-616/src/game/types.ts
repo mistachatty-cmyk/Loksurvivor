@@ -1324,7 +1324,7 @@ export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'a
 
 export type VendorEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
-  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult'; amount: number };
+  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult' | 'extra-life'; amount: number };
 
 export interface VendorItemDef {
   id: string;

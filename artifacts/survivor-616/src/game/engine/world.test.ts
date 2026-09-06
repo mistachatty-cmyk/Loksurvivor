@@ -2444,6 +2444,50 @@ test('switching Storm Chaser to rain washes an existing fire/acid/frost ground s
   assert.ok(!enemy.activeEffects.some((effect) => effect.id === 'acid'), 'rain should also wash the acid status off the enemy standing in it');
 });
 
+test('Fragmented Backup restores 25% HP once instead of ending the run, then a second lethal hit ends it normally', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    11,
+    [],
+    1,
+    true,
+    null,
+    { extraLifeAvailable: true },
+  );
+  const enemy = addEnemy(world, 'nightcrawler', 10, 0);
+  enemy.damage = 999;
+  world.player.hp = 1;
+
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.outcome, 'running', 'the extra life should have absorbed the lethal hit');
+  assert.ok(world.player.hp > 0, 'HP should be restored, not left at 0');
+  assert.equal(world.extraLifeUsed, true);
+
+  world.player.invulnUntil = 0;
+  world.player.hp = 1;
+  enemy.contactReadyAt = 0;
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.outcome, 'dead', 'a second lethal hit should end the run -- the extra life is spent');
+});
+
+test('the Corrupted status periodically relocates the enemy it is applied to', () => {
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), CHARACTERS[0]!, CHARACTERS[0]!.stats, 12);
+  const enemy = addEnemy(world, 'nightcrawler', 400, 400);
+  enemy.activeEffects.push({ id: 'corrupted', stacks: 1, appliedAt: 0, expiresAt: 5000 });
+  const startX = enemy.x;
+  const startY = enemy.y;
+
+  for (let i = 0; i < 40 && enemy.x === startX && enemy.y === startY; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.ok(enemy.x !== startX || enemy.y !== startY, 'Corrupted should have relocated the enemy within a second');
+});
+
 test('castFreezeCone freezes enemies ahead of a facing-right player, skips ones behind and bosses', () => {
   const character = freezeThrowTestCharacter();
   const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 3);
