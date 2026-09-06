@@ -2,7 +2,6 @@ import { arachnidRig, blobRig, expressiveRig, giantRig, humanoidRig } from '@/ga
 import type { EnemyDef } from '@/game/types';
 import { palette } from './authoring';
 import { REACTION_PRESETS } from './reactivity';
-import { palette } from './authoring';
 
 /**
  * Everything that wants the player gone. `behavior` selects the movement
