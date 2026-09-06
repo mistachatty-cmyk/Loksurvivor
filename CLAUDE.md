@@ -240,4 +240,11 @@ just *what*, so the reasoning doesn't need to be re-derived:
   dimensions in `draw.ts` instead), and the endless-mode difficulty caps
   (`hpMult` ≤ 1.7, spawn rate ≤ 3.2/s) — any new difficulty multiplier must
   be composed *inside* those `Math.min()` calls, never stacked on top.
+- `rts-mechanics-roadmap.md` — before building any character ability that
+  casts, then drag-selects a result, then issues a follow-up command
+  (RTS-shaped, multi-step, stateful across input frames), read this first:
+  it's neither a `DashSkillDef` kind nor an `UltimateDef.effect` (both are
+  proven poor fits, see `zero-day-freeze-throw.md`), and reuses concrete
+  pieces (the `PointerMode` extension pattern, world-space box selection,
+  the DOM marquee overlay) that already exist rather than re-deriving them.
 - `MEMORY.md` — index/entry point for the above.
