@@ -863,6 +863,7 @@ export interface AreaDef {
 
 export type CustomMapAssetCategory =
   | 'ground'
+  | 'beacon'
   | 'structure'
   | 'hazard'
   | 'landmark'
@@ -911,6 +912,8 @@ export interface CustomMapAsset {
   spawnSide?: 'player' | 'hostile';
   /** objective-marker only: what a mission objective can do with this point. */
   markerRole?: 'hold' | 'destroy' | 'escort' | 'extract';
+  /** beacon only: which `SectorStructureDef` this placement builds. */
+  beaconId?: string;
 }
 
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
@@ -1661,6 +1664,14 @@ export interface RunResult {
   cleared: boolean;
   /** Present for a failed run; distinguishes lethal environmental deaths. */
   deathCause?: 'lethal-pothole' | 'ordinary-hazard';
+  /** Sector Command: which mission this run was, if any. */
+  missionId?: string;
+  /**
+   * Sector Command: whether the mission's required objectives were all met.
+   * Campaign credit follows this, never `cleared` -- surviving the clock ends
+   * the run but does not complete the mission.
+   */
+  missionComplete?: boolean;
   survivedSec: number;
   kills: number;
   level: number;
@@ -2033,6 +2044,11 @@ export interface SectorMissionDef {
   /** Id of an authored map in `data/sectorMaps.ts`. */
   mapId: string;
   economyTier: SectorEconomyTier;
+  /**
+   * Hides unscouted ground. Presentation and targeting only -- enemy AI is
+   * unchanged, so the fog never lies about what the simulation knows.
+   */
+  fogOfWar?: boolean;
   durationSec: number;
   /** Max total `squadCost` the player may command at once. Keep low for touch. */
   squadCap: number;

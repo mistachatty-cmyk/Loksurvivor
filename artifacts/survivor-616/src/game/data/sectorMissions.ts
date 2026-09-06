@@ -1,5 +1,6 @@
 import type { SectorMissionDef } from '@/game/types';
 import { ALLIES_BY_ID } from './progression';
+import { ENEMIES_BY_ID } from './enemies';
 import { FACTIONS_BY_ID } from './factions';
 import { SECTOR_MAPS_BY_ID } from './sectorMaps';
 
@@ -32,6 +33,11 @@ const mission = (def: SectorMissionDef): SectorMissionDef => {
     throw new Error(`Mission ${def.id} references unknown map: ${def.mapId}`);
   }
   for (const objective of def.objectives) {
+    // A kill-enemy objective naming an enemy that does not exist can never be
+    // completed, and nothing else would catch the typo.
+    if (objective.enemyId && !ENEMIES_BY_ID[objective.enemyId]) {
+      throw new Error(`Mission ${def.id} objective ${objective.id} targets unknown enemy: ${objective.enemyId}`);
+    }
     if (!objective.markerAssetId) continue;
     const hasMarker = map.placements.some(
       (placement) => placement.category === 'objective-marker' && placement.assetId === objective.markerAssetId,
@@ -121,6 +127,61 @@ export const SECTOR_MISSIONS: SectorMissionDef[] = [
     ],
     unlock: { kind: 'clearArea', areaId: 'neon-arcade' },
     requiresMissionIds: ['sector-cut-the-substation'],
+  }),
+  mission({
+    // The first beacon-tier mission: losing your squad is survivable here,
+    // which is exactly why the map can afford to be this hostile.
+    id: 'sector-hold-northline',
+    name: 'Hold Northline',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'morrow',
+    mapId: 'sector-map-northline-yard',
+    economyTier: 'beacon',
+    durationSec: 330,
+    squadCap: 8,
+    briefing:
+      'Morrow got two relays running in the freight yard before the Choir noticed, and they will not both survive the night. While they stand they will keep handing you bodies. Hold the yard, and keep at least one of them standing while you do it.',
+    debrief:
+      'One relay still humming at dawn. Morrow calls that a win and starts drawing up a third.',
+    objectives: [
+      { id: 'northline-hold', label: 'Hold the yard centre for 90s', kind: 'hold-marker', targetCount: 90, markerAssetId: 'objective-marker:hold' },
+      { id: 'northline-kills', label: 'Down 40 of theirs', kind: 'kill-any', targetCount: 40 },
+      { id: 'northline-extract', label: 'Bonus: reach the far gate', kind: 'reach-marker', targetCount: 1, markerAssetId: 'objective-marker:extract', optional: true },
+    ],
+    beats: [
+      { id: 'northline-open', trigger: { kind: 'at-sec', sec: 4 }, line: 'Morrow: "Both relays are live. They will print you a body every so often — spend them."', speakerAllyId: 'morrow' },
+      { id: 'northline-held', trigger: { kind: 'objective-complete', objectiveId: 'northline-hold' }, line: 'Morrow: "Centre is ours. Do not let them behind you now."', speakerAllyId: 'morrow' },
+      { id: 'northline-wipe', trigger: { kind: 'squad-wiped' }, line: 'Morrow: "Squad is gone — the relays will cover you. Get back to one."', speakerAllyId: 'morrow' },
+    ],
+    unlock: { kind: 'clearArea', areaId: 'northline-yard' },
+    requiresMissionIds: ['sector-relay-extraction'],
+  }),
+  mission({
+    // The fog mission, and the only one that asks for a named target.
+    id: 'sector-blackout-yard',
+    name: 'Blackout at Northline',
+    factionId: 'cabinet-rot',
+    commanderAllyId: 'cinder',
+    mapId: 'sector-map-northline-yard',
+    economyTier: 'beacon',
+    fogOfWar: true,
+    durationSec: 330,
+    squadCap: 8,
+    briefing:
+      'Cinder cut the yard lights to buy you cover, which means you get exactly as much of the yard as you can see. Something big is walking it. Find the crypt bouncers, put them down, and get out the far gate before the Rot works out where you went.',
+    debrief:
+      'Cinder brings the lights back up on an empty yard. Whatever else was out there left on its own.',
+    objectives: [
+      { id: 'blackout-hunt', label: 'Put down 3 crypt bouncers', kind: 'kill-enemy', targetCount: 3, enemyId: 'crypt-bouncer' },
+      { id: 'blackout-out', label: 'Reach the far gate', kind: 'reach-marker', targetCount: 1, markerAssetId: 'objective-marker:extract' },
+      { id: 'blackout-quiet', label: 'Bonus: hold the centre for 45s', kind: 'hold-marker', targetCount: 45, markerAssetId: 'objective-marker:hold', optional: true },
+    ],
+    beats: [
+      { id: 'blackout-open', trigger: { kind: 'at-sec', sec: 4 }, line: 'Cinder: "You have the dark and they do not. Send your units wide — they see for you."', speakerAllyId: 'cinder' },
+      { id: 'blackout-found', trigger: { kind: 'objective-complete', objectiveId: 'blackout-hunt' }, line: 'Cinder: "That is all three. Go, before something else notices the quiet."', speakerAllyId: 'cinder' },
+    ],
+    unlock: { kind: 'clearArea', areaId: 'northline-yard' },
+    requiresMissionIds: ['sector-hold-northline'],
   }),
 ];
 

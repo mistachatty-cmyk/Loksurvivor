@@ -155,7 +155,6 @@ function Game() {
     }
   }, []);
 
-  const missionId = screen.name === 'run' ? screen.missionId : undefined;
   const handleFinish = useCallback(
     (result: RunResult) => {
       const fatigueBefore = meta.fatigueByCharacter[result.characterId] ?? 0;
@@ -185,10 +184,12 @@ function Game() {
         })),
       };
       completeRun(resultWithFatigue);
-      if (missionId && result.cleared) completeSectorMission(missionId);
+      // Campaign credit follows the mission's own objectives, not the run's
+      // generic `cleared` -- otherwise idling out the clock banks the mission.
+      if (result.missionId && result.missionComplete) completeSectorMission(result.missionId);
       setScreen({ name: 'summary', result: resultWithFatigue });
     },
-    [completeRun, completeSectorMission, missionId, meta.fatigueByCharacter, meta.knownRelicIds],
+    [completeRun, completeSectorMission, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
   switch (screen.name) {

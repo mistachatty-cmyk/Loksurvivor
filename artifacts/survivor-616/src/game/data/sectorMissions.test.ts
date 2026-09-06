@@ -77,3 +77,33 @@ test('capturable units reference real enemies and are never bosses', () => {
   assert.equal(isCapturable('nightcrawler'), true);
   assert.equal(isCapturable('the-sire'), false);
 });
+
+test('each mission agrees with its map about how long the run is', () => {
+  // The two values are authored separately (the mission for the briefing, the
+  // map for the actual run clock). Nothing but this test stops them drifting,
+  // and drift would make a mission fail on a timer the briefing never showed.
+  for (const mission of SECTOR_MISSIONS) {
+    const map = SECTOR_MAPS.find((entry) => entry.id === mission.mapId)!;
+    assert.equal(
+      mission.durationSec,
+      map.durationSec,
+      `${mission.id} says ${mission.durationSec}s but ${map.id} runs ${map.durationSec}s`,
+    );
+  }
+});
+
+test('kill-enemy objectives name enemies that exist and can actually spawn', () => {
+  for (const mission of SECTOR_MISSIONS) {
+    const map = SECTOR_MAPS.find((entry) => entry.id === mission.mapId)!;
+    for (const objective of mission.objectives) {
+      if (!objective.enemyId) continue;
+      assert.ok(ENEMIES_BY_ID[objective.enemyId], `${mission.id} targets unknown enemy ${objective.enemyId}`);
+      // An objective asking you to kill something the map never spawns is
+      // impossible, which the type system cannot see.
+      const spawns = map.placements.some((placement) =>
+        (placement.category === 'enemy' || placement.category === 'encounter') &&
+        placement.assetId.endsWith(`:${objective.enemyId}`));
+      assert.ok(spawns, `${mission.id}/${objective.id} wants ${objective.enemyId}, which ${map.id} never spawns`);
+    }
+  }
+});

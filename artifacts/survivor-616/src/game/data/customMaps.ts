@@ -160,6 +160,12 @@ const OBJECTIVE_MARKER_ASSETS: CustomMapAsset[] = [
   { id: 'objective-marker:extract', category: 'objective-marker', name: 'Extraction', description: 'Reach this to finish an extraction objective.', color: '#a78bfa', w: 64, h: 64, markerRole: 'extract' },
 ];
 
+/** Tier 2 economy: one entry per `SectorStructureDef`, so a map can place them. */
+export const BEACON_ASSETS: CustomMapAsset[] = [
+  { id: 'beacon:relay-beacon', category: 'beacon', name: 'Choir Relay', description: 'Trickles a light unit every 12s while it stands. Never exceeds the squad cap.', color: '#facc15', w: 56, h: 56, beaconId: 'relay-beacon' },
+  { id: 'beacon:repeater-beacon', category: 'beacon', name: 'Null Repeater', description: 'Slower reinforcements, sturdier body.', color: '#38bdf8', w: 56, h: 56, beaconId: 'repeater-beacon' },
+];
+
 export const CUSTOM_MAP_ASSETS: CustomMapAsset[] = [
   ...GROUND_ASSETS,
   ...STRUCTURE_ASSETS,
@@ -169,6 +175,7 @@ export const CUSTOM_MAP_ASSETS: CustomMapAsset[] = [
   ...ENCOUNTER_ASSETS,
   ...SPAWN_POINT_ASSETS,
   ...OBJECTIVE_MARKER_ASSETS,
+  ...BEACON_ASSETS,
 ];
 
 export const CUSTOM_MAP_ASSETS_BY_ID: Record<string, CustomMapAsset> = Object.fromEntries(
@@ -177,6 +184,7 @@ export const CUSTOM_MAP_ASSETS_BY_ID: Record<string, CustomMapAsset> = Object.fr
 
 export const CUSTOM_MAP_ASSET_CATEGORIES = [
   { id: 'ground', label: 'Ground styles' },
+  { id: 'beacon', label: 'Reinforcement beacons' },
   { id: 'structure', label: 'Structures & props' },
   { id: 'hazard', label: 'Hazards' },
   { id: 'landmark', label: 'Landmarks' },
@@ -192,6 +200,11 @@ export function spawnPointsOf(map: CustomMap, side: 'player' | 'hostile'): Custo
     if (placement.category !== 'spawn-point') return false;
     return assetFromId(placement.assetId)?.spawnSide === side;
   });
+}
+
+/** Sector Command reads beacon placements off an authored map; never world geometry. */
+export function beaconsOf(map: CustomMap): CustomMapPlacement[] {
+  return map.placements.filter((placement) => placement.category === 'beacon');
 }
 
 export function objectiveMarkersOf(map: CustomMap, role?: NonNullable<CustomMapAsset['markerRole']>): CustomMapPlacement[] {
@@ -230,10 +243,20 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   return Math.round(Math.min(max, Math.max(min, finite(value, fallback))));
 }
 
+/**
+ * Derived from the catalog on purpose. This used to be a hand-written list,
+ * and it silently omitted `spawn-point` and `objective-marker` when those
+ * categories were added -- so the editor could place them but `saveCustomMap`
+ * (which normalises) dropped them on the way to storage. Deriving it means a
+ * new category can never be forgotten here again.
+ */
+const PLACEABLE_CATEGORIES = new Set<string>(
+  CUSTOM_MAP_ASSET_CATEGORIES.map((category) => category.id).filter((id) => id !== 'ground'),
+);
+
 function validCategory(value: unknown): CustomMapPlacement['category'] | null {
-  return value === 'structure' || value === 'hazard' || value === 'landmark' ||
-    value === 'enemy' || value === 'encounter'
-    ? value
+  return typeof value === 'string' && PLACEABLE_CATEGORIES.has(value)
+    ? (value as CustomMapPlacement['category'])
     : null;
 }
 

@@ -105,7 +105,24 @@ export function SectorCommandScreen({ onBack, onLaunch }: SectorCommandScreenPro
             <p className="mt-0.5 font-mono text-[9px] uppercase tracking-wider text-white/45">
               Commander {ALLIES_BY_ID[selected.commanderAllyId]?.name ?? selected.commanderAllyId} ·{' '}
               {Math.round(selected.durationSec / 60)} min · {selected.economyTier} economy
+              {selected.fogOfWar ? ' · blackout' : ''}
             </p>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {selected.economyTier === 'beacon' ? (
+                <span className="border border-amber-300/45 px-1 py-px font-mono text-[8px] uppercase tracking-wider text-amber-200">
+                  Beacons rebuild your squad
+                </span>
+              ) : (
+                <span className="border border-white/25 px-1 py-px font-mono text-[8px] uppercase tracking-wider text-white/55">
+                  Stolen army — no reinforcements
+                </span>
+              )}
+              {selected.fogOfWar ? (
+                <span className="border border-cyan-300/45 px-1 py-px font-mono text-[8px] uppercase tracking-wider text-cyan-200">
+                  Fog — units scout for you
+                </span>
+              ) : null}
+            </div>
 
             {selectedMap ? (
               <div className="relative mt-2 h-44 overflow-hidden border border-white/10 sm:h-56">

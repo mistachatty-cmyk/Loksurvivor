@@ -6,7 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
-import { LANDED_HEAT_RADIUS, type FluidKind, type World } from '@/game/engine/world';
+import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
@@ -2067,6 +2067,89 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
+/**
+ * Tier 2 economy: reinforcement beacons. A standing beacon pulses and carries a
+ * health bar, because "why did my reinforcements stop" must be answerable at a
+ * glance; a broken one leaves a dark stump so the ground still reads as lost.
+ */
+function drawBeacons(ctx: CanvasRenderingContext2D, w: World) {
+  for (const beacon of w.beacons) {
+    const half = 22;
+    if (beacon.broken) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#2b2b33';
+      ctx.fillRect(beacon.x - half, beacon.y - 6, half * 2, 12);
+      ctx.restore();
+      continue;
+    }
+
+    const pulse = 0.5 + 0.5 * Math.sin(w.now / 420);
+    ctx.save();
+    // Ground glow, so it reads as a place and not just a prop.
+    const glow = ctx.createRadialGradient(beacon.x, beacon.y, 4, beacon.x, beacon.y, 90);
+    glow.addColorStop(0, `rgba(250, 204, 21, ${0.16 + pulse * 0.1})`);
+    glow.addColorStop(1, 'rgba(250, 204, 21, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(beacon.x - 90, beacon.y - 90, 180, 180);
+
+    ctx.fillStyle = w.now < beacon.hitFlashUntil ? '#fff' : '#3f3f18';
+    ctx.fillRect(beacon.x - half, beacon.y - 34, half * 2, 44);
+    ctx.fillStyle = '#facc15';
+    ctx.globalAlpha = 0.6 + pulse * 0.4;
+    ctx.fillRect(beacon.x - half + 4, beacon.y - 30, half * 2 - 8, 6);
+    ctx.globalAlpha = 1;
+    ctx.fillRect(beacon.x - 3, beacon.y - 52, 6, 20);
+
+    // Health bar.
+    const ratio = Math.max(0, beacon.hp / beacon.maxHp);
+    ctx.fillStyle = '#00000099';
+    ctx.fillRect(beacon.x - half, beacon.y + 16, half * 2, 5);
+    ctx.fillStyle = ratio > 0.35 ? '#facc15' : '#ff4d5e';
+    ctx.fillRect(beacon.x - half, beacon.y + 16, half * 2 * ratio, 5);
+    ctx.restore();
+  }
+}
+
+/**
+ * Fog of war. Drawn after the world and the arena edges, so it covers terrain,
+ * props and actors alike, and before the screen-space overlays so the HUD stays
+ * readable. Cells are painted at grid resolution with a blur, which is what
+ * stops a 64-unit grid reading as a checkerboard.
+ */
+function drawFog(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+) {
+  const fog = w.fog;
+  if (!fog) return;
+  const halfW = w.bounds.w / 2;
+  const halfH = w.bounds.h / 2;
+  const minCol = Math.max(0, Math.floor((left + halfW) / fog.cell));
+  const maxCol = Math.min(fog.cols - 1, Math.ceil((right + halfW) / fog.cell));
+  const minRow = Math.max(0, Math.floor((top + halfH) / fog.cell));
+  const maxRow = Math.min(fog.rows - 1, Math.ceil((bottom + halfH) / fog.cell));
+
+  ctx.save();
+  ctx.filter = 'blur(12px)';
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      const state = fog.cells[row * fog.cols + col] ?? 0;
+      if (state === 2) continue;
+      ctx.fillStyle = state === 1 ? 'rgba(4, 6, 12, 0.62)' : 'rgba(3, 4, 9, 0.97)';
+      const x = col * fog.cell - halfW;
+      const y = row * fog.cell - halfH;
+      // Overdraw by a cell edge so the blur has neighbours to blend into.
+      ctx.fillRect(x - 1, y - 1, fog.cell + 2, fog.cell + 2);
+    }
+  }
+  ctx.restore();
+}
+
 function drawAwarenessArrow(ctx: CanvasRenderingContext2D, w: World) {
   const elite = w.enemies.find((e) => !e.dying && (e.def.family === 'Boss' || e.maxHp > 100) && Math.hypot(e.x - w.player.x, e.y - w.player.y) < 500);
   if (!elite) return;
@@ -3040,6 +3123,10 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   };
 
   for (const enemy of sorted) {
+    // Fog of war: hostiles are only drawn where you can currently see. An
+    // "explored" cell remembers the terrain, never the units standing on it.
+    // Your own units are always drawn -- they are what does the seeing.
+    if (w.fog && !enemy.commanded && fogAt(w, enemy.x, enemy.y) < 2) continue;
     if (enemy.y > w.player.y) drawPlayer();
     const converted = enemy.convertedUntil > w.now && !enemy.dying;
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
@@ -3111,10 +3198,11 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
         ctx.stroke();
         ctx.restore();
       }
-      if (enemy.orderKind === 'move') {
+      if (enemy.orderKind === 'move' || enemy.orderKind === 'attack-move') {
         ctx.save();
         ctx.globalAlpha = 0.22;
-        ctx.strokeStyle = '#65f6d1';
+        // Attack-move reads red: you are taking ground, not repositioning.
+        ctx.strokeStyle = enemy.orderKind === 'attack-move' ? '#ff8f6b' : '#65f6d1';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([5, 5]);
         ctx.beginPath();
@@ -3314,7 +3402,9 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
     drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
   }
+  drawBeacons(ctx, w);
   drawArenaEdges(ctx, w, { left, top, right, bottom });
+  drawFog(ctx, w, left, top, right, bottom);
   drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);

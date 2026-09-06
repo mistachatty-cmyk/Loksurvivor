@@ -40,7 +40,12 @@ import {
   orderSelectedUnits,
   selectAllCommandedUnits,
   squadCostUsed,
+  assignControlGroup,
+  fogAt,
   selectCommandedUnitAt,
+  selectCommandedUnitByUid,
+  selectControlGroup,
+  squadCostUsed,
   updateCommandSelection,
   castFreezeCone,
   updateFreezeSelection,
@@ -2816,4 +2821,273 @@ test('tapping a unit selects just that unit', () => {
   // A tap in open ground selects nothing and leaves the selection alone.
   assert.equal(selectCommandedUnitAt(world, 600, 600), 0);
   assert.deepEqual(world.sectorCommand?.selectedUids, [a.uid]);
+});
+
+test('running out the clock with objectives outstanding fails the mission and banks nothing', () => {
+  const missionDef: SectorMissionDef = {
+    id: 'test-timeout-mission',
+    name: 'Timeout Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    durationSec: 5,
+    squadCap: 4,
+    briefing: 'b',
+    debrief: 'd',
+    // Never satisfied by standing still, which is exactly the exploit.
+    objectives: [{ id: 'turn', kind: 'capture-units', label: 'Turn 1', targetCount: 1 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  const area = { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 5 };
+  const world = createWorld(
+    area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 43, [], 1, true, null,
+    { sectorSquadCap: 4, mission: missionDef },
+  );
+
+  // Idle until the clock expires.
+  for (let i = 0; i < 200 && world.outcome === 'running'; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.equal(world.outcome, 'cleared', 'the run still ends through the ordinary timed path');
+  assert.equal(world.mission?.complete, false, 'but the mission is not complete');
+  assert.equal(world.mission?.failed, true, 'it is explicitly failed');
+
+  const result = buildResult(world);
+  assert.equal(result.cleared, true, 'the run result keeps its generic cleared flag');
+  assert.equal(result.missionComplete, false, 'and campaign credit is withheld');
+  assert.equal(result.missionId, 'test-timeout-mission');
+});
+
+/** A world with one beacon, which requires a 'beacon'-tier mission to activate. */
+function beaconWorld(squadCap = 6) {
+  const missionDef: SectorMissionDef = {
+    id: 'test-beacon-mission',
+    name: 'Beacon Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'beacon',
+    durationSec: 600,
+    squadCap,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  const area = { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 };
+  return createWorld(
+    area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 61, [], 1, true, null,
+    {
+      sectorSquadCap: squadCap,
+      mission: missionDef,
+      missionBeacons: [{ beaconId: 'relay-beacon', x: 240, y: 0 }],
+    },
+  );
+}
+
+test('a beacon trickles commanded reinforcements on its own timer', () => {
+  const world = beaconWorld();
+  assert.equal(world.beacons.length, 1);
+  assert.equal(commandedUnits(world).length, 0);
+
+  // Long enough for the staggered first spawn plus one interval.
+  for (let i = 0; i < 60 * 20; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  const units = commandedUnits(world);
+  assert.ok(units.length > 0, 'the beacon should have produced at least one unit');
+  assert.ok(units.every((unit) => unit.commanded), 'beacon output is an ordinary commanded unit');
+});
+
+test('a beacon refills a squad but never inflates it past the cap', () => {
+  const world = beaconWorld(2);
+  for (let i = 0; i < 60 * 90; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(squadCostUsed(world) <= 2, 'the squad cap is absolute, beacons included');
+});
+
+test('a beacon is mortal, and stops reinforcing once broken', () => {
+  const world = beaconWorld();
+  const beacon = world.beacons[0]!;
+  // Park a hostile on top of it.
+  const attacker = addEnemy(world, 'nightcrawler', beacon.x, beacon.y);
+  attacker.damage = 500;
+  for (let i = 0; i < 120 && !beacon.broken; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(beacon.broken, true, 'hostiles standing on a beacon should break it');
+
+  const unitsAfterBreak = commandedUnits(world).length;
+  for (let i = 0; i < 60 * 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(commandedUnits(world).length, unitsAfterBreak, 'a broken beacon produces nothing');
+});
+
+test('beacons stay inert for a stolen-economy mission even if the map places them', () => {
+  const missionDef: SectorMissionDef = {
+    id: 'test-stolen-mission',
+    name: 'Stolen Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    durationSec: 600,
+    squadCap: 6,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  const world = createWorld(
+    { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 },
+    CHARACTERS[0]!, CHARACTERS[0]!.stats, 62, [], 1, true, null,
+    { sectorSquadCap: 6, mission: missionDef, missionBeacons: [{ beaconId: 'relay-beacon', x: 240, y: 0 }] },
+  );
+  assert.equal(world.beacons.length, 0, 'economyTier gates whether beacons exist at all');
+});
+
+test('a commanded unit fights back, and its kills count like the player’s', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 200, 0);
+  unit.hp = 1;
+  captureEnemy(world, unit);
+  unit.damage = 40;
+
+  const foe = addEnemy(world, 'nightcrawler', 210, 0);
+  foe.uid = 960;
+  const foeHpBefore = foe.hp;
+  const killsBefore = world.kills;
+
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(foe.hp < foeHpBefore || foe.dying, 'a unit in contact should damage the hostile');
+
+  for (let i = 0; i < 60 * 12 && !foe.dying; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(foe.dying, true, 'and eventually kill it');
+  assert.ok(world.kills > killsBefore, 'a unit kill counts toward the run, like the player’s');
+});
+
+test('attack-move breaks off to engage, plain move does not', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', -200, 0);
+  unit.hp = 1;
+  captureEnemy(world, unit);
+  unit.damage = 1;
+
+  // A hostile sitting just off the unit's path.
+  const bystander = addEnemy(world, 'nightcrawler', -140, 0);
+  bystander.uid = 961;
+  bystander.hp = bystander.maxHp * 20;
+  bystander.speed = 0;
+
+  selectAllCommandedUnits(world);
+  orderSelectedUnits(world, 300, 0, 'attack-move');
+  assert.equal(unit.orderKind, 'attack-move');
+
+  for (let i = 0; i < 90; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  // It should have stopped at the bystander rather than run past to x=300.
+  assert.ok(unit.x < 0, `attack-move should hold at the contact, got x=${unit.x}`);
+});
+
+test('control groups store and recall a selection, pruning the dead', () => {
+  const world = sectorWorld();
+  const a = addEnemy(world, 'nightcrawler', 100, 0);
+  a.hp = 1;
+  captureEnemy(world, a);
+  const b = addEnemy(world, 'corner-cutter', -100, 0);
+  b.uid = 962;
+  b.hp = 1;
+  captureEnemy(world, b);
+
+  selectAllCommandedUnits(world);
+  assert.equal(assignControlGroup(world, 0), 2);
+
+  selectCommandedUnitByUid(world, a.uid);
+  assert.equal(world.sectorCommand?.selectedUids.length, 1);
+
+  assert.equal(selectControlGroup(world, 0), 2, 'recalling the group restores both');
+
+  // Lose one, and the group forgets it.
+  b.dying = true;
+  assert.equal(selectControlGroup(world, 0), 1, 'a dead unit is pruned from its group');
+  assert.deepEqual(world.sectorCommand?.groups[0], [a.uid]);
+});
+
+/** A fog-enabled mission world. */
+function fogWorld() {
+  const missionDef: SectorMissionDef = {
+    id: 'test-fog-mission',
+    name: 'Fog Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    fogOfWar: true,
+    durationSec: 600,
+    squadCap: 6,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  return createWorld(
+    { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 },
+    CHARACTERS[0]!, CHARACTERS[0]!.stats, 63, [], 1, true, null,
+    { sectorSquadCap: 6, mission: missionDef },
+  );
+}
+
+test('fog starts dark, lights around the player, and remembers where you have been', () => {
+  const world = fogWorld();
+  assert.ok(world.fog, 'the mission asked for fog');
+  assert.equal(fogAt(world, 900, 900), 0, 'far ground starts unseen');
+
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(fogAt(world, world.player.x, world.player.y), 2, 'the player lights their own cell');
+
+  // Walk right, then check the ground behind is remembered but no longer lit.
+  for (let i = 0; i < 200; i += 1) stepWorld(world, 1 / 30, { moveX: 1, moveY: 0, ultimate: false });
+  assert.equal(fogAt(world, 0, 0), 1, 'ground you have left is explored, not visible');
+  assert.equal(fogAt(world, world.player.x, world.player.y), 2);
+});
+
+test('fog is presentation only — it never changes the simulation', () => {
+  const seed = 64;
+  const build = (fogOn: boolean) => {
+    const missionDef: SectorMissionDef = {
+      id: 'test-fog-parity',
+      name: 'Fog Parity',
+      factionId: 'afterimage-choir',
+      commanderAllyId: 'vee',
+      mapId: 'sector-map-loading-dock',
+      economyTier: 'stolen',
+      fogOfWar: fogOn,
+      durationSec: 600,
+      squadCap: 6,
+      briefing: 'b',
+      debrief: 'd',
+      objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+      beats: [],
+      unlock: { kind: 'default' },
+    };
+    return createWorld(
+      { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 },
+      CHARACTERS[0]!, CHARACTERS[0]!.stats, seed, [], 1, true, null,
+      { sectorSquadCap: 6, mission: missionDef },
+    );
+  };
+  const foggy = build(true);
+  const clear = build(false);
+  assert.ok(foggy.fog);
+  assert.equal(clear.fog, null);
+
+  for (let i = 0; i < 600; i += 1) {
+    stepWorld(foggy, 1 / 30, { moveX: 1, moveY: 0, ultimate: false });
+    stepWorld(clear, 1 / 30, { moveX: 1, moveY: 0, ultimate: false });
+  }
+
+  // Same seed, same inputs: fog must not have perturbed anything the sim does.
+  assert.equal(foggy.kills, clear.kills, 'fog changed the kill count');
+  assert.equal(foggy.enemies.length, clear.enemies.length, 'fog changed enemy spawning');
+  assert.equal(Math.round(foggy.player.x), Math.round(clear.player.x), 'fog changed player movement');
+  assert.equal(Math.round(foggy.player.hp), Math.round(clear.player.hp), 'fog changed incoming damage');
 });

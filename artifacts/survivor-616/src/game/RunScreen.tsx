@@ -18,7 +18,8 @@ import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudL
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { nextRescueAllyId } from '@/game/data/progression';
-import { customMapToArea, objectiveMarkersOf, spawnPointsOf } from '@/game/data/customMaps';
+import { beaconsOf, customMapToArea, objectiveMarkersOf, spawnPointsOf } from '@/game/data/customMaps';
+import { CUSTOM_MAP_ASSETS_BY_ID } from '@/game/data/customMaps';
 import { SECTOR_MAPS_BY_ID } from '@/game/data/sectorMaps';
 import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { availableChallengeContracts } from '@/game/data/vendor';
@@ -36,8 +37,11 @@ import {
   hudSnapshot,
   missionSnapshot,
   orderSelectedUnits,
+  assignControlGroup,
   selectAllCommandedUnits,
   selectCommandedUnitAt,
+  selectCommandedUnitByUid,
+  selectControlGroup,
   setCommandMode,
   updateCommandSelection,
   primePhysicsObject,
@@ -206,6 +210,7 @@ export function RunScreen({
   const freezeSelectPointerIdRef = useRef<number | null>(null);
   const freezeSelectOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
   const commandPointerIdRef = useRef<number | null>(null);
+  const groupHoldRef = useRef<number | null>(null);
   /**
    * Sector Command's second camera mode. A fully detached, drag-to-pan
    * commander camera would fight the marquee for the same drag on touch, so
@@ -275,6 +280,15 @@ export function RunScreen({
   const missionArea = missionMap ? customMapToArea(missionMap) : undefined;
   const missionMarkers = missionMap
     ? objectiveMarkersOf(missionMap).map((placement) => ({ assetId: placement.assetId, x: placement.x, y: placement.y }))
+    : undefined;
+  const missionBeacons = missionMap
+    ? beaconsOf(missionMap)
+        .map((placement) => ({
+          beaconId: CUSTOM_MAP_ASSETS_BY_ID[placement.assetId]?.beaconId ?? '',
+          x: placement.x,
+          y: placement.y,
+        }))
+        .filter((placement) => placement.beaconId)
     : undefined;
   const missionPlayerStart = missionMap
     ? spawnPointsOf(missionMap, 'player').map((placement) => ({ x: placement.x, y: placement.y }))[0]
@@ -354,6 +368,7 @@ export function RunScreen({
         playerStart: missionPlayerStart,
         mission,
         missionMarkers,
+        missionBeacons,
       },
     );
   }
@@ -617,7 +632,8 @@ export function RunScreen({
       // standing selection. Without the first branch, tapping a unit did
       // nothing at all, which reads as command mode being broken.
       if (selectCommandedUnitAt(world, origin.worldX, origin.worldY) > 0) return;
-      if (orderSelectedUnits(world, origin.worldX, origin.worldY) === 0) {
+      const orderMode = world.sectorCommand?.orderMode ?? 'move';
+      if (orderSelectedUnits(world, origin.worldX, origin.worldY, orderMode) === 0) {
         setCommandHint('Select units first — drag over them, or tap one');
       }
       return;
@@ -1349,6 +1365,12 @@ export function RunScreen({
           <div className="text-white/60">
             Squad {missionHud.squadCost}/{missionHud.squadCap} · Units {missionHud.units} · Lost {missionHud.losses}
           </div>
+          {missionHud.beaconsTotal > 0 ? (
+            <div className={missionHud.beaconsStanding > 0 ? 'text-amber-200/80' : 'text-red-300'}>
+              Beacons {missionHud.beaconsStanding}/{missionHud.beaconsTotal}
+              {missionHud.beaconsStanding === 0 ? ' — no reinforcements' : ''}
+            </div>
+          ) : null}
           <ul className="mt-1 space-y-0.5">
             {missionHud.objectives.map((objective) => (
               <li key={objective.id} className={objective.done ? 'text-emerald-300' : 'text-white/80'}>
@@ -1363,6 +1385,72 @@ export function RunScreen({
               {missionHud.lastBeatLine}
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Sector Command: the squad roster. Tapping a chip selects that one unit,
+          which is the only way to pick a unit out of a stack with a thumb. */}
+      {missionHud && missionHud.roster.length > 0 ? (
+        <div
+          // One scrolling row, not a wrapping grid: at a full squad of 8 the
+          // wrapped version was four rows deep and swallowed the screen.
+          className="absolute inset-x-2 bottom-[17.5rem] z-40 flex gap-1 overflow-x-auto pb-0.5"
+          data-testid="unit-roster"
+        >
+          {missionHud.roster.map((unit) => (
+            <button
+              key={unit.uid}
+              type="button"
+              onClick={() => { const world = worldRef.current; if (world) selectCommandedUnitByUid(world, unit.uid); }}
+              className={`w-[3.75rem] shrink-0 border px-1 py-0.5 text-left font-mono text-[8px] uppercase tracking-wider ${
+                unit.selected ? 'border-emerald-300 bg-emerald-300/20 text-emerald-100' : 'border-white/20 bg-black/75 text-white/70'
+              }`}
+              data-testid={`unit-chip-${unit.uid}`}
+            >
+              {/* Every capture profile is named "Turned <enemy>"; the prefix is
+                  the same on every chip, so it is pure noise in a 60px box. */}
+              <span className="block truncate">{unit.name.replace(/^Turned /i, '')}</span>
+              <span className="mt-0.5 block h-1 w-full bg-black/70">
+                <span
+                  className={`block h-full ${unit.hpPct > 35 ? 'bg-emerald-400' : 'bg-red-400'}`}
+                  style={{ width: `${unit.hpPct}%` }}
+                />
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Sector Command: control groups. Tap recalls, long-press assigns --
+          there is no keyboard, so 1-9 hotkeys become three thumb chips. */}
+      {missionHud && commandModeOn ? (
+        <div className="absolute bottom-[15.5rem] left-2 z-40 flex gap-1" data-testid="group-chips">
+          {(missionHud.groupSizes.length > 0 ? missionHud.groupSizes : [0, 0, 0]).map((size, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => {
+                const world = worldRef.current;
+                if (!world) return;
+                if (selectControlGroup(world, index) === 0) setCommandHint(`Group ${index + 1} is empty — hold to assign`);
+              }}
+              onPointerDown={() => {
+                groupHoldRef.current = window.setTimeout(() => {
+                  const world = worldRef.current;
+                  if (!world) return;
+                  const n = assignControlGroup(world, index);
+                  setCommandHint(n > 0 ? `Group ${index + 1} set (${n})` : 'Select units first');
+                }, 550);
+              }}
+              onPointerUp={() => { if (groupHoldRef.current) window.clearTimeout(groupHoldRef.current); }}
+              onPointerLeave={() => { if (groupHoldRef.current) window.clearTimeout(groupHoldRef.current); }}
+              className="h-8 w-8 rounded-sm border border-amber-300/45 bg-black/75 font-mono text-[9px] uppercase text-amber-100"
+              data-testid={`group-chip-${index + 1}`}
+            >
+              {index + 1}
+              <span className="block text-[7px] text-white/45">{size}</span>
+            </button>
+          ))}
         </div>
       ) : null}
 
@@ -1425,6 +1513,26 @@ export function RunScreen({
           >
             {commanderView ? 'Embodied' : 'Cmdr View'}
           </button>
+          {commandModeOn ? (
+            <button
+              type="button"
+              onClick={() => {
+                const world = worldRef.current;
+                if (!world?.sectorCommand) return;
+                const next = world.sectorCommand.orderMode === 'move' ? 'attack-move' : 'move';
+                world.sectorCommand.orderMode = next;
+                setCommandHint(next === 'attack-move' ? 'Taps now order attack-move' : 'Taps now order move');
+              }}
+              className={`h-9 w-[5.5rem] rounded-md border font-mono text-[9px] uppercase tracking-wider ${
+                missionHud.orderMode === 'attack-move'
+                  ? 'border-orange-300 bg-orange-300/20 text-orange-100'
+                  : 'border-white/25 bg-black/75 text-white/70'
+              }`}
+              data-testid="button-order-mode"
+            >
+              {missionHud.orderMode === 'attack-move' ? 'Atk-Move' : 'Move'}
+            </button>
+          ) : null}
           {commandModeOn ? (
             <button
               type="button"

@@ -20,6 +20,7 @@ import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { SECTOR_STRUCTURES_BY_ID } from '@/game/data/sectorStructures';
 import { SECTOR_UNITS_BY_ENEMY_ID } from '@/game/data/sectorUnits';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
@@ -69,6 +70,7 @@ import type {
   MissionBeatDef,
   MissionObjectiveDef,
   SectorMissionDef,
+  SectorStructureDef,
 } from '@/game/types';
 
 import {
@@ -173,7 +175,7 @@ export interface EnemyActor extends Actor {
    */
   commanded: boolean;
   /** Sector Command: the standing order a commanded unit walks to and holds. */
-  orderKind: 'none' | 'move' | 'hold';
+  orderKind: 'none' | 'move' | 'hold' | 'attack-move';
   orderX: number;
   orderY: number;
   /** Sector Command: inside the current command-mode drag box. */
@@ -479,6 +481,14 @@ export interface SectorCommandState {
   /** Mission bookkeeping: units taken and units lost across the mission. */
   captures: number;
   losses: number;
+  /**
+   * Control groups, as uid lists. Three, because that is how many chips fit
+   * within thumb reach -- there is no keyboard here, so groups are buttons.
+   * Pruned of dead units on read rather than on death.
+   */
+  groups: number[][];
+  /** Which order a tap issues: plain move, or attack-move. */
+  orderMode: 'move' | 'attack-move';
 }
 
 /** One objective's live progress. Progress is derived from world state each frame. */
@@ -497,6 +507,45 @@ export interface MissionBeatRuntime {
   firedAt: number;
 }
 
+/**
+ * Tier 2 economy: a placed reinforcement beacon.
+ *
+ * Mortal on purpose -- hostiles that reach it break it and the reinforcements
+ * stop, so a beacon is ground worth holding rather than a free tap.
+ */
+export interface BeaconActor {
+  uid: number;
+  def: SectorStructureDef;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  nextSpawnAt: number;
+  broken: boolean;
+  hitFlashUntil: number;
+}
+
+/**
+ * Fog of war: a coarse visibility grid.
+ *
+ * Deliberately *not* built on the renderer's shadow caster, which is a
+ * per-frame lighting effect over nearby breakables and cannot answer "has the
+ * player seen this cell". A grid can, costs a few KB at mission scale, and is
+ * cheap to stamp.
+ *
+ * Cells hold 0 = never seen, 1 = explored (terrain remembered, actors hidden),
+ * 2 = currently visible. This is read by the renderer only -- see
+ * `SectorMissionDef.fogOfWar`.
+ */
+export interface FogState {
+  cols: number;
+  rows: number;
+  cell: number;
+  /** Row-major, `cols * rows` entries. */
+  cells: Uint8Array;
+  nextUpdateAt: number;
+}
+
 /** Sector Command mission runtime; null outside a mission. */
 export interface MissionRuntime {
   def: SectorMissionDef;
@@ -505,6 +554,14 @@ export interface MissionRuntime {
   /** Objective-marker positions lifted off the authored map. */
   markers: Array<{ assetId: string; x: number; y: number }>;
   complete: boolean;
+  /**
+   * Set when the clock runs out with a required objective outstanding. The run
+   * still ends through the ordinary timed-clear path -- `RunOutcome` stays
+   * `'running' | 'cleared' | 'dead'`, because widening it would ripple through
+   * summary, contracts, episodes and relics for no gain. Mission success is
+   * carried separately, on the mission and on `RunResult`.
+   */
+  failed: boolean;
   /** Guards the squad-wiped beat so it cannot fire before you ever had a squad. */
   everHadUnits: boolean;
   lastBeatLine: string | null;
@@ -730,6 +787,10 @@ export interface World {
   freezeThrow: FreezeThrowState | null;
   /** Sector Command runtime state; null outside the dev-gated campaign mode. */
   sectorCommand: SectorCommandState | null;
+  /** Tier 2 economy: reinforcement beacons authored onto the mission's map. */
+  beacons: BeaconActor[];
+  /** Fog of war; null unless the mission asked for it. */
+  fog: FogState | null;
   /** Sector Command mission objectives/beats; null outside a mission. */
   mission: MissionRuntime | null;
   /** Fragmented Backup vendor item: a lethal hit restores 25% HP once per run instead of ending it. */
@@ -991,6 +1052,8 @@ export function createWorld(
     /** Sector Command: the mission being played, and its map's objective markers. */
     mission?: SectorMissionDef;
     missionMarkers?: Array<{ assetId: string; x: number; y: number }>;
+    /** Tier 2 economy: beacon placements lifted off the authored map. */
+    missionBeacons?: Array<{ beaconId: string; x: number; y: number }>;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1058,6 +1121,33 @@ export function createWorld(
       : null,
     extraLifeAvailable: setup.extraLifeAvailable ?? false,
     extraLifeUsed: false,
+    fog: setup.mission?.fogOfWar
+      ? (() => {
+          const cell = FOG_CELL;
+          const cols = Math.ceil(area.bounds.w / cell) + 2;
+          const rows = Math.ceil(area.bounds.h / cell) + 2;
+          return { cols, rows, cell, cells: new Uint8Array(cols * rows), nextUpdateAt: 0 };
+        })()
+      : null,
+    beacons: (setup.mission?.economyTier === 'beacon' ? setup.missionBeacons ?? [] : [])
+      .map((placement, index): BeaconActor | null => {
+        const def = SECTOR_STRUCTURES_BY_ID[placement.beaconId];
+        if (!def) return null;
+        return {
+          uid: 90000 + index,
+          def,
+          x: placement.x,
+          y: placement.y,
+          hp: def.hp,
+          maxHp: def.hp,
+          // Stagger the first trickle so a map with several beacons does not
+          // hand you a whole squad on one tick.
+          nextSpawnAt: def.spawnIntervalSec * 1000 * (0.5 + index * 0.25),
+          broken: false,
+          hitFlashUntil: 0,
+        };
+      })
+      .filter((beacon): beacon is BeaconActor => beacon !== null),
     sectorCommand: setup.sectorSquadCap
       ? {
           squadCap: setup.sectorSquadCap,
@@ -1068,6 +1158,8 @@ export function createWorld(
           selectedUids: [],
           captures: 0,
           losses: 0,
+          groups: [[], [], []],
+          orderMode: 'move',
         }
       : null,
     mission: setup.mission
@@ -1080,6 +1172,7 @@ export function createWorld(
           markers: setup.missionMarkers ?? [],
           complete: false,
           everHadUnits: false,
+          failed: false,
           lastBeatLine: null,
           lastBeatAt: 0,
         }
@@ -1224,6 +1317,11 @@ export function createWorld(
         }
       : undefined,
   };
+
+  // Stamp the fog once up front. `updateFog` only runs inside `stepWorld`, so
+  // without this the countdown renders a fully black map -- including the
+  // ground the player is standing on.
+  updateFog(world);
 
   world.breakables = area.obstacles.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
   world.potholes = area.obstacles.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
@@ -5204,6 +5302,10 @@ function updateMission(w: World, dt: number) {
   if (required.length > 0 && required.every((objective) => objective.done)) {
     mission.complete = true;
     w.outcome = 'cleared';
+  } else if (!w.area.endless && w.time >= w.area.durationSec) {
+    // Out of time with work outstanding. The generic timed-clear below still
+    // ends the run; what it must not do is bank the mission.
+    mission.failed = true;
   }
 }
 
@@ -5215,9 +5317,20 @@ export function missionSnapshot(w: World) {
     id: mission.def.id,
     name: mission.def.name,
     complete: mission.complete,
+    failed: mission.failed,
     lastBeatLine: mission.lastBeatLine,
     lastBeatAt: mission.lastBeatAt,
     captureCandidates: captureCandidateCount(w),
+    orderMode: w.sectorCommand?.orderMode ?? 'move',
+    groupSizes: (w.sectorCommand?.groups ?? []).map((group) => group.length),
+    roster: commandedUnits(w).map((unit) => ({
+      uid: unit.uid,
+      name: SECTOR_UNITS_BY_ENEMY_ID[unit.defId]?.name ?? unit.def.name,
+      hpPct: Math.max(0, Math.round((unit.hp / unit.maxHp) * 100)),
+      selected: unit.selectedForCommand,
+    })),
+    beaconsStanding: w.beacons.filter((beacon) => !beacon.broken).length,
+    beaconsTotal: w.beacons.length,
     squadCost: squadCostUsed(w),
     squadCap: w.sectorCommand?.squadCap ?? 0,
     units: commandedUnits(w).length,
@@ -5280,6 +5393,128 @@ export function captureCandidateCount(w: World): number {
     if (w.now < enemy.capturableUntil && !enemy.commanded && !enemy.dying) count += 1;
   }
   return count;
+}
+
+/** Fog cell size, matched to the ground tile so the mask lines up with the art. */
+const FOG_CELL = 64;
+/** How far the player sees through fog. */
+const FOG_PLAYER_SIGHT = 300;
+/** How far a commanded unit sees -- less than you, so scouting costs something. */
+const FOG_UNIT_SIGHT = 190;
+/** Fog is restamped on a throttle; it does not need to be per-frame. */
+const FOG_UPDATE_MS = 120;
+
+/**
+ * Restamps the visibility grid from the player and every commanded unit.
+ *
+ * Presentation only. Nothing here touches enemy state, AI, or targeting -- a
+ * fog that changed what the simulation knew would be a different (and much
+ * larger) feature, and one that lied about the game underneath it.
+ */
+function updateFog(w: World) {
+  const fog = w.fog;
+  if (!fog) return;
+  if (w.now < fog.nextUpdateAt) return;
+  fog.nextUpdateAt = w.now + FOG_UPDATE_MS;
+
+  // Anything currently visible drops back to merely explored; sight sources
+  // then re-light what they can still see.
+  for (let i = 0; i < fog.cells.length; i += 1) {
+    if (fog.cells[i] === 2) fog.cells[i] = 1;
+  }
+
+  const stamp = (cx: number, cy: number, sight: number) => {
+    const halfW = w.bounds.w / 2;
+    const halfH = w.bounds.h / 2;
+    const minCol = Math.max(0, Math.floor((cx - sight + halfW) / fog.cell));
+    const maxCol = Math.min(fog.cols - 1, Math.ceil((cx + sight + halfW) / fog.cell));
+    const minRow = Math.max(0, Math.floor((cy - sight + halfH) / fog.cell));
+    const maxRow = Math.min(fog.rows - 1, Math.ceil((cy + sight + halfH) / fog.cell));
+    const sightSq = sight * sight;
+    for (let row = minRow; row <= maxRow; row += 1) {
+      for (let col = minCol; col <= maxCol; col += 1) {
+        const wx = col * fog.cell - halfW + fog.cell / 2;
+        const wy = row * fog.cell - halfH + fog.cell / 2;
+        if (dist2(wx, wy, cx, cy) > sightSq) continue;
+        fog.cells[row * fog.cols + col] = 2;
+      }
+    }
+  };
+
+  stamp(w.player.x, w.player.y, FOG_PLAYER_SIGHT);
+  for (const enemy of w.enemies) {
+    if (enemy.commanded && !enemy.dying) stamp(enemy.x, enemy.y, FOG_UNIT_SIGHT);
+  }
+}
+
+/** Visibility of a world point: 0 unseen, 1 explored, 2 visible. */
+export function fogAt(w: World, x: number, y: number): number {
+  const fog = w.fog;
+  if (!fog) return 2;
+  const col = Math.floor((x + w.bounds.w / 2) / fog.cell);
+  const row = Math.floor((y + w.bounds.h / 2) / fog.cell);
+  if (col < 0 || row < 0 || col >= fog.cols || row >= fog.rows) return 0;
+  return fog.cells[row * fog.cols + col] ?? 0;
+}
+
+/** How far a commanded unit reaches to trade blows. */
+const UNIT_REACH = 18;
+/** Cooldown on a unit's melee exchange. */
+const UNIT_ATTACK_MS = 620;
+/** How far a unit on attack-move will break off to engage. */
+const UNIT_AGGRO_RANGE = 190;
+
+/** How close a hostile must be to start breaking a beacon. */
+const BEACON_CONTACT_RADIUS = 46;
+
+/**
+ * Tier 2 economy: beacons trickle reinforcements and can be broken.
+ *
+ * Two invariants, both deliberate (see `data/sectorStructures.ts`):
+ *  - A beacon never pushes the squad past `squadCap`. When the squad is full
+ *    the tick is *skipped*, not queued, so the mobile unit ceiling stays
+ *    absolute and a beacon can never quietly inflate a squad.
+ *  - A beacon is mortal, so holding the ground around it is the point.
+ */
+function updateBeacons(w: World, dt: number) {
+  const state = w.sectorCommand;
+  if (!state || w.beacons.length === 0) return;
+
+  for (const beacon of w.beacons) {
+    if (beacon.broken) continue;
+
+    // Hostiles standing on a beacon chew through it. Commanded units are
+    // yours, so they never damage it.
+    for (const enemy of w.enemies) {
+      if (enemy.commanded || enemy.dying) continue;
+      if (dist2(enemy.x, enemy.y, beacon.x, beacon.y) > BEACON_CONTACT_RADIUS * BEACON_CONTACT_RADIUS) continue;
+      beacon.hp -= Math.max(1, enemy.damage) * dt;
+      beacon.hitFlashUntil = w.now + 90;
+    }
+    if (beacon.hp <= 0) {
+      beacon.broken = true;
+      spawnParticles(w, beacon.x, beacon.y, '#facc15', 18, 150);
+      pushAlert(w, `${beacon.def.name.toUpperCase()} DOWN`);
+      continue;
+    }
+
+    if (w.now < beacon.nextSpawnAt) continue;
+    beacon.nextSpawnAt = w.now + beacon.def.spawnIntervalSec * 1000;
+
+    const unit = SECTOR_UNITS_BY_ENEMY_ID[beacon.def.unitEnemyId];
+    const def = getEnemy(beacon.def.unitEnemyId);
+    if (!unit || !def) continue;
+    // Skip, never queue: a full squad means the beacon simply idles.
+    if (squadCostUsed(w) + unit.squadCost > state.squadCap) continue;
+
+    const before = w.enemies.length;
+    spawnEnemy(w, def, 1, { x: beacon.x, y: beacon.y + 34 });
+    const spawned = w.enemies[w.enemies.length - 1];
+    // `spawnEnemy` is a no-op at MAX_ENEMIES; only capture something it made.
+    if (w.enemies.length === before || !spawned) continue;
+    spawned.hp = spawned.maxHp * unit.captureHpFraction * 0.5;
+    captureEnemy(w, spawned);
+  }
 }
 
 /** How much of the squad cap the current commanded units use up. */
@@ -5376,13 +5611,25 @@ function destroyCommandedUnit(w: World, enemy: EnemyActor) {
  * orders short and near the player is the design mitigation.
  */
 function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
-  // Hostiles in contact hurt the unit back, which is what makes a squad
-  // something you can actually lose.
+  // The melee exchange. One cooldown covers both halves: a unit in contact
+  // trades blows rather than only absorbing them. Until this existed a
+  // captured unit could be ordered around and killed but contributed nothing
+  // to a fight, which made the whole economy decorative.
   if (w.now >= enemy.contactReadyAt) {
-    const attacker = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + 18, new Set([enemy.uid]));
-    if (attacker) {
-      enemy.contactReadyAt = w.now + 620;
-      enemy.hp -= Math.max(1, attacker.damage);
+    const foe = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + UNIT_REACH, new Set([enemy.uid]));
+    if (foe) {
+      enemy.contactReadyAt = w.now + UNIT_ATTACK_MS;
+      // Routed through `damageEnemy` on purpose: it is the single choke point,
+      // so a unit's kill counts toward `w.kills`, drops loot and XP, and feeds
+      // kill objectives exactly like the player's own. The deliberate
+      // consequence is that crit and lifesteal apply to a unit's hits too --
+      // your squad feeds you.
+      damageEnemy(w, foe, Math.max(1, enemy.damage), 2, enemy.x, enemy.y);
+      enemy.anim = 'attack';
+      enemy.animStartedAt = w.now;
+
+      // ...and it takes the return hit in the same exchange.
+      enemy.hp -= Math.max(1, foe.damage);
       enemy.hitFlashUntil = w.now + 90;
       if (enemy.hp <= 0) {
         destroyCommandedUnit(w, enemy);
@@ -5391,7 +5638,30 @@ function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
     }
   }
 
-  if (enemy.orderKind !== 'move') return;
+  // Attack-move: walk the order line, but break off for anything hostile that
+  // comes within aggro range, then resume once it is gone. This is the order
+  // you want for taking ground; plain 'move' is the one you want for
+  // disengaging, so both exist.
+  if (enemy.orderKind === 'attack-move') {
+    const target = nearestEnemy(w, enemy.x, enemy.y, UNIT_AGGRO_RANGE, new Set([enemy.uid]));
+    if (target) {
+      const tdx = target.x - enemy.x;
+      const tdy = target.y - enemy.y;
+      const tdist = Math.hypot(tdx, tdy) || 1;
+      if (tdist > enemy.radius + UNIT_REACH * 0.8) {
+        const step = enemy.speed * statusSpeedMultiplier(enemy) * dt;
+        enemy.x += (tdx / tdist) * step;
+        enemy.y += (tdy / tdist) * step;
+        enemy.facing = tdx >= 0 ? 1 : -1;
+        enemy.anim = 'walk';
+        collideObstacles(w, enemy);
+        clampToArena(w, enemy);
+      }
+      return;
+    }
+  }
+
+  if (enemy.orderKind !== 'move' && enemy.orderKind !== 'attack-move') return;
   const dx = enemy.orderX - enemy.x;
   const dy = enemy.orderY - enemy.y;
   const distance = Math.hypot(dx, dy);
@@ -5476,6 +5746,37 @@ export function selectCommandedUnitAt(w: World, x: number, y: number, radius = T
   return 1;
 }
 
+/** Stores the current selection as control group `index`. */
+export function assignControlGroup(w: World, index: number): number {
+  const state = w.sectorCommand;
+  if (!state || index < 0 || index >= state.groups.length) return 0;
+  state.groups[index] = [...state.selectedUids];
+  return state.groups[index]!.length;
+}
+
+/** Selects control group `index`, dropping any member that has since died. */
+export function selectControlGroup(w: World, index: number): number {
+  const state = w.sectorCommand;
+  if (!state || index < 0 || index >= state.groups.length) return 0;
+  const alive = state.groups[index]!.filter((uid) =>
+    w.enemies.some((enemy) => enemy.uid === uid && enemy.commanded && !enemy.dying));
+  state.groups[index] = alive;
+  for (const enemy of w.enemies) enemy.selectedForCommand = alive.includes(enemy.uid);
+  state.selectedUids = [...alive];
+  return alive.length;
+}
+
+/** Selects exactly one unit by uid -- the roster strip's tap target. */
+export function selectCommandedUnitByUid(w: World, uid: number): boolean {
+  const state = w.sectorCommand;
+  if (!state) return false;
+  const target = w.enemies.find((enemy) => enemy.uid === uid && enemy.commanded && !enemy.dying);
+  if (!target) return false;
+  for (const enemy of w.enemies) enemy.selectedForCommand = enemy.uid === uid;
+  state.selectedUids = [uid];
+  return true;
+}
+
 /** Ends the drag but keeps the selection -- the next tap is the order. */
 export function endCommandSelectionDrag(w: World) {
   if (w.sectorCommand) w.sectorCommand.selecting = false;
@@ -5500,7 +5801,12 @@ export function selectAllCommandedUnits(w: World): number {
  * target using the existing `formationPositions` geometry so a squad does not
  * pile onto one pixel.
  */
-export function orderSelectedUnits(w: World, targetX: number, targetY: number): number {
+export function orderSelectedUnits(
+  w: World,
+  targetX: number,
+  targetY: number,
+  kind: 'move' | 'attack-move' = 'move',
+): number {
   const state = w.sectorCommand;
   if (!state || state.selectedUids.length === 0) return 0;
   const units = state.selectedUids
@@ -5513,7 +5819,7 @@ export function orderSelectedUnits(w: World, targetX: number, targetY: number): 
     // Ring the destination so a multi-unit order reads as a formation.
     const angle = (Math.PI * 2 * index) / units.length;
     const radius = units.length === 1 ? 0 : spread * Math.ceil(units.length / 6);
-    unit.orderKind = 'move';
+    unit.orderKind = kind;
     unit.orderX = targetX + Math.cos(angle) * radius;
     unit.orderY = targetY + Math.sin(angle) * radius;
   });
@@ -6735,6 +7041,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateFluids(w);
   // Runs after enemies/breakables so objectives read this frame's state.
   updateCapturePriming(w);
+  updateFog(w);
+  updateBeacons(w, dt);
   updateMission(w, dt);
 
   // Weapon cadence.
@@ -6996,6 +7304,10 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     areaId: w.area.id,
     characterId: w.character.id,
     cleared,
+    // Sector Command: campaign credit follows the mission, never the run's
+    // generic `cleared` -- surviving the clock is not completing objectives.
+    missionId: w.mission?.def.id,
+    missionComplete: w.mission ? w.mission.complete : undefined,
     survivedSec: survival,
     kills: w.kills,
     level: w.level,

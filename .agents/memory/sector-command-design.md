@@ -103,23 +103,95 @@ action that silently does nothing is indistinguishable from a bug.** Every
 command verb needs a visible pre-state (the reticle, the capture count on the
 button) or a visible failure (the hint).
 
+### Mission success is not the run's `cleared` flag
+
+The engine ends any timed area as `cleared` at `durationSec`, which is right
+for a survivor block and wrong for a mission -- and campaign credit was keyed
+off it, so **idling out the clock banked every mission**. Objectives were
+decoration until this was fixed.
+
+The fix deliberately does *not* widen `RunOutcome` (`'running' | 'cleared' |
+'dead'`), which run summary, contracts, episodes and relics all read. Instead
+mission success rides separately: `MissionRuntime.failed` is set when the clock
+expires with a required objective outstanding, `buildResult` carries
+`missionId`/`missionComplete`, and `App.tsx` banks on `missionComplete`. The run
+still ends the ordinary way; only the campaign ledger changed.
+
+`RunSummary` now reads that pair to headline *Mission complete* / *Mission
+failed*, and is the only place the authored `debrief` string has ever been
+shown.
+
+### Tier 2 shipped: beacons
+
+Two invariants keep beacons from undoing Tier 1's tension, and both are tested:
+
+- **A beacon refills a squad, it never inflates one.** When the squad is at
+  `squadCap` the spawn tick is *skipped*, not queued, so the mobile unit
+  ceiling stays absolute.
+- **A beacon is mortal.** Hostiles standing on it break it and reinforcements
+  stop, so it is ground worth holding rather than a free tap.
+
+Beacon output is an ordinary commanded unit (`spawnEnemy` then `captureEnemy`),
+so it inherits orders, squad-cost accounting and the cap for free.
+`SectorMissionDef.economyTier` gates whether beacons exist at all -- a
+`'stolen'` mission ignores them even if its map places them.
+
+### Commanded units now fight
+
+Captured units took damage but never dealt any, which made the whole economy
+decorative -- a squad you could lose but not use. The melee exchange runs on one
+cooldown in `advanceCommandedUnit`, and unit damage is routed through
+`damageEnemy` on purpose: kill credit, loot, XP, status and kill objectives all
+work exactly as they do for the player. The accepted consequence is that crit
+and lifesteal apply to a unit's hits too.
+
+`orderKind` gained `'attack-move'`: walk the order line but break off for
+hostiles inside `UNIT_AGGRO_RANGE`, then resume. Plain `'move'` still exists
+because disengaging is a different intent from taking ground; a dock toggle
+picks which one a tap issues, so a tap still means exactly one thing.
+
+### Fog of war needed its own grid
+
+The earlier note in this file suggested reusing the renderer's shadow caster.
+**That was wrong** and is corrected here: the shadow caster is a per-frame
+lighting effect projecting breakable corners away from light sources, and it
+cannot answer "has the player seen this cell". Fog is a coarse `Uint8Array`
+grid (64-unit cells, matching the ground tile) stamped from the player and every
+commanded unit on a 120 ms throttle -- a few KB at mission scale.
+
+**Fog is presentation and targeting only.** Enemy AI still knows exactly where
+the player is. There is a parity test that runs two identically-seeded worlds,
+one foggy and one not, for 20 simulated seconds and asserts identical kills,
+enemy counts, player position and player HP. A fog that changed the simulation
+would be a much larger feature; a fog that *looked* like it had would be a lie.
+
+### What the map editor was silently eating
+
+`normalizeCustomMap` filtered placements through a hand-written category list
+that was never updated when `spawn-point` and `objective-marker` were added --
+so the editor could place them and `saveCustomMap` dropped them on the way to
+storage. Campaign maps escaped it only because they read their raw authored
+records. The list is now derived from the asset catalog, so a new category
+cannot be forgotten there again.
+
 ## Deliberately unbuilt (typed, not implemented)
 
 `SectorStructureDef`, `SectorResourceDef` and `SectorProductionDef` exist in
 `types.ts` and `SectorMissionDef.economyTier` already names the tier, so a
 mission can be authored against a tier the engine does not yet run.
 
-- **Tier 2 — Beacon.** A placeable structure that trickles basic units, so a
-  wipe is a setback rather than a dead run. Smallest real step up from Tier 1:
-  it needs a structure entity and a spawn timer, no resource model at all.
 - **Tier 3 — Production.** A real resource (`perKill` income is already the
   shape sketched) plus a build queue. This is where a base-defense mission
   becomes possible.
 
-Worth stealing later, in rough order of value per unit of work:
-fog of war (the shadow caster already exists), hero units with abilities (the
-character roster already *is* a hero roster), rally points, control-group chips,
-queued waypoints, tech tiers, and a skirmish mode against a scripted opponent.
+Worth stealing later, in rough order of value per unit of work: hero units with
+abilities (the character roster already *is* a hero roster), rally points,
+queued waypoints, tech tiers, hostile beacons you can raze (needs a
+player-targeting change, since weapons only ever target enemies), and a
+skirmish mode against a scripted opponent.
+
+Queued waypoints were scoped out of the QoL pass on purpose: on touch they cost
+another gesture for less benefit than unit combat, which was the actual gap.
 
 **Story hooks already exist.** `MissionBeatDef` carries authored lines and
 fires on elapsed time, objective completion, or a squad wipe — that is the seam
@@ -138,4 +210,12 @@ progression instead of running beside it.
 4. Unit counts stay small. The mobile ceiling is fingers, not `MAX_ENEMIES`.
 5. Mission content is data (`sectorMaps.ts` / `sectorMissions.ts`), validated
    at module load by the `mission()` factory — bad content fails at boot, not
-   mid-run.
+   mid-run. The factory now also rejects a `kill-enemy` objective naming an
+   enemy that does not exist, and a test rejects one naming an enemy the
+   mission's own map never spawns. That test caught an impossible mission the
+   day it was written.
+6. A beacon refills a squad but never inflates it past `squadCap`, and fog
+   never touches the simulation. Both are load-bearing and both are tested.
+7. On touch, an action that silently does nothing is indistinguishable from a
+   bug. Every command verb needs a visible pre-state (the capture reticle, the
+   candidate count on the button) or a visible failure (the hint line).

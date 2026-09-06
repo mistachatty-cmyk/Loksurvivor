@@ -117,6 +117,46 @@ export const SECTOR_MAPS: CustomMap[] = [
       at('encounter:crypt-spitter', 'encounter', 380, 0, 40, 40),
     ],
   },
+  {
+    // Tier 2 battleground. Built wide and open on purpose: the beacons are far
+    // enough apart that you cannot stand on both, and the extraction sits at
+    // the dark end of the yard so fog has something worth scouting.
+    id: 'sector-map-northline-yard',
+    name: 'Northline Freight Yard',
+    bounds: { w: 1600, h: 1000 },
+    groundAssetId: 'ground:northline-yard',
+    landmarkAssetId: null,
+    backdrop: 'art/street.jpeg',
+    durationSec: 330,
+    threat: 'severe',
+    updatedAt: 0,
+    placements: [
+      playerStart(-640, 380),
+      hostileEntry(680, -400),
+      hostileEntry(680, 400),
+      hostileEntry(0, -450),
+      // Two beacons, deliberately apart: holding both is the whole problem.
+      at('beacon:relay-beacon', 'beacon', -420, 40, 56, 56),
+      at('beacon:repeater-beacon', 'beacon', 300, -220, 56, 56),
+      // The far objective, past the freight rows.
+      at('objective-marker:extract', 'objective-marker', 660, 380, 64, 64),
+      at('objective-marker:hold', 'objective-marker', -60, 60, 64, 64),
+      // Freight rows: cover, sight lines, and something for fog to hide.
+      at('structure:barrier', 'structure', -220, -180, 180, 40),
+      at('structure:barrier', 'structure', 60, -60, 180, 40),
+      at('structure:barrier', 'structure', -60, 240, 180, 40),
+      at('structure:barrier', 'structure', 360, 140, 180, 40),
+      at('structure:dumpster', 'structure', -480, -260, 60, 60),
+      at('structure:dumpster', 'structure', 480, -60, 60, 60),
+      at('structure:street-lamp', 'structure', -200, 320, 30, 90),
+      at('structure:street-lamp', 'structure', 240, -360, 30, 90),
+      at('encounter:nightcrawler', 'encounter', 620, -380, 40, 40),
+      at('encounter:corner-cutter', 'encounter', 620, 380, 40, 40),
+      // Blackout at Northline hunts these; without the spawn the mission is
+      // unwinnable, which `sectorMissions.test.ts` now enforces.
+      at('encounter:crypt-bouncer', 'encounter', 0, -420, 40, 40),
+    ],
+  },
 ];
 
 export const SECTOR_MAPS_BY_ID: Record<string, CustomMap> = Object.fromEntries(

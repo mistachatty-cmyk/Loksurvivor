@@ -8,6 +8,7 @@ import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
+import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
@@ -58,15 +59,54 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
   const rumorAlly = result.crewRumor ? ALLIES_BY_ID[result.crewRumor.allyId] : undefined;
   const RumorIcon = result.crewRumor ? (RUMOR_ICONS[result.crewRumor.icon] ?? Sparkles) : Sparkles;
   const firstNight = result.firstNight;
+  // Sector Command: a mission run is judged on its objectives, so it gets its
+  // own headline and its authored debrief instead of the block-cleared copy.
+  const mission = result.missionId ? SECTOR_MISSIONS_BY_ID[result.missionId] : undefined;
+  const missionWon = Boolean(mission && result.missionComplete);
+  const title = mission
+    ? (missionWon ? 'Mission complete' : 'Mission failed')
+    : (result.cleared ? 'Block cleared' : 'You went down');
+  const positive = mission ? missionWon : result.cleared;
 
   return (
     <ScreenLayout 
-      title={result.cleared ? 'Block cleared' : 'You went down'}
-      subtitle={area.name}
+      title={title}
+      subtitle={mission ? mission.name : area.name}
       backdrop={area.backdrop}
-      className={result.cleared ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
+      className={positive ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
     >
       <div className="max-w-4xl mx-auto w-full space-y-8 mt-4">
+
+        {mission ? (
+          <section
+            className={`border p-5 ${missionWon ? 'border-amber-200/45 bg-amber-950/15' : 'border-destructive/45 bg-destructive/10'}`}
+            data-testid="section-mission-debrief"
+          >
+            <div className="flex items-center gap-2">
+              <Radio className={`h-4 w-4 ${missionWon ? 'text-amber-200' : 'text-destructive'}`} />
+              <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-white">
+                {missionWon ? 'Objectives met' : 'Objectives outstanding'}
+              </h2>
+            </div>
+            {!missionWon ? (
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-destructive/90">
+                Nothing banked — the campaign only advances on a completed mission.
+              </p>
+            ) : null}
+            <ul className="mt-3 space-y-1">
+              {mission.objectives.map((objective) => (
+                <li key={objective.id} className="font-mono text-[11px] text-white/80">
+                  · {objective.label}{objective.optional ? ' (optional)' : ''}
+                </li>
+              ))}
+            </ul>
+            {missionWon ? (
+              <p className="mt-3 border-t border-amber-200/20 pt-3 text-[13px] leading-relaxed text-white/80">
+                {mission.debrief}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         {result.completedDailyContracts && result.completedDailyContracts.length > 0 ? (
           <section className="border border-cyan-200/40 bg-cyan-950/15 p-5" data-testid="section-daily-contract-rewards">
