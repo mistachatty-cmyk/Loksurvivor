@@ -824,21 +824,50 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   };
 }
 
+/**
+ * Parses and validates a raw JSON save string, returning a fully normalised
+ * MetaState or null if the JSON is malformed or missing a usable version.
+ *
+ * Only garbage (unparsable JSON, or a missing/non-numeric version) is
+ * rejected -- an unrecognised version *value* is not, since normalizeMeta
+ * already backfills every field against createInitialMeta() defaults. So a
+ * save from an older or newer META_VERSION than this build still loads
+ * safely, without a hardcoded list of known-good versions needing a manual
+ * entry added on every content release (a save from version 16 read by a
+ * client still on 15 should keep the player's progress, not nuke it).
+ */
+function parseAndNormalizeMeta(raw: string): MetaState | null {
+  const parsed = JSON.parse(raw) as Partial<MetaState>;
+  if (parsed === null || typeof parsed !== 'object') return null;
+  if (typeof parsed.version !== 'number' || !Number.isFinite(parsed.version) || parsed.version < 1) return null;
+  // Hand-edited or half-written saves must never brick the game, so every
+  // field is normalised against the defaults rather than merged blindly.
+  return normalizeMeta(parsed);
+}
+
 export function loadMeta(): MetaState {
   if (typeof window === 'undefined') return createInitialMeta();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return createInitialMeta();
-    const parsed = JSON.parse(raw) as Partial<MetaState>;
-    if (parsed === null || typeof parsed !== 'object') return createInitialMeta();
-    if (parsed.version !== META_VERSION && parsed.version !== 14 && parsed.version !== 13 && parsed.version !== 12 && parsed.version !== 11 && parsed.version !== 10 && parsed.version !== 9 && parsed.version !== 8 && parsed.version !== 7 && parsed.version !== 6 && parsed.version !== 5 && parsed.version !== 4 && parsed.version !== 3 && parsed.version !== 2 && parsed.version !== 1) return createInitialMeta();
-    // Hand-edited or half-written saves must never brick the game, so every
-    // field is normalised against the defaults rather than merged blindly.
-    return normalizeMeta(parsed);
+    return parseAndNormalizeMeta(raw) ?? createInitialMeta();
   } catch (error) {
     console.warn('Could not read saved progress, starting fresh.', error);
     return createInitialMeta();
   }
+}
+
+/** Parses an arbitrary JSON string (e.g. an imported save file) into a safe MetaState, or null if it isn't one. */
+export function parseMetaFile(raw: string): MetaState | null {
+  try {
+    return parseAndNormalizeMeta(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function serializeMeta(meta: MetaState): string {
+  return JSON.stringify(meta, null, 2);
 }
 
 function saveMeta(meta: MetaState) {
@@ -1119,6 +1148,7 @@ type Action =
   | { type: 'saveCustomMap'; map: CustomMap }
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
+  | { type: 'replaceMeta'; meta: Partial<MetaState> }
   | { type: 'reset' };
 
 function addUnique(list: string[], value?: string): string[] {
@@ -1207,6 +1237,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'reset':
       return { meta: createInitialMeta(), lastRun: null };
+
+    // Wholesale replace, used by a cloud-save pull or a manual save import --
+    // normalised the same way a freshly-loaded localStorage save would be,
+    // so a save from another device/version can never carry a malformed field.
+    case 'replaceMeta':
+      return { ...state, meta: normalizeMeta(action.meta) };
 
     case 'clearLastRun':
       return { ...state, lastRun: null };
@@ -1802,6 +1838,8 @@ export interface MetaContextValue {
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
   resetProgress: () => void;
+  /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
+  importMeta: (meta: Partial<MetaState>) => void;
 }
 
 const MetaContext = createContext<MetaContextValue | null>(null);
@@ -1815,6 +1853,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveMeta(state.meta);
   }, [state.meta]);
+
+  // Wholesale-replace, used by a manual save import or (via CloudSyncProvider
+  // in @/state/cloudSyncStore, kept out of this file so importing pure
+  // metaStore helpers in tests never pulls in the Supabase-touching auth
+  // module) a cloud-save pull.
+  const importMeta = useCallback((meta: Partial<MetaState>) => dispatch({ type: 'replaceMeta', meta }), []);
 
   const selectCharacter = useCallback((id: string) => dispatch({ type: 'selectCharacter', id }), []);
   const selectCharacterSkin = useCallback((characterId: string, skinId: string) => dispatch({ type: 'selectCharacterSkin', characterId, skinId }), []);
@@ -2018,6 +2062,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       saveCustomMap,
       duplicateCustomMap,
       deleteCustomMap,
+      importMeta,
     };
   }, [
     state,
@@ -2078,6 +2123,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     saveCustomMap,
     duplicateCustomMap,
     deleteCustomMap,
+    importMeta,
   ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;

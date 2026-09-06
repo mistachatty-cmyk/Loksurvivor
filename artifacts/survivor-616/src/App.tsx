@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
 import { AuthProvider } from '@/state/authStore';
+import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import {
   FATIGUE_PER_RUN_PCT,
   getLokPetDiscoveries,
@@ -309,10 +310,12 @@ function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <MetaProvider>
-          <MusicProvider>
-            {children}
-            <MusicNowPlaying />
-          </MusicProvider>
+          <CloudSyncProvider>
+            <MusicProvider>
+              {children}
+              <MusicNowPlaying />
+            </MusicProvider>
+          </CloudSyncProvider>
         </MetaProvider>
       </AuthProvider>
       <Toaster />

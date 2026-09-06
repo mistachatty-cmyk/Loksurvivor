@@ -2,13 +2,16 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import {
   getSession,
   joinWaitlist,
+  loadCloudSave,
   onAuthStateChange,
+  saveCloudSave,
   signInWithApple,
   signInWithEmail,
   signInWithGoogle,
   signOut as signOutClient,
   signUpWithEmail,
   submitFeedback,
+  type CloudSaveResult,
   type FeedbackCategory,
   type JoinWaitlistInput,
   type NotificationPreference,
@@ -35,6 +38,9 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   joinWaitlist: (input: Omit<JoinWaitlistInput, 'source'>) => Promise<{ error: string | null }>;
   submitFeedback: (input: Omit<SubmitFeedbackInput, 'source' | 'userId'>) => Promise<{ error: string | null }>;
+  /** Cloud save (auth_saves), namespaced under SOURCE. null user/lokClient => no-ops. */
+  loadCloudSave: () => Promise<CloudSaveResult | null>;
+  saveCloudSave: (data: unknown) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -107,6 +113,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
+  const doLoadCloudSave = useCallback(async () => {
+    if (!lokClient || !session) return null;
+    return loadCloudSave(lokClient, session.user.id, SOURCE);
+  }, [session]);
+
+  const doSaveCloudSave = useCallback(
+    async (data: unknown) => {
+      if (!lokClient || !session) return { error: 'Not signed in.' };
+      return saveCloudSave(lokClient, session.user.id, SOURCE, data);
+    },
+    [session],
+  );
+
   const value: AuthContextValue = {
     available: Boolean(lokClient),
     session,
@@ -119,6 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: doSignOut,
     joinWaitlist: doJoinWaitlist,
     submitFeedback: doSubmitFeedback,
+    loadCloudSave: doLoadCloudSave,
+    saveCloudSave: doSaveCloudSave,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
