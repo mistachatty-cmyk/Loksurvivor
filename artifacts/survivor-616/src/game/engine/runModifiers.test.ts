@@ -4,6 +4,7 @@ import test from 'node:test';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { HORDE_SPIN_TIERS } from '@/game/data/hordeSpin';
+import { DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
 import { createWorld, stepWorld } from '@/game/engine/world';
 import type { AreaDef, WaveDef } from '@/game/types';
 
@@ -83,10 +84,76 @@ test('infiniteMode keeps the run going past durationSec and keeps the last wave 
   assert.ok(infinite.enemies.length > 0, 'infiniteMode should keep spawning from the final wave past its own toSec');
 });
 
+test('infiniteMode extends every wave tied at the true max toSec, not just the last array entry', () => {
+  // Regression test: the first implementation picked "the wave at array
+  // index length-1" as the one to extend, but several authored areas (e.g.
+  // bar-siege) have their real finale as multiple waves tied at the highest
+  // toSec that do NOT sit last in the array. Put the earlier-ending wave
+  // last here to reproduce that shape.
+  const tiedA: WaveDef = { fromSec: 0, toSec: 60, enemyId: 'bloodhound', ratePerSec: 1, burst: 1 };
+  const tiedB: WaveDef = { fromSec: 0, toSec: 60, enemyId: 'nightcrawler', ratePerSec: 1, burst: 1 };
+  const earlierButLast: WaveDef = { fromSec: 0, toSec: 40, enemyId: 'corner-cutter', ratePerSec: 1, burst: 1 };
+  const area: AreaDef = { ...areaWithWave(tiedA), durationSec: 1, waves: [tiedA, tiedB, earlierButLast] };
+  const character = CHARACTERS[0]!;
+  const world = createWorld(area, character, character.stats, 1, [], 1, true, null, { modifiers: { infiniteMode: true } });
+  // This test only cares about spawn-window bookkeeping, not combat --
+  // three overlapping waves would otherwise swarm and kill a stationary
+  // level-1 player well before t=60s, freezing w.time (stepWorld no-ops
+  // once outcome !== 'running') and making every assertion below vacuous.
+  world.player.invulnUntil = Number.POSITIVE_INFINITY;
+
+  // The player's default weapon auto-fires every step, so a live-enemies
+  // count alone would confound "stopped spawning" with "got killed off" --
+  // count spawns cumulatively instead (alive now + already killed).
+  const countOf = (id: string) => world.enemies.filter((e) => e.defId === id).length + (world.killsByEnemy[id] ?? 0);
+  for (let elapsed = 0; elapsed < 60; elapsed += 1 / 30) stepWorld(world, 1 / 30, neutralInput);
+  const bloodhoundAt60 = countOf('bloodhound');
+  const nightcrawlerAt60 = countOf('nightcrawler');
+  assert.ok(bloodhoundAt60 > 0 && nightcrawlerAt60 > 0, 'both tied waves should have spawned during their normal window');
+
+  for (let elapsed = 0; elapsed < 15; elapsed += 1 / 30) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(countOf('bloodhound') > bloodhoundAt60, 'the first tied wave should keep spawning past its shared toSec');
+  assert.ok(countOf('nightcrawler') > nightcrawlerAt60, 'the second tied wave should keep spawning past its shared toSec too, not just whichever sits last in the array');
+});
+
+test('modifierHpMult reaches enemies spawned outside the wave system (e.g. district incursions)', () => {
+  // Regression test: modifierHpMult originally lived only in updateSpawning
+  // and updateEndlessSpawning, so doubleMode/scalerMode silently never
+  // affected district incursions, the endless dungeon boss, or the elite
+  // rotation -- every spawn path that calls spawnEnemy directly with its own
+  // hpMult. It now lives inside spawnEnemy itself, so this must hold too.
+  const def = DISTRICT_INCURSIONS_BY_ID['floodwall-surge']!;
+  const area = AREAS.find((candidate) => candidate.id === def.areaId)!;
+  const character = CHARACTERS[0]!;
+
+  function triggerIncursion(scalerLevel: number | null) {
+    const world = createWorld(area, character, character.stats, 1, [], 1, true, null, {
+      districtIncursionId: def.id,
+      modifiers: scalerLevel !== null ? { scalerMode: true } : {},
+    });
+    if (scalerLevel !== null) world.level = scalerLevel;
+    world.time = def.triggerAtSec - def.warningLeadSec;
+    world.now = world.time * 1000;
+    for (let elapsed = 0; elapsed < def.warningLeadSec; elapsed += 1 / 30) stepWorld(world, 1 / 30, neutralInput);
+    assert.equal(world.districtIncursion?.phase, 'active');
+    return world;
+  }
+
+  const base = triggerIncursion(null);
+  const scaled = triggerIncursion(40);
+  assert.ok(base.enemies.length > 0 && scaled.enemies.length > 0, 'the incursion should have spawned its hand-placed enemies');
+  assert.ok(scaled.enemies[0]!.hp > base.enemies[0]!.hp, 'scalerMode should raise incursion enemy hp too, not just wave-spawned enemies');
+});
+
 test('HordeSpin runs a full idle -> spinning -> result -> active -> reward cycle', () => {
   const area = areaWithWave({ ...immediateWave, ratePerSec: 0 });
   const character = CHARACTERS[0]!;
   const world = createWorld(area, character, character.stats, 7, [], 1, true, null, { modifiers: { hordeSpinEnabled: true } });
+  // A rare high tier (5x5/666) spawns enough enemies that a stationary
+  // level-1 player could die before the cycle completes, which would freeze
+  // w.time and fail every assertion below for a reason unrelated to what
+  // this test checks -- see the infiniteMode test above for the same trap.
+  world.player.invulnUntil = Number.POSITIVE_INFINITY;
   assert.ok(world.wheelSpin, 'hordeSpinEnabled should initialize wheel state');
   assert.equal(world.wheelSpin!.phase, 'idle');
 
