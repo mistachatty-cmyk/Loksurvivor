@@ -251,6 +251,28 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     cost: 90,
     maxStacks: 1,
   },
+
+  // -- Essence-forged: crafted from the crypto farm's Digital Essence instead of cred or keys. --
+  {
+    id: 'essence-forged-plating',
+    name: 'Essence-Forged Plating',
+    description: '+3% contact resistance per stack, mined and cast from raw Digital Essence.',
+    category: 'stat',
+    cost: 120,
+    maxStacks: 3,
+    currency: 'digitalEssence',
+    effects: [{ kind: 'stat', stat: 'armor', add: 0.03, cap: 0.6 }],
+  },
+  {
+    id: 'essence-forged-reflexes',
+    name: 'Essence-Forged Reflexes',
+    description: '+2% crit chance per stack. The essence hums right before it lands.',
+    category: 'stat',
+    cost: 150,
+    maxStacks: 3,
+    currency: 'digitalEssence',
+    effects: [{ kind: 'stat', stat: 'crit', add: 0.02, cap: 0.4 }],
+  },
 ];
 
 export const VENDOR_CATALOG_BY_ID: Record<string, VendorItemDef> = Object.fromEntries(

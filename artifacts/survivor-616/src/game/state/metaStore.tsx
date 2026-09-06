@@ -41,6 +41,14 @@ import {
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import {
+  CRYPTO_FARM_CAPACITY_TIERS,
+  CRYPTO_FARM_RATE_TIERS,
+  CRYPTO_FARM_UNLOCK_COST,
+  ESSENCE_PACKS_BY_ID,
+  rollCollectibleCard,
+  toOwnedCard,
+} from '@/game/data/cryptoFarm';
+import {
   advanceDailyContracts,
   contractDayKey,
   dailyContractDefs,
@@ -66,6 +74,7 @@ import type {
   CharacterEpisodeDef,
   CharacterDef,
   HubRoomDef,
+  OwnedCollectibleCard,
   LokPetAttackKind,
   LokPetCatalogEntry,
   LokPetCatalogTrait,
@@ -215,6 +224,15 @@ export function createInitialMeta(): MetaState {
     dailyContractDayKey: contractDayKey(),
     dailyContractProgressById: {},
     completedDailyContractIds: [],
+    cryptoFarmUnlocked: false,
+    cryptoFarmCharge: 0,
+    cryptoFarmBankedCharges: 0,
+    cryptoFarmCapacityLevel: 1,
+    cryptoFarmRateLevel: 0,
+    cryptoFarmUpdatedAt: Date.now(),
+    digitalEssence: 0,
+    essencePacksOpened: 0,
+    collectibleCards: [],
   };
 }
 
@@ -587,12 +605,111 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
   }).slice(0, 48);
 }
 
+const CARD_RARITIES = new Set(['standard', 'uncommon', 'rare', 'legendary']);
+const CARD_VARIANTS = new Set(['standard', 'foil', 'holo', 'gold']);
+const CARD_SOURCES = new Set(['crypto-farm', 'essence-pack']);
+
+function normalizeCollectibleCards(value: unknown): OwnedCollectibleCard[] {
+  if (!Array.isArray(value)) return [];
+  const characterIds = new Set(CHARACTERS.map((c) => c.id));
+  return value.flatMap((entry): OwnedCollectibleCard[] => {
+    if (!entry || typeof entry !== 'object') return [];
+    const candidate = entry as Partial<OwnedCollectibleCard>;
+    if (
+      typeof candidate.instanceId !== 'string' ||
+      typeof candidate.characterId !== 'string' || !characterIds.has(candidate.characterId) ||
+      typeof candidate.rarity !== 'string' || !CARD_RARITIES.has(candidate.rarity) ||
+      typeof candidate.variant !== 'string' || !CARD_VARIANTS.has(candidate.variant) ||
+      typeof candidate.source !== 'string' || !CARD_SOURCES.has(candidate.source)
+    ) return [];
+    return [{
+      instanceId: candidate.instanceId,
+      characterId: candidate.characterId,
+      rarity: candidate.rarity as OwnedCollectibleCard['rarity'],
+      rarityLabel: typeof candidate.rarityLabel === 'string' ? candidate.rarityLabel : candidate.rarity,
+      variant: candidate.variant as OwnedCollectibleCard['variant'],
+      value: Math.max(0, counter(candidate.value)),
+      acquiredAt: typeof candidate.acquiredAt === 'number' ? candidate.acquiredAt : Date.now(),
+      source: candidate.source as OwnedCollectibleCard['source'],
+    }];
+  }).slice(0, 2000);
+}
+
 function replenishPetElixirs(meta: MetaState, now = Date.now()): Pick<MetaState, 'petElixirs' | 'petElixirUpdatedAt'> {
   const elapsed = Math.max(0, now - meta.petElixirUpdatedAt);
   const grants = Math.floor(elapsed / ELIXIR_GRANT_MS);
   return grants > 0
     ? { petElixirs: Math.min(ELIXIR_CAP, meta.petElixirs + grants * ELIXIR_GRANT_AMOUNT), petElixirUpdatedAt: meta.petElixirUpdatedAt + grants * ELIXIR_GRANT_MS }
     : { petElixirs: meta.petElixirs, petElixirUpdatedAt: meta.petElixirUpdatedAt };
+}
+
+/** Reaching this capacity level unlocks a chance for a collected charge to also drop a free essence pack. */
+export const CRYPTO_FARM_MAXED_LEVEL = CRYPTO_FARM_CAPACITY_TIERS[CRYPTO_FARM_CAPACITY_TIERS.length - 1].level;
+const CRYPTO_FARM_CARD_CHANCE_PER_CHARGE = 0.1;
+const CRYPTO_FARM_BONUS_PACK_CHANCE_PER_CHARGE = 0.12;
+const CRYPTO_FARM_ESSENCE_PER_CHARGE_MIN = 8;
+const CRYPTO_FARM_ESSENCE_PER_CHARGE_MAX = 14;
+
+export function cryptoFarmCapacityTier(level: number) {
+  const index = Math.max(0, Math.min(CRYPTO_FARM_CAPACITY_TIERS.length - 1, level - 1));
+  return CRYPTO_FARM_CAPACITY_TIERS[index];
+}
+
+export function cryptoFarmRateTier(level: number) {
+  const index = Math.max(0, Math.min(CRYPTO_FARM_RATE_TIERS.length - 1, level));
+  return CRYPTO_FARM_RATE_TIERS[index];
+}
+
+/** Folds elapsed wall-clock time into charge/banked-charge progress -- the same shape as `replenishPetElixirs`, but continuous instead of granted in batches, and capped by the owned capacity tier instead of a fixed ceiling. */
+function replenishCryptoFarm(meta: MetaState, now = Date.now()): Pick<MetaState, 'cryptoFarmCharge' | 'cryptoFarmBankedCharges' | 'cryptoFarmUpdatedAt'> {
+  if (!meta.cryptoFarmUnlocked) {
+    return { cryptoFarmCharge: 0, cryptoFarmBankedCharges: 0, cryptoFarmUpdatedAt: now };
+  }
+  const maxBanked = cryptoFarmCapacityTier(meta.cryptoFarmCapacityLevel).maxBankedCharges;
+  if (meta.cryptoFarmBankedCharges >= maxBanked) {
+    return { cryptoFarmCharge: 0, cryptoFarmBankedCharges: meta.cryptoFarmBankedCharges, cryptoFarmUpdatedAt: now };
+  }
+  const elapsedSec = Math.max(0, (now - meta.cryptoFarmUpdatedAt) / 1000);
+  const rate = cryptoFarmRateTier(meta.cryptoFarmRateLevel).chargePerSec;
+  let charge = meta.cryptoFarmCharge + rate * elapsedSec;
+  let bankedCharges = meta.cryptoFarmBankedCharges;
+  while (charge >= 1 && bankedCharges < maxBanked) {
+    charge -= 1;
+    bankedCharges += 1;
+  }
+  if (bankedCharges >= maxBanked) charge = 0;
+  return { cryptoFarmCharge: charge, cryptoFarmBankedCharges: bankedCharges, cryptoFarmUpdatedAt: now };
+}
+
+/** Pure snapshot for UI: recomputes from the persisted timestamp so a render loop can show a smoothly filling meter without dispatching every frame. */
+export function cryptoFarmLiveState(meta: MetaState, now = Date.now()) {
+  const capacity = cryptoFarmCapacityTier(meta.cryptoFarmCapacityLevel);
+  const rate = cryptoFarmRateTier(meta.cryptoFarmRateLevel);
+  const resolved = replenishCryptoFarm(meta, now);
+  return {
+    unlocked: meta.cryptoFarmUnlocked,
+    charge: resolved.cryptoFarmCharge,
+    bankedCharges: resolved.cryptoFarmBankedCharges,
+    maxBankedCharges: capacity.maxBankedCharges,
+    chargePerSec: rate.chargePerSec,
+    isFull: resolved.cryptoFarmBankedCharges >= capacity.maxBankedCharges,
+    isMaxCapacity: meta.cryptoFarmCapacityLevel >= CRYPTO_FARM_MAXED_LEVEL,
+  };
+}
+
+/** Resolves one banked charge into essence, and rolls the card / bonus-pack chances riding along with it. */
+function resolveCryptoFarmCharge(rng: () => number, capacityLevel: number): { essence: number; card?: ReturnType<typeof rollCollectibleCard> } {
+  const essence = CRYPTO_FARM_ESSENCE_PER_CHARGE_MIN + Math.floor(rng() * (CRYPTO_FARM_ESSENCE_PER_CHARGE_MAX - CRYPTO_FARM_ESSENCE_PER_CHARGE_MIN + 1));
+  if (rng() < CRYPTO_FARM_CARD_CHANCE_PER_CHARGE) {
+    return { essence, card: rollCollectibleCard(rng) };
+  }
+  if (capacityLevel >= CRYPTO_FARM_MAXED_LEVEL && rng() < CRYPTO_FARM_BONUS_PACK_CHANCE_PER_CHARGE) {
+    const bonusPack = ESSENCE_PACKS_BY_ID['copper-essence-pack'];
+    const bonusEssence = bonusPack ? bonusPack.essenceMin + Math.floor(rng() * (bonusPack.essenceMax - bonusPack.essenceMin + 1)) : 0;
+    const card = bonusPack && rng() < bonusPack.cardChance ? rollCollectibleCard(rng) : undefined;
+    return { essence: essence + bonusEssence, card };
+  }
+  return { essence };
 }
 
 /** Coerce an untrusted save payload into a usable MetaState. */
@@ -730,6 +847,17 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     petElixirs: Math.min(ELIXIR_CAP, counter(parsed.petElixirs ?? 3)),
     petElixirUpdatedAt: Math.max(0, typeof parsed.petElixirUpdatedAt === 'number' ? parsed.petElixirUpdatedAt : Date.now()),
   });
+  const cryptoFarmCapacityLevel = Math.max(1, Math.min(CRYPTO_FARM_CAPACITY_TIERS.length, counter(parsed.cryptoFarmCapacityLevel, 1)));
+  const cryptoFarmRateLevel = Math.max(0, Math.min(CRYPTO_FARM_RATE_TIERS.length - 1, counter(parsed.cryptoFarmRateLevel)));
+  const recoveredCryptoFarm = replenishCryptoFarm({
+    ...defaults,
+    cryptoFarmUnlocked: parsed.cryptoFarmUnlocked === true,
+    cryptoFarmCapacityLevel,
+    cryptoFarmRateLevel,
+    cryptoFarmCharge: Math.max(0, typeof parsed.cryptoFarmCharge === 'number' ? parsed.cryptoFarmCharge : 0),
+    cryptoFarmBankedCharges: Math.max(0, Math.min(cryptoFarmCapacityTier(cryptoFarmCapacityLevel).maxBankedCharges, counter(parsed.cryptoFarmBankedCharges))),
+    cryptoFarmUpdatedAt: Math.max(0, typeof parsed.cryptoFarmUpdatedAt === 'number' ? parsed.cryptoFarmUpdatedAt : Date.now()),
+  });
 
   return {
     version: META_VERSION,
@@ -821,6 +949,13 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
+    cryptoFarmUnlocked: parsed.cryptoFarmUnlocked === true,
+    cryptoFarmCapacityLevel,
+    cryptoFarmRateLevel,
+    ...recoveredCryptoFarm,
+    digitalEssence: counter(parsed.digitalEssence),
+    essencePacksOpened: counter(parsed.essencePacksOpened),
+    collectibleCards: normalizeCollectibleCards(parsed.collectibleCards),
   };
 }
 
@@ -1119,6 +1254,13 @@ type Action =
   | { type: 'saveCustomMap'; map: CustomMap }
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
+  | { type: 'unlockCryptoFarm'; now: number }
+  | { type: 'refreshCryptoFarm'; now: number }
+  | { type: 'collectCryptoFarm'; now: number }
+  | { type: 'buyCryptoFarmCapacity'; now: number }
+  | { type: 'buyCryptoFarmRate'; now: number }
+  | { type: 'buyEssencePack'; id: string; now: number }
+  | { type: 'recycleCard'; instanceId: string }
   | { type: 'reset' };
 
 function addUnique(list: string[], value?: string): string[] {
@@ -1256,7 +1398,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
     }
 
     case 'refundAllVendorItems': {
-      const refundByCurrency: Partial<Record<'cred' | 'skeletonKeys', number>> = {};
+      const refundByCurrency: Partial<Record<'cred' | 'skeletonKeys' | 'digitalEssence', number>> = {};
       for (const item of VENDOR_CATALOG) {
         const owned = Math.min(item.maxStacks, Math.max(0, Math.floor(state.meta.vendorPurchases[item.id] ?? 0)));
         if (owned <= 0) continue;
@@ -1270,6 +1412,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
           ...state.meta,
           cred: state.meta.cred + (refundByCurrency.cred ?? 0),
           skeletonKeys: state.meta.skeletonKeys + (refundByCurrency.skeletonKeys ?? 0),
+          digitalEssence: state.meta.digitalEssence + (refundByCurrency.digitalEssence ?? 0),
           vendorPurchases: {},
         },
       };
@@ -1576,6 +1719,117 @@ export function reducer(state: StoreState, action: Action): StoreState {
         meta: { ...state.meta, customMaps: state.meta.customMaps.filter((map) => map.id !== action.id) },
       };
 
+    case 'unlockCryptoFarm': {
+      if (state.meta.cryptoFarmUnlocked || state.meta.cred < CRYPTO_FARM_UNLOCK_COST) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - CRYPTO_FARM_UNLOCK_COST,
+          cryptoFarmUnlocked: true,
+          cryptoFarmCharge: 0,
+          cryptoFarmBankedCharges: 0,
+          cryptoFarmUpdatedAt: action.now,
+        },
+      };
+    }
+
+    case 'refreshCryptoFarm': {
+      if (!state.meta.cryptoFarmUnlocked) return state;
+      const resolved = replenishCryptoFarm(state.meta, action.now);
+      if (resolved.cryptoFarmBankedCharges === state.meta.cryptoFarmBankedCharges && resolved.cryptoFarmCharge === state.meta.cryptoFarmCharge) return state;
+      return { ...state, meta: { ...state.meta, ...resolved } };
+    }
+
+    case 'collectCryptoFarm': {
+      if (!state.meta.cryptoFarmUnlocked) return state;
+      const resolved = replenishCryptoFarm(state.meta, action.now);
+      if (resolved.cryptoFarmBankedCharges <= 0) return { ...state, meta: { ...state.meta, ...resolved } };
+      let essenceGained = 0;
+      const newCards: OwnedCollectibleCard[] = [];
+      for (let i = 0; i < resolved.cryptoFarmBankedCharges; i++) {
+        const result = resolveCryptoFarmCharge(Math.random, state.meta.cryptoFarmCapacityLevel);
+        essenceGained += result.essence;
+        if (result.card) {
+          newCards.push(toOwnedCard(result.card, 'crypto-farm', action.now, `card-${action.now.toString(36)}-${i}-${Math.random().toString(36).slice(2, 7)}`));
+        }
+      }
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cryptoFarmCharge: resolved.cryptoFarmCharge,
+          cryptoFarmBankedCharges: 0,
+          cryptoFarmUpdatedAt: action.now,
+          digitalEssence: state.meta.digitalEssence + essenceGained,
+          collectibleCards: newCards.length > 0 ? [...state.meta.collectibleCards, ...newCards] : state.meta.collectibleCards,
+        },
+      };
+    }
+
+    case 'buyCryptoFarmCapacity': {
+      if (!state.meta.cryptoFarmUnlocked) return state;
+      const nextLevel = state.meta.cryptoFarmCapacityLevel + 1;
+      const nextTier = CRYPTO_FARM_CAPACITY_TIERS.find((tier) => tier.level === nextLevel);
+      if (!nextTier || state.meta.cred < nextTier.cost) return state;
+      const settled = replenishCryptoFarm(state.meta, action.now);
+      return {
+        ...state,
+        meta: { ...state.meta, ...settled, cred: state.meta.cred - nextTier.cost, cryptoFarmCapacityLevel: nextLevel },
+      };
+    }
+
+    case 'buyCryptoFarmRate': {
+      if (!state.meta.cryptoFarmUnlocked) return state;
+      const nextLevel = state.meta.cryptoFarmRateLevel + 1;
+      const nextTier = CRYPTO_FARM_RATE_TIERS.find((tier) => tier.level === nextLevel);
+      if (!nextTier || state.meta.cred < nextTier.cost) return state;
+      const settled = replenishCryptoFarm(state.meta, action.now);
+      return {
+        ...state,
+        meta: { ...state.meta, ...settled, cred: state.meta.cred - nextTier.cost, cryptoFarmRateLevel: nextLevel },
+      };
+    }
+
+    case 'buyEssencePack': {
+      const pack = ESSENCE_PACKS_BY_ID[action.id];
+      if (!pack || state.meta.cred < pack.cost) return state;
+      const essence = pack.essenceMin + Math.floor(Math.random() * (pack.essenceMax - pack.essenceMin + 1));
+      const newCards: OwnedCollectibleCard[] = [];
+      for (let i = 0; i < pack.cardRolls; i++) {
+        if (Math.random() >= pack.cardChance) continue;
+        const minRarity = i === 0 ? pack.guaranteeMinRarity : undefined;
+        const card = rollCollectibleCard(Math.random, minRarity);
+        newCards.push(toOwnedCard(card, 'essence-pack', action.now, `card-${action.now.toString(36)}-${i}-${Math.random().toString(36).slice(2, 7)}`));
+      }
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - pack.cost,
+          digitalEssence: state.meta.digitalEssence + essence,
+          essencePacksOpened: state.meta.essencePacksOpened + 1,
+          collectibleCards: newCards.length > 0 ? [...state.meta.collectibleCards, ...newCards] : state.meta.collectibleCards,
+        },
+      };
+    }
+
+    case 'recycleCard': {
+      const card = state.meta.collectibleCards.find((c) => c.instanceId === action.instanceId);
+      if (!card) return state;
+      // Protects the player's last copy of a character, like the LOKdex recycler this mirrors.
+      const remainingOfCharacter = state.meta.collectibleCards.filter((c) => c.characterId === card.characterId).length;
+      if (remainingOfCharacter <= 1) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          digitalEssence: state.meta.digitalEssence + card.value,
+          collectibleCards: state.meta.collectibleCards.filter((c) => c.instanceId !== action.instanceId),
+        },
+      };
+    }
+
     case 'completeRun': {
       const result = action.result;
       const prev = state.meta;
@@ -1801,6 +2055,13 @@ export interface MetaContextValue {
   saveCustomMap: (map: CustomMap) => void;
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
+  unlockCryptoFarm: () => void;
+  refreshCryptoFarm: () => void;
+  collectCryptoFarm: () => void;
+  buyCryptoFarmCapacity: () => void;
+  buyCryptoFarmRate: () => void;
+  buyEssencePack: (id: string) => void;
+  recycleCard: (instanceId: string) => void;
   resetProgress: () => void;
 }
 
@@ -1925,6 +2186,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const saveCustomMap = useCallback((map: CustomMap) => dispatch({ type: 'saveCustomMap', map }), []);
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
+  const unlockCryptoFarm = useCallback(() => dispatch({ type: 'unlockCryptoFarm', now: Date.now() }), []);
+  const refreshCryptoFarm = useCallback(() => dispatch({ type: 'refreshCryptoFarm', now: Date.now() }), []);
+  const collectCryptoFarm = useCallback(() => dispatch({ type: 'collectCryptoFarm', now: Date.now() }), []);
+  const buyCryptoFarmCapacity = useCallback(() => dispatch({ type: 'buyCryptoFarmCapacity', now: Date.now() }), []);
+  const buyCryptoFarmRate = useCallback(() => dispatch({ type: 'buyCryptoFarmRate', now: Date.now() }), []);
+  const buyEssencePack = useCallback((id: string) => dispatch({ type: 'buyEssencePack', id, now: Date.now() }), []);
+  const recycleCard = useCallback((instanceId: string) => dispatch({ type: 'recycleCard', instanceId }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -2018,6 +2286,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       saveCustomMap,
       duplicateCustomMap,
       deleteCustomMap,
+      unlockCryptoFarm,
+      refreshCryptoFarm,
+      collectCryptoFarm,
+      buyCryptoFarmCapacity,
+      buyCryptoFarmRate,
+      buyEssencePack,
+      recycleCard,
     };
   }, [
     state,
@@ -2078,6 +2353,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     saveCustomMap,
     duplicateCustomMap,
     deleteCustomMap,
+    unlockCryptoFarm,
+    refreshCryptoFarm,
+    collectCryptoFarm,
+    buyCryptoFarmCapacity,
+    buyCryptoFarmRate,
+    buyEssencePack,
+    recycleCard,
   ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;

@@ -1239,7 +1239,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'account' | 'feedback'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'crypto-farm' | 'settings' | 'palette-store' | 'account' | 'feedback'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1309,7 +1309,7 @@ export interface VendorItemDef {
   effects?: VendorEffect[];
   challengeId?: string;
   /** Currency this item is priced in. Omitted means 'cred', the original default. */
-  currency?: 'cred' | 'skeletonKeys';
+  currency?: 'cred' | 'skeletonKeys' | 'digitalEssence';
   /**
    * Another vendor item's id that must own at least one stack first. Used to
    * chain "ability" category items into a purchase tree (e.g. minimap tiers,
@@ -1424,6 +1424,60 @@ export interface CelebrationDef {
   cost: number;
   tier: CosmeticTier;
   style: CelebrationStyle;
+}
+
+/* ------------------------------------------------------------------ */
+/* Crypto farm & collectible cast cards                                */
+/* ------------------------------------------------------------------ */
+
+/** Card rarity reuses the cosmetic tier scale so both systems read consistently. */
+export type CollectibleCardRarity = CosmeticTier;
+/** Print finish on a specific card copy; independent from rarity, like the hideout's cosmetic variants. */
+export type CollectibleCardVariant = 'standard' | 'foil' | 'holo' | 'gold';
+
+export interface OwnedCollectibleCard {
+  instanceId: string;
+  /** References a `CharacterDef.id` from the survivor-616 cast; not required to be unlocked yet. */
+  characterId: string;
+  rarity: CollectibleCardRarity;
+  rarityLabel: string;
+  variant: CollectibleCardVariant;
+  /** Digital Essence this copy refunds if recycled. */
+  value: number;
+  acquiredAt: number;
+  source: 'crypto-farm' | 'essence-pack';
+}
+
+export interface CryptoFarmCapacityTierDef {
+  /** 1-indexed; level 1 is the farm's base capacity, owned as soon as the rig is unlocked. */
+  level: number;
+  maxBankedCharges: number;
+  /** Cred cost to buy this tier from the previous one; 0 for level 1 (bundled with the unlock). */
+  cost: number;
+}
+
+export interface CryptoFarmRateTierDef {
+  /** 0-indexed; level 0 is the farm's base rate, owned as soon as the rig is unlocked. */
+  level: number;
+  chargePerSec: number;
+  /** Cred cost to buy this tier from the previous one; 0 for level 0. */
+  cost: number;
+}
+
+export interface EssencePackDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Cred cost. */
+  cost: number;
+  essenceMin: number;
+  essenceMax: number;
+  /** Independent rolls against the collectible-card table. */
+  cardRolls: number;
+  /** Chance per roll, 0..1. */
+  cardChance: number;
+  /** The first successful roll is re-rolled up to this floor rarity. */
+  guaranteeMinRarity?: CollectibleCardRarity;
 }
 
 export type UpgradeEffect =
@@ -1604,6 +1658,24 @@ export interface MetaState {
   dailyContractProgressById: Record<string, number>;
   /** Contracts already paid out for today's Broadcast board. */
   completedDailyContractIds: string[];
+  /** Whether the player has bought the crypto farm rig in the hideout. */
+  cryptoFarmUnlocked: boolean;
+  /** Fractional progress (0..1) toward the next banked charge. */
+  cryptoFarmCharge: number;
+  /** Charges banked and awaiting collection, capped by the owned capacity tier. */
+  cryptoFarmBankedCharges: number;
+  /** Owned capacity tier level; see `CRYPTO_FARM_CAPACITY_TIERS`. */
+  cryptoFarmCapacityLevel: number;
+  /** Owned rate ("overclock") tier level; see `CRYPTO_FARM_RATE_TIERS`. */
+  cryptoFarmRateLevel: number;
+  /** Wall-clock ms the charge math was last resolved to, so the farm keeps earning while the tab or app is closed. */
+  cryptoFarmUpdatedAt: number;
+  /** Crafting currency minted by the crypto farm and essence packs. */
+  digitalEssence: number;
+  /** Essence packs opened, for stats/flavor text. */
+  essencePacksOpened: number;
+  /** Collectible cast cards pulled from the crypto farm and essence packs. */
+  collectibleCards: OwnedCollectibleCard[];
 }
 
 /* ------------------------------------------------------------------ */

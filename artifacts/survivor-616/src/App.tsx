@@ -28,6 +28,7 @@ import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
 import { VendorPanel } from '@/ui/VendorPanel';
 import { WorkshopPanel } from '@/ui/WorkshopPanel';
+import { CryptoFarmPanel } from '@/ui/CryptoFarmPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
 import { AccountPanel } from '@/ui/AccountPanel';
@@ -54,6 +55,7 @@ type Screen =
   | { name: 'recovery' }
   | { name: 'vendor' }
   | { name: 'workshop' }
+  | { name: 'crypto-farm' }
   | { name: 'settings' }
   | { name: 'palette-store' }
   | { name: 'account' }
@@ -134,6 +136,9 @@ function Game() {
         break;
       case 'workshop':
         setScreen({ name: 'workshop' });
+        break;
+      case 'crypto-farm':
+        setScreen({ name: 'crypto-farm' });
         break;
       case 'settings':
         setScreen({ name: 'settings' });
@@ -237,6 +242,9 @@ function Game() {
 
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
+
+    case 'crypto-farm':
+      return <CryptoFarmPanel onBack={goHub} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} />;
