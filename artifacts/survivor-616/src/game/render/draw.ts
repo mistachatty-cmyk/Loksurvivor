@@ -3076,6 +3076,28 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     // Sector Command: a selected unit gets a bright ring, and a unit walking
     // to an order gets a thin line to where it is going. Captured units
     // already read as allies via the existing `converted` tint below.
+    // Sector Command: a primed enemy is one you can grab *right now*. Without
+    // this the capture button was a lottery -- you could not tell who was in
+    // the window, or that a window existed.
+    if (!enemy.commanded && !enemy.dying && enemy.capturableUntil > w.now) {
+      const pulse = 0.55 + 0.35 * Math.sin(w.now / 130);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#65f6d1';
+      ctx.shadowColor = '#65f6d1';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
+      const r = enemy.radius + 10;
+      // Four corner brackets read as a reticle without hiding the sprite.
+      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + sx * r, enemy.y + 2 + sy * r - sy * 6);
+        ctx.lineTo(enemy.x + sx * r, enemy.y + 2 + sy * r);
+        ctx.lineTo(enemy.x + sx * r - sx * 6, enemy.y + 2 + sy * r);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     if (enemy.commanded && !enemy.dying) {
       if (enemy.selectedForCommand) {
         ctx.save();

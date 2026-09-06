@@ -73,6 +73,36 @@ That zoom-out also exposed a latent renderer bug worth remembering:
 border, which is always enough at the default zoom and visibly not enough when
 zoomed out. It now derives its extents from the visible world rect.
 
+### What the first playtest broke on
+
+Three complaints, all the same root cause -- the controls were *correct* and
+gave the player nothing to read:
+
+- **"You kill units before you can add them."** `captureHpFraction` is 0.35-0.5,
+  auto-fire DPS is high, and nothing showed who was capturable. The window
+  between "weak enough" and "dead" was often a single frame. Fixed with capture
+  **priming**: an enemy weakened inside `CAPTURE_REACH` gets
+  `capturableUntil = now + 3.5s`, and while primed `damageEnemy` floors it at
+  1 hp instead of killing it. Again the choke point earns its keep -- one line
+  covers every weapon, splash and status path. Scoped to missions
+  (`w.sectorCommand` non-null), so ordinary runs are untouched, and there is a
+  test asserting priming never leaks outside Sector Command.
+- **"Hard to drag over characters."** The marquee tested point-in-box against a
+  ~10px sprite, so a drag that visibly crossed a unit could select nothing. It
+  now tests overlap, inflating by `enemy.radius + SELECTION_TOUCH_PAD`. The box
+  also draws from pointer-down at zero size; waiting for the 12px slop before
+  rendering anything made the drag feel like it had failed to start.
+- **"Commanding is buggy."** A tap on your own unit did nothing -- taps only
+  ever issued orders -- and an order with an empty selection failed silently.
+  Tap grammar is now: tap a unit (within `TAP_SELECT_RADIUS`, snap-to-nearest)
+  selects just that unit; any other tap orders the standing selection; an order
+  with nothing selected raises a one-line hint instead of nothing.
+
+The general lesson, worth applying to anything added here: **on touch, an
+action that silently does nothing is indistinguishable from a bug.** Every
+command verb needs a visible pre-state (the reticle, the capture count on the
+button) or a visible failure (the hint).
+
 ## Deliberately unbuilt (typed, not implemented)
 
 `SectorStructureDef`, `SectorResourceDef` and `SectorProductionDef` exist in

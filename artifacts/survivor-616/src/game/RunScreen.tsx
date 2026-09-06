@@ -37,6 +37,7 @@ import {
   missionSnapshot,
   orderSelectedUnits,
   selectAllCommandedUnits,
+  selectCommandedUnitAt,
   setCommandMode,
   updateCommandSelection,
   primePhysicsObject,
@@ -226,6 +227,7 @@ export function RunScreen({
   const [commandBox, setCommandBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [commandModeOn, setCommandModeOn] = useState(false);
   const [commanderView, setCommanderView] = useState(false);
+  const [commandHint, setCommandHint] = useState<string | null>(null);
   const [missionHud, setMissionHud] = useState<ReturnType<typeof missionSnapshot>>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
   const [reelTick, setReelTick] = useState(0);
@@ -301,6 +303,13 @@ export function RunScreen({
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // The command hint is a nudge, not a state: it clears itself.
+  useEffect(() => {
+    if (!commandHint) return;
+    const timer = window.setTimeout(() => setCommandHint(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [commandHint]);
 
   const setPhaseBoth = useCallback((next: RunPhase) => {
     // Once a run is over it stays over -- nothing may steal the hand-off.
@@ -418,6 +427,9 @@ export function RunScreen({
       pointerModeRef.current = 'commandSelect';
       commandPointerIdRef.current = event.pointerId;
       commandOriginRef.current = { worldX: point.x, worldY: point.y, clientX: event.clientX, clientY: event.clientY };
+      // Show the box immediately at zero size. Waiting for the slop threshold
+      // to draw anything made the marquee feel like it had failed to start.
+      setCommandBox({ x: event.clientX, y: event.clientY, w: 0, h: 0 });
       return;
     }
 
@@ -595,8 +607,19 @@ export function RunScreen({
       if (!world || !origin) return;
       const wasTap = event.type !== 'pointercancel'
         && Math.hypot(event.clientX - origin.clientX, event.clientY - origin.clientY) <= COMMAND_TAP_SLOP;
-      if (wasTap) orderSelectedUnits(world, origin.worldX, origin.worldY);
-      else endCommandSelectionDrag(world);
+      if (!wasTap) {
+        endCommandSelectionDrag(world);
+        return;
+      }
+      // Tap grammar, in priority order: a tap on one of your own units selects
+      // just that unit (the touch stand-in for clicking a portrait, and the
+      // only way to pick one unit out of a stack); any other tap orders the
+      // standing selection. Without the first branch, tapping a unit did
+      // nothing at all, which reads as command mode being broken.
+      if (selectCommandedUnitAt(world, origin.worldX, origin.worldY) > 0) return;
+      if (orderSelectedUnits(world, origin.worldX, origin.worldY) === 0) {
+        setCommandHint('Select units first — drag over them, or tap one');
+      }
       return;
     }
     if (pointerModeRef.current === 'freezeSelect') {
@@ -1343,6 +1366,16 @@ export function RunScreen({
         </div>
       ) : null}
 
+      {/* Sector Command: one-line coaching when an action did nothing. */}
+      {commandHint ? (
+        <div
+          className="pointer-events-none absolute bottom-[14.5rem] left-1/2 z-40 max-w-[70vw] -translate-x-1/2 border border-amber-300/50 bg-black/85 px-2 py-1 text-center font-mono text-[9px] uppercase leading-snug tracking-wider text-amber-100"
+          data-testid="command-hint"
+        >
+          {commandHint}
+        </div>
+      ) : null}
+
       {/* Sector Command: the thumb dock. Command mode swaps the pointer grammar. */}
       {missionHud ? (
         <div className="absolute bottom-5 left-3 z-40 flex flex-col gap-1.5 sm:bottom-8 sm:left-6" data-testid="command-dock">
@@ -1368,11 +1401,15 @@ export function RunScreen({
           </button>
           <button
             type="button"
-            onClick={() => { const world = worldRef.current; if (world) captureNearestEnemy(world); }}
-            className="h-11 w-[5.5rem] rounded-md border-2 border-emerald-300/60 bg-black/75 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-100"
+            disabled={(missionHud.captureCandidates ?? 0) === 0}
+            onClick={() => {
+              const world = worldRef.current;
+              if (world && !captureNearestEnemy(world)) setCommandHint('Nothing in reach is weak enough yet');
+            }}
+            className="h-11 w-[5.5rem] rounded-md border-2 border-emerald-300/60 bg-black/75 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-100 disabled:border-white/20 disabled:text-white/35"
             data-testid="button-capture"
           >
-            Capture
+            {missionHud.captureCandidates > 0 ? `Capture ${missionHud.captureCandidates}` : 'Capture'}
           </button>
           <button
             type="button"

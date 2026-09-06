@@ -178,6 +178,12 @@ export interface EnemyActor extends Actor {
   orderY: number;
   /** Sector Command: inside the current command-mode drag box. */
   selectedForCommand: boolean;
+  /**
+   * Sector Command: primed for capture until this timestamp. While primed, the
+   * enemy cannot be killed by player damage -- see `damageEnemy`. This is what
+   * makes capture a decision instead of a reflex test.
+   */
+  capturableUntil: number;
 }
 
 export interface Projectile {
@@ -1518,6 +1524,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     orderX: 0,
     orderY: 0,
     selectedForCommand: false,
+    capturableUntil: 0,
   };
   w.enemies.push(enemy);
 
@@ -2339,6 +2346,14 @@ function damageEnemy(
   const dealt = Math.max(1, Math.round((isCrit ? amount * 2 : amount) * beatBonus * stealthBonus));
   if (onBeat) w.onBeatHits += 1;
   enemy.hp -= dealt;
+  // Sector Command: an enemy you have already worked into its capture window,
+  // while standing next to it, must not evaporate to the next auto-fired shot.
+  // Flooring it at 1 hp for the priming window is what turns "I killed it
+  // before I could grab it" into a real choice. Missions only -- outside a
+  // mission `sectorCommand` is null and this is dead code.
+  if (w.sectorCommand && enemy.hp <= 0 && w.now < enemy.capturableUntil) {
+    enemy.hp = 1;
+  }
   enemy.hitFlashUntil = w.now + 90;
 
   if (w.stats.lifesteal > 0 && burstDepth === 0) {
@@ -5202,6 +5217,7 @@ export function missionSnapshot(w: World) {
     complete: mission.complete,
     lastBeatLine: mission.lastBeatLine,
     lastBeatAt: mission.lastBeatAt,
+    captureCandidates: captureCandidateCount(w),
     squadCost: squadCostUsed(w),
     squadCap: w.sectorCommand?.squadCap ?? 0,
     units: commandedUnits(w).length,
@@ -5220,6 +5236,51 @@ export function missionSnapshot(w: World) {
 /* ------------------------------------------------------------------ */
 /* Sector Command: capture -> select -> order                          */
 /* ------------------------------------------------------------------ */
+
+/** How close the player must be for capture, and for priming a target. */
+export const CAPTURE_REACH = 170;
+/** How long a primed enemy stays un-killable and grabbable. */
+const CAPTURE_GRACE_MS = 3500;
+/** Extra slack on the marquee, in world units, on top of a unit's radius. */
+const SELECTION_TOUCH_PAD = 14;
+/** How far a tap may miss a unit and still select it. */
+const TAP_SELECT_RADIUS = 46;
+
+/** True when this enemy can be captured right now. */
+export function isCaptureReady(w: World, enemy: EnemyActor): boolean {
+  if (enemy.dying || enemy.commanded || enemy.def.family === 'Boss') return false;
+  const unit = SECTOR_UNITS_BY_ENEMY_ID[enemy.defId];
+  if (!unit) return false;
+  return enemy.hp <= enemy.maxHp * unit.captureHpFraction;
+}
+
+/**
+ * Marks nearby weakened enemies as primed for capture.
+ *
+ * Runs every frame during a mission. Priming is what `damageEnemy` reads to
+ * stop the player's own auto-fire from finishing a target they are clearly
+ * trying to take, and what the renderer reads to draw a reticle -- so the
+ * player can see the opportunity instead of guessing at it.
+ */
+function updateCapturePriming(w: World) {
+  if (!w.sectorCommand) return;
+  const p = w.player;
+  for (const enemy of w.enemies) {
+    if (!isCaptureReady(w, enemy)) continue;
+    if (dist2(enemy.x, enemy.y, p.x, p.y) > CAPTURE_REACH * CAPTURE_REACH) continue;
+    enemy.capturableUntil = w.now + CAPTURE_GRACE_MS;
+  }
+}
+
+/** How many enemies are primed and grabbable right now -- drives the HUD button. */
+export function captureCandidateCount(w: World): number {
+  if (!w.sectorCommand) return 0;
+  let count = 0;
+  for (const enemy of w.enemies) {
+    if (w.now < enemy.capturableUntil && !enemy.commanded && !enemy.dying) count += 1;
+  }
+  return count;
+}
 
 /** How much of the squad cap the current commanded units use up. */
 export function squadCostUsed(w: World): number {
@@ -5272,15 +5333,16 @@ export function captureEnemy(w: World, enemy: EnemyActor): boolean {
 }
 
 /** The player-facing capture button: takes the best eligible enemy in reach. */
-export function captureNearestEnemy(w: World, reach = 150): boolean {
+export function captureNearestEnemy(w: World, reach = CAPTURE_REACH): boolean {
   const state = w.sectorCommand;
   if (!state) return false;
   const p = w.player;
   const eligible = w.enemies
     .filter((enemy) => {
-      if (enemy.dying || enemy.commanded || enemy.def.family === 'Boss') return false;
-      const unit = SECTOR_UNITS_BY_ENEMY_ID[enemy.defId];
-      if (!unit || enemy.hp > enemy.maxHp * unit.captureHpFraction) return false;
+      // A primed enemy still counts even if something nudged it back over the
+      // threshold -- the window the player was shown is the window they get.
+      if (enemy.dying || enemy.commanded) return false;
+      if (!(w.now < enemy.capturableUntil) && !isCaptureReady(w, enemy)) return false;
       return dist2(enemy.x, enemy.y, p.x, p.y) <= reach * reach;
     })
     .sort((a, b) => dist2(a.x, a.y, p.x, p.y) - dist2(b.x, b.y, p.x, p.y));
@@ -5374,12 +5436,44 @@ export function updateCommandSelection(w: World, startX: number, startY: number,
   const maxY = Math.max(startY, endY);
   const selected: number[] = [];
   for (const enemy of w.enemies) {
+    // Overlap, not containment: units render ~10px wide, so requiring the box
+    // to contain a unit's exact centre makes a quick thumb-drag across a squad
+    // select nothing. Inflating by the unit's radius (plus a touch margin) is
+    // what makes the marquee feel like it caught what it visibly crossed.
+    const pad = enemy.radius + SELECTION_TOUCH_PAD;
     const inBox = enemy.commanded && !enemy.dying &&
-      enemy.x >= minX && enemy.x <= maxX && enemy.y >= minY && enemy.y <= maxY;
+      enemy.x >= minX - pad && enemy.x <= maxX + pad &&
+      enemy.y >= minY - pad && enemy.y <= maxY + pad;
     enemy.selectedForCommand = inBox;
     if (inBox) selected.push(enemy.uid);
   }
   state.selectedUids = selected;
+}
+
+/**
+ * Tap-to-select: the nearest commanded unit within `radius` of a point.
+ *
+ * Without this, a tap in command mode can only ever *order*, so tapping
+ * directly on one of your own units does nothing -- which reads as the mode
+ * being broken. Returns the number of units selected (0 or 1).
+ */
+export function selectCommandedUnitAt(w: World, x: number, y: number, radius = TAP_SELECT_RADIUS): number {
+  const state = w.sectorCommand;
+  if (!state) return 0;
+  let best: EnemyActor | null = null;
+  let bestDist = radius * radius;
+  for (const enemy of w.enemies) {
+    if (!enemy.commanded || enemy.dying) continue;
+    const d = dist2(enemy.x, enemy.y, x, y);
+    if (d <= bestDist) {
+      bestDist = d;
+      best = enemy;
+    }
+  }
+  if (!best) return 0;
+  for (const enemy of w.enemies) enemy.selectedForCommand = enemy.uid === best.uid;
+  state.selectedUids = [best.uid];
+  return 1;
 }
 
 /** Ends the drag but keeps the selection -- the next tap is the order. */
@@ -6640,6 +6734,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateBreakables(w, dt);
   updateFluids(w);
   // Runs after enemies/breakables so objectives read this frame's state.
+  updateCapturePriming(w);
   updateMission(w, dt);
 
   // Weapon cadence.

@@ -40,6 +40,7 @@ import {
   orderSelectedUnits,
   selectAllCommandedUnits,
   squadCostUsed,
+  selectCommandedUnitAt,
   updateCommandSelection,
   castFreezeCone,
   updateFreezeSelection,
@@ -160,6 +161,7 @@ function addEnemy(
     orderX: 0,
     orderY: 0,
     selectedForCommand: false,
+    capturableUntil: 0,
   };
   world.enemies.push(enemy);
   return enemy;
@@ -2744,4 +2746,74 @@ test('select-all then order sends every unit walking to the ordered point', () =
   const distanceBefore = Math.hypot(unit.x - -120, unit.y - -60);
   for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
   assert.ok(Math.hypot(unit.x - -120, unit.y - -60) < distanceBefore, 'the unit should close on its order');
+});
+
+test('a primed enemy survives player damage so the capture window is winnable', () => {
+  const world = sectorWorld();
+  const enemy = addEnemy(world, 'nightcrawler', 30, 0);
+  enemy.hp = enemy.maxHp * 0.2;
+
+  // Standing next to a weakened enemy primes it.
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(enemy.capturableUntil > world.now, 'a weakened enemy in reach should prime');
+
+  // Now let the player's own auto-fire pound it for two full seconds. This
+  // goes through the real weapon path on purpose -- the floor lives in
+  // `damageEnemy`, so anything that reaches it must respect the window.
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(enemy.dying, false, 'a primed enemy must not be killed by player damage');
+  assert.equal(enemy.hp, 1, 'it is floored at 1 hp instead');
+  assert.equal(captureEnemy(world, enemy), true, 'and it is still capturable afterwards');
+});
+
+test('capture priming only applies inside reach, and only in a mission', () => {
+  const world = sectorWorld();
+  const farAway = addEnemy(world, 'nightcrawler', 900, 900);
+  farAway.hp = farAway.maxHp * 0.2;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(farAway.capturableUntil, 0, 'an enemy out of reach is never primed');
+
+  // No sectorCommand -> no priming at all, so ordinary runs are untouched.
+  const plain = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), CHARACTERS[0]!, CHARACTERS[0]!.stats, 71);
+  const ordinary = addEnemy(plain, 'nightcrawler', 30, 0);
+  ordinary.hp = 1;
+  stepWorld(plain, 1 / 30, neutralInput);
+  assert.equal(ordinary.capturableUntil, 0, 'priming must not leak outside Sector Command');
+});
+
+test('the marquee catches units it crosses, not only ones it fully contains', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 100, 0);
+  unit.hp = 1;
+  captureEnemy(world, unit);
+
+  // A box that stops short of the unit's centre but visibly crosses it.
+  updateCommandSelection(world, 40, -30, unit.x - unit.radius - 4, 30);
+  assert.equal(world.sectorCommand?.selectedUids.length, 1, 'an overlapping box should select the unit');
+
+  // A box nowhere near it still selects nothing.
+  updateCommandSelection(world, -400, -400, -300, -300);
+  assert.equal(world.sectorCommand?.selectedUids.length, 0);
+});
+
+test('tapping a unit selects just that unit', () => {
+  const world = sectorWorld();
+  const a = addEnemy(world, 'nightcrawler', 100, 0);
+  a.hp = 1;
+  captureEnemy(world, a);
+  const b = addEnemy(world, 'corner-cutter', -100, 0);
+  b.uid = 950;
+  b.hp = 1;
+  captureEnemy(world, b);
+  selectAllCommandedUnits(world);
+  assert.equal(world.sectorCommand?.selectedUids.length, 2);
+
+  // A tap that misses slightly still lands on the nearer unit.
+  assert.equal(selectCommandedUnitAt(world, a.x + 20, a.y + 10), 1);
+  assert.deepEqual(world.sectorCommand?.selectedUids, [a.uid]);
+  assert.equal(b.selectedForCommand, false, 'tap-select replaces the selection, it does not add');
+
+  // A tap in open ground selects nothing and leaves the selection alone.
+  assert.equal(selectCommandedUnitAt(world, 600, 600), 0);
+  assert.deepEqual(world.sectorCommand?.selectedUids, [a.uid]);
 });
