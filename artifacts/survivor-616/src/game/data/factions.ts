@@ -92,6 +92,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#fde047',
     roster: ['marquee-reaper'],
   },
+  {
+    id: 'null-sector',
+    name: 'Null Sector',
+    description: 'A decommissioned data-center basement, corrupted by a rogue signal. Nothing down here is plugged in, and everything is still running.',
+    accent: '#22d3ee',
+    roster: ['packet-wraith', 'firewall-brute', 'null-spitter', 'corrupted-lookout', 'drift-shard'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

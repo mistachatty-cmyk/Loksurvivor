@@ -1,5 +1,6 @@
 import type { AreaDef } from '@/game/types';
 import { AREAS_2X } from './areas-2x';
+import { AREAS_NULL_SECTOR } from './areas-null-sector';
 import { squadWave } from './authoring';
 
 /**
@@ -745,6 +746,7 @@ export const AREAS: AreaDef[] = [
     endless: true,
   },
   ...AREAS_2X,
+  ...AREAS_NULL_SECTOR,
 ];
 
 export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(

@@ -766,7 +766,9 @@ export interface ObstacleDef {
      | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole'
      | 'trash-can' | 'mailbox' | 'fire-hydrant' | 'parking-meter'
      /** A heavy, wonky sentry block: zaps the player with a short-range bolt on a cadence. See oddity-arenas.md. */
-     | 'attack-block';
+     | 'attack-block'
+     /** Null Sector only: a tall breakable server cabinet that overloads into a small AoE burst when destroyed. */
+     | 'server-rack';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */

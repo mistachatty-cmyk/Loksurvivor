@@ -509,6 +509,8 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'ac-unit': { variant: 'light-breakable', hp: 100 },
   /** Wonky sentry block: tough, pushable, and armed. See oddity-arenas.md. */
   'attack-block': { variant: 'heavy-metal', hp: 220 },
+  /** Null Sector only: overloads into an AoE burst on break. See null-sector.md. */
+  'server-rack': { variant: 'light-breakable', hp: 110 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
@@ -3432,6 +3434,14 @@ function damageBreakable(
           damageEnemy(w, enemy, 18 * w.stats.power, 3, b.x, b.y);
         }
       });
+    }
+    if (b.kind === 'server-rack') {
+      forEachNearby(w, b.x, b.y, 90, (enemy) => {
+        if (dist2(enemy.x, enemy.y, b.x, b.y) <= (72 + enemy.radius) ** 2) {
+          damageEnemy(w, enemy, 14 * w.stats.power, 2, b.x, b.y);
+        }
+      });
+      pushAlert(w, 'RACK OVERLOAD');
     }
     if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel') {
       w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : 6, bornAt: w.now });

@@ -178,14 +178,18 @@ roster id that no longer exists. `squadWave`'s own `burst` still means
 ### Cross-cutting rules to respect when adding an `ObstacleDef` kind
 
 Adding a new obstacle kind touches several exhaustive/lookup structures at
-once — confirmed by hitting each of these when `vending-machine` was added:
-`types.ts` (`ObstacleDef['kind']` union), `world.ts` (`BREAKABLE_HP`,
-`PUSHABLE_KINDS` if it should be shovable, the damage-particle/xp-drop
-branches in `damageBreakable`), `draw.ts` (`OBSTACLE_COLORS`, and the
-light-source/shadow-exclusion filters if it glows), and `chunks.ts` (the
-`sizes` record is an exhaustive `Record<ObstacleDef['kind'], ...>` for
-endless-mode chunk generation, even if the kind isn't added to `KINDS`/the
-per-variant weight tables).
+once — confirmed by hitting each of these both when `vending-machine` and
+later `server-rack` (Null Sector, see null-sector.md) were added: `types.ts`
+(`ObstacleDef['kind']` union), `world.ts` (`OBSTACLE_WEIGHT_PROFILES` sets HP
+and movability variant together — an entry with no `hp` reads as
+indestructible; movability comes from `propProfile()`'s `propVariant`
+mapping, not a separate pushable-kinds list — plus any per-kind branch in
+`damageBreakable` for on-destroy effects), `draw.ts` (`OBSTACLE_COLORS`, and
+*both* the light-source list and its shadow-exclusion counterpart if it
+glows — they're two separate `.includes([...])` filters that must stay in
+sync), and `chunks.ts` (the `sizes` record is an exhaustive
+`Record<ObstacleDef['kind'], ...>` for endless-mode chunk generation, even if
+the kind isn't added to `KINDS`/the per-variant weight tables).
 
 ### Adding an enemy, checklist
 

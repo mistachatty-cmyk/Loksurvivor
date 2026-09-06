@@ -397,6 +397,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'choir-hymn', name: 'The Choir\'s Hymn', blurb: 'Twenty verses, one voice each, none of them singing anything you could ever hum back.' },
   { id: 'arcade-high-score', name: 'The High Score', blurb: 'A cabinet screen still glowing under the dust, top of the board initials burned into the phosphor.' },
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
+  { id: 'null-sector-log', name: 'The Null Sector Log', blurb: 'A maintenance log with no author field. Every entry ends the same way: "still running."' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(
