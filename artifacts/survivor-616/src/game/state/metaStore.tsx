@@ -59,6 +59,7 @@ import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game
 import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
+import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
 import type {
   AllyDef,
   AreaDef,
@@ -76,6 +77,7 @@ import type {
   SavedLokPet,
   MetaState,
   RunResult,
+  RunModifiers,
   FacilityTier,
   RecoverySession,
   StealthAbilityConfig,
@@ -129,6 +131,36 @@ function settleRecovery(meta: MetaState, now = Date.now()): MetaState {
   };
 }
 
+/**
+ * Lazily settles cred earned by owned generators since the last settle,
+ * same shape as `settleRecovery`/`replenishPetElixirs` above: a timestamp is
+ * persisted and the delta is computed on read, so income keeps accruing
+ * while the player is away instead of needing a running interval.
+ */
+function settleGeneratorIncome(meta: MetaState, now = Date.now()): Pick<MetaState, 'cred' | 'generatorAccrualAt'> {
+  const elapsedMinutes = Math.max(0, now - meta.generatorAccrualAt) / 60000;
+  if (elapsedMinutes <= 0 || meta.ownedGeneratorIds.length === 0) {
+    return { cred: meta.cred, generatorAccrualAt: now };
+  }
+  const perMinute = meta.ownedGeneratorIds.reduce(
+    (sum, id) => sum + (RENTABLE_GENERATORS_BY_ID[id]?.credPerMinute ?? 0),
+    0,
+  );
+  return { cred: meta.cred + Math.floor(perMinute * elapsedMinutes), generatorAccrualAt: now };
+}
+
+function normalizeRunModifiers(value: unknown): RunModifiers {
+  if (!isRecord(value)) return {};
+  const modifiers: RunModifiers = {};
+  if (value.doubleMode === true) modifiers.doubleMode = true;
+  if (value.invertedMap === true) modifiers.invertedMap = true;
+  if (value.speedMode === true) modifiers.speedMode = true;
+  if (value.scalerMode === true) modifiers.scalerMode = true;
+  if (value.infiniteMode === true) modifiers.infiniteMode = true;
+  if (value.hordeSpinEnabled === true) modifiers.hordeSpinEnabled = true;
+  return modifiers;
+}
+
 /** Keeps a persisted or dispatched tilt sensitivity inside a usable range. */
 function clampGyroSensitivity(value: unknown): number {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 1;
@@ -180,6 +212,9 @@ export function createInitialMeta(): MetaState {
     cred: 0,
     lootTokens: 0,
     skeletonKeys: 0,
+    ownedGeneratorIds: [],
+    generatorAccrualAt: Date.now(),
+    runModifiers: {},
     onboarded: false,
     endlessRecordDistancePx: 0,
     endlessRecordDepth: 0,
@@ -730,6 +765,13 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     petElixirs: Math.min(ELIXIR_CAP, counter(parsed.petElixirs ?? 3)),
     petElixirUpdatedAt: Math.max(0, typeof parsed.petElixirUpdatedAt === 'number' ? parsed.petElixirUpdatedAt : Date.now()),
   });
+  const ownedGeneratorIds = idList(parsed.ownedGeneratorIds, new Set(RENTABLE_GENERATORS.map((g) => g.id)), []);
+  const settledGeneratorIncome = settleGeneratorIncome({
+    ...defaults,
+    cred: counter(parsed.cred),
+    ownedGeneratorIds,
+    generatorAccrualAt: Math.max(0, typeof parsed.generatorAccrualAt === 'number' ? parsed.generatorAccrualAt : Date.now()),
+  });
 
   return {
     version: META_VERSION,
@@ -778,9 +820,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     totalKills: counter(parsed.totalKills),
     totalRuns: counter(parsed.totalRuns),
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
-    cred: counter(parsed.cred),
+    ...settledGeneratorIncome,
     lootTokens: counter(parsed.lootTokens),
     skeletonKeys: counter(parsed.skeletonKeys),
+    ownedGeneratorIds,
+    runModifiers: normalizeRunModifiers(parsed.runModifiers),
     onboarded: parsed.onboarded === true,
     endlessRecordDistancePx: counter(parsed.endlessRecordDistancePx),
     endlessRecordDepth: counter(parsed.endlessRecordDepth),
@@ -1110,6 +1154,9 @@ type Action =
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
   | { type: 'setWorldInvertEnabled'; enabled: boolean }
   | { type: 'setPaletteInvertEnabled'; enabled: boolean }
+  | { type: 'toggleRunModifier'; key: keyof RunModifiers }
+  | { type: 'buyGenerator'; id: string; now: number }
+  | { type: 'refreshGeneratorIncome'; now: number }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
@@ -1498,6 +1545,33 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (action.enabled && vendorPurchaseCount(state.meta, 'invert-palette') <= 0) return state;
       return { ...state, meta: { ...state.meta, paletteInvertEnabled: action.enabled } };
 
+    case 'toggleRunModifier': {
+      const current = state.meta.runModifiers[action.key] === true;
+      return {
+        ...state,
+        meta: { ...state.meta, runModifiers: { ...state.meta.runModifiers, [action.key]: !current } },
+      };
+    }
+
+    case 'refreshGeneratorIncome':
+      return { ...state, meta: { ...state.meta, ...settleGeneratorIncome(state.meta, action.now) } };
+
+    case 'buyGenerator': {
+      const def = RENTABLE_GENERATORS_BY_ID[action.id];
+      if (!def || state.meta.ownedGeneratorIds.includes(action.id)) return state;
+      const settled = settleGeneratorIncome(state.meta, action.now);
+      if (settled.cred < def.cost) return { ...state, meta: { ...state.meta, ...settled } };
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          ...settled,
+          cred: settled.cred - def.cost,
+          ownedGeneratorIds: [...state.meta.ownedGeneratorIds, action.id],
+        },
+      };
+    }
+
     case 'tickRecovery':
       return { ...state, meta: settleRecovery(state.meta, action.now) };
 
@@ -1792,6 +1866,9 @@ export interface MetaContextValue {
   setMinimapPosition: (position: { x: number; y: number }) => void;
   setWorldInvertEnabled: (enabled: boolean) => void;
   setPaletteInvertEnabled: (enabled: boolean) => void;
+  toggleRunModifier: (key: keyof RunModifiers) => void;
+  buyGenerator: (id: string) => void;
+  refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
@@ -1913,6 +1990,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setPaletteInvertEnabled', enabled }),
     [],
   );
+  const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
+  const buyGenerator = useCallback((id: string) => dispatch({ type: 'buyGenerator', id, now: Date.now() }), []);
+  const refreshGeneratorIncome = useCallback(() => dispatch({ type: 'refreshGeneratorIncome', now: Date.now() }), []);
   const setUiDensity = useCallback(
     (density: 'grid' | 'list') => dispatch({ type: 'setUiDensity', density }),
     [],
@@ -2008,6 +2088,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMinimapPosition,
       setWorldInvertEnabled,
       setPaletteInvertEnabled,
+      toggleRunModifier,
+      buyGenerator,
+      refreshGeneratorIncome,
       setUiDensity,
       resetProgress,
       startRecovery,
@@ -2068,6 +2151,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMinimapPosition,
     setWorldInvertEnabled,
     setPaletteInvertEnabled,
+    toggleRunModifier,
+    buyGenerator,
+    refreshGeneratorIncome,
     setUiDensity,
     resetProgress,
     startRecovery,

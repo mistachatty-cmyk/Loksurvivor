@@ -25,6 +25,15 @@ import { getFirstNightChapter } from '@/game/data/firstNight';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
 import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
+import {
+  HORDE_SPIN_ACTIVE_MS_PER_STEP,
+  HORDE_SPIN_BASE_CLUSTER,
+  HORDE_SPIN_INTERVAL_MS,
+  HORDE_SPIN_RESULT_MS,
+  HORDE_SPIN_SPIN_MS,
+  getHordeSpinTier,
+  pickHordeSpinTier,
+} from '@/game/data/hordeSpin';
 import { SILENT_FRAME, msFromNearestBeat, type AudioFrame } from '@/game/audio/beatBus';
 import { reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type {
@@ -43,6 +52,7 @@ import type {
   EvolutionDef,
   HudSnapshot,
   HatStyle,
+  HordeSpinTierId,
   LootPrizeDef,
   LokPetInstance,
   LokPetRoll,
@@ -50,6 +60,7 @@ import type {
   RunObjective,
   RunResult,
   RunAuraStyle,
+  RunModifiers,
   RunPassive,
   RunWeapon,
   StatusEffectInstance,
@@ -63,6 +74,7 @@ import type {
   RelicRecipeDef,
   StealthAbilityConfig,
   StormCloudMode,
+  WheelSpinState,
 } from '@/game/types';
 
 import {
@@ -770,6 +782,10 @@ export interface World {
   firstNightBeatTriggeredAt: number;
   /** Optional, short landmark encounter selected for this run. */
   districtIncursion?: DistrictIncursionState;
+  /** Run-wide toggles picked on the Roster screen. See `RunModifiers`. */
+  modifiers: RunModifiers;
+  /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
+  wheelSpin: WheelSpinState | null;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -874,9 +890,19 @@ export function createWorld(
     /** Progression-aware rescue selected by the meta layer. Undefined means this route is complete. */
     rescueAllyId?: string | undefined;
     startingLokPets?: LokPetRoll[];
+    modifiers?: RunModifiers;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
+  const modifiers = setup.modifiers ?? {};
+  // `invertedMap` mirrors the area's authored obstacle layout left-to-right;
+  // area coordinates are centered at (0,0) (bounds are half-extents), so
+  // flipping is just negating x. All three of obstacles/breakables/potholes
+  // below are independently derived from `area.obstacles`, so the mirrored
+  // copy is built once here and reused for all three.
+  const obstacleDefs = modifiers.invertedMap
+    ? area.obstacles.map((o) => ({ ...o, x: -o.x }))
+    : area.obstacles;
   const player: PlayerActor = {
     uid: 1,
     x: 0,
@@ -949,7 +975,7 @@ export function createWorld(
     ambient: [],
     lokPets: [],
     lokPetHistory: [],
-    obstacles: area.obstacles
+    obstacles: obstacleDefs
       .filter((o) => o.kind !== 'pothole')
       .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
@@ -1053,6 +1079,20 @@ export function createWorld(
           propUids: [],
         }
       : undefined,
+    modifiers,
+    wheelSpin: modifiers.hordeSpinEnabled
+      ? {
+          phase: 'idle',
+          nextSpinAt: HORDE_SPIN_INTERVAL_MS,
+          spinStartedAt: 0,
+          resultAt: 0,
+          resultTierId: undefined,
+          activeEndsAt: 0,
+          rewardGranted: false,
+          spinsThisRun: 0,
+          colorFluctuation: false,
+        }
+      : null,
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     claimedLootPrizes: new WeakSet(),
@@ -1073,8 +1113,8 @@ export function createWorld(
       : undefined,
   };
 
-  world.breakables = area.obstacles.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
-  world.potholes = area.obstacles.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
+  world.breakables = obstacleDefs.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
+  world.potholes = obstacleDefs.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
 
   if (area.endless) {
     world.endless = {
@@ -1221,7 +1261,26 @@ function areaMult(w: World): number {
 }
 
 function speedMult(w: World): number {
-  return ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
+  const ult = ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
+  return ult * (w.modifiers.speedMode ? 1.35 : 1);
+}
+
+/**
+ * Flat hp multiplier from run modifiers, internally bounded (max 1.5 * 3 =
+ * 4.5x) so timed-area callers can apply it directly. Endless-mode's own
+ * `Math.min(1.7, ...)` cap must still compose this *inside* the min per
+ * endless-mode-engine.md -- see `updateEndlessSpawning`.
+ */
+function modifierHpMult(w: World): number {
+  let mult = 1;
+  if (w.modifiers.doubleMode) mult *= 1.5;
+  if (w.modifiers.scalerMode) mult *= Math.min(3, 1 + (w.level - 1) * 0.06);
+  return mult;
+}
+
+/** Flat spawn-rate multiplier from run modifiers. See `modifierHpMult` for the endless-cap caveat. */
+function modifierSpawnMult(w: World): number {
+  return w.modifiers.doubleMode ? 2 : 1;
 }
 
 function cooldownMult(w: World): number {
@@ -1339,7 +1398,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     anim: 'walk',
     animStartedAt: w.now,
     hitFlashUntil: 0,
-    speed: def.speed,
+    speed: def.speed * (w.modifiers.speedMode ? 1.25 : 1),
     damage: def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1),
     xp: def.xp,
     mass: def.mass,
@@ -1420,10 +1479,22 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
 
 function updateSpawning(w: World, dt: number) {
   const waves = w.area.waves;
+  const baseHpMult = modifierHpMult(w);
+  const baseSpawnMult = modifierSpawnMult(w);
   for (let i = 0; i < waves.length; i += 1) {
     const wave = waves[i]!;
-    if (w.time < wave.fromSec || w.time > wave.toSec) continue;
-    const spawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+    const isLastWave = i === waves.length - 1;
+    // `infiniteMode` keeps the run going past `durationSec` (see the run-end
+    // check in stepWorld); without this the last wave's `toSec` window would
+    // close and spawning would simply stop. Escalation is capped the same
+    // way endless mode caps its own difficulty (endless-mode-engine.md).
+    const infiniteActive = Boolean(w.modifiers.infiniteMode) && isLastWave && w.time > wave.toSec;
+    if (!infiniteActive && (w.time < wave.fromSec || w.time > wave.toSec)) continue;
+    const infiniteTier = infiniteActive ? Math.floor((w.time - wave.toSec) / 20) : 0;
+    const infiniteHpMult = infiniteActive ? Math.min(1.7, 1 + infiniteTier * 0.07) : 1;
+    const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
+    const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult;
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
@@ -1432,10 +1503,11 @@ function updateSpawning(w: World, dt: number) {
       const total = wave.burst * ids.length;
       const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
       let positionIndex = 0;
+      const hpMult = (wave.hpMult ?? 1) * baseHpMult * infiniteHpMult;
       for (let b = 0; b < wave.burst; b += 1) {
-        spawnEnemy(w, def, wave.hpMult ?? 1, positions[positionIndex++]);
+        spawnEnemy(w, def, hpMult, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
-          spawnEnemy(w, getEnemy(groupEnemyId), wave.hpMult ?? 1, positions[positionIndex++]);
+          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++]);
         }
       }
     }
@@ -4789,6 +4861,90 @@ function updateStormCloud(w: World, dt: number) {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* HordeSpin                                                           */
+/* ------------------------------------------------------------------ */
+
+const HORDE_SPIN_FORMATIONS: Array<'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file'> = [
+  'ring', 'wedge', 'wall', 'file', 'escort', 'pincer',
+];
+
+/** Whichever area wave is active right now, falling back to the first wave (or a safe default). */
+function hordeSpinEnemyPool(w: World): string[] {
+  const waves = w.area.waves;
+  const activeWave = waves.find((wave) => w.time >= wave.fromSec && w.time <= wave.toSec) ?? waves[0];
+  if (!activeWave) return ['nightcrawler'];
+  return [activeWave.enemyId, ...(activeWave.group ?? [])];
+}
+
+/**
+ * 1x-4x spawn one scaled cluster; 5x5 and 666 spawn `spawnMultiplier`
+ * separate clusters (5 enemies each) in different formations, reading as
+ * distinct groups arriving in different shapes rather than one bigger blob.
+ */
+function spawnHordeSpinBurst(w: World, tier: ReturnType<typeof getHordeSpinTier>) {
+  const pool = hordeSpinEnemyPool(w);
+  const hpMult = tier.hpMult * modifierHpMult(w);
+  const useClusters = tier.id === '5x5' || tier.id === '666';
+  const clusterCount = useClusters ? tier.spawnMultiplier : 1;
+  const perCluster = useClusters ? HORDE_SPIN_BASE_CLUSTER : HORDE_SPIN_BASE_CLUSTER * tier.spawnMultiplier;
+  for (let c = 0; c < clusterCount; c += 1) {
+    const formation = HORDE_SPIN_FORMATIONS[c % HORDE_SPIN_FORMATIONS.length]!;
+    const positions = formationPositions(w, formation, perCluster);
+    for (let i = 0; i < perCluster; i += 1) {
+      const enemyId = pool[Math.floor(w.rng() * pool.length)]!;
+      spawnEnemy(w, getEnemy(enemyId), hpMult, positions[i]);
+    }
+  }
+}
+
+/**
+ * State machine for the periodic HordeSpin wheel: idle -> spinning -> result
+ * -> active (horde spawned, counting down) -> back to idle with a reward
+ * paid out. Follows the same `w.now`-driven timer shape as `updateStormCloud`
+ * above. Only runs when `modifiers.hordeSpinEnabled` gave the run a
+ * `w.wheelSpin` state to begin with.
+ */
+function updateWheelSpin(w: World) {
+  const state = w.wheelSpin;
+  if (!state) return;
+  const now = w.now;
+
+  if (state.phase === 'idle' && now >= state.nextSpinAt) {
+    state.phase = 'spinning';
+    state.spinStartedAt = now;
+    state.resultTierId = undefined;
+    pushAlert(w, 'HordeSpin — spinning...');
+  } else if (state.phase === 'spinning' && now - state.spinStartedAt >= HORDE_SPIN_SPIN_MS) {
+    const tier = pickHordeSpinTier(w.rng);
+    state.phase = 'result';
+    state.resultAt = now;
+    state.resultTierId = tier.id;
+    pushAlert(w, `HordeSpin landed on ${tier.label}!`);
+  } else if (state.phase === 'result' && state.resultTierId && now - state.resultAt >= HORDE_SPIN_RESULT_MS) {
+    const tier = getHordeSpinTier(state.resultTierId);
+    state.phase = 'active';
+    state.colorFluctuation = Boolean(tier.colorFluctuation);
+    state.rewardGranted = false;
+    state.activeEndsAt = now + HORDE_SPIN_ACTIVE_MS_PER_STEP * tier.spawnMultiplier;
+    spawnHordeSpinBurst(w, tier);
+    pushAlert(w, tier.rare ? `HORDE INCOMING — ${tier.label}` : 'Horde incoming');
+    w.shake = Math.max(w.shake, tier.rare ? 14 : 8);
+  } else if (state.phase === 'active' && state.resultTierId && now >= state.activeEndsAt) {
+    const tier = getHordeSpinTier(state.resultTierId);
+    if (!state.rewardGranted) {
+      state.rewardGranted = true;
+      w.cred += tier.rewardCred;
+      if (tier.grantsPet) spawnLokPet(w, rollLokPet(w.rng), 'chest');
+      pushAlert(w, `HordeSpin reward — +${tier.rewardCred} cred`);
+    }
+    state.phase = 'idle';
+    state.colorFluctuation = false;
+    state.spinsThisRun += 1;
+    state.nextSpinAt = now + HORDE_SPIN_INTERVAL_MS;
+  }
+}
+
 /** Resolves 'meteor' weapon strikes once their telegraph window elapses. See run-presentation.md. */
 function updateMeteors(w: World) {
   for (let i = w.pendingMeteors.length - 1; i >= 0; i -= 1) {
@@ -5747,8 +5903,11 @@ function updateEndlessSpawning(w: World, dt: number) {
   const tier = endlessDiffTier(e);
   const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
   const nightMult = nightDifficultyMult(w.cycle.phase);
-  const spawnRate = Math.min(3.2, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier);
-  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
+  // Run modifiers compose INSIDE these caps, never stacked on top afterward
+  // (endless-mode-engine.md) -- a modifier can only push a run up to the same
+  // 3.2/s and 1.7x ceilings everything else here is bound by.
+  const spawnRate = Math.min(3.2, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
+  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult * modifierHpMult(w));
 
   const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
   const pool = bandPool?.length
@@ -5907,6 +6066,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateLokPets(w, dt);
   updateFollowers(w, dt);
   updateStormCloud(w, dt);
+  updateWheelSpin(w);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
@@ -5943,7 +6103,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (w.shake < 0.2) w.shake = 0;
 
   // Time-based clear (timed areas only — endless runs end via "head home").
-  if (!w.area.endless && w.time >= w.area.durationSec && w.outcome === 'running') {
+  // `infiniteMode` also skips this: the run only ends by death or abort.
+  if (!w.area.endless && !w.modifiers.infiniteMode && w.time >= w.area.durationSec && w.outcome === 'running') {
     w.outcome = 'cleared';
   }
 }
@@ -6092,6 +6253,22 @@ export function hudSnapshot(w: World): HudSnapshot {
             ? Math.max(0, Math.ceil((w.districtIncursion.endsAt - w.now) / 1000))
             : 0,
         }
+      : undefined,
+    wheelSpin: w.wheelSpin
+      ? (() => {
+          const tier = w.wheelSpin!.resultTierId ? getHordeSpinTier(w.wheelSpin!.resultTierId) : undefined;
+          return {
+            phase: w.wheelSpin!.phase,
+            resultTierId: w.wheelSpin!.resultTierId,
+            resultLabel: tier?.label,
+            rewardCred: tier?.rewardCred ?? 0,
+            rare: Boolean(tier?.rare),
+            celebration: tier?.celebration ?? 'mild',
+            secondsToNextSpin: w.wheelSpin!.phase === 'idle' ? Math.max(0, Math.ceil((w.wheelSpin!.nextSpinAt - w.now) / 1000)) : 0,
+            activeRemainingSec: w.wheelSpin!.phase === 'active' ? Math.max(0, Math.ceil((w.wheelSpin!.activeEndsAt - w.now) / 1000)) : 0,
+            colorFluctuation: w.wheelSpin!.colorFluctuation,
+          };
+        })()
       : undefined,
     objectives: w.objectives.map((o) => ({
       label: o.def.label,
