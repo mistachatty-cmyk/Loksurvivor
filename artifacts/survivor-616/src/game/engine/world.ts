@@ -1380,7 +1380,13 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     }
   }
 
-  const hp = def.hp * hpMult * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1);
+  // modifierHpMult lives here (not folded into any per-mode cap) so it
+  // applies to every spawn path uniformly -- incursions and the endless
+  // dungeon boss/elite rotation call spawnEnemy directly with their own
+  // hpMult and would otherwise never see doubleMode/scalerMode at all. This
+  // mirrors how w.challenges' enemyHealthMultiplier already stacks on top of
+  // endless mode's own Math.min(1.7, ...) cap uncapped -- see run-modifiers.md.
+  const hp = def.hp * hpMult * modifierHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1);
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -1479,16 +1485,22 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
 
 function updateSpawning(w: World, dt: number) {
   const waves = w.area.waves;
-  const baseHpMult = modifierHpMult(w);
   const baseSpawnMult = modifierSpawnMult(w);
+  const infiniteMode = Boolean(w.modifiers.infiniteMode);
+  // Several authored areas' climaxes are multiple waves tied at the same
+  // (highest) toSec rather than one wave that happens to sit last in the
+  // array -- e.g. bar-siege has three waves ending at 180 but its last
+  // array entry ends at 141. Extending "the last array entry" would keep an
+  // arbitrary earlier-ending wave alive instead of the actual finale, so
+  // infiniteMode instead extends every wave tied at the area's max toSec.
+  const maxToSec = infiniteMode && waves.length > 0 ? Math.max(...waves.map((candidate) => candidate.toSec)) : 0;
   for (let i = 0; i < waves.length; i += 1) {
     const wave = waves[i]!;
-    const isLastWave = i === waves.length - 1;
     // `infiniteMode` keeps the run going past `durationSec` (see the run-end
-    // check in stepWorld); without this the last wave's `toSec` window would
-    // close and spawning would simply stop. Escalation is capped the same
-    // way endless mode caps its own difficulty (endless-mode-engine.md).
-    const infiniteActive = Boolean(w.modifiers.infiniteMode) && isLastWave && w.time > wave.toSec;
+    // check in stepWorld); without this the finale wave(s)' `toSec` window
+    // would close and spawning would simply stop. Escalation is capped the
+    // same way endless mode caps its own difficulty (endless-mode-engine.md).
+    const infiniteActive = infiniteMode && wave.toSec === maxToSec && w.time > wave.toSec;
     if (!infiniteActive && (w.time < wave.fromSec || w.time > wave.toSec)) continue;
     const infiniteTier = infiniteActive ? Math.floor((w.time - wave.toSec) / 20) : 0;
     const infiniteHpMult = infiniteActive ? Math.min(1.7, 1 + infiniteTier * 0.07) : 1;
@@ -1503,7 +1515,9 @@ function updateSpawning(w: World, dt: number) {
       const total = wave.burst * ids.length;
       const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
       let positionIndex = 0;
-      const hpMult = (wave.hpMult ?? 1) * baseHpMult * infiniteHpMult;
+      // modifierHpMult isn't applied here -- spawnEnemy applies it to every
+      // caller uniformly (see its own comment for why).
+      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
       for (let b = 0; b < wave.burst; b += 1) {
         spawnEnemy(w, def, hpMult, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
@@ -4884,7 +4898,9 @@ function hordeSpinEnemyPool(w: World): string[] {
  */
 function spawnHordeSpinBurst(w: World, tier: ReturnType<typeof getHordeSpinTier>) {
   const pool = hordeSpinEnemyPool(w);
-  const hpMult = tier.hpMult * modifierHpMult(w);
+  // modifierHpMult is applied inside spawnEnemy itself now, so it isn't
+  // repeated here -- doing so would double-apply doubleMode/scalerMode.
+  const hpMult = tier.hpMult;
   const useClusters = tier.id === '5x5' || tier.id === '666';
   const clusterCount = useClusters ? tier.spawnMultiplier : 1;
   const perCluster = useClusters ? HORDE_SPIN_BASE_CLUSTER : HORDE_SPIN_BASE_CLUSTER * tier.spawnMultiplier;
@@ -5903,11 +5919,16 @@ function updateEndlessSpawning(w: World, dt: number) {
   const tier = endlessDiffTier(e);
   const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
   const nightMult = nightDifficultyMult(w.cycle.phase);
-  // Run modifiers compose INSIDE these caps, never stacked on top afterward
-  // (endless-mode-engine.md) -- a modifier can only push a run up to the same
-  // 3.2/s and 1.7x ceilings everything else here is bound by.
+  // Automatic/environmental multipliers (tier, night) stay inside this cap
+  // per endless-mode-engine.md. modifierSpawnMult is folded in here to match
+  // how w.challenges' own enemySpawnMultiplier is already capped alongside
+  // it -- but modifierHpMult is deliberately NOT added to the hp cap below:
+  // w.challenges' enemyHealthMultiplier already stacks on top of this hp cap
+  // uncapped (inside spawnEnemy), and run modifiers are the same kind of
+  // player-opted-in multiplier as challenges, not an automatic one. Adding
+  // it here would also double-apply it, since spawnEnemy applies it too.
   const spawnRate = Math.min(3.2, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
-  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult * modifierHpMult(w));
+  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
   const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
   const pool = bandPool?.length
