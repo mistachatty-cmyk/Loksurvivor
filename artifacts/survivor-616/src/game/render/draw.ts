@@ -47,6 +47,12 @@ export interface Viewport {
   width: number;
   height: number;
   dpr: number;
+  /**
+   * How many world units wide the view should show. Normally derived from
+   * `width` so every screen sees roughly the same slice of the world; the
+   * map editor overrides it to fit a whole authored map in one frame.
+   */
+  targetViewOverride?: number;
 }
 
 function hashCell(x: number, y: number): number {
@@ -3182,8 +3188,10 @@ function drawPopups(ctx: CanvasRenderingContext2D, w: World) {
 export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewport) {
   const { width, height, dpr } = view;
 
-  // Show roughly the same slice of the world regardless of screen size.
-  const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+  // Show roughly the same slice of the world regardless of screen size,
+  // unless a caller (the map editor's whole-map preview) asks for a
+  // specific slice width.
+  const targetView = view.targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78));
   const zoom = width / targetView;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

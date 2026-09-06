@@ -861,7 +861,17 @@ export interface AreaDef {
   randomDrops?: { intervalMs: number };
 }
 
-export type CustomMapAssetCategory = 'ground' | 'structure' | 'hazard' | 'landmark' | 'enemy' | 'encounter';
+export type CustomMapAssetCategory =
+  | 'ground'
+  | 'structure'
+  | 'hazard'
+  | 'landmark'
+  | 'enemy'
+  | 'encounter'
+  /** Where the player (or a Sector Command faction) enters the map. */
+  | 'spawn-point'
+  /** A named point a mission objective can reference (hold, escort, destroy). */
+  | 'objective-marker';
 
 export interface CustomMapPlacement {
   id: string;
@@ -897,6 +907,10 @@ export interface CustomMapAsset {
   areaId?: string;
   enemyId?: string;
   wave?: WaveDef;
+  /** spawn-point only: which side enters here. 'player' is the run's start position. */
+  spawnSide?: 'player' | 'hostile';
+  /** objective-marker only: what a mission objective can do with this point. */
+  markerRole?: 'hold' | 'destroy' | 'escort' | 'extract';
 }
 
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
