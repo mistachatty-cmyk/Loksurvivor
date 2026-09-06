@@ -1,0 +1,111 @@
+# Sector Command — dev-gated RTS/campaign mode
+
+## What shipped
+
+A playable, dev-gated campaign mode that reuses the survivor run loop rather
+than forking it. A mission is a normal `RunScreen` run with three extra things
+attached: an authored map, a `MissionRuntime`, and a `SectorCommandState`.
+
+Entry: `HubScreen`'s Sector Command button, which only renders when
+`meta.devModeAccessUnlocked` is on. `App.tsx`'s `sector-command` case
+**re-checks that flag**, because `initialScreen()`'s `?screen=` param bypasses
+hub-level gating entirely — a hub-only gate is not a gate.
+
+### The Tier 1 economy: a stolen army
+
+There is no production, no resource and no build queue. Every unit you have is
+an enemy you weakened and captured, so the economy *is* the wave, and every
+unit costs you the kill (`captureEnemy` deliberately does not increment
+`w.kills` or drop loot). `SectorUnitDef.captureHpFraction` is the window: an
+enemy must be under that fraction of max HP before it can be turned. Bosses are
+never capturable, and `sectorMissions.test.ts` enforces that against
+`ENEMIES_BY_ID` so a roster edit can't quietly make one capturable.
+
+### Load-bearing engine decisions
+
+- **`commanded` is not `convertedUntil`.** The allymaker weapon's temporary
+  ally already existed and already inherited stats, rig, HP and grid
+  membership. Sector Command adds a *separate* `commanded: boolean` rather than
+  reusing that timer, so the weapon's behavior is untouched and the two can
+  never be confused by a `w.now >= …` comparison.
+- **`damageEnemy()` is where friendly fire dies.** `nearestEnemy()` skipping
+  commanded units only stops them being *aimed at*; splash, status ticks,
+  thrown enemies and every other path still reach `damageEnemy`. The single
+  `if (enemy.commanded) return;` there is what actually makes a unit safe from
+  its own side. A unit's own mortality (hostile contact damage in
+  `advanceCommandedUnit`) touches `hp` directly and so is unaffected by it.
+  There is a regression test that runs 8 simulated seconds with no hostiles
+  present and asserts a captured unit takes zero damage.
+- **A move order is the storm cloud's lerp with a sticky target.** No
+  pathfinding exists anywhere in this engine and none was added: units steer
+  straight, get ejected by `collideObstacles`, and slide along walls. They
+  *will* press against a concave obstacle cluster. Keeping orders short and
+  near the player is the design mitigation, and the briefing screen says so
+  out loud rather than hiding it.
+- **Mission clear is "every required objective done".** Optional objectives
+  never hold a mission open. `updateMission` runs after enemies, breakables and
+  fluids so objectives read the same frame's state.
+
+### Mobile is the constraint that shaped the controls
+
+The one rule everything else follows: **the movement stick and the RTS grammar
+never share a pointer-down.** A visible Command toggle swaps the whole pointer
+meaning — with it off, a drag steers you; with it on, a drag marquee-selects
+and a tap issues an order. Movement under `COMMAND_TAP_SLOP` (12px) is a tap,
+not a drag, so a thumb wobble can't wipe a standing selection.
+
+Everything else follows from having no hover, no right-click and no keyboard:
+Select All is a button (there are no control-group hotkeys), capture is a
+button with a reach radius and a nearest-eligible sort (there is no unit to
+click on precisely), and unit caps stay small (6–8 squad cost) because ~10px
+sprites and fat fingers do not permit dense micro.
+
+**Commander view** is the second camera mode, and it is deliberately *not* a
+detached drag-to-pan camera: panning and marquee want the same drag on touch,
+and adding a third pointer meaning would break the rule above. Instead it keeps
+the player-locked camera and pulls it back via the `targetViewOverride` hook
+that `MapLivePreview` introduced. Pointer math must read the *rendered* target
+view (`renderTargetViewRef`), not recompute the default, or selections land in
+the wrong place at commander zoom.
+
+That zoom-out also exposed a latent renderer bug worth remembering:
+`drawArenaEdges` blacked out the region past the arena with a fixed 400-unit
+border, which is always enough at the default zoom and visibly not enough when
+zoomed out. It now derives its extents from the visible world rect.
+
+## Deliberately unbuilt (typed, not implemented)
+
+`SectorStructureDef`, `SectorResourceDef` and `SectorProductionDef` exist in
+`types.ts` and `SectorMissionDef.economyTier` already names the tier, so a
+mission can be authored against a tier the engine does not yet run.
+
+- **Tier 2 — Beacon.** A placeable structure that trickles basic units, so a
+  wipe is a setback rather than a dead run. Smallest real step up from Tier 1:
+  it needs a structure entity and a spawn timer, no resource model at all.
+- **Tier 3 — Production.** A real resource (`perKill` income is already the
+  shape sketched) plus a build queue. This is where a base-defense mission
+  becomes possible.
+
+Worth stealing later, in rough order of value per unit of work:
+fog of war (the shadow caster already exists), hero units with abilities (the
+character roster already *is* a hero roster), rally points, control-group chips,
+queued waypoints, tech tiers, and a skirmish mode against a scripted opponent.
+
+**Story hooks already exist.** `MissionBeatDef` carries authored lines and
+fires on elapsed time, objective completion, or a squad wipe — that is the seam
+where "movie scenes" and original characters plug in without an engine change.
+Missions are bound to registered `FactionDef`s and to allies the player
+actually rescued (`commanderAllyId`), so the campaign consumes base-game
+progression instead of running beside it.
+
+## Rules that must survive anything added here
+
+1. No pointer gesture may mean two things at once. If a feature needs a new
+   gesture, it needs a mode toggle, not an overload.
+2. Any new camera behavior must feed `renderTargetViewRef` (or its successor),
+   or pointer→world conversion silently drifts.
+3. Captured units stay excluded at `damageEnemy`, not only at targeting.
+4. Unit counts stay small. The mobile ceiling is fingers, not `MAX_ENEMIES`.
+5. Mission content is data (`sectorMaps.ts` / `sectorMissions.ts`), validated
+   at module load by the `mission()` factory — bad content fails at boot, not
+   mid-run.

@@ -247,4 +247,10 @@ just *what*, so the reasoning doesn't need to be re-derived:
   proven poor fits, see `zero-day-freeze-throw.md`), and reuses concrete
   pieces (the `PointerMode` extension pattern, world-space box selection,
   the DOM marquee overlay) that already exist rather than re-deriving them.
+- `sector-command-design.md` — read before touching Sector Command (the
+  dev-gated RTS/campaign mode) or anything it hooks into: why captured units
+  are excluded at `damageEnemy()` and not just at targeting, why `commanded`
+  is separate from the allymaker's `convertedUntil`, the mobile rule that the
+  movement stick and the RTS pointer grammar never share a pointer-down, and
+  the Tier 2/3 economies that are typed but deliberately unbuilt.
 - `MEMORY.md` — index/entry point for the above.

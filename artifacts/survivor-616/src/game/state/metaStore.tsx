@@ -59,6 +59,7 @@ import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game
 import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
+import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type {
   AllyDef,
   AreaDef,
@@ -199,6 +200,7 @@ export function createInitialMeta(): MetaState {
     completedEpisodeIds: [],
     unlockedEvolutionIds: [],
     episodeProgressById: {},
+    completedSectorMissionIds: [],
     knownRelicIds: [],
     customMaps: [],
     uiPanelLayout: 'rail',
@@ -691,6 +693,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       );
     }
   }
+  const completedSectorMissionIds = idList(
+    parsed.completedSectorMissionIds,
+    new Set(SECTOR_MISSIONS.map((mission) => mission.id)),
+    [],
+  );
   const knownRelicIds = idList(
     parsed.knownRelicIds,
     new Set(CITY_RELICS.map((relic) => relic.id)),
@@ -809,6 +816,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     completedEpisodeIds,
     unlockedEvolutionIds,
     episodeProgressById,
+    completedSectorMissionIds,
     knownRelicIds,
     customMaps,
     uiPanelLayout: parsed.uiPanelLayout === 'slideout' ? 'slideout' : 'rail',
@@ -1131,6 +1139,7 @@ type Action =
   | { type: 'tickRecovery'; now: number }
   | { type: 'upgradeFacility' }
   | { type: 'createCustomMap' }
+  | { type: 'completeSectorMission'; missionId: string }
   | { type: 'saveCustomMap'; map: CustomMap }
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
@@ -1561,6 +1570,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
         : state;
     }
 
+    case 'completeSectorMission': {
+      if (!SECTOR_MISSIONS_BY_ID[action.missionId]) return state;
+      if (state.meta.completedSectorMissionIds.includes(action.missionId)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          completedSectorMissionIds: [...state.meta.completedSectorMissionIds, action.missionId],
+        },
+      };
+    }
+
     case 'saveCustomMap': {
       const map = normalizeCustomMap({ ...action.map, updatedAt: Date.now() }, action.map.id);
       if (!map) return state;
@@ -1817,6 +1838,7 @@ export interface MetaContextValue {
   tickRecovery: () => void;
   upgradeFacility: () => void;
   createCustomMap: () => void;
+  completeSectorMission: (missionId: string) => void;
   saveCustomMap: (map: CustomMap) => void;
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
@@ -1942,6 +1964,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const tickRecovery = useCallback(() => dispatch({ type: 'tickRecovery', now: Date.now() }), []);
   const upgradeFacility = useCallback(() => dispatch({ type: 'upgradeFacility' }), []);
   const createCustomMap = useCallback(() => dispatch({ type: 'createCustomMap' }), []);
+  const completeSectorMission = useCallback(
+    (missionId: string) => dispatch({ type: 'completeSectorMission', missionId }),
+    [],
+  );
   const saveCustomMap = useCallback((map: CustomMap) => dispatch({ type: 'saveCustomMap', map }), []);
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
@@ -2036,6 +2062,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       tickRecovery,
       upgradeFacility,
       createCustomMap,
+      completeSectorMission,
       saveCustomMap,
       duplicateCustomMap,
       deleteCustomMap,
@@ -2097,6 +2124,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     tickRecovery,
     upgradeFacility,
     createCustomMap,
+    completeSectorMission,
     saveCustomMap,
     duplicateCustomMap,
     deleteCustomMap,

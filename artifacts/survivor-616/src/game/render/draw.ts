@@ -1335,7 +1335,16 @@ function inferObstacleKind(obs: { w: number; h: number }): ObstacleDef['kind'] {
   return 'crate';
 }
 
-function drawArenaEdges(ctx: CanvasRenderingContext2D, w: World) {
+/**
+ * `view` is the visible world rect. The out-of-bounds blackout has to reach
+ * the edge of *that*, not a fixed distance: a zoomed-out camera (Sector
+ * Command's commander view) otherwise shows lit ground past the arena wall.
+ */
+function drawArenaEdges(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  view: { left: number; top: number; right: number; bottom: number },
+) {
   // Endless mode has no walls.
   if (w.area.endless) return;
 
@@ -1344,10 +1353,14 @@ function drawArenaEdges(ctx: CanvasRenderingContext2D, w: World) {
   const thickness = 26;
 
   ctx.fillStyle = '#0a0a0d';
-  ctx.fillRect(-halfW - 400, -halfH - 400, w.bounds.w + 800, 400);
-  ctx.fillRect(-halfW - 400, halfH, w.bounds.w + 800, 400);
-  ctx.fillRect(-halfW - 400, -halfH, 400, w.bounds.h);
-  ctx.fillRect(halfW, -halfH, 400, w.bounds.h);
+  const outLeft = Math.min(view.left, -halfW) - 400;
+  const outRight = Math.max(view.right, halfW) + 400;
+  const outTop = Math.min(view.top, -halfH) - 400;
+  const outBottom = Math.max(view.bottom, halfH) + 400;
+  ctx.fillRect(outLeft, outTop, outRight - outLeft, -halfH - outTop);
+  ctx.fillRect(outLeft, halfH, outRight - outLeft, outBottom - halfH);
+  ctx.fillRect(outLeft, -halfH, -halfW - outLeft, w.bounds.h);
+  ctx.fillRect(halfW, -halfH, outRight - halfW, w.bounds.h);
 
   const groundTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
   ctx.fillStyle = groundTint ? mixHex(w.area.ground.seam, groundTint.bodyDark, 0.3) : w.area.ground.seam;
@@ -3279,7 +3292,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
     drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
   }
-  drawArenaEdges(ctx, w);
+  drawArenaEdges(ctx, w, { left, top, right, bottom });
   drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);

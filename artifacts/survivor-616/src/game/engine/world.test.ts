@@ -36,6 +36,7 @@ import {
   setStormCloudMode,
   captureEnemy,
   commandedUnits,
+  missionSnapshot,
   orderSelectedUnits,
   selectAllCommandedUnits,
   squadCostUsed,
@@ -62,7 +63,7 @@ import {
   reducer,
   startingWeaponLevel,
 } from '@/game/state/metaStore';
-import type { AreaDef, CharacterDef, LokPetRoll, RunResult } from '@/game/types';
+import type { AreaDef, CharacterDef, LokPetRoll, RunResult, SectorMissionDef } from '@/game/types';
 
 const neutralInput = { moveX: 0, moveY: 0, ultimate: false };
 
@@ -2667,4 +2668,80 @@ test('throwSelectedFrozenEnemies damages what it hits and grants a kill; a whiff
   }
   assert.equal(missWorld.kills, killsBeforeMiss, 'a whiff grants no kill credit');
   assert.ok(!missWorld.enemies.some((e) => e.uid === missProjectile.uid), 'the thrown enemy is still removed once it expires');
+});
+
+test('captured units are immune to every player damage path, not just targeting', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 40, 0);
+  unit.hp = unit.maxHp * 0.2;
+  assert.equal(captureEnemy(world, unit), true);
+  unit.hp = unit.maxHp;
+
+  // Nothing hostile is on the arena, so any hp loss over a long stretch of
+  // simulation could only have come from the player's own weapons.
+  const hpBefore = unit.hp;
+  for (let i = 0; i < 240; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(unit.hp, hpBefore, 'a captured unit must not be shot by its own side');
+  assert.equal(unit.dying, false);
+});
+
+test('a mission tracks its objectives and clears the run when the required ones are done', () => {
+  const missionDef: SectorMissionDef = {
+    id: 'test-mission',
+    name: 'Test Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    durationSec: 120,
+    squadCap: 4,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [
+      { id: 'turn', kind: 'capture-units', label: 'Turn 1', targetCount: 1 },
+      { id: 'bonus', kind: 'kill-any', label: 'Down 99', targetCount: 99, optional: true },
+    ],
+    beats: [{ id: 'open', trigger: { kind: 'at-sec', sec: 0 }, line: 'Vee: go.' }],
+    unlock: { kind: 'default' },
+  };
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    41,
+    [],
+    1,
+    true,
+    null,
+    { sectorSquadCap: 4, mission: missionDef },
+  );
+
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(missionSnapshot(world)?.lastBeatLine, 'Vee: go.', 'an at-0s beat fires on the first frame');
+  assert.equal(world.outcome, 'running');
+
+  const unit = addEnemy(world, 'nightcrawler', 40, 0);
+  unit.hp = unit.maxHp * 0.2;
+  assert.equal(captureEnemy(world, unit), true);
+  stepWorld(world, 1 / 30, neutralInput);
+
+  const snapshot = missionSnapshot(world)!;
+  assert.equal(snapshot.objectives.find((objective) => objective.id === 'turn')?.done, true);
+  assert.equal(snapshot.objectives.find((objective) => objective.id === 'bonus')?.done, false);
+  assert.equal(world.outcome, 'cleared', 'an unfinished optional objective must not hold the mission open');
+});
+
+test('select-all then order sends every unit walking to the ordered point', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 40, 0);
+  unit.hp = unit.maxHp * 0.2;
+  captureEnemy(world, unit);
+
+  assert.equal(selectAllCommandedUnits(world), 1);
+  assert.equal(orderSelectedUnits(world, -120, -60), 1);
+  assert.equal(unit.orderKind, 'move');
+
+  const distanceBefore = Math.hypot(unit.x - -120, unit.y - -60);
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(Math.hypot(unit.x - -120, unit.y - -60) < distanceBefore, 'the unit should close on its order');
 });

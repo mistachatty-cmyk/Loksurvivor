@@ -18,17 +18,27 @@ import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudL
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { nextRescueAllyId } from '@/game/data/progression';
+import { customMapToArea, objectiveMarkersOf, spawnPointsOf } from '@/game/data/customMaps';
+import { SECTOR_MAPS_BY_ID } from '@/game/data/sectorMaps';
+import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
   castFreezeCone,
+  captureNearestEnemy,
   claimLootPrize,
   claimRumorEmergencyHeal,
   createWorld,
   dashPlayer,
+  endCommandSelectionDrag,
   endFreezeSelectionDrag,
   hudSnapshot,
+  missionSnapshot,
+  orderSelectedUnits,
+  selectAllCommandedUnits,
+  setCommandMode,
+  updateCommandSelection,
   primePhysicsObject,
   rollUpgradeChoices,
   setStormCloudMode,
@@ -60,6 +70,28 @@ import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 
+/**
+ * Screen point -> world point, using the same camera math `renderWorld` uses.
+ * (The `targetView` expression is duplicated inline elsewhere in this file for
+ * the older pointer paths; new code should call this.)
+ */
+function toWorldPoint(
+  canvas: HTMLCanvasElement,
+  world: World,
+  clientX: number,
+  clientY: number,
+  targetViewOverride?: number,
+) {
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, rect.width);
+  const targetView = targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78));
+  const zoom = width / targetView;
+  return {
+    x: (clientX - rect.left - width / 2) / zoom + world.camera.x,
+    y: (clientY - rect.top - rect.height / 2) / zoom + world.camera.y,
+  };
+}
+
 /** Resolve the weapon a level-up card represents, if any, for its icon. */
 function resolveCardWeapon(upgrade: UpgradeDef) {
   if (upgrade.weaponId) return WEAPONS_BY_ID[upgrade.weaponId];
@@ -75,6 +107,8 @@ export interface RunScreenProps {
   physicsObjectClicksEnabled?: boolean;
   episodeId?: string;
   areaOverride?: AreaDef;
+  /** Sector Command (dev-gated): plays this mission on its authored map. */
+  missionId?: string;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -88,7 +122,7 @@ interface StickState {
   dy: number;
 }
 
-type PointerMode = 'none' | 'stick' | 'object' | 'cloud' | 'freezeSelect';
+type PointerMode = 'none' | 'stick' | 'object' | 'cloud' | 'freezeSelect' | 'commandSelect';
 
 interface TapRecord {
   time: number;
@@ -111,6 +145,8 @@ interface RandomUpgradeReveal {
 }
 
 const STICK_RADIUS = 54;
+/** Sector Command: movement under this many px is a tap (an order), not a drag (a selection). */
+const COMMAND_TAP_SLOP = 12;
 
 /** Storm Chaser's weather picker: label/color per mode, matching the cloud's own on-canvas colors. */
 const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: string }> = [
@@ -140,6 +176,7 @@ export function RunScreen({
   physicsObjectClicksEnabled = true,
   episodeId,
   areaOverride,
+  missionId,
   onAbort,
   onFinish,
 }: RunScreenProps) {
@@ -167,6 +204,18 @@ export function RunScreen({
   const lastTapRef = useRef<TapRecord | null>(null);
   const freezeSelectPointerIdRef = useRef<number | null>(null);
   const freezeSelectOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
+  const commandPointerIdRef = useRef<number | null>(null);
+  /**
+   * Sector Command's second camera mode. A fully detached, drag-to-pan
+   * commander camera would fight the marquee for the same drag on touch, so
+   * the shipped "commander view" instead pulls the existing player-locked
+   * camera way back through `targetViewOverride` -- you see the whole
+   * engagement and can marquee across it, without a second pan gesture.
+   */
+  const commanderViewRef = useRef(false);
+  /** The target view the last rendered frame actually used, so pointer math matches it. */
+  const renderTargetViewRef = useRef<number | undefined>(undefined);
+  const commandOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
@@ -174,6 +223,10 @@ export function RunScreen({
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [freezeSelectBox, setFreezeSelectBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [commandBox, setCommandBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [commandModeOn, setCommandModeOn] = useState(false);
+  const [commanderView, setCommanderView] = useState(false);
+  const [missionHud, setMissionHud] = useState<ReturnType<typeof missionSnapshot>>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
   const [reelTick, setReelTick] = useState(0);
   const [chestFlight, setChestFlight] = useState(0);
@@ -213,7 +266,19 @@ export function RunScreen({
     invertY: meta.gyroInvertY,
   });
 
-  const area = areaOverride ?? getArea(areaId);
+  // Sector Command: a mission owns its map, its markers and its player spawn,
+  // so it supplies the whole area rather than going through AREAS.
+  const mission = missionId ? SECTOR_MISSIONS_BY_ID[missionId] : undefined;
+  const missionMap = mission ? SECTOR_MAPS_BY_ID[mission.mapId] : undefined;
+  const missionArea = missionMap ? customMapToArea(missionMap) : undefined;
+  const missionMarkers = missionMap
+    ? objectiveMarkersOf(missionMap).map((placement) => ({ assetId: placement.assetId, x: placement.x, y: placement.y }))
+    : undefined;
+  const missionPlayerStart = missionMap
+    ? spawnPointsOf(missionMap, 'player').map((placement) => ({ x: placement.x, y: placement.y }))[0]
+    : undefined;
+
+  const area = missionArea ?? areaOverride ?? getArea(areaId);
   const baseCharacter = getCharacter(characterId);
   const activeWorldPalette = meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId);
   const character = {
@@ -276,6 +341,10 @@ export function RunScreen({
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
         worldColorPalette: activeWorldPalette,
         worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
+        sectorSquadCap: mission?.squadCap,
+        playerStart: missionPlayerStart,
+        mission,
+        missionMarkers,
       },
     );
   }
@@ -338,6 +407,20 @@ export function RunScreen({
 
     const canvas = canvasRef.current;
     const world = worldRef.current;
+
+    // Sector Command: with command mode on, the pointer stops steering the
+    // player entirely -- a drag marquee-selects units, a tap orders whatever
+    // is selected. This is the one thing that makes an RTS grammar and a
+    // virtual movement stick coexist on a touchscreen: they never share a
+    // pointer-down.
+    if (canvas && world && world.sectorCommand?.commandMode) {
+      const point = toWorldPoint(canvas, world, event.clientX, event.clientY, renderTargetViewRef.current);
+      pointerModeRef.current = 'commandSelect';
+      commandPointerIdRef.current = event.pointerId;
+      commandOriginRef.current = { worldX: point.x, worldY: point.y, clientX: event.clientX, clientY: event.clientY };
+      return;
+    }
+
     const now = performance.now();
     const previousTap = lastTapRef.current;
     if (canvas && world && previousTap &&
@@ -436,6 +519,24 @@ export function RunScreen({
   }, [dungeonTransition, physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerModeRef.current === 'commandSelect') {
+      const canvas = canvasRef.current;
+      const world = worldRef.current;
+      const origin = commandOriginRef.current;
+      if (!canvas || !world || !origin || commandPointerIdRef.current !== event.pointerId) return;
+      // Under the tap threshold this is still a pending order, not a drag --
+      // don't wipe the standing selection just because a thumb wobbled.
+      if (Math.hypot(event.clientX - origin.clientX, event.clientY - origin.clientY) <= COMMAND_TAP_SLOP) return;
+      const point = toWorldPoint(canvas, world, event.clientX, event.clientY, renderTargetViewRef.current);
+      updateCommandSelection(world, origin.worldX, origin.worldY, point.x, point.y);
+      setCommandBox({
+        x: Math.min(origin.clientX, event.clientX),
+        y: Math.min(origin.clientY, event.clientY),
+        w: Math.abs(event.clientX - origin.clientX),
+        h: Math.abs(event.clientY - origin.clientY),
+      });
+      return;
+    }
     if (pointerModeRef.current === 'freezeSelect') {
       const canvas = canvasRef.current;
       const world = worldRef.current;
@@ -484,6 +585,20 @@ export function RunScreen({
 
   const endPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
+    if (pointerModeRef.current === 'commandSelect') {
+      const world = worldRef.current;
+      const origin = commandOriginRef.current;
+      pointerModeRef.current = 'none';
+      commandPointerIdRef.current = null;
+      commandOriginRef.current = null;
+      setCommandBox(null);
+      if (!world || !origin) return;
+      const wasTap = event.type !== 'pointercancel'
+        && Math.hypot(event.clientX - origin.clientX, event.clientY - origin.clientY) <= COMMAND_TAP_SLOP;
+      if (wasTap) orderSelectedUnits(world, origin.worldX, origin.worldY);
+      else endCommandSelectionDrag(world);
+      return;
+    }
     if (pointerModeRef.current === 'freezeSelect') {
       pointerModeRef.current = 'none';
       freezeSelectPointerIdRef.current = null;
@@ -662,11 +777,17 @@ export function RunScreen({
         }
       }
 
-      renderWorld(ctx, world, view);
+      // Commander view: same player-locked camera, pulled back to squad scale.
+      const commanderTargetView = commanderViewRef.current
+        ? (view.width < 620 ? 900 : Math.min(1700, view.width * 1.4))
+        : undefined;
+      renderTargetViewRef.current = commanderTargetView;
+      renderWorld(ctx, world, commanderTargetView ? { ...view, targetViewOverride: commanderTargetView } : view);
 
       if (time - hudAt > 60) {
         hudAt = time;
         setHud(hudSnapshot(world));
+        if (world.mission) setMissionHud(missionSnapshot(world));
       }
     };
 
@@ -1183,6 +1304,100 @@ export function RunScreen({
               </button>
             );
           })}
+        </div>
+      ) : null}
+
+      {/* Sector Command: the marquee. Same DOM overlay pattern as Zero Day's. */}
+      {commandBox ? (
+        <div
+          className="pointer-events-none absolute z-30 border-2 border-amber-300/80 bg-amber-300/10"
+          style={{ left: commandBox.x, top: commandBox.y, width: commandBox.w, height: commandBox.h }}
+          data-testid="command-select-box"
+        />
+      ) : null}
+
+      {/* Sector Command: objective checklist + squad readout. Mission runs only. */}
+      {missionHud ? (
+        <div
+          className="pointer-events-none absolute left-2 top-[4.75rem] z-40 w-[min(52vw,190px)] border border-amber-300/40 bg-black/80 p-1.5 font-mono text-[9px] uppercase tracking-wider text-amber-100"
+          data-testid="mission-hud"
+        >
+          <div className="truncate text-amber-300">{missionHud.name}</div>
+          <div className="text-white/60">
+            Squad {missionHud.squadCost}/{missionHud.squadCap} · Units {missionHud.units} · Lost {missionHud.losses}
+          </div>
+          <ul className="mt-1 space-y-0.5">
+            {missionHud.objectives.map((objective) => (
+              <li key={objective.id} className={objective.done ? 'text-emerald-300' : 'text-white/80'}>
+                {objective.done ? '[x]' : '[ ]'} {objective.label}
+                {objective.target > 1 && !objective.done ? ` ${objective.progress}/${objective.target}` : ''}
+                {objective.optional ? ' (opt)' : ''}
+              </li>
+            ))}
+          </ul>
+          {missionHud.lastBeatLine ? (
+            <div className="mt-1 border-t border-amber-300/20 pt-1 text-amber-200/90 normal-case tracking-normal">
+              {missionHud.lastBeatLine}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Sector Command: the thumb dock. Command mode swaps the pointer grammar. */}
+      {missionHud ? (
+        <div className="absolute bottom-5 left-3 z-40 flex flex-col gap-1.5 sm:bottom-8 sm:left-6" data-testid="command-dock">
+          <button
+            type="button"
+            onClick={() => {
+              const world = worldRef.current;
+              if (!world) return;
+              const next = !(world.sectorCommand?.commandMode ?? false);
+              setCommandMode(world, next);
+              setCommandModeOn(next);
+              setCommandBox(null);
+              pointerModeRef.current = 'none';
+            }}
+            className={`h-12 w-[5.5rem] rounded-md border-2 font-mono text-[9px] font-bold uppercase tracking-wider ${
+              commandModeOn
+                ? 'border-amber-300 bg-amber-300/25 text-amber-100'
+                : 'border-white/25 bg-black/75 text-white/75'
+            }`}
+            data-testid="button-command-mode"
+          >
+            {commandModeOn ? 'Command On' : 'Command'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { const world = worldRef.current; if (world) captureNearestEnemy(world); }}
+            className="h-11 w-[5.5rem] rounded-md border-2 border-emerald-300/60 bg-black/75 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-100"
+            data-testid="button-capture"
+          >
+            Capture
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !commanderViewRef.current;
+              commanderViewRef.current = next;
+              setCommanderView(next);
+            }}
+            className={`h-9 w-[5.5rem] rounded-md border font-mono text-[9px] uppercase tracking-wider ${
+              commanderView ? 'border-cyan-300 bg-cyan-300/20 text-cyan-100' : 'border-white/25 bg-black/75 text-white/70'
+            }`}
+            data-testid="button-commander-view"
+          >
+            {commanderView ? 'Embodied' : 'Cmdr View'}
+          </button>
+          {commandModeOn ? (
+            <button
+              type="button"
+              onClick={() => { const world = worldRef.current; if (world) selectAllCommandedUnits(world); }}
+              className="h-9 w-[5.5rem] rounded-md border border-amber-300/45 bg-black/75 font-mono text-[9px] uppercase tracking-wider text-amber-100"
+              data-testid="button-select-all-units"
+            >
+              Select All
+            </button>
+          ) : null}
         </div>
       ) : null}
 

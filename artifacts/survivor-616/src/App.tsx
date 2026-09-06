@@ -37,6 +37,7 @@ import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
 import { MapBuilder } from '@/ui/MapBuilder';
+import { SectorCommandScreen } from '@/ui/SectorCommandScreen';
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
 
@@ -59,7 +60,8 @@ type Screen =
   | { name: 'account' }
   | { name: 'feedback' }
   | { name: 'map-editor' }
-  | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string }
+  | { name: 'sector-command' }
+  | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
 
 /**
@@ -92,12 +94,15 @@ function initialScreen(onboarded: boolean): Screen {
     ) {
       return { name: requested };
     }
+    // Sector Command is dev-gated, and `?screen=` bypasses the hub's gating --
+    // so the flag has to be re-checked here, not just on the hub button.
+    if (requested === 'sector-command') return { name: 'sector-command' };
   }
   return { name: onboarded ? 'hub' : 'intro' };
 }
 
 function Game() {
-  const { meta, markOnboarded, selectedCharacter, completeRun, enterHideout, unlockedAreas } = useMeta();
+  const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
 
@@ -150,6 +155,7 @@ function Game() {
     }
   }, []);
 
+  const missionId = screen.name === 'run' ? screen.missionId : undefined;
   const handleFinish = useCallback(
     (result: RunResult) => {
       const fatigueBefore = meta.fatigueByCharacter[result.characterId] ?? 0;
@@ -179,9 +185,10 @@ function Game() {
         })),
       };
       completeRun(resultWithFatigue);
+      if (missionId && result.cleared) completeSectorMission(missionId);
       setScreen({ name: 'summary', result: resultWithFatigue });
     },
-    [completeRun, meta.fatigueByCharacter, meta.knownRelicIds],
+    [completeRun, completeSectorMission, missionId, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
   switch (screen.name) {
@@ -196,7 +203,25 @@ function Game() {
       );
 
     case 'hub':
-      return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} onOpenMapEditor={() => setScreen({ name: 'map-editor' })} />;
+      return (
+        <HubScreen
+          roomId={roomId}
+          onChangeRoom={setRoomId}
+          onOpen={openPanel}
+          onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
+          onOpenSectorCommand={meta.devModeAccessUnlocked ? () => setScreen({ name: 'sector-command' }) : undefined}
+        />
+      );
+
+    case 'sector-command':
+      // Dev-gated: reachable only with the dev flag on, however you got here.
+      if (!meta.devModeAccessUnlocked) return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} onOpenMapEditor={() => setScreen({ name: 'map-editor' })} />;
+      return (
+        <SectorCommandScreen
+          onBack={goHub}
+          onLaunch={(missionId) => setScreen({ name: 'run', areaId: missionId, missionId })}
+        />
+      );
 
     case 'map-editor':
       return <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />;
@@ -262,6 +287,7 @@ function Game() {
               key={`${screen.areaId}-${selectedCharacter.id}-${screen.episodeId ?? 'standard'}-${(screen.challengeIds ?? []).join('-')}`}
               areaId={screen.areaId}
               areaOverride={customMap ? customMapToArea(customMap) : undefined}
+              missionId={screen.missionId}
               characterId={selectedCharacter.id}
               challengeIds={screen.challengeIds}
               episodeId={screen.episodeId}

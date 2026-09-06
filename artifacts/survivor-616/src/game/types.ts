@@ -1538,6 +1538,8 @@ export interface MetaState {
   worldPaletteBlendEnabled: boolean;
   /** Extends the active world palette to recolor enemies and environment accents too, not just the player. Off by default to preserve the original look. */
   worldColorFullRecolorEnabled: boolean;
+  /** Sector Command (dev-gated): missions cleared at least once. */
+  completedSectorMissionIds: string[];
   /** Whether device tilt steers the player on supported hardware. */
   gyroEnabled: boolean;
   /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */

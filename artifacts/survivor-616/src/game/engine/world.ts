@@ -66,6 +66,9 @@ import type {
   StormCloudMode,
   SpritePalette,
   FreezeThrowConfig,
+  MissionBeatDef,
+  MissionObjectiveDef,
+  SectorMissionDef,
 } from '@/game/types';
 
 import {
@@ -472,6 +475,36 @@ export interface SectorCommandState {
   losses: number;
 }
 
+/** One objective's live progress. Progress is derived from world state each frame. */
+export interface MissionObjectiveRuntime {
+  def: MissionObjectiveDef;
+  progress: number;
+  /** Seconds banked for time-based objectives (hold-marker). */
+  accumulator: number;
+  done: boolean;
+  doneAt: number;
+}
+
+export interface MissionBeatRuntime {
+  def: MissionBeatDef;
+  fired: boolean;
+  firedAt: number;
+}
+
+/** Sector Command mission runtime; null outside a mission. */
+export interface MissionRuntime {
+  def: SectorMissionDef;
+  objectives: MissionObjectiveRuntime[];
+  beats: MissionBeatRuntime[];
+  /** Objective-marker positions lifted off the authored map. */
+  markers: Array<{ assetId: string; x: number; y: number }>;
+  complete: boolean;
+  /** Guards the squad-wiped beat so it cannot fire before you ever had a squad. */
+  everHadUnits: boolean;
+  lastBeatLine: string | null;
+  lastBeatAt: number;
+}
+
 /** Zero Day's freeze-then-throw runtime state. See createFreezeCone/updateFreezeSelection/throwSelectedFrozenEnemies. */
 export interface FreezeThrowState {
   lastCastAt: number;
@@ -691,6 +724,8 @@ export interface World {
   freezeThrow: FreezeThrowState | null;
   /** Sector Command runtime state; null outside the dev-gated campaign mode. */
   sectorCommand: SectorCommandState | null;
+  /** Sector Command mission objectives/beats; null outside a mission. */
+  mission: MissionRuntime | null;
   /** Fragmented Backup vendor item: a lethal hit restores 25% HP once per run instead of ending it. */
   extraLifeAvailable: boolean;
   extraLifeUsed: boolean;
@@ -947,6 +982,9 @@ export function createWorld(
     sectorSquadCap?: number;
     /** Sector Command: where the authored map's player spawn point puts you. */
     playerStart?: { x: number; y: number };
+    /** Sector Command: the mission being played, and its map's objective markers. */
+    mission?: SectorMissionDef;
+    missionMarkers?: Array<{ assetId: string; x: number; y: number }>;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1024,6 +1062,20 @@ export function createWorld(
           selectedUids: [],
           captures: 0,
           losses: 0,
+        }
+      : null,
+    mission: setup.mission
+      ? {
+          def: setup.mission,
+          objectives: setup.mission.objectives.map((objective) => ({
+            def: objective, progress: 0, accumulator: 0, done: false, doneAt: 0,
+          })),
+          beats: setup.mission.beats.map((beat) => ({ def: beat, fired: false, firedAt: 0 })),
+          markers: setup.missionMarkers ?? [],
+          complete: false,
+          everHadUnits: false,
+          lastBeatLine: null,
+          lastBeatAt: 0,
         }
       : null,
     worldColorPalette: setup.worldColorPalette,
@@ -2267,6 +2319,12 @@ function damageEnemy(
   burstDepth = 0,
 ) {
   if (enemy.dying) return;
+  // Sector Command: this is the single choke point for player-caused damage,
+  // so excluding captured units here is what makes them safe from *every*
+  // weapon, splash and status path at once -- `nearestEnemy`'s filter only
+  // stops them being aimed at. Their own mortality runs through
+  // `advanceCommandedUnit`, which touches hp directly.
+  if (enemy.commanded) return;
   // Wraiths can't be hurt while lurking invisible -- see oddity-arenas.md.
   if (w.now < enemy.invisibleUntil) return;
   // Zero Day: frozen "stone" enemies are untargetable by normal damage --
@@ -5030,6 +5088,136 @@ export function throwSelectedFrozenEnemies(w: World, targetX: number, targetY: n
 }
 
 /* ------------------------------------------------------------------ */
+/* Sector Command: mission objectives and scripted beats               */
+/* ------------------------------------------------------------------ */
+
+const MARKER_HOLD_RADIUS = 90;
+
+/**
+ * Advances mission objectives and fires scripted beats. Objective progress is
+ * derived from live world state each frame (the `episodeSnapshot` approach)
+ * rather than being incremented from scattered call sites, so there is one
+ * place to read and no double-counting.
+ */
+function updateMission(w: World, dt: number) {
+  const mission = w.mission;
+  if (!mission || w.outcome !== 'running') return;
+  const p = w.player;
+
+  for (const objective of mission.objectives) {
+    if (objective.done) continue;
+    const def = objective.def;
+    switch (def.kind) {
+      case 'kill-any':
+        objective.progress = w.kills;
+        break;
+      case 'kill-enemy':
+        objective.progress = def.enemyId ? (w.killsByEnemy[def.enemyId] ?? 0) : 0;
+        break;
+      case 'survive-sec':
+        objective.progress = Math.floor(w.time);
+        break;
+      case 'capture-units':
+        objective.progress = w.sectorCommand?.captures ?? 0;
+        break;
+      case 'hold-marker': {
+        // Progress in seconds held: the player (or any commanded unit)
+        // standing inside any matching marker counts.
+        const held = mission.markers.some((marker) => {
+          if (marker.assetId !== def.markerAssetId) return false;
+          if (dist2(p.x, p.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS) return true;
+          return w.enemies.some((enemy) =>
+            enemy.commanded && !enemy.dying &&
+            dist2(enemy.x, enemy.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS);
+        });
+        if (held) objective.accumulator += dt;
+        objective.progress = Math.floor(objective.accumulator);
+        break;
+      }
+      case 'reach-marker': {
+        const reached = mission.markers.some((marker) =>
+          marker.assetId === def.markerAssetId &&
+          dist2(p.x, p.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS);
+        if (reached) objective.progress = Math.max(objective.progress, 1);
+        break;
+      }
+      case 'destroy-marker': {
+        // A demolition marker is cleared when no unbroken breakable remains
+        // near it -- reusing the existing obstacle destruction, not a new
+        // entity type.
+        let cleared = 0;
+        for (const marker of mission.markers) {
+          if (marker.assetId !== def.markerAssetId) continue;
+          const standing = w.breakables.some((breakable) =>
+            !breakable.broken &&
+            dist2(breakable.x, breakable.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS);
+          if (!standing) cleared += 1;
+        }
+        objective.progress = cleared;
+        break;
+      }
+    }
+    if (objective.progress >= def.targetCount) {
+      objective.done = true;
+      objective.doneAt = w.now;
+      pushAlert(w, `OBJECTIVE: ${def.label.toUpperCase()}`);
+    }
+  }
+
+  // Scripted beats.
+  const squadWiped = mission.everHadUnits && commandedUnits(w).length === 0;
+  for (const beat of mission.beats) {
+    if (beat.fired) continue;
+    const trigger = beat.def.trigger;
+    const shouldFire =
+      trigger.kind === 'at-sec' ? w.time >= trigger.sec
+        : trigger.kind === 'objective-complete'
+          ? mission.objectives.some((objective) => objective.def.id === trigger.objectiveId && objective.done)
+          : squadWiped;
+    if (!shouldFire) continue;
+    beat.fired = true;
+    beat.firedAt = w.now;
+    mission.lastBeatLine = beat.def.line;
+    mission.lastBeatAt = w.now;
+    pushAlert(w, beat.def.line);
+    if (beat.def.spawnWave) w.area.waves.push(beat.def.spawnWave);
+  }
+  if (commandedUnits(w).length > 0) mission.everHadUnits = true;
+
+  // The mission is cleared once every required objective is done.
+  const required = mission.objectives.filter((objective) => !objective.def.optional);
+  if (required.length > 0 && required.every((objective) => objective.done)) {
+    mission.complete = true;
+    w.outcome = 'cleared';
+  }
+}
+
+/** Live mission readout for the HUD. */
+export function missionSnapshot(w: World) {
+  const mission = w.mission;
+  if (!mission) return null;
+  return {
+    id: mission.def.id,
+    name: mission.def.name,
+    complete: mission.complete,
+    lastBeatLine: mission.lastBeatLine,
+    lastBeatAt: mission.lastBeatAt,
+    squadCost: squadCostUsed(w),
+    squadCap: w.sectorCommand?.squadCap ?? 0,
+    units: commandedUnits(w).length,
+    losses: w.sectorCommand?.losses ?? 0,
+    objectives: mission.objectives.map((objective) => ({
+      id: objective.def.id,
+      label: objective.def.label,
+      optional: Boolean(objective.def.optional),
+      done: objective.done,
+      progress: Math.min(objective.progress, objective.def.targetCount),
+      target: objective.def.targetCount,
+    })),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Sector Command: capture -> select -> order                          */
 /* ------------------------------------------------------------------ */
 
@@ -6451,6 +6639,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateEnemies(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
+  // Runs after enemies/breakables so objectives read this frame's state.
+  updateMission(w, dt);
 
   // Weapon cadence.
   updateOrbiters(w, dt);
