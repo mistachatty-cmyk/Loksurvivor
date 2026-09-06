@@ -4498,10 +4498,21 @@ function updateEnemies(w: World, dt: number) {
             let diff = Math.abs(toPlayer - faceAngle) % (Math.PI * 2);
             if (diff > Math.PI) diff = Math.PI * 2 - diff;
             const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
-            if (diff < halfAngle && w.now < w.stealthUntil) {
-              w.stealthUntil = w.now;
-              pushAlert(w, 'SPOTTED');
-              spawnParticles(w, p.x, p.y, '#ff5f6d', 10, 90);
+            if (diff < halfAngle && w.now >= enemy.fireReadyAt) {
+              enemy.fireReadyAt = w.now + 900;
+              w.effects.push({
+                uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: rdist, angle: toPlayer, spread: halfAngle * 2,
+                bornAt: w.now, expiresAt: w.now + 220, color: '#f59e0b', damage: 0, impactIntensity: 0,
+                hitUids: new Set(), followPlayer: false,
+              });
+              if (w.now < w.stealthUntil) {
+                w.stealthUntil = w.now;
+                // A short penalty on top of the ability's own cooldown -- being
+                // caught should sting more than just losing the current cloak.
+                w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+                pushAlert(w, 'SPOTTED');
+                spawnParticles(w, p.x, p.y, '#ff5f6d', 10, 90);
+              }
             }
           }
         }
