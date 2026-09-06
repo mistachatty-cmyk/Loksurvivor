@@ -34,6 +34,12 @@ import {
   resolveImpactTravel,
   relicRecipeEligibility,
   setStormCloudMode,
+  captureEnemy,
+  commandedUnits,
+  orderSelectedUnits,
+  selectAllCommandedUnits,
+  squadCostUsed,
+  updateCommandSelection,
   castFreezeCone,
   updateFreezeSelection,
   throwSelectedFrozenEnemies,
@@ -148,6 +154,11 @@ function addEnemy(
     baseRadius: def.radius,
     frozenUntil: 0,
     selectedForThrow: false,
+    commanded: false,
+    orderKind: 'none',
+    orderX: 0,
+    orderY: 0,
+    selectedForCommand: false,
   };
   world.enemies.push(enemy);
   return enemy;
@@ -2442,6 +2453,84 @@ test('switching Storm Chaser to rain washes an existing fire/acid/frost ground s
 
   assert.ok(!world.fluids.some((tile) => tile.kind === 'acid-storm'), 'rain should wash the acid-storm stain off the ground');
   assert.ok(!enemy.activeEffects.some((effect) => effect.id === 'acid'), 'rain should also wash the acid status off the enemy standing in it');
+});
+
+function sectorWorld(squadCap = 6) {
+  return createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    21,
+    [],
+    1,
+    true,
+    null,
+    { sectorSquadCap: squadCap },
+  );
+}
+
+test('capture refuses healthy enemies, takes weakened ones, and forfeits the kill', () => {
+  const world = sectorWorld();
+  const enemy = addEnemy(world, 'nightcrawler', 60, 0);
+  const killsBefore = world.kills;
+
+  assert.equal(captureEnemy(world, enemy), false, 'a healthy enemy cannot be captured');
+
+  enemy.hp = enemy.maxHp * 0.2;
+  assert.equal(captureEnemy(world, enemy), true);
+  assert.equal(enemy.commanded, true);
+  assert.equal(commandedUnits(world).length, 1);
+  assert.equal(world.kills, killsBefore, 'capturing must not count as a kill');
+  assert.equal(world.sectorCommand?.captures, 1);
+});
+
+test('capture refuses bosses, unlisted enemies, and anything over the squad cap', () => {
+  const world = sectorWorld(2);
+  const boss = addEnemy(world, 'the-sire', 60, 0);
+  boss.hp = 1;
+  assert.equal(captureEnemy(world, boss), false, 'bosses are never capturable');
+
+  const unlisted = addEnemy(world, 'belfry-bat', 60, 20);
+  unlisted.uid = 901;
+  unlisted.hp = 1;
+  assert.equal(captureEnemy(world, unlisted), false, 'enemies without a capture profile are refused');
+
+  // Two 1-cost units fit a cap of 2; a third does not.
+  const first = addEnemy(world, 'nightcrawler', 40, 0);
+  first.uid = 902;
+  first.hp = 1;
+  const second = addEnemy(world, 'corner-cutter', 40, 20);
+  second.uid = 903;
+  second.hp = 1;
+  const third = addEnemy(world, 'nightcrawler', 40, 40);
+  third.uid = 904;
+  third.hp = 1;
+
+  assert.equal(captureEnemy(world, first), true);
+  assert.equal(captureEnemy(world, second), true);
+  assert.equal(squadCostUsed(world), 2);
+  assert.equal(captureEnemy(world, third), false, 'the squad cap is enforced');
+});
+
+test('captured units are excluded from player targeting, then take orders and walk to them', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 60, 0);
+  unit.hp = 1;
+  assert.equal(captureEnemy(world, unit), true);
+
+  // Selection: a box around the unit picks it up; a box elsewhere does not.
+  updateCommandSelection(world, 0, -60, 120, 60);
+  assert.deepEqual(world.sectorCommand?.selectedUids, [unit.uid]);
+  updateCommandSelection(world, 400, 400, 500, 500);
+  assert.deepEqual(world.sectorCommand?.selectedUids, []);
+
+  assert.equal(selectAllCommandedUnits(world), 1);
+  assert.equal(orderSelectedUnits(world, 260, 0), 1);
+  assert.equal(unit.orderKind, 'move');
+
+  const startX = unit.x;
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(unit.x > startX, 'a commanded unit should walk toward its order');
 });
 
 test('Fragmented Backup restores 25% HP once instead of ending the run, then a second lethal hit ends it normally', () => {

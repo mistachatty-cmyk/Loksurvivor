@@ -20,6 +20,7 @@ import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { SECTOR_UNITS_BY_ENEMY_ID } from '@/game/data/sectorUnits';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
@@ -161,6 +162,19 @@ export interface EnemyActor extends Actor {
   frozenUntil: number;
   /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
   selectedForThrow: boolean;
+  /**
+   * Sector Command: permanently captured and fighting for the player. Distinct
+   * from the legacy `convertedUntil` timer (the allymaker weapon), which stays
+   * exactly as it was -- only `commanded` units are excluded from player
+   * targeting, take hostile contact damage, and obey move orders.
+   */
+  commanded: boolean;
+  /** Sector Command: the standing order a commanded unit walks to and holds. */
+  orderKind: 'none' | 'move' | 'hold';
+  orderX: number;
+  orderY: number;
+  /** Sector Command: inside the current command-mode drag box. */
+  selectedForCommand: boolean;
 }
 
 export interface Projectile {
@@ -438,6 +452,26 @@ export interface StormCloud {
   autoCycle: boolean;
 }
 
+/**
+ * Sector Command runtime state; null outside the dev-gated campaign mode.
+ * Selection mirrors `FreezeThrowState`'s shape deliberately -- same marquee
+ * grammar, same uid-list contract -- but targets commanded units instead of
+ * frozen enemies.
+ */
+export interface SectorCommandState {
+  /** Max total `SectorUnitDef.squadCost` the player may hold at once. */
+  squadCap: number;
+  /** True while the player has command mode on: drag selects, tap orders. */
+  commandMode: boolean;
+  selecting: boolean;
+  selectionStart: { x: number; y: number } | null;
+  selectionEnd: { x: number; y: number } | null;
+  selectedUids: number[];
+  /** Mission bookkeeping: units taken and units lost across the mission. */
+  captures: number;
+  losses: number;
+}
+
 /** Zero Day's freeze-then-throw runtime state. See createFreezeCone/updateFreezeSelection/throwSelectedFrozenEnemies. */
 export interface FreezeThrowState {
   lastCastAt: number;
@@ -655,6 +689,8 @@ export interface World {
   stormCloud: StormCloud | null;
   /** Zero Day's freeze-then-throw runtime state; null for every other character. */
   freezeThrow: FreezeThrowState | null;
+  /** Sector Command runtime state; null outside the dev-gated campaign mode. */
+  sectorCommand: SectorCommandState | null;
   /** Fragmented Backup vendor item: a lethal hit restores 25% HP once per run instead of ending it. */
   extraLifeAvailable: boolean;
   extraLifeUsed: boolean;
@@ -907,13 +943,19 @@ export function createWorld(
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
     extraLifeAvailable?: boolean;
+    /** Sector Command: squad cap for this mission. Presence of this enables the mode. */
+    sectorSquadCap?: number;
+    /** Sector Command: where the authored map's player spawn point puts you. */
+    playerStart?: { x: number; y: number };
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
   const player: PlayerActor = {
     uid: 1,
-    x: 0,
-    y: 0,
+    // Sector Command missions start you on the map's authored player spawn
+    // point; every other mode starts at the origin as it always has.
+    x: setup.playerStart?.x ?? 0,
+    y: setup.playerStart?.y ?? 0,
     vx: 0,
     vy: 0,
     kx: 0,
@@ -972,6 +1014,18 @@ export function createWorld(
       : null,
     extraLifeAvailable: setup.extraLifeAvailable ?? false,
     extraLifeUsed: false,
+    sectorCommand: setup.sectorSquadCap
+      ? {
+          squadCap: setup.sectorSquadCap,
+          commandMode: false,
+          selecting: false,
+          selectionStart: null,
+          selectionEnd: null,
+          selectedUids: [],
+          captures: 0,
+          losses: 0,
+        }
+      : null,
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
     orbiters: [],
@@ -1407,6 +1461,11 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     phaseUntil: 0,
     frozenUntil: 0,
     selectedForThrow: false,
+    commanded: false,
+    orderKind: 'none',
+    orderX: 0,
+    orderY: 0,
+    selectedForCommand: false,
   };
   w.enemies.push(enemy);
 
@@ -2497,6 +2556,10 @@ function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?
     if (enemy.dying) continue;
     if (exclude?.has(enemy.uid)) continue;
     if (w.now < enemy.invisibleUntil) continue;
+    // Sector Command: your own captured units are never a target -- not for
+    // your weapons, and not for each other. (Legacy `convertedUntil` allies
+    // from the allymaker weapon keep their original behavior.)
+    if (enemy.commanded) continue;
     const d = dist2(enemy.x, enemy.y, x, y);
     if (d < bestDist) {
       bestDist = d;
@@ -4342,6 +4405,12 @@ function updateEnemies(w: World, dt: number) {
           hitUids: new Set(), followPlayer: false,
         });
       }
+      // Sector Command: a captured unit walks to its standing order and is
+      // mortal. Legacy allymaker allies have `commanded === false` and keep
+      // their original stationary-turret behavior untouched.
+      if (enemy.commanded) {
+        advanceCommandedUnit(w, enemy, dt);
+      }
       continue;
     }
 
@@ -4958,6 +5027,220 @@ export function throwSelectedFrozenEnemies(w: World, targetX: number, targetY: n
   }
   state.selectedUids = [];
   return thrown;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sector Command: capture -> select -> order                          */
+/* ------------------------------------------------------------------ */
+
+/** How much of the squad cap the current commanded units use up. */
+export function squadCostUsed(w: World): number {
+  let total = 0;
+  for (const enemy of w.enemies) {
+    if (!enemy.commanded || enemy.dying) continue;
+    total += SECTOR_UNITS_BY_ENEMY_ID[enemy.defId]?.squadCost ?? 1;
+  }
+  return total;
+}
+
+/** Every commanded unit still standing. */
+export function commandedUnits(w: World): EnemyActor[] {
+  return w.enemies.filter((enemy) => enemy.commanded && !enemy.dying);
+}
+
+/**
+ * Tier-1 economy verb: take an enemy instead of killing it. Refuses bosses,
+ * enemies with no capture profile, healthy enemies (you have to soften them
+ * first), and anything that would exceed the mission's squad cap.
+ *
+ * Capturing deliberately forfeits the kill -- no XP, no drops -- so "army now
+ * vs. progression now" is a real decision every time.
+ */
+export function captureEnemy(w: World, enemy: EnemyActor): boolean {
+  const state = w.sectorCommand;
+  if (!state || enemy.dying || enemy.commanded) return false;
+  if (enemy.def.family === 'Boss') return false;
+  const unit = SECTOR_UNITS_BY_ENEMY_ID[enemy.defId];
+  if (!unit) return false;
+  if (enemy.hp > enemy.maxHp * unit.captureHpFraction) return false;
+  if (squadCostUsed(w) + unit.squadCost > state.squadCap) return false;
+
+  enemy.commanded = true;
+  enemy.convertedUntil = Number.POSITIVE_INFINITY;
+  enemy.activeEffects = [];
+  enemy.frozenUntil = 0;
+  enemy.selectedForThrow = false;
+  enemy.maxHp = Math.max(1, Math.round(enemy.def.hp * unit.hpMult));
+  enemy.hp = enemy.maxHp;
+  enemy.damage = enemy.damage * unit.damageMult;
+  enemy.speed = enemy.def.speed * unit.speedMult;
+  enemy.orderKind = 'hold';
+  enemy.orderX = enemy.x;
+  enemy.orderY = enemy.y;
+  state.captures += 1;
+  spawnParticles(w, enemy.x, enemy.y, '#65f6d1', 12, 110);
+  pushAlert(w, `${unit.name.toUpperCase()} TURNED`);
+  return true;
+}
+
+/** The player-facing capture button: takes the best eligible enemy in reach. */
+export function captureNearestEnemy(w: World, reach = 150): boolean {
+  const state = w.sectorCommand;
+  if (!state) return false;
+  const p = w.player;
+  const eligible = w.enemies
+    .filter((enemy) => {
+      if (enemy.dying || enemy.commanded || enemy.def.family === 'Boss') return false;
+      const unit = SECTOR_UNITS_BY_ENEMY_ID[enemy.defId];
+      if (!unit || enemy.hp > enemy.maxHp * unit.captureHpFraction) return false;
+      return dist2(enemy.x, enemy.y, p.x, p.y) <= reach * reach;
+    })
+    .sort((a, b) => dist2(a.x, a.y, p.x, p.y) - dist2(b.x, b.y, p.x, p.y));
+  const target = eligible[0];
+  if (!target) return false;
+  return captureEnemy(w, target);
+}
+
+/** A lost unit is not a kill: no XP, no loot, just gone. */
+function destroyCommandedUnit(w: World, enemy: EnemyActor) {
+  if (enemy.dying) return;
+  enemy.dying = true;
+  enemy.deathAt = w.now;
+  enemy.anim = 'death';
+  enemy.animStartedAt = w.now;
+  enemy.commanded = false;
+  enemy.selectedForCommand = false;
+  spawnParticles(w, enemy.x, enemy.y, '#94a3b8', 8, 90);
+  if (w.sectorCommand) w.sectorCommand.losses += 1;
+}
+
+/**
+ * Per-frame update for one captured unit: take contact damage from hostiles
+ * standing on it, then walk toward its standing order.
+ *
+ * Movement is the storm cloud's steer-toward-a-point primitive with a sticky
+ * target, plus the same `collideObstacles`/`clampToArena` the player and
+ * enemies use -- so units slide along walls exactly like everything else in
+ * the game. There is no pathfinding anywhere in this engine, so a unit
+ * ordered around a concave obstacle cluster will press against it; keeping
+ * orders short and near the player is the design mitigation.
+ */
+function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
+  // Hostiles in contact hurt the unit back, which is what makes a squad
+  // something you can actually lose.
+  if (w.now >= enemy.contactReadyAt) {
+    const attacker = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + 18, new Set([enemy.uid]));
+    if (attacker) {
+      enemy.contactReadyAt = w.now + 620;
+      enemy.hp -= Math.max(1, attacker.damage);
+      enemy.hitFlashUntil = w.now + 90;
+      if (enemy.hp <= 0) {
+        destroyCommandedUnit(w, enemy);
+        return;
+      }
+    }
+  }
+
+  if (enemy.orderKind !== 'move') return;
+  const dx = enemy.orderX - enemy.x;
+  const dy = enemy.orderY - enemy.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 20) {
+    enemy.orderKind = 'hold';
+    enemy.orderX = enemy.x;
+    enemy.orderY = enemy.y;
+    return;
+  }
+  const step = enemy.speed * statusSpeedMultiplier(enemy) * dt;
+  enemy.x += (dx / distance) * step;
+  enemy.y += (dy / distance) * step;
+  enemy.facing = dx >= 0 ? 1 : -1;
+  enemy.anim = 'walk';
+  collideObstacles(w, enemy);
+  clampToArena(w, enemy);
+}
+
+/** Command mode swaps the pointer grammar: drag selects units, tap orders them. */
+export function setCommandMode(w: World, on: boolean) {
+  const state = w.sectorCommand;
+  if (!state) return;
+  state.commandMode = on;
+  if (!on) {
+    state.selecting = false;
+    state.selectionStart = null;
+    state.selectionEnd = null;
+  }
+}
+
+/** Recomputes which commanded units fall inside the drag box (world coords). */
+export function updateCommandSelection(w: World, startX: number, startY: number, endX: number, endY: number) {
+  const state = w.sectorCommand;
+  if (!state) return;
+  state.selecting = true;
+  state.selectionStart = { x: startX, y: startY };
+  state.selectionEnd = { x: endX, y: endY };
+
+  const minX = Math.min(startX, endX);
+  const maxX = Math.max(startX, endX);
+  const minY = Math.min(startY, endY);
+  const maxY = Math.max(startY, endY);
+  const selected: number[] = [];
+  for (const enemy of w.enemies) {
+    const inBox = enemy.commanded && !enemy.dying &&
+      enemy.x >= minX && enemy.x <= maxX && enemy.y >= minY && enemy.y <= maxY;
+    enemy.selectedForCommand = inBox;
+    if (inBox) selected.push(enemy.uid);
+  }
+  state.selectedUids = selected;
+}
+
+/** Ends the drag but keeps the selection -- the next tap is the order. */
+export function endCommandSelectionDrag(w: World) {
+  if (w.sectorCommand) w.sectorCommand.selecting = false;
+}
+
+/** Selects every commanded unit at once -- the touch-friendly "select all". */
+export function selectAllCommandedUnits(w: World): number {
+  const state = w.sectorCommand;
+  if (!state) return 0;
+  const selected: number[] = [];
+  for (const enemy of w.enemies) {
+    const eligible = enemy.commanded && !enemy.dying;
+    enemy.selectedForCommand = eligible;
+    if (eligible) selected.push(enemy.uid);
+  }
+  state.selectedUids = selected;
+  return selected.length;
+}
+
+/**
+ * Issues a move order to the current selection. Units spread around the
+ * target using the existing `formationPositions` geometry so a squad does not
+ * pile onto one pixel.
+ */
+export function orderSelectedUnits(w: World, targetX: number, targetY: number): number {
+  const state = w.sectorCommand;
+  if (!state || state.selectedUids.length === 0) return 0;
+  const units = state.selectedUids
+    .map((selectedUid) => w.enemies.find((enemy) => enemy.uid === selectedUid && enemy.commanded && !enemy.dying))
+    .filter((enemy): enemy is EnemyActor => Boolean(enemy));
+  if (units.length === 0) return 0;
+
+  const spread = 34;
+  units.forEach((unit, index) => {
+    // Ring the destination so a multi-unit order reads as a formation.
+    const angle = (Math.PI * 2 * index) / units.length;
+    const radius = units.length === 1 ? 0 : spread * Math.ceil(units.length / 6);
+    unit.orderKind = 'move';
+    unit.orderX = targetX + Math.cos(angle) * radius;
+    unit.orderY = targetY + Math.sin(angle) * radius;
+  });
+  w.effects.push({
+    uid: uid(w), kind: 'ring', x: targetX, y: targetY, radius: 26,
+    angle: 0, spread: 0, bornAt: w.now, expiresAt: w.now + 340,
+    color: '#65f6d1', damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+  });
+  return units.length;
 }
 
 const STORM_CLOUD_MODE_ORDER: StormCloudMode[] = ['rain', 'fire-rain', 'acid-rain', 'frost-rain'];

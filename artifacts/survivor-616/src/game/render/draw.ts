@@ -3060,6 +3060,35 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     // Zero Day: "stone" enemies -- a flat tint reusing drawRig's existing
     // tint option, plus a frozen anim frame (no idle/attack progression).
     const stoned = enemy.frozenUntil > w.now && !enemy.dying;
+    // Sector Command: a selected unit gets a bright ring, and a unit walking
+    // to an order gets a thin line to where it is going. Captured units
+    // already read as allies via the existing `converted` tint below.
+    if (enemy.commanded && !enemy.dying) {
+      if (enemy.selectedForCommand) {
+        ctx.save();
+        ctx.globalAlpha = 0.6 + 0.25 * Math.sin(w.now / 110);
+        ctx.strokeStyle = '#e5faff';
+        ctx.shadowColor = '#65f6d1';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (enemy.orderKind === 'move') {
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.strokeStyle = '#65f6d1';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(enemy.x, enemy.y);
+        ctx.lineTo(enemy.orderX, enemy.orderY);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
     if (stoned && enemy.selectedForThrow) {
       const pulse = 0.55 + 0.25 * Math.sin(w.now / 90);
       ctx.save();
