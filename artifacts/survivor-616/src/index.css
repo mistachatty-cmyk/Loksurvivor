@@ -433,6 +433,13 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   .palette-preview-wave { animation: none; }
 }
 
+/* Hideout credits chip: a small pulse while at least one passive generator is owned. */
+@keyframes hub-cred-pulse { 50% { transform: scale(1.22); filter: brightness(1.5); } }
+.hub-cred-pulse { animation: hub-cred-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hub-cred-pulse { animation: none; }
+}
+
 /* Arcade Cabinet's CRT flourishes: chrome frame, phosphor glow, scanlines. Inert under every other theme. */
 [data-ui-theme='arcade'] .terminal-frame {
   border-width: 2px;

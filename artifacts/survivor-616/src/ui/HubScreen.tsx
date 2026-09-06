@@ -20,6 +20,8 @@ import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+import { RENTABLE_GENERATORS } from '@/game/data/generators';
+import { Coins } from 'lucide-react';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'account' | 'feedback';
 
@@ -83,7 +85,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
 
@@ -113,6 +115,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
     document.addEventListener('visibilitychange', updateVisibility);
     return () => document.removeEventListener('visibilitychange', updateVisibility);
   }, []);
+
+  useEffect(() => {
+    refreshGeneratorIncome();
+    const timer = window.setInterval(refreshGeneratorIncome, 15_000);
+    return () => window.clearInterval(timer);
+  }, [refreshGeneratorIncome]);
 
   /**
    * Optional procedural ambience for the room you are standing in. Off unless
@@ -201,8 +209,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Session Stats</p>
+              <p className="flex items-center gap-1.5 justify-start sm:justify-end text-lg font-black text-amber-300" data-testid="text-cred-balance">
+                <Coins className={`h-4 w-4 ${meta.ownedGeneratorIds.length > 0 ? 'hub-cred-pulse' : ''}`} />
+                {meta.cred} cred
+              </p>
               <p className="text-sm font-bold">
-                <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated <span className="opacity-50">/</span> <span className="text-white">{meta.cred}</span> cred
+                <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated
               </p>
               {meta.lootTokens > 0 && (
                 <p className="text-xs font-mono text-amber-400 mt-1">
@@ -216,6 +228,46 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
               )}
             </div>
           </div>
+
+          <section className="mb-6 border border-amber-400/25 bg-card p-3" data-testid="section-generators">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-amber-300">Passive income</p>
+              <span className="text-[10px] text-muted-foreground">Rent it once, it keeps paying while you're away</span>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {RENTABLE_GENERATORS.map((generator) => {
+                const owned = meta.ownedGeneratorIds.includes(generator.id);
+                const affordable = meta.cred >= generator.cost;
+                return (
+                  <div
+                    key={generator.id}
+                    className={`flex items-center justify-between gap-2 border p-2 ${owned ? 'border-amber-400/50 bg-amber-400/5' : 'border-border bg-black/20'}`}
+                    data-testid={`generator-${generator.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-bold uppercase text-white">{generator.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {owned ? `+${generator.credPerMinute} cred/min` : `${generator.cost} cred · +${generator.credPerMinute}/min`}
+                      </p>
+                    </div>
+                    {owned ? (
+                      <Coins className="h-4 w-4 shrink-0 text-amber-300 hub-cred-pulse" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => buyGenerator(generator.id)}
+                        disabled={!affordable}
+                        className="shrink-0 border border-amber-400/40 bg-amber-400/10 px-2 py-1 font-mono text-[9px] font-bold uppercase text-amber-200 disabled:opacity-30"
+                        data-testid={`button-buy-generator-${generator.id}`}
+                      >
+                        Rent
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
           <nav className="flex flex-wrap gap-2 mb-6">
             {unlockedRooms.map((room) => {

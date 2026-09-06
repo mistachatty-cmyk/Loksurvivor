@@ -1,6 +1,7 @@
 import { arachnidRig, blobRig, expressiveRig, giantRig, humanoidRig } from '@/game/sprites/rigs';
 import type { EnemyDef } from '@/game/types';
 import { REACTION_PRESETS } from './reactivity';
+import { palette } from './authoring';
 
 /**
  * Everything that wants the player gone. `behavior` selects the movement
@@ -725,6 +726,59 @@ export const ENEMIES: EnemyDef[] = [
     role: 'anchor',
     traits: { shiftMs: 2400, shiftScale: 1.3 },
     lore: 'The marquee out front spelled a name nobody could remember choosing. It walks now, still spelling it, one bulb at a time.',
+  },
+  // Three new street-tier specials, sized for HordeSpin bursts and everyday waves alike.
+  {
+    id: 'pallet-wraith',
+    react: REACTION_PRESETS.beatTwitch,
+    name: 'Pallet Wraith',
+    family: 'Street',
+    behavior: 'flanker',
+    hp: 24,
+    speed: 52,
+    damage: 7,
+    radius: 10,
+    xp: 4,
+    mass: 1.1,
+    palette: palette({ ink: '#0a0f12', body: '#2f4a4a', bodyDark: '#1a2d2d', accent: '#4dd0c4' }),
+    rig: humanoidRig({ height: 18, width: 10, hunched: true }),
+    traits: { teleportMs: 4000, ghostMs: 480 },
+    lore: 'Still on the loading-dock clock, shift after shift after the warehouse closed for good. Blinks between pallets that are no longer there.',
+  },
+  {
+    id: 'marquee-static',
+    name: 'Marquee Static',
+    family: 'Street',
+    behavior: 'lookout',
+    hp: 18,
+    speed: 40,
+    damage: 5,
+    radius: 9,
+    xp: 5,
+    mass: 1,
+    ranged: { cooldownMs: 2200, projectileSpeed: 220, damage: 8 },
+    palette: palette({ ink: '#0a0a10', body: '#3a3a3a', bodyDark: '#1f1f1f', accent: '#f5f542' }),
+    rig: blobRig({ height: 10, width: 9, tendrils: false }),
+    lore: 'Dead-channel snow that learned to hold a shape. Spits the last frame it ever showed.',
+  },
+  {
+    id: 'curb-stomper',
+    name: 'Curb Stomper',
+    family: 'Elite',
+    behavior: 'charger',
+    hp: 85,
+    speed: 46,
+    damage: 14,
+    radius: 14,
+    xp: 14,
+    mass: 2.4,
+    sizeClass: 'elite',
+    palette: palette({ ink: '#140505', body: '#8a2b2b', bodyDark: '#4a1414', accent: '#ffb84d' }),
+    rig: humanoidRig({ height: 20, width: 13, bulk: true }),
+    traits: { shiftMs: 2000, shiftScale: 1.25 },
+    faction: 'Cabinet Rot',
+    role: 'anchor',
+    lore: 'Used to just kick over trash cans for the noise. Found out it likes the noise better when something bigger tips over.',
   },
 ];
 

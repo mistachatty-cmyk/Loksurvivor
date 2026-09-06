@@ -19,6 +19,7 @@ import { CosmeticPreview } from './CosmeticPreview';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getHatStyle } from '@/game/data/hats';
 import { getCelebrationStyle } from '@/game/data/celebrations';
+import type { RunModifiers } from '@/game/types';
 
 export interface CharacterSelectProps {
   onBack: () => void;
@@ -210,8 +211,56 @@ function LockedCharacterTile({ character }: { character: CharacterDef }) {
   );
 }
 
+const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; description: string }> = [
+  { key: 'doubleMode', name: '2x Mode', description: 'Doubled spawn rate and a flat hp bump on any run. Stacks with everything else here.' },
+  { key: 'invertedMap', name: 'Invert', description: 'Mirrors the area layout left-to-right.' },
+  { key: 'speedMode', name: 'Speed Mode', description: 'Raises player and enemy movement speed.' },
+  { key: 'scalerMode', name: 'Scaler', description: "Enemy hp scales up with your level as the run goes." },
+  { key: 'infiniteMode', name: 'Infinite Mode', description: 'The clock never runs out -- the final wave repeats and escalates instead.' },
+  { key: 'hordeSpinEnabled', name: 'HordeSpin', description: 'Every 45s, spin a wheel for a scaled horde event and a reward. 5x5 and 666 are rare.' },
+];
+
+function RunModifiersChecklist({ modifiers, onToggle }: { modifiers: RunModifiers; onToggle: (key: keyof RunModifiers) => void }) {
+  return (
+    <section className="border border-primary/30 bg-card p-4" data-testid="section-run-modifiers">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-primary">Run modifiers</p>
+          <h2 className="mt-1 text-lg font-black uppercase text-white">Check off before you go out</h2>
+        </div>
+        <span className="font-mono text-[10px] uppercase text-muted-foreground">Applies to every run</span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {RUN_MODIFIER_OPTIONS.map((option) => {
+          const checked = modifiers[option.key] === true;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onToggle(option.key)}
+              aria-pressed={checked}
+              className={`flex items-start gap-2 border p-2.5 text-left transition-colors ${checked ? 'border-primary bg-primary/10' : 'border-border bg-black/20 hover:border-primary/50'}`}
+              data-testid={`button-toggle-modifier-${option.key}`}
+            >
+              <span
+                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border font-mono text-[9px] ${checked ? 'border-primary bg-primary text-primary-foreground' : 'border-white/30 text-transparent'}`}
+              >
+                &#10003;
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-bold uppercase tracking-wide text-white">{option.name}</span>
+                <span className="block text-[10px] leading-snug text-muted-foreground">{option.description}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: CharacterSelectProps) {
-  const { unlockedCharacters, lockedCharacters, selectedCharacter, selectCharacter, selectCharacterSkin, setUiPanelLayout, meta, toggleSavedLokPet, restoreSavedLokPet, refreshPetElixirs } = useMeta();
+  const { unlockedCharacters, lockedCharacters, selectedCharacter, selectCharacter, selectCharacterSkin, setUiPanelLayout, meta, toggleSavedLokPet, restoreSavedLokPet, refreshPetElixirs, toggleRunModifier } = useMeta();
 
   useEffect(() => {
     refreshPetElixirs();
@@ -244,6 +293,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
             <button type="button" onClick={() => setUiPanelLayout('rail')} aria-pressed={layout === 'rail'} className={`border px-3 py-2 font-mono text-[9px] uppercase ${layout === 'rail' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>Original</button>
           </div>
         </div>
+        <RunModifiersChecklist modifiers={meta.runModifiers} onToggle={toggleRunModifier} />
         <details className="border border-border bg-card/40 p-3" data-testid="character-combat-preview">
           <summary className="cursor-pointer font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Weapon &amp; ability preview</summary>
           <div className="mt-3"><CharacterAbilityVisualizer character={{ ...selectedCharacter, palette: resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled) }} /></div>

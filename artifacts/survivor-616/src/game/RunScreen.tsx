@@ -50,6 +50,7 @@ import {
 } from '@/game/state/metaStore';
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, StormCloudMode, UpgradeDef } from '@/game/types';
 import { ChestTally } from '@/ui/ChestTally';
+import { HordeSpinWheel } from '@/ui/HordeSpinWheel';
 import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
 import { Minimap } from '@/ui/Minimap';
 import { SettingsPanel } from '@/ui/SettingsPanel';
@@ -264,6 +265,7 @@ export function RunScreen({
         paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
+        modifiers: meta.runModifiers,
       },
     );
   }
@@ -776,9 +778,12 @@ export function RunScreen({
       style={{
         transform: meta.worldInvertEnabled ? 'rotate(180deg)' : undefined,
         filter: meta.paletteInvertEnabled ? 'invert(1)' : undefined,
+        animation: hud?.wheelSpin?.colorFluctuation ? 'hordespin-hue 2.2s linear infinite' : undefined,
       }}
       data-testid="screen-run"
     >
+      {/* 666 HordeSpin tier only -- pure screen-space decoration, never touches the simulation. */}
+      <style>{`@keyframes hordespin-hue { from { filter: hue-rotate(0deg) saturate(1.4); } to { filter: hue-rotate(360deg) saturate(1.4); } }`}</style>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
       {/* Touch surface: dragging anywhere steers. */}
@@ -1012,6 +1017,8 @@ export function RunScreen({
             ) : null}
           </div>
         ) : null}
+
+        {hud?.wheelSpin ? <HordeSpinWheel wheelSpin={hud.wheelSpin} /> : null}
 
         {hud?.evolution ? (
           <div
@@ -1391,7 +1398,7 @@ export function RunScreen({
       {/* Loot box reel overlay */}
       {reel ? (
         <div
-          className={meta.liveModeEnabled ? 'absolute bottom-20 right-2 z-50 flex max-h-[42dvh] w-[min(58vw,220px)] flex-col items-center justify-center overflow-y-auto border border-blue-300/45 bg-black/90 p-2 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/92'}
+          className={meta.liveModeEnabled ? 'absolute bottom-20 right-2 z-50 flex max-h-[42dvh] w-[min(58vw,220px)] flex-col items-center justify-center overflow-y-auto border border-blue-300/45 bg-black/90 p-2 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex max-h-dvh flex-col items-center justify-center overflow-y-auto bg-black/92 px-4 py-6'}
           data-testid="overlay-reel"
         >
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.4em] text-white/50">Blue Box</p>
@@ -1455,7 +1462,7 @@ export function RunScreen({
           <button
             type="button"
             onClick={dismissReel}
-            className="border border-white/20 bg-white/5 px-8 py-3 font-mono text-xs uppercase tracking-widest text-white/70 hover:bg-white/10"
+            className={`shrink-0 border border-white/20 bg-white/5 font-mono uppercase tracking-widest text-white/70 hover:bg-white/10 ${meta.liveModeEnabled ? 'px-4 py-1.5 text-[10px]' : 'px-8 py-3 text-xs'}`}
             data-testid="button-reel-skip"
           >
             {reel.phase === 'landed' ? 'Continue' : 'Skip'}

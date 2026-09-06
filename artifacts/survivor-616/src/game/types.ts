@@ -921,6 +921,62 @@ export interface DistrictIncursionState {
   propUids: number[];
 }
 
+/**
+ * Player-chosen run-wide toggles, picked on the Roster screen before launch
+ * and carried into `createWorld`'s `setup.modifiers`. Every field is
+ * additive/independent so any combination can be enabled together -- see
+ * `modifierHpMult`/`modifierSpawnMult`/`speedMult` in `engine/world.ts`.
+ */
+export interface RunModifiers {
+  /** Doubles enemy spawn rate and applies a flat 1.5x hp bump, stacking with everything else. */
+  doubleMode?: boolean;
+  /** Mirrors the area's obstacle layout left-to-right at run start. */
+  invertedMap?: boolean;
+  /** Raises player and enemy movement speed. */
+  speedMode?: boolean;
+  /** Enemy hp scales up with the player's current level, capped. */
+  scalerMode?: boolean;
+  /** The area's timer never ends the run; the final wave repeats and escalates instead. */
+  infiniteMode?: boolean;
+  /** Enables the periodic HordeSpin wheel event. */
+  hordeSpinEnabled?: boolean;
+}
+
+export type HordeSpinTierId = '1x' | '2x' | '3x' | '4x' | '5x5' | '666';
+export type HordeSpinPhase = 'idle' | 'spinning' | 'result' | 'active';
+
+/** One weighted outcome on the HordeSpin wheel. Content lives in `data/hordeSpin.ts`. */
+export interface HordeSpinTierDef {
+  id: HordeSpinTierId;
+  label: string;
+  /** Relative odds; the pool doesn't need to sum to 100. */
+  weight: number;
+  /** Base horde size multiplier (base cluster size is fixed in the engine). */
+  spawnMultiplier: number;
+  hpMult: number;
+  rewardCred: number;
+  rare?: boolean;
+  /** 666 only: screen hue-shifts while the horde is active. */
+  colorFluctuation?: boolean;
+  /** Grants a guaranteed LokPet roll when the horde is cleared. */
+  grantsPet?: boolean;
+  celebration: 'mild' | 'big' | 'legendary';
+}
+
+/** Runtime state for the periodic HordeSpin wheel event. Null unless `RunModifiers.hordeSpinEnabled`. */
+export interface WheelSpinState {
+  phase: HordeSpinPhase;
+  /** w.now the wheel is next allowed to spin again (only meaningful while idle). */
+  nextSpinAt: number;
+  spinStartedAt: number;
+  resultAt: number;
+  resultTierId?: HordeSpinTierId;
+  activeEndsAt: number;
+  rewardGranted: boolean;
+  spinsThisRun: number;
+  colorFluctuation: boolean;
+}
+
 /** Authored story layer for the opening city thread. */
 export interface FirstNightChapter {
   areaId: string;
@@ -1536,6 +1592,12 @@ export interface MetaState {
   lootTokens: number;
   /** Rare currency found by breaking street props, weighted toward endless mode. Spendable in the hideout vendor's relic category. */
   skeletonKeys: number;
+  /** Rentable/buildable passive cred generators the player owns. See `data/generators.ts`. */
+  ownedGeneratorIds: string[];
+  /** Wall-clock ms of the last time owned generators' income was settled into `cred`. */
+  generatorAccrualAt: number;
+  /** Run-wide toggles picked on the Roster screen before launch. See `RunModifiers`. */
+  runModifiers: RunModifiers;
   /** Whether the player has seen the intro briefing. */
   onboarded: boolean;
   /** Farthest endless distance ever reached (world units). */
@@ -1815,6 +1877,18 @@ export interface HudSnapshot {
     target: number;
     accent: string;
     remainingSec: number;
+  };
+  /** Present only when `RunModifiers.hordeSpinEnabled` was on at run start. */
+  wheelSpin?: {
+    phase: HordeSpinPhase;
+    resultTierId?: HordeSpinTierId;
+    resultLabel?: string;
+    rewardCred: number;
+    rare: boolean;
+    celebration: 'mild' | 'big' | 'legendary';
+    secondsToNextSpin: number;
+    activeRemainingSec: number;
+    colorFluctuation: boolean;
   };
   episode?: {
     id: string;
