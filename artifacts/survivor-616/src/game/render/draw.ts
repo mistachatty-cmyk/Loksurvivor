@@ -2511,6 +2511,23 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
 
 function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
   for (const proj of w.projectiles) {
+    // Zero Day: a thrown frozen enemy renders as its own rig in flight
+    // instead of a normal weapon-projectile sprite.
+    if (proj.carriedEnemyUid !== undefined) {
+      const carried = w.enemies.find((e) => e.uid === proj.carriedEnemyUid);
+      ctx.save();
+      if (carried) {
+        drawRig(ctx, carried.def.rig, carried.def.palette, 'idle', 0, proj.x, proj.y, proj.vx >= 0 ? 1 : -1,
+          SPRITE_SCALE * sizeClassScale(carried.def) * 0.85, { tint: { color: '#22c55e', alpha: 0.6 } });
+      } else {
+        ctx.fillStyle = proj.color;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      continue;
+    }
     ctx.save();
     ctx.globalAlpha = 0.4;
     ctx.strokeStyle = proj.color;
@@ -3034,6 +3051,24 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     // literally alpha 0 -- a keen-eyed player can still catch a shimmer.
     const hidden = enemy.invisibleUntil > w.now && !enemy.dying;
     const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
+    // Zero Day: "stone" enemies -- a flat tint reusing drawRig's existing
+    // tint option, plus a frozen anim frame (no idle/attack progression).
+    const stoned = enemy.frozenUntil > w.now && !enemy.dying;
+    if (stoned && enemy.selectedForThrow) {
+      const pulse = 0.55 + 0.25 * Math.sin(w.now / 90);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#e5faff';
+      ctx.shadowColor = '#7ef9a0';
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 4]);
+      ctx.lineDashOffset = -w.now / 20;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     if (converted) {
       const pulse = 0.72 + Math.sin(w.now / 130) * 0.18;
       ctx.save();
@@ -3084,7 +3119,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.def.rig,
       enemyPalette,
       enemy.anim,
-      w.now - enemy.animStartedAt,
+      stoned ? 0 : w.now - enemy.animStartedAt,
       enemy.x,
       enemy.y + 2 + fallProgress * 10,
       enemy.facing,
@@ -3093,7 +3128,9 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss' || enemy.def.sizeClass === 'giant',
         dissolve,
-        tint: converted
+        tint: stoned
+          ? { color: '#22c55e', alpha: 0.68 }
+          : converted
           ? { color: '#65f6d1', alpha: 0.42 }
           : freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
       },

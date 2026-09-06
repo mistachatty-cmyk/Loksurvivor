@@ -34,6 +34,9 @@ import {
   resolveImpactTravel,
   relicRecipeEligibility,
   setStormCloudMode,
+  castFreezeCone,
+  updateFreezeSelection,
+  throwSelectedFrozenEnemies,
   type EnemyActor,
   type Projectile,
   stepWorld,
@@ -71,6 +74,21 @@ function testArea(obstacle: AreaDef['obstacles'][number]): AreaDef {
 function testCharacter(weaponId: string): CharacterDef {
   const weapon = WEAPONS_BY_ID[weaponId]!;
   return { ...CHARACTERS[0], weapon };
+}
+
+function freezeThrowTestCharacter(): CharacterDef {
+  return {
+    ...CHARACTERS[0]!,
+    freezeThrow: {
+      coneRangeUnits: 260,
+      coneAngleDeg: 90,
+      maxFreezeTargets: 7,
+      freezeDurationMs: 5000,
+      castCooldownMs: 8000,
+      throwDamage: 40,
+      throwSpeed: 500,
+    },
+  };
 }
 
 function addEnemy(
@@ -128,6 +146,8 @@ function addEnemy(
     phaseUntil: 0,
     burstUntil: 0,
     baseRadius: def.radius,
+    frozenUntil: 0,
+    selectedForThrow: false,
   };
   world.enemies.push(enemy);
   return enemy;
@@ -2422,4 +2442,96 @@ test('switching Storm Chaser to rain washes an existing fire/acid/frost ground s
 
   assert.ok(!world.fluids.some((tile) => tile.kind === 'acid-storm'), 'rain should wash the acid-storm stain off the ground');
   assert.ok(!enemy.activeEffects.some((effect) => effect.id === 'acid'), 'rain should also wash the acid status off the enemy standing in it');
+});
+
+test('castFreezeCone freezes enemies ahead of a facing-right player, skips ones behind and bosses', () => {
+  const character = freezeThrowTestCharacter();
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 3);
+  const ahead = addEnemy(world, 'nightcrawler', 120, 0);
+  const behind = addEnemy(world, 'nightcrawler', -120, 0);
+  behind.uid = 901;
+  const boss = addEnemy(world, 'the-sire', 100, 10);
+  boss.uid = 902;
+  world.player.facing = 1;
+
+  const frozenCount = castFreezeCone(world);
+
+  assert.equal(frozenCount, 1);
+  assert.ok(ahead.frozenUntil > world.now, 'the enemy ahead of the player should be frozen');
+  assert.equal(behind.frozenUntil, 0, 'an enemy behind the player is outside the cone');
+  assert.equal(boss.frozenUntil, 0, 'bosses are exempt from freezing');
+});
+
+test('castFreezeCone respects its cooldown and caps at maxFreezeTargets', () => {
+  const character = freezeThrowTestCharacter();
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 4);
+  for (let i = 0; i < 9; i += 1) {
+    const enemy = addEnemy(world, 'nightcrawler', 60 + i * 5, i * 4 - 16);
+    enemy.uid = 900 + i;
+  }
+  world.player.facing = 1;
+
+  const firstCast = castFreezeCone(world);
+  assert.equal(firstCast, 7, 'capped at maxFreezeTargets even though 9 enemies are in range');
+
+  const secondCast = castFreezeCone(world);
+  assert.equal(secondCast, 0, 'still on cooldown immediately after the first cast');
+});
+
+test('updateFreezeSelection marks only frozen enemies inside the drag box', () => {
+  const character = freezeThrowTestCharacter();
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 5);
+  const frozenInBox = addEnemy(world, 'nightcrawler', 100, 0);
+  const frozenOutsideBox = addEnemy(world, 'nightcrawler', 400, 400);
+  frozenOutsideBox.uid = 901;
+  const unfrozenInBox = addEnemy(world, 'nightcrawler', 110, 5);
+  unfrozenInBox.uid = 902;
+  frozenInBox.frozenUntil = world.now + 5000;
+  frozenOutsideBox.frozenUntil = world.now + 5000;
+  // unfrozenInBox stays unfrozen -- selection should skip it even though it's inside the box.
+
+  updateFreezeSelection(world, 50, -50, 150, 50);
+
+  assert.equal(frozenInBox.selectedForThrow, true);
+  assert.equal(frozenOutsideBox.selectedForThrow, false);
+  assert.equal(unfrozenInBox.selectedForThrow, false);
+  assert.deepEqual(world.freezeThrow?.selectedUids, [frozenInBox.uid]);
+});
+
+test('throwSelectedFrozenEnemies damages what it hits and grants a kill; a whiff grants no credit', () => {
+  const character = freezeThrowTestCharacter();
+
+  // Hit case: a target enemy sits directly in the thrown enemy's flight path.
+  const hitWorld = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 6);
+  const projectile = addEnemy(hitWorld, 'nightcrawler', 50, 0);
+  const target = addEnemy(hitWorld, 'nightcrawler', 150, 0);
+  target.uid = 901;
+  projectile.frozenUntil = hitWorld.now + 5000;
+  projectile.selectedForThrow = true;
+  hitWorld.freezeThrow!.selectedUids = [projectile.uid];
+  const targetHpBefore = target.hp;
+  const killsBefore = hitWorld.kills;
+
+  const thrownCount = throwSelectedFrozenEnemies(hitWorld, 300, 0);
+  assert.equal(thrownCount, 1);
+  for (let i = 0; i < 60 && hitWorld.enemies.some((e) => e.uid === projectile.uid); i += 1) {
+    stepWorld(hitWorld, 1 / 30, neutralInput);
+  }
+  assert.ok(target.hp < targetHpBefore, 'the struck enemy should take damage');
+  assert.equal(hitWorld.kills, killsBefore + 1, 'a successful throw grants the normal kill reward for the carried enemy');
+  assert.ok(!hitWorld.enemies.some((e) => e.uid === projectile.uid), 'the thrown enemy is resolved, not left lingering');
+
+  // Whiff case: nothing else on the arena for the thrown enemy to hit.
+  const missWorld = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 7);
+  const missProjectile = addEnemy(missWorld, 'nightcrawler', 50, 0);
+  missProjectile.frozenUntil = missWorld.now + 5000;
+  missWorld.freezeThrow!.selectedUids = [missProjectile.uid];
+  const killsBeforeMiss = missWorld.kills;
+
+  throwSelectedFrozenEnemies(missWorld, 900, 900);
+  for (let i = 0; i < 90 && missWorld.enemies.some((e) => e.uid === missProjectile.uid); i += 1) {
+    stepWorld(missWorld, 1 / 30, neutralInput);
+  }
+  assert.equal(missWorld.kills, killsBeforeMiss, 'a whiff grants no kill credit');
+  assert.ok(!missWorld.enemies.some((e) => e.uid === missProjectile.uid), 'the thrown enemy is still removed once it expires');
 });

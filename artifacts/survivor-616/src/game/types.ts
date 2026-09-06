@@ -620,6 +620,31 @@ export interface CharacterDef {
    * any future character could opt in the same way. See run-presentation.md.
    */
   stormCloud?: StormCloudConfig;
+  /**
+   * Zero Day's freeze-then-throw ability: a directional cast that petrifies
+   * a handful of enemies in front of the player, which can then be
+   * drag-selected RTS-style and thrown at other enemies. Optional -- any
+   * future character could opt in the same way `stormCloud` does. See
+   * zero-day-freeze-throw.md.
+   */
+  freezeThrow?: FreezeThrowConfig;
+}
+
+export interface FreezeThrowConfig {
+  /** How far in front of the player the freeze cone reaches, in world units. */
+  coneRangeUnits: number;
+  /** Full cone angle, in degrees (split evenly around the facing direction). */
+  coneAngleDeg: number;
+  /** Maximum enemies frozen per cast, nearest-first. */
+  maxFreezeTargets: number;
+  /** How long a frozen enemy stays "stone" before thawing if never thrown. */
+  freezeDurationMs: number;
+  /** Cooldown between casts. */
+  castCooldownMs: number;
+  /** Damage a thrown enemy deals to whatever it hits. */
+  throwDamage: number;
+  /** Travel speed of a thrown enemy, in world units/sec. */
+  throwSpeed: number;
 }
 
 /**

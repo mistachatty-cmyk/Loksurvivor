@@ -22,15 +22,19 @@ import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
+  castFreezeCone,
   claimLootPrize,
   claimRumorEmergencyHeal,
   createWorld,
   dashPlayer,
+  endFreezeSelectionDrag,
   hudSnapshot,
   primePhysicsObject,
   rollUpgradeChoices,
   setStormCloudMode,
   stepWorld,
+  throwSelectedFrozenEnemies,
+  updateFreezeSelection,
   type World,
 } from '@/game/engine/world';
 import { useGyroInput } from '@/game/input/gyro';
@@ -83,7 +87,7 @@ interface StickState {
   dy: number;
 }
 
-type PointerMode = 'none' | 'stick' | 'object' | 'cloud';
+type PointerMode = 'none' | 'stick' | 'object' | 'cloud' | 'freezeSelect';
 
 interface TapRecord {
   time: number;
@@ -160,12 +164,15 @@ export function RunScreen({
   const pointerModeRef = useRef<PointerMode>('none');
   const cloudPointerIdRef = useRef<number | null>(null);
   const lastTapRef = useRef<TapRecord | null>(null);
+  const freezeSelectPointerIdRef = useRef<number | null>(null);
+  const freezeSelectOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
   const [choices, setChoices] = useState<UpgradeDef[]>([]);
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
+  const [freezeSelectBox, setFreezeSelectBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
   const [reelTick, setReelTick] = useState(0);
   const [chestFlight, setChestFlight] = useState(0);
@@ -369,6 +376,34 @@ export function RunScreen({
       }
     }
 
+    // Zero Day: everyone else has no world.freezeThrow, so this whole block
+    // is a no-op for the rest of the roster. A held selection throws on the
+    // next tap; otherwise, pointer-down starts a drag-select box over
+    // whatever is currently frozen (suspending movement for that drag, the
+    // same way grabbing the storm cloud above does).
+    if (canvas && world && world.freezeThrow) {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      if (world.freezeThrow.selectedUids.length > 0) {
+        throwSelectedFrozenEnemies(world, worldX, worldY);
+        pointerModeRef.current = 'none';
+        return;
+      }
+      const hasFrozen = world.enemies.some((enemy) => world.now < enemy.frozenUntil);
+      if (hasFrozen) {
+        pointerModeRef.current = 'freezeSelect';
+        freezeSelectPointerIdRef.current = event.pointerId;
+        freezeSelectOriginRef.current = { worldX, worldY, clientX: event.clientX, clientY: event.clientY };
+        updateFreezeSelection(world, worldX, worldY, worldX, worldY);
+        setFreezeSelectBox({ x: event.clientX, y: event.clientY, w: 0, h: 0 });
+        return;
+      }
+    }
+
     if (physicsObjectClicksEnabled && canvas && world) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
@@ -399,6 +434,26 @@ export function RunScreen({
   }, [dungeonTransition, physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerModeRef.current === 'freezeSelect') {
+      const canvas = canvasRef.current;
+      const world = worldRef.current;
+      const origin = freezeSelectOriginRef.current;
+      if (!canvas || !world || !world.freezeThrow || !origin || freezeSelectPointerIdRef.current !== event.pointerId) return;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const zoom = width / targetView;
+      const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      updateFreezeSelection(world, origin.worldX, origin.worldY, worldX, worldY);
+      setFreezeSelectBox({
+        x: Math.min(origin.clientX, event.clientX),
+        y: Math.min(origin.clientY, event.clientY),
+        w: Math.abs(event.clientX - origin.clientX),
+        h: Math.abs(event.clientY - origin.clientY),
+      });
+      return;
+    }
     if (pointerModeRef.current === 'cloud') {
       const canvas = canvasRef.current;
       const world = worldRef.current;
@@ -427,6 +482,15 @@ export function RunScreen({
 
   const endPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
+    if (pointerModeRef.current === 'freezeSelect') {
+      pointerModeRef.current = 'none';
+      freezeSelectPointerIdRef.current = null;
+      freezeSelectOriginRef.current = null;
+      const world = worldRef.current;
+      if (world) endFreezeSelectionDrag(world);
+      setFreezeSelectBox(null);
+      return;
+    }
     if (pointerModeRef.current === 'cloud') {
       pointerModeRef.current = 'none';
       cloudPointerIdRef.current = null;
@@ -794,6 +858,15 @@ export function RunScreen({
         data-testid="surface-controls"
       />
 
+      {/* Zero Day: RTS-style drag-select box over frozen enemies. Screen-space DOM overlay, not a canvas draw call. */}
+      {freezeSelectBox ? (
+        <div
+          className="pointer-events-none absolute z-30 border-2 border-emerald-300/80 bg-emerald-300/10"
+          style={{ left: freezeSelectBox.x, top: freezeSelectBox.y, width: freezeSelectBox.w, height: freezeSelectBox.h }}
+          data-testid="freeze-select-box"
+        />
+      ) : null}
+
       {/* Top HUD */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 z-40 p-1"
@@ -1109,6 +1182,18 @@ export function RunScreen({
             );
           })}
         </div>
+      ) : null}
+
+      {/* Zero Day: freeze cast button. Hidden for every other character. */}
+      {character.freezeThrow ? (
+        <button
+          type="button"
+          onClick={() => { if (worldRef.current) castFreezeCone(worldRef.current); }}
+          className="absolute bottom-5 right-24 h-14 w-14 rounded-full border-2 border-emerald-300/60 bg-black/75 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider text-emerald-100 sm:bottom-8 sm:right-28 sm:h-16 sm:w-16 sm:text-[9px]"
+          data-testid="button-freeze-cone"
+        >
+          Freeze
+        </button>
       ) : null}
 
       {/* Ultimate */}

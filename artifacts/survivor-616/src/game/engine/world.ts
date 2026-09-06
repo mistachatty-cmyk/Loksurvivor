@@ -64,6 +64,7 @@ import type {
   StealthAbilityConfig,
   StormCloudMode,
   SpritePalette,
+  FreezeThrowConfig,
 } from '@/game/types';
 
 import {
@@ -156,6 +157,10 @@ export interface EnemyActor extends Actor {
   invisibleUntil: number;
   /** wraith: w.now this circling phase ends and the next teleport fires. */
   phaseUntil: number;
+  /** Zero Day: frozen "stone" and fully inert (no AI, no contact damage, undamageable) while `w.now < frozenUntil`. */
+  frozenUntil: number;
+  /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
+  selectedForThrow: boolean;
 }
 
 export interface Projectile {
@@ -186,6 +191,8 @@ export interface Projectile {
   explosionRadius?: number;
   explosionDamage?: number;
   evolutionBehavior?: EvolutionBehavior;
+  /** Zero Day: when set, this projectile IS a thrown frozen enemy (that uid), resolved by resolveThrownEnemyImpact instead of the normal hit path. */
+  carriedEnemyUid?: number;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact'
@@ -431,6 +438,17 @@ export interface StormCloud {
   autoCycle: boolean;
 }
 
+/** Zero Day's freeze-then-throw runtime state. See createFreezeCone/updateFreezeSelection/throwSelectedFrozenEnemies. */
+export interface FreezeThrowState {
+  lastCastAt: number;
+  /** True while the player is actively dragging a selection box. */
+  selecting: boolean;
+  selectionStart: { x: number; y: number } | null;
+  selectionEnd: { x: number; y: number } | null;
+  /** Frozen enemy uids currently inside the (locked-in or in-progress) selection box. */
+  selectedUids: number[];
+}
+
 /**
  * Ground-hazard liquids. Never solid -- always kept out of `w.obstacles`.
  * `water`/`oil`/`coolant`/`runoff` spawn from breaking certain obstacles
@@ -635,6 +653,8 @@ export interface World {
   pendingMeteors: PendingMeteor[];
   /** Storm Chaser's draggable cloud; null for every other character. */
   stormCloud: StormCloud | null;
+  /** Zero Day's freeze-then-throw runtime state; null for every other character. */
+  freezeThrow: FreezeThrowState | null;
   /** Active world-color theme, when full recolor is enabled; undefined otherwise. */
   worldColorPalette?: SpritePalette;
   /** Settings toggle: also blend `worldColorPalette` into enemy sprites and environment colors, not just the player's own sprite. */
@@ -942,6 +962,9 @@ export function createWorld(
           x: player.x, y: player.y - 50, targetX: player.x, targetY: player.y - 50,
           dragging: false, mode: 'rain', modeStartedAt: 0, nextTickAt: 0, autoCycle: true,
         }
+      : null,
+    freezeThrow: character.freezeThrow
+      ? { lastCastAt: Number.NEGATIVE_INFINITY, selecting: false, selectionStart: null, selectionEnd: null, selectedUids: [] }
       : null,
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
@@ -1376,6 +1399,8 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     fallStartedAt: 0,
     invisibleUntil: def.traits?.revealMs ? w.now + def.traits.revealMs : 0,
     phaseUntil: 0,
+    frozenUntil: 0,
+    selectedForThrow: false,
   };
   w.enemies.push(enemy);
 
@@ -2179,6 +2204,9 @@ function damageEnemy(
   if (enemy.dying) return;
   // Wraiths can't be hurt while lurking invisible -- see oddity-arenas.md.
   if (w.now < enemy.invisibleUntil) return;
+  // Zero Day: frozen "stone" enemies are untargetable by normal damage --
+  // they're resolved directly via killEnemy() when thrown, not damageEnemy().
+  if (w.now < enemy.frozenUntil) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
   const isCrit = burstDepth === 0 && w.rng() < w.stats.crit;
   // Landing a hit on the beat is its own bonus, stacking with a rolled crit.
@@ -4271,6 +4299,14 @@ function updateEnemies(w: World, dt: number) {
 
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
+    // Zero Day: frozen "stone" enemies are fully inert -- no AI, no attacks,
+    // no contact damage (the contact check further down never runs since we
+    // skip the rest of the loop body for them entirely).
+    if (w.now < enemy.frozenUntil) {
+      enemy.vx = 0;
+      enemy.vy = 0;
+      continue;
+    }
 
     if (enemy.convertedUntil > w.now) {
       const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, new Set([enemy.uid]));
@@ -4641,6 +4677,30 @@ function updateProjectiles(w: World, dt: number) {
       }
     }
 
+    // Zero Day: a thrown frozen enemy is its own self-contained hit-test,
+    // separate from the generic pierce/split/evolution machinery below
+    // (none of which applies to a carried enemy).
+    if (proj.carriedEnemyUid !== undefined) {
+      let hit = false;
+      if (!remove) {
+        forEachNearby(w, proj.x, proj.y, 40, (enemy) => {
+          if (remove || hit || enemy.dying || enemy.uid === proj.carriedEnemyUid) return;
+          const reach = proj.radius + enemy.radius;
+          if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
+            hit = true;
+            damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y);
+            spawnParticles(w, proj.x, proj.y, proj.color, 10, 120);
+          }
+        });
+      }
+      if (hit) remove = true;
+      if (remove) {
+        resolveThrownEnemyImpact(w, proj.carriedEnemyUid, hit, proj.x, proj.y);
+        w.projectiles.splice(i, 1);
+      }
+      continue;
+    }
+
     if (!remove && proj.fromPlayer) {
       forEachNearby(w, proj.x, proj.y, 30, (enemy) => {
         if (remove || enemy.dying || proj.hitUids.has(enemy.uid)) return;
@@ -4719,6 +4779,164 @@ function updateProjectiles(w: World, dt: number) {
 
     if (remove) w.projectiles.splice(i, 1);
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Zero Day: freeze -> select -> throw                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A carried enemy's fate once its throw resolves. `granted` means it hit
+ * something (a clean "combo kill", full XP/loot via the normal killEnemy
+ * path); otherwise it flew off into the arena bounds or expired without
+ * hitting anything, and is removed silently with no kill credit so flinging
+ * enemies into empty space can't be farmed for free kills.
+ */
+function resolveThrownEnemyImpact(w: World, carriedUid: number, granted: boolean, atX: number, atY: number) {
+  const carried = w.enemies.find((e) => e.uid === carriedUid);
+  if (!carried) return;
+  if (granted) {
+    // Move it to the impact point first so the death animation, particles,
+    // and loot drop land where it actually hit, not back at the freeze spot.
+    carried.x = atX;
+    carried.y = atY;
+    killEnemy(w, carried);
+  } else {
+    const index = w.enemies.indexOf(carried);
+    if (index !== -1) w.enemies.splice(index, 1);
+  }
+}
+
+/**
+ * Casts Zero Day's freeze cone: petrifies up to `maxFreezeTargets` enemies
+ * in a cone in front of the player (facing-based, like the directional-wall
+ * dash skill's `p.facing > 0 ? 0 : Math.PI`), nearest first. Bosses are
+ * exempt. A no-op for every character without `freezeThrow` configured, or
+ * while its cooldown hasn't elapsed. Returns the number of enemies frozen.
+ */
+export function castFreezeCone(w: World): number {
+  const config = w.character.freezeThrow;
+  const state = w.freezeThrow;
+  if (!config || !state) return 0;
+  if (w.now - state.lastCastAt < config.castCooldownMs) return 0;
+
+  const p = w.player;
+  const angle = p.facing > 0 ? 0 : Math.PI;
+  const halfSpread = (config.coneAngleDeg * Math.PI) / 360;
+
+  const candidates = w.enemies
+    .filter((enemy) => {
+      if (enemy.dying || enemy.def.family === 'Boss' || w.now < enemy.frozenUntil) return false;
+      const dx = enemy.x - p.x;
+      const dy = enemy.y - p.y;
+      if (dx * dx + dy * dy > config.coneRangeUnits * config.coneRangeUnits) return false;
+      const angleTo = Math.atan2(dy, dx);
+      let diff = Math.abs(angleTo - angle);
+      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+      return diff <= halfSpread;
+    })
+    .sort((a, b) => dist2(a.x, a.y, p.x, p.y) - dist2(b.x, b.y, p.x, p.y))
+    .slice(0, config.maxFreezeTargets);
+
+  for (const enemy of candidates) {
+    enemy.frozenUntil = w.now + config.freezeDurationMs;
+    enemy.vx = 0;
+    enemy.vy = 0;
+    enemy.kx = 0;
+    enemy.ky = 0;
+    spawnParticles(w, enemy.x, enemy.y, '#7ef9a0', 10, 90);
+  }
+  state.lastCastAt = w.now;
+  if (candidates.length > 0) pushAlert(w, `${candidates.length} FROZEN`);
+  return candidates.length;
+}
+
+/**
+ * Called every frame while the player drags a selection box (world-space
+ * coordinates -- RunScreen converts screen/touch coordinates the same way
+ * it already does for every other pointer mode). Recomputes which frozen
+ * enemies fall inside the box and marks them `selectedForThrow` for
+ * rendering. A no-op for every character without `freezeThrow`.
+ */
+export function updateFreezeSelection(w: World, startX: number, startY: number, endX: number, endY: number) {
+  const state = w.freezeThrow;
+  if (!state) return;
+  state.selecting = true;
+  state.selectionStart = { x: startX, y: startY };
+  state.selectionEnd = { x: endX, y: endY };
+
+  const minX = Math.min(startX, endX);
+  const maxX = Math.max(startX, endX);
+  const minY = Math.min(startY, endY);
+  const maxY = Math.max(startY, endY);
+
+  const selected: number[] = [];
+  for (const enemy of w.enemies) {
+    const inBox = w.now < enemy.frozenUntil && !enemy.dying &&
+      enemy.x >= minX && enemy.x <= maxX && enemy.y >= minY && enemy.y <= maxY;
+    enemy.selectedForThrow = inBox;
+    if (inBox) selected.push(enemy.uid);
+  }
+  state.selectedUids = selected;
+}
+
+/** Ends the drag without clearing the current selection -- the player can still throw it. */
+export function endFreezeSelectionDrag(w: World) {
+  if (w.freezeThrow) w.freezeThrow.selecting = false;
+}
+
+/**
+ * Throws every currently-selected frozen enemy at `targetX`/`targetY` as a
+ * projectile carrying that enemy's own uid (`Projectile.carriedEnemyUid`),
+ * resolved by the carriedEnemyUid branch in `updateProjectiles`. Clears the
+ * selection either way. Returns the number thrown.
+ */
+export function throwSelectedFrozenEnemies(w: World, targetX: number, targetY: number): number {
+  const config = w.character.freezeThrow;
+  const state = w.freezeThrow;
+  if (!config || !state || state.selectedUids.length === 0) return 0;
+
+  let thrown = 0;
+  for (const uidToThrow of state.selectedUids) {
+    const enemy = w.enemies.find((e) => e.uid === uidToThrow && w.now < e.frozenUntil && !e.dying);
+    if (!enemy) continue;
+    const dx = targetX - enemy.x;
+    const dy = targetY - enemy.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Frozen enemies are exempted from normal AI/render as a live enemy
+    // (see the frozenUntil guards in updateEnemies/damageEnemy) but stay in
+    // w.enemies until resolveThrownEnemyImpact removes them, the same way
+    // an invisibleUntil enemy stays present without acting.
+    // Stays inert and (via invisibleUntil, reusing the existing wraith-hidden
+    // render/damage path) unrendered at its old position for the flight --
+    // the projectile is what's actually visible now. resolveThrownEnemyImpact
+    // removes it from w.enemies on impact/expiry regardless of this timer.
+    enemy.frozenUntil = w.now + 60000;
+    enemy.invisibleUntil = w.now + 60000;
+    enemy.selectedForThrow = false;
+    w.projectiles.push({
+      uid: uid(w),
+      x: enemy.x,
+      y: enemy.y,
+      vx: (dx / len) * config.throwSpeed,
+      vy: (dy / len) * config.throwSpeed,
+      radius: enemy.radius,
+      damage: config.throwDamage,
+      impactIntensity: 3,
+      fromPlayer: true,
+      expiresAt: w.now + 2200,
+      targetUid: null,
+      turnRate: 0,
+      color: enemy.def.palette.accent,
+      trail: [],
+      pierce: 0,
+      hitUids: new Set(),
+      carriedEnemyUid: enemy.uid,
+    });
+    thrown += 1;
+  }
+  state.selectedUids = [];
+  return thrown;
 }
 
 const STORM_CLOUD_MODE_ORDER: StormCloudMode[] = ['rain', 'fire-rain', 'acid-rain', 'frost-rain'];
