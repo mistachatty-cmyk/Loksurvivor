@@ -675,7 +675,11 @@ export type EnemyBehavior =
   | 'ringer'
   /** Invisible and unhurtable for `traits.revealMs`, then circles the player firing
    *  ranged shots and periodically teleports to a new angle. See oddity-arenas.md. */
-  | 'wraith';
+  | 'wraith'
+  /** Slow patrol that sweeps a facing cone (`traits.coneDetect`); spotting the
+   *  player's *true* position inside it -- even through stealth -- ends the
+   *  player's active stealth for every enemy, not just this one. */
+  | 'sentry';
 
 export interface EnemyDef {
   id: string;
@@ -721,6 +725,10 @@ export interface EnemyDef {
     swayMs?: number;
     /** wraith: invisible and undamageable window from spawn, in ms. */
     revealMs?: number;
+    /** sentry: a swept detection cone that sees the player's real position
+     *  (bypassing stealth's frozen-anchor tracking) and, on a hit, ends
+     *  the player's active stealth for every enemy in the run. */
+    coneDetect?: { range: number; halfAngleDeg: number; sweepSpeed?: number };
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];

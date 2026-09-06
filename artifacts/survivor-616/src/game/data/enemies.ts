@@ -1,5 +1,6 @@
 import { arachnidRig, blobRig, expressiveRig, giantRig, humanoidRig } from '@/game/sprites/rigs';
 import type { EnemyDef } from '@/game/types';
+import { palette } from './authoring';
 import { REACTION_PRESETS } from './reactivity';
 
 /**
@@ -7,6 +8,22 @@ import { REACTION_PRESETS } from './reactivity';
  * routine in the simulation; the rest is tuning.
  */
 export const ENEMIES: EnemyDef[] = [
+  {
+    id: 'watchlight',
+    name: 'Watchlight',
+    family: 'Street',
+    behavior: 'sentry',
+    hp: 16,
+    speed: 30,
+    damage: 3,
+    radius: 9,
+    xp: 3,
+    mass: 1,
+    traits: { coneDetect: { range: 260, halfAngleDeg: 24, sweepSpeed: 0.7 } },
+    palette: palette({ ink: '#0a0a12', body: '#78350f', bodyDark: '#451a03', accent: '#f59e0b', glow: '#fde68a' }),
+    rig: humanoidRig({ height: 16, width: 9, cap: true }),
+    lore: 'A parking-lot floodlight that learned to walk. Its beam finds what wants to stay hidden.',
+  },
   {
     id: 'nightcrawler',
     react: REACTION_PRESETS.beatTwitch,

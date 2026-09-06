@@ -4481,6 +4481,32 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'sentry': {
+        // Sweeps a facing cone at half its normal approach speed; the cone
+        // checks the player's *real* position (p.x/p.y), not the stealth
+        // anchor, so it's the one thing that can catch a cloaked player.
+        speed *= 0.45;
+        const detect = traits?.coneDetect;
+        if (detect) {
+          enemy.weave += dt * (detect.sweepSpeed ?? 0.6);
+          const faceAngle = enemy.weave;
+          const rdx = p.x - enemy.x;
+          const rdy = p.y - enemy.y;
+          const rdist = Math.hypot(rdx, rdy);
+          if (rdist < detect.range) {
+            const toPlayer = Math.atan2(rdy, rdx);
+            let diff = Math.abs(toPlayer - faceAngle) % (Math.PI * 2);
+            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+            const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
+            if (diff < halfAngle && w.now < w.stealthUntil) {
+              w.stealthUntil = w.now;
+              pushAlert(w, 'SPOTTED');
+              spawnParticles(w, p.x, p.y, '#ff5f6d', 10, 90);
+            }
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
