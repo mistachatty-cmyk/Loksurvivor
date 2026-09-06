@@ -56,6 +56,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 76, toSec: 120, enemyId: 'corner-cutter', ratePerSec: 0.42, burst: 1, formation: 'pincer', faction: 'Afterimage Choir' },
       { fromSec: 90, toSec: 120, enemyId: 'curb-stomper', ratePerSec: 0.1, burst: 1 },
       { fromSec: 95, toSec: 120, enemyId: 'crypt-bouncer', ratePerSec: 0.12, burst: 1 },
+      squadWave({ fromSec: 30, toSec: 120, factionId: 'the-watch', ratePerSec: 0.25, formation: 'ring' }),
     ],
   },
   {

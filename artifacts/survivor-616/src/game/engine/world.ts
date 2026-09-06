@@ -4553,6 +4553,43 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'sentry': {
+        // Sweeps a facing cone at half its normal approach speed; the cone
+        // checks the player's *real* position (p.x/p.y), not the stealth
+        // anchor, so it's the one thing that can catch a cloaked player.
+        speed *= 0.45;
+        const detect = traits?.coneDetect;
+        if (detect) {
+          enemy.weave += dt * (detect.sweepSpeed ?? 0.6);
+          const faceAngle = enemy.weave;
+          const rdx = p.x - enemy.x;
+          const rdy = p.y - enemy.y;
+          const rdist = Math.hypot(rdx, rdy);
+          if (rdist < detect.range) {
+            const toPlayer = Math.atan2(rdy, rdx);
+            let diff = Math.abs(toPlayer - faceAngle) % (Math.PI * 2);
+            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+            const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
+            if (diff < halfAngle && w.now >= enemy.fireReadyAt) {
+              enemy.fireReadyAt = w.now + 900;
+              w.effects.push({
+                uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: rdist, angle: toPlayer, spread: halfAngle * 2,
+                bornAt: w.now, expiresAt: w.now + 220, color: '#f59e0b', damage: 0, impactIntensity: 0,
+                hitUids: new Set(), followPlayer: false,
+              });
+              if (w.now < w.stealthUntil) {
+                w.stealthUntil = w.now;
+                // A short penalty on top of the ability's own cooldown -- being
+                // caught should sting more than just losing the current cloak.
+                w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+                pushAlert(w, 'SPOTTED');
+                spawnParticles(w, p.x, p.y, '#ff5f6d', 10, 90);
+              }
+            }
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;

@@ -30,6 +30,13 @@ export interface FactionDef {
 
 export const FACTIONS: FactionDef[] = [
   {
+    id: 'the-watch',
+    name: 'The Watch',
+    description: 'Cone-sighted sentries that sweep for movement and can catch what stealth hides.',
+    accent: '#f59e0b',
+    roster: ['watchlight', 'floodline'],
+  },
+  {
     id: 'afterimage-choir',
     name: 'Afterimage Choir',
     description: 'Shadow-born flankers that never approach in a straight line.',

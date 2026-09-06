@@ -1,5 +1,6 @@
 import { arachnidRig, blobRig, expressiveRig, giantRig, humanoidRig } from '@/game/sprites/rigs';
 import type { EnemyDef } from '@/game/types';
+import { palette } from './authoring';
 import { REACTION_PRESETS } from './reactivity';
 import { palette } from './authoring';
 
@@ -8,6 +9,43 @@ import { palette } from './authoring';
  * routine in the simulation; the rest is tuning.
  */
 export const ENEMIES: EnemyDef[] = [
+  {
+    id: 'watchlight',
+    name: 'Watchlight',
+    family: 'Street',
+    behavior: 'sentry',
+    hp: 16,
+    speed: 30,
+    damage: 3,
+    radius: 9,
+    xp: 3,
+    mass: 1,
+    faction: 'The Watch',
+    traits: { coneDetect: { range: 260, halfAngleDeg: 24, sweepSpeed: 0.7 } },
+    palette: palette({ ink: '#0a0a12', body: '#78350f', bodyDark: '#451a03', accent: '#f59e0b', glow: '#fde68a' }),
+    rig: humanoidRig({ height: 16, width: 9, cap: true }),
+    lore: 'A parking-lot floodlight that learned to walk. Its beam finds what wants to stay hidden.',
+  },
+  {
+    id: 'floodline',
+    name: 'Floodline',
+    family: 'Street',
+    behavior: 'sentry',
+    hp: 26,
+    speed: 0,
+    damage: 4,
+    radius: 11,
+    xp: 4,
+    mass: 2.4,
+    faction: 'The Watch',
+    // Zero speed makes the sentry case's own approach movement a no-op, so
+    // this one plants itself and only sweeps -- a fixed watchtower instead
+    // of Watchlight's slow patrol. See "sentry" in engine/world.ts.
+    traits: { coneDetect: { range: 330, halfAngleDeg: 16, sweepSpeed: 0.4 } },
+    palette: palette({ ink: '#0a0a12', body: '#1e293b', bodyDark: '#0f172a', accent: '#f59e0b', glow: '#fde68a' }),
+    rig: giantRig(20),
+    lore: 'Bolted to a rooftop, its lens never blinks. Longest sightline of anything in 616.',
+  },
   {
     id: 'nightcrawler',
     react: REACTION_PRESETS.beatTwitch,

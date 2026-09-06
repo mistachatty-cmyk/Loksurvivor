@@ -2983,6 +2983,19 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   for (const enemy of sorted) {
     if (enemy.y > w.player.y) drawPlayer();
     const converted = enemy.convertedUntil > w.now && !enemy.dying;
+    if (!enemy.dying && enemy.def.behavior === 'sentry' && enemy.def.traits?.coneDetect) {
+      const detect = enemy.def.traits.coneDetect;
+      const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(enemy.x, enemy.y);
+      ctx.arc(enemy.x, enemy.y, detect.range, enemy.weave - halfAngle, enemy.weave + halfAngle);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;
       const radius = enemy.specialRadius || enemy.radius * 3;
