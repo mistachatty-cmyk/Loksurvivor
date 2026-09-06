@@ -54,6 +54,51 @@ function hashCell(x: number, y: number): number {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+/** Rotates a #rrggbb color's hue by `degrees`. Used for disco color-cycle effects. */
+function hueRotate(hex: string, degrees: number): string {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  h = (h + degrees / 360) % 1;
+  if (h < 0) h += 1;
+  const hue2rgb = (p: number, q: number, t: number) => {
+    let tt = t;
+    if (tt < 0) tt += 1;
+    if (tt > 1) tt -= 1;
+    if (tt < 1 / 6) return p + (q - p) * 6 * tt;
+    if (tt < 1 / 2) return q;
+    if (tt < 2 / 3) return p + (q - p) * (2 / 3 - tt) * 6;
+    return p;
+  };
+  let nr: number;
+  let ng: number;
+  let nb: number;
+  if (s === 0) {
+    nr = ng = nb = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    nr = hue2rgb(p, q, h + 1 / 3);
+    ng = hue2rgb(p, q, h);
+    nb = hue2rgb(p, q, h - 1 / 3);
+  }
+  const toHex = (v: number) => Math.round(clamp(v, 0, 1) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Ground                                                              */
 /* ------------------------------------------------------------------ */
@@ -3068,6 +3113,10 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
     ctx.save();
     ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
+    const colorCycleMs = enemy.def.traits?.colorCycleMs;
+    const discoTint = colorCycleMs
+      ? { color: hueRotate(enemy.def.palette.accentBright, ((w.now % colorCycleMs) / colorCycleMs) * 360), alpha: 0.55 }
+      : undefined;
     drawRig(
       ctx,
       enemy.def.rig,
@@ -3084,7 +3133,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
         dissolve,
         tint: converted
           ? { color: '#65f6d1', alpha: 0.42 }
-          : freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
+          : freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : discoTint,
       },
     );
     ctx.restore();
@@ -3158,7 +3207,11 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const bottom = w.camera.y + halfViewH + 40;
 
   // Use the era's ground palette when inside a dungeon room.
-  const ground = effectiveGround(w);
+  let ground = effectiveGround(w);
+  if (w.area.discoFloor) {
+    const spin = (w.now / 20) % 360;
+    ground = { ...ground, tile: hueRotate(ground.tile, spin), glow: hueRotate(ground.glow, spin), seam: hueRotate(ground.seam, spin) };
+  }
   const sky = effectiveSky(w);
   const profile = SKY_PROFILES[sky];
   // Settings toggle: some players would rather birds/fireflies stay put

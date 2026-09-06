@@ -729,6 +729,8 @@ export interface EnemyDef {
      *  (bypassing stealth's frozen-anchor tracking) and, on a hit, ends
      *  the player's active stealth for every enemy in the run. */
     coneDetect?: { range: number; halfAngleDeg: number; sweepSpeed?: number };
+    /** Render-only: cycles the palette's hue over this period, in ms. See disco faction. */
+    colorCycleMs?: number;
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
@@ -835,6 +837,8 @@ export interface AreaDef {
    * The world streams outward; the player ends by dying or heading home.
    */
   endless?: true;
+  /** Ground/glow colors hue-rotate continuously over time. See disco faction. */
+  discoFloor?: true;
   /**
    * When set, pickups spawn at random points in the arena on a cadence,
    * independent of kills or breakables. See oddity-arenas.md.

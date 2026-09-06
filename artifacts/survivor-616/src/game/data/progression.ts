@@ -397,6 +397,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'choir-hymn', name: 'The Choir\'s Hymn', blurb: 'Twenty verses, one voice each, none of them singing anything you could ever hum back.' },
   { id: 'arcade-high-score', name: 'The High Score', blurb: 'A cabinet screen still glowing under the dust, top of the board initials burned into the phosphor.' },
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
+  { id: 'mirror-lounge-floor', name: 'The Mirror Lounge Floor', blurb: 'A parquet tile pried up from underneath the ball. Whatever finish they used still shifts color in your hand.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

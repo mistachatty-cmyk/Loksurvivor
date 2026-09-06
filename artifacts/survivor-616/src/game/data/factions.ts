@@ -99,6 +99,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#fde047',
     roster: ['marquee-reaper'],
   },
+  {
+    id: 'mirror-ball-cartel',
+    name: 'Mirror Ball Cartel',
+    description: 'The Mirror Lounge never turned the lights back up. Neither did the crowd.',
+    accent: '#f472b6',
+    roster: ['disco-diva', 'mirrorball-heavy', 'chroma-wisp'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(
