@@ -68,6 +68,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setPaletteInvertEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,
+    setWorldColorFullRecolor,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
   const effectiveUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
@@ -688,6 +689,16 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 >
                   <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">Animated palette motion</span>
                   <span className="mt-1 block text-xs">{meta.paletteAnimationsEnabled ? 'Effects moving' : 'Colors remain, motion off'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWorldColorFullRecolor(!meta.worldColorFullRecolorEnabled)}
+                  aria-pressed={meta.worldColorFullRecolorEnabled}
+                  className={`border px-3 py-3 text-left transition-colors ${meta.worldColorFullRecolorEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
+                  data-testid="button-toggle-world-color-full-recolor"
+                >
+                  <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">Full world recolor</span>
+                  <span className="mt-1 block text-xs">{meta.worldColorFullRecolorEnabled ? 'Enemies + environment recolored too' : 'Your fighter only (original look)'}</span>
                 </button>
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

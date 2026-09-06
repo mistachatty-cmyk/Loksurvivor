@@ -63,6 +63,7 @@ import type {
   RelicRecipeDef,
   StealthAbilityConfig,
   StormCloudMode,
+  SpritePalette,
 } from '@/game/types';
 
 import {
@@ -632,6 +633,10 @@ export interface World {
   pendingMeteors: PendingMeteor[];
   /** Storm Chaser's draggable cloud; null for every other character. */
   stormCloud: StormCloud | null;
+  /** Active world-color theme, when full recolor is enabled; undefined otherwise. */
+  worldColorPalette?: SpritePalette;
+  /** Settings toggle: also blend `worldColorPalette` into enemy sprites and environment colors, not just the player's own sprite. */
+  worldColorFullRecolor?: boolean;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
   /** Runtime bookkeeping for the character's dash skill, when it has one. */
@@ -874,6 +879,8 @@ export function createWorld(
     /** Progression-aware rescue selected by the meta layer. Undefined means this route is complete. */
     rescueAllyId?: string | undefined;
     startingLokPets?: LokPetRoll[];
+    worldColorPalette?: SpritePalette;
+    worldColorFullRecolor?: boolean;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -934,6 +941,8 @@ export function createWorld(
           dragging: false, mode: 'rain', modeStartedAt: 0, nextTickAt: 0, autoCycle: true,
         }
       : null,
+    worldColorPalette: setup.worldColorPalette,
+    worldColorFullRecolor: setup.worldColorFullRecolor,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),

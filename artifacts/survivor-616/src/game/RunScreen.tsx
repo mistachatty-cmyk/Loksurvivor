@@ -207,12 +207,13 @@ export function RunScreen({
 
   const area = areaOverride ?? getArea(areaId);
   const baseCharacter = getCharacter(characterId);
+  const activeWorldPalette = meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId);
   const character = {
     ...baseCharacter,
     palette: resolveCharacterCosmeticPalette(
       baseCharacter,
       meta.characterSkinByCharacterId[baseCharacter.id],
-      meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
+      activeWorldPalette,
       meta.worldPaletteBlendEnabled,
     ),
   };
@@ -264,6 +265,8 @@ export function RunScreen({
         paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
+        worldColorPalette: activeWorldPalette,
+        worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
       },
     );
   }

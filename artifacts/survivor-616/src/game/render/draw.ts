@@ -13,8 +13,9 @@ import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { ALLIES_BY_ID } from '@/game/data/progression';
-import type { AreaSky, ObstacleDef, StormCloudMode } from '@/game/types';
+import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
+import { blendSpritePalettes } from '@/game/data/characterSkins';
 
 import { drawRig, drawShadow } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
@@ -1342,7 +1343,8 @@ function drawArenaEdges(ctx: CanvasRenderingContext2D, w: World) {
   ctx.fillRect(-halfW - 400, -halfH, 400, w.bounds.h);
   ctx.fillRect(halfW, -halfH, 400, w.bounds.h);
 
-  ctx.fillStyle = w.area.ground.seam;
+  const groundTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
+  ctx.fillStyle = groundTint ? mixHex(w.area.ground.seam, groundTint.bodyDark, 0.3) : w.area.ground.seam;
   ctx.globalAlpha = 0.85;
   ctx.fillRect(-halfW, -halfH, w.bounds.w, 4);
   ctx.fillRect(-halfW, halfH - 4, w.bounds.w, 4);
@@ -1353,7 +1355,7 @@ function drawArenaEdges(ctx: CanvasRenderingContext2D, w: World) {
   // Hazard striping just inside the boundary.
   ctx.save();
   ctx.globalAlpha = 0.18;
-  ctx.fillStyle = w.area.ground.glow;
+  ctx.fillStyle = groundTint ? mixHex(w.area.ground.glow, groundTint.accent, 0.35) : w.area.ground.glow;
   for (let x = -halfW; x < halfW; x += 46) {
     ctx.fillRect(x, -halfH + 4, 24, thickness * 0.35);
     ctx.fillRect(x, halfH - 4 - thickness * 0.35, 24, thickness * 0.35);
@@ -1636,8 +1638,12 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
       : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
 
+  const worldTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
   for (const obstacle of obstacleList) {
-    const colors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
+    const baseColors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
+    const colors = worldTint
+      ? { top: mixHex(baseColors.top, worldTint.accent, 0.25), side: mixHex(baseColors.side, worldTint.bodyDark, 0.25), trim: mixHex(baseColors.trim, worldTint.accentBright, 0.3) }
+      : baseColors;
     const x = obstacle.x - obstacle.w / 2;
     const y = obstacle.y - obstacle.h / 2;
 
@@ -2980,6 +2986,20 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     }
   };
 
+  // Full-recolor setting: blend each enemy's own palette with the active
+  // world-color theme, same math as the player's own blend
+  // (characterSkins.ts's blendSpritePalettes). Cached per enemy id per frame
+  // since many enemies on screen share one EnemyDef.
+  const enemyPaletteCache = w.worldColorFullRecolor && w.worldColorPalette ? new Map<string, SpritePalette>() : null;
+  const resolveEnemyPalette = (def: EnemyDef): SpritePalette => {
+    if (!enemyPaletteCache || !w.worldColorPalette) return def.palette;
+    const cached = enemyPaletteCache.get(def.id);
+    if (cached) return cached;
+    const blended = blendSpritePalettes(def.palette, w.worldColorPalette, 0.35);
+    enemyPaletteCache.set(def.id, blended);
+    return blended;
+  };
+
   for (const enemy of sorted) {
     if (enemy.y > w.player.y) drawPlayer();
     const converted = enemy.convertedUntil > w.now && !enemy.dying;
@@ -3055,10 +3075,11 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
     ctx.save();
     ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
+    const enemyPalette = resolveEnemyPalette(enemy.def);
     drawRig(
       ctx,
       enemy.def.rig,
-      enemy.def.palette,
+      enemyPalette,
       enemy.anim,
       w.now - enemy.animStartedAt,
       enemy.x,
@@ -3082,7 +3103,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       const top = enemy.y - enemy.radius * 2.6;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.fillRect(enemy.x - width / 2, top, width, 4);
-      ctx.fillStyle = converted ? '#65f6d1' : enemy.def.palette.accent;
+      ctx.fillStyle = converted ? '#65f6d1' : enemyPalette.accent;
       ctx.fillRect(enemy.x - width / 2, top, width * (enemy.hp / enemy.maxHp), 4);
     }
   }

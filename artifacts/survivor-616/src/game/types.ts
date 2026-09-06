@@ -1495,6 +1495,8 @@ export interface MetaState {
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */
   worldPaletteBlendEnabled: boolean;
+  /** Extends the active world palette to recolor enemies and environment accents too, not just the player. Off by default to preserve the original look. */
+  worldColorFullRecolorEnabled: boolean;
   /** Whether device tilt steers the player on supported hardware. */
   gyroEnabled: boolean;
   /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */

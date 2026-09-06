@@ -157,6 +157,7 @@ export function createInitialMeta(): MetaState {
     hideoutAmbienceEnabled: false,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
+    worldColorFullRecolorEnabled: false,
     gyroEnabled: false,
     studioPluginsEnabled: false,
     gyroSensitivity: 1,
@@ -757,6 +758,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
+    // Opt-in: recoloring enemies/environment is a bigger visual change than
+    // the player-only blend, so a returning save keeps the original look
+    // until the player turns this on deliberately.
+    worldColorFullRecolorEnabled: parsed.worldColorFullRecolorEnabled === true,
     gyroEnabled: parsed.gyroEnabled === true,
     // Defaults to false on every load, including projects saved before this
     // existed -- remote code is never enabled by an upgrade.
@@ -1102,6 +1107,7 @@ type Action =
   | { type: 'setHideoutAmbience'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
+  | { type: 'setWorldColorFullRecolor'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
   | { type: 'setStudioPlugins'; enabled: boolean }
   | { type: 'setGyroSensitivity'; value: number }
@@ -1448,6 +1454,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setWorldPaletteBlend':
       return { ...state, meta: { ...state.meta, worldPaletteBlendEnabled: action.enabled } };
 
+    case 'setWorldColorFullRecolor':
+      return { ...state, meta: { ...state.meta, worldColorFullRecolorEnabled: action.enabled } };
+
     case 'setGyroEnabled':
       return { ...state, meta: { ...state.meta, gyroEnabled: action.enabled } };
 
@@ -1784,6 +1793,7 @@ export interface MetaContextValue {
   setHideoutAmbience: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
+  setWorldColorFullRecolor: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
   setStudioPlugins: (enabled: boolean) => void;
   setGyroSensitivity: (value: number) => void;
@@ -1877,6 +1887,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setPaletteAnimations = useCallback((enabled: boolean) => dispatch({ type: 'setPaletteAnimations', enabled }), []);
   const setWorldPaletteBlend = useCallback((enabled: boolean) => dispatch({ type: 'setWorldPaletteBlend', enabled }), []);
+  const setWorldColorFullRecolor = useCallback((enabled: boolean) => dispatch({ type: 'setWorldColorFullRecolor', enabled }), []);
   const setStudioPlugins = useCallback(
     (enabled: boolean) => dispatch({ type: 'setStudioPlugins', enabled }),
     [],
@@ -2000,6 +2011,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutAmbience,
       setPaletteAnimations,
       setWorldPaletteBlend,
+      setWorldColorFullRecolor,
       setGyroEnabled,
       setStudioPlugins,
       setGyroSensitivity,
@@ -2061,6 +2073,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutAmbience,
     setPaletteAnimations,
     setWorldPaletteBlend,
+    setWorldColorFullRecolor,
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,

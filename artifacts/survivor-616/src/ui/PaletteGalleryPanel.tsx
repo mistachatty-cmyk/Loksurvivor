@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CloudRain, Flame, Lock, Palette, Radar, ScanLine, Sparkles } from 'lucide-react';
 
 import { RUN_AURAS } from '@/game/data/runAuras';
@@ -120,7 +120,10 @@ export function PaletteGalleryPanel({ onBack }: Props) {
 
   useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 
-  const primeShowing = takeoverActive || flickerActive;
+  // Prime's whole gimmick is reacting to world colors, so the palette tab
+  // always shows him -- not just during the rare takeover/flicker windows
+  // that govern his appearance everywhere else in the hideout.
+  const primeShowing = category === 'palettes' || takeoverActive || flickerActive;
   const vendorRig = primeShowing ? PRIME.rig : ARTISAN_VALOR_RIG;
   const vendorName = primeShowing ? PRIME.name : 'Artisan Valor';
 
@@ -150,9 +153,16 @@ export function PaletteGalleryPanel({ onBack }: Props) {
 
   const previewWorldPalette = previewPaletteId === 'default' ? undefined : THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette;
   const previewPaletteEffect = meta.paletteAnimationsEnabled ? THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.effect?.kind : undefined;
-  const previewPalette = primeShowing
-    ? resolveCharacterCosmeticPalette(PRIME, meta.characterSkinByCharacterId[PRIME.id], previewWorldPalette, meta.worldPaletteBlendEnabled)
-    : ARTISAN_VALOR_PALETTE;
+  // Memoized so RigPortrait's animation loop (keyed on palette identity)
+  // doesn't restart on every unrelated re-render (a quip firing, a purchase
+  // completing) -- only when the colors it actually resolves to change.
+  const skinId = meta.characterSkinByCharacterId[PRIME.id];
+  const previewPalette = useMemo(
+    () => primeShowing
+      ? resolveCharacterCosmeticPalette(PRIME, skinId, previewWorldPalette, meta.worldPaletteBlendEnabled)
+      : ARTISAN_VALOR_PALETTE,
+    [primeShowing, skinId, previewWorldPalette, meta.worldPaletteBlendEnabled],
+  );
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);
