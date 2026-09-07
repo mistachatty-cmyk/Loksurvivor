@@ -15,6 +15,8 @@ import {
   FileAudio,
   FileJson,
   ListMusic,
+  Mic,
+  MicOff,
   Monitor,
   Music4,
   Pause,
@@ -66,6 +68,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
 
   const targetTrackId = studio.project.tracks[0]?.id;
   const hasInstrumentTrack = studio.project.tracks.some((track) => track.instrumentId);
+  const armedTrack = studio.project.tracks.find((track) => track.id === studio.armedTrackId) ?? null;
 
   // 'auto' follows the device's own viewport; 'mobile'/'desktop' force a
   // layout regardless of it, so a phone can opt into the full mixer and a
@@ -304,6 +307,26 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             >
               Solo
             </button>
+            <button
+              type="button"
+              onClick={() => studio.armTrack(track.id)}
+              aria-pressed={studio.armedTrackId === track.id}
+              title={
+                track.instrumentId
+                  ? 'Arm to record pad taps as notes'
+                  : 'Arm to record a microphone take'
+              }
+              className={`flex-1 border px-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                mobileMode ? 'py-3' : 'py-1'
+              } ${
+                studio.armedTrackId === track.id
+                  ? 'border-destructive bg-destructive/20 text-destructive'
+                  : 'border-border text-muted-foreground hover:text-white'
+              }`}
+              data-testid={`button-arm-${track.id}`}
+            >
+              Arm
+            </button>
           </div>
 
           {/* insert chain -- order here is the signal path */}
@@ -398,7 +421,15 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
     </div>
   );
 
-  const padsPanel = <PadGrid destination={studio.master} />;
+  const padsPanel = (
+    <PadGrid
+      destination={studio.master}
+      playing={studio.playing}
+      playheadRef={studio.playheadRef}
+      armedInstrumentId={armedTrack?.instrumentId}
+      onRecordNote={armedTrack?.instrumentId ? (note) => studio.placeNote(armedTrack.id, note) : undefined}
+    />
+  );
 
   return (
     <ScreenLayout title="Studio" subtitle="616 Records" onBack={onBack}>
@@ -440,6 +471,21 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             aria-label="Stop"
           >
             <Square className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => (studio.recordingMic ? studio.stopMicRecording() : void studio.startMicRecording())}
+            className={`flex h-11 w-11 items-center justify-center border transition-colors ${
+              studio.recordingMic
+                ? 'animate-pulse border-destructive bg-destructive/20 text-destructive'
+                : 'border-border bg-card text-white hover:border-primary hover:text-primary'
+            }`}
+            style={{ touchAction: 'none' }}
+            data-testid="button-studio-record"
+            aria-label={studio.recordingMic ? 'Stop recording' : 'Record from microphone'}
+            title="Record the armed track from your microphone"
+          >
+            {studio.micSupported ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
           </button>
 
           <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">

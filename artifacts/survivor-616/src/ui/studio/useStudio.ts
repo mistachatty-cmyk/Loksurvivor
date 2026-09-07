@@ -27,6 +27,14 @@ import {
   releaseBuffer,
   type ImportedBuffer,
 } from '@/game/audio/studio/importer';
+
+/** Tried in order; the first the browser's `MediaRecorder` supports wins. */
+const MIC_MIME_CANDIDATES = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/mp4;codecs=mp4a.40.2',
+  'audio/mp4',
+];
 import {
   addClip,
   addEffect,
@@ -98,6 +106,14 @@ export interface StudioController {
   dropNote: (trackId: string, noteId: string) => void;
   dropTrack: (trackId: string) => void;
 
+  /** The track pad taps write notes into, or a mic recording captures onto. */
+  armedTrackId: string | null;
+  armTrack: (trackId: string) => void;
+  recordingMic: boolean;
+  micSupported: boolean;
+  startMicRecording: () => Promise<void>;
+  stopMicRecording: () => void;
+
   exportWav: () => Promise<void>;
   sendToSoundtrack: () => Promise<void>;
   exportProject: () => void;
@@ -113,6 +129,18 @@ export function useStudio(): StudioController {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const playheadRef = useRef(0);
+
+  const [armedTrackId, setArmedTrackId] = useState<string | null>(null);
+  const [recordingMic, setRecordingMic] = useState(false);
+  /** Latest armed track, for the async getUserMedia/MediaRecorder callbacks. */
+  const armedTrackIdRef = useRef<string | null>(null);
+  armedTrackIdRef.current = armedTrackId;
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  /** Snapshotted at record-start, so arming a different track mid-take can't retarget it. */
+  const recordTrackIdRef = useRef<string | null>(null);
+  const recordStartBeatRef = useRef(0);
 
   // Built eagerly, adopting the soundtrack player's context when it has one.
   // Eager rather than lazy so `master` is a real node on the first render --
@@ -141,6 +169,9 @@ export function useStudio(): StudioController {
       Tone.getTransport().position = 0;
       engineInstance.graph.clearSchedule();
       stopStudioClock();
+      // A recording in progress must not leave the mic hot after navigating away.
+      mediaRecorderRef.current?.stop();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, [engineInstance]);
 
@@ -246,6 +277,109 @@ export function useStudio(): StudioController {
       })),
     }));
     releaseBuffer(bufferId);
+  }, []);
+
+  const armTrack = useCallback((trackId: string) => {
+    setArmedTrackId((current) => (current === trackId ? null : trackId));
+  }, []);
+
+  /**
+   * Decodes a finished mic take through the same import path a dropped file
+   * takes, then places it directly on the track it was recorded into -- a
+   * take belongs on the timeline, not in the unplaced-clips library.
+   */
+  const finishMicRecording = useCallback(async (mimeType: string) => {
+    const trackId = recordTrackIdRef.current;
+    recordTrackIdRef.current = null;
+    const chunks = recordedChunksRef.current;
+    recordedChunksRef.current = [];
+    setRecordingMic(false);
+    if (!trackId || chunks.length === 0) return;
+
+    const extension = mimeType.includes('mp4') ? 'm4a' : 'webm';
+    const file = new File([new Blob(chunks, { type: mimeType })], `Mic take ${Date.now()}.${extension}`, {
+      type: mimeType,
+    });
+
+    setBusy('Processing recording...');
+    try {
+      const imported = await importAudioFile(file, engine().context);
+      const startBeat = Math.max(0, Math.round(recordStartBeatRef.current));
+      setProject((current) =>
+        addClip(current, trackId, {
+          bufferId: imported.id,
+          name: imported.name,
+          startBeat,
+          lengthBeats: clipLengthInBeats(imported.buffer, current.bpm),
+        }),
+      );
+    } catch (cause) {
+      setError(cause instanceof ImportError ? cause.message : 'Could not process the recording.');
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
+  const startMicRecording = useCallback(async () => {
+    const trackId = armedTrackIdRef.current;
+    const track = trackId ? projectRef.current.tracks.find((t) => t.id === trackId) : undefined;
+    if (!track) {
+      setError('Arm a track to record into first.');
+      return;
+    }
+    if (track.instrumentId) {
+      setError(`"${track.name}" has an instrument assigned -- arm an audio-clips track for a mic recording.`);
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setError('This browser cannot record audio.');
+      return;
+    }
+
+    // Same reasoning as togglePlay: a suspended context never fires what gets
+    // scheduled on it, and the first gesture on the page is often this one.
+    await unlockStudioAudio();
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (cause) {
+      const name = cause instanceof DOMException ? cause.name : '';
+      setError(
+        name === 'NotAllowedError'
+          ? 'Microphone access was denied. Allow it in your browser settings to record.'
+          : name === 'NotFoundError'
+            ? 'No microphone was found on this device.'
+            : 'Could not access the microphone.',
+      );
+      return;
+    }
+
+    const mimeType = MIC_MIME_CANDIDATES.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? '';
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+    recordedChunksRef.current = [];
+    recordTrackIdRef.current = track.id;
+    recordStartBeatRef.current = playheadRef.current;
+    mediaStreamRef.current = stream;
+    mediaRecorderRef.current = recorder;
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      stream.getTracks().forEach((mediaTrack) => mediaTrack.stop());
+      mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
+      void finishMicRecording(recorder.mimeType || mimeType || 'audio/webm');
+    };
+
+    recorder.start();
+    setRecordingMic(true);
+  }, [finishMicRecording]);
+
+  const stopMicRecording = useCallback(() => {
+    mediaRecorderRef.current?.stop();
   }, []);
 
   /**
@@ -366,7 +500,18 @@ export function useStudio(): StudioController {
       [],
     ),
     dropNote: useCallback((trackId, noteId) => setProject((c) => removeNote(c, trackId, noteId)), []),
-    dropTrack: useCallback((trackId) => setProject((c) => removeTrack(c, trackId)), []),
+    dropTrack: useCallback((trackId) => {
+      // A deleted track can't stay armed -- nothing left to record into.
+      setArmedTrackId((current) => (current === trackId ? null : current));
+      setProject((c) => removeTrack(c, trackId));
+    }, []),
+
+    armedTrackId,
+    armTrack,
+    recordingMic,
+    micSupported: typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia,
+    startMicRecording,
+    stopMicRecording,
 
     exportWav,
     sendToSoundtrack,
