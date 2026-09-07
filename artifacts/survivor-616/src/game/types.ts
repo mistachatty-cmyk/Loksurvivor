@@ -1571,6 +1571,12 @@ export interface MetaState {
    * game does, so it is enabled deliberately or not at all.
    */
   studioPluginsEnabled: boolean;
+  /**
+   * Studio layout: 'auto' follows the device's own viewport (mobile-width
+   * devices get the tabbed touch layout, everything else gets the full
+   * multi-panel one); 'mobile'/'desktop' force one regardless of viewport.
+   */
+  studioLayout: 'auto' | 'mobile' | 'desktop';
   selectedCharacterId: string;
   /** Character id -> selected personal four-color skin id. */
   characterSkinByCharacterId: Record<string, string>;
