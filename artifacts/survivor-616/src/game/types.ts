@@ -1303,7 +1303,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'account' | 'feedback'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'account' | 'feedback'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1571,6 +1571,12 @@ export interface MetaState {
    * game does, so it is enabled deliberately or not at all.
    */
   studioPluginsEnabled: boolean;
+  /**
+   * Studio layout: 'auto' follows the device's own viewport (mobile-width
+   * devices get the tabbed touch layout, everything else gets the full
+   * multi-panel one); 'mobile'/'desktop' force one regardless of viewport.
+   */
+  studioLayout: 'auto' | 'mobile' | 'desktop';
   selectedCharacterId: string;
   /** Character id -> selected personal four-color skin id. */
   characterSkinByCharacterId: Record<string, string>;

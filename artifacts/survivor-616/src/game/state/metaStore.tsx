@@ -191,6 +191,7 @@ export function createInitialMeta(): MetaState {
     worldPaletteBlendEnabled: true,
     gyroEnabled: false,
     studioPluginsEnabled: false,
+    studioLayout: 'auto',
     gyroSensitivity: 1,
     gyroInvertY: false,
     selectedCharacterId: 'shade',
@@ -803,6 +804,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // Defaults to false on every load, including projects saved before this
     // existed -- remote code is never enabled by an upgrade.
     studioPluginsEnabled: parsed.studioPluginsEnabled === true,
+    // 'auto' (the default for a save predating this) follows the device's
+    // own viewport rather than forcing either layout on a returning player.
+    studioLayout: parsed.studioLayout === 'mobile' || parsed.studioLayout === 'desktop' ? parsed.studioLayout : 'auto',
     gyroSensitivity: clampGyroSensitivity(parsed.gyroSensitivity),
     gyroInvertY: parsed.gyroInvertY === true,
     selectedCharacterId,
@@ -1177,6 +1181,7 @@ type Action =
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
   | { type: 'setStudioPlugins'; enabled: boolean }
+  | { type: 'setStudioLayout'; value: MetaState['studioLayout'] }
   | { type: 'setGyroSensitivity'; value: number }
   | { type: 'setGyroInvertY'; enabled: boolean }
   | { type: 'setMinimapExpanded'; enabled: boolean }
@@ -1537,6 +1542,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setStudioPlugins':
       return { ...state, meta: { ...state.meta, studioPluginsEnabled: action.enabled } };
 
+    case 'setStudioLayout':
+      return { ...state, meta: { ...state.meta, studioLayout: action.value } };
+
     case 'setGyroSensitivity':
       return {
         ...state,
@@ -1896,6 +1904,7 @@ export interface MetaContextValue {
   setWorldPaletteBlend: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
   setStudioPlugins: (enabled: boolean) => void;
+  setStudioLayout: (value: MetaState['studioLayout']) => void;
   setGyroSensitivity: (value: number) => void;
   setGyroInvertY: (enabled: boolean) => void;
   setMinimapExpanded: (enabled: boolean) => void;
@@ -2000,6 +2009,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setWorldPaletteBlend = useCallback((enabled: boolean) => dispatch({ type: 'setWorldPaletteBlend', enabled }), []);
   const setStudioPlugins = useCallback(
     (enabled: boolean) => dispatch({ type: 'setStudioPlugins', enabled }),
+    [],
+  );
+  const setStudioLayout = useCallback(
+    (value: MetaState['studioLayout']) => dispatch({ type: 'setStudioLayout', value }),
     [],
   );
   const setGyroEnabled = useCallback(
@@ -2126,6 +2139,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setWorldPaletteBlend,
       setGyroEnabled,
       setStudioPlugins,
+      setStudioLayout,
       setGyroSensitivity,
       setGyroInvertY,
       setMinimapExpanded,
@@ -2190,6 +2204,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setPaletteAnimations,
     setWorldPaletteBlend,
     setGyroEnabled,
+    setStudioLayout,
     setGyroSensitivity,
     setGyroInvertY,
     setMinimapExpanded,

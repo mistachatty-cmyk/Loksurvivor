@@ -12,7 +12,7 @@
  * rather than the second finger stealing the first one's note.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import * as Tone from 'tone';
 
 import {
@@ -23,6 +23,10 @@ import {
   type InstrumentDef,
 } from '@/game/audio/studio/instruments';
 import { setLiveLatencyMode, unlockStudioAudio } from '@/game/audio/studio/engine';
+import type { StudioNote } from '@/game/audio/studio/project';
+
+/** Matches the '8n' duration the pad's own live sound already uses. */
+const RECORDED_NOTE_LENGTH_BEATS = 0.5;
 
 /**
  * Pointer capture is a convenience -- it keeps a drag reporting to the element
@@ -49,11 +53,25 @@ function releasePointer(element: Element, pointerId: number): void {
 export interface PadGridProps {
   /** Where the instrument's output goes -- normally the studio master. */
   destination: Tone.ToneAudioNode;
+  /** Whether the transport is running -- a tap only records while it is. */
+  playing?: boolean;
+  /** Beats since the start of playback. Read per tap; never state. */
+  playheadRef?: RefObject<number>;
+  /** Set while an instrument track is armed, to write live taps as notes. */
+  onRecordNote?: (note: Omit<StudioNote, 'id'>) => void;
+  /** The armed track's own instrument, so what's heard here matches it. */
+  armedInstrumentId?: string;
 }
 
-export function PadGrid({ destination }: PadGridProps) {
+export function PadGrid({ destination, playing, playheadRef, onRecordNote, armedInstrumentId }: PadGridProps) {
   const [instrumentId, setInstrumentId] = useState(DEFAULT_INSTRUMENT_ID);
   const instrument: InstrumentDef = findInstrument(instrumentId);
+
+  // A recording should sound like what the armed track will actually play
+  // back, not whatever kit happened to be selected here beforehand.
+  useEffect(() => {
+    if (armedInstrumentId) setInstrumentId(armedInstrumentId);
+  }, [armedInstrumentId]);
 
   const voiceRef = useRef<ReturnType<InstrumentDef['create']> | null>(null);
   const padRefs = useRef(new Map<number, HTMLButtonElement>());
@@ -94,6 +112,18 @@ export function PadGrid({ destination }: PadGridProps) {
     capturePointer(event.currentTarget, event.pointerId);
     const note = instrument.notes[index]!;
 
+    // Written after the audio trigger, never before -- the audible sound is
+    // the part that must never wait on React or the project model.
+    const recordTap = () => {
+      if (!onRecordNote || !playing || !playheadRef) return;
+      onRecordNote({
+        pitch: Tone.Frequency(note).toMidi(),
+        startBeat: Math.max(0, playheadRef.current),
+        lengthBeats: RECORDED_NOTE_LENGTH_BEATS,
+        velocity: 0.8,
+      });
+    };
+
     // A pad can be the first thing touched on the screen, and until a gesture
     // unlocks the context nothing sounds. Unlocking is async, so the very first
     // press waits for it and every press after goes straight through -- paying
@@ -102,11 +132,13 @@ export function PadGrid({ destination }: PadGridProps) {
       void unlockStudioAudio().then(() => {
         unlockedRef.current = true;
         triggerInstrument(voice, note, '8n', Tone.now());
+        recordTap();
       });
       return;
     }
     // Tone.now() rather than a scheduled time: the player already pressed it.
     triggerInstrument(voice, note, '8n', Tone.now());
+    recordTap();
   };
 
   const release = (event: React.PointerEvent<HTMLButtonElement>) => {
