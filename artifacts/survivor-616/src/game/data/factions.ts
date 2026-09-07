@@ -34,21 +34,21 @@ export const FACTIONS: FactionDef[] = [
     name: 'The Watch',
     description: 'Cone-sighted sentries that sweep for movement and can catch what stealth hides.',
     accent: '#f59e0b',
-    roster: ['watchlight', 'floodline'],
+    roster: ['watchlight', 'floodline', 'sodium-lamp'],
   },
   {
     id: 'afterimage-choir',
     name: 'Afterimage Choir',
     description: 'Shadow-born flankers that never approach in a straight line.',
     accent: '#a78bfa',
-    roster: ['spiral-moth', 'neon-comet'],
+    roster: ['spiral-moth', 'neon-comet', 'hollow-echo'],
   },
   {
     id: 'cinder-procession',
     name: 'Cinder Procession',
     description: 'Armored chargers built from the east side fire that never fully went out.',
     accent: '#f43f5e',
-    roster: ['smoke-horn'],
+    roster: ['smoke-horn', 'ember-hauler'],
   },
   {
     id: 'river-antler-court',
@@ -76,7 +76,7 @@ export const FACTIONS: FactionDef[] = [
     name: 'Loop Chorus',
     description: 'Endless-mode ring runners that never learned to walk in a straight line.',
     accent: '#facc15',
-    roster: ['ring-runner'],
+    roster: ['ring-runner', 'loop-wisp'],
   },
   {
     id: 'choir-of-twenty',

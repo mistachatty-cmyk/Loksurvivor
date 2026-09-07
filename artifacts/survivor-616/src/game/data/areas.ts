@@ -162,7 +162,7 @@ export const AREAS: AreaDef[] = [
     discoveryId: 'lantern-shard',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
     waves: [
-      { fromSec: 0, toSec: 55, enemyId: 'ash-wisp', ratePerSec: 1.6, burst: 2, group: ['spiral-moth'] },
+      { fromSec: 0, toSec: 55, enemyId: 'ash-wisp', ratePerSec: 1.6, burst: 2, group: ['spiral-moth', 'hollow-echo'] },
       { fromSec: 25, toSec: 100, enemyId: 'crypt-spitter', ratePerSec: 0.6, burst: 1 },
       { fromSec: 54, toSec: 120, enemyId: 'spiral-moth', ratePerSec: 0.55, burst: 1 },
       { fromSec: 50, toSec: 150, enemyId: 'nightcrawler', ratePerSec: 1.6, burst: 3, hpMult: 1.4 },
@@ -201,7 +201,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 40, toSec: 130, enemyId: 'bloodhound', ratePerSec: 1.1, burst: 2, hpMult: 1.4 },
       { fromSec: 60, toSec: 150, enemyId: 'crypt-spitter', ratePerSec: 0.7, burst: 2, hpMult: 1.3 },
       { fromSec: 78, toSec: 180, enemyId: 'bass-bruiser', ratePerSec: 0.24, burst: 1, hpMult: 1.2 },
-      { fromSec: 88, toSec: 180, enemyId: 'smoke-horn', ratePerSec: 0.12, burst: 1 },
+      { fromSec: 88, toSec: 180, enemyId: 'smoke-horn', ratePerSec: 0.12, burst: 1, group: ['ember-hauler'] },
       { fromSec: 90, toSec: 180, enemyId: 'crypt-bouncer', ratePerSec: 0.4, burst: 1, hpMult: 1.4 },
       { fromSec: 140, toSec: 141, enemyId: 'the-sire', ratePerSec: 1, burst: 1 },
     ],
@@ -540,6 +540,8 @@ export const AREAS: AreaDef[] = [
       { x: 160, y: -40, w: 36, h: 44, kind: 'flora' },
       { x: 60, y: 220, w: 30, h: 42, kind: 'trash-can' },
       { x: -60, y: -220, w: 30, h: 42, kind: 'trash-can' },
+      { x: 200, y: 60, w: 26, h: 26, kind: 'pothole' },
+      { x: -200, y: -60, w: 24, h: 30, kind: 'fire-hydrant' },
     ],
     durationSec: 150,
     threat: 'rising',
@@ -548,8 +550,8 @@ export const AREAS: AreaDef[] = [
     waves: [
       { fromSec: 0, toSec: 60, enemyId: 'nightcrawler', ratePerSec: 1.3, burst: 2 },
       { fromSec: 15, toSec: 90, enemyId: 'neon-leech', ratePerSec: 0.9, burst: 2 },
-      { fromSec: 50, toSec: 150, enemyId: 'bloodhound', ratePerSec: 0.5, burst: 1 },
-      { fromSec: 80, toSec: 150, enemyId: 'ring-runner', ratePerSec: 1.6, burst: 3, formation: 'ring' },
+      { fromSec: 50, toSec: 150, enemyId: 'bloodhound', ratePerSec: 0.5, burst: 1, formation: 'wedge' },
+      { fromSec: 80, toSec: 150, enemyId: 'ring-runner', ratePerSec: 1.6, burst: 3, formation: 'ring', group: ['loop-wisp'] },
     ],
   },
   {
