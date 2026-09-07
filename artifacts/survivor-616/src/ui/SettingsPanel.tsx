@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ChangeEvent } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -6,6 +6,7 @@ import {
   Check,
   Compass,
   Dices,
+  Download,
   FlaskConical,
   FlipVertical2,
   LayoutDashboard,
@@ -18,12 +19,15 @@ import {
   PanelRight,
   PauseCircle,
   Plug,
+  Save,
   Settings2,
   Smartphone,
+  Upload,
 } from 'lucide-react';
 
+import { toast } from '@/hooks/use-toast';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
-import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { activeUiThemeSwatchId, parseMetaFile, serializeMeta, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
@@ -68,6 +72,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setPaletteInvertEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,
+    importMeta,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
   const effectiveUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
@@ -102,6 +107,40 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
       return next.taps;
     });
   }, [unlockDevModeAccess]);
+
+  const handleExportSave = useCallback(() => {
+    const blob = new Blob([serializeMeta(meta)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `616-survivor-save-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Save exported', description: 'Saved to your downloads.' });
+  }, [meta]);
+
+  const handleImportSave = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      void file.text().then((text) => {
+        const parsed = parseMetaFile(text);
+        if (!parsed) {
+          toast({
+            title: "Couldn't import save",
+            description: "That file doesn't look like a 616 Survivor save.",
+            variant: 'destructive',
+          });
+          return;
+        }
+        if (!window.confirm('Importing will replace your current progress with this save file. Continue?')) return;
+        importMeta(parsed);
+        toast({ title: 'Save imported', description: 'Your progress has been replaced with the imported save.' });
+      });
+    },
+    [importMeta],
+  );
 
   return (
     <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
@@ -785,6 +824,39 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              <Save className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Save data</p>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">Back up or transfer your progress</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                Export a save file to keep as a backup or move to another browser or device. Signing in
+                under Account keeps your progress synced automatically instead.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportSave}
+                  className="flex items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
+                  data-testid="button-export-save"
+                >
+                  <Download className="h-4 w-4" /> Export save
+                </button>
+                <label
+                  className="flex cursor-pointer items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
+                  data-testid="button-import-save"
+                >
+                  <Upload className="h-4 w-4" /> Import save
+                  <input type="file" accept="application/json" className="hidden" onChange={handleImportSave} />
+                </label>
               </div>
             </div>
           </div>
