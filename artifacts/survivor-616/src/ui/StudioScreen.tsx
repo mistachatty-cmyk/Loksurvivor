@@ -9,7 +9,7 @@
  * every control wired.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Download,
   FileAudio,
@@ -31,6 +31,8 @@ import { PadGrid } from './studio/PadGrid';
 import { PianoRoll } from './studio/PianoRoll';
 import { PluginRack } from './studio/PluginRack';
 import { useStudio } from './studio/useStudio';
+import { useAudioFrame } from '@/game/audio/useAudioFrame';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { EFFECTS, findEffect } from '@/game/audio/studio/effects';
 import { INSTRUMENTS } from '@/game/audio/studio/instruments';
 import { useMeta } from '@/game/state/metaStore';
@@ -43,16 +45,49 @@ export interface StudioScreenProps {
 export function StudioScreen({ onBack }: StudioScreenProps) {
   const studio = useStudio();
   const { meta } = useMeta();
+  const music = useMusicPlayer();
+  const audioFrame = useAudioFrame();
   const audioInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
   const targetTrackId = studio.project.tracks[0]?.id;
 
+  useEffect(() => {
+    // Excludes the currently-playing track when there's a choice: playTrack()
+    // toggles play/pause when handed the id already playing, so re-picking it
+    // would silently pause the room instead of starting a fresh song.
+    const pool = music.tracks.filter((track) => track.id !== music.currentTrack?.id);
+    const candidates = pool.length > 0 ? pool : music.tracks;
+    if (candidates.length === 0) return;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)]!;
+    music.playTrack(pick.id);
+    // Runs once per visit to the Studio, not on every re-render (mixer edits,
+    // transport changes) or every soundtrack tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ambianceStyle = {
+    background: `radial-gradient(circle at 25% 15%, hsla(${
+      200 - audioFrame.bands.high * 160
+    }, 85%, 55%, ${0.22 + audioFrame.bands.high * 0.3}) 0%, transparent 85%),
+      radial-gradient(circle at 80% 85%, hsla(${
+        350 - audioFrame.bands.bass * 60
+      }, 85%, 50%, ${0.22 + audioFrame.bands.bass * 0.35}) 0%, transparent 90%)`,
+    opacity: 0.65 + audioFrame.energy * 0.35,
+    transition: 'background 100ms linear, opacity 100ms linear',
+  };
+
   return (
     <ScreenLayout title="Studio" subtitle="616 Records" onBack={onBack}>
       <div
-        className="flex min-w-0 flex-col gap-6"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0"
+        data-testid="studio-ambiance"
+        style={ambianceStyle}
+      />
+      <div
+        className="relative z-10 flex min-w-0 flex-col gap-6"
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           // Dropping anywhere but a lane imports without placing; the lane's own
