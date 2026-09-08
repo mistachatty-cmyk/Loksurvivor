@@ -74,8 +74,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
   // layout regardless of it, so a phone can opt into the full mixer and a
   // desktop tester can preview the tabbed layout without resizing anything.
   const isMobileViewport = useIsMobile();
-  const mobileMode =
-    meta.studioLayout === 'desktop' ? false : meta.studioLayout === 'mobile' ? true : isMobileViewport;
+  const mobileMode = meta.studioLayout === 'desktop' ? false : meta.studioLayout === 'mobile' ? true : isMobileViewport;
   const activeTab = mobileTab === 'keys' && !hasInstrumentTrack ? 'arrange' : mobileTab;
 
   useEffect(() => {
@@ -240,7 +239,11 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
               max={1}
               step={0.01}
               value={track.gain}
-              onChange={(event) => studio.patchTrack(track.id, { gain: Number(event.target.value) })}
+              onChange={(event) =>
+                studio.patchTrack(track.id, {
+                  gain: Number(event.target.value),
+                })
+              }
               className="min-w-0 flex-1"
               aria-label={`${track.name} volume`}
             />
@@ -311,11 +314,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
               type="button"
               onClick={() => studio.armTrack(track.id)}
               aria-pressed={studio.armedTrackId === track.id}
-              title={
-                track.instrumentId
-                  ? 'Arm to record pad taps as notes'
-                  : 'Arm to record a microphone take'
-              }
+              title={track.instrumentId ? 'Arm to record pad taps as notes' : 'Arm to record a microphone take'}
               className={`flex-1 border px-2 text-[10px] font-bold uppercase tracking-widest transition-colors ${
                 mobileMode ? 'py-3' : 'py-1'
               } ${
@@ -336,9 +335,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             return (
               <div key={effect.id} className="border border-border/60 bg-background/40 p-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                    {def.label}
-                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">{def.label}</span>
                   <button
                     type="button"
                     onClick={() => studio.dropEffect(track.id, effect.id)}
@@ -392,9 +389,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             ))}
           </select>
 
-          {meta.studioPluginsEnabled && (
-            <PluginRack trackId={track.id} trackName={track.name} graph={studio.graph} />
-          )}
+          {meta.studioPluginsEnabled && <PluginRack trackId={track.id} trackName={track.name} graph={studio.graph} />}
         </div>
       ))}
     </div>
@@ -412,9 +407,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             playheadRef={studio.playheadRef}
             playing={studio.playing}
             onAddNote={(note) => studio.placeNote(track.id, note)}
-            onMoveNote={(noteId, pitch, startBeat) =>
-              studio.relocateNote(track.id, noteId, pitch, startBeat)
-            }
+            onMoveNote={(noteId, pitch, startBeat) => studio.relocateNote(track.id, noteId, pitch, startBeat)}
             onRemoveNote={(noteId) => studio.dropNote(track.id, noteId)}
           />
         ))}
@@ -608,6 +601,21 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
               <Monitor className="h-4 w-4" />
             </button>
           </div>
+
+          <p
+            className="basis-full text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+            data-testid="text-studio-persistence"
+            aria-live="polite"
+          >
+            Local only ·{' '}
+            {studio.persistenceState === 'loading'
+              ? 'restoring project…'
+              : studio.persistenceState === 'saving'
+                ? 'saving…'
+                : studio.persistenceState === 'session-only'
+                  ? 'session only — export a backup'
+                  : `saved on this device${studio.restoredAssetCount > 0 ? ` · ${studio.restoredAssetCount} sources restored` : ''}`}
+          </p>
 
           <input
             ref={audioInputRef}

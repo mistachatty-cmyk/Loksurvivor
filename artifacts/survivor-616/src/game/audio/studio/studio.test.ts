@@ -12,6 +12,13 @@ import test from 'node:test';
 
 import { encodeWav } from './exporter';
 import { estimateBufferBpm, clipLengthInBeats } from './importer';
+import { hashBlob, mediaAssetId } from '../localMediaStore';
+import {
+  ACTIVE_STUDIO_WORKSPACE_ID,
+  createStudioWorkspaceRecord,
+  parseStudioWorkspaceRecord,
+  referencedStudioAssetIds,
+} from './persistence';
 import {
   addClip,
   addNote,
@@ -109,7 +116,12 @@ test('edits never mutate the project they are given', () => {
   const project = createProject();
   const before = serializeProject(project);
   addTrack(project);
-  addClip(project, project.tracks[0]!.id, { bufferId: 'b', name: 'x', startBeat: 0, lengthBeats: 4 });
+  addClip(project, project.tracks[0]!.id, {
+    bufferId: 'b',
+    name: 'x',
+    startBeat: 0,
+    lengthBeats: 4,
+  });
   updateTrack(project, project.tracks[0]!.id, { gain: 0.1 });
   assert.equal(serializeProject(project), before);
 });
@@ -117,7 +129,12 @@ test('edits never mutate the project they are given', () => {
 test('a clip moved before the start of the song is clamped to zero', () => {
   let project = createProject();
   const trackId = project.tracks[0]!.id;
-  project = addClip(project, trackId, { bufferId: 'b', name: 'x', startBeat: 8, lengthBeats: 4 });
+  project = addClip(project, trackId, {
+    bufferId: 'b',
+    name: 'x',
+    startBeat: 8,
+    lengthBeats: 4,
+  });
   const clipId = project.tracks[0]!.clips[0]!.id;
 
   // A negative start would schedule at a negative transport time, which never
@@ -129,7 +146,12 @@ test('a clip moved before the start of the song is clamped to zero', () => {
 test('a clip can be moved to another track', () => {
   let project = createProject();
   const [from, to] = project.tracks;
-  project = addClip(project, from!.id, { bufferId: 'b', name: 'x', startBeat: 0, lengthBeats: 4 });
+  project = addClip(project, from!.id, {
+    bufferId: 'b',
+    name: 'x',
+    startBeat: 0,
+    lengthBeats: 4,
+  });
   const clipId = project.tracks[0]!.clips[0]!.id;
 
   project = moveClip(project, clipId, 16, to!.id);
@@ -171,6 +193,54 @@ test('removing a clip finds it on whichever track holds it', () => {
   assert.equal(project.tracks[1]!.clips.length, 0);
 });
 
+/* --- local workspace persistence -------------------------------------- */
+
+test('a workspace stores unique content-addressed sources from lanes and the clip library', () => {
+  const drums = mediaAssetId('a'.repeat(64));
+  const bass = mediaAssetId('b'.repeat(64));
+  let project = createProject('Local session');
+  project = addClip(project, project.tracks[0]!.id, {
+    bufferId: drums,
+    name: 'Drums',
+    startBeat: 0,
+    lengthBeats: 4,
+  });
+
+  assert.deepEqual(referencedStudioAssetIds(project), [drums]);
+  const record = createStudioWorkspaceRecord(project, [drums, bass, bass, 'buffer-session-only'], null, 616);
+  assert.equal(record.id, ACTIVE_STUDIO_WORKSPACE_ID);
+  assert.equal(record.createdAt, 616);
+  assert.equal(record.updatedAt, 616);
+  assert.deepEqual(record.assetIds, [drums, bass]);
+});
+
+test('workspace parsing repairs its project and drops invalid asset references', () => {
+  const source = mediaAssetId('c'.repeat(64));
+  const restored = parseStudioWorkspaceRecord({
+    id: ACTIVE_STUDIO_WORKSPACE_ID,
+    project: { name: 'Recovered', bpm: 999, tracks: [] },
+    assetIds: [source, source, 'not-content-addressed'],
+    createdAt: 10,
+    updatedAt: 20,
+  });
+  assert.ok(restored);
+  assert.equal(restored.project.name, 'Recovered');
+  assert.equal(restored.project.bpm, 240);
+  assert.ok(restored.project.tracks.length > 0);
+  assert.deepEqual(restored.assetIds, [source]);
+  assert.equal(restored.createdAt, 10);
+  assert.equal(restored.updatedAt, 20);
+});
+
+test('content hashes deduplicate equal audio bytes', async () => {
+  const first = await hashBlob(new Blob(['same audio'], { type: 'audio/wav' }));
+  const second = await hashBlob(new Blob(['same audio'], { type: 'audio/wav' }));
+  const other = await hashBlob(new Blob(['different audio'], { type: 'audio/wav' }));
+  assert.equal(first, second);
+  assert.notEqual(first, other);
+  assert.match(mediaAssetId(first), /^sha256:[0-9a-f]{64}$/);
+});
+
 /* --- instrument tracks -------------------------------------------------- */
 
 test('a track becomes an instrument track and back again', () => {
@@ -200,7 +270,12 @@ test('an instrument track round-trips with its notes', () => {
 test('notes snap to the grid and cannot start before zero', () => {
   let project = setTrackInstrument(createProject(), createProject().tracks[0]!.id, 'neon-keys');
   const trackId = project.tracks[0]!.id;
-  project = addNote(project, trackId, { pitch: 60, startBeat: 0, lengthBeats: 1, velocity: 0.8 });
+  project = addNote(project, trackId, {
+    pitch: 60,
+    startBeat: 0,
+    lengthBeats: 1,
+    velocity: 0.8,
+  });
   const noteId = project.tracks[0]!.notes[0]!.id;
 
   project = moveNote(project, trackId, noteId, 64, 1.31);
@@ -215,7 +290,12 @@ test('notes snap to the grid and cannot start before zero', () => {
 test('a note is clamped to the MIDI range rather than wrapping', () => {
   let project = setTrackInstrument(createProject(), createProject().tracks[0]!.id, 'neon-keys');
   const trackId = project.tracks[0]!.id;
-  project = addNote(project, trackId, { pitch: 60, startBeat: 0, lengthBeats: 1, velocity: 0.8 });
+  project = addNote(project, trackId, {
+    pitch: 60,
+    startBeat: 0,
+    lengthBeats: 1,
+    velocity: 0.8,
+  });
   const noteId = project.tracks[0]!.notes[0]!.id;
   project = moveNote(project, trackId, noteId, 999, 0);
   assert.equal(project.tracks[0]!.notes[0]!.pitch, 127);
@@ -251,7 +331,12 @@ test('removing a note leaves the others alone', () => {
   let project = setTrackInstrument(createProject(), createProject().tracks[0]!.id, 'neon-keys');
   const trackId = project.tracks[0]!.id;
   for (const pitch of [60, 62, 64]) {
-    project = addNote(project, trackId, { pitch, startBeat: 0, lengthBeats: 1, velocity: 0.8 });
+    project = addNote(project, trackId, {
+      pitch,
+      startBeat: 0,
+      lengthBeats: 1,
+      velocity: 0.8,
+    });
   }
   const target = project.tracks[0]!.notes[1]!.id;
   project = removeNote(project, trackId, target);
@@ -342,10 +427,7 @@ function clickTrack(bpm: number, seconds: number, sampleRate = 22_050): AudioBuf
 test('tempo estimation recovers the bpm of a click track', () => {
   for (const bpm of [90, 120, 140]) {
     const { bpm: estimated, confidence } = estimateBufferBpm(clickTrack(bpm, 20));
-    assert.ok(
-      Math.abs(estimated - bpm) <= 2,
-      `estimated ${estimated} for a ${bpm}bpm click track`,
-    );
+    assert.ok(Math.abs(estimated - bpm) <= 2, `estimated ${estimated} for a ${bpm}bpm click track`);
     assert.ok(confidence > 0, 'a clean click track is not a guess');
   }
 });
