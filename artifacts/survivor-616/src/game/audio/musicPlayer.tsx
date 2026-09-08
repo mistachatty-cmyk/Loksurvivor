@@ -138,11 +138,11 @@ export interface MusicPlayerValue {
 const MusicContext = createContext<MusicPlayerValue | null>(null);
 
 /** Plain audio formats -- decoded and played as-is, no conversion offered. */
-const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus)$/i;
+const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|aif|aiff)$/i;
 /** Containers that carry a video track alongside audio; `<audio>` still plays
  * just the audio track, but these are the ones "Convert to MP3" applies to. */
 const VIDEO_CONTAINER_EXTENSIONS = /\.(mp4|m4v|mov|webm|mkv)$/i;
-const MEDIA_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|mp4|m4v|mov|webm|mkv)$/i;
+const MEDIA_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|aif|aiff|mp4|m4v|mov|webm|mkv)$/i;
 
 /** Direct-link import fetches whatever URL it's given; these are refused up
  * front rather than attempted, since scraping them isn't what "paste a link"
@@ -626,8 +626,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
       if (isStreamingServiceUrl(url)) {
         setError(
-          'Streaming-service links (YouTube, Spotify, SoundCloud, etc.) aren\'t supported here -- ' +
-            'save the file to your device and drop it in instead.',
+          'That is a streaming-service share link, not a downloadable media file. ' +
+            'Import a file you own from Files, or use the service\'s official player when streaming embeds are added.',
         );
         return false;
       }
