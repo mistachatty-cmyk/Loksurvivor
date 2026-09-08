@@ -36,6 +36,7 @@ export interface MusicPanelProps {
 
 export function MusicPanel({ onBack }: MusicPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const anyFileInputRef = useRef<HTMLInputElement>(null);
   const player = useMusicPlayer();
   const [dragActive, setDragActive] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -96,7 +97,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
         <div className="flex min-w-0 flex-col">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <p className="text-sm text-muted-foreground max-w-md">
-              Drop MP3, WAV, M4A, FLAC or MP4/MOV/WebM files anywhere here, add a direct link, or extend the 616 mixtape below. Nothing is uploaded.
+              Add music you own from Files: MP3, WAV, M4A/AAC, FLAC, OGG/OPUS, AIFF, or MP4/MOV/WebM. Nothing is uploaded.
             </p>
             <div className="flex flex-wrap gap-2 shrink-0">
               <button
@@ -106,6 +107,14 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 data-testid="button-add-tracks"
               >
                 <Upload className="w-4 h-4" /> Add Tracks
+              </button>
+              <button
+                type="button"
+                onClick={() => anyFileInputRef.current?.click()}
+                className="flex items-center gap-2 border border-dashed border-border bg-card px-4 py-2 font-bold uppercase text-xs tracking-widest text-white transition-colors hover:border-primary hover:text-primary"
+                data-testid="button-browse-all-files"
+              >
+                Browse Files
               </button>
               <button
                 type="button"
@@ -139,6 +148,27 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 event.target.value = '';
               }}
             />
+            {/* iOS can apply a narrow media filter to Recents even when the file is
+                valid. This deliberately has no accept attribute: addFiles still
+                validates every selection, while Browse Files exposes iCloud Drive
+                and other locations without the picker hiding BandLab exports. */}
+            <input
+              ref={anyFileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              data-testid="input-all-files"
+              onChange={(event) => {
+                if (event.target.files) player.addFiles(event.target.files);
+                event.target.value = '';
+              }}
+            />
+          </div>
+
+          <div className="mb-5 border-l-2 border-primary/70 bg-primary/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+            <span className="font-bold uppercase tracking-widest text-primary">iPhone tip: </span>
+            If <span className="font-semibold text-white">Add Tracks</span> does not show a BandLab export in Recents, choose{' '}
+            <span className="font-semibold text-white">Browse Files</span>, open its iCloud Drive folder, and tap the cloud icon first if the song has not downloaded yet.
           </div>
 
           {linkOpen && (
@@ -147,18 +177,23 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
               animate={{ opacity: 1, height: 'auto' }}
               className="flex items-center gap-2 mb-4"
             >
-              <input
-                type="url"
-                value={linkValue}
-                onChange={(e) => setLinkValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void submitLink();
-                }}
-                placeholder="https://your-own-file-host/track.mp3"
-                autoFocus
-                className="min-w-0 flex-1 border border-border bg-black px-3 py-2 text-sm text-white outline-none focus:border-primary"
-                data-testid="input-track-link"
-              />
+              <div className="min-w-0 flex-1">
+                <input
+                  type="url"
+                  value={linkValue}
+                  onChange={(e) => setLinkValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void submitLink();
+                  }}
+                  placeholder="Direct file URL: https://your-host/track.mp3"
+                  autoFocus
+                  className="w-full border border-border bg-black px-3 py-2 text-sm text-white outline-none focus:border-primary"
+                  data-testid="input-track-link"
+                />
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  Direct MP3/WAV/M4A/video-file links work when the host allows downloads. Spotify, YouTube, BandLab and SoundCloud share links are service pages, not media files; official embedded players are a separate future integration.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => void submitLink()}
