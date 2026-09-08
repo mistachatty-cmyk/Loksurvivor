@@ -5,6 +5,7 @@
  * control wired.
  */
 import { useRef, useState } from 'react';
+import { formatBytes } from '@/game/audio/localTrackLibrary';
 import { formatTime, useMusicPlayer, type Track } from '@/game/audio/musicPlayer';
 import { ScreenLayout } from './ScreenLayout';
 import {
@@ -139,7 +140,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 data-testid="button-clear-tracks"
                 disabled={!player.tracks.some((track) => track.source === 'local')}
               >
-                Clear local
+                Clear local library
               </button>
             </div>
             <input
@@ -212,13 +213,32 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
             </motion.div>
           )}
 
+          <section className="mb-5 border border-border bg-card/50 p-4" aria-labelledby="local-soundtrack-title">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p id="local-soundtrack-title" className="text-xs font-bold uppercase tracking-[0.2em] text-white">Local game mix</p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                  Your imported files score the run and power beat reactions. They are stored only in this browser on this device—never uploaded or shared.
+                </p>
+              </div>
+              <span className="shrink-0 border border-primary/30 bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                {player.localLibrary.ready
+                  ? `${player.localLibrary.count} saved · ${formatBytes(player.localLibrary.bytes)}`
+                  : 'Checking device storage…'}
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80">
+              Clearing browser/site data also clears this library. Use <span className="font-semibold text-white">Clear local library</span> when you want to free space.
+            </p>
+          </section>
+
           {player.streamingEmbeds.length > 0 && (
             <section className="mb-6 border border-primary/35 bg-card/70 p-4" aria-labelledby="streaming-shelf-title">
               <div className="mb-3 flex items-start justify-between gap-4">
                 <div>
                   <p id="streaming-shelf-title" className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Streaming shelf</p>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    Official service players. They stay separate from the game-reactive local soundtrack and follow each service&apos;s playback rules.
+                    Official service players. They do not power game beat reactions and follow each service&apos;s playback rules.
                   </p>
                 </div>
                 <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{player.streamingEmbeds.length} saved</span>
