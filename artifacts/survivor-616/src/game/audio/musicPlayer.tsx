@@ -23,6 +23,14 @@ import {
 import { MusicAnalyser } from './analysis';
 import { beatBus } from './beatBus';
 import { ConversionError, convertToMp3 } from './convert';
+import {
+  clearLocalTracks as clearStoredLocalTracks,
+  getLocalLibrarySummary,
+  loadLocalTracks,
+  removeLocalTrack as removeStoredLocalTrack,
+  saveLocalTrack,
+  type LocalLibrarySummary,
+} from './localTrackLibrary';
 import dontFly from '@assets/Don\'t_Fly_1787686881680.mp3?url';
 import fat from '@assets/F.A.T.$_2_1787686881680.m4a?url';
 import layback from '@assets/Layback_1787686881680.wav?url';
@@ -44,6 +52,8 @@ export interface Track {
   /** Seconds; filled in once metadata loads. */
   duration: number | null;
   source: 'bundled' | 'local';
+  /** True after a file has been restored from the device-local library. */
+  restoredFromLibrary?: boolean;
   /**
    * True for a video container (mp4/mov/webm/mkv) added for its audio track.
    * Gates the "Convert to MP3" affordance -- there is no reason to offer it
@@ -122,6 +132,8 @@ export interface MusicPlayerValue {
    * false for a direct media URL so the caller can use addFromUrl instead. */
   addStreamingEmbed: (url: string) => boolean;
   removeStreamingEmbed: (id: string) => void;
+  /** Files and bytes stored for this browser only; never sent to a server. */
+  localLibrary: LocalLibrarySummary & { ready: boolean };
   /**
    * The one `AudioContext` the app owns, or null before it has been created.
    * The studio adopts this rather than creating a second context -- two
@@ -329,6 +341,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [localLibrary, setLocalLibrary] = useState<LocalLibrarySummary & { ready: boolean }>({ count: 0, bytes: 0, ready: false });
   const [streamingEmbeds, setStreamingEmbeds] = useState<StreamingEmbed[]>(() => loadStreamingEmbeds());
   const [conversion, setConversion] = useState<ConversionState | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>(() => loadStoredPlaylists().playlists);
@@ -338,6 +351,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const reactiveRootRef = useRef<HTMLDivElement | null>(null);
 
   tracksRef.current = tracks;
+
+  const refreshLocalLibrary = useCallback(() => {
+    void getLocalLibrarySummary()
+      .then((summary) => setLocalLibrary({ ...summary, ready: true }))
+      .catch(() => setLocalLibrary((current) => ({ ...current, ready: true })));
+  }, []);
 
   // One audio element for the whole app so music survives screen changes.
   if (audioRef.current === null && typeof Audio !== 'undefined') {
@@ -536,6 +555,40 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     audio.muted = muted;
   }, [volume, muted]);
 
+  // Restore only files the player has already chosen to keep on this device.
+  // The game never uploads these bytes or attempts to sync them elsewhere.
+  useEffect(() => {
+    let cancelled = false;
+    void loadLocalTracks()
+      .then((stored) => {
+        if (cancelled) return;
+        const restored: Track[] = stored.map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          url: URL.createObjectURL(entry.file),
+          size: entry.file.size,
+          duration: null,
+          source: 'local',
+          isVideoContainer: entry.isVideoContainer,
+          restoredFromLibrary: true,
+        }));
+        setTracks((previous) => {
+          const knownIds = new Set(previous.map((track) => track.id));
+          const merged = [...previous, ...restored.filter((track) => !knownIds.has(track.id))];
+          tracksRef.current = merged;
+          return merged;
+        });
+        const bytes = stored.reduce((total, entry) => total + entry.file.size, 0);
+        setLocalLibrary({ count: stored.length, bytes, ready: true });
+      })
+      .catch(() => {
+        if (!cancelled) setLocalLibrary((current) => ({ ...current, ready: true }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Persist playlists (metadata + order only -- see Playlist management below
   // for why local-file entries don't survive a reload).
   useEffect(() => {
@@ -639,6 +692,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const addFiles = useCallback((files: FileList | File[]): number => {
     const incoming = Array.from(files);
     const accepted: Track[] = [];
+    const acceptedFiles: Array<{ track: Track; file: File }> = [];
     const rejected: string[] = [];
 
     for (const file of incoming) {
@@ -646,7 +700,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         rejected.push(file.name);
         continue;
       }
-      accepted.push({
+      const track: Track = {
         id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
         title: titleFromFile(file),
         url: URL.createObjectURL(file),
@@ -654,7 +708,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         duration: null,
         source: 'local',
         isVideoContainer: looksLikeVideoContainer(file),
-      });
+      };
+      accepted.push(track);
+      acceptedFiles.push({ track, file });
     }
 
     if (rejected.length > 0) {
@@ -695,10 +751,23 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         probe.addEventListener('error', release);
         probe.src = track.url;
       }
+      for (const { track, file } of acceptedFiles) {
+        void saveLocalTrack({
+          id: track.id,
+          title: track.title,
+          file,
+          isVideoContainer: Boolean(track.isVideoContainer),
+          addedAt: Date.now(),
+        })
+          .then(refreshLocalLibrary)
+          .catch(() => {
+            setError('The track was added for this session, but this browser could not save it for later.');
+          });
+      }
     }
 
     return accepted.length;
-  }, []);
+  }, [refreshLocalLibrary]);
 
   /**
    * Fetches a direct link to a media file client-side and adds it exactly
@@ -852,6 +921,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       const track = prev[index]!;
       if (track.source === 'bundled') return;
       if (track.source === 'local') URL.revokeObjectURL(track.url);
+      if (track.source === 'local') void removeStoredLocalTrack(id).then(refreshLocalLibrary).catch(() => {});
 
       const next = prev.filter((t) => t.id !== id);
       tracksRef.current = next;
@@ -878,6 +948,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     for (const track of tracksRef.current) {
       if (track.source === 'local') URL.revokeObjectURL(track.url);
     }
+    void clearStoredLocalTracks().then(refreshLocalLibrary).catch(() => {});
     tracksRef.current = BUNDLED_TRACKS;
     setTracks(BUNDLED_TRACKS);
     setCurrentIndex(-1);
@@ -1016,6 +1087,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       streamingEmbeds,
       addStreamingEmbed,
       removeStreamingEmbed,
+      localLibrary,
       getAudioContext,
       ensureAudioContext,
       playlists,
@@ -1033,6 +1105,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
       progressSec, durationSec, error, addFiles, addFromUrl, linkLoading, convertTrackToMp3,
       streamingEmbeds, addStreamingEmbed, removeStreamingEmbed,
+      localLibrary,
       conversion, removeTrack, clearTracks, playTrack, togglePlay, next, previous, seek,
       setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext, ensureAudioContext,
       playTrackOnRepeat,
