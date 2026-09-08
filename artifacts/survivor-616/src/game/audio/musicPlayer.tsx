@@ -54,6 +54,9 @@ export interface Track {
   source: 'bundled' | 'local';
   /** True after a file has been restored from the device-local library. */
   restoredFromLibrary?: boolean;
+  /** File identity used for duplicate protection; never sent anywhere. */
+  fingerprint?: string;
+  favorite?: boolean;
   /**
    * True for a video container (mp4/mov/webm/mkv) added for its audio track.
    * Gates the "Convert to MP3" affordance -- there is no reason to offer it
@@ -102,6 +105,9 @@ export interface MusicPlayerValue {
   durationSec: number;
   error: string | null;
   addFiles: (files: FileList | File[]) => number;
+  lastImport: { added: number; duplicates: number; rejected: number } | null;
+  dismissImportReport: () => void;
+  toggleTrackFavorite: (id: string) => void;
   /**
    * Fetches a direct link to a media file and adds it like a dropped file.
    * Resolves false (and sets `error`) on a bad URL, a blocked streaming-service
@@ -190,6 +196,7 @@ const STREAMING_SERVICE_HOSTS = [
 
 const PLAYLISTS_STORAGE_KEY = 'survivor616.playlists.v1';
 const STREAMING_EMBEDS_STORAGE_KEY = 'survivor616.streaming-embeds.v1';
+const FAVORITES_STORAGE_KEY = 'survivor616.favorite-track-ids.v1';
 
 const BUNDLED_TRACKS: Track[] = ([
   { id: 'dont-fly', title: "Don't Fly", url: dontFly, source: 'bundled' },
@@ -205,6 +212,20 @@ const BUNDLED_TRACKS: Track[] = ([
 
 function titleFromFile(file: File): string {
   return file.name.replace(MEDIA_EXTENSIONS, '').replace(/[_-]+/g, ' ').trim() || file.name;
+}
+
+function fileFingerprint(file: Pick<File, 'name' | 'size' | 'lastModified'>): string {
+  return `${file.name.toLowerCase()}::${file.size}::${file.lastModified}`;
+}
+
+function loadFavoriteIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(FAVORITES_STORAGE_KEY) ?? '[]') as unknown;
+    return new Set(Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : []);
+  } catch {
+    return new Set();
+  }
 }
 
 function looksLikeMedia(file: { type: string; name: string }): boolean {
@@ -341,6 +362,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [lastImport, setLastImport] = useState<{ added: number; duplicates: number; rejected: number } | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => loadFavoriteIds());
   const [localLibrary, setLocalLibrary] = useState<LocalLibrarySummary & { ready: boolean }>({ count: 0, bytes: 0, ready: false });
   const [streamingEmbeds, setStreamingEmbeds] = useState<StreamingEmbed[]>(() => loadStreamingEmbeds());
   const [conversion, setConversion] = useState<ConversionState | null>(null);
@@ -571,10 +594,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           source: 'local',
           isVideoContainer: entry.isVideoContainer,
           restoredFromLibrary: true,
+          fingerprint: entry.fingerprint ?? fileFingerprint(entry.file),
+          favorite: loadFavoriteIds().has(entry.id),
         }));
         setTracks((previous) => {
           const knownIds = new Set(previous.map((track) => track.id));
-          const merged = [...previous, ...restored.filter((track) => !knownIds.has(track.id))];
+          const knownFingerprints = new Set(previous.map((track) => track.fingerprint).filter(Boolean));
+          const merged = [...previous, ...restored.filter((track) => !knownIds.has(track.id) && !knownFingerprints.has(track.fingerprint))];
           tracksRef.current = merged;
           return merged;
         });
@@ -588,6 +614,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteIds]));
+    } catch {
+      // Favorites are optional organization metadata; the audio library remains intact.
+    }
+  }, [favoriteIds]);
 
   // Persist playlists (metadata + order only -- see Playlist management below
   // for why local-file entries don't survive a reload).
@@ -694,12 +729,20 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     const accepted: Track[] = [];
     const acceptedFiles: Array<{ track: Track; file: File }> = [];
     const rejected: string[] = [];
+    let duplicates = 0;
+    const knownFingerprints = new Set(tracksRef.current.map((track) => track.fingerprint).filter(Boolean));
 
     for (const file of incoming) {
       if (!looksLikeMedia(file)) {
         rejected.push(file.name);
         continue;
       }
+      const fingerprint = fileFingerprint(file);
+      if (knownFingerprints.has(fingerprint)) {
+        duplicates += 1;
+        continue;
+      }
+      knownFingerprints.add(fingerprint);
       const track: Track = {
         id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
         title: titleFromFile(file),
@@ -708,11 +751,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         duration: null,
         source: 'local',
         isVideoContainer: looksLikeVideoContainer(file),
+        fingerprint,
+        favorite: false,
       };
       accepted.push(track);
       acceptedFiles.push({ track, file });
     }
 
+    setLastImport({ added: accepted.length, duplicates, rejected: rejected.length });
     if (rejected.length > 0) {
       setError(
         rejected.length === 1
@@ -756,6 +802,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           id: track.id,
           title: track.title,
           file,
+          fingerprint: track.fingerprint,
           isVideoContainer: Boolean(track.isVideoContainer),
           addedAt: Date.now(),
         })
@@ -768,6 +815,20 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
     return accepted.length;
   }, [refreshLocalLibrary]);
+
+  const dismissImportReport = useCallback(() => setLastImport(null), []);
+
+  const toggleTrackFavorite = useCallback((id: string) => {
+    const track = tracksRef.current.find((entry) => entry.id === id);
+    if (!track || track.source !== 'local') return;
+    setFavoriteIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setTracks((previous) => previous.map((entry) => (entry.id === id ? { ...entry, favorite: !entry.favorite } : entry)));
+  }, []);
 
   /**
    * Fetches a direct link to a media file client-side and adds it exactly
@@ -922,6 +983,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (track.source === 'bundled') return;
       if (track.source === 'local') URL.revokeObjectURL(track.url);
       if (track.source === 'local') void removeStoredLocalTrack(id).then(refreshLocalLibrary).catch(() => {});
+      if (track.source === 'local') setFavoriteIds((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
 
       const next = prev.filter((t) => t.id !== id);
       tracksRef.current = next;
@@ -949,6 +1015,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (track.source === 'local') URL.revokeObjectURL(track.url);
     }
     void clearStoredLocalTracks().then(refreshLocalLibrary).catch(() => {});
+    setFavoriteIds(new Set());
     tracksRef.current = BUNDLED_TRACKS;
     setTracks(BUNDLED_TRACKS);
     setCurrentIndex(-1);
@@ -1067,6 +1134,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       durationSec,
       error,
       addFiles,
+      lastImport,
+      dismissImportReport,
+      toggleTrackFavorite,
       addFromUrl,
       linkLoading,
       convertTrackToMp3,
@@ -1104,6 +1174,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [
       tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
       progressSec, durationSec, error, addFiles, addFromUrl, linkLoading, convertTrackToMp3,
+      lastImport, dismissImportReport, toggleTrackFavorite,
       streamingEmbeds, addStreamingEmbed, removeStreamingEmbed,
       localLibrary,
       conversion, removeTrack, clearTracks, playTrack, togglePlay, next, previous, seek,
