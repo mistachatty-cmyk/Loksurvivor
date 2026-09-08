@@ -27,6 +27,7 @@ import {
   X,
   GripVertical,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
 
@@ -53,6 +54,11 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
 
   const submitLink = async () => {
     if (!linkValue.trim() || player.linkLoading) return;
+    if (player.addStreamingEmbed(linkValue)) {
+      setLinkValue('');
+      setLinkOpen(false);
+      return;
+    }
     const ok = await player.addFromUrl(linkValue);
     if (ok) {
       setLinkValue('');
@@ -185,13 +191,13 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void submitLink();
                   }}
-                  placeholder="Direct file URL: https://your-host/track.mp3"
+                  placeholder="Paste a file, Spotify, YouTube, SoundCloud, or BandLab link"
                   autoFocus
                   className="w-full border border-border bg-black px-3 py-2 text-sm text-white outline-none focus:border-primary"
                   data-testid="input-track-link"
                 />
                 <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-                  Direct MP3/WAV/M4A/video-file links work when the host allows downloads. Spotify, YouTube, BandLab and SoundCloud share links are service pages, not media files; official embedded players are a separate future integration.
+                  Direct MP3/WAV/M4A/video-file links import into the game when the host allows downloads. Spotify, YouTube, and SoundCloud links add their official player below; BandLab links are saved to open at the source.
                 </p>
               </div>
               <button
@@ -204,6 +210,66 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 {player.linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add'}
               </button>
             </motion.div>
+          )}
+
+          {player.streamingEmbeds.length > 0 && (
+            <section className="mb-6 border border-primary/35 bg-card/70 p-4" aria-labelledby="streaming-shelf-title">
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <div>
+                  <p id="streaming-shelf-title" className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Streaming shelf</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Official service players. They stay separate from the game-reactive local soundtrack and follow each service&apos;s playback rules.
+                  </p>
+                </div>
+                <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{player.streamingEmbeds.length} saved</span>
+              </div>
+              <div className="grid gap-4 xl:grid-cols-2">
+                {player.streamingEmbeds.map((embed) => (
+                  <article key={embed.id} className="overflow-hidden border border-border bg-black/60">
+                    <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white">{embed.service}</span>
+                      <div className="flex items-center gap-1">
+                        <a
+                          href={embed.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 text-muted-foreground transition-colors hover:text-primary"
+                          aria-label={`Open this ${embed.service} link`}
+                          title="Open source"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => player.removeStreamingEmbed(embed.id)}
+                          className="p-1.5 text-muted-foreground transition-colors hover:text-destructive"
+                          aria-label={`Remove this ${embed.service} link`}
+                          title="Remove from streaming shelf"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {embed.embedUrl ? (
+                      <iframe
+                        src={embed.embedUrl}
+                        title={`${embed.service} player`}
+                        className={embed.service === 'youtube' ? 'aspect-video min-h-[200px] w-full border-0' : 'h-[152px] w-full border-0'}
+                        loading="lazy"
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        allowFullScreen={embed.service === 'youtube'}
+                      />
+                    ) : (
+                      <div className="flex min-h-[152px] flex-col items-start justify-center gap-2 p-4 text-sm text-muted-foreground">
+                        <p className="font-semibold text-white">BandLab source saved</p>
+                        <p className="max-w-sm text-xs leading-relaxed">Open it in BandLab to listen, download your own export, or return with a direct media file. A verified official BandLab embed is not wired yet.</p>
+                        <a href={embed.sourceUrl} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase tracking-widest text-primary hover:text-white">Open BandLab</a>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
           )}
 
           {/* Playlists */}

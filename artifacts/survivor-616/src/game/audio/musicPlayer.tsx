@@ -67,6 +67,18 @@ export interface ConversionState {
   ratio: number;
 }
 
+/** A player supplied by its original streaming service. These are deliberately
+ * separate from Track: embedded streams cannot be analysed or mixed into the
+ * game's reactive local-audio transport. */
+export interface StreamingEmbed {
+  id: string;
+  service: 'spotify' | 'youtube' | 'soundcloud' | 'bandlab';
+  sourceUrl: string;
+  /** Null means the source is saved as an openable link until that service has
+   * a verified embeddable player route. */
+  embedUrl: string | null;
+}
+
 export interface MusicPlayerValue {
   tracks: Track[];
   currentTrack: Track | null;
@@ -105,6 +117,11 @@ export interface MusicPlayerValue {
   toggleShuffle: () => void;
   cycleRepeat: () => void;
   dismissError: () => void;
+  streamingEmbeds: StreamingEmbed[];
+  /** Saves a recognized service URL as an official player/source card. Returns
+   * false for a direct media URL so the caller can use addFromUrl instead. */
+  addStreamingEmbed: (url: string) => boolean;
+  removeStreamingEmbed: (id: string) => void;
   /**
    * The one `AudioContext` the app owns, or null before it has been created.
    * The studio adopts this rather than creating a second context -- two
@@ -160,6 +177,7 @@ const STREAMING_SERVICE_HOSTS = [
 ];
 
 const PLAYLISTS_STORAGE_KEY = 'survivor616.playlists.v1';
+const STREAMING_EMBEDS_STORAGE_KEY = 'survivor616.streaming-embeds.v1';
 
 const BUNDLED_TRACKS: Track[] = ([
   { id: 'dont-fly', title: "Don't Fly", url: dontFly, source: 'bundled' },
@@ -188,6 +206,76 @@ function looksLikeVideoContainer(file: { type: string; name: string }): boolean 
 function isStreamingServiceUrl(url: URL): boolean {
   const host = url.hostname.toLowerCase().replace(/^www\./, '');
   return STREAMING_SERVICE_HOSTS.some((blocked) => host === blocked || host.endsWith(`.${blocked}`));
+}
+
+function isHost(url: URL, host: string): boolean {
+  const actual = url.hostname.toLowerCase().replace(/^www\./, '');
+  return actual === host || actual.endsWith(`.${host}`);
+}
+
+function createStreamingEmbed(rawUrl: string): StreamingEmbed | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+
+  const id = `stream-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  if (isHost(url, 'spotify.com')) {
+    const [kind, entityId] = url.pathname.split('/').filter(Boolean);
+    if (!entityId || !['track', 'album', 'playlist', 'artist', 'show', 'episode'].includes(kind ?? '')) return null;
+    return { id, service: 'spotify', sourceUrl: url.toString(), embedUrl: `https://open.spotify.com/embed/${kind}/${entityId}` };
+  }
+  if (isHost(url, 'youtube.com') || isHost(url, 'youtu.be')) {
+    const videoId = isHost(url, 'youtu.be')
+      ? url.pathname.split('/').filter(Boolean)[0]
+      : url.searchParams.get('v') ?? url.pathname.split('/').filter(Boolean).find((part, index, path) =>
+          (path[index - 1] === 'embed' || path[index - 1] === 'shorts') && Boolean(part),
+        );
+    if (!videoId) return null;
+    return {
+      id,
+      service: 'youtube',
+      sourceUrl: url.toString(),
+      embedUrl: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?playsinline=1&rel=0`,
+    };
+  }
+  if (isHost(url, 'soundcloud.com')) {
+    return {
+      id,
+      service: 'soundcloud',
+      sourceUrl: url.toString(),
+      embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url.toString())}&visual=true`,
+    };
+  }
+  if (isHost(url, 'bandlab.com')) {
+    return { id, service: 'bandlab', sourceUrl: url.toString(), embedUrl: null };
+  }
+  return null;
+}
+
+function loadStreamingEmbeds(): StreamingEmbed[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(STREAMING_EMBEDS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is StreamingEmbed => {
+      if (typeof item !== 'object' || item === null) return false;
+      const candidate = item as Partial<StreamingEmbed>;
+      return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.sourceUrl === 'string' &&
+        ['spotify', 'youtube', 'soundcloud', 'bandlab'].includes(candidate.service ?? '') &&
+        (typeof candidate.embedUrl === 'string' || candidate.embedUrl === null)
+      );
+    });
+  } catch {
+    return [];
+  }
 }
 
 interface StoredPlaylists {
@@ -241,6 +329,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [streamingEmbeds, setStreamingEmbeds] = useState<StreamingEmbed[]>(() => loadStreamingEmbeds());
   const [conversion, setConversion] = useState<ConversionState | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>(() => loadStoredPlaylists().playlists);
   const [activePlaylistId, setActivePlaylistIdState] = useState<string | null>(
@@ -459,6 +548,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
   }, [playlists, activePlaylistId]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(STREAMING_EMBEDS_STORAGE_KEY, JSON.stringify(streamingEmbeds));
+    } catch {
+      // The streaming shelf is a convenience; playback still works without persistence.
+    }
+  }, [streamingEmbeds]);
+
   // Release every object URL when the app unmounts.
   useEffect(() => {
     return () => {
@@ -667,6 +765,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     },
     [addFiles],
   );
+
+  const addStreamingEmbed = useCallback((rawUrl: string): boolean => {
+    const embed = createStreamingEmbed(rawUrl);
+    if (!embed) return false;
+    if (streamingEmbeds.some((item) => item.sourceUrl === embed.sourceUrl)) {
+      setError('That streaming link is already on your soundtrack desk.');
+      return true;
+    }
+    setStreamingEmbeds((previous) => [...previous, embed]);
+    setError(null);
+    return true;
+  }, [streamingEmbeds]);
+
+  const removeStreamingEmbed = useCallback((id: string) => {
+    setStreamingEmbeds((previous) => previous.filter((item) => item.id !== id));
+  }, []);
 
   /**
    * Re-encodes a local video-container track to a real .mp3 in place. The id
@@ -899,6 +1013,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       toggleShuffle,
       cycleRepeat,
       dismissError,
+      streamingEmbeds,
+      addStreamingEmbed,
+      removeStreamingEmbed,
       getAudioContext,
       ensureAudioContext,
       playlists,
@@ -915,6 +1032,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [
       tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
       progressSec, durationSec, error, addFiles, addFromUrl, linkLoading, convertTrackToMp3,
+      streamingEmbeds, addStreamingEmbed, removeStreamingEmbed,
       conversion, removeTrack, clearTracks, playTrack, togglePlay, next, previous, seek,
       setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext, ensureAudioContext,
       playTrackOnRepeat,
