@@ -97,10 +97,12 @@ export interface LootPrizeDef {
 }
 
 export type LokPetFamily = 'animal' | 'ghoul' | 'bat' | 'mote' | 'blob' | 'mechanical';
-export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jelly' | 'clockwork';
+export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jelly' | 'clockwork'
+  | 'prism-moth' | 'void-pup' | 'ember-koi' | 'clock-beetle';
 export type LokPetAttackKind = 'shot' | 'rapid-shot' | 'heavy-shot' | 'pulse' | 'explosion';
 export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow';
 export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
+export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescue' | 'clock-pause';
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
@@ -119,6 +121,12 @@ export interface LokPetVariantDef {
   silhouette: LokPetSilhouette;
   palette: LokPetPalette;
   description: string;
+  /** Relative in-run render scale; authored pets deliberately do not all occupy one size. */
+  sizeScale?: number;
+  legendary?: boolean;
+  specialAbility?: LokPetSpecialAbility;
+  /** Variant-roll weight. Legendary companions are deliberately scarce. */
+  weight?: number;
 }
 
 /** Rarity-tuned stat sheet used when a chest generates a LokPet. */
@@ -153,6 +161,9 @@ export interface LokPetRoll {
   description: string;
   stats: Omit<LokPetStatSheet, 'rarity' | 'label' | 'weight' | 'powerMultiplier'>;
   traitLabel: string;
+  sizeScale?: number;
+  legendary?: boolean;
+  specialAbility?: LokPetSpecialAbility;
 }
 
 /** A captured, repeatable LokPet blueprint stored in the player's kennel. */
@@ -225,6 +236,9 @@ export interface LokPetInstance extends LokPetRoll {
   ghost: boolean;
   readyAt: number;
   nextPulseAt: number;
+  specialReadyAt: number;
+  /** Clockwork Beetle accelerates its clock face while this timestamp is active. */
+  specialActiveUntil: number;
   hp: number;
   maxHp: number;
 }
@@ -380,6 +394,18 @@ export type ImpactIntensity = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type PotholeTrigger = 'stomp' | 'ground-shock';
 
+export type LegendaryWeaponPattern =
+  | 'resonance-return'
+  | 'grind-charge'
+  | 'ghostlight-network'
+  | 'steam-harpoon'
+  | 'origami-decoys'
+  | 'event-horizon'
+  | 'root-network'
+  | 'royal-command'
+  | 'zero-split'
+  | 'tidal-memory';
+
 export interface WeaponDef {
   id: string;
   name: string;
@@ -435,6 +461,8 @@ export interface WeaponDef {
    */
   bonusVsStatusId?: string;
   bonusVsStatusMult?: number;
+  /** Focused mechanics for the 2026-09-09 legendary roster. */
+  legendaryPattern?: LegendaryWeaponPattern;
 }
 
 /** Designer-facing metadata for a combat status effect. */
@@ -609,6 +637,9 @@ export interface CharacterDef {
   weapon: WeaponDef;
   ultimate: UltimateDef;
   unlock: UnlockRule;
+  rarity?: 'legendary';
+  /** Two locked identity hooks surfaced in the roster without changing older characters. */
+  signatureTraits?: readonly [string, string];
   /** Optional always-on ability the dash button also triggers or empowers. */
   dashSkill?: DashSkillDef;
   /** Path to the reference art the rig was built from, if any. */
