@@ -15,26 +15,25 @@ import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { findEffect } from '@/game/audio/studio/effects';
 import { getStudioEngine, unlockStudioAudio } from '@/game/audio/studio/engine';
 import type { TrackGraph } from '@/game/audio/studio/tracks';
+import { startStudioClock, stopStudioClock, tickStudioClock } from '@/game/audio/studio/clock';
 import {
-  startStudioClock,
-  stopStudioClock,
-  tickStudioClock,
-} from '@/game/audio/studio/clock';
-import {
+  adoptImportedBufferId,
   clipLengthInBeats,
   importAudioFile,
   ImportError,
   releaseBuffer,
   type ImportedBuffer,
 } from '@/game/audio/studio/importer';
+import {
+  loadStudioAudioAssets,
+  loadStudioWorkspace,
+  saveStudioAudioFile,
+  saveStudioWorkspace,
+} from '@/game/audio/studio/persistence';
+import { isMediaAssetId, LocalMediaStorageError } from '@/game/audio/localMediaStore';
 
 /** Tried in order; the first the browser's `MediaRecorder` supports wins. */
-const MIC_MIME_CANDIDATES = [
-  'audio/webm;codecs=opus',
-  'audio/webm',
-  'audio/mp4;codecs=mp4a.40.2',
-  'audio/mp4',
-];
+const MIC_MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4'];
 import {
   addClip,
   addEffect,
@@ -76,6 +75,9 @@ export interface StudioController {
   error: string | null;
   /** Confirmation of something that worked, as distinct from a failure. */
   notice: string | null;
+  persistenceState: 'loading' | 'saving' | 'saved' | 'session-only';
+  lastSavedAt: number | null;
+  restoredAssetCount: number;
   dismissError: () => void;
   dismissNotice: () => void;
 
@@ -128,7 +130,13 @@ export function useStudio(): StudioController {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [persistenceState, setPersistenceState] = useState<StudioController['persistenceState']>('loading');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [restoredAssetCount, setRestoredAssetCount] = useState(0);
   const playheadRef = useRef(0);
+  const persistenceReadyRef = useRef(false);
+  const persistenceDisabledRef = useRef(false);
+  const sessionOnlySourceIdsRef = useRef(new Set<string>());
 
   const [armedTrackId, setArmedTrackId] = useState<string | null>(null);
   const [recordingMic, setRecordingMic] = useState(false);
@@ -153,6 +161,18 @@ export function useStudio(): StudioController {
   const projectRef = useRef(project);
   projectRef.current = project;
 
+  /** Stable ids in the Clips panel plus any source already placed on a lane. */
+  const persistedAssetIds = useCallback((currentProject: StudioProject, currentClips: ImportedBuffer[]) => {
+    return [
+      ...new Set(
+        [
+          ...currentClips.map((clip) => clip.id),
+          ...currentProject.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)),
+        ].filter(isMediaAssetId),
+      ),
+    ];
+  }, []);
+
   // Keep the audio graph and the saved copy in step with the model.
   useEffect(() => {
     engine().graph.sync(project);
@@ -160,6 +180,100 @@ export function useStudio(): StudioController {
     // Tempo is live: dragging the BPM field while playing should be audible.
     Tone.getTransport().bpm.value = project.bpm;
   }, [project]);
+
+  // Restore the active project and rebuild decoded runtime buffers from the
+  // original player-owned files. A broken source is skipped; the rest of the
+  // project still opens and remains editable.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const stored = await loadStudioWorkspace();
+        if (cancelled) return;
+
+        if (!stored) {
+          const migrated = await saveStudioWorkspace(projectRef.current, []);
+          if (cancelled) return;
+          persistenceReadyRef.current = true;
+          setLastSavedAt(migrated.updatedAt);
+          setPersistenceState('saved');
+          return;
+        }
+
+        setBusy('Restoring local Studio project...');
+        const assets = await loadStudioAudioAssets(stored.assetIds);
+        const restored: ImportedBuffer[] = [];
+        let unreadable = 0;
+        for (const asset of assets) {
+          try {
+            const file = new File([asset.blob], asset.fileName, {
+              type: asset.mimeType,
+              lastModified: asset.createdAt,
+            });
+            restored.push(await importAudioFile(file, engineInstance.context, asset.id));
+          } catch {
+            unreadable += 1;
+          }
+        }
+        if (cancelled) return;
+
+        setProject(stored.project);
+        setClips(restored);
+        setRestoredAssetCount(restored.length);
+        setLastSavedAt(stored.updatedAt);
+        persistenceReadyRef.current = true;
+        setPersistenceState('saved');
+
+        const missing = Math.max(0, stored.assetIds.length - assets.length) + unreadable;
+        if (missing > 0) {
+          setError(
+            `${missing} saved Studio source${missing === 1 ? '' : 's'} could not be restored. ` +
+              'The rest of the project is still available.',
+          );
+        }
+      } catch (cause) {
+        if (cancelled) return;
+        persistenceReadyRef.current = true;
+        persistenceDisabledRef.current = true;
+        setPersistenceState('session-only');
+        setError(
+          cause instanceof LocalMediaStorageError
+            ? cause.message
+            : 'The Studio can run for this session, but its local project could not be restored.',
+        );
+      } finally {
+        if (!cancelled) setBusy(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [engineInstance]);
+
+  // Debounced IndexedDB autosave keeps fader drags from creating a write per
+  // pointer event. The synchronous localStorage copy above remains a small
+  // recovery fallback while this version migrates existing projects.
+  useEffect(() => {
+    if (!persistenceReadyRef.current || persistenceDisabledRef.current) return;
+    setPersistenceState('saving');
+    const timeout = window.setTimeout(() => {
+      void saveStudioWorkspace(project, persistedAssetIds(project, clips))
+        .then((record) => {
+          setLastSavedAt(record.updatedAt);
+          setPersistenceState(sessionOnlySourceIdsRef.current.size > 0 ? 'session-only' : 'saved');
+        })
+        .catch((cause: unknown) => {
+          persistenceDisabledRef.current = true;
+          setPersistenceState('session-only');
+          setError(
+            cause instanceof LocalMediaStorageError
+              ? cause.message
+              : 'The Studio could not autosave. Export a project backup before leaving.',
+          );
+        });
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [clips, persistedAssetIds, project]);
 
   // Stopping when the screen unmounts is not optional -- the transport is a
   // singleton and would otherwise keep publishing a grid over a game run.
@@ -240,32 +354,62 @@ export function useStudio(): StudioController {
     setBusy(`Importing ${list.length === 1 ? list[0]!.name : `${list.length} files`}...`);
     const imported: ImportedBuffer[] = [];
     const failures: string[] = [];
+    const sessionOnly: string[] = [];
 
     for (const file of list) {
       try {
-        imported.push(await importAudioFile(file, engine().context));
+        let decoded = await importAudioFile(file, engine().context);
+        try {
+          const asset = await saveStudioAudioFile(file);
+          decoded = adoptImportedBufferId(decoded, asset.id);
+        } catch {
+          sessionOnlySourceIdsRef.current.add(decoded.id);
+          sessionOnly.push(file.name);
+        }
+        imported.push(decoded);
       } catch (cause) {
         failures.push(cause instanceof ImportError ? cause.message : `Could not read ${file.name}.`);
       }
     }
 
-    if (imported.length > 0) setClips((previous) => [...previous, ...imported]);
+    if (imported.length > 0) {
+      setClips((previous) => {
+        const merged = new Map(previous.map((clip) => [clip.id, clip]));
+        for (const clip of imported) merged.set(clip.id, clip);
+        return [...merged.values()];
+      });
+    }
     setBusy(null);
-    if (failures.length > 0) setError(failures.join('\n'));
+    if (failures.length > 0 || sessionOnly.length > 0) {
+      setError(
+        [
+          ...failures,
+          ...(sessionOnly.length > 0
+            ? [
+                `${sessionOnly.length} imported source${sessionOnly.length === 1 ? '' : 's'} will work for this session but could not be saved on this device.`,
+              ]
+            : []),
+        ].join('\n'),
+      );
+    }
+    if (sessionOnly.length > 0) setPersistenceState('session-only');
   }, []);
 
-  const placeClip = useCallback((bufferId: string, trackId: string, startBeat: number) => {
-    setProject((current) => {
-      const source = clips.find((clip) => clip.id === bufferId);
-      if (!source) return current;
-      return addClip(current, trackId, {
-        bufferId,
-        name: source.name,
-        startBeat: Math.max(0, Math.round(startBeat)),
-        lengthBeats: clipLengthInBeats(source.buffer, current.bpm),
+  const placeClip = useCallback(
+    (bufferId: string, trackId: string, startBeat: number) => {
+      setProject((current) => {
+        const source = clips.find((clip) => clip.id === bufferId);
+        if (!source) return current;
+        return addClip(current, trackId, {
+          bufferId,
+          name: source.name,
+          startBeat: Math.max(0, Math.round(startBeat)),
+          lengthBeats: clipLengthInBeats(source.buffer, current.bpm),
+        });
       });
-    });
-  }, [clips]);
+    },
+    [clips],
+  );
 
   const discardImport = useCallback((bufferId: string) => {
     setClips((previous) => previous.filter((clip) => clip.id !== bufferId));
@@ -277,6 +421,10 @@ export function useStudio(): StudioController {
       })),
     }));
     releaseBuffer(bufferId);
+    sessionOnlySourceIdsRef.current.delete(bufferId);
+    if (sessionOnlySourceIdsRef.current.size === 0 && !persistenceDisabledRef.current) {
+      setPersistenceState('saved');
+    }
   }, []);
 
   const armTrack = useCallback((trackId: string) => {
@@ -303,7 +451,19 @@ export function useStudio(): StudioController {
 
     setBusy('Processing recording...');
     try {
-      const imported = await importAudioFile(file, engine().context);
+      let imported = await importAudioFile(file, engine().context);
+      try {
+        const asset = await saveStudioAudioFile(file);
+        imported = adoptImportedBufferId(imported, asset.id);
+      } catch {
+        sessionOnlySourceIdsRef.current.add(imported.id);
+        setPersistenceState('session-only');
+        setError('The recording is available for this session, but could not be saved on this device.');
+      }
+      setClips((previous) => {
+        const withoutDuplicate = previous.filter((clip) => clip.id !== imported.id);
+        return [...withoutDuplicate, imported];
+      });
       const startBeat = Math.max(0, Math.round(recordStartBeatRef.current));
       setProject((current) =>
         addClip(current, trackId, {
@@ -431,7 +591,7 @@ export function useStudio(): StudioController {
     const added = addFiles([new File([blob], filename, { type: 'audio/wav' })]);
     setNotice(
       added > 0
-        ? `Added to your soundtrack. Play it from the Soundtrack panel and the game will move to it. It lives in this session only — use WAV to keep a copy.`
+        ? `Added to your soundtrack and saved on this device. Play it from the Soundtrack panel and the game will move to it. Use WAV or a project backup for a portable copy.`
         : 'The soundtrack would not accept that render.',
     );
   }, [addFiles, renderCurrent]);
@@ -456,6 +616,9 @@ export function useStudio(): StudioController {
     busy,
     error,
     notice,
+    persistenceState,
+    lastSavedAt,
+    restoredAssetCount,
     dismissError: useCallback(() => setError(null), []),
     dismissNotice: useCallback(() => setNotice(null), []),
 

@@ -5,10 +5,10 @@
  * by being exported from wherever it was made and dropped on the window, which
  * is the same guarantee the soundtrack player makes.
  *
- * Decoded buffers live in a runtime map keyed by id and are deliberately never
- * serialised: a project references the player's files, it does not carry them.
- * A project reloaded in a fresh session therefore has clips whose buffers are
- * missing, which the graph handles by skipping them rather than failing.
+ * Decoded buffers live in a runtime map keyed by id and are never serialised.
+ * Device-local persistence stores the original owned file separately and
+ * rebuilds this map after a refresh; the plain project document still carries
+ * no Web Audio objects or raw media bytes.
  */
 
 import { studioId } from './project';
@@ -50,7 +50,11 @@ export class ImportError extends Error {}
  * a context per import would leak one per dropped file and, on iOS, risk the
  * browser suspending the one actually playing.
  */
-export async function importAudioFile(file: File, context: BaseAudioContext): Promise<ImportedBuffer> {
+export async function importAudioFile(
+  file: File,
+  context: BaseAudioContext,
+  preferredId?: string,
+): Promise<ImportedBuffer> {
   if (!file.type.startsWith('audio/') && !AUDIO_EXTENSIONS.test(file.name)) {
     throw new ImportError(`${file.name} is not an audio file. Try .wav, .mp3, .m4a, .ogg or .flac.`);
   }
@@ -66,7 +70,7 @@ export async function importAudioFile(file: File, context: BaseAudioContext): Pr
   }
 
   const { bpm, confidence } = estimateBufferBpm(buffer);
-  const id = studioId('buffer');
+  const id = preferredId ?? studioId('buffer');
   bufferMap.set(id, buffer);
 
   return {
@@ -76,6 +80,18 @@ export async function importAudioFile(file: File, context: BaseAudioContext): Pr
     estimatedBpm: bpm,
     bpmConfidence: confidence,
   };
+}
+
+/**
+ * Re-keys a decoded session buffer after its source file receives a stable,
+ * content-addressed id. This avoids decoding the same large file twice merely
+ * to persist it.
+ */
+export function adoptImportedBufferId(imported: ImportedBuffer, id: string): ImportedBuffer {
+  if (imported.id === id) return imported;
+  bufferMap.delete(imported.id);
+  bufferMap.set(id, imported.buffer);
+  return { ...imported, id };
 }
 
 export function getBuffer(id: string): AudioBuffer | null {
@@ -107,7 +123,10 @@ export function clearBuffers(): void {
  * ~3000 bins, which autocorrelates in single-digit milliseconds, and a worker
  * would cost more in ceremony than it saves.
  */
-export function estimateBufferBpm(buffer: AudioBuffer): { bpm: number; confidence: number } {
+export function estimateBufferBpm(buffer: AudioBuffer): {
+  bpm: number;
+  confidence: number;
+} {
   const samples = buffer.getChannelData(0);
   const sampleRate = buffer.sampleRate;
   const binSamples = Math.max(1, Math.round((BIN_MS / 1000) * sampleRate));

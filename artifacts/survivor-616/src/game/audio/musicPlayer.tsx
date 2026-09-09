@@ -31,7 +31,7 @@ import {
   saveLocalTrack,
   type LocalLibrarySummary,
 } from './localTrackLibrary';
-import dontFly from '@assets/Don\'t_Fly_1787686881680.mp3?url';
+import dontFly from "@assets/Don't_Fly_1787686881680.mp3?url";
 import fat from '@assets/F.A.T.$_2_1787686881680.m4a?url';
 import layback from '@assets/Layback_1787686881680.wav?url';
 import dodds from '@assets/Dodds_Ave_289-~Somethin_1787686881680.m4a?url';
@@ -39,7 +39,7 @@ import rbm from '@assets/RBM_1787686881680.m4a?url';
 import neverMind from '@assets/NeverMind-Brkn-Part2_1787686881680.mp3?url';
 import demoTape from '@assets/That_One_Song-Demo_Tape_1787686881680.mp3?url';
 import goinLoco from '@assets/Goin_Loco_Mary_Sue_1787686881680.mp3?url';
-import dontFly2 from '@assets/Don\'t_Fly_2_1787686881680.mp3?url';
+import dontFly2 from "@assets/Don't_Fly_2_1787686881680.mp3?url";
 
 export interface Track {
   id: string;
@@ -191,17 +191,19 @@ const STREAMING_SERVICE_HOSTS = [
 const PLAYLISTS_STORAGE_KEY = 'survivor616.playlists.v1';
 const STREAMING_EMBEDS_STORAGE_KEY = 'survivor616.streaming-embeds.v1';
 
-const BUNDLED_TRACKS: Track[] = ([
-  { id: 'dont-fly', title: "Don't Fly", url: dontFly, source: 'bundled' },
-  { id: 'fat-2', title: 'F.A.T.$ 2', url: fat, source: 'bundled' },
-  { id: 'layback', title: 'Layback', url: layback, source: 'bundled' },
-  { id: 'dodds-ave-somethin', title: 'Dodds Ave ~ Somethin', url: dodds, source: 'bundled' },
-  { id: 'rbm', title: 'RBM', url: rbm, source: 'bundled' },
-  { id: 'never-mind-brkn-part-2', title: 'NeverMind — Brkn Part 2', url: neverMind, source: 'bundled' },
-  { id: 'that-one-song-demo-tape', title: 'That One Song — Demo Tape', url: demoTape, source: 'bundled' },
-  { id: 'goin-loco-mary-sue', title: 'Goin Loco — Mary Sue', url: goinLoco, source: 'bundled' },
-  { id: 'dont-fly-2', title: "Don't Fly 2", url: dontFly2, source: 'bundled' },
-] as const).map((track) => ({ ...track, size: 0, duration: null }));
+const BUNDLED_TRACKS: Track[] = (
+  [
+    { id: 'dont-fly', title: "Don't Fly", url: dontFly, source: 'bundled' },
+    { id: 'fat-2', title: 'F.A.T.$ 2', url: fat, source: 'bundled' },
+    { id: 'layback', title: 'Layback', url: layback, source: 'bundled' },
+    { id: 'dodds-ave-somethin', title: 'Dodds Ave ~ Somethin', url: dodds, source: 'bundled' },
+    { id: 'rbm', title: 'RBM', url: rbm, source: 'bundled' },
+    { id: 'never-mind-brkn-part-2', title: 'NeverMind — Brkn Part 2', url: neverMind, source: 'bundled' },
+    { id: 'that-one-song-demo-tape', title: 'That One Song — Demo Tape', url: demoTape, source: 'bundled' },
+    { id: 'goin-loco-mary-sue', title: 'Goin Loco — Mary Sue', url: goinLoco, source: 'bundled' },
+    { id: 'dont-fly-2', title: "Don't Fly 2", url: dontFly2, source: 'bundled' },
+  ] as const
+).map((track) => ({ ...track, size: 0, duration: null }));
 
 function titleFromFile(file: File): string {
   return file.name.replace(MEDIA_EXTENSIONS, '').replace(/[_-]+/g, ' ').trim() || file.name;
@@ -238,14 +240,21 @@ function createStreamingEmbed(rawUrl: string): StreamingEmbed | null {
   if (isHost(url, 'spotify.com')) {
     const [kind, entityId] = url.pathname.split('/').filter(Boolean);
     if (!entityId || !['track', 'album', 'playlist', 'artist', 'show', 'episode'].includes(kind ?? '')) return null;
-    return { id, service: 'spotify', sourceUrl: url.toString(), embedUrl: `https://open.spotify.com/embed/${kind}/${entityId}` };
+    return {
+      id,
+      service: 'spotify',
+      sourceUrl: url.toString(),
+      embedUrl: `https://open.spotify.com/embed/${kind}/${entityId}`,
+    };
   }
   if (isHost(url, 'youtube.com') || isHost(url, 'youtu.be')) {
     const videoId = isHost(url, 'youtu.be')
       ? url.pathname.split('/').filter(Boolean)[0]
-      : url.searchParams.get('v') ?? url.pathname.split('/').filter(Boolean).find((part, index, path) =>
-          (path[index - 1] === 'embed' || path[index - 1] === 'shorts') && Boolean(part),
-        );
+      : (url.searchParams.get('v') ??
+        url.pathname
+          .split('/')
+          .filter(Boolean)
+          .find((part, index, path) => (path[index - 1] === 'embed' || path[index - 1] === 'shorts') && Boolean(part)));
     if (!videoId) return null;
     return {
       id,
@@ -305,8 +314,7 @@ function loadStoredPlaylists(): StoredPlaylists {
     if (!parsed || !Array.isArray(parsed.playlists)) return empty;
     const playlists = parsed.playlists
       .filter(
-        (p): p is Playlist =>
-          typeof p?.id === 'string' && typeof p?.name === 'string' && Array.isArray(p?.trackIds),
+        (p): p is Playlist => typeof p?.id === 'string' && typeof p?.name === 'string' && Array.isArray(p?.trackIds),
       )
       .map((p) => ({
         id: p.id,
@@ -341,7 +349,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
-  const [localLibrary, setLocalLibrary] = useState<LocalLibrarySummary & { ready: boolean }>({ count: 0, bytes: 0, ready: false });
+  const [localLibrary, setLocalLibrary] = useState<LocalLibrarySummary & { ready: boolean }>({
+    count: 0,
+    bytes: 0,
+    ready: false,
+  });
   const [streamingEmbeds, setStreamingEmbeds] = useState<StreamingEmbed[]>(() => loadStreamingEmbeds());
   const [conversion, setConversion] = useState<ConversionState | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>(() => loadStoredPlaylists().playlists);
@@ -402,7 +414,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const ensureAudioContext = useCallback((): AudioContext | null => {
     if (typeof window === 'undefined') return null;
     const AudioContextConstructor =
-      window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      window.AudioContext ??
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextConstructor) return null;
     if (!audioContextRef.current) {
       try {
@@ -469,33 +482,36 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [shuffle, repeat, activeQueueIds],
   );
 
-  const playIndex = useCallback((index: number) => {
-    const audio = audioRef.current;
-    const track = tracksRef.current[index];
-    if (!audio || !track) return;
-    if (!track.url) {
-      setError(`"${track.title}" is no longer available -- add the file again.`);
-      return;
-    }
-    setCurrentIndex(index);
-    audio.src = track.url;
-    audio.currentTime = 0;
-    void audio
-      .play()
-      .then(() => {
-        connectAnalyser();
-        // A new track has a new tempo -- drop the old grid rather than easing
-        // toward the new one from a stale estimate.
-        analysisRef.current?.reset();
-        startEnergyMeter();
-        setIsPlaying(true);
-        setError(null);
-      })
-      .catch(() => {
-        setIsPlaying(false);
-        setError(`Could not play "${track.title}". The browser may not support this format.`);
-      });
-  }, [connectAnalyser, startEnergyMeter]);
+  const playIndex = useCallback(
+    (index: number) => {
+      const audio = audioRef.current;
+      const track = tracksRef.current[index];
+      if (!audio || !track) return;
+      if (!track.url) {
+        setError(`"${track.title}" is no longer available -- add the file again.`);
+        return;
+      }
+      setCurrentIndex(index);
+      audio.src = track.url;
+      audio.currentTime = 0;
+      void audio
+        .play()
+        .then(() => {
+          connectAnalyser();
+          // A new track has a new tempo -- drop the old grid rather than easing
+          // toward the new one from a stale estimate.
+          analysisRef.current?.reset();
+          startEnergyMeter();
+          setIsPlaying(true);
+          setError(null);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setError(`Could not play "${track.title}". The browser may not support this format.`);
+        });
+    },
+    [connectAnalyser, startEnergyMeter],
+  );
 
   /* --------------------------------------------------------------- */
   /* Audio element wiring                                             */
@@ -634,13 +650,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   /* --------------------------------------------------------------- */
   /* Playlist management                                              */
   /*                                                                   */
-  /* Playlists store track *ids*, not tracks. Bundled ids are stable   */
-  /* across sessions so those entries survive a reload; a local file's */
-  /* id is tied to an object URL that dies with the tab, so those      */
-  /* entries are silently dropped at read time (`activeQueueIds`) and  */
-  /* actively pruned below whenever a track is actually removed -- the */
-  /* same "reference the player's files, don't carry them, skip what's */
-  /* missing" tradeoff the studio's project model makes.               */
+  /* Playlists store track *ids*, not tracks. Bundled and IndexedDB-   */
+  /* restored local ids are stable across sessions. Missing references */
+  /* are skipped at read time and actively pruned when a track is       */
+  /* removed.                                                           */
   /* --------------------------------------------------------------- */
 
   const createPlaylist = useCallback((name: string): string => {
@@ -668,9 +681,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const addToPlaylist = useCallback((playlistId: string, trackId: string) => {
     setPlaylists((prev) =>
       prev.map((p) =>
-        p.id === playlistId && !p.trackIds.includes(trackId)
-          ? { ...p, trackIds: [...p.trackIds, trackId] }
-          : p,
+        p.id === playlistId && !p.trackIds.includes(trackId) ? { ...p, trackIds: [...p.trackIds, trackId] } : p,
       ),
     );
   }, []);
@@ -689,85 +700,88 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   /* Library management                                               */
   /* --------------------------------------------------------------- */
 
-  const addFiles = useCallback((files: FileList | File[]): number => {
-    const incoming = Array.from(files);
-    const accepted: Track[] = [];
-    const acceptedFiles: Array<{ track: Track; file: File }> = [];
-    const rejected: string[] = [];
+  const addFiles = useCallback(
+    (files: FileList | File[]): number => {
+      const incoming = Array.from(files);
+      const accepted: Track[] = [];
+      const acceptedFiles: Array<{ track: Track; file: File }> = [];
+      const rejected: string[] = [];
 
-    for (const file of incoming) {
-      if (!looksLikeMedia(file)) {
-        rejected.push(file.name);
-        continue;
-      }
-      const track: Track = {
-        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-        title: titleFromFile(file),
-        url: URL.createObjectURL(file),
-        size: file.size,
-        duration: null,
-        source: 'local',
-        isVideoContainer: looksLikeVideoContainer(file),
-      };
-      accepted.push(track);
-      acceptedFiles.push({ track, file });
-    }
-
-    if (rejected.length > 0) {
-      setError(
-        rejected.length === 1
-          ? `"${rejected[0]}" is not an audio or video file.`
-          : `${rejected.length} files were skipped because they are not audio or video.`,
-      );
-    } else if (accepted.length > 0) {
-      setError(null);
-    }
-
-    if (accepted.length > 0) {
-      setTracks((prev) => {
-        const merged = [...prev, ...accepted];
-        tracksRef.current = merged;
-        return merged;
-      });
-      // Read durations without disturbing playback. Works for a video
-      // container too -- an <audio> element still reads container metadata.
-      for (const track of accepted) {
-        const probe = new Audio();
-        probe.preload = 'metadata';
-        // A probe that never fires either event would otherwise hold its
-        // decoder and the object URL alive for the life of the tab.
-        const release = () => {
-          probe.removeEventListener('loadedmetadata', onProbeMeta);
-          probe.removeEventListener('error', release);
-          probe.removeAttribute('src');
-          probe.load();
+      for (const file of incoming) {
+        if (!looksLikeMedia(file)) {
+          rejected.push(file.name);
+          continue;
+        }
+        const track: Track = {
+          id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+          title: titleFromFile(file),
+          url: URL.createObjectURL(file),
+          size: file.size,
+          duration: null,
+          source: 'local',
+          isVideoContainer: looksLikeVideoContainer(file),
         };
-        const onProbeMeta = () => {
-          const seconds = Number.isFinite(probe.duration) ? probe.duration : null;
-          setTracks((prev) => prev.map((t) => (t.id === track.id ? { ...t, duration: seconds } : t)));
-          release();
-        };
-        probe.addEventListener('loadedmetadata', onProbeMeta);
-        probe.addEventListener('error', release);
-        probe.src = track.url;
+        accepted.push(track);
+        acceptedFiles.push({ track, file });
       }
-      for (const { track, file } of acceptedFiles) {
-        void saveLocalTrack({
-          id: track.id,
-          title: track.title,
-          file,
-          isVideoContainer: Boolean(track.isVideoContainer),
-          addedAt: Date.now(),
-        })
-          .then(refreshLocalLibrary)
-          .catch(() => {
-            setError('The track was added for this session, but this browser could not save it for later.');
-          });
-      }
-    }
 
-    return accepted.length;
-  }, [refreshLocalLibrary]);
+      if (rejected.length > 0) {
+        setError(
+          rejected.length === 1
+            ? `"${rejected[0]}" is not an audio or video file.`
+            : `${rejected.length} files were skipped because they are not audio or video.`,
+        );
+      } else if (accepted.length > 0) {
+        setError(null);
+      }
+
+      if (accepted.length > 0) {
+        setTracks((prev) => {
+          const merged = [...prev, ...accepted];
+          tracksRef.current = merged;
+          return merged;
+        });
+        // Read durations without disturbing playback. Works for a video
+        // container too -- an <audio> element still reads container metadata.
+        for (const track of accepted) {
+          const probe = new Audio();
+          probe.preload = 'metadata';
+          // A probe that never fires either event would otherwise hold its
+          // decoder and the object URL alive for the life of the tab.
+          const release = () => {
+            probe.removeEventListener('loadedmetadata', onProbeMeta);
+            probe.removeEventListener('error', release);
+            probe.removeAttribute('src');
+            probe.load();
+          };
+          const onProbeMeta = () => {
+            const seconds = Number.isFinite(probe.duration) ? probe.duration : null;
+            setTracks((prev) => prev.map((t) => (t.id === track.id ? { ...t, duration: seconds } : t)));
+            release();
+          };
+          probe.addEventListener('loadedmetadata', onProbeMeta);
+          probe.addEventListener('error', release);
+          probe.src = track.url;
+        }
+        for (const { track, file } of acceptedFiles) {
+          void saveLocalTrack({
+            id: track.id,
+            title: track.title,
+            file,
+            isVideoContainer: Boolean(track.isVideoContainer),
+            addedAt: Date.now(),
+          })
+            .then(refreshLocalLibrary)
+            .catch(() => {
+              setError('The track was added for this session, but this browser could not save it for later.');
+            });
+        }
+      }
+
+      return accepted.length;
+    },
+    [refreshLocalLibrary],
+  );
 
   /**
    * Fetches a direct link to a media file client-side and adds it exactly
@@ -794,7 +808,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       if (isStreamingServiceUrl(url)) {
         setError(
           'That is a streaming-service share link, not a downloadable media file. ' +
-            'Import a file you own from Files, or use the service\'s official player when streaming embeds are added.',
+            "Import a file you own from Files, or use the service's official player when streaming embeds are added.",
         );
         return false;
       }
@@ -824,7 +838,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         return true;
       } catch {
         setError(
-          "Could not load that link directly -- the site likely blocks cross-origin downloads. " +
+          'Could not load that link directly -- the site likely blocks cross-origin downloads. ' +
             'Save the file and drop it in instead.',
         );
         return false;
@@ -835,17 +849,20 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [addFiles],
   );
 
-  const addStreamingEmbed = useCallback((rawUrl: string): boolean => {
-    const embed = createStreamingEmbed(rawUrl);
-    if (!embed) return false;
-    if (streamingEmbeds.some((item) => item.sourceUrl === embed.sourceUrl)) {
-      setError('That streaming link is already on your soundtrack desk.');
+  const addStreamingEmbed = useCallback(
+    (rawUrl: string): boolean => {
+      const embed = createStreamingEmbed(rawUrl);
+      if (!embed) return false;
+      if (streamingEmbeds.some((item) => item.sourceUrl === embed.sourceUrl)) {
+        setError('That streaming link is already on your soundtrack desk.');
+        return true;
+      }
+      setStreamingEmbeds((previous) => [...previous, embed]);
+      setError(null);
       return true;
-    }
-    setStreamingEmbeds((previous) => [...previous, embed]);
-    setError(null);
-    return true;
-  }, [streamingEmbeds]);
+    },
+    [streamingEmbeds],
+  );
 
   const removeStreamingEmbed = useCallback((id: string) => {
     setStreamingEmbeds((previous) => previous.filter((item) => item.id !== id));
@@ -899,9 +916,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         }
         setError(null);
       } catch (err) {
-        setError(
-          err instanceof ConversionError ? err.message : `Could not convert "${track.title}" to MP3.`,
-        );
+        setError(err instanceof ConversionError ? err.message : `Could not convert "${track.title}" to MP3.`);
       } finally {
         setConversion(null);
       }
@@ -921,7 +936,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       const track = prev[index]!;
       if (track.source === 'bundled') return;
       if (track.source === 'local') URL.revokeObjectURL(track.url);
-      if (track.source === 'local') void removeStoredLocalTrack(id).then(refreshLocalLibrary).catch(() => {});
+      if (track.source === 'local')
+        void removeStoredLocalTrack(id)
+          .then(refreshLocalLibrary)
+          .catch(() => {});
 
       const next = prev.filter((t) => t.id !== id);
       tracksRef.current = next;
@@ -936,9 +954,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       } else if (index < currentIndex) {
         setCurrentIndex(currentIndex - 1);
       }
-      setPlaylists((prevLists) =>
-        prevLists.map((p) => ({ ...p, trackIds: p.trackIds.filter((tid) => tid !== id) })),
-      );
+      setPlaylists((prevLists) => prevLists.map((p) => ({ ...p, trackIds: p.trackIds.filter((tid) => tid !== id) })));
     },
     [currentIndex],
   );
@@ -948,7 +964,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     for (const track of tracksRef.current) {
       if (track.source === 'local') URL.revokeObjectURL(track.url);
     }
-    void clearStoredLocalTracks().then(refreshLocalLibrary).catch(() => {});
+    void clearStoredLocalTracks()
+      .then(refreshLocalLibrary)
+      .catch(() => {});
     tracksRef.current = BUNDLED_TRACKS;
     setTracks(BUNDLED_TRACKS);
     setCurrentIndex(-1);
@@ -976,12 +994,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [currentIndex, playIndex],
   );
 
-  const playTrackOnRepeat = useCallback((id: string) => {
-    const index = tracksRef.current.findIndex((track) => track.id === id);
-    if (index === -1) return;
-    setRepeat('one');
-    playIndex(index);
-  }, [playIndex]);
+  const playTrackOnRepeat = useCallback(
+    (id: string) => {
+      const index = tracksRef.current.findIndex((track) => track.id === id);
+      if (index === -1) return;
+      setRepeat('one');
+      playIndex(index);
+    },
+    [playIndex],
+  );
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -1046,10 +1067,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
-  const cycleRepeat = useCallback(
-    () => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')),
-    [],
-  );
+  const cycleRepeat = useCallback(() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')), []);
   const dismissError = useCallback(() => setError(null), []);
   const getAudioContext = useCallback(() => audioContextRef.current, []);
 
@@ -1102,25 +1120,57 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       reorderPlaylistTracks,
     }),
     [
-      tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
-      progressSec, durationSec, error, addFiles, addFromUrl, linkLoading, convertTrackToMp3,
-      streamingEmbeds, addStreamingEmbed, removeStreamingEmbed,
+      tracks,
+      currentTrack,
+      currentIndex,
+      isPlaying,
+      volume,
+      muted,
+      shuffle,
+      repeat,
+      progressSec,
+      durationSec,
+      error,
+      addFiles,
+      addFromUrl,
+      linkLoading,
+      convertTrackToMp3,
+      streamingEmbeds,
+      addStreamingEmbed,
+      removeStreamingEmbed,
       localLibrary,
-      conversion, removeTrack, clearTracks, playTrack, togglePlay, next, previous, seek,
-      setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext, ensureAudioContext,
+      conversion,
+      removeTrack,
+      clearTracks,
+      playTrack,
+      togglePlay,
+      next,
+      previous,
+      seek,
+      setVolume,
+      toggleMute,
+      toggleShuffle,
+      cycleRepeat,
+      dismissError,
+      getAudioContext,
+      ensureAudioContext,
       playTrackOnRepeat,
-      playlists, activePlaylistId, activePlaylist, setActivePlaylist, createPlaylist,
-      renamePlaylist, deletePlaylist, addToPlaylist, removeFromPlaylist, reorderPlaylistTracks,
+      playlists,
+      activePlaylistId,
+      activePlaylist,
+      setActivePlaylist,
+      createPlaylist,
+      renamePlaylist,
+      deletePlaylist,
+      addToPlaylist,
+      removeFromPlaylist,
+      reorderPlaylistTracks,
     ],
   );
 
   return (
     <MusicContext.Provider value={value}>
-      <div
-        className="music-reactive-root"
-        ref={reactiveRootRef}
-        style={{ '--music-energy': 0 } as CSSProperties}
-      >
+      <div className="music-reactive-root" ref={reactiveRootRef} style={{ '--music-energy': 0 } as CSSProperties}>
         {children}
       </div>
     </MusicContext.Provider>

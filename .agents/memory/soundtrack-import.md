@@ -52,21 +52,23 @@ a player's own Drive/S3/CDN link. It is not a downloader:
   stays generic and points at the same fallback: download it, then drop it.
 
 This is the same constraint `survivor-616-art-assets.md` already documents
-for the soundtrack generally -- links extend *how* a player hands over a
-file they already control, not *whose* files play.
+for the soundtrack generally -- links extend _how_ a player hands over a
+file they already control, not _whose_ files play.
 
 ## Playlists store track ids, not tracks
 
-A `Playlist` is `{ id, name, trackIds }`; the id list is resolved against
-the live `tracks` array at read time (`activeQueueIds`), and any id that no
-longer resolves is silently skipped rather than shown broken -- the same
-"reference, don't carry, skip what's missing" tradeoff the studio's project
-model makes for the same reason. A bundled track's id is stable across
-sessions, so those entries persist. A local file's id is tied to an object
-URL that dies with the tab, so those entries are dead weight after a reload;
-`removeTrack`/`clearTracks` actively prune playlists when a track is
-actually removed, but a stale id from a closed tab just gets filtered out
-next time it's read, never surfaced as an error.
+A `Playlist` is `{ id, name, trackIds }`; the id list is resolved against the
+live `tracks` array at read time (`activeQueueIds`), and any id that no longer
+resolves is silently skipped rather than shown broken. Bundled ids and
+IndexedDB-restored local-track ids are stable across sessions, so both kinds
+of playlist entry survive a reload. `removeTrack`/`clearTracks` actively prune
+playlist references when a track is removed.
+
+Local track records originally carried their `File` inline in database version
+
+1. Version 2 migrates those records in place to a shared content-addressed media
+   asset plus a small track reference. The database name stays
+   `survivor616-soundtrack`, preserving existing player-owned files and ids.
 
 Persisted separately from meta progression, at `survivor616.playlists.v1`
 -- this is playback organization, not save-file state, and didn't belong in

@@ -15,6 +15,10 @@ Build a focused, BandLab-inspired creation studio inside Survivor 616: make, arr
 
 The repository already has a local Studio surface, a shared Web Audio context, local audio import, instruments/effects, rendering, and a **To Soundtrack** handoff. The next work should strengthen these pieces rather than replace them.
 
+### Implementation checkpoint — September 8, 2026
+
+Issue #68 begins the reliability phase with a shared, content-addressed IndexedDB media store, in-place migration of the original local soundtrack database, active-project autosave, imported-source restoration, explicit local/session-only status, and storage-focused tests. A project browser, undo/redo, waveform caching, and broader backup tooling remain separate follow-up slices rather than being hidden inside the storage migration.
+
 ## Delivery sequence
 
 ### 1. Reliable local projects
