@@ -14,6 +14,8 @@ export interface StoredLocalTrack {
   id: string;
   title: string;
   file: File;
+  /** Stable enough to avoid storing the same picked file twice. */
+  fingerprint?: string;
   isVideoContainer: boolean;
   addedAt: number;
 }

@@ -29,6 +29,7 @@ import {
   GripVertical,
   Loader2,
   ExternalLink,
+  Heart,
 } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
 
@@ -46,12 +47,14 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
   const [newPlaylistDraft, setNewPlaylistDraft] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
 
-  const viewedTracks: Track[] = player.activePlaylist
+  const playlistTracks: Track[] = player.activePlaylist
     ? player.activePlaylist.trackIds
         .map((id) => player.tracks.find((t) => t.id === id))
         .filter((t): t is Track => t !== undefined)
     : player.tracks;
+  const viewedTracks = favoritesOnly ? playlistTracks.filter((track) => track.favorite) : playlistTracks;
 
   const submitLink = async () => {
     if (!linkValue.trim() || player.linkLoading) return;
@@ -178,6 +181,24 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
             <span className="font-semibold text-white">Browse Files</span>, open its iCloud Drive folder, and tap the cloud icon first if the song has not downloaded yet.
           </div>
 
+          {player.lastImport && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-5 flex items-start justify-between gap-3 border border-primary/30 bg-primary/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+              role="status"
+              data-testid="text-import-report"
+            >
+              <p>
+                <span className="font-bold uppercase tracking-widest text-primary">Import complete: </span>
+                {player.lastImport.added} added{player.lastImport.duplicates ? `, ${player.lastImport.duplicates} duplicate${player.lastImport.duplicates === 1 ? '' : 's'} skipped` : ''}{player.lastImport.rejected ? `, ${player.lastImport.rejected} unsupported skipped` : ''}.
+              </p>
+              <button type="button" onClick={player.dismissImportReport} className="shrink-0 text-muted-foreground hover:text-white" aria-label="Dismiss import report">
+                <X className="h-4 w-4" />
+              </button>
+            </motion.div>
+          )}
+
           {linkOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -221,11 +242,22 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                   Your imported files score the run and power beat reactions. They are stored only in this browser on this device—never uploaded or shared.
                 </p>
               </div>
-              <span className="shrink-0 border border-primary/30 bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-primary">
-                {player.localLibrary.ready
-                  ? `${player.localLibrary.count} saved · ${formatBytes(player.localLibrary.bytes)}`
-                  : 'Checking device storage…'}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFavoritesOnly((current) => !current)}
+                  className={`flex items-center gap-1 border px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors ${favoritesOnly ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`}
+                  data-testid="button-filter-favorites"
+                  aria-pressed={favoritesOnly}
+                >
+                  <Heart className="h-3 w-3" fill={favoritesOnly ? 'currentColor' : 'none'} /> Favorites
+                </button>
+                <span className="shrink-0 border border-primary/30 bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                  {player.localLibrary.ready
+                    ? `${player.localLibrary.count} saved · ${formatBytes(player.localLibrary.bytes)}`
+                    : 'Checking device storage…'}
+                </span>
+              </div>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80">
               Clearing browser/site data also clears this library. Use <span className="font-semibold text-white">Clear local library</span> when you want to free space.
@@ -410,10 +442,12 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
             <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-border/50 text-muted-foreground p-12 text-center min-h-[300px]">
               <Music className="w-12 h-12 mb-4 opacity-20" />
               <p className="font-bold uppercase tracking-widest mb-2 text-white">
-                {player.activePlaylist ? 'This playlist is empty' : 'No tracks loaded'}
+                {favoritesOnly ? 'No favorite tracks yet' : player.activePlaylist ? 'This playlist is empty' : 'No tracks loaded'}
               </p>
               <p className="text-sm max-w-sm">
-                {player.activePlaylist
+                {favoritesOnly
+                  ? 'Tap the heart on a local track to keep it close.'
+                  : player.activePlaylist
                   ? 'Switch to "All Tracks" and use the add-to-playlist menu on a track to build it out.'
                   : 'The built-in mixtape is unavailable. Add local MP3, WAV, M4A, FLAC, or MP4/MOV/WebM files to score your runs.'}
               </p>
@@ -437,7 +471,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                   <Reorder.Item
                     key={track.id}
                     value={track}
-                    drag={player.activePlaylist ? 'y' : false}
+                    drag={player.activePlaylist && !favoritesOnly ? 'y' : false}
                     className={`group flex min-w-0 items-center justify-between border p-1 pr-3 transition-colors ${
                       isCurrent ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
                     }`}
@@ -470,6 +504,18 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                     </button>
 
                     <div className="flex shrink-0 items-center gap-1">
+                      {track.source === 'local' && (
+                        <button
+                          type="button"
+                          onClick={() => player.toggleTrackFavorite(track.id)}
+                          className={`p-2 transition-colors ${track.favorite ? 'text-primary' : 'text-muted-foreground opacity-70 hover:text-primary group-hover:opacity-100'}`}
+                          title={track.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                          aria-label={track.favorite ? `Remove ${track.title} from favorites` : `Add ${track.title} to favorites`}
+                          data-testid={`button-favorite-${track.id}`}
+                        >
+                          <Heart className="h-4 w-4" fill={track.favorite ? 'currentColor' : 'none'} />
+                        </button>
+                      )}
                       {track.isVideoContainer && track.source === 'local' && (
                         converting ? (
                           <span
