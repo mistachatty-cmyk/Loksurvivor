@@ -2647,13 +2647,42 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     const facing: 1 | -1 = pet.vx < -4 ? -1 : 1;
     const rig = lokPetRig(pet.silhouette);
     const palette = lokPetSpritePalette(pet.palette);
+    const petScale = LOKPET_SPRITE_SCALE * (pet.sizeScale ?? 1) * (0.9 + pulse * 0.1);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.shadowColor = pet.palette.glow;
-    ctx.shadowBlur = pet.ghost ? 13 : 9;
-    drawRig(ctx, rig, palette, 'idle', w.now - pet.bornAt, pet.x, pet.y, facing, LOKPET_SPRITE_SCALE * (0.9 + pulse * 0.1), {
+    ctx.shadowBlur = pet.ghost ? 13 : pet.legendary ? 16 : 9;
+    drawRig(ctx, rig, palette, 'idle', w.now - pet.bornAt, pet.x, pet.y, facing, petScale, {
       outline: !pet.ghost,
     });
+    if (pet.variantId === 'clockwork-beetle' && !pet.ghost) {
+      // The shell is a real moving clock, not a static badge. Its hands run
+      // continuously and visibly overcrank while Borrowed Moment is active.
+      const centerY = pet.y - 9 * petScale;
+      const radius = 5.2 * petScale;
+      const accelerated = w.now < pet.specialActiveUntil;
+      const minuteAngle = w.now / (accelerated ? 75 : 620);
+      const hourAngle = w.now / (accelerated ? 240 : 2400);
+      ctx.save();
+      ctx.fillStyle = `${pet.palette.eye}d9`;
+      ctx.strokeStyle = pet.palette.accent;
+      ctx.lineWidth = Math.max(1, petScale * 0.55);
+      ctx.beginPath(); ctx.arc(pet.x, centerY, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      for (let mark = 0; mark < 4; mark += 1) {
+        const angle = mark * Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(pet.x + Math.cos(angle) * radius * 0.72, centerY + Math.sin(angle) * radius * 0.72);
+        ctx.lineTo(pet.x + Math.cos(angle) * radius * 0.92, centerY + Math.sin(angle) * radius * 0.92);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = pet.palette.bodyDark;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(pet.x, centerY); ctx.lineTo(pet.x + Math.cos(hourAngle) * radius * 0.48, centerY + Math.sin(hourAngle) * radius * 0.48); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pet.x, centerY); ctx.lineTo(pet.x + Math.cos(minuteAngle) * radius * 0.72, centerY + Math.sin(minuteAngle) * radius * 0.72); ctx.stroke();
+      ctx.fillStyle = pet.palette.glow;
+      ctx.beginPath(); ctx.arc(pet.x, centerY, Math.max(1.4, petScale), 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     if (!pet.ghost) {
       ctx.globalAlpha = 0.4;
       ctx.strokeStyle = pet.palette.glow;
@@ -2856,6 +2885,11 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     const blink = invuln && Math.floor(w.now / 70) % 2 === 0;
     const stealthed = w.now < w.stealthUntil;
     const stealthAlpha = w.stealthConfig?.fullInvisible ? 0.12 : 0.32;
+    ctx.save();
+    if (w.character.rarity === 'legendary') {
+      ctx.shadowColor = w.character.palette.glow;
+      ctx.shadowBlur = 13 + Math.sin(w.now / 180) * 3;
+    }
     drawRig(
       ctx,
       w.character.rig,
@@ -2877,6 +2911,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
             : undefined,
       },
     );
+    ctx.restore();
 
     // The base aura stays on the ground for readable movement, while this
     // second layer makes the selected aura clearly wrap the fighter too.

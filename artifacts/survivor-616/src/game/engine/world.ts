@@ -197,6 +197,10 @@ export interface Projectile {
   explosionRadius?: number;
   explosionDamage?: number;
   evolutionBehavior?: EvolutionBehavior;
+  /** Resonance Bell reverses once so a reflected tone can cross its route again. */
+  reverseAt?: number;
+  reversed?: boolean;
+  pausedUntil?: number;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact'
@@ -228,6 +232,9 @@ export interface Effect {
   /** Elemental-synergy bonus: extra damage when the target already carries this status. */
   bonusVsStatusId?: string;
   bonusVsStatusMult?: number;
+  /** Persistent inward force used by gravity-well fields. */
+  pullStrength?: number;
+  pausedUntil?: number;
 }
 
 export interface Orbiter {
@@ -637,6 +644,9 @@ export interface World {
   cycle: { phase: number; cycleMs: number };
 
   player: PlayerActor;
+  /** Short deterministic route history used only by Tidal Memory. */
+  playerTrail: Array<{ x: number; y: number; at: number }>;
+  nextPlayerTrailAt: number;
   enemies: EnemyActor[];
   projectiles: Projectile[];
   effects: Effect[];
@@ -950,6 +960,8 @@ export function createWorld(
     // run, so most runs see at most one transition.
     cycle: { phase: 0.5, cycleMs: 420000 },
     player,
+    playerTrail: [{ x: player.x, y: player.y, at: 0 }],
+    nextPlayerTrailAt: 100,
     enemies: [],
     projectiles: [],
     effects: [],
@@ -1953,6 +1965,8 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
     ghost: false,
     readyAt: w.now + 500,
     nextPulseAt: w.now + 500,
+    specialReadyAt: w.now + 1800,
+    specialActiveUntil: 0,
     hp: roll.stats.health,
     maxHp: roll.stats.health,
   };
@@ -1961,6 +1975,76 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
   spawnParticles(w, pet.x, pet.y, pet.palette.glow, 10, 85);
   pushAlert(w, `${pet.name} joined the run`);
   return pet;
+}
+
+function showLokPetSpecial(w: World, pet: LokPetInstance, label: string, radius: number) {
+  w.effects.push({
+    uid: uid(w), kind: 'ring', x: pet.x, y: pet.y, radius, angle: 0, spread: 0,
+    bornAt: w.now, expiresAt: w.now + 460, color: pet.palette.glow,
+    damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+  });
+  spawnParticles(w, pet.x, pet.y, pet.palette.glow, 10, 90);
+  pushAlert(w, `${pet.name} — ${label}`);
+}
+
+function triggerSpecialLokPetAbility(w: World, pet: LokPetInstance) {
+  if (!pet.specialAbility || w.now < pet.specialReadyAt || pet.ghost) return;
+
+  if (pet.specialAbility === 'prism-collect') {
+    const candidates = w.pickups
+      .filter((pickup) => dist2(pickup.x, pickup.y, pet.x, pet.y) <= 360 ** 2)
+      .sort((a, b) => dist2(a.x, a.y, pet.x, pet.y) - dist2(b.x, b.y, pet.x, pet.y))
+      .slice(0, 4);
+    for (const pickup of candidates) {
+      const dx = w.player.x - pickup.x; const dy = w.player.y - pickup.y; const length = Math.hypot(dx, dy) || 1;
+      pickup.vx += (dx / length) * 760;
+      pickup.vy += (dy / length) * 760;
+      spawnParticles(w, pickup.x, pickup.y, pet.palette.accent, 3, 45);
+    }
+    showLokPetSpecial(w, pet, 'SPECTRUM SWEEP', 92);
+    pet.specialReadyAt = w.now + 3200;
+  } else if (pet.specialAbility === 'void-fetch') {
+    const pickup = w.pickups
+      .filter((candidate) => candidate.kind !== 'loot-box')
+      .sort((a, b) => dist2(a.x, a.y, w.player.x, w.player.y) - dist2(b.x, b.y, w.player.x, w.player.y))[0];
+    if (pickup) {
+      pickup.x = w.player.x + 12;
+      pickup.y = w.player.y;
+      pickup.vx = 0; pickup.vy = 0;
+    }
+    showLokPetBurst(w, pet.x, pet.y, 118, lokPetDamage(w, pet) * 0.55, pet.palette.glow, 'slow');
+    showLokPetSpecial(w, pet, 'EVENTIDE FETCH', 118);
+    pet.specialReadyAt = w.now + 4200;
+  } else if (pet.specialAbility === 'ember-rescue') {
+    const heal = 4;
+    w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+    const missed = [...w.pickups].sort((a, b) => a.bornAt - b.bornAt)[0];
+    if (missed && w.now - missed.bornAt > 2400) {
+      missed.x = w.player.x + 14;
+      missed.y = w.player.y + 4;
+      missed.vx = 0; missed.vy = 0;
+    }
+    w.popups.push({ x: w.player.x, y: w.player.y + 28, text: `+${heal} WARM CURRENT`, color: pet.palette.glow, bornAt: w.now, vy: 26 });
+    showLokPetSpecial(w, pet, 'LAST CATCH', 106);
+    pet.specialReadyAt = w.now + 4800;
+  } else {
+    const pauseUntil = w.now + 850;
+    for (const projectile of w.projectiles) {
+      if (!projectile.fromPlayer) projectile.pausedUntil = Math.max(projectile.pausedUntil ?? 0, pauseUntil);
+    }
+    for (const effect of w.effects) {
+      if (effect.hurtsPlayer) effect.pausedUntil = Math.max(effect.pausedUntil ?? 0, pauseUntil);
+    }
+    for (const enemy of w.enemies) {
+      enemy.chargeReadyAt += 850;
+      enemy.fireReadyAt += 850;
+      enemy.specialReadyAt += 850;
+    }
+    for (const weapon of w.weapons) weapon.readyAt = Math.max(w.now, weapon.readyAt - 520);
+    pet.specialActiveUntil = pauseUntil;
+    showLokPetSpecial(w, pet, 'BORROWED MOMENT', 128);
+    pet.specialReadyAt = w.now + 5600;
+  }
 }
 
 function updateLokPets(w: World, dt: number) {
@@ -1989,6 +2073,8 @@ function updateLokPets(w: World, dt: number) {
     pet.vy += (dy / len * speed - pet.vy) * Math.min(1, dt * 7);
     pet.x += pet.vx * dt;
     pet.y += pet.vy * dt;
+
+    triggerSpecialLokPetAbility(w, pet);
 
     const target = nearestEnemy(w, pet.x, pet.y, pet.stats.range);
     if (!target || w.now < pet.readyAt) continue;
@@ -2577,6 +2663,167 @@ function triggerEvolutionHit(
   }
 }
 
+/**
+ * Compact, opt-in mechanics for the locked legendary signatures. These reuse
+ * the normal projectile/effect/damage paths so the roster stays playable
+ * without creating a second combat engine.
+ */
+function fireLegendaryWeapon(w: World, runWeapon: RunWeapon, damage: number, reach: number): boolean {
+  const weapon = runWeapon.def;
+  const pattern = weapon.legendaryPattern;
+  if (!pattern) return false;
+  const p = w.player;
+  const color = weapon.color ?? w.character.palette.accent;
+  const target = nearestEnemy(w, p.x, p.y, reach + 140);
+  const aim = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.facing > 0 ? 0 : Math.PI;
+
+  if (pattern === 'resonance-return') {
+    const shots = Math.max(1, runWeapon.count);
+    for (let i = 0; i < shots; i += 1) {
+      const angle = aim + (i - (shots - 1) / 2) * 0.24;
+      const speed = weapon.speed ?? 280;
+      w.projectiles.push({
+        uid: uid(w), x: p.x, y: p.y + 8, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        radius: 8, damage, impactIntensity: weaponImpact(weapon), fromPlayer: true,
+        expiresAt: w.now + (weapon.lifetimeMs ?? 1500), targetUid: null, turnRate: 0, color,
+        trail: [], pierce: 2, hitUids: new Set(), obstacleUids: new Set(), obstacleInteraction: 'reflect',
+        reverseAt: w.now + 620,
+      });
+    }
+    pushAlert(w, 'RESONANCE RETURN');
+  } else if (pattern === 'grind-charge') {
+    const dx = Math.cos(aim);
+    const dy = Math.sin(aim);
+    p.dashDirectionX = dx; p.dashDirectionY = dy;
+    p.dashStartedAt = w.now; p.dashUntil = w.now + 330; p.dashHitUids.clear();
+    p.vx = dx * DASH_SPEED; p.vy = dy * DASH_SPEED;
+    w.effects.push({
+      uid: uid(w), kind: 'slash', x: p.x, y: p.y, radius: reach, angle: aim, spread: 0.58,
+      bornAt: w.now, expiresAt: w.now + 360, color, damage, impactIntensity: weaponImpact(weapon),
+      impactTrigger: 'ground-shock', hitUids: new Set(), followPlayer: true,
+    });
+    pushAlert(w, 'GRINDWHEEL — COMMITTED');
+  } else if (pattern === 'ghostlight-network') {
+    const linked: EnemyActor[] = [];
+    const used = new Set<number>();
+    for (let i = 0; i < Math.max(2, runWeapon.count); i += 1) {
+      const enemy = nearestEnemy(w, p.x, p.y, reach, used);
+      if (!enemy) break;
+      used.add(enemy.uid); linked.push(enemy);
+      damageEnemy(w, enemy, damage, 0, p.x, p.y, 'slow');
+    }
+    for (let i = 0; i + 1 < linked.length; i += 1) {
+      const a = linked[i]!; const b = linked[i + 1]!;
+      w.effects.push({
+        uid: uid(w), kind: 'web', x: a.x, y: a.y, radius: Math.hypot(b.x - a.x, b.y - a.y),
+        angle: Math.atan2(b.y - a.y, b.x - a.x), spread: 0, bornAt: w.now, expiresAt: w.now + 900,
+        color, damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+      });
+    }
+    pushAlert(w, `GHOSTLIGHT LINK ×${linked.length}`);
+  } else if (pattern === 'steam-harpoon') {
+    if (target) {
+      const dx = target.x - p.x; const dy = target.y - p.y; const length = Math.hypot(dx, dy) || 1;
+      damageEnemy(w, target, damage, 2, target.x + dx, target.y + dy, 'slow');
+      target.kx -= (dx / length) * 360;
+      target.ky -= (dy / length) * 360;
+      w.effects.push({
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: Math.min(reach, length), angle: aim, spread: 0.035,
+        bornAt: w.now, expiresAt: w.now + 260, color, damage: 0, impactIntensity: 0,
+        hitUids: new Set(), followPlayer: false,
+      });
+      novaDamage(w, p.x, p.y, 54 * areaMult(w), damage * 0.45, 2, 'slow');
+    }
+    pushAlert(w, 'STEAM HARPOON');
+  } else if (pattern === 'origami-decoys') {
+    if (weapon.follower) spawnFollowers(w, weapon);
+    const shots = Math.max(3, runWeapon.count);
+    for (let i = 0; i < shots; i += 1) {
+      const angle = aim + (i - (shots - 1) / 2) * 0.34;
+      const speed = weapon.speed ?? 360;
+      w.projectiles.push({
+        uid: uid(w), x: p.x, y: p.y + 10, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        radius: 10, damage, impactIntensity: weaponImpact(weapon), fromPlayer: true,
+        expiresAt: w.now + (weapon.lifetimeMs ?? 1300), targetUid: null, turnRate: 0, color,
+        trail: [], pierce: weapon.pierce ?? 2, hitUids: new Set(), obstacleUids: new Set(), obstacleInteraction: 'reflect',
+      });
+    }
+    pushAlert(w, 'FALSE FOLDS DEPLOYED');
+  } else if (pattern === 'event-horizon') {
+    const x = target?.x ?? p.x + Math.cos(aim) * reach * 0.55;
+    const y = target?.y ?? p.y + Math.sin(aim) * reach * 0.55;
+    w.effects.push({
+      uid: uid(w), kind: 'hazard', x, y, radius: reach * 0.52, angle: 0, spread: Math.PI * 2,
+      bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 4200), color, damage,
+      impactIntensity: 0, hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+      hurtsPlayer: false, statusEffectId: 'slow', pullStrength: 46,
+    });
+    pushAlert(w, 'EVENT HORIZON');
+  } else if (pattern === 'root-network') {
+    const count = Math.max(4, runWeapon.count);
+    const positions: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count;
+      const x = p.x + Math.cos(angle) * reach;
+      const y = p.y + Math.sin(angle) * reach;
+      positions.push({ x, y });
+      w.effects.push({
+        uid: uid(w), kind: 'hazard', x, y, radius: reach * 0.34, angle: 0, spread: Math.PI * 2,
+        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 3300), color, damage,
+        impactIntensity: 0, hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+        hurtsPlayer: false, statusEffectId: 'slow',
+        evolutionBehavior: { kind: 'delayed-burst', radius: 1, statusEffectId: 'slow' },
+      });
+    }
+    for (let i = 0; i < count; i += 1) {
+      const a = positions[i]!; const b = positions[(i + 1) % count]!;
+      w.effects.push({ uid: uid(w), kind: 'web', x: a.x, y: a.y, radius: Math.hypot(b.x - a.x, b.y - a.y),
+        angle: Math.atan2(b.y - a.y, b.x - a.x), spread: 0, bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 3300),
+        color, damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false });
+    }
+    p.hp = Math.min(p.maxHp, p.hp + 3);
+    pushAlert(w, 'ROOT NETWORK PLANTED');
+  } else if (pattern === 'royal-command') {
+    const used = new Set<number>();
+    let converted = 0;
+    for (let i = 0; i < Math.max(2, runWeapon.count); i += 1) {
+      const enemy = nearestEnemy(w, p.x, p.y, reach, used);
+      if (!enemy) break;
+      used.add(enemy.uid); converted += 1;
+      enemy.convertedUntil = w.now + (weapon.durationMs ?? 4300);
+      enemy.convertedAttackReadyAt = w.now;
+      applyStatusEffect(w, enemy, 'slow');
+      damageEnemy(w, enemy, damage * 0.35, 0, p.x, p.y);
+    }
+    pushAlert(w, `ROYAL COMMAND ×${converted}`);
+  } else if (pattern === 'zero-split') {
+    for (const offset of [-0.48, 0.48]) {
+      w.effects.push({
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle: aim + offset, spread: 0.045,
+        bornAt: w.now, expiresAt: w.now + 360, color, damage, impactIntensity: weaponImpact(weapon),
+        hitUids: new Set(), followPlayer: false, statusEffectId: 'freeze',
+      });
+    }
+    pushAlert(w, 'ZERO SPLIT');
+  } else if (pattern === 'tidal-memory') {
+    const path = w.playerTrail.filter((_, index) => index % 4 === 0).slice(-8).reverse();
+    for (let i = 0; i < path.length; i += 1) {
+      const point = path[i]!;
+      novaDamage(w, point.x, point.y, 46 * areaMult(w), damage * 0.72, 2, 'slow');
+      w.effects.push({
+        uid: uid(w), kind: 'ring', x: point.x, y: point.y, radius: 46, angle: 0, spread: 0,
+        bornAt: w.now + i * 45, expiresAt: w.now + 420 + i * 45, color,
+        damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+      });
+    }
+    pushAlert(w, 'TIDAL MEMORY — ROUTE RETRACED');
+  }
+
+  p.anim = 'attack';
+  p.animStartedAt = w.now;
+  return true;
+}
+
 function fireWeapon(w: World, runWeapon: RunWeapon) {
   const weapon = runWeapon.def;
   const p = w.player;
@@ -2584,6 +2831,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
   const reach = weapon.range * areaMult(w);
   const palette = w.character.palette;
   const behavior = weaponEvolutionBehavior(w, weapon);
+
+  if (fireLegendaryWeapon(w, runWeapon, damage, reach)) return;
 
   switch (weapon.kind) {
     case 'follower': {
@@ -4703,6 +4952,15 @@ function updateProjectiles(w: World, dt: number) {
   for (let i = w.projectiles.length - 1; i >= 0; i -= 1) {
     const proj = w.projectiles[i]!;
 
+    if (w.now < (proj.pausedUntil ?? 0)) continue;
+    if (proj.reverseAt && !proj.reversed && w.now >= proj.reverseAt) {
+      proj.vx *= -1;
+      proj.vy *= -1;
+      proj.reversed = true;
+      proj.hitUids.clear();
+      spawnParticles(w, proj.x, proj.y, proj.color, 5, 65);
+    }
+
     if (proj.targetUid !== null) {
       const target = w.enemies.find((e) => e.uid === proj.targetUid && !e.dying);
       if (target) {
@@ -5021,6 +5279,7 @@ function updateEffects(w: World) {
 
   for (let i = w.effects.length - 1; i >= 0; i -= 1) {
     const effect = w.effects[i]!;
+    if (w.now < (effect.pausedUntil ?? 0)) continue;
     if (effect.followPlayer) {
       effect.x = p.x;
       effect.y = p.y;
@@ -5064,6 +5323,13 @@ function updateEffects(w: World) {
         const reach = effect.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, effect.x, effect.y) > reach * reach) return;
         effect.hitUids.add(enemy.uid);
+        if (effect.pullStrength) {
+          const dx = effect.x - enemy.x;
+          const dy = effect.y - enemy.y;
+          const distance = Math.hypot(dx, dy) || 1;
+          enemy.kx += (dx / distance) * effect.pullStrength;
+          enemy.ky += (dy / distance) * effect.pullStrength;
+        }
         damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.statusEffectId ?? (effect.color.includes('b8ff') ? 'acid' : 'burning'));
       });
       if (effect.hurtsPlayer && dist2(p.x, p.y, effect.x, effect.y) <= (effect.radius + p.radius) ** 2) {
@@ -6105,6 +6371,11 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  if (w.now >= w.nextPlayerTrailAt) {
+    w.playerTrail.push({ x: w.player.x, y: w.player.y, at: w.now });
+    w.nextPlayerTrailAt = w.now + 100;
+    while (w.playerTrail.length > 0 && w.now - w.playerTrail[0]!.at > 2800) w.playerTrail.shift();
+  }
   updateStealth(w);
   updateDistrictIncursion(w, dt);
 

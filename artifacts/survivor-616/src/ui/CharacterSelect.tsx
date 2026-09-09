@@ -69,6 +69,7 @@ function CharacterDetail({
       <div className="flex shrink-0 items-center gap-3">
         <CosmeticPreview rig={character.rig} palette={displayPalette} aura={getRunAuraStyle(meta.activeRunAuraId)} hat={getHatStyle(meta.activeHatId)} celebration={getCelebrationStyle(meta.activeCelebrationId)} paletteEffect={paletteEffect} compact />
         <div className="min-w-0">
+          {character.rarity === 'legendary' ? <span className="font-mono text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">Legendary</span> : null}
           <h3 className="terminal-glow truncate text-lg font-black uppercase leading-tight text-white">{character.name}</h3>
           <p className="truncate text-[11px] font-bold uppercase tracking-wider text-primary">{character.handle}</p>
         </div>
@@ -111,6 +112,13 @@ function CharacterDetail({
 
       <div className={inline ? 'min-w-[14rem] flex-1' : ''}>
         <p className="text-xs italic text-muted-foreground">&ldquo;{character.tagline}&rdquo;</p>
+        {character.signatureTraits ? (
+          <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`character-traits-${character.id}`}>
+            {character.signatureTraits.map((trait) => (
+              <span key={trait} className="border border-primary/30 bg-primary/10 px-2 py-1 font-mono text-[8px] font-bold uppercase tracking-wider text-primary">{trait}</span>
+            ))}
+          </div>
+        ) : null}
         <div className={`mt-3 grid gap-x-4 ${inline ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <StatRow label="Health" value={Math.round(stats.maxHp).toString()} />
           <StatRow label="Speed" value={Math.round(stats.speed).toString()} />
@@ -187,11 +195,13 @@ function CharacterTile({
         selected ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
       }`}
       data-testid={`button-character-${character.id}`}
+      style={character.rarity === 'legendary' ? { boxShadow: `0 0 18px ${palette.glow}33` } : undefined}
     >
       <div className="grid h-14 w-14 place-items-center border border-border bg-black/40">
         <RigPortrait rig={character.rig} palette={palette} anim="idle" size={48} />
       </div>
       <span className="w-full truncate text-[10px] font-black uppercase tracking-wide text-white">{character.name}</span>
+      {character.rarity === 'legendary' ? <span className="font-mono text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">Legendary</span> : null}
     </button>
   );
 }

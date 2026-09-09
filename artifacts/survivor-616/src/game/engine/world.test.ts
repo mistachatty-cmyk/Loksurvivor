@@ -1904,6 +1904,97 @@ test('LokPets follow, apply elemental attacks, explode, and become transparent g
   assert.equal(world.lokPetHistory.length, 1);
 });
 
+test('legendary LokPet specials affect pickups, recovery, and combat time', () => {
+  const makeWorld = () => createWorld(
+    testArea({ x: 400, y: 400, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    616,
+  );
+  const base = rollLokPet(createRng(44));
+
+  const prismWorld = makeWorld();
+  prismWorld.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  prismWorld.pickups.push({ uid: 801, kind: 'xp', x: 200, y: 0, vx: 0, vy: 0, value: 1, bornAt: 0 });
+  const prism = spawnLokPet(prismWorld, { ...base, variantId: 'prism-moth', specialAbility: 'prism-collect', legendary: true });
+  prism.specialReadyAt = 0;
+  stepWorld(prismWorld, 1 / 60, neutralInput);
+  assert.ok(prismWorld.pickups[0]!.vx < 0, 'Prism Moth must pull pickups toward the player');
+
+  const voidWorld = makeWorld();
+  voidWorld.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  voidWorld.pickups.push({ uid: 802, kind: 'xp', x: 220, y: 0, vx: 0, vy: 0, value: 1, bornAt: 0 });
+  const voidPup = spawnLokPet(voidWorld, { ...base, variantId: 'void-pup', specialAbility: 'void-fetch', legendary: true });
+  voidPup.specialReadyAt = 0;
+  stepWorld(voidWorld, 1 / 60, neutralInput);
+  assert.ok(voidWorld.pickups.length === 0 || Math.abs(voidWorld.pickups[0]!.x - voidWorld.player.x) < 30, 'Void Pup must fetch a reward');
+
+  const emberWorld = makeWorld();
+  emberWorld.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  emberWorld.player.hp = emberWorld.player.maxHp - 10;
+  const ember = spawnLokPet(emberWorld, { ...base, variantId: 'ember-koi', specialAbility: 'ember-rescue', legendary: true });
+  ember.specialReadyAt = 0;
+  stepWorld(emberWorld, 1 / 60, neutralInput);
+  assert.equal(emberWorld.player.hp, emberWorld.player.maxHp - 6, 'Ember Koi must restore four HP');
+
+  const clockWorld = makeWorld();
+  clockWorld.weapons[0]!.readyAt = 5000;
+  clockWorld.projectiles.push({
+    uid: 803, x: 90, y: 0, vx: -50, vy: 0, radius: 4, damage: 5, impactIntensity: 0,
+    fromPlayer: false, expiresAt: 5000, targetUid: null, turnRate: 0, color: '#fff', trail: [],
+    pierce: 0, hitUids: new Set(), obstacleUids: new Set(),
+  });
+  const clock = spawnLokPet(clockWorld, { ...base, variantId: 'clockwork-beetle', specialAbility: 'clock-pause', legendary: true });
+  clock.specialReadyAt = 0;
+  stepWorld(clockWorld, 1 / 60, neutralInput);
+  assert.ok(clock.specialActiveUntil > clockWorld.now, 'Clockwork Beetle must enter its accelerated-face state');
+  assert.ok(clockWorld.projectiles[0]!.pausedUntil! > clockWorld.now, 'Clockwork Beetle must pause hostile projectiles');
+  assert.ok(clockWorld.weapons[0]!.readyAt < 5000, 'Clockwork Beetle must borrow weapon cooldown time');
+});
+
+test('every legendary signature enters its distinct combat path in a real world', () => {
+  const ids = [
+    'bellwright',
+    'mawheel',
+    'lantern-widow',
+    'brassback',
+    'paper-saint',
+    'eclipse-pilgrim',
+    'bloomheart',
+    'marionette-king',
+    'cryo-mantis',
+    'neon-leviathan',
+  ] as const;
+
+  const worlds = Object.fromEntries(ids.map((id) => {
+    const character = getCharacter(id);
+    const world = createWorld(
+      testArea({ x: 400, y: 400, w: 20, h: 20, kind: 'barrier' }),
+      character,
+      character.stats,
+      616,
+    );
+    addEnemy(world, 'nightcrawler', 72, 0);
+    addEnemy(world, 'nightcrawler', 92, 18).uid += 1;
+    addEnemy(world, 'nightcrawler', 108, -18).uid += 2;
+    world.weapons[0]!.readyAt = 0;
+    stepWorld(world, 1 / 60, neutralInput);
+    assert.ok(world.weapons[0]!.readyAt > world.now, `${id} must fire through normal weapon cadence`);
+    return [id, world];
+  })) as Record<(typeof ids)[number], ReturnType<typeof createWorld>>;
+
+  assert.ok(worlds.bellwright.projectiles.some((projectile) => projectile.reverseAt));
+  assert.ok(worlds.mawheel.player.dashUntil > worlds.mawheel.now);
+  assert.ok(worlds['lantern-widow'].effects.some((effect) => effect.kind === 'web'));
+  assert.ok(worlds.brassback.enemies[0]!.kx < 0, 'Steam Harpoon must pull toward the player');
+  assert.ok(worlds['paper-saint'].projectiles.length >= 3 && worlds['paper-saint'].followers.length >= 2);
+  assert.ok(worlds['eclipse-pilgrim'].effects.some((effect) => effect.kind === 'hazard' && effect.pullStrength));
+  assert.ok(worlds.bloomheart.effects.some((effect) => effect.kind === 'hazard') && worlds.bloomheart.effects.some((effect) => effect.kind === 'web'));
+  assert.ok(worlds['marionette-king'].enemies.filter((enemy) => enemy.convertedUntil > worlds['marionette-king'].now).length >= 2);
+  assert.equal(worlds['cryo-mantis'].effects.filter((effect) => effect.kind === 'laser').length, 2);
+  assert.ok(worlds['neon-leviathan'].effects.some((effect) => effect.kind === 'ring'), 'Tidal Memory must replay the sampled route');
+});
+
 test('formation-tagged waves release deterministic positions', () => {
   const area = {
     ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),

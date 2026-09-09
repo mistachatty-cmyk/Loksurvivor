@@ -1,5 +1,6 @@
 import { arachnidRig, blobRig, eelRig, expressiveRig, giantRig, humanoidRig, quadrupedRig, serpentRig, triangleRig } from '@/game/sprites/rigs';
 import type { CharacterDef, SpriteRig } from '@/game/types';
+import { palette } from './authoring';
 import { REACTION_PRESETS } from './reactivity';
 
 /** Static Nomad's rig: a cloud-afro head, metallic arms and a flared trouser stance, plus a floating electrified trail. */
@@ -45,6 +46,134 @@ function bellwetherRig(): SpriteRig {
     { key: 'crest', x: 5, y: 12, w: 5, h: 7, color: 'accent', z: 7 },
     { key: 'aura', x: -12, y: 0, w: 24, h: 2, color: 'glow', z: 0 },
   );
+  return rig;
+}
+
+/** 2026-09-09 legendary silhouettes: procedural, cheap, and intentionally extreme. */
+function bellwrightRig(): SpriteRig {
+  const rig = humanoidRig({ height: 26, width: 8, hood: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift(
+    { key: 'aura', x: -12, y: 5, w: 4, h: 18, color: 'body', z: 0 },
+    { key: 'aura', x: 8, y: 5, w: 4, h: 18, color: 'body', z: 0 },
+    { key: 'aura', x: -8, y: 21, w: 16, h: 4, color: 'accent', z: 0 },
+    { key: 'aura', x: -8, y: 3, w: 16, h: 4, color: 'accent', z: 0 },
+  );
+  return rig;
+}
+
+function mawheelRig(): SpriteRig {
+  const rig = humanoidRig({ height: 17, width: 12, seated: true, hunched: true, headColor: 'ink', torsoColor: 'body' });
+  rig.parts.unshift(
+    { key: 'legL', x: -11, y: -1, w: 22, h: 4, color: 'bodyDark', z: 0 },
+    { key: 'legL', x: -11, y: 13, w: 22, h: 4, color: 'bodyDark', z: 0 },
+    { key: 'legL', x: -12, y: 3, w: 4, h: 10, color: 'accent', z: 0 },
+    { key: 'legR', x: 8, y: 3, w: 4, h: 10, color: 'accent', z: 0 },
+  );
+  return rig;
+}
+
+function lanternWidowRig(): SpriteRig {
+  const rig = humanoidRig({ height: 27, width: 6, hood: true, torsoColor: 'ink' });
+  for (let arm = 0; arm < 3; arm += 1) {
+    const y = 5 + arm * 7;
+    rig.parts.push(
+      { key: 'armL', x: -15 + arm, y, w: 10, h: 2, color: arm % 2 ? 'glow' : 'accent', z: 1 },
+      { key: 'armR', x: 5, y: y + 2, w: 10 - arm, h: 2, color: arm % 2 ? 'accent' : 'glow', z: 1 },
+      { key: 'crest', x: -16 + arm, y: y - 2, w: 2, h: 4, color: 'accentBright', z: 8 },
+      { key: 'crest', x: 13 - arm, y, w: 2, h: 4, color: 'accentBright', z: 8 },
+    );
+  }
+  return rig;
+}
+
+function brassbackRig(): SpriteRig {
+  const rig = humanoidRig({ height: 19, width: 18, bulk: true, headColor: 'bodyDark', torsoColor: 'body' });
+  rig.parts.unshift({ key: 'aura', x: -14, y: 2, w: 28, h: 13, color: 'bodyDark', z: 0 });
+  rig.parts.push(
+    { key: 'crest', x: 5, y: 18, w: 5, h: 11, color: 'bodyDark', z: 8 },
+    { key: 'aura', x: 6, y: 30, w: 3, h: 4, color: 'glow', z: 0 },
+    { key: 'aura', x: 3, y: 34, w: 4, h: 3, color: 'accentBright', z: 0 },
+  );
+  rig.pixelHeight = 37;
+  return rig;
+}
+
+function paperSaintRig(): SpriteRig {
+  const rig = humanoidRig({ height: 30, width: 5, wings: true, headColor: 'body', torsoColor: 'bodyDark' });
+  rig.parts.push(
+    { key: 'aura', x: -18, y: 8, w: 13, h: 3, color: 'accentBright', z: 0 },
+    { key: 'aura', x: -15, y: 11, w: 10, h: 8, color: 'body', z: 0 },
+    { key: 'aura', x: 5, y: 8, w: 13, h: 3, color: 'accentBright', z: 0 },
+    { key: 'aura', x: 5, y: 11, w: 10, h: 8, color: 'body', z: 0 },
+    { key: 'crest', x: -1, y: 32, w: 2, h: 7, color: 'glow', z: 9 },
+  );
+  rig.pixelHeight = 39;
+  return rig;
+}
+
+function eclipsePilgrimRig(): SpriteRig {
+  const rig = humanoidRig({ height: 27, width: 9, hood: true, flarePants: true, headColor: 'ink', torsoColor: 'bodyDark' });
+  rig.parts.unshift(
+    { key: 'aura', x: -12, y: 4, w: 7, h: 22, color: 'body', z: 0 },
+    { key: 'aura', x: -7, y: 22, w: 17, h: 4, color: 'accent', z: 0 },
+  );
+  rig.parts.push(
+    { key: 'crest', x: -7, y: 33, w: 14, h: 10, color: 'ink', z: 8 },
+    { key: 'crest', x: 3, y: 35, w: 5, h: 7, color: 'glow', z: 9 },
+  );
+  rig.pixelHeight = 43;
+  return rig;
+}
+
+function bloomheartRig(): SpriteRig {
+  const rig = blobRig({ height: 19, width: 24, spikes: true, tendrils: true });
+  rig.parts.push(
+    { key: 'crest', x: -10, y: 18, w: 3, h: 12, color: 'bodyDark', z: 7 },
+    { key: 'crest', x: 7, y: 18, w: 3, h: 12, color: 'bodyDark', z: 7 },
+    { key: 'crest', x: -15, y: 27, w: 8, h: 3, color: 'accent', z: 8 },
+    { key: 'crest', x: 7, y: 27, w: 8, h: 3, color: 'accent', z: 8 },
+    { key: 'face', x: -4, y: 8, w: 8, h: 8, color: 'glow', z: 9 },
+  );
+  rig.pixelHeight = 31;
+  return rig;
+}
+
+function marionetteKingRig(): SpriteRig {
+  const rig = humanoidRig({ height: 26, width: 6, headColor: 'skin', torsoColor: 'bodyDark' });
+  rig.parts.push(
+    { key: 'crest', x: -5, y: 27, w: 10, h: 3, color: 'accent', z: 8 },
+    { key: 'crest', x: -4, y: 30, w: 2, h: 5, color: 'accentBright', z: 9 },
+    { key: 'crest', x: 2, y: 30, w: 2, h: 5, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -8, y: 34, w: 16, h: 6, color: 'skin', z: 0 },
+    { key: 'aura', x: -3, y: 25, w: 1, h: 12, color: 'glow', z: 0 },
+    { key: 'aura', x: 3, y: 25, w: 1, h: 12, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 40;
+  return rig;
+}
+
+function cryoMantisRig(): SpriteRig {
+  const rig = humanoidRig({ height: 26, width: 8, hunched: true, headColor: 'bodyDark', torsoColor: 'body' });
+  rig.parts.push(
+    { key: 'armL', x: -17, y: 17, w: 13, h: 2, color: 'accentBright', z: 7 },
+    { key: 'armL', x: -14, y: 9, w: 10, h: 2, color: 'glow', z: 6 },
+    { key: 'armR', x: 4, y: 17, w: 13, h: 2, color: 'accentBright', z: 7 },
+    { key: 'armR', x: 4, y: 9, w: 10, h: 2, color: 'glow', z: 6 },
+    { key: 'crest', x: -5, y: 27, w: 3, h: 8, color: 'accent', z: 8 },
+    { key: 'crest', x: 2, y: 27, w: 3, h: 8, color: 'accent', z: 8 },
+  );
+  rig.pixelHeight = 35;
+  return rig;
+}
+
+function neonLeviathanRig(): SpriteRig {
+  const rig = serpentRig({ length: 44, segments: 8 });
+  rig.parts.push(
+    { key: 'aura', x: -17, y: 9, w: 8, h: 6, color: 'accent', z: 7 },
+    { key: 'aura', x: -1, y: 10, w: 9, h: 6, color: 'glow', z: 7 },
+    { key: 'crest', x: -19, y: 5, w: 34, h: 2, color: 'accentBright', z: 8 },
+  );
+  rig.pixelHeight = 17;
   return rig;
 }
 
@@ -991,6 +1120,128 @@ export const CHARACTERS: CharacterDef[] = [
     unlock: { kind: 'kills', count: 170 },
   },
   // 2x World: Extreme difficulty variants designed to dominate doubled spawns
+  // Legendary update 2026-09-09. The first five palettes remain preview
+  // palettes; all silhouettes and mechanics are locked.
+  {
+    id: 'bellwright', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Bellwright', handle: 'The Returning Tone', tagline: 'Every wall rings twice.',
+    bio: 'A narrow bell keeper carrying a colossal shoulder bell. The first tone finds the crowd; the returning tone finds what survived.',
+    signatureTraits: ['Colossal shoulder bell', 'Returning ricochet tone'],
+    palette: palette({ ink: '#120d18', body: '#4e315c', bodyDark: '#211827', accent: '#f2b84b', accentBright: '#fff1b8', glow: '#ffd36d' }),
+    rig: bellwrightRig(),
+    stats: { maxHp: 112, speed: 92, power: 1.14, area: 1.2, haste: 0.96, magnet: 58, armor: 0.1, crit: 0.06, lifesteal: 0 },
+    weapon: { id: 'resonance-bell', name: 'Resonance Bell', kind: 'projectile', legendaryPattern: 'resonance-return', description: 'Reflecting sound bolts reverse once and cross their own path on the return.', damage: 18, cooldownMs: 1180, range: 420, speed: 300, count: 3, lifetimeMs: 1550, levelDamageScale: 0.28, impactIntensity: 3, color: '#f2b84b', obstacleInteraction: 'reflect' },
+    ultimate: { id: 'grand-peal', name: 'Grand Peal', description: 'The colossal bell tolls from every direction at once.', cooldownMs: 25000, durationMs: 4200, effect: { novaDamage: 92, novaRadius: 225, damageMult: 1.45, cooldownMult: 0.55 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'mawheel', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Mawheel', handle: 'One-Way Hunger', tagline: 'Forward is the only promise.',
+    bio: 'A hunched rider fused to one enormous wheel. Every attack commits to the lane and grows more violent as it rolls.',
+    signatureTraits: ['Single-wheel lower body', 'Forward-locked attack charge'],
+    palette: palette({ ink: '#180c0d', body: '#7b3426', bodyDark: '#2b1919', accent: '#e26737', accentBright: '#ffd08d', glow: '#ff9c4a' }),
+    rig: mawheelRig(),
+    stats: { maxHp: 134, speed: 108, power: 1.2, area: 1.02, haste: 0.9, magnet: 45, armor: 0.14, crit: 0.05, lifesteal: 0 },
+    weapon: { id: 'grindwheel', name: 'Grindwheel', kind: 'sweep', legendaryPattern: 'grind-charge', description: 'Locks into a forward charge, crushing the lane and throwing a spark wake.', damage: 26, cooldownMs: 1700, range: 86, levelDamageScale: 0.31, impactIntensity: 5, impactTrigger: 'ground-shock', color: '#e26737' },
+    ultimate: { id: 'redline', name: 'Redline', description: 'The wheel refuses to slow and every impact becomes a burst.', cooldownMs: 27000, durationMs: 4800, effect: { invulnerable: true, speedMult: 1.6, damageMult: 1.65, novaDamage: 72, novaRadius: 150 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'lantern-widow', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Lantern Widow', handle: 'Sixfold Vigil', tagline: 'Nothing stays hidden once the hooks are lit.',
+    bio: 'A thin cloaked watcher with six lantern-hook arms. Her light catches several enemies and makes them answer the same call together.',
+    signatureTraits: ['Six lantern-hook arms', 'Multi-target damage network'],
+    palette: palette({ ink: '#090b1e', body: '#472153', bodyDark: '#17132c', accent: '#dc5bd7', accentBright: '#a9fbff', glow: '#63e6ea' }),
+    rig: lanternWidowRig(),
+    stats: { maxHp: 92, speed: 104, power: 1.08, area: 1.24, haste: 1.06, magnet: 72, armor: 0.03, crit: 0.08, lifesteal: 0 },
+    weapon: { id: 'ghostlight-thread', name: 'Ghostlight Thread', kind: 'hazard', legendaryPattern: 'ghostlight-network', description: 'Hooks up to six enemies into one glowing network and deals shared damage across the link.', damage: 15, cooldownMs: 1350, range: 300, count: 6, durationMs: 900, levelDamageScale: 0.27, impactIntensity: 1, color: '#dc5bd7', statusEffectId: 'slow' },
+    ultimate: { id: 'all-lanterns-open', name: 'All Lanterns Open', description: 'Every hidden threat is exposed and bound into the same burning thread.', cooldownMs: 24000, durationMs: 4500, effect: { novaDamage: 78, novaRadius: 240, cooldownMult: 0.42, damageMult: 1.35 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'brassback', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Brassback', handle: 'Walking Boiler', tagline: 'Pressure is stored permission.',
+    bio: 'A short, broad boiler guard sealed inside a brass shell. The chimney announces the pull a heartbeat before the steam erupts.',
+    signatureTraits: ['Brass shell and chimney', 'Pull-then-burst harpoon'],
+    palette: palette({ ink: '#17120a', body: '#9a6a2d', bodyDark: '#3e3421', accent: '#e88736', accentBright: '#fff0b0', glow: '#ffcf63' }),
+    rig: brassbackRig(),
+    stats: { maxHp: 162, speed: 76, power: 1.22, area: 1.12, haste: 0.86, magnet: 42, armor: 0.22, crit: 0.04, lifesteal: 0.03 },
+    weapon: { id: 'steam-harpoon', name: 'Steam Harpoon', kind: 'laser', legendaryPattern: 'steam-harpoon', description: 'Hooks the nearest threat inward, then vents a scalding pressure burst.', damage: 28, cooldownMs: 1650, range: 360, levelDamageScale: 0.31, impactIntensity: 4, color: '#e88736', statusEffectId: 'slow' },
+    ultimate: { id: 'boiler-overdrive', name: 'Boiler Overdrive', description: 'Stored heat becomes armor, speed, and repeated pressure vents.', cooldownMs: 28000, durationMs: 5200, effect: { damageMult: 1.55, cooldownMult: 0.5, invulnerable: true, novaDamage: 80, novaRadius: 175 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'paper-saint', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Paper Saint', handle: 'Edge-On Mercy', tagline: 'Turns sideways and leaves the hit behind.',
+    bio: 'A towering folded figure whose wings become blades. False folds peel away as decoys while the true edge keeps moving.',
+    signatureTraits: ['Paper-thin winged silhouette', 'Piercing blades plus decoys'],
+    palette: palette({ ink: '#251b27', body: '#eee7dc', bodyDark: '#89768d', accent: '#b54077', accentBright: '#fff9e8', glow: '#e9a9f1' }),
+    rig: paperSaintRig(),
+    stats: { maxHp: 86, speed: 120, power: 1.12, area: 1.08, haste: 1.14, magnet: 62, armor: 0.01, crit: 0.12, lifesteal: 0 },
+    weapon: { id: 'origami-guillotine', name: 'Origami Guillotine', kind: 'projectile', legendaryPattern: 'origami-decoys', description: 'Unfolds three reflecting guillotine blades and releases false-fold decoys.', damage: 22, cooldownMs: 1250, range: 410, speed: 390, count: 3, lifetimeMs: 1450, levelDamageScale: 0.29, impactIntensity: 3, pierce: 2, color: '#e9a9f1', obstacleInteraction: 'reflect', follower: { speed: 150, radius: 38, count: 2, growAfterMs: 0, maxRadius: 8, lifetimeMs: 2200 } },
+    ultimate: { id: 'thousand-fold-escape', name: 'Thousand-Fold Escape', description: 'Folds edge-on through danger while the arena fills with cutting copies.', cooldownMs: 23000, durationMs: 4300, effect: { invulnerable: true, speedMult: 1.7, cooldownMult: 0.38, damageMult: 1.4 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'eclipse-pilgrim', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Eclipse Pilgrim', handle: 'Black-Sun Walker', tagline: 'Carries night into rooms that never had a sky.',
+    bio: 'A crescent-cloaked traveler beneath a floating black sun. Gravity wells darken the block and drag the fight off its intended route.',
+    signatureTraits: ['Floating black sun', 'Persistent pulling darkness'],
+    palette: palette({ ink: '#050509', body: '#3f267d', bodyDark: '#15121f', accent: '#826cff', accentBright: '#c8c7d1', glow: '#4bc8ff' }),
+    rig: eclipsePilgrimRig(),
+    stats: { maxHp: 108, speed: 94, power: 1.16, area: 1.3, haste: 0.93, magnet: 86, armor: 0.08, crit: 0.07, lifesteal: 0 },
+    weapon: { id: 'event-horizon', name: 'Event Horizon', kind: 'hazard', legendaryPattern: 'event-horizon', description: 'Plants a dark gravity well that slows, damages, and continuously pulls enemies inward.', damage: 11, cooldownMs: 2100, range: 160, durationMs: 4600, levelDamageScale: 0.24, impactIntensity: 1, color: '#826cff', statusEffectId: 'slow', nativeCharacterId: 'eclipse-pilgrim' },
+    ultimate: { id: 'totality', name: 'Totality', description: 'The black sun opens completely and the Pilgrim becomes strongest inside its night.', cooldownMs: 28000, durationMs: 5600, effect: { invulnerable: true, damageMult: 1.8, cooldownMult: 0.52, novaDamage: 90, novaRadius: 235 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'bloomheart', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Bloomheart', handle: 'Crystal Garden', tagline: 'Every step plants a decision.',
+    bio: 'A wide flower guardian with branching antlers and a visible crystal heart. Its roots heal the center before the connected garden erupts.',
+    signatureTraits: ['Antlered crystal-heart body', 'Healing linked root traps'],
+    palette: palette({ ink: '#09261d', body: '#177b54', bodyDark: '#15412f', accent: '#ee6e72', accentBright: '#d7ae4a', glow: '#8cff3f' }),
+    rig: bloomheartRig(),
+    stats: { maxHp: 142, speed: 82, power: 1.1, area: 1.32, haste: 0.88, magnet: 74, armor: 0.15, crit: 0.04, lifesteal: 0.04 },
+    weapon: { id: 'root-network', name: 'Root Network', kind: 'hazard', legendaryPattern: 'root-network', description: 'Plants connected healing roots that trap enemies and burst together at the end.', damage: 10, cooldownMs: 2400, range: 112, count: 5, durationMs: 3600, levelDamageScale: 0.25, impactIntensity: 1, color: '#8cff3f', statusEffectId: 'slow', nativeCharacterId: 'bloomheart' },
+    ultimate: { id: 'heartbloom', name: 'Heartbloom', description: 'The crystal heart opens and every planted node blooms at once.', cooldownMs: 27000, durationMs: 5000, effect: { novaDamage: 105, novaRadius: 220, damageMult: 1.5, invulnerable: true } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'marionette-king', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Marionette King', handle: 'The Hand Above', tagline: 'A crown is just another control surface.',
+    bio: 'A thin crowned puppet suspended beneath a giant spectral hand. Several enemies at once are ordered to turn on their own formation.',
+    signatureTraits: ['Giant overhead hand and strings', 'Multi-enemy forced allegiance'],
+    palette: palette({ ink: '#1b0913', body: '#9a2039', bodyDark: '#4f245f', accent: '#d9a42f', accentBright: '#efe3d0', skin: '#efe3d0', glow: '#c78cff' }),
+    rig: marionetteKingRig(),
+    stats: { maxHp: 96, speed: 98, power: 1.04, area: 1.22, haste: 1.08, magnet: 68, armor: 0.03, crit: 0.1, lifesteal: 0 },
+    weapon: { id: 'royal-command', name: 'Royal Command', kind: 'convert', legendaryPattern: 'royal-command', description: 'Seizes several enemies at once and orders them to fight their former allies.', damage: 13, cooldownMs: 2350, range: 290, count: 3, durationMs: 4500, levelDamageScale: 0.22, impactIntensity: 1, color: '#d9a42f', statusEffectId: 'slow' },
+    ultimate: { id: 'confetti-coup', name: 'Confetti Coup', description: 'Every seized subject attacks before the strings snap in a razor-confetti burst.', cooldownMs: 26000, durationMs: 5200, effect: { novaDamage: 88, novaRadius: 210, cooldownMult: 0.45, damageMult: 1.35 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'cryo-mantis', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Cryo-Mantis', handle: 'Four-Blade Winter', tagline: 'Two lines are enough to end the argument.',
+    bio: 'A tall insect duelist with four scythe arms and a faceted ice abdomen. Its crossed zero-lines freeze everything caught between them.',
+    signatureTraits: ['Four scythe-arm silhouette', 'Crossed absolute-zero cuts'],
+    palette: palette({ ink: '#07131f', body: '#36dce8', bodyDark: '#102b55', accent: '#eefcff', accentBright: '#ef4bce', glow: '#50eaf0' }),
+    rig: cryoMantisRig(),
+    stats: { maxHp: 94, speed: 116, power: 1.18, area: 1.08, haste: 1.16, magnet: 55, armor: 0.03, crit: 0.13, lifesteal: 0 },
+    weapon: { id: 'zero-split', name: 'Zero Split', kind: 'laser', legendaryPattern: 'zero-split', description: 'Cuts two crossing absolute-zero lines that freeze and fracture the crowd.', damage: 27, cooldownMs: 1500, range: 430, levelDamageScale: 0.3, impactIntensity: 3, color: '#50eaf0', statusEffectId: 'freeze' },
+    ultimate: { id: 'shatter-season', name: 'Shatter Season', description: 'Frozen targets become the blades for the next crossed cut.', cooldownMs: 24000, durationMs: 4300, effect: { novaDamage: 96, novaRadius: 205, damageMult: 1.65, cooldownMult: 0.42, speedMult: 1.25 } },
+    unlock: { kind: 'default' },
+  },
+  {
+    id: 'neon-leviathan', rarity: 'legendary', react: REACTION_PRESETS.playerBob,
+    name: 'Neon Leviathan', handle: 'Tidal Recall', tagline: 'The route behind you is still alive.',
+    bio: 'A long whale-headed serpent with floating fins and a transparent luminous spine. Its spectral double retraces the path the player just survived.',
+    signatureTraits: ['Serpentine whale and luminous spine', 'Weapon replays the recent movement route'],
+    palette: palette({ ink: '#061724', body: '#16d7c2', bodyDark: '#592eae', accent: '#ff3697', accentBright: '#49e7ef', glow: '#ff3da5' }),
+    rig: neonLeviathanRig(),
+    stats: { maxHp: 118, speed: 126, power: 1.12, area: 1.18, haste: 1.04, magnet: 82, armor: 0.07, crit: 0.07, lifesteal: 0 },
+    weapon: { id: 'tidal-memory', name: 'Tidal Memory', kind: 'wave', legendaryPattern: 'tidal-memory', description: 'A spectral Leviathan retraces the player’s recent route as a chain of crushing waves.', damage: 24, cooldownMs: 1850, range: 180, count: 1, levelDamageScale: 0.29, impactIntensity: 3, color: '#ff3697', statusEffectId: 'slow' },
+    ultimate: { id: 'phase-breach', name: 'Phase Breach', description: 'The Leviathan becomes a wall-crossing streak of neon tide.', cooldownMs: 25000, durationMs: 5000, effect: { invulnerable: true, speedMult: 1.8, damageMult: 1.5, novaDamage: 82, novaRadius: 210 } },
+    unlock: { kind: 'default' },
+  },
   {
     id: 'apex-shade',
     react: REACTION_PRESETS.playerBob,

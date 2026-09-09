@@ -10,7 +10,7 @@ import type {
   SpritePalette,
   SpriteRig,
 } from '@/game/types';
-import { blobRig } from '@/game/sprites/rigs';
+import { arachnidRig, blobRig, quadrupedRig, serpentRig } from '@/game/sprites/rigs';
 
 /** Original silhouette and palette sheets for the temporary LokPet family. */
 export const LOKPET_VARIANTS: LokPetVariantDef[] = [
@@ -26,6 +26,10 @@ export const LOKPET_VARIANTS: LokPetVariantDef[] = [
   { id: 'plum-jelly', name: 'Plum Jelly', family: 'blob', silhouette: 'jelly', palette: { body: '#87529a', bodyDark: '#33214c', accent: '#f0abfc', glow: '#c084fc', eye: '#fef3c7' }, description: 'A buoyant little lump that pulses in time with the city lights.' },
   { id: 'tin-cricket', name: 'Tin Cricket', family: 'mechanical', silhouette: 'clockwork', palette: { body: '#788b99', bodyDark: '#273440', accent: '#fbbf24', glow: '#f59e0b', eye: '#fef08a' }, description: 'A clockwork chirper assembled from three harmless loose parts.' },
   { id: 'neon-gear', name: 'Neon Gear', family: 'mechanical', silhouette: 'clockwork', palette: { body: '#43677a', bodyDark: '#142a3a', accent: '#4de1ff', glow: '#22d3ee', eye: '#ffffff' }, description: 'A spinning pocket machine with a very small emergency siren.' },
+  { id: 'prism-moth', name: 'Prism Moth', family: 'bat', silhouette: 'prism-moth', palette: { body: '#b993ff', bodyDark: '#352058', accent: '#69eaff', glow: '#ff84da', eye: '#fffef2' }, description: 'A tiny diamond body carried by enormous crystalline wings.', sizeScale: 0.68, legendary: true, specialAbility: 'prism-collect', weight: 1 },
+  { id: 'void-pup', name: 'Void Pup', family: 'animal', silhouette: 'void-pup', palette: { body: '#22205b', bodyDark: '#070814', accent: '#712fc2', glow: '#2d9dff', eye: '#e8f4ff' }, description: 'A medium star-filled wolf with smoke in place of paws.', sizeScale: 0.92, legendary: true, specialAbility: 'void-fetch', weight: 1 },
+  { id: 'ember-koi', name: 'Ember Koi', family: 'animal', silhouette: 'ember-koi', palette: { body: '#ff792b', bodyDark: '#ad2134', accent: '#f3c347', glow: '#25c9ba', eye: '#fff8d8' }, description: 'A large ribbon-bodied koi with oversized fins and a long flame tail.', sizeScale: 1.28, legendary: true, specialAbility: 'ember-rescue', weight: 1 },
+  { id: 'clockwork-beetle', name: 'Clockwork Beetle', family: 'mechanical', silhouette: 'clock-beetle', palette: { body: '#b08235', bodyDark: '#5b321f', accent: '#177c78', glow: '#b9e339', eye: '#efffb0' }, description: 'A tiny six-legged beetle built around a clock-face shell whose hands never stop.', sizeScale: 0.76, legendary: true, specialAbility: 'clock-pause', weight: 1 },
 ];
 
 export const LOKPET_STAT_SHEETS: LokPetStatSheet[] = [
@@ -69,6 +73,29 @@ function pickWeightedSheet(rng: () => number): LokPetStatSheet {
   return LOKPET_STAT_SHEETS[0]!;
 }
 
+function pickWeightedVariant(rng: () => number): LokPetVariantDef {
+  const total = LOKPET_VARIANTS.reduce((sum, variant) => sum + (variant.weight ?? 8), 0);
+  let roll = rng() * total;
+  for (const variant of LOKPET_VARIANTS) {
+    roll -= variant.weight ?? 8;
+    if (roll <= 0) return variant;
+  }
+  return LOKPET_VARIANTS[0]!;
+}
+
+const SPECIAL_LOKPET_LOADOUTS: Record<string, {
+  attackKind: LokPetAttackKind;
+  element: LokPetElement;
+  elementLabel: string;
+  traitLabel: string;
+  stats: LokPetRoll['stats'];
+}> = {
+  'prism-moth': { attackKind: 'rapid-shot', element: 'none', elementLabel: 'prismatic', traitLabel: 'Spectrum Sweep · split collector', stats: { health: 76, moveSpeed: 178, damage: 13, cooldownMs: 620, range: 330, projectileSpeed: 430, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 108000 } },
+  'void-pup': { attackKind: 'pulse', element: 'slow', elementLabel: 'void slow', traitLabel: 'Eventide Fetch · hollow howl', stats: { health: 98, moveSpeed: 150, damage: 17, cooldownMs: 980, range: 300, projectileSpeed: 360, explosionRadius: 0, pulseRadius: 112, lifetimeMs: 108000 } },
+  'ember-koi': { attackKind: 'explosion', element: 'fire', elementLabel: 'restorative fire', traitLabel: 'Cinder Current · last catch', stats: { health: 126, moveSpeed: 136, damage: 21, cooldownMs: 820, range: 320, projectileSpeed: 360, explosionRadius: 72, pulseRadius: 0, lifetimeMs: 108000 } },
+  'clockwork-beetle': { attackKind: 'heavy-shot', element: 'slow', elementLabel: 'time slow', traitLabel: 'Overclock Chime · borrowed moment', stats: { health: 112, moveSpeed: 118, damage: 24, cooldownMs: 940, range: 285, projectileSpeed: 320, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 108000 } },
+};
+
 function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element: LokPetElement; label: string } {
   // Keep combinations readable: pulses prefer control, while explosions
   // prefer fire. The generator still exposes every elemental behavior.
@@ -82,7 +109,28 @@ function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element
 
 /** Generate one deterministic, chest-ready LokPet blueprint. */
 export function rollLokPet(rng: () => number): LokPetRoll {
-  const variant = pick(rng, LOKPET_VARIANTS);
+  const variant = pickWeightedVariant(rng);
+  const special = SPECIAL_LOKPET_LOADOUTS[variant.id];
+  if (special) {
+    return {
+      name: variant.name,
+      variantId: variant.id,
+      family: variant.family,
+      silhouette: variant.silhouette,
+      palette: variant.palette,
+      rarity: 'mythic',
+      rarityLabel: 'Legendary',
+      attackKind: special.attackKind,
+      element: special.element,
+      elementLabel: special.elementLabel,
+      description: `${variant.description} ${special.traitLabel}.`,
+      stats: special.stats,
+      traitLabel: special.traitLabel,
+      sizeScale: variant.sizeScale,
+      legendary: true,
+      specialAbility: variant.specialAbility,
+    };
+  }
   const sheet = pickWeightedSheet(rng);
   const attack = pick(rng, ATTACKS);
   const element = pickElement(rng, attack.kind);
@@ -144,6 +192,10 @@ export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
   spark: 'Mote',
   jelly: 'Blob',
   clockwork: 'Clockwork',
+  'prism-moth': 'Prism Moth',
+  'void-pup': 'Void Pup',
+  'ember-koi': 'Ember Koi',
+  'clock-beetle': 'Clock Beetle',
 };
 
 /**
@@ -154,6 +206,49 @@ export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
  * (wings), spark (smallest, plain), jelly (biggest, plain), clockwork
  * (spiked + legged).
  */
+function prismMothRig(): SpriteRig {
+  const rig = blobRig({ height: 8, width: 7, wings: true });
+  rig.parts.push(
+    { key: 'aura', x: -12, y: 3, w: 8, h: 11, color: 'glow', z: 0 },
+    { key: 'aura', x: 4, y: 3, w: 8, h: 11, color: 'accent', z: 0 },
+    { key: 'crest', x: -2, y: 12, w: 4, h: 4, color: 'accentBright', z: 8 },
+  );
+  rig.pixelHeight = 16;
+  return rig;
+}
+
+function voidPupRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 14, length: 17, ears: true });
+  rig.parts.push(
+    { key: 'aura', x: -10, y: -1, w: 4, h: 3, color: 'glow', z: 0 },
+    { key: 'aura', x: -3, y: -2, w: 5, h: 3, color: 'accent', z: 0 },
+    { key: 'crest', x: -6, y: 8, w: 2, h: 2, color: 'accentBright', z: 7 },
+  );
+  return rig;
+}
+
+function emberKoiRig(): SpriteRig {
+  const rig = serpentRig({ length: 34, segments: 7 });
+  rig.parts.push(
+    { key: 'aura', x: -21, y: 2, w: 7, h: 8, color: 'glow', z: 0 },
+    { key: 'crest', x: 5, y: 9, w: 8, h: 5, color: 'accent', z: 8 },
+    { key: 'crest', x: -4, y: 8, w: 7, h: 4, color: 'accentBright', z: 7 },
+  );
+  rig.pixelHeight = 16;
+  return rig;
+}
+
+function clockBeetleRig(): SpriteRig {
+  const rig = arachnidRig({ height: 8, span: 12, legPairs: 3 });
+  rig.parts.push(
+    { key: 'torso', x: -7, y: 3, w: 14, h: 10, color: 'body', z: 6 },
+    { key: 'face', x: -4, y: 6, w: 8, h: 6, color: 'accentBright', z: 7 },
+    { key: 'crest', x: -1, y: 7, w: 2, h: 5, color: 'bodyDark', z: 8 },
+  );
+  rig.pixelHeight = 15;
+  return rig;
+}
+
 const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   pouncer: blobRig({ height: 15, width: 12, tendrils: true }),
   skull: blobRig({ height: 14, width: 11, spikes: true }),
@@ -161,6 +256,10 @@ const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   spark: blobRig({ height: 10, width: 9 }),
   jelly: blobRig({ height: 17, width: 15 }),
   clockwork: blobRig({ height: 14, width: 12, spikes: true, tendrils: true }),
+  'prism-moth': prismMothRig(),
+  'void-pup': voidPupRig(),
+  'ember-koi': emberKoiRig(),
+  'clock-beetle': clockBeetleRig(),
 };
 
 export function lokPetRig(silhouette: LokPetSilhouette): SpriteRig {
