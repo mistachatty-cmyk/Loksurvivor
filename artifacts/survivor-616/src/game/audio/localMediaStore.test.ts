@@ -17,8 +17,15 @@ import { loadMediaAssets } from './localMediaStore';
 import { loadLocalTracks, saveLocalTrack } from './localTrackLibrary';
 import { addClip, createProject } from './studio/project';
 import {
+  ACTIVE_STUDIO_WORKSPACE_ID,
+  createStudioProjectWorkspace,
+  deleteStudioProject,
+  duplicateStudioProject,
+  listStudioProjects,
   loadStudioAudioAssets,
   loadStudioWorkspace,
+  openStudioProject,
+  renameStudioProject,
   saveStudioAudioFile,
   saveStudioWorkspace,
 } from './studio/persistence';
@@ -114,6 +121,15 @@ test('equal media bytes are stored once and shared by Studio references', async 
   assert.equal(restored.project.name, 'Deduplicated');
   assert.deepEqual(restored.assetIds, [studioAsset.id]);
   assert.equal((await loadStudioAudioAssets(restored.assetIds)).length, 1);
+
+  const duplicate = await duplicateStudioProject(restored.id);
+  assert.deepEqual(duplicate.assetIds, [studioAsset.id]);
+  const reopenedDatabase = await openLocalMediaDatabase();
+  const reopenedTransaction = reopenedDatabase.transaction(MEDIA_ASSET_STORE, 'readonly');
+  const duplicatedAssetCount = await requestResult(reopenedTransaction.objectStore(MEDIA_ASSET_STORE).count());
+  await transactionDone(reopenedTransaction);
+  reopenedDatabase.close();
+  assert.equal(duplicatedAssetCount, 1, 'duplicating a project does not duplicate its media bytes');
 });
 
 test('a saved Studio audio file and project reopen from the shared database', async () => {
@@ -132,4 +148,91 @@ test('a saved Studio audio file and project reopen from the shared database', as
   assert.equal(sources.length, 1);
   assert.equal(sources[0]!.fileName, 'mic-take.webm');
   assert.equal(await sources[0]!.blob.text(), 'owned recording');
+});
+
+test('the single active workspace migrates into the multi-project index', async () => {
+  const database = await openLocalMediaDatabase();
+  const transaction = database.transaction(STUDIO_PROJECT_STORE, 'readwrite');
+  transaction.objectStore(STUDIO_PROJECT_STORE).put({
+    id: ACTIVE_STUDIO_WORKSPACE_ID,
+    version: 1,
+    project: createProject('Single-project release'),
+    assetIds: [],
+    createdAt: 10,
+    updatedAt: 20,
+  });
+  await transactionDone(transaction);
+  database.close();
+
+  const migrated = await loadStudioWorkspace();
+  assert.ok(migrated);
+  assert.match(migrated.id, /^project:/);
+  assert.equal(migrated.project.name, 'Single-project release');
+  assert.equal(migrated.createdAt, 10);
+  assert.equal((await listStudioProjects()).length, 1);
+
+  const reopenedDatabase = await openLocalMediaDatabase();
+  const reopenedTransaction = reopenedDatabase.transaction(STUDIO_PROJECT_STORE, 'readonly');
+  const oldRecord = await requestResult(
+    reopenedTransaction.objectStore(STUDIO_PROJECT_STORE).get(ACTIVE_STUDIO_WORKSPACE_ID),
+  );
+  await transactionDone(reopenedTransaction);
+  reopenedDatabase.close();
+  assert.equal(oldRecord, undefined);
+});
+
+test('projects can be created, renamed, opened, duplicated, and deleted', async () => {
+  const first = await saveStudioWorkspace(createProject('First'), []);
+  const second = await createStudioProjectWorkspace('Second');
+  await renameStudioProject(first.id, 'First renamed');
+
+  const opened = await openStudioProject(first.id);
+  assert.equal(opened.project.name, 'First renamed');
+  assert.equal((await loadStudioWorkspace())?.id, first.id);
+
+  const duplicate = await duplicateStudioProject(first.id);
+  assert.notEqual(duplicate.id, first.id);
+  assert.equal(duplicate.project.name, 'First renamed Copy');
+  assert.equal((await loadStudioWorkspace())?.id, duplicate.id);
+
+  const deleted = await deleteStudioProject(second.id);
+  assert.equal(deleted.active.id, duplicate.id);
+  assert.deepEqual((await listStudioProjects()).map((project) => project.name).sort(), [
+    'First renamed',
+    'First renamed Copy',
+  ]);
+});
+
+test('project summaries report unavailable local sources without dropping the project', async () => {
+  const unavailableAssetId = `sha256:${'f'.repeat(64)}`;
+  const saved = await saveStudioWorkspace(createProject('Needs source'), [unavailableAssetId]);
+  const summary = (await listStudioProjects()).find((project) => project.id === saved.id);
+  assert.ok(summary);
+  assert.equal(summary.sourceCount, 1);
+  assert.equal(summary.missingSourceCount, 1);
+});
+
+test('project deletion removes only media with no project or Soundtrack references', async () => {
+  const shared = await saveStudioAudioFile(new File(['shared'], 'shared.wav', { type: 'audio/wav' }));
+  const orphan = await saveStudioAudioFile(new File(['orphan'], 'orphan.wav', { type: 'audio/wav' }));
+  const soundtrack = await saveStudioAudioFile(new File(['soundtrack'], 'soundtrack.wav', { type: 'audio/wav' }));
+
+  const first = await saveStudioWorkspace(createProject('First'), [shared.id, orphan.id, soundtrack.id]);
+  await createStudioProjectWorkspace('Second');
+  const second = await saveStudioWorkspace(createProject('Second'), [shared.id]);
+  await saveLocalTrack({
+    id: 'soundtrack-owner',
+    title: 'Soundtrack owner',
+    file: new File(['soundtrack'], 'soundtrack-copy.wav', { type: 'audio/wav' }),
+    isVideoContainer: false,
+    addedAt: 616,
+  });
+
+  const result = await deleteStudioProject(first.id);
+  assert.equal(result.active.id, second.id);
+  assert.equal(result.removedAssetCount, 1);
+  assert.deepEqual(
+    (await loadMediaAssets([shared.id, orphan.id, soundtrack.id])).map((asset) => asset.id).sort(),
+    [shared.id, soundtrack.id].sort(),
+  );
 });
