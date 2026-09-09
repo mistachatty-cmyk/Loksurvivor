@@ -94,3 +94,41 @@ test('restores an imported owned source and its arrangement after reload', async
   await expect(page.getByTestId('list-studio-clips')).toContainText('restore me');
   await expect(page.getByTestId('text-studio-persistence')).toContainText('1 sources restored');
 });
+
+test('creates, renames, duplicates, deletes, and reopens local projects', async ({ page }) => {
+  await page.goto('/?screen=studio');
+  await expect(page.getByTestId('text-studio-persistence')).toContainText('saved on this device');
+
+  await page.getByTestId('input-studio-name').fill('Original beat');
+  await page.waitForTimeout(450);
+  await page.getByTestId('button-studio-projects').click();
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(1);
+
+  await page.getByTestId('button-studio-new-project').click();
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Untitled');
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(2);
+
+  await page.getByLabel('Rename Original beat').locator('..').getByRole('button', { name: 'Open' }).click();
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Original beat');
+
+  await page.getByLabel('Duplicate Original beat').click();
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Original beat Copy');
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(3);
+
+  const duplicateName = page.getByLabel('Rename Original beat Copy');
+  await duplicateName.fill('Remix branch');
+  await duplicateName.press('Enter');
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Remix branch');
+
+  await page.getByLabel('Delete Original beat').click();
+  await page
+    .getByRole('group', { name: 'Confirm deletion of Original beat' })
+    .getByRole('button', { name: 'Delete' })
+    .click();
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(2);
+
+  await page.reload();
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Remix branch');
+  await page.getByTestId('button-studio-projects').click();
+  await expect(page.getByTestId('list-studio-projects')).toContainText('Remix branch');
+});

@@ -207,8 +207,15 @@ test('a workspace stores unique content-addressed sources from lanes and the cli
   });
 
   assert.deepEqual(referencedStudioAssetIds(project), [drums]);
-  const record = createStudioWorkspaceRecord(project, [drums, bass, bass, 'buffer-session-only'], null, 616);
-  assert.equal(record.id, ACTIVE_STUDIO_WORKSPACE_ID);
+  const record = createStudioWorkspaceRecord(
+    project,
+    [drums, bass, bass, 'buffer-session-only'],
+    null,
+    616,
+    'project:test',
+  );
+  assert.equal(record.id, 'project:test');
+  assert.equal(record.kind, 'project');
   assert.equal(record.createdAt, 616);
   assert.equal(record.updatedAt, 616);
   assert.deepEqual(record.assetIds, [drums, bass]);
@@ -230,6 +237,19 @@ test('workspace parsing repairs its project and drops invalid asset references',
   assert.deepEqual(restored.assetIds, [source]);
   assert.equal(restored.createdAt, 10);
   assert.equal(restored.updatedAt, 20);
+});
+
+test('workspace parsing repairs invalid timestamps before the project browser formats them', () => {
+  const restored = parseStudioWorkspaceRecord({
+    id: 'project:broken-time',
+    project: createProject('Recovered time'),
+    assetIds: [],
+    createdAt: Number.NaN,
+    updatedAt: Number.POSITIVE_INFINITY,
+  });
+  assert.ok(restored);
+  assert.ok(Number.isFinite(restored.createdAt));
+  assert.ok(Number.isFinite(restored.updatedAt));
 });
 
 test('content hashes deduplicate equal audio bytes', async () => {

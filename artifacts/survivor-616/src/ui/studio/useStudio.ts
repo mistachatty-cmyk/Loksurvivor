@@ -25,10 +25,18 @@ import {
   type ImportedBuffer,
 } from '@/game/audio/studio/importer';
 import {
+  createStudioProjectWorkspace,
+  deleteStudioProject,
+  duplicateStudioProject,
+  listStudioProjects,
   loadStudioAudioAssets,
   loadStudioWorkspace,
+  openStudioProject,
+  renameStudioProject,
   saveStudioAudioFile,
   saveStudioWorkspace,
+  type StudioProjectSummary,
+  type StudioWorkspaceRecord,
 } from '@/game/audio/studio/persistence';
 import { isMediaAssetId, LocalMediaStorageError } from '@/game/audio/localMediaStore';
 
@@ -78,6 +86,8 @@ export interface StudioController {
   persistenceState: 'loading' | 'saving' | 'saved' | 'session-only';
   lastSavedAt: number | null;
   restoredAssetCount: number;
+  projects: StudioProjectSummary[];
+  activeProjectId: string | null;
   dismissError: () => void;
   dismissNotice: () => void;
 
@@ -85,6 +95,11 @@ export interface StudioController {
   stop: () => void;
   setBpm: (bpm: number) => void;
   rename: (name: string) => void;
+  createLocalProject: () => Promise<void>;
+  openLocalProject: (projectId: string) => Promise<void>;
+  renameLocalProject: (projectId: string, name: string) => Promise<void>;
+  duplicateLocalProject: (projectId: string) => Promise<void>;
+  deleteLocalProject: (projectId: string) => Promise<void>;
 
   importFiles: (files: FileList | File[]) => Promise<void>;
   placeClip: (bufferId: string, trackId: string, startBeat: number) => void;
@@ -133,10 +148,15 @@ export function useStudio(): StudioController {
   const [persistenceState, setPersistenceState] = useState<StudioController['persistenceState']>('loading');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [restoredAssetCount, setRestoredAssetCount] = useState(0);
+  const [projects, setProjects] = useState<StudioProjectSummary[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const playheadRef = useRef(0);
   const persistenceReadyRef = useRef(false);
   const persistenceDisabledRef = useRef(false);
   const sessionOnlySourceIdsRef = useRef(new Set<string>());
+  const activeProjectIdRef = useRef<string | null>(null);
+  const pendingProjectWriteRef = useRef<Promise<void>>(Promise.resolve());
+  const workspaceGenerationRef = useRef(0);
 
   const [armedTrackId, setArmedTrackId] = useState<string | null>(null);
   const [recordingMic, setRecordingMic] = useState(false);
@@ -160,6 +180,9 @@ export function useStudio(): StudioController {
   /** Latest project, for callbacks that must not re-bind on every edit. */
   const projectRef = useRef(project);
   projectRef.current = project;
+  const clipsRef = useRef(clips);
+  clipsRef.current = clips;
+  activeProjectIdRef.current = activeProjectId;
 
   /** Stable ids in the Clips panel plus any source already placed on a lane. */
   const persistedAssetIds = useCallback((currentProject: StudioProject, currentClips: ImportedBuffer[]) => {
@@ -172,6 +195,46 @@ export function useStudio(): StudioController {
       ),
     ];
   }, []);
+
+  const refreshProjectSummaries = useCallback(async () => {
+    const summaries = await listStudioProjects();
+    setProjects(summaries);
+  }, []);
+
+  /** Rebuilds decoded runtime buffers when the active document changes. */
+  const restoreWorkspace = useCallback(
+    async (workspace: StudioWorkspaceRecord): Promise<number> => {
+      const assets = await loadStudioAudioAssets(workspace.assetIds);
+      // Release before decoding. Equal content-addressed ids can appear in two
+      // projects; releasing afterwards would remove the newly restored buffer.
+      for (const source of clipsRef.current) releaseBuffer(source.id);
+      const restored: ImportedBuffer[] = [];
+      let unreadable = 0;
+      for (const asset of assets) {
+        try {
+          const file = new File([asset.blob], asset.fileName, {
+            type: asset.mimeType,
+            lastModified: asset.createdAt,
+          });
+          restored.push(await importAudioFile(file, engineInstance.context, asset.id));
+        } catch {
+          unreadable += 1;
+        }
+      }
+
+      sessionOnlySourceIdsRef.current.clear();
+      setArmedTrackId(null);
+      setProject(workspace.project);
+      setClips(restored);
+      setRestoredAssetCount(restored.length);
+      activeProjectIdRef.current = workspace.id;
+      setActiveProjectId(workspace.id);
+      setLastSavedAt(workspace.updatedAt);
+      setPersistenceState('saved');
+      return Math.max(0, workspace.assetIds.length - assets.length) + unreadable;
+    },
+    [engineInstance],
+  );
 
   // Keep the audio graph and the saved copy in step with the model.
   useEffect(() => {
@@ -194,37 +257,20 @@ export function useStudio(): StudioController {
         if (!stored) {
           const migrated = await saveStudioWorkspace(projectRef.current, []);
           if (cancelled) return;
+          setActiveProjectId(migrated.id);
           persistenceReadyRef.current = true;
           setLastSavedAt(migrated.updatedAt);
           setPersistenceState('saved');
+          await refreshProjectSummaries();
           return;
         }
 
         setBusy('Restoring local Studio project...');
-        const assets = await loadStudioAudioAssets(stored.assetIds);
-        const restored: ImportedBuffer[] = [];
-        let unreadable = 0;
-        for (const asset of assets) {
-          try {
-            const file = new File([asset.blob], asset.fileName, {
-              type: asset.mimeType,
-              lastModified: asset.createdAt,
-            });
-            restored.push(await importAudioFile(file, engineInstance.context, asset.id));
-          } catch {
-            unreadable += 1;
-          }
-        }
+        const missing = await restoreWorkspace(stored);
         if (cancelled) return;
-
-        setProject(stored.project);
-        setClips(restored);
-        setRestoredAssetCount(restored.length);
-        setLastSavedAt(stored.updatedAt);
         persistenceReadyRef.current = true;
-        setPersistenceState('saved');
+        await refreshProjectSummaries();
 
-        const missing = Math.max(0, stored.assetIds.length - assets.length) + unreadable;
         if (missing > 0) {
           setError(
             `${missing} saved Studio source${missing === 1 ? '' : 's'} could not be restored. ` +
@@ -248,19 +294,37 @@ export function useStudio(): StudioController {
     return () => {
       cancelled = true;
     };
-  }, [engineInstance]);
+  }, [refreshProjectSummaries, restoreWorkspace]);
 
   // Debounced IndexedDB autosave keeps fader drags from creating a write per
   // pointer event. The synchronous localStorage copy above remains a small
   // recovery fallback while this version migrates existing projects.
   useEffect(() => {
-    if (!persistenceReadyRef.current || persistenceDisabledRef.current) return;
+    if (!persistenceReadyRef.current || persistenceDisabledRef.current || !activeProjectId) return;
     setPersistenceState('saving');
+    const savingProjectId = activeProjectId;
+    const savingGeneration = workspaceGenerationRef.current;
     const timeout = window.setTimeout(() => {
-      void saveStudioWorkspace(project, persistedAssetIds(project, clips))
+      if (workspaceGenerationRef.current !== savingGeneration) return;
+      const operation = pendingProjectWriteRef.current.then(() =>
+        workspaceGenerationRef.current === savingGeneration
+          ? saveStudioWorkspace(project, persistedAssetIds(project, clips), savingProjectId)
+          : null,
+      );
+      pendingProjectWriteRef.current = operation.then(
+        () => undefined,
+        () => undefined,
+      );
+      void operation
         .then((record) => {
+          if (!record) return;
+          if (activeProjectIdRef.current !== savingProjectId) return;
           setLastSavedAt(record.updatedAt);
           setPersistenceState(sessionOnlySourceIdsRef.current.size > 0 ? 'session-only' : 'saved');
+          void refreshProjectSummaries().catch(() => {
+            // The project itself is safely written; a stale browser list can
+            // retry on the next successful save or lifecycle operation.
+          });
         })
         .catch((cause: unknown) => {
           persistenceDisabledRef.current = true;
@@ -273,7 +337,7 @@ export function useStudio(): StudioController {
         });
     }, 350);
     return () => window.clearTimeout(timeout);
-  }, [clips, persistedAssetIds, project]);
+  }, [activeProjectId, clips, persistedAssetIds, project, refreshProjectSummaries]);
 
   // Stopping when the screen unmounts is not optional -- the transport is a
   // singleton and would otherwise keep publishing a grid over a game run.
@@ -313,6 +377,198 @@ export function useStudio(): StudioController {
     playheadRef.current = 0;
     setPlaying(false);
   }, []);
+
+  const persistCurrentWorkspace = useCallback(async () => {
+    if (persistenceDisabledRef.current) {
+      throw new LocalMediaStorageError('Local project management is unavailable for this session.', 'unavailable');
+    }
+    const currentId = activeProjectIdRef.current;
+    if (!currentId) return null;
+    const operation = pendingProjectWriteRef.current.then(() =>
+      saveStudioWorkspace(projectRef.current, persistedAssetIds(projectRef.current, clipsRef.current), currentId),
+    );
+    pendingProjectWriteRef.current = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
+  }, [persistedAssetIds]);
+
+  const reportProjectOperationError = useCallback((cause: unknown) => {
+    setError(
+      cause instanceof LocalMediaStorageError || cause instanceof Error
+        ? cause.message
+        : 'The Studio could not update its local projects.',
+    );
+  }, []);
+
+  const projectChangeBlocked = useCallback(() => {
+    if (!mediaRecorderRef.current) return false;
+    setError('Stop the microphone recording before changing projects.');
+    return true;
+  }, []);
+
+  const openLocalProject = useCallback(
+    async (projectId: string) => {
+      if (projectId === activeProjectIdRef.current) return;
+      if (projectChangeBlocked()) return;
+      setBusy('Opening local project...');
+      setNotice(null);
+      try {
+        await pendingProjectWriteRef.current;
+        await persistCurrentWorkspace();
+        workspaceGenerationRef.current += 1;
+        stop();
+        const record = await openStudioProject(projectId);
+        const missing = await restoreWorkspace(record);
+        await refreshProjectSummaries();
+        setNotice(
+          missing > 0
+            ? `Opened “${record.project.name}” with ${missing} unavailable source${missing === 1 ? '' : 's'}.`
+            : `Opened “${record.project.name}”.`,
+        );
+      } catch (cause) {
+        reportProjectOperationError(cause);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [
+      persistCurrentWorkspace,
+      projectChangeBlocked,
+      refreshProjectSummaries,
+      reportProjectOperationError,
+      restoreWorkspace,
+      stop,
+    ],
+  );
+
+  const createLocalProject = useCallback(async () => {
+    if (projectChangeBlocked()) return;
+    setBusy('Creating local project...');
+    setNotice(null);
+    try {
+      await pendingProjectWriteRef.current;
+      await persistCurrentWorkspace();
+      workspaceGenerationRef.current += 1;
+      stop();
+      const record = await createStudioProjectWorkspace();
+      await restoreWorkspace(record);
+      await refreshProjectSummaries();
+      setNotice('Created a new local Studio project.');
+    } catch (cause) {
+      reportProjectOperationError(cause);
+    } finally {
+      setBusy(null);
+    }
+  }, [
+    persistCurrentWorkspace,
+    projectChangeBlocked,
+    refreshProjectSummaries,
+    reportProjectOperationError,
+    restoreWorkspace,
+    stop,
+  ]);
+
+  const renameLocalProject = useCallback(
+    async (projectId: string, name: string) => {
+      const nextName = name.trim() || 'Untitled';
+      const operation = pendingProjectWriteRef.current.then(async () => {
+        if (projectId === activeProjectIdRef.current) {
+          const renamed = { ...projectRef.current, name: nextName };
+          projectRef.current = renamed;
+          setProject(renamed);
+          setProjects((current) =>
+            current.map((project) => (project.id === projectId ? { ...project, name: nextName } : project)),
+          );
+          await saveStudioWorkspace(renamed, persistedAssetIds(renamed, clipsRef.current), projectId);
+        } else {
+          await renameStudioProject(projectId, nextName);
+        }
+        await refreshProjectSummaries();
+      });
+      pendingProjectWriteRef.current = operation.catch(() => undefined);
+      try {
+        await operation;
+      } catch (cause) {
+        reportProjectOperationError(cause);
+      }
+    },
+    [persistedAssetIds, refreshProjectSummaries, reportProjectOperationError],
+  );
+
+  const duplicateLocalProject = useCallback(
+    async (projectId: string) => {
+      if (projectChangeBlocked()) return;
+      setBusy('Duplicating local project...');
+      setNotice(null);
+      try {
+        await pendingProjectWriteRef.current;
+        await persistCurrentWorkspace();
+        workspaceGenerationRef.current += 1;
+        stop();
+        const record = await duplicateStudioProject(projectId);
+        const missing = await restoreWorkspace(record);
+        await refreshProjectSummaries();
+        setNotice(
+          missing > 0
+            ? `Duplicated “${record.project.name}”; ${missing} unavailable source${missing === 1 ? '' : 's'} could not be copied.`
+            : `Duplicated “${record.project.name}” without copying its audio bytes.`,
+        );
+      } catch (cause) {
+        reportProjectOperationError(cause);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [
+      persistCurrentWorkspace,
+      projectChangeBlocked,
+      refreshProjectSummaries,
+      reportProjectOperationError,
+      restoreWorkspace,
+      stop,
+    ],
+  );
+
+  const deleteLocalProject = useCallback(
+    async (projectId: string) => {
+      if (projectChangeBlocked()) return;
+      setBusy('Deleting local project...');
+      setNotice(null);
+      try {
+        await pendingProjectWriteRef.current;
+        await persistCurrentWorkspace();
+        const deletingActive = projectId === activeProjectIdRef.current;
+        if (deletingActive) workspaceGenerationRef.current += 1;
+        const result = await deleteStudioProject(projectId);
+        if (deletingActive) {
+          stop();
+          await restoreWorkspace(result.active);
+        }
+        await refreshProjectSummaries();
+        setNotice(
+          `Deleted the project.${
+            result.removedAssetCount > 0
+              ? ` Recovered ${result.removedAssetCount} unused local source${result.removedAssetCount === 1 ? '' : 's'}.`
+              : ''
+          }`,
+        );
+      } catch (cause) {
+        reportProjectOperationError(cause);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [
+      persistCurrentWorkspace,
+      projectChangeBlocked,
+      refreshProjectSummaries,
+      reportProjectOperationError,
+      restoreWorkspace,
+      stop,
+    ],
+  );
 
   const togglePlay = useCallback(() => {
     if (playing) {
@@ -619,6 +875,8 @@ export function useStudio(): StudioController {
     persistenceState,
     lastSavedAt,
     restoredAssetCount,
+    projects,
+    activeProjectId,
     dismissError: useCallback(() => setError(null), []),
     dismissNotice: useCallback(() => setNotice(null), []),
 
@@ -626,6 +884,11 @@ export function useStudio(): StudioController {
     stop,
     setBpm: useCallback((bpm) => setProject((c) => ({ ...c, bpm: clampBpm(bpm) })), []),
     rename: useCallback((name) => setProject((c) => ({ ...c, name })), []),
+    createLocalProject,
+    openLocalProject,
+    renameLocalProject,
+    duplicateLocalProject,
+    deleteLocalProject,
 
     importFiles,
     placeClip,

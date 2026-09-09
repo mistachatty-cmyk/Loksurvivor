@@ -14,6 +14,7 @@ import {
   Download,
   FileAudio,
   FileJson,
+  FolderOpen,
   ListMusic,
   Mic,
   MicOff,
@@ -34,6 +35,7 @@ import { ArrangeView } from './studio/ArrangeView';
 import { PadGrid } from './studio/PadGrid';
 import { PianoRoll } from './studio/PianoRoll';
 import { PluginRack } from './studio/PluginRack';
+import { StudioProjectBrowser } from './studio/StudioProjectBrowser';
 import { useStudio } from './studio/useStudio';
 import { useAudioFrame } from '@/game/audio/useAudioFrame';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
@@ -65,6 +67,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
   const projectInputRef = useRef<HTMLInputElement>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<StudioTab>('arrange');
+  const [projectBrowserOpen, setProjectBrowserOpen] = useState(false);
 
   const targetTrackId = studio.project.tracks[0]?.id;
   const hasInstrumentTrack = studio.project.tracks.some((track) => track.instrumentId);
@@ -76,6 +79,10 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
   const isMobileViewport = useIsMobile();
   const mobileMode = meta.studioLayout === 'desktop' ? false : meta.studioLayout === 'mobile' ? true : isMobileViewport;
   const activeTab = mobileTab === 'keys' && !hasInstrumentTrack ? 'arrange' : mobileTab;
+
+  useEffect(() => {
+    setSelectedClipId(null);
+  }, [studio.activeProjectId]);
 
   useEffect(() => {
     // Excludes the currently-playing track when there's a choice: playTrack()
@@ -504,6 +511,26 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             data-testid="input-studio-name"
           />
 
+          <button
+            type="button"
+            onClick={() => setProjectBrowserOpen((open) => !open)}
+            disabled={
+              studio.persistenceState === 'loading' ||
+              studio.persistenceState === 'session-only' ||
+              studio.busy !== null ||
+              studio.recordingMic
+            }
+            aria-expanded={projectBrowserOpen}
+            className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+              projectBrowserOpen
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-card text-white hover:border-primary hover:text-primary'
+            }`}
+            data-testid="button-studio-projects"
+          >
+            <FolderOpen className="h-4 w-4" /> Projects ({studio.projects.length})
+          </button>
+
           {/* The main way a finished beat leaves the studio: it becomes an
               ordinary soundtrack track, and the game reacts to it from there.
               These are direct children of the transport bar's own flex-wrap
@@ -642,6 +669,25 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             }}
           />
         </div>
+
+        {projectBrowserOpen ? (
+          <StudioProjectBrowser
+            projects={studio.projects}
+            activeProjectId={studio.activeProjectId}
+            busy={
+              studio.busy !== null ||
+              studio.persistenceState === 'loading' ||
+              studio.persistenceState === 'session-only' ||
+              studio.recordingMic
+            }
+            onClose={() => setProjectBrowserOpen(false)}
+            onCreate={studio.createLocalProject}
+            onOpen={studio.openLocalProject}
+            onRename={studio.renameLocalProject}
+            onDuplicate={studio.duplicateLocalProject}
+            onDelete={studio.deleteLocalProject}
+          />
+        ) : null}
 
         {studio.busy && (
           <p className="text-xs uppercase tracking-widest text-primary" data-testid="text-studio-busy">
