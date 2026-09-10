@@ -6,6 +6,7 @@ import { CHARACTERS } from '@/game/data/characters';
 import { HORDE_SPIN_TIERS } from '@/game/data/hordeSpin';
 import { DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
 import { createWorld, stepWorld } from '@/game/engine/world';
+import { normalizeMeta } from '@/game/state/metaStore';
 import type { AreaDef, WaveDef } from '@/game/types';
 
 const neutralInput = { moveX: 0, moveY: 0, ultimate: false };
@@ -33,6 +34,29 @@ test('doubleMode raises spawned enemy hp without touching map bounds', () => {
   assert.ok(base.enemies.length > 0 && doubled.enemies.length > 0, 'both worlds should have spawned at least one enemy');
   assert.equal(doubled.bounds.w, base.bounds.w, 'doubleMode must not resize the arena');
   assert.ok(doubled.enemies[0]!.hp > base.enemies[0]!.hp * 1.4, 'doubleMode should meaningfully raise enemy hp');
+});
+
+test('quadSpawnMode creates fourfold wave pressure without accidentally stacking to 8x', () => {
+  const wave: WaveDef = { fromSec: 0, toSec: 300, enemyId: 'nightcrawler', ratePerSec: 1, burst: 1 };
+  const area = areaWithWave(wave);
+  const character = CHARACTERS[0]!;
+  const base = createWorld(area, character, character.stats, 1, [], 1, true, null, {});
+  const quad = createWorld(area, character, character.stats, 1, [], 1, true, null, { modifiers: { quadSpawnMode: true } });
+  const combined = createWorld(area, character, character.stats, 1, [], 1, true, null, { modifiers: { doubleMode: true, quadSpawnMode: true } });
+  for (const world of [base, quad, combined]) {
+    world.player.invulnUntil = Number.POSITIVE_INFINITY;
+    world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 31; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  }
+  assert.equal(base.enemies.length, 1);
+  assert.equal(quad.enemies.length, 4);
+  assert.equal(combined.enemies.length, 4, '4x replaces the 2x spawn portion instead of multiplying it again');
+  assert.ok(combined.enemies[0]!.maxHp > quad.enemies[0]!.maxHp, '2x Mode may still contribute its documented hp bump');
+});
+
+test('quadSpawnMode survives save normalization and rejects non-boolean lookalikes', () => {
+  assert.equal(normalizeMeta({ version: 15, runModifiers: { quadSpawnMode: true } }).runModifiers.quadSpawnMode, true);
+  assert.equal(normalizeMeta({ version: 15, runModifiers: { quadSpawnMode: 'true' } }).runModifiers.quadSpawnMode, undefined);
 });
 
 test('scalerMode raises enemy hp with the player level, capped', () => {

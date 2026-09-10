@@ -1292,6 +1292,7 @@ function modifierHpMult(w: World): number {
 
 /** Flat spawn-rate multiplier from run modifiers. See `modifierHpMult` for the endless-cap caveat. */
 function modifierSpawnMult(w: World): number {
+  if (w.modifiers.quadSpawnMode) return 4;
   return w.modifiers.doubleMode ? 2 : 1;
 }
 

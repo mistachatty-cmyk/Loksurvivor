@@ -969,6 +969,8 @@ export interface DistrictIncursionState {
 export interface RunModifiers {
   /** Doubles enemy spawn rate and applies a flat 1.5x hp bump, stacking with everything else. */
   doubleMode?: boolean;
+  /** Quadruples normal wave spawn rate. Overrides doubleMode's spawn portion when both are enabled. */
+  quadSpawnMode?: boolean;
   /** Mirrors the area's obstacle layout left-to-right at run start. */
   invertedMap?: boolean;
   /** Raises player and enemy movement speed. */
