@@ -5,7 +5,7 @@ import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { HORDE_SPIN_TIERS } from '@/game/data/hordeSpin';
 import { DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
-import { createWorld, stepWorld } from '@/game/engine/world';
+import { createWorld, NORMAL_ENEMY_CAP, stepWorld, UNLEASHED_ENEMY_CAP } from '@/game/engine/world';
 import { normalizeMeta } from '@/game/state/metaStore';
 import type { AreaDef, WaveDef } from '@/game/types';
 
@@ -57,6 +57,37 @@ test('quadSpawnMode creates fourfold wave pressure without accidentally stacking
 test('quadSpawnMode survives save normalization and rejects non-boolean lookalikes', () => {
   assert.equal(normalizeMeta({ version: 15, runModifiers: { quadSpawnMode: true } }).runModifiers.quadSpawnMode, true);
   assert.equal(normalizeMeta({ version: 15, runModifiers: { quadSpawnMode: 'true' } }).runModifiers.quadSpawnMode, undefined);
+});
+
+test('unleashedMode uses independent 8x pressure and raises only its own live-enemy cap to 1,000', () => {
+  const cadenceWave: WaveDef = { fromSec: 0, toSec: 300, enemyId: 'nightcrawler', ratePerSec: 1, burst: 1 };
+  const cadenceArea = areaWithWave(cadenceWave);
+  const character = CHARACTERS[0]!;
+  const unleashed = createWorld(cadenceArea, character, character.stats, 1, [], 1, true, null, {
+    modifiers: { unleashedMode: true, doubleMode: true, quadSpawnMode: true },
+  });
+  unleashed.player.invulnUntil = Number.POSITIVE_INFINITY;
+  unleashed.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < 31; i += 1) stepWorld(unleashed, 1 / 30, neutralInput);
+  assert.equal(unleashed.enemies.length, 8, 'Unleashed overrides 2x/4x spawn cadence instead of multiplying to 64x');
+
+  const floodArea = areaWithWave({ ...cadenceWave, ratePerSec: 10_000 });
+  const normalFlood = createWorld(floodArea, character, character.stats, 1, [], 1, true, null, {});
+  const unleashedFlood = createWorld(floodArea, character, character.stats, 1, [], 1, true, null, { modifiers: { unleashedMode: true } });
+  for (const world of [normalFlood, unleashedFlood]) {
+    world.player.invulnUntil = Number.POSITIVE_INFINITY;
+    world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+  assert.equal(normalFlood.enemies.length, NORMAL_ENEMY_CAP, 'normal runs must retain the original safety cap');
+  assert.equal(unleashedFlood.enemies.length, UNLEASHED_ENEMY_CAP);
+  for (let i = 0; i < 4; i += 1) stepWorld(unleashedFlood, 1 / 30, neutralInput);
+  assert.equal(unleashedFlood.enemies.length, UNLEASHED_ENEMY_CAP, 'the saturated swarm should remain bounded while stepping');
+});
+
+test('unleashedMode survives save normalization and rejects non-boolean lookalikes', () => {
+  assert.equal(normalizeMeta({ version: 15, runModifiers: { unleashedMode: true } }).runModifiers.unleashedMode, true);
+  assert.equal(normalizeMeta({ version: 15, runModifiers: { unleashedMode: 'true' } }).runModifiers.unleashedMode, undefined);
 });
 
 test('scalerMode raises enemy hp with the player level, capped', () => {

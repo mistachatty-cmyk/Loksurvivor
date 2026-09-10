@@ -224,6 +224,7 @@ function LockedCharacterTile({ character }: { character: CharacterDef }) {
 const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; description: string }> = [
   { key: 'doubleMode', name: '2x Mode', description: 'Doubled spawn rate and a flat hp bump on any run. Stacks with everything else here.' },
   { key: 'quadSpawnMode', name: '4x Spawns', description: 'Optional fourfold wave pressure. If 2x Mode is also on, 4x wins for spawns while its hp bump remains.' },
+  { key: 'unleashedMode', name: 'Unleashed 1000', description: 'Up to 1,000 live enemies with optimized 8x pressure. Overrides other spawn-rate toggles, but keeps their hp effects.' },
   { key: 'invertedMap', name: 'Invert', description: 'Mirrors the area layout left-to-right.' },
   { key: 'speedMode', name: 'Speed Mode', description: 'Raises player and enemy movement speed.' },
   { key: 'scalerMode', name: 'Scaler', description: "Enemy hp scales up with your level as the run goes." },

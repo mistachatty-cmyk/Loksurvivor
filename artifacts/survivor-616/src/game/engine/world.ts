@@ -823,7 +823,10 @@ export interface World {
   };
 }
 
-const MAX_ENEMIES = 190;
+export const NORMAL_ENEMY_CAP = 190;
+export const UNLEASHED_ENEMY_CAP = 1000;
+const UNLEASHED_PROJECTILE_BUDGET = 260;
+const UNLEASHED_ENEMY_EFFECT_BUDGET = 180;
 const CELL = 48;
 
 /** Kill counts that drop a blue loot box (each fires once per run). */
@@ -1292,8 +1295,21 @@ function modifierHpMult(w: World): number {
 
 /** Flat spawn-rate multiplier from run modifiers. See `modifierHpMult` for the endless-cap caveat. */
 function modifierSpawnMult(w: World): number {
+  if (w.modifiers.unleashedMode) return 8;
   if (w.modifiers.quadSpawnMode) return 4;
   return w.modifiers.doubleMode ? 2 : 1;
+}
+
+function enemyCap(w: World): number {
+  return w.modifiers.unleashedMode ? UNLEASHED_ENEMY_CAP : NORMAL_ENEMY_CAP;
+}
+
+function canSpawnEnemyProjectile(w: World): boolean {
+  return !w.modifiers.unleashedMode || w.projectiles.length < UNLEASHED_PROJECTILE_BUDGET;
+}
+
+function canSpawnEnemyEffect(w: World): boolean {
+  return !w.modifiers.unleashedMode || w.effects.length < UNLEASHED_ENEMY_EFFECT_BUDGET;
 }
 
 function cooldownMult(w: World): number {
@@ -1356,7 +1372,7 @@ function forEachNearby(w: World, x: number, y: number, radius: number, fn: (e: E
 /* ------------------------------------------------------------------ */
 
 function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
-  if (w.enemies.length >= MAX_ENEMIES) return;
+  if (w.enemies.length >= enemyCap(w)) return;
 
   let x = 0;
   let y = 0;
@@ -1808,7 +1824,10 @@ function updateDistrictIncursion(w: World, dt: number) {
 /* ------------------------------------------------------------------ */
 
 function spawnParticles(w: World, x: number, y: number, color: string, count: number, power = 90) {
-  for (let i = 0; i < count; i += 1) {
+  const denseUnleashed = w.modifiers.unleashedMode && w.enemies.length >= 300;
+  const budget = denseUnleashed ? 160 : 320;
+  const emitted = denseUnleashed ? Math.max(1, Math.ceil(count * 0.35)) : count;
+  for (let i = 0; i < emitted; i += 1) {
     const angle = w.rng() * Math.PI * 2;
     const speed = randRange(w.rng, power * 0.3, power);
     w.particles.push({
@@ -1822,7 +1841,7 @@ function spawnParticles(w: World, x: number, y: number, color: string, count: nu
       lifeMs: randRange(w.rng, 220, 520),
     });
   }
-  if (w.particles.length > 320) w.particles.splice(0, w.particles.length - 320);
+  if (w.particles.length > budget) w.particles.splice(0, w.particles.length - budget);
 }
 
 function spawnFollower(w: World, weapon: WeaponDef, index: number) {
@@ -2365,15 +2384,19 @@ function damageEnemy(
     enemy.ky += (dy / len) * impulse;
   }
 
-  w.popups.push({
-    x: enemy.x + randRange(w.rng, -5, 5),
-    y: enemy.y + enemy.radius + 10,
-    text: isCrit ? `${dealt}!` : String(dealt),
-    color: isCrit ? '#ff5c5c' : '#ffe8a3',
-    bornAt: w.now,
-    vy: isCrit ? 34 : 26,
-  });
-  if (w.popups.length > 40) w.popups.shift();
+  const denseUnleashed = w.modifiers.unleashedMode && w.enemies.length >= 300;
+  if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
+    w.popups.push({
+      x: enemy.x + randRange(w.rng, -5, 5),
+      y: enemy.y + enemy.radius + 10,
+      text: isCrit ? `${dealt}!` : String(dealt),
+      color: isCrit ? '#ff5c5c' : '#ffe8a3',
+      bornAt: w.now,
+      vy: isCrit ? 34 : 26,
+    });
+    const popupBudget = denseUnleashed ? 24 : 40;
+    if (w.popups.length > popupBudget) w.popups.splice(0, w.popups.length - popupBudget);
+  }
 
   if (impactIntensity >= 5 && burstDepth === 0) {
     emitEnemyImpactBurst(w, enemy, dealt, '#fff1a8');
@@ -4586,6 +4609,7 @@ function updateEnemies(w: World, dt: number) {
   const trackX = stealthed ? w.stealthAnchorX : p.x;
   const trackY = stealthed ? w.stealthAnchorY : p.y;
 
+  const enemyMoveBreakables = w.breakables.filter((b) => !b.broken && b.movable);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
 
@@ -4596,7 +4620,7 @@ function updateEnemies(w: World, dt: number) {
         damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8 * statusDamageMultiplier(enemy))), 2, enemy.x, enemy.y);
         const attackAngle = Math.atan2(allyTarget.y - enemy.y, allyTarget.x - enemy.x);
         const attackDistance = Math.hypot(allyTarget.x - enemy.x, allyTarget.y - enemy.y);
-        w.effects.push({
+        if (canSpawnEnemyEffect(w)) w.effects.push({
           uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: attackDistance, angle: attackAngle, spread: 0,
           bornAt: w.now, expiresAt: w.now + 180, color: '#65f6d1', damage: 0, impactIntensity: 0,
           hitUids: new Set(), followPlayer: false,
@@ -4659,7 +4683,7 @@ function updateEnemies(w: World, dt: number) {
         else if (distance < 260) speed = 0;
         if (w.now >= enemy.fireReadyAt && distance < 420) {
           const ranged = enemy.def.ranged;
-          if (ranged) {
+          if (ranged && canSpawnEnemyProjectile(w)) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.2);
             w.projectiles.push({
               uid: uid(w),
@@ -4708,7 +4732,7 @@ function updateEnemies(w: World, dt: number) {
         enemy.weave += dt * 1.8;
         if (w.now >= enemy.fireReadyAt && distance < 480) {
           const ranged = enemy.def.ranged;
-          if (ranged) {
+          if (ranged && canSpawnEnemyProjectile(w)) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.15);
             w.projectiles.push({
               uid: uid(w), x: enemy.x, y: enemy.y + 8,
@@ -4748,7 +4772,7 @@ function updateEnemies(w: World, dt: number) {
               p.ky += dirY * push;
             }
           }
-          w.effects.push({
+          if (canSpawnEnemyEffect(w)) w.effects.push({
             uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius,
             angle: 0, spread: Math.PI * 2, bornAt: w.now, expiresAt: w.now + 360,
             color: enemy.def.palette.accent, damage: 0, impactIntensity: 0,
@@ -4799,7 +4823,7 @@ function updateEnemies(w: World, dt: number) {
         }
         if (revealed && w.now >= enemy.fireReadyAt) {
           const ranged = enemy.def.ranged;
-          if (ranged) {
+          if (ranged && canSpawnEnemyProjectile(w)) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.2);
             const fdx = trackX - enemy.x;
             const fdy = trackY - enemy.y;
@@ -4836,7 +4860,7 @@ function updateEnemies(w: World, dt: number) {
             const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
             if (diff < halfAngle && w.now >= enemy.fireReadyAt) {
               enemy.fireReadyAt = w.now + 900;
-              w.effects.push({
+              if (canSpawnEnemyEffect(w)) w.effects.push({
                 uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: rdist, angle: toPlayer, spread: halfAngle * 2,
                 bornAt: w.now, expiresAt: w.now + 220, color: '#f59e0b', damage: 0, impactIntensity: 0,
                 hitUids: new Set(), followPlayer: false,
@@ -4886,8 +4910,8 @@ function updateEnemies(w: World, dt: number) {
     enemy.x += moveX * speed * dt;
     enemy.y += moveY * speed * dt;
     applyKnockback(enemy, dt);
-    for (const b of w.breakables) {
-      if (b.broken || !b.movable || w.now < b.nextEnemyImpactAt) continue;
+    for (const b of enemyMoveBreakables) {
+      if (b.broken || w.now < b.nextEnemyImpactAt) continue;
       if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
         b.contacts += 1;
         if (b.kind === 'car-wreck' && b.contacts < 3) continue;
@@ -4916,7 +4940,9 @@ function updateEnemies(w: World, dt: number) {
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
     forEachNearby(w, enemy.x, enemy.y, enemy.radius * 2, (other) => {
-      if (other === enemy) return;
+      // Every pair only needs one symmetric resolution. The previous loop
+      // processed A/B and B/A, doubling the hottest crowd-work path.
+      if (other.uid <= enemy.uid) return;
       const dx = other.x - enemy.x;
       const dy = other.y - enemy.y;
       const minDist = enemy.radius + other.radius;
@@ -6231,7 +6257,8 @@ function updateEndlessSpawning(w: World, dt: number) {
   // uncapped (inside spawnEnemy), and run modifiers are the same kind of
   // player-opted-in multiplier as challenges, not an automatic one. Adding
   // it here would also double-apply it, since spawnEnemy applies it too.
-  const spawnRate = Math.min(3.2, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
+  const spawnRateCap = w.modifiers.unleashedMode ? 12 : 3.2;
+  const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
   const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
   const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;

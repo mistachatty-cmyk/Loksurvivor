@@ -1920,12 +1920,14 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   }
   for (const enemy of w.enemies) {
     if (enemy.dying || enemy.defId !== 'ash-wisp') continue;
+    if (Math.abs(enemy.x - w.camera.x) > 760 || Math.abs(enemy.y - w.camera.y) > 760) continue;
     const r = 52;
     const g = ctx.createRadialGradient(enemy.x, enemy.y, 2, enemy.x, enemy.y, r);
     g.addColorStop(0, '#ff4de155'); g.addColorStop(1, '#ff4de100');
     ctx.fillStyle = g; ctx.fillRect(enemy.x - r, enemy.y - r, r * 2, r * 2);
   }
-  for (const boss of w.enemies.filter((e) => !e.dying && e.def.family === 'Boss' && w.now - e.animStartedAt < 1200)) {
+  for (const boss of w.enemies.filter((e) => !e.dying && e.def.family === 'Boss' && w.now - e.animStartedAt < 1200
+    && Math.abs(e.x - w.camera.x) <= 760 && Math.abs(e.y - w.camera.y) <= 760)) {
     const fade = 1 - (w.now - boss.animStartedAt) / 1200;
     ctx.save(); ctx.globalAlpha = Math.max(0, fade) * 0.32; ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
@@ -2638,7 +2640,11 @@ function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawActors(ctx: CanvasRenderingContext2D, w: World) {
+function drawActors(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  viewBounds: { left: number; top: number; right: number; bottom: number },
+) {
   const outlineEnemies = w.enemies.length < 70;
 
   for (const pet of w.lokPets) {
@@ -2709,8 +2715,14 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     ctx.restore();
   }
 
-  // Painter's order: things further up the screen render first.
-  const sorted = [...w.enemies].sort((a, b) => a.y - b.y);
+  // Painter's order only needs on-screen actors. Simulation still owns all
+  // 1,000 Unleashed enemies, while expensive rig drawing and sorting stay
+  // proportional to what the camera can actually show.
+  const margin = 100;
+  const sorted = w.enemies
+    .filter((enemy) => enemy.x >= viewBounds.left - margin && enemy.x <= viewBounds.right + margin
+      && enemy.y >= viewBounds.top - margin && enemy.y <= viewBounds.bottom + margin)
+    .sort((a, b) => a.y - b.y);
   const playerDrawn = { done: false };
 
   const drawPlayer = () => {
@@ -3242,7 +3254,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawAmbient(ctx, w);
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
-  drawActors(ctx, w);
+  drawActors(ctx, w, { left, top, right, bottom });
   drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
   drawEffects(ctx, w);
