@@ -2,7 +2,15 @@
  * Cold open. Sets the premise before the player ever sees the hideout.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
+
+// Pulls in the full simulation engine (createWorld/stepWorld/renderWorld),
+// which is otherwise only paid for once a real run starts. Lazy-loading it
+// here keeps the intro's first paint just as fast as before -- the engine
+// bundle loads in the background and the canvas fades in once it's ready,
+// same pattern this codebase already uses for RunScreen/StudioScreen.
+const AttractMode = lazy(() => import('@/ui/AttractMode').then((m) => ({ default: m.AttractMode })));
 
 export interface IntroScreenProps {
   onBegin: () => void;
@@ -11,6 +19,11 @@ export interface IntroScreenProps {
 export function IntroScreen({ onBegin }: IntroScreenProps) {
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 text-center bg-black text-white relative overflow-hidden">
+      {/* A bot-piloted run of the real game plays behind the copy below --
+          random character, random area, rotating scenes. See AttractMode.tsx. */}
+      <Suspense fallback={null}>
+        <AttractMode />
+      </Suspense>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)] pointer-events-none" />
       
       <motion.div
