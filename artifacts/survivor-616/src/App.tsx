@@ -193,6 +193,10 @@ function Game() {
             markOnboarded();
             goHub();
           }}
+          onSignIn={() => {
+            markOnboarded();
+            setScreen({ name: 'account' });
+          }}
         />
       );
 
