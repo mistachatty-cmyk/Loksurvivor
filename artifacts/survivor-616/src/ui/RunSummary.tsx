@@ -13,6 +13,7 @@ import type { RunHighlightKind } from '@/game/data/runHighlights';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
+import { AccountNudge } from './AccountNudge';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
@@ -24,6 +25,7 @@ export interface RunSummaryProps {
   onReturnToHub: () => void;
   onRetry: () => void;
   onOpenArchive?: (variantId: string) => void;
+  onOpenAccount?: () => void;
   areaOverride?: AreaDef;
 }
 
@@ -51,7 +53,7 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
   'run-ended': BatteryLow,
 };
 
-export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, areaOverride }: RunSummaryProps) {
+export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
@@ -279,6 +281,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
             </div>
           </div>
         </div>
+        {onOpenAccount ? <AccountNudge runNumber={meta.totalRuns} onOpenAccount={onOpenAccount} /> : null}
         {result.highlights && result.highlights.length > 0 ? (
           <section className="border border-primary/25 bg-primary/5 p-5" data-testid="section-run-highlights">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Highlights</p>
