@@ -14,6 +14,7 @@ import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
 import { AccountNudge } from './AccountNudge';
+import { AnimatedNumber } from './AnimatedNumber';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
@@ -55,6 +56,8 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
 
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const characterPalette = resolveCharacterCosmeticPalette(
@@ -250,11 +253,15 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
               <>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><MapPin className="w-3 h-3 text-primary" /> Blocks walked</p>
-                  <p className="text-2xl font-mono font-bold text-white">{result.endless.blocksWalked}</p>
+                  <p className="text-2xl font-mono font-bold text-white">
+                    <AnimatedNumber value={result.endless.blocksWalked} disabled={prefersReducedMotion} />
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><TrendingDown className="w-3 h-3 text-primary" /> Depth</p>
-                  <p className="text-2xl font-mono font-bold text-white">{result.endless.dungeonDepth}</p>
+                  <p className="text-2xl font-mono font-bold text-white">
+                    <AnimatedNumber value={result.endless.dungeonDepth} disabled={prefersReducedMotion} />
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-primary" /> Edge reached</p>
@@ -264,20 +271,28 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
             ) : (
               <div>
                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Trophy className="w-3 h-3 text-primary" /> Time</p>
-                <p className="text-2xl font-mono font-bold text-white">{Math.floor(result.survivedSec)}s</p>
+                <p className="text-2xl font-mono font-bold text-white">
+                  <AnimatedNumber value={Math.floor(result.survivedSec)} suffix="s" disabled={prefersReducedMotion} />
+                </p>
               </div>
             )}
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Skull className="w-3 h-3 text-primary" /> Defeated</p>
-              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-kills">{result.kills}</p>
+              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-kills">
+                <AnimatedNumber value={result.kills} disabled={prefersReducedMotion} />
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Zap className="w-3 h-3 text-primary" /> Level</p>
-              <p className="text-2xl font-mono font-bold text-white">{result.level}</p>
+              <p className="text-2xl font-mono font-bold text-white">
+                <AnimatedNumber value={result.level} disabled={prefersReducedMotion} />
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Coins className="w-3 h-3 text-primary" /> Cred</p>
-              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">{result.cred}</p>
+              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">
+                <AnimatedNumber value={result.cred} durationMs={1400} disabled={prefersReducedMotion} />
+              </p>
             </div>
           </div>
         </div>

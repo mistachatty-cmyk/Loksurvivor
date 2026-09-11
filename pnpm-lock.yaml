@@ -21,6 +21,9 @@ catalogs:
     '@tanstack/react-query':
       specifier: ^5.90.21
       version: 5.101.4
+    '@types/animejs':
+      specifier: ^3.1.13
+      version: 3.1.13
     '@types/node':
       specifier: ^25.3.3
       version: 25.9.5
@@ -33,6 +36,9 @@ catalogs:
     '@vitejs/plugin-react':
       specifier: ^5.0.4
       version: 5.2.0
+    animejs:
+      specifier: ^3.2.2
+      version: 3.2.2
     class-variance-authority:
       specifier: ^0.7.1
       version: 0.7.1
@@ -517,6 +523,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.1.0)
+      '@types/animejs':
+        specifier: 'catalog:'
+        version: 3.1.13
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.5
@@ -535,6 +544,9 @@ importers:
       '@workspace/lok-client':
         specifier: workspace:*
         version: link:../../lib/lok-client
+      animejs:
+        specifier: 'catalog:'
+        version: 3.2.2
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -1646,6 +1658,9 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
+  '@types/animejs@3.1.13':
+    resolution: {integrity: sha512-yWg9l1z7CAv/TKpty4/vupEh24jDGUZXv4r26StRkpUPQm04ztJaftgpto8vwdFs8SiTq6XfaPKCSI+wjzNMvQ==}
+
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
 
@@ -1771,6 +1786,9 @@ packages:
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
+
+  animejs@3.2.2:
+    resolution: {integrity: sha512-Ao95qWLpDPXXM+WrmwcKbl6uNlC5tjnowlaRYtuVDHHoygjtIPfDUoK9NthrlZsQSKjZXlmji2TrBUAVbiH0LQ==}
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
@@ -4321,6 +4339,8 @@ snapshots:
       '@tanstack/query-core': 5.101.4
       react: 19.1.0
 
+  '@types/animejs@3.1.13': {}
+
   '@types/babel__core@7.20.5':
     dependencies:
       '@babel/parser': 7.29.7
@@ -4470,6 +4490,8 @@ snapshots:
       fast-uri: 3.1.4
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
+
+  animejs@3.2.2: {}
 
   argparse@2.0.1: {}
 
