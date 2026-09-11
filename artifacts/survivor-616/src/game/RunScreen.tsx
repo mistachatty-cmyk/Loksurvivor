@@ -19,6 +19,7 @@ import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudL
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { nextRescueAllyId } from '@/game/data/progression';
+import { createRunHighlightRecorder } from '@/game/data/runHighlights';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
@@ -149,6 +150,7 @@ export function RunScreen({
   const music = useMusicPlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
+  const highlightRecorderRef = useRef(createRunHighlightRecorder());
   const phaseRef = useRef<RunPhase>('countdown');
   const finishedRef = useRef(false);
   const keysRef = useRef(new Set<string>());
@@ -601,6 +603,8 @@ export function RunScreen({
 
       renderWorld(ctx, world, view);
 
+      highlightRecorderRef.current.observe(world);
+
       if (time - hudAt > 60) {
         hudAt = time;
         setHud(hudSnapshot(world));
@@ -620,7 +624,9 @@ export function RunScreen({
       if (finishedRef.current) return;
       finishedRef.current = true;
       for (const prize of [...world.pendingReel, ...queuedPrizes, ...(reel ? [reel.prize] : [])]) claimReelPrize(prize);
-      onFinish(buildResult(world, finalRewardMultiplier));
+      const result = buildResult(world, finalRewardMultiplier);
+      result.highlights = highlightRecorderRef.current.getHighlights();
+      onFinish(result);
     }, 1100);
     return () => window.clearTimeout(timer);
   }, [claimReelPrize, finalRewardMultiplier, onFinish, phase, queuedPrizes, reel]);

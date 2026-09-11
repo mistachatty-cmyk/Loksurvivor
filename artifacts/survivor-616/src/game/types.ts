@@ -7,6 +7,7 @@
  */
 
 import type { BeatReaction } from '@/game/data/reactivity';
+import type { RunHighlight } from '@/game/data/runHighlights';
 
 export interface Vec2 {
   x: number;
@@ -1850,6 +1851,8 @@ export interface RunResult {
     discoveredBandIds: EndlessBandId[];
     discoveredRouteEventIds: string[];
   };
+  /** Bounded, capped list of notable moments captured during the run. See `game/data/runHighlights.ts`. */
+  highlights?: RunHighlight[];
 }
 
 export interface HudSnapshot {

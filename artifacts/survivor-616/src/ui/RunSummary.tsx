@@ -9,6 +9,7 @@ import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
+import type { RunHighlightKind } from '@/game/data/runHighlights';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
@@ -38,6 +39,16 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   utensils: Utensils,
   radio: Radio,
   magnet: Magnet,
+};
+
+const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
+  'level-up': Zap,
+  'boss-defeated': Skull,
+  'close-call': Heart,
+  ultimate: Sparkles,
+  'ally-rescued': Unlock,
+  'run-cleared': Trophy,
+  'run-ended': BatteryLow,
 };
 
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, areaOverride }: RunSummaryProps) {
@@ -268,6 +279,23 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
             </div>
           </div>
         </div>
+        {result.highlights && result.highlights.length > 0 ? (
+          <section className="border border-primary/25 bg-primary/5 p-5" data-testid="section-run-highlights">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Highlights</p>
+            <ol className="mt-3 space-y-2">
+              {result.highlights.map((highlight, index) => {
+                const Icon = RUN_HIGHLIGHT_ICONS[highlight.kind] ?? Sparkles;
+                return (
+                  <li key={`${highlight.kind}-${highlight.atMs}-${index}`} className="flex items-center gap-3 text-sm text-white/85">
+                    <Icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="font-mono text-[11px] text-muted-foreground w-10 shrink-0">{highlight.detail}</span>
+                    <span>{highlight.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        ) : null}
         {result.endless && (result.endless.discoveredBandIds.length > 1 || result.endless.discoveredRouteEventIds.length > 0) ? (
           <section className="border border-violet-300/25 bg-violet-300/5 p-5" data-testid="section-endless-discoveries">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-violet-200">Outer-city knowledge recovered</p>
