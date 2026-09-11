@@ -9,7 +9,7 @@ import { getFirstNightChapter } from '@/game/data/firstNight';
 import { ScreenLayout } from './ScreenLayout';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion } from 'framer-motion';
-import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy } from 'lucide-react';
+import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy, Maximize2 } from 'lucide-react';
 import { useState } from 'react';
 
 export interface AreaSelectProps {
@@ -211,6 +211,12 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                       <span className="text-[10px] font-bold uppercase tracking-widest">{Math.round(area.durationSec)}s Survive</span>
                     </div>
                   )}
+                  {Math.max(area.bounds.w, area.bounds.h) >= 1800 ? (
+                    <div className="flex items-center gap-1.5 border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-cyan-100">
+                      <Maximize2 className="h-3 w-3" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">XL Route</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </motion.button>

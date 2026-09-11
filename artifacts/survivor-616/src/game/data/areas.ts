@@ -1,5 +1,6 @@
 import type { AreaDef } from '@/game/types';
 import { AREAS_2X } from './areas-2x';
+import { WEIRD_AREAS } from './areas-weird';
 import { squadWave } from './authoring';
 
 /**
@@ -730,6 +731,8 @@ export const AREAS: AreaDef[] = [
       { fromSec: 150, toSec: 240, enemyId: 'crypt-bouncer', ratePerSec: 0.15, burst: 1 },
     ],
   },
+
+  ...WEIRD_AREAS,
 
   // Endless mode -- no time limit, no walls, procedurally generated world.
   {
