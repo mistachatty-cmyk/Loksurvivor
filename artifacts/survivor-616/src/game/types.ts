@@ -1599,6 +1599,8 @@ export interface MetaState {
   musicReactiveEnabled: boolean;
   /** Optional procedural room ambience in the hideout (rain, pipe hum, cellar drips). Off by default. */
   hideoutAmbienceEnabled: boolean;
+  /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
+  hideoutWeatherEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */

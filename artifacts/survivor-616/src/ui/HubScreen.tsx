@@ -184,14 +184,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
              aria-hidden="true"
            >
              <div className="hideout-sky-glow" />
-             <div className="hideout-cloud hideout-cloud-one" />
-             <div className="hideout-cloud hideout-cloud-two" />
-             <div className={`hideout-fliers hideout-fliers-${scene.motionKind}`}>
-               <span className="hideout-flier flier-one">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
-               <span className="hideout-flier flier-two">{scene.motionKind === 'motes' ? '·' : scene.motionKind === 'drones' ? '◇' : '⌁'}</span>
-               <span className="hideout-flier flier-three">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
-             </div>
-             <div className="hideout-weather-particles" />
+             {meta.hideoutWeatherEnabled && (
+               <>
+                 <div className="hideout-cloud hideout-cloud-one" />
+                 <div className="hideout-cloud hideout-cloud-two" />
+                 <div className={`hideout-fliers hideout-fliers-${scene.motionKind}`}>
+                   <span className="hideout-flier flier-one">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
+                   <span className="hideout-flier flier-two">{scene.motionKind === 'motes' ? '·' : scene.motionKind === 'drones' ? '◇' : '⌁'}</span>
+                   <span className="hideout-flier flier-three">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
+                 </div>
+                 <div className="hideout-weather-particles" />
+               </>
+             )}
              <div className="hideout-home-art">
                {scene.biome === 'sanctum' && <div className="hideout-window-grid"><span /><span /><span /></div>}
                {scene.biome === 'rooftop' && <RadioTower className="h-20 w-20 opacity-40" />}

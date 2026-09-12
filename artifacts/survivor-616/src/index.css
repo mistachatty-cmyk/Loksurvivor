@@ -506,6 +506,11 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   to { background-position: -3rem 8rem; }
 }
 
+@keyframes hideout-heat-waver {
+  0%, 100% { transform: scale(1) translateY(0); opacity: .8; }
+  50% { transform: scale(1.1) translateY(-3%); opacity: 1; }
+}
+
 .hideout-ambient { color: var(--scene-accent); overflow: hidden; }
 .hideout-sky-glow {
   position: absolute; inset: 0 0 35%; opacity: .22;
@@ -534,8 +539,28 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   background-size: 3.5rem 8rem; animation: hideout-rain .8s linear infinite;
 }
 .hideout-weather-fog .hideout-weather-particles { background: linear-gradient(90deg, transparent, rgba(203, 213, 225, .16), transparent); animation: hideout-drift-two 22s linear infinite; }
-.hideout-weather-heat .hideout-weather-particles { background: radial-gradient(ellipse at 42% 70%, rgba(45, 212, 191, .18), transparent 34%); filter: blur(12px); }
+.hideout-weather-heat .hideout-weather-particles {
+  background: radial-gradient(ellipse at 42% 70%, rgba(45, 212, 191, .18), transparent 34%);
+  filter: blur(12px);
+  transform-origin: 42% 70%;
+  /* The-cellar's own flavor text ("warmth ... wavers through the old
+     brick") describes motion this glow didn't have -- it was a static
+     blur. A slow breathing scale/opacity pulse is the cheapest way to
+     read as heat haze rather than a fixed light fixture. */
+  animation: hideout-heat-waver 6s ease-in-out infinite;
+}
 .hideout-weather-snow .hideout-weather-particles { background-image: radial-gradient(circle, rgba(255,255,255,.65) 0 1px, transparent 1.5px); background-size: 2.4rem 2.4rem; animation: hideout-rain 5s linear infinite; }
+.hideout-weather-clear .hideout-weather-particles {
+  /* The-alley was the one room with no particle layer at all -- "clear"
+     read as literally nothing moving. Warm drifting motes (embers off
+     the lamp, salvage dust) fit its own flavor text without implying
+     precipitation. Fixed background-size, not a percentage -- see the
+     rain comment above and hideout-ambiance.md; a percentage width would
+     stretch the repeat unit on a wide viewport and read as frozen. */
+  background-image: radial-gradient(circle, rgba(251, 146, 60, .55) 0 1px, transparent 1.5px);
+  background-size: 3.4rem 3.4rem;
+  animation: hideout-rain 16s linear infinite;
+}
 .hideout-home-art { position: absolute; right: 6%; bottom: 13%; display: grid; place-items: center; color: var(--scene-accent); opacity: .65; }
 .hideout-window-grid { display: flex; gap: .5rem; padding: .8rem; border: 2px solid currentColor; box-shadow: 0 0 2rem color-mix(in srgb, var(--scene-accent) 35%, transparent); }
 .hideout-window-grid span { display: block; width: 1.2rem; height: 1.6rem; background: currentColor; opacity: .5; }

@@ -190,6 +190,7 @@ export function createInitialMeta(): MetaState {
     uiDensity: 'grid',
     musicReactiveEnabled: true,
     hideoutAmbienceEnabled: false,
+    hideoutWeatherEnabled: true,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
     gyroEnabled: false,
@@ -805,6 +806,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // Opt-in, unlike the other audio toggles: ambience should never start
     // making noise on its own for a returning save that predates it.
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
+    hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
     gyroEnabled: parsed.gyroEnabled === true,
@@ -1185,6 +1187,7 @@ type Action =
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
   | { type: 'setHideoutAmbience'; enabled: boolean }
+  | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
@@ -1540,6 +1543,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setHideoutAmbience':
       return { ...state, meta: { ...state.meta, hideoutAmbienceEnabled: action.enabled } };
+
+    case 'setHideoutWeather':
+      return { ...state, meta: { ...state.meta, hideoutWeatherEnabled: action.enabled } };
 
     case 'setPaletteAnimations':
       return { ...state, meta: { ...state.meta, paletteAnimationsEnabled: action.enabled } };
@@ -1912,6 +1918,7 @@ export interface MetaContextValue {
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
   setHideoutAmbience: (enabled: boolean) => void;
+  setHideoutWeather: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
@@ -2011,6 +2018,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setHideoutAmbience = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutAmbience', enabled }),
+    [],
+  );
+  const setHideoutWeather = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setHideoutWeather', enabled }),
     [],
   );
 
@@ -2149,6 +2160,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMinimapVisible,
       setMusicReactive,
       setHideoutAmbience,
+      setHideoutWeather,
       setPaletteAnimations,
       setWorldPaletteBlend,
       setGyroEnabled,
@@ -2216,6 +2228,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMinimapVisible,
     setMusicReactive,
     setHideoutAmbience,
+    setHideoutWeather,
     setPaletteAnimations,
     setWorldPaletteBlend,
     setGyroEnabled,

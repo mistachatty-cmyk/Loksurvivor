@@ -90,13 +90,33 @@ Three constraints worth keeping:
 This is the "toggleable ambiance" the roadmap note below asked for, on the
 audio side; the CSS weather variety part of that note is still open.
 
-### Hideout room ambiance: more variety, toggleable
+### Hideout room ambiance: more variety, toggleable -- built 2026-09-12
 
-Beyond the rain bug fix above, there's a stated intent for more per-room
-background ambiance variety (`main-floor` currently has rain; other rooms
-have their own static `weather` in `HIDEOUT_SCENES`), and for ambiance to be
-**toggleable** by the player (a settings switch, presumably similar in
-spirit to existing toggles like `meta.wildlifeSheltersInRain` /
-`meta.minimapVisible`). No specific new weather kinds or toggle UI were
-specified -- flagged here so a future pass doesn't have to rediscover that
-this was asked for, but the concrete design is still open.
+Both parts of this roadmap note are now implemented, closing the gap it
+described:
+
+- **Variety.** Of the five `HIDEOUT_SCENES`, two had no real particle motion:
+  `the-cellar`'s `heat` was a static blurred glow (its own flavor text says
+  the warmth "wavers", which the CSS didn't) and `the-alley`'s `clear` had no
+  `.hideout-weather-clear` rule at all -- the one room with zero atmospheric
+  effect. `heat` now runs a slow breathing scale/opacity pulse
+  (`hideout-heat-waver`, 6s ease-in-out). `clear` now drifts warm
+  ember-colored dots, reusing the existing `hideout-rain` keyframe at a much
+  slower 16s duration rather than adding a new one -- same fixed-`rem`
+  `background-size` rule as rain/snow above (never a percentage, see the bug
+  fix at the top of this doc).
+- **Toggleable.** `meta.hideoutWeatherEnabled` (Settings > "Hideout
+  weather"), following the `pauseMapVisible`/`wildlifeSheltersInRain` boolean
+  pattern -- defaults to **`true`** (unlike the audio ambience toggle above,
+  which defaults to `false`: this is silent CSS decoration, not new sound, so
+  the "a returning player must never be surprised" rule that justifies
+  audio's opt-in default doesn't apply here). Gates the clouds, the
+  birds/drones/motes fliers, and the weather-particles layer as one unit in
+  `HubScreen.tsx`; `.hideout-sky-glow` (the static per-room accent tint)
+  intentionally stays regardless -- it's a plain radial-gradient, not
+  animated, so there's no motion or cost to opt out of.
+
+Verified by reading the live computed `animation-name`/`transform`/
+`background-position` at two points in time (not just screenshotting), and
+by confirming the toggle actually removes the elements from the DOM rather
+than only changing a class.
