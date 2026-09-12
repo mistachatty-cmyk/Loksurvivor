@@ -60,6 +60,7 @@ import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegist
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
+import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type {
   AllyDef,
   AreaDef,
@@ -253,6 +254,7 @@ export function createInitialMeta(): MetaState {
     dailyContractDayKey: contractDayKey(),
     dailyContractProgressById: {},
     completedDailyContractIds: [],
+    claimedAchievementIds: [],
   };
 }
 
@@ -871,6 +873,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
+    claimedAchievementIds: idList(
+      parsed.claimedAchievementIds,
+      new Set(ACHIEVEMENTS.map((achievement) => achievement.id)),
+      [],
+    ),
   };
 }
 
@@ -1202,6 +1209,7 @@ type Action =
   | { type: 'saveCustomMap'; map: CustomMap }
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
+  | { type: 'claimAchievement'; id: string }
   | { type: 'replaceMeta'; meta: Partial<MetaState> }
   | { type: 'reset' };
 
@@ -1618,6 +1626,24 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'claimAchievement': {
+      const def = ACHIEVEMENTS_BY_ID[action.id];
+      if (!def || !def.reward) return state;
+      if (state.meta.claimedAchievementIds.includes(action.id)) return state;
+      if (!def.isComplete(state.meta)) return state;
+      const currencyPatch = def.reward.kind === 'cred'
+        ? { cred: state.meta.cred + def.reward.amount }
+        : { lootTokens: state.meta.lootTokens + def.reward.amount };
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          ...currencyPatch,
+          claimedAchievementIds: [...state.meta.claimedAchievementIds, action.id],
+        },
+      };
+    }
+
     case 'tickRecovery':
       return { ...state, meta: settleRecovery(state.meta, action.now) };
 
@@ -1925,6 +1951,7 @@ export interface MetaContextValue {
   saveCustomMap: (map: CustomMap) => void;
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
+  claimAchievement: (id: string) => void;
   resetProgress: () => void;
   /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
   importMeta: (meta: Partial<MetaState>) => void;
@@ -2064,6 +2091,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const saveCustomMap = useCallback((map: CustomMap) => dispatch({ type: 'saveCustomMap', map }), []);
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
+  const claimAchievement = useCallback((id: string) => dispatch({ type: 'claimAchievement', id }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -2161,6 +2189,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       saveCustomMap,
       duplicateCustomMap,
       deleteCustomMap,
+      claimAchievement,
       importMeta,
     };
   }, [
@@ -2226,6 +2255,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     saveCustomMap,
     duplicateCustomMap,
     deleteCustomMap,
+    claimAchievement,
     importMeta,
   ]);
 

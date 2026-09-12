@@ -1715,6 +1715,8 @@ export interface MetaState {
   dailyContractProgressById: Record<string, number>;
   /** Contracts already paid out for today's Broadcast board. */
   completedDailyContractIds: string[];
+  /** Achievement ids whose one-time currency reward has already been paid out. See `data/achievements.ts`. */
+  claimedAchievementIds: string[];
 }
 
 /* ------------------------------------------------------------------ */
