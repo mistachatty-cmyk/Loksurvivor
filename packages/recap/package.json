@@ -20,14 +20,14 @@
     "render:run": "node scripts/render-run.mjs"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.240",
-    "remotion": "4.0.240",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zod": "^3.23.8"
+    "@remotion/cli": "catalog:",
+    "remotion": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "4.5.4"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "typescript": "^5.5.4"
+    "@types/react": "catalog:",
+    "typescript": "~5.9.3"
   }
 }

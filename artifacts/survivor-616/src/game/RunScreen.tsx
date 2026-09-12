@@ -57,6 +57,7 @@ import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
 import { Minimap } from '@/ui/Minimap';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { LevelUpAnnouncement, LevelUpFlash } from '@/anim/components/LevelUpFlash';
+import { LootFeed, type LootPickup } from '@/anim/components/LootPop';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 
@@ -179,6 +180,11 @@ export function RunScreen({
   const [celebration, setCelebration] = useState(false);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const [pauseSoundtrackOpen, setPauseSoundtrackOpen] = useState(false);
+  const [lootPickups, setLootPickups] = useState<LootPickup[]>([]);
+  const expireLootPickup = useCallback(
+    (id: string) => setLootPickups((prev) => prev.filter((pickup) => pickup.id !== id)),
+    [],
+  );
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
@@ -637,6 +643,13 @@ export function RunScreen({
       const world = worldRef.current;
       if (!world) return;
       applyUpgrade(world, upgrade);
+      const tier: LootPickup['tier'] =
+        upgrade.cardKind === 'evolution' || upgrade.cardKind === 'relic-evolution'
+          ? 'evolved'
+          : upgrade.cardKind === 'weapon' || upgrade.cardKind === 'passive'
+            ? 'rare'
+            : 'common';
+      setLootPickups((prev) => [...prev, { id: crypto.randomUUID(), label: upgrade.name, tier }]);
       if (world.pendingLevelUps > 0) {
         const nextChoices = rollUpgradeChoices(world);
         upgradeChoicesRef.current = nextChoices;
@@ -800,6 +813,9 @@ export function RunScreen({
       {/* Fires on level change only, never on mount -- loading a run mid-level stays quiet. The one full-screen effect in the game. */}
       <LevelUpFlash level={hud?.level ?? 1} />
       <LevelUpAnnouncement level={hud?.level ?? 1} />
+
+      {/* A level-up card taken is this game's "drop" -- new weapon/passive or an evolution reads as rarer than a plain stack. */}
+      <LootFeed pickups={lootPickups} onExpire={expireLootPickup} />
 
       {/* Touch surface: dragging anywhere steers. */}
       <div

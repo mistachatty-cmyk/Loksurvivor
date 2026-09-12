@@ -13,6 +13,20 @@ settings:
 - Build: `pnpm --filter @workspace/survivor-616 run build`
 - Output: `artifacts/survivor-616/dist/public`
 
-No runtime environment variables are required for the game. Replit still
-provides `PORT` and `BASE_PATH` for its own workflow; Vite defaults to the
-standard hosted values when those variables are absent.
+No runtime environment variables are required for the game to build or run.
+Replit still provides `PORT` and `BASE_PATH` for its own workflow; Vite
+defaults to the standard hosted values when those variables are absent.
+
+## Optional: account features (cloud saves, sign-in)
+
+The intro screen's "Sign in" button, the post-run "save your progress"
+nudge, and cloud save sync all gate themselves off automatically when auth
+isn't configured (see `authStore.tsx`'s `available` flag) — the game plays
+identically without them. To turn those features on, set these in the
+Vercel project's Environment Variables:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Both come from the Supabase project's API settings. Leave them unset to
+ship the game with account features quietly disabled.
