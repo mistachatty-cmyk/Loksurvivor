@@ -193,6 +193,10 @@ function Game() {
             markOnboarded();
             goHub();
           }}
+          onSignIn={() => {
+            markOnboarded();
+            setScreen({ name: 'account' });
+          }}
         />
       );
 
@@ -286,6 +290,7 @@ function Game() {
           areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
           onReturnToHub={goHub}
           onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
+          onOpenAccount={() => setScreen({ name: 'account' })}
           onRetry={() =>
             canRetry
               ? setScreen({

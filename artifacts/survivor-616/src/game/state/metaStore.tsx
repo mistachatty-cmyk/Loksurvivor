@@ -181,6 +181,7 @@ export function createInitialMeta(): MetaState {
     lootPresentation: 'auto-pause',
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
+    graphicsQuality: 'high',
     wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
@@ -190,6 +191,7 @@ export function createInitialMeta(): MetaState {
     uiDensity: 'grid',
     musicReactiveEnabled: true,
     hideoutAmbienceEnabled: false,
+    hideoutWeatherEnabled: true,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
     gyroEnabled: false,
@@ -791,6 +793,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
         ? parsed.levelUpPresentation
         : liveModeEnabled || parsed.levelUpPausesEnabled === false ? 'compact-live' : 'pause-focus',
     pauseMapVisible: parsed.pauseMapVisible !== false,
+    graphicsQuality:
+      parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
+        ? parsed.graphicsQuality
+        : 'high',
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
@@ -802,6 +808,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // Opt-in, unlike the other audio toggles: ambience should never start
     // making noise on its own for a returning save that predates it.
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
+    hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
     gyroEnabled: parsed.gyroEnabled === true,
@@ -1182,10 +1189,12 @@ type Action =
   | { type: 'setLootPresentation'; value: MetaState['lootPresentation'] }
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
+  | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
   | { type: 'setHideoutAmbience'; enabled: boolean }
+  | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
@@ -1528,6 +1537,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setPauseMapVisible':
       return { ...state, meta: { ...state.meta, pauseMapVisible: action.enabled } };
 
+    case 'setGraphicsQuality':
+      return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
+
     case 'setWildlifeSheltersInRain':
       return {
         ...state,
@@ -1539,6 +1551,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setHideoutAmbience':
       return { ...state, meta: { ...state.meta, hideoutAmbienceEnabled: action.enabled } };
+
+    case 'setHideoutWeather':
+      return { ...state, meta: { ...state.meta, hideoutWeatherEnabled: action.enabled } };
 
     case 'setPaletteAnimations':
       return { ...state, meta: { ...state.meta, paletteAnimationsEnabled: action.enabled } };
@@ -1924,10 +1939,12 @@ export interface MetaContextValue {
   setLootPresentation: (value: MetaState['lootPresentation']) => void;
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
+  setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
   setHideoutAmbience: (enabled: boolean) => void;
+  setHideoutWeather: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
@@ -2021,12 +2038,17 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLootPresentation = useCallback((value: MetaState['lootPresentation']) => dispatch({ type: 'setLootPresentation', value }), []);
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
+  const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setWildlifeSheltersInRain = useCallback(
     (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
     [],
   );
   const setHideoutAmbience = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutAmbience', enabled }),
+    [],
+  );
+  const setHideoutWeather = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setHideoutWeather', enabled }),
     [],
   );
 
@@ -2161,10 +2183,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLootPresentation,
       setLevelUpPresentation,
       setPauseMapVisible,
+      setGraphicsQuality,
       setWildlifeSheltersInRain,
       setMinimapVisible,
       setMusicReactive,
       setHideoutAmbience,
+      setHideoutWeather,
       setPaletteAnimations,
       setWorldPaletteBlend,
       setGyroEnabled,
@@ -2228,10 +2252,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLootPresentation,
     setLevelUpPresentation,
     setPauseMapVisible,
+    setGraphicsQuality,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMusicReactive,
     setHideoutAmbience,
+    setHideoutWeather,
     setPaletteAnimations,
     setWorldPaletteBlend,
     setGyroEnabled,
