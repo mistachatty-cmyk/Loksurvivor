@@ -9,9 +9,15 @@ import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
+import type { RunHighlightKind } from '@/game/data/runHighlights';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
+import { AccountNudge } from './AccountNudge';
+import { AnimatedNumber } from './AnimatedNumber';
+import { ShareRecapButton } from './ShareRecapButton';
+import type { GameRunSummaryLike } from '@lok/recap';
+import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
@@ -23,6 +29,7 @@ export interface RunSummaryProps {
   onReturnToHub: () => void;
   onRetry: () => void;
   onOpenArchive?: (variantId: string) => void;
+  onOpenAccount?: () => void;
   areaOverride?: AreaDef;
 }
 
@@ -40,8 +47,21 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, areaOverride }: RunSummaryProps) {
+const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
+  'level-up': Zap,
+  'boss-defeated': Skull,
+  'close-call': Heart,
+  ultimate: Sparkles,
+  'ally-rescued': Unlock,
+  'run-cleared': Trophy,
+  'run-ended': BatteryLow,
+};
+
+export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
+  const { session, user } = useAuth();
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const characterPalette = resolveCharacterCosmeticPalette(
@@ -50,6 +70,29 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
     meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
     meta.worldPaletteBlendEnabled,
   );
+  // Reuses the highlight recorder's already-tested detections rather than a
+  // second, separate event log -- only the kinds the recap timeline knows
+  // about (see `MILESTONE_KINDS` in @lok/recap) have a mapping.
+  const recapSummary: GameRunSummaryLike = {
+    playerName: user?.email?.split('@')[0],
+    signedIn: Boolean(session),
+    characterId: character.id,
+    characterName: character.name,
+    stageName: area.name,
+    endless: Boolean(result.endless),
+    outcome: result.cleared ? 'cleared' : 'died',
+    elapsedSeconds: result.survivedSec,
+    kills: result.kills,
+    level: result.level,
+    cred: result.cred,
+    events: (result.highlights ?? []).flatMap((highlight) => {
+      const type = highlight.kind === 'level-up' ? 'level'
+        : highlight.kind === 'boss-defeated' ? 'boss'
+        : highlight.kind === 'close-call' ? 'close-call'
+        : null;
+      return type ? [{ atSeconds: highlight.atMs / 1000, type, label: highlight.label }] : [];
+    }),
+  };
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
   const lokPets = result.lokPets ?? [];
@@ -237,11 +280,15 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
               <>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><MapPin className="w-3 h-3 text-primary" /> Blocks walked</p>
-                  <p className="text-2xl font-mono font-bold text-white">{result.endless.blocksWalked}</p>
+                  <p className="text-2xl font-mono font-bold text-white">
+                    <AnimatedNumber value={result.endless.blocksWalked} disabled={prefersReducedMotion} />
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><TrendingDown className="w-3 h-3 text-primary" /> Depth</p>
-                  <p className="text-2xl font-mono font-bold text-white">{result.endless.dungeonDepth}</p>
+                  <p className="text-2xl font-mono font-bold text-white">
+                    <AnimatedNumber value={result.endless.dungeonDepth} disabled={prefersReducedMotion} />
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-primary" /> Edge reached</p>
@@ -251,23 +298,49 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
             ) : (
               <div>
                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Trophy className="w-3 h-3 text-primary" /> Time</p>
-                <p className="text-2xl font-mono font-bold text-white">{Math.floor(result.survivedSec)}s</p>
+                <p className="text-2xl font-mono font-bold text-white">
+                  <AnimatedNumber value={Math.floor(result.survivedSec)} suffix="s" disabled={prefersReducedMotion} />
+                </p>
               </div>
             )}
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Skull className="w-3 h-3 text-primary" /> Defeated</p>
-              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-kills">{result.kills}</p>
+              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-kills">
+                <AnimatedNumber value={result.kills} disabled={prefersReducedMotion} />
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Zap className="w-3 h-3 text-primary" /> Level</p>
-              <p className="text-2xl font-mono font-bold text-white">{result.level}</p>
+              <p className="text-2xl font-mono font-bold text-white">
+                <AnimatedNumber value={result.level} disabled={prefersReducedMotion} />
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Coins className="w-3 h-3 text-primary" /> Cred</p>
-              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">{result.cred}</p>
+              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">
+                <AnimatedNumber value={result.cred} durationMs={1400} disabled={prefersReducedMotion} />
+              </p>
             </div>
           </div>
         </div>
+        {onOpenAccount ? <AccountNudge runNumber={meta.totalRuns} onOpenAccount={onOpenAccount} /> : null}
+        {result.highlights && result.highlights.length > 0 ? (
+          <section className="border border-primary/25 bg-primary/5 p-5" data-testid="section-run-highlights">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Highlights</p>
+            <ol className="mt-3 space-y-2">
+              {result.highlights.map((highlight, index) => {
+                const Icon = RUN_HIGHLIGHT_ICONS[highlight.kind] ?? Sparkles;
+                return (
+                  <li key={`${highlight.kind}-${highlight.atMs}-${index}`} className="flex items-center gap-3 text-sm text-white/85">
+                    <Icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="font-mono text-[11px] text-muted-foreground w-10 shrink-0">{highlight.detail}</span>
+                    <span>{highlight.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        ) : null}
         {result.endless && (result.endless.discoveredBandIds.length > 1 || result.endless.discoveredRouteEventIds.length > 0) ? (
           <section className="border border-violet-300/25 bg-violet-300/5 p-5" data-testid="section-endless-discoveries">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-violet-200">Outer-city knowledge recovered</p>
@@ -661,14 +734,18 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
           >
             Run it back
           </button>
-          <button 
-            type="button" 
-            onClick={onReturnToHub} 
-            className="flex-1 border border-border bg-card text-white py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors" 
+          <button
+            type="button"
+            onClick={onReturnToHub}
+            className="flex-1 border border-border bg-card text-white py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors"
             data-testid="button-return-hub"
           >
             Back to Hideout
           </button>
+          <ShareRecapButton
+            summary={recapSummary}
+            className="flex-1 border border-primary/40 bg-primary/5 text-primary py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors disabled:opacity-50"
+          />
         </div>
 
       </div>

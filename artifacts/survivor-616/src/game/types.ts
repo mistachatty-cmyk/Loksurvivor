@@ -7,6 +7,7 @@
  */
 
 import type { BeatReaction } from '@/game/data/reactivity';
+import type { RunHighlight } from '@/game/data/runHighlights';
 
 export interface Vec2 {
   x: number;
@@ -1572,6 +1573,14 @@ export interface MetaState {
   levelUpPresentation: 'pause-focus' | 'compact-live' | 'random-live';
   /** Show the tactical map by default in the pause dashboard. */
   pauseMapVisible: boolean;
+  /**
+   * 'high' (default) matches every run's current, unchanged behavior --
+   * nothing about how the game looks changes unless the player opts into a
+   * lower tier. 'balanced'/'performance' trim decorative density (particle
+   * counts, damage popups, enemy outlines/shadows) starting at progressively
+   * lower enemy counts, useful on a slower device or a very dense swarm run.
+   */
+  graphicsQuality: 'high' | 'balanced' | 'performance';
   /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
   wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */
@@ -1590,6 +1599,8 @@ export interface MetaState {
   musicReactiveEnabled: boolean;
   /** Optional procedural room ambience in the hideout (rain, pipe hum, cellar drips). Off by default. */
   hideoutAmbienceEnabled: boolean;
+  /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
+  hideoutWeatherEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */
@@ -1852,6 +1863,8 @@ export interface RunResult {
     discoveredBandIds: EndlessBandId[];
     discoveredRouteEventIds: string[];
   };
+  /** Bounded, capped list of notable moments captured during the run. See `game/data/runHighlights.ts`. */
+  highlights?: RunHighlight[];
 }
 
 export interface HudSnapshot {

@@ -2,16 +2,53 @@
  * Cold open. Sets the premise before the player ever sees the hideout.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
+
+import { useAuth } from '@/state/authStore';
+
+// Pulls in the full simulation engine (createWorld/stepWorld/renderWorld),
+// which is otherwise only paid for once a real run starts. Lazy-loading it
+// here keeps the intro's first paint just as fast as before -- the engine
+// bundle loads in the background and the canvas fades in once it's ready,
+// same pattern this codebase already uses for RunScreen/StudioScreen.
+const AttractMode = lazy(() => import('@/ui/AttractMode').then((m) => ({ default: m.AttractMode })));
 
 export interface IntroScreenProps {
   onBegin: () => void;
+  /** Optional -- omitted entirely (renders nothing) if the caller doesn't wire it up. */
+  onSignIn?: () => void;
 }
 
-export function IntroScreen({ onBegin }: IntroScreenProps) {
+export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
+  // Same `available` gate every other account surface in this codebase
+  // uses (AccountPanel, AccountNudge) -- stays invisible until auth is
+  // actually configured, and never shown to someone already signed in.
+  const { available, session } = useAuth();
+  const showSignIn = Boolean(onSignIn) && available && !session;
+
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 text-center bg-black text-white relative overflow-hidden">
+      {/* A bot-piloted run of the real game plays behind the copy below --
+          random character, random area, rotating scenes. See AttractMode.tsx. */}
+      <Suspense fallback={null}>
+        <AttractMode />
+      </Suspense>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)] pointer-events-none" />
+
+      {showSignIn ? (
+        <motion.button
+          type="button"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1, delay: 0.4 }}
+          onClick={onSignIn}
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20 rounded-full border border-white/15 bg-black/30 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-white/60 hover:text-white/90 hover:border-white/30 transition-colors"
+          data-testid="button-intro-sign-in"
+        >
+          Sign in
+        </motion.button>
+      ) : null}
       
       <motion.div
         initial={{ opacity: 0, y: 20 }}

@@ -737,6 +737,8 @@ export interface World {
   ambientRng: () => number;
   /** Rebuilt every frame for enemy separation. */
   grid: Map<number, EnemyActor[]>;
+  /** Rebuilt every frame from `obstacles` so per-actor collision only tests nearby boxes. */
+  obstacleGrid: Map<number, Aabb[]>;
 
   /** Seed used to create rng; also forwarded to endless chunk generation. */
   rngSeed: number;
@@ -794,6 +796,12 @@ export interface World {
   districtIncursion?: DistrictIncursionState;
   /** Run-wide toggles picked on the Roster screen. See `RunModifiers`. */
   modifiers: RunModifiers;
+  /**
+   * Player's persistent graphics preference (Settings), read once at
+   * creation. Render-only -- affects decorative density (particles, damage
+   * popups, enemy outlines/shadows), never difficulty or rewards.
+   */
+  graphicsQuality: 'high' | 'balanced' | 'performance';
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
   wheelSpin: WheelSpinState | null;
 
@@ -827,6 +835,16 @@ export const NORMAL_ENEMY_CAP = 190;
 export const UNLEASHED_ENEMY_CAP = 1000;
 const UNLEASHED_PROJECTILE_BUDGET = 260;
 const UNLEASHED_ENEMY_EFFECT_BUDGET = 180;
+/**
+ * Ground pickups have no expiry and no per-mode budget gate -- unlike
+ * projectiles/effects, rejecting a new one would mean a kill silently pays
+ * no XP/cred, which reads as a bug, not a density limit. Instead this trims
+ * the *oldest* excess pickups each frame (evicting presumably-abandoned
+ * drops, never the one a kill just paid out) once the array is long enough
+ * that scanning it in `updatePickups` would otherwise grow without bound --
+ * e.g. a player who kills through a horde without backtracking to collect.
+ */
+const PICKUP_CAP = 600;
 const CELL = 48;
 
 /** Kill counts that drop a blue loot box (each fires once per run). */
@@ -904,6 +922,7 @@ export function createWorld(
     rescueAllyId?: string | undefined;
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
+    graphicsQuality?: 'high' | 'balanced' | 'performance';
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1035,6 +1054,7 @@ export function createWorld(
     rng,
     ambientRng: createRng(seed + 0x5eed),
     grid: new Map(),
+    obstacleGrid: new Map(),
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
@@ -1095,6 +1115,7 @@ export function createWorld(
         }
       : undefined,
     modifiers,
+    graphicsQuality: setup.graphicsQuality ?? 'high',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
           phase: 'idle',
@@ -1312,6 +1333,21 @@ function canSpawnEnemyEffect(w: World): boolean {
   return !w.modifiers.unleashedMode || w.effects.length < UNLEASHED_ENEMY_EFFECT_BUDGET;
 }
 
+/**
+ * Whether decorative spawn budgets (particles, damage popups) should start
+ * trimming right now. At 'high' (default) this is unchanged from the
+ * original Unleashed-only gate: unaffected outside Unleashed mode, and only
+ * kicks in past 300 enemies within it. 'balanced'/'performance' trim earlier
+ * and apply regardless of Unleashed, since a slower device can want the
+ * headroom even at the normal 190-enemy cap.
+ */
+function isDenseForQuality(w: World): boolean {
+  const count = w.enemies.length;
+  if (w.graphicsQuality === 'performance') return count >= 80;
+  if (w.graphicsQuality === 'balanced') return count >= 150;
+  return Boolean(w.modifiers.unleashedMode) && count >= 300;
+}
+
 function cooldownMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.cooldownMult ?? 1) : 1;
   return w.stats.haste * ult;
@@ -1351,6 +1387,29 @@ function rebuildGrid(w: World) {
     const bucket = w.grid.get(key);
     if (bucket) bucket.push(enemy);
     else w.grid.set(key, [enemy]);
+  }
+}
+
+/**
+ * An obstacle can be larger than one cell (a building wall, a city block),
+ * so it's registered in every cell its bounding box touches -- unlike the
+ * point-sample enemy grid above, which only ever needs one cell per actor.
+ */
+function rebuildObstacleGrid(w: World) {
+  w.obstacleGrid.clear();
+  for (const box of w.obstacles) {
+    const minCx = Math.floor((box.x - box.w / 2) / CELL);
+    const maxCx = Math.floor((box.x + box.w / 2) / CELL);
+    const minCy = Math.floor((box.y - box.h / 2) / CELL);
+    const maxCy = Math.floor((box.y + box.h / 2) / CELL);
+    for (let cx = minCx; cx <= maxCx; cx += 1) {
+      for (let cy = minCy; cy <= maxCy; cy += 1) {
+        const key = (cx + 512) * 4096 + (cy + 512);
+        const bucket = w.obstacleGrid.get(key);
+        if (bucket) bucket.push(box);
+        else w.obstacleGrid.set(key, [box]);
+      }
+    }
   }
 }
 
@@ -1824,7 +1883,7 @@ function updateDistrictIncursion(w: World, dt: number) {
 /* ------------------------------------------------------------------ */
 
 function spawnParticles(w: World, x: number, y: number, color: string, count: number, power = 90) {
-  const denseUnleashed = w.modifiers.unleashedMode && w.enemies.length >= 300;
+  const denseUnleashed = isDenseForQuality(w);
   const budget = denseUnleashed ? 160 : 320;
   const emitted = denseUnleashed ? Math.max(1, Math.ceil(count * 0.35)) : count;
   for (let i = 0; i < emitted; i += 1) {
@@ -2384,7 +2443,7 @@ function damageEnemy(
     enemy.ky += (dy / len) * impulse;
   }
 
-  const denseUnleashed = w.modifiers.unleashedMode && w.enemies.length >= 300;
+  const denseUnleashed = isDenseForQuality(w);
   if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
     w.popups.push({
       x: enemy.x + randRange(w.rng, -5, 5),
@@ -3571,11 +3630,24 @@ function clampToArena(w: World, actor: Actor) {
 }
 
 function collideObstacles(w: World, actor: Actor) {
-  for (const box of w.obstacles) {
-    // Cheap reject before the precise test.
-    if (Math.abs(actor.x - box.x) > box.w / 2 + actor.radius + 4) continue;
-    if (Math.abs(actor.y - box.y) > box.h / 2 + actor.radius + 4) continue;
-    resolveCircleBox(actor, actor.radius, box);
+  // Only the cells within reach of the actor's radius can hold a box it
+  // might overlap -- was a scan of every obstacle for every actor, which
+  // dominated frame time once enemy counts climbed into the hundreds
+  // (profiled at ~40% of a step at 850 enemies on endless-streets).
+  const reach = Math.ceil((actor.radius + 4) / CELL);
+  const baseX = Math.floor(actor.x / CELL);
+  const baseY = Math.floor(actor.y / CELL);
+  for (let ix = -reach; ix <= reach; ix += 1) {
+    for (let iy = -reach; iy <= reach; iy += 1) {
+      const bucket = w.obstacleGrid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+      if (!bucket) continue;
+      for (const box of bucket) {
+        // Cheap reject before the precise test.
+        if (Math.abs(actor.x - box.x) > box.w / 2 + actor.radius + 4) continue;
+        if (Math.abs(actor.y - box.y) > box.h / 2 + actor.radius + 4) continue;
+        resolveCircleBox(actor, actor.radius, box);
+      }
+    }
   }
 }
 
@@ -4936,28 +5008,43 @@ function updateEnemies(w: World, dt: number) {
   }
 
   // Separation so enemies form a crowd instead of a single stacked sprite.
+  // Inlined rather than routed through `forEachNearby`'s callback: this is
+  // the one grid query that runs once per enemy (every other caller runs
+  // once per event -- a projectile, an effect tick), so at hundreds of
+  // enemies the per-enemy closure allocation and indirect call it would
+  // otherwise need were themselves a measurable share of frame time.
   rebuildGrid(w);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
-    forEachNearby(w, enemy.x, enemy.y, enemy.radius * 2, (other) => {
-      // Every pair only needs one symmetric resolution. The previous loop
-      // processed A/B and B/A, doubling the hottest crowd-work path.
-      if (other.uid <= enemy.uid) return;
-      const dx = other.x - enemy.x;
-      const dy = other.y - enemy.y;
-      const minDist = enemy.radius + other.radius;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= minDist * minDist || d2 < 1e-4) return;
-      const d = Math.sqrt(d2);
-      const overlap = (minDist - d) * 0.5;
-      const ox = (dx / d) * overlap;
-      const oy = (dy / d) * overlap;
-      const total = enemy.mass + other.mass;
-      enemy.x -= ox * (other.mass / total) * 2;
-      enemy.y -= oy * (other.mass / total) * 2;
-      other.x += ox * (enemy.mass / total) * 2;
-      other.y += oy * (enemy.mass / total) * 2;
-    });
+    const radius = enemy.radius * 2;
+    const cells = Math.ceil(radius / CELL);
+    const baseX = Math.floor(enemy.x / CELL);
+    const baseY = Math.floor(enemy.y / CELL);
+    for (let ix = -cells; ix <= cells; ix += 1) {
+      for (let iy = -cells; iy <= cells; iy += 1) {
+        const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+        if (!bucket) continue;
+        for (const other of bucket) {
+          // Every pair only needs one symmetric resolution. The previous
+          // loop processed A/B and B/A, doubling the hottest crowd-work path.
+          if (other.uid <= enemy.uid) continue;
+          const dx = other.x - enemy.x;
+          const dy = other.y - enemy.y;
+          const minDist = enemy.radius + other.radius;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= minDist * minDist || d2 < 1e-4) continue;
+          const d = Math.sqrt(d2);
+          const overlap = (minDist - d) * 0.5;
+          const ox = (dx / d) * overlap;
+          const oy = (dy / d) * overlap;
+          const total = enemy.mass + other.mass;
+          enemy.x -= ox * (other.mass / total) * 2;
+          enemy.y -= oy * (other.mass / total) * 2;
+          other.x += ox * (enemy.mass / total) * 2;
+          other.y += oy * (enemy.mass / total) * 2;
+        }
+      }
+    }
   }
 
   // Retire finished death animations.
@@ -5549,6 +5636,12 @@ function updatePickups(w: World, dt: number) {
       }
       w.pickups.splice(i, 1);
     }
+  }
+
+  // Removals above only ever splice a single index out, so the array stays
+  // in the order pickups were born -- trimming the front evicts the oldest.
+  if (w.pickups.length > PICKUP_CAP) {
+    w.pickups.splice(0, w.pickups.length - PICKUP_CAP);
   }
 }
 
@@ -6385,6 +6478,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
+  rebuildObstacleGrid(w);
 
   if (
     w.firstNightChapter &&

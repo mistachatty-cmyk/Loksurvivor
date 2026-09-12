@@ -2645,7 +2645,14 @@ function drawActors(
   w: World,
   viewBounds: { left: number; top: number; right: number; bottom: number },
 ) {
-  const outlineEnemies = w.enemies.length < 70;
+  // 'high' (default) is the original, unchanged 70-enemy threshold.
+  // 'balanced'/'performance' drop the purely-decorative non-boss outline
+  // earlier -- it's an extra fillRect per part, so it's one of the cheaper
+  // knobs to trim first at density. Boss/giant outlines are untouched
+  // (drawn unconditionally at the call site) since those aid readability.
+  const outlineThreshold = w.graphicsQuality === 'performance' ? 0 : w.graphicsQuality === 'balanced' ? 40 : 70;
+  const outlineEnemies = w.enemies.length < outlineThreshold;
+  const skipEnemyShadows = w.graphicsQuality === 'performance' && w.enemies.length >= 150;
 
   for (const pet of w.lokPets) {
     const pulse = 0.86 + Math.sin(w.now / 115 + pet.uid) * 0.14;
@@ -3109,7 +3116,7 @@ function drawActors(
       ctx.stroke();
       ctx.restore();
     }
-    drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - Math.max(dissolve, fallProgress) * 0.6));
+    if (!skipEnemyShadows) drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - Math.max(dissolve, fallProgress) * 0.6));
     const shadowed = w.breakables.some((b) => !b.broken &&
       enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);

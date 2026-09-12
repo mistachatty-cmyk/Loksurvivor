@@ -51,6 +51,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setLootPresentation,
     setLevelUpPresentation,
     setPauseMapVisible,
+    setGraphicsQuality,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
@@ -64,6 +65,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setDevModeAllUnlocks,
     setMusicReactive,
     setHideoutAmbience,
+    setHideoutWeather,
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,
@@ -175,6 +177,29 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
                 <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['high', 'balanced', 'performance'] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setGraphicsQuality(value)}
+                        aria-pressed={meta.graphicsQuality === value}
+                        className={`border p-2 uppercase ${meta.graphicsQuality === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-graphics-quality-${value}`}
+                      >
+                        {value === 'high' ? 'High' : value === 'balanced' ? 'Balanced' : 'Performance'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    High matches how the game has always looked. Balanced and Performance
+                    trim decorative density (particles, damage numbers, enemy outlines/
+                    shadows) starting at a lower enemy count -- useful on a slower device
+                    or a very dense swarm run. Never affects difficulty or rewards.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -288,6 +313,31 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     data-testid="button-toggle-hideout-ambience"
                   >
                     {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout weather</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Drifting clouds, room-specific weather (rain, fog, heat haze, embers), and the small
+                      birds/drones/motes over each room's backdrop. Purely visual, silent CSS decoration --
+                      turn it off for a calmer or faster hideout screen.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHideoutWeather(!meta.hideoutWeatherEnabled)}
+                    aria-pressed={meta.hideoutWeatherEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.hideoutWeatherEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-hideout-weather"
+                  >
+                    {meta.hideoutWeatherEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>
