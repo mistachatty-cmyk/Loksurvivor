@@ -796,6 +796,12 @@ export interface World {
   districtIncursion?: DistrictIncursionState;
   /** Run-wide toggles picked on the Roster screen. See `RunModifiers`. */
   modifiers: RunModifiers;
+  /**
+   * Player's persistent graphics preference (Settings), read once at
+   * creation. Render-only -- affects decorative density (particles, damage
+   * popups, enemy outlines/shadows), never difficulty or rewards.
+   */
+  graphicsQuality: 'high' | 'balanced' | 'performance';
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
   wheelSpin: WheelSpinState | null;
 
@@ -916,6 +922,7 @@ export function createWorld(
     rescueAllyId?: string | undefined;
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
+    graphicsQuality?: 'high' | 'balanced' | 'performance';
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1108,6 +1115,7 @@ export function createWorld(
         }
       : undefined,
     modifiers,
+    graphicsQuality: setup.graphicsQuality ?? 'high',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
           phase: 'idle',
@@ -1323,6 +1331,21 @@ function canSpawnEnemyProjectile(w: World): boolean {
 
 function canSpawnEnemyEffect(w: World): boolean {
   return !w.modifiers.unleashedMode || w.effects.length < UNLEASHED_ENEMY_EFFECT_BUDGET;
+}
+
+/**
+ * Whether decorative spawn budgets (particles, damage popups) should start
+ * trimming right now. At 'high' (default) this is unchanged from the
+ * original Unleashed-only gate: unaffected outside Unleashed mode, and only
+ * kicks in past 300 enemies within it. 'balanced'/'performance' trim earlier
+ * and apply regardless of Unleashed, since a slower device can want the
+ * headroom even at the normal 190-enemy cap.
+ */
+function isDenseForQuality(w: World): boolean {
+  const count = w.enemies.length;
+  if (w.graphicsQuality === 'performance') return count >= 80;
+  if (w.graphicsQuality === 'balanced') return count >= 150;
+  return Boolean(w.modifiers.unleashedMode) && count >= 300;
 }
 
 function cooldownMult(w: World): number {
@@ -1860,7 +1883,7 @@ function updateDistrictIncursion(w: World, dt: number) {
 /* ------------------------------------------------------------------ */
 
 function spawnParticles(w: World, x: number, y: number, color: string, count: number, power = 90) {
-  const denseUnleashed = w.modifiers.unleashedMode && w.enemies.length >= 300;
+  const denseUnleashed = isDenseForQuality(w);
   const budget = denseUnleashed ? 160 : 320;
   const emitted = denseUnleashed ? Math.max(1, Math.ceil(count * 0.35)) : count;
   for (let i = 0; i < emitted; i += 1) {
@@ -2420,7 +2443,7 @@ function damageEnemy(
     enemy.ky += (dy / len) * impulse;
   }
 
-  const denseUnleashed = w.modifiers.unleashedMode && w.enemies.length >= 300;
+  const denseUnleashed = isDenseForQuality(w);
   if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
     w.popups.push({
       x: enemy.x + randRange(w.rng, -5, 5),

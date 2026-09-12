@@ -51,6 +51,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setLootPresentation,
     setLevelUpPresentation,
     setPauseMapVisible,
+    setGraphicsQuality,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
@@ -175,6 +176,29 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
                 <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['high', 'balanced', 'performance'] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setGraphicsQuality(value)}
+                        aria-pressed={meta.graphicsQuality === value}
+                        className={`border p-2 uppercase ${meta.graphicsQuality === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-graphics-quality-${value}`}
+                      >
+                        {value === 'high' ? 'High' : value === 'balanced' ? 'Balanced' : 'Performance'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    High matches how the game has always looked. Balanced and Performance
+                    trim decorative density (particles, damage numbers, enemy outlines/
+                    shadows) starting at a lower enemy count -- useful on a slower device
+                    or a very dense swarm run. Never affects difficulty or rewards.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

@@ -1573,6 +1573,14 @@ export interface MetaState {
   levelUpPresentation: 'pause-focus' | 'compact-live' | 'random-live';
   /** Show the tactical map by default in the pause dashboard. */
   pauseMapVisible: boolean;
+  /**
+   * 'high' (default) matches every run's current, unchanged behavior --
+   * nothing about how the game looks changes unless the player opts into a
+   * lower tier. 'balanced'/'performance' trim decorative density (particle
+   * counts, damage popups, enemy outlines/shadows) starting at progressively
+   * lower enemy counts, useful on a slower device or a very dense swarm run.
+   */
+  graphicsQuality: 'high' | 'balanced' | 'performance';
   /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
   wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */

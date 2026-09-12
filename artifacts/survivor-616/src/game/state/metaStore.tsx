@@ -180,6 +180,7 @@ export function createInitialMeta(): MetaState {
     lootPresentation: 'auto-pause',
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
+    graphicsQuality: 'high',
     wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
@@ -789,6 +790,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
         ? parsed.levelUpPresentation
         : liveModeEnabled || parsed.levelUpPausesEnabled === false ? 'compact-live' : 'pause-focus',
     pauseMapVisible: parsed.pauseMapVisible !== false,
+    graphicsQuality:
+      parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
+        ? parsed.graphicsQuality
+        : 'high',
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
@@ -1175,6 +1180,7 @@ type Action =
   | { type: 'setLootPresentation'; value: MetaState['lootPresentation'] }
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
+  | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
@@ -1519,6 +1525,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     case 'setPauseMapVisible':
       return { ...state, meta: { ...state.meta, pauseMapVisible: action.enabled } };
+
+    case 'setGraphicsQuality':
+      return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
 
     case 'setWildlifeSheltersInRain':
       return {
@@ -1898,6 +1907,7 @@ export interface MetaContextValue {
   setLootPresentation: (value: MetaState['lootPresentation']) => void;
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
+  setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
@@ -1994,6 +2004,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLootPresentation = useCallback((value: MetaState['lootPresentation']) => dispatch({ type: 'setLootPresentation', value }), []);
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
+  const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setWildlifeSheltersInRain = useCallback(
     (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
     [],
@@ -2133,6 +2144,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLootPresentation,
       setLevelUpPresentation,
       setPauseMapVisible,
+      setGraphicsQuality,
       setWildlifeSheltersInRain,
       setMinimapVisible,
       setMusicReactive,
@@ -2199,6 +2211,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLootPresentation,
     setLevelUpPresentation,
     setPauseMapVisible,
+    setGraphicsQuality,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMusicReactive,

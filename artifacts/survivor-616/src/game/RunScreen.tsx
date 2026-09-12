@@ -279,6 +279,7 @@ export function RunScreen({
         rescueAllyId,
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
         modifiers: meta.runModifiers,
+        graphicsQuality: meta.graphicsQuality,
       },
     );
   }

@@ -252,6 +252,11 @@ export function drawRig(
 
   const k = scale / BAKE_SCALE;
   ctx.save();
+  // Every rig part is a flat-color axis-aligned rectangle -- force nearest-
+  // neighbor scaling so blitting the baked bitmap reproduces the same crisp,
+  // un-antialiased edges `drawPartsSlow`'s fillRect calls always had, at any
+  // scale factor. (The shadow blit below is a gradient and wants smoothing.)
+  ctx.imageSmoothingEnabled = false;
   ctx.translate(screenX, screenY);
   if (facing === -1) ctx.scale(-1, 1);
   ctx.drawImage(baked.canvas, -baked.originX * k, -baked.originY * k, baked.canvas.width * k, baked.canvas.height * k);
