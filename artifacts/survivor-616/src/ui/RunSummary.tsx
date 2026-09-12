@@ -15,6 +15,9 @@ import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
 import { AccountNudge } from './AccountNudge';
 import { AnimatedNumber } from './AnimatedNumber';
+import { ShareRecapButton } from './ShareRecapButton';
+import type { GameRunSummaryLike } from '@lok/recap';
+import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
@@ -56,6 +59,7 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
 
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
+  const { session, user } = useAuth();
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const area = areaOverride ?? getArea(result.areaId);
@@ -66,6 +70,29 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
     meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
     meta.worldPaletteBlendEnabled,
   );
+  // Reuses the highlight recorder's already-tested detections rather than a
+  // second, separate event log -- only the kinds the recap timeline knows
+  // about (see `MILESTONE_KINDS` in @lok/recap) have a mapping.
+  const recapSummary: GameRunSummaryLike = {
+    playerName: user?.email?.split('@')[0],
+    signedIn: Boolean(session),
+    characterId: character.id,
+    characterName: character.name,
+    stageName: area.name,
+    endless: Boolean(result.endless),
+    outcome: result.cleared ? 'cleared' : 'died',
+    elapsedSeconds: result.survivedSec,
+    kills: result.kills,
+    level: result.level,
+    cred: result.cred,
+    events: (result.highlights ?? []).flatMap((highlight) => {
+      const type = highlight.kind === 'level-up' ? 'level'
+        : highlight.kind === 'boss-defeated' ? 'boss'
+        : highlight.kind === 'close-call' ? 'close-call'
+        : null;
+      return type ? [{ atSeconds: highlight.atMs / 1000, type, label: highlight.label }] : [];
+    }),
+  };
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
   const lokPets = result.lokPets ?? [];
@@ -707,14 +734,18 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
           >
             Run it back
           </button>
-          <button 
-            type="button" 
-            onClick={onReturnToHub} 
-            className="flex-1 border border-border bg-card text-white py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors" 
+          <button
+            type="button"
+            onClick={onReturnToHub}
+            className="flex-1 border border-border bg-card text-white py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors"
             data-testid="button-return-hub"
           >
             Back to Hideout
           </button>
+          <ShareRecapButton
+            summary={recapSummary}
+            className="flex-1 border border-primary/40 bg-primary/5 text-primary py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors disabled:opacity-50"
+          />
         </div>
 
       </div>
