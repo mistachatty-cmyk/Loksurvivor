@@ -201,7 +201,15 @@ function Game() {
       );
 
     case 'hub':
-      return <HubScreen roomId={roomId} onChangeRoom={setRoomId} onOpen={openPanel} onOpenMapEditor={() => setScreen({ name: 'map-editor' })} />;
+      return (
+        <HubScreen
+          roomId={roomId}
+          onChangeRoom={setRoomId}
+          onOpen={openPanel}
+          onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
+          onBack={() => setScreen({ name: 'intro' })}
+        />
+      );
 
     case 'map-editor':
       return <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />;
