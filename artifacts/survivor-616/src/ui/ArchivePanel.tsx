@@ -2,6 +2,7 @@
  * Archive: rescued crew, discovered locations, and everything still locked.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { ACHIEVEMENTS } from '@/game/data/achievements';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { CHARACTER_EPISODES } from '@/game/data/episodes';
@@ -21,7 +22,7 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -29,8 +30,15 @@ export interface ArchivePanelProps {
   focusVariantId?: string;
 }
 
+const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }> = {
+  bronze: { border: 'border-l-amber-700', label: 'text-amber-500' },
+  silver: { border: 'border-l-slate-300', label: 'text-slate-300' },
+  gold: { border: 'border-l-yellow-400', label: 'text-yellow-300' },
+  legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
+};
+
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
-  const { meta, resetProgress } = useMeta();
+  const { meta, resetProgress, claimAchievement } = useMeta();
   const isListView = meta.uiDensity === 'list';
   const [showHistory, setShowHistory] = useState(false);
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
@@ -167,8 +175,11 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     }
   ];
 
+  const completedAchievementCount = ACHIEVEMENTS.filter((achievement) => achievement.isComplete(meta)).length;
+
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
+    { key: 'achievements', label: 'Achievements', icon: Trophy, count: completedAchievementCount, total: ACHIEVEMENTS.length },
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
@@ -224,6 +235,78 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           data-testid="section-archive-workshop"
         >
           <WorkshopOverview compact />
+        </motion.section>
+      )}
+
+      {activeChapter === 'achievements' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-achievements"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Trophy className="h-5 w-5 text-yellow-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Achievements</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Lifetime milestones, tallied automatically</p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">
+              {completedAchievementCount} / {ACHIEVEMENTS.length}
+            </span>
+          </div>
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {ACHIEVEMENTS.map((achievement) => {
+              const complete = achievement.isComplete(meta);
+              const progress = complete ? 1 : Math.max(0, Math.min(1, achievement.progress?.(meta) ?? 0));
+              const claimed = meta.claimedAchievementIds.includes(achievement.id);
+              const claimable = complete && Boolean(achievement.reward) && !claimed;
+              const tierStyle = ACHIEVEMENT_TIER_STYLES[achievement.tier];
+              return (
+                <article
+                  key={achievement.id}
+                  className={`flex flex-col gap-2 border border-l-4 p-4 ${
+                    complete ? `border-border ${tierStyle.border} bg-card text-white` : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
+                  }`}
+                  data-testid={`card-achievement-${achievement.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold uppercase tracking-wide text-sm">{achievement.name}</p>
+                    <span className={`shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest ${tierStyle.label}`}>
+                      {achievement.tier}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${complete ? 'text-muted-foreground' : 'opacity-70'}`}>{achievement.description}</p>
+                  {!complete && (
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-primary/70"
+                        style={{ width: `${Math.round(progress * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                  {achievement.reward && (
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                        Reward: {achievement.reward.amount} {achievement.reward.kind === 'cred' ? 'Cred' : 'Loot Tokens'}
+                        {claimed ? ' · claimed' : ''}
+                      </span>
+                      {claimable && (
+                        <button
+                          type="button"
+                          onClick={() => claimAchievement(achievement.id)}
+                          className="inline-flex shrink-0 items-center gap-1 border border-yellow-300/50 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-yellow-200 transition-colors hover:border-yellow-200 hover:bg-yellow-300/10"
+                          data-testid={`button-claim-achievement-${achievement.id}`}
+                        >
+                          <Gift className="h-3 w-3" />
+                          Claim
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
         </motion.section>
       )}
 
