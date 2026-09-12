@@ -3,10 +3,11 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
-import { ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
@@ -53,6 +54,7 @@ import { ChestTally } from '@/ui/ChestTally';
 import { HordeSpinWheel } from '@/ui/HordeSpinWheel';
 import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
 import { Minimap } from '@/ui/Minimap';
+import { MusicPanel } from '@/ui/MusicPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 
@@ -144,6 +146,7 @@ export function RunScreen({
     setMinimapExpanded,
     setMinimapPosition,
   } = useMeta();
+  const music = useMusicPlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const phaseRef = useRef<RunPhase>('countdown');
@@ -172,6 +175,7 @@ export function RunScreen({
   const [chestFlight, setChestFlight] = useState(0);
   const [celebration, setCelebration] = useState(false);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
+  const [pauseSoundtrackOpen, setPauseSoundtrackOpen] = useState(false);
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
@@ -1336,10 +1340,59 @@ export function RunScreen({
       ) : null}
 
       {/* Pause */}
-      {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen ? (
+      {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen && !pauseSoundtrackOpen ? (
         <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
           <div className="pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
             <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div>
+            {!liveDashboardOpen ? (
+              <div className="mb-3 flex items-center gap-2 border border-cyan-200/20 bg-[#08111a] px-3 py-2" data-testid="pause-music-bar">
+                <button
+                  type="button"
+                  onClick={music.previous}
+                  disabled={!music.currentTrack}
+                  className="grid h-7 w-7 shrink-0 place-items-center border border-white/20 text-white hover:border-cyan-300 hover:text-cyan-200 disabled:opacity-30"
+                  aria-label="Previous track"
+                  data-testid="button-pause-music-prev"
+                >
+                  <SkipBack className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={music.togglePlay}
+                  disabled={!music.currentTrack}
+                  className="grid h-7 w-7 shrink-0 place-items-center border border-white/20 text-white hover:border-cyan-300 hover:text-cyan-200 disabled:opacity-30"
+                  aria-label={music.isPlaying ? 'Pause soundtrack' : 'Play soundtrack'}
+                  data-testid="button-pause-music-toggle"
+                >
+                  {music.isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={music.next}
+                  disabled={!music.currentTrack}
+                  className="grid h-7 w-7 shrink-0 place-items-center border border-white/20 text-white hover:border-cyan-300 hover:text-cyan-200 disabled:opacity-30"
+                  aria-label="Next track"
+                  data-testid="button-pause-music-next"
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-0 flex-1 truncate font-mono text-[10px] uppercase tracking-wider text-white/70" title={music.currentTrack?.title}>
+                  {music.currentTrack ? music.currentTrack.title : 'No track loaded'}
+                </span>
+                <Volume2 className="h-3.5 w-3.5 shrink-0 text-white/50" aria-hidden="true" />
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={music.volume}
+                  onChange={(event) => music.setVolume(Number(event.target.value))}
+                  className="h-1 w-16 shrink-0 accent-cyan-300"
+                  aria-label="Soundtrack volume"
+                  data-testid="input-pause-music-volume"
+                />
+              </div>
+            ) : null}
             <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
               {meta.pauseMapVisible ? <div className="min-h-44 border border-cyan-200/20 bg-[#08111a] p-3">{hud?.endless ? <div className="relative h-52 overflow-hidden"><Minimap map={hud.endless} expanded position={{x:0,y:0}} onPositionChange={() => undefined} onToggleExpanded={() => undefined} /></div> : <div className="grid h-44 place-items-center"><div className="relative h-32 w-52 border border-white/15 bg-[radial-gradient(circle_at_center,rgba(34,211,238,.16),transparent_55%)]"><span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-cyan-300 shadow-[0_0_14px_#67e8f9]"/><span className="absolute left-2 top-2 font-mono text-[9px] uppercase text-white/45">{area.district}</span><span className="absolute bottom-2 right-2 font-mono text-[9px] uppercase text-white/45">{area.name}</span></div></div>}</div> : null}
               <div className="space-y-3">
@@ -1366,6 +1419,16 @@ export function RunScreen({
             >
               Settings
             </button>
+            {!liveDashboardOpen ? (
+              <button
+                type="button"
+                onClick={() => setPauseSoundtrackOpen(true)}
+                className="w-full rounded-sm border border-cyan-200/40 bg-cyan-300/10 px-4 py-3 font-bold uppercase tracking-widest text-cyan-100"
+                data-testid="button-pause-soundtrack"
+              >
+                Soundtrack
+              </button>
+            ) : null}
             {area.endless && !liveDashboardOpen && (
               <button
                 type="button"
@@ -1392,6 +1455,12 @@ export function RunScreen({
       {phase === 'paused' && runSettingsOpen ? (
         <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-run-settings">
           <SettingsPanel onBack={() => setRunSettingsOpen(false)} />
+        </div>
+      ) : null}
+
+      {phase === 'paused' && pauseSoundtrackOpen ? (
+        <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-pause-soundtrack">
+          <MusicPanel onBack={() => setPauseSoundtrackOpen(false)} />
         </div>
       ) : null}
 
