@@ -22,6 +22,7 @@ import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
+import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'account' | 'feedback';
 
@@ -88,6 +89,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
+  const roomNavRef = useRef<HTMLElement>(null);
+  useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
   const enterRoom = (nextRoomId: string) => {
     onChangeRoom(nextRoomId);
@@ -269,17 +272,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
             </div>
           </section>
 
-          <nav className="flex flex-wrap gap-2 mb-6">
+          <nav ref={roomNavRef} className="flex flex-wrap gap-2 mb-6">
             {unlockedRooms.map((room) => {
               const isActive = room.id === roomId;
               return (
                 <button
                   key={room.id}
                   type="button"
+                  data-nav-item
                   onClick={() => enterRoom(room.id)}
                   className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border ${
-                    isActive 
-                      ? 'bg-primary text-primary-foreground border-primary' 
+                    isActive
+                      ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-white'
                   }`}
                   data-active={isActive}

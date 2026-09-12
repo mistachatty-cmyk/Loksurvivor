@@ -56,6 +56,7 @@ import { HordeSpinWheel } from '@/ui/HordeSpinWheel';
 import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
 import { Minimap } from '@/ui/Minimap';
 import { MusicPanel } from '@/ui/MusicPanel';
+import { LevelUpAnnouncement, LevelUpFlash } from '@/anim/components/LevelUpFlash';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
 
@@ -795,6 +796,10 @@ export function RunScreen({
       {/* 666 HordeSpin tier only -- pure screen-space decoration, never touches the simulation. */}
       <style>{`@keyframes hordespin-hue { from { filter: hue-rotate(0deg) saturate(1.4); } to { filter: hue-rotate(360deg) saturate(1.4); } }`}</style>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+
+      {/* Fires on level change only, never on mount -- loading a run mid-level stays quiet. The one full-screen effect in the game. */}
+      <LevelUpFlash level={hud?.level ?? 1} />
+      <LevelUpAnnouncement level={hud?.level ?? 1} />
 
       {/* Touch surface: dragging anywhere steers. */}
       <div
