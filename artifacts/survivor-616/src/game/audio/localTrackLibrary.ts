@@ -19,6 +19,8 @@ export interface StoredLocalTrack {
   id: string;
   title: string;
   file: File;
+  /** Device-only file identity used to avoid adding the same export twice. */
+  fingerprint?: string;
   isVideoContainer: boolean;
   addedAt: number;
 }
@@ -32,6 +34,7 @@ interface StoredLocalTrackReference {
   id: string;
   title: string;
   assetId: string;
+  fingerprint?: string;
   isVideoContainer: boolean;
   addedAt: number;
 }
@@ -58,6 +61,7 @@ export async function saveLocalTrack(track: StoredLocalTrack): Promise<void> {
     id: track.id,
     title: track.title,
     assetId: asset.id,
+    fingerprint: track.fingerprint,
     isVideoContainer: track.isVideoContainer,
     addedAt: track.addedAt,
   };
@@ -81,6 +85,7 @@ async function migrateLegacyTrack(track: StoredLocalTrack): Promise<void> {
     id: track.id,
     title: track.title,
     assetId,
+    fingerprint: track.fingerprint,
     isVideoContainer: track.isVideoContainer,
     addedAt: track.addedAt,
   };
@@ -114,6 +119,7 @@ export async function loadLocalTracks(): Promise<StoredLocalTrack[]> {
       assetId?: unknown;
       isVideoContainer?: unknown;
       addedAt?: unknown;
+      fingerprint?: unknown;
     };
     if (
       typeof candidate.id !== 'string' ||
@@ -133,6 +139,7 @@ export async function loadLocalTracks(): Promise<StoredLocalTrack[]> {
         id: candidate.id,
         title: candidate.title,
         file: legacyFile,
+        fingerprint: typeof candidate.fingerprint === 'string' ? candidate.fingerprint : undefined,
         isVideoContainer: candidate.isVideoContainer,
         addedAt: typeof candidate.addedAt === 'number' ? candidate.addedAt : Date.now(),
       };
@@ -158,6 +165,7 @@ export async function loadLocalTracks(): Promise<StoredLocalTrack[]> {
         type: asset.mimeType,
         lastModified: asset.createdAt,
       }),
+      fingerprint: typeof candidate.fingerprint === 'string' ? candidate.fingerprint : undefined,
       isVideoContainer: candidate.isVideoContainer,
       addedAt: typeof candidate.addedAt === 'number' ? candidate.addedAt : asset.createdAt,
     });

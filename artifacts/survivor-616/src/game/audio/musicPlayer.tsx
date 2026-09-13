@@ -54,6 +54,9 @@ export interface Track {
   source: 'bundled' | 'local';
   /** True after a file has been restored from the device-local library. */
   restoredFromLibrary?: boolean;
+  /** Device-only file identity used for duplicate protection and favorites. */
+  fingerprint?: string;
+  favorite?: boolean;
   /**
    * True for a video container (mp4/mov/webm/mkv) added for its audio track.
    * Gates the "Convert to MP3" affordance -- there is no reason to offer it
@@ -102,6 +105,9 @@ export interface MusicPlayerValue {
   durationSec: number;
   error: string | null;
   addFiles: (files: FileList | File[]) => number;
+  lastImport: { added: number; duplicates: number; rejected: number } | null;
+  dismissImportReport: () => void;
+  toggleTrackFavorite: (id: string) => void;
   /**
    * Fetches a direct link to a media file and adds it like a dropped file.
    * Resolves false (and sets `error`) on a bad URL, a blocked streaming-service
@@ -190,6 +196,7 @@ const STREAMING_SERVICE_HOSTS = [
 
 const PLAYLISTS_STORAGE_KEY = 'survivor616.playlists.v1';
 const STREAMING_EMBEDS_STORAGE_KEY = 'survivor616.streaming-embeds.v1';
+const FAVORITE_FINGERPRINTS_STORAGE_KEY = 'survivor616.favorite-track-fingerprints.v1';
 
 const BUNDLED_TRACKS: Track[] = (
   [
@@ -207,6 +214,20 @@ const BUNDLED_TRACKS: Track[] = (
 
 function titleFromFile(file: File): string {
   return file.name.replace(MEDIA_EXTENSIONS, '').replace(/[_-]+/g, ' ').trim() || file.name;
+}
+
+function fileFingerprint(file: Pick<File, 'name' | 'size' | 'lastModified'>): string {
+  return `${file.name.toLowerCase()}::${file.size}::${file.lastModified}`;
+}
+
+function loadFavoriteFingerprints(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(FAVORITE_FINGERPRINTS_STORAGE_KEY) ?? '[]') as unknown;
+    return new Set(Array.isArray(stored) ? stored.filter((value): value is string => typeof value === 'string') : []);
+  } catch {
+    return new Set();
+  }
 }
 
 function looksLikeMedia(file: { type: string; name: string }): boolean {
@@ -349,6 +370,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [lastImport, setLastImport] = useState<{ added: number; duplicates: number; rejected: number } | null>(null);
+  const [favoriteFingerprints, setFavoriteFingerprints] = useState<Set<string>>(() => loadFavoriteFingerprints());
   const [localLibrary, setLocalLibrary] = useState<LocalLibrarySummary & { ready: boolean }>({
     count: 0,
     bytes: 0,
@@ -587,10 +610,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           source: 'local',
           isVideoContainer: entry.isVideoContainer,
           restoredFromLibrary: true,
+          fingerprint: entry.fingerprint ?? fileFingerprint(entry.file),
+          favorite: favoriteFingerprints.has(entry.fingerprint ?? fileFingerprint(entry.file)),
         }));
         setTracks((previous) => {
           const knownIds = new Set(previous.map((track) => track.id));
-          const merged = [...previous, ...restored.filter((track) => !knownIds.has(track.id))];
+          const knownFingerprints = new Set(previous.map((track) => track.fingerprint).filter(Boolean));
+          const merged = [...previous, ...restored.filter((track) => !knownIds.has(track.id) && !knownFingerprints.has(track.fingerprint))];
           tracksRef.current = merged;
           return merged;
         });
@@ -604,6 +630,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(FAVORITE_FINGERPRINTS_STORAGE_KEY, JSON.stringify([...favoriteFingerprints]));
+    } catch {
+      // Favorites are optional organization metadata; the audio library remains intact.
+    }
+  }, [favoriteFingerprints]);
 
   // Persist playlists (metadata + order only -- see Playlist management below
   // for why local-file entries don't survive a reload).
@@ -706,12 +741,20 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       const accepted: Track[] = [];
       const acceptedFiles: Array<{ track: Track; file: File }> = [];
       const rejected: string[] = [];
+      let duplicates = 0;
+      const knownFingerprints = new Set(tracksRef.current.map((track) => track.fingerprint).filter(Boolean));
 
       for (const file of incoming) {
         if (!looksLikeMedia(file)) {
           rejected.push(file.name);
           continue;
         }
+        const fingerprint = fileFingerprint(file);
+        if (knownFingerprints.has(fingerprint)) {
+          duplicates += 1;
+          continue;
+        }
+        knownFingerprints.add(fingerprint);
         const track: Track = {
           id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
           title: titleFromFile(file),
@@ -720,10 +763,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           duration: null,
           source: 'local',
           isVideoContainer: looksLikeVideoContainer(file),
+          fingerprint,
+          favorite: favoriteFingerprints.has(fingerprint),
         };
         accepted.push(track);
         acceptedFiles.push({ track, file });
       }
+
+      setLastImport({ added: accepted.length, duplicates, rejected: rejected.length });
 
       if (rejected.length > 0) {
         setError(
@@ -768,6 +815,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             id: track.id,
             title: track.title,
             file,
+            fingerprint: track.fingerprint,
             isVideoContainer: Boolean(track.isVideoContainer),
             addedAt: Date.now(),
           })
@@ -780,8 +828,24 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
       return accepted.length;
     },
-    [refreshLocalLibrary],
+    [favoriteFingerprints, refreshLocalLibrary],
   );
+
+  const dismissImportReport = useCallback(() => setLastImport(null), []);
+
+  const toggleTrackFavorite = useCallback((id: string) => {
+    const track = tracksRef.current.find((entry) => entry.id === id);
+    if (!track || track.source !== 'local' || !track.fingerprint) return;
+    setFavoriteFingerprints((previous) => {
+      const next = new Set(previous);
+      if (next.has(track.fingerprint!)) next.delete(track.fingerprint!);
+      else next.add(track.fingerprint!);
+      return next;
+    });
+    setTracks((previous) => previous.map((entry) =>
+      entry.id === id ? { ...entry, favorite: !entry.favorite } : entry,
+    ));
+  }, []);
 
   /**
    * Fetches a direct link to a media file client-side and adds it exactly
@@ -940,6 +1004,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         void removeStoredLocalTrack(id)
           .then(refreshLocalLibrary)
           .catch(() => {});
+      if (track.source === 'local' && track.fingerprint) {
+        setFavoriteFingerprints((previous) => {
+          const next = new Set(previous);
+          next.delete(track.fingerprint!);
+          return next;
+        });
+      }
 
       const next = prev.filter((t) => t.id !== id);
       tracksRef.current = next;
@@ -967,6 +1038,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     void clearStoredLocalTracks()
       .then(refreshLocalLibrary)
       .catch(() => {});
+    setFavoriteFingerprints(new Set());
     tracksRef.current = BUNDLED_TRACKS;
     setTracks(BUNDLED_TRACKS);
     setCurrentIndex(-1);
@@ -1085,6 +1157,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       durationSec,
       error,
       addFiles,
+      lastImport,
+      dismissImportReport,
+      toggleTrackFavorite,
       addFromUrl,
       linkLoading,
       convertTrackToMp3,
@@ -1132,6 +1207,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       durationSec,
       error,
       addFiles,
+      lastImport,
+      dismissImportReport,
+      toggleTrackFavorite,
       addFromUrl,
       linkLoading,
       convertTrackToMp3,
