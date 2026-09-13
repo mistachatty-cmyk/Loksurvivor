@@ -214,6 +214,7 @@ function Game() {
           onOpen={openPanel}
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
+          onBack={() => setScreen({ name: 'intro' })}
         />
       );
 
