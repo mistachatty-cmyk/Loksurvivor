@@ -4,7 +4,6 @@
  */
 import { ACHIEVEMENTS } from '@/game/data/achievements';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
-import type { LokAssetManifest } from '@/game/lok/types';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { CHARACTER_EPISODES } from '@/game/data/episodes';
@@ -22,6 +21,7 @@ import { WorkshopOverview } from './WorkshopPanel';
 import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
+import { LockDeckCollection } from './LockDeckCollection';
 import { ScreenLayout } from './ScreenLayout';
 import {
   exportLokPetAsPortableCard,
@@ -44,36 +44,6 @@ const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }>
   silver: { border: 'border-l-slate-300', label: 'text-slate-300' },
   gold: { border: 'border-l-yellow-400', label: 'text-yellow-300' },
   legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
-};
-
-/**
- * The Card Binder had no imagery at all -- every entry was rarity-colored
- * text. Reuse whatever portrait renderer this same file already wires up
- * for a card's underlying record (LokPet variant, rescued ally) instead of
- * building a new one; a card kind with no existing renderer here (roster
- * operatives, bestiary, endless milestones) falls back to the tab's own
- * icon rather than left blank.
- */
-function cardBinderVisual(card: LokAssetManifest) {
-  if (card.slug.startsWith('pet-')) {
-    const variant = LOKPET_VARIANTS_BY_ID[card.slug.slice('pet-'.length)];
-    if (variant) return <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} size={40} />;
-  }
-  if (card.slug.startsWith('ally-')) {
-    const ally = ALLIES.find((entry) => entry.id === card.slug.slice('ally-'.length));
-    if (ally) return <RigPortrait rig={allyRig(ally)} palette={ally.palette} anim="idle" size={40} />;
-  }
-  return <div className="grid h-10 w-10 place-items-center border border-white/10 bg-black/20"><CreditCard className="h-4 w-4 text-sky-300" /></div>;
-}
-
-const CARD_RARITY_STYLES: Record<string, { border: string; label: string }> = {
-  common: { border: 'border-l-slate-400', label: 'text-slate-300' },
-  uncommon: { border: 'border-l-emerald-400', label: 'text-emerald-300' },
-  rare: { border: 'border-l-sky-400', label: 'text-sky-300' },
-  epic: { border: 'border-l-purple-400', label: 'text-purple-300' },
-  legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
-  mythic: { border: 'border-l-yellow-300', label: 'text-yellow-200' },
-  secret: { border: 'border-l-red-400', label: 'text-red-300' },
 };
 
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
@@ -413,41 +383,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               {ownedCardCount} / {CARD_MANIFESTS.length}
             </span>
           </div>
-          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-            {CARD_MANIFESTS.map((card) => {
-              const owned = isCardOwned(card, meta);
-              const rarityStyle = CARD_RARITY_STYLES[card.rarity];
-              return (
-                <article
-                  key={card.id}
-                  className={`flex flex-col gap-2 border border-l-4 p-4 ${
-                    owned ? `border-border ${rarityStyle.border} bg-card text-white` : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
-                  }`}
-                  data-testid={`card-lok-${card.slug}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`shrink-0 ${owned ? '' : 'opacity-25 grayscale'}`}>
-                      {cardBinderVisual(card)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-bold uppercase tracking-wide text-sm">{owned ? card.name : 'Uncatalogued'}</p>
-                        <span className={`shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest ${rarityStyle.label}`}>
-                          {card.rarity}
-                        </span>
-                      </div>
-                      <p className={`mt-1 text-xs ${owned ? 'text-muted-foreground' : 'opacity-70'}`}>
-                        {owned ? card.description : 'Earn this in a run to add it to the binder.'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">
-                    {card.id}
-                  </span>
-                </article>
-              );
-            })}
-          </div>
+          <LockDeckCollection meta={meta} listView={isListView} />
         </motion.section>
       )}
 
