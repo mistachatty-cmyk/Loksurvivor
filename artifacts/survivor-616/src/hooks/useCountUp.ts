@@ -49,6 +49,14 @@ export function useCountUp(target: number, options: UseCountUpOptions = {}): num
       easing: 'easeOutCubic',
       round: decimals === 0 ? 1 : Math.pow(10, decimals),
       update: () => setDisplay(valueRef.current.value),
+      // Belt-and-suspenders: if the page is under heavy load right as this
+      // starts (e.g. mounting straight into a fresh page load/reload),
+      // anime.js's first scheduled frame can land so late that it finishes
+      // the whole tween in one jump and skips calling `update` entirely --
+      // `display` would then stay stuck at its initial value forever
+      // despite `valueRef.current.value` having reached `target`. Setting
+      // it again here is a no-op in the normal case (update already got there).
+      complete: () => setDisplay(target),
     });
 
     return () => animation.pause();

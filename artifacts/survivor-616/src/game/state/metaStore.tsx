@@ -260,6 +260,7 @@ export function createInitialMeta(): MetaState {
     dailyContractProgressById: {},
     completedDailyContractIds: [],
     claimedAchievementIds: [],
+    revealedStats: {},
   };
 }
 
@@ -290,6 +291,24 @@ function counter(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : fallback;
+}
+
+const MAX_REVEALED_STATS = 500;
+
+/**
+ * Unlike `bestiary`/`killsByCharacter`, this is a pure display cache with
+ * no gameplay meaning, so an orphaned or unrecognized key is harmless --
+ * validation only needs to keep the shape sane and bound its size against
+ * a corrupted or hand-edited save, not check every key against a live id set.
+ */
+function normalizeRevealedStats(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const result: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value).slice(0, MAX_REVEALED_STATS)) {
+    if (key.length === 0 || key.length > 200) continue;
+    result[key] = counter(raw);
+  }
+  return result;
 }
 
 function normalizedPosition(value: unknown, fallback: { x: number; y: number }): { x: number; y: number } {
@@ -906,6 +925,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       new Set(ACHIEVEMENTS.map((achievement) => achievement.id)),
       [],
     ),
+    revealedStats: normalizeRevealedStats(parsed.revealedStats),
   };
 }
 
@@ -1240,6 +1260,7 @@ type Action =
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
   | { type: 'claimAchievement'; id: string }
+  | { type: 'revealStat'; key: string; value: number }
   | { type: 'replaceMeta'; meta: Partial<MetaState> }
   | { type: 'reset' };
 
@@ -1679,6 +1700,17 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'revealStat': {
+      if (state.meta.revealedStats[action.key] === action.value) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          revealedStats: { ...state.meta.revealedStats, [action.key]: action.value },
+        },
+      };
+    }
+
     case 'tickRecovery':
       return { ...state, meta: settleRecovery(state.meta, action.now) };
 
@@ -2007,6 +2039,7 @@ export interface MetaContextValue {
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
   claimAchievement: (id: string) => void;
+  revealStat: (key: string, value: number) => void;
   resetProgress: () => void;
   /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
   importMeta: (meta: Partial<MetaState>) => void;
@@ -2152,6 +2185,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
   const claimAchievement = useCallback((id: string) => dispatch({ type: 'claimAchievement', id }), []);
+  const revealStat = useCallback((key: string, value: number) => dispatch({ type: 'revealStat', key, value }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -2252,6 +2286,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       duplicateCustomMap,
       deleteCustomMap,
       claimAchievement,
+      revealStat,
       importMeta,
     };
   }, [
@@ -2320,6 +2355,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     duplicateCustomMap,
     deleteCustomMap,
     claimAchievement,
+    revealStat,
     importMeta,
   ]);
 

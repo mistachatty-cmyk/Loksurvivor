@@ -21,6 +21,7 @@ import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 import { RENTABLE_GENERATORS } from '@/game/data/generators';
+import { RevealingNumber } from './RevealingNumber';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
 
@@ -218,19 +219,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Session Stats</p>
               <p className="flex items-center gap-1.5 justify-start sm:justify-end text-lg font-black text-amber-300" data-testid="text-cred-balance">
                 <Coins className={`h-4 w-4 ${meta.ownedGeneratorIds.length > 0 ? 'hub-cred-pulse' : ''}`} />
-                {meta.cred} cred
+                <RevealingNumber statKey="cred" value={meta.cred} suffix=" cred" />
               </p>
               <p className="text-sm font-bold">
-                <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated
+                <span className="text-white"><RevealingNumber statKey="totalRuns" value={meta.totalRuns} /></span> runs <span className="opacity-50">/</span> <span className="text-white"><RevealingNumber statKey="totalKills" value={meta.totalKills} /></span> defeated
               </p>
               {meta.lootTokens > 0 && (
                 <p className="text-xs font-mono text-amber-400 mt-1">
-                  <Package className="inline w-3 h-3 mr-1" />{meta.lootTokens} loot tokens
+                  <Package className="inline w-3 h-3 mr-1" /><RevealingNumber statKey="lootTokens" value={meta.lootTokens} suffix=" loot tokens" />
                 </p>
               )}
               {meta.skeletonKeys > 0 && (
                 <p className="text-xs font-mono text-sky-400 mt-1">
-                  <KeyRound className="inline w-3 h-3 mr-1" />{meta.skeletonKeys} skeleton keys
+                  <KeyRound className="inline w-3 h-3 mr-1" /><RevealingNumber statKey="skeletonKeys" value={meta.skeletonKeys} suffix=" skeleton keys" />
                 </p>
               )}
             </div>
@@ -555,7 +556,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
           <button type="button" onClick={() => onOpen('palette-store')} className="mt-6 w-full border border-amber-900/40 bg-amber-950/20 px-5 py-3 flex items-center gap-3 text-left transition-colors hover:border-amber-400/50 hover:bg-amber-950/35" data-testid="section-tokens">
             <Package className="w-4 h-4 text-amber-400 shrink-0" />
             <div>
-              <span className="font-mono text-sm text-amber-300 font-bold">{meta.lootTokens}</span>
+              <span className="font-mono text-sm text-amber-300 font-bold"><RevealingNumber statKey="lootTokens" value={meta.lootTokens} /></span>
               <span className="ml-1.5 font-mono text-xs text-muted-foreground uppercase tracking-widest">loot tokens — open customization shop</span>
             </div>
           </button>
@@ -570,7 +571,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
           >
             <KeyRound className="w-4 h-4 text-sky-400 shrink-0" />
             <div>
-              <span className="font-mono text-sm text-sky-300 font-bold">{meta.skeletonKeys}</span>
+              <span className="font-mono text-sm text-sky-300 font-bold"><RevealingNumber statKey="skeletonKeys" value={meta.skeletonKeys} /></span>
               <span className="ml-1.5 font-mono text-xs text-muted-foreground uppercase tracking-widest">skeleton keys — spend at the Quartermaster</span>
             </div>
           </button>

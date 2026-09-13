@@ -1732,6 +1732,15 @@ export interface MetaState {
   completedDailyContractIds: string[];
   /** Achievement ids whose one-time currency reward has already been paid out. See `data/achievements.ts`. */
   claimedAchievementIds: string[];
+  /**
+   * statKey -> the last value that stat has actually been shown catching up
+   * to on screen (bestiary kills, cred, loot tokens, mastery kills, ...).
+   * A lifetime counter can jump between visits (finishing a run updates it
+   * off-screen); this is compared against the counter's real current value
+   * to decide what a `RevealingNumber` animates from. Never read by game
+   * logic -- purely a display cache. See `hooks/useRevealingStat.ts`.
+   */
+  revealedStats: Record<string, number>;
 }
 
 /* ------------------------------------------------------------------ */

@@ -17,6 +17,7 @@ import { CharacterAbilityVisualizer } from './CharacterAbilityVisualizer';
 import { LokPetIcon, LokPetVariantSheet } from './LokPetVariantSheet';
 import { WeaponIcon } from './WeaponIcon';
 import { CosmeticPreview } from './CosmeticPreview';
+import { RevealingNumber } from './RevealingNumber';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getHatStyle } from '@/game/data/hats';
 import { getCelebrationStyle } from '@/game/data/celebrations';
@@ -91,7 +92,7 @@ function CharacterDetail({
           <span className="font-mono text-[8px] uppercase text-muted-foreground">{meta.worldPaletteBlendEnabled ? 'World blend on' : 'Personal only'}</span>
         </div>
         <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground" data-testid={`character-mastery-${character.id}`}>
-          Mastery Level <span className="text-white">{masteryLevel}</span> · {masteryKills.toLocaleString()} kills
+          Mastery Level <span className="text-white"><RevealingNumber statKey={`mastery-level:${character.id}`} value={masteryLevel} /></span> · <RevealingNumber statKey={`mastery-kills:${character.id}`} value={masteryKills} suffix=" kills" />
         </p>
         <div className="mt-2 grid grid-cols-4 gap-1.5">
           {skins.map((skin) => {

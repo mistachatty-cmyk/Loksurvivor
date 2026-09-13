@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import { Skull, Ghost, LockKeyhole, Sparkles, Users } from 'lucide-react';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+import { RevealingNumber } from './RevealingNumber';
 
 export interface BestiaryPanelProps {
   onBack: () => void;
@@ -162,7 +163,9 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
                   {known ? (
                     <div className="flex items-center gap-1.5 bg-black border border-border px-2 py-1">
                       <Skull className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-[10px] font-mono text-white font-bold">{kills}x</span>
+                      <span className="text-[10px] font-mono text-white font-bold">
+                        <RevealingNumber statKey={`bestiary:${enemy.id}`} value={kills} suffix="x" />
+                      </span>
                     </div>
                   ) : (
                     <Ghost className="w-6 h-6 text-muted-foreground/30" />
