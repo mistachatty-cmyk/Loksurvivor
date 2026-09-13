@@ -19,7 +19,8 @@ import {
 import { AREAS, getArea } from '@/game/data/areas';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
-import { getCharacterSkins } from '@/game/data/characterSkins';
+import { characterSkinId, getCharacterSkins, isCharacterSkinUnlocked } from '@/game/data/characterSkins';
+import { characterMasteryLevel, MASTERY_SKIN_LEVELS } from '@/game/data/characterMastery';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
@@ -203,6 +204,8 @@ export function createInitialMeta(): MetaState {
     characterSkinByCharacterId: {},
     unlockedCharacterIds: CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id),
     clearedAreaIds: [],
+    killsByCharacter: {},
+    clearedAreaIdsByCharacter: {},
     rescuedAllyIds: [],
     discoveryIds: [],
     lokPetCatalog: [],
@@ -710,13 +713,29 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     crewActivitySeed,
   );
   const completedEpisodeIds = idList(parsed.completedEpisodeIds, episodeIds, []);
+  const killsByCharacter: Record<string, number> = {};
+  if (isRecord(parsed.killsByCharacter)) {
+    for (const [id, value] of Object.entries(parsed.killsByCharacter)) {
+      if (characterIds.has(id)) killsByCharacter[id] = counter(value);
+    }
+  }
+  const clearedAreaIdsByCharacter: Record<string, string[]> = {};
+  if (isRecord(parsed.clearedAreaIdsByCharacter)) {
+    for (const [id, value] of Object.entries(parsed.clearedAreaIdsByCharacter)) {
+      if (characterIds.has(id)) clearedAreaIdsByCharacter[id] = idList(value, areaIds, []);
+    }
+  }
+  const skinUnlockContext = {
+    devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
+    completedEpisodeIds,
+    killsByCharacter,
+  };
   const characterSkinByCharacterId: Record<string, string> = {};
   if (parsed.characterSkinByCharacterId && typeof parsed.characterSkinByCharacterId === 'object') {
     for (const character of CHARACTERS) {
       const requested = parsed.characterSkinByCharacterId[character.id];
       const skin = getCharacterSkins(character).find((entry) => entry.id === requested);
-      const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (skin && (!skin.episodeRequired || Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)))) {
+      if (skin && isCharacterSkinUnlocked(skin, skinUnlockContext)) {
         characterSkinByCharacterId[character.id] = skin.id;
       }
     }
@@ -824,6 +843,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     characterSkinByCharacterId,
     unlockedCharacterIds,
     clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
+    killsByCharacter,
+    clearedAreaIdsByCharacter,
     rescuedAllyIds,
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
@@ -1236,8 +1257,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const character = CHARACTERS.find((entry) => entry.id === action.characterId);
       if (!character) return state;
       const skin = getCharacterSkins(character).find((entry) => entry.id === action.skinId);
-      const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (!skin || (skin.episodeRequired && (!characterEpisode || !state.meta.completedEpisodeIds.includes(characterEpisode.id)))) return state;
+      if (!skin || !isCharacterSkinUnlocked(skin, state.meta)) return state;
       return {
         ...state,
         meta: {
@@ -1780,6 +1800,21 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const clearedAreaIds = result.cleared
         ? addUnique(prev.clearedAreaIds, result.areaId)
         : prev.clearedAreaIds;
+      const prevMasteryLevel = characterMasteryLevel(result.characterId, prev);
+      const killsByCharacter = {
+        ...prev.killsByCharacter,
+        [result.characterId]: (prev.killsByCharacter[result.characterId] ?? 0) + result.kills,
+      };
+      const clearedAreaIdsByCharacter = result.cleared
+        ? {
+            ...prev.clearedAreaIdsByCharacter,
+            [result.characterId]: addUnique(prev.clearedAreaIdsByCharacter[result.characterId] ?? [], result.areaId),
+          }
+        : prev.clearedAreaIdsByCharacter;
+      const nextMasteryLevel = characterMasteryLevel(result.characterId, { killsByCharacter });
+      const newlyUnlockedSkinIds = MASTERY_SKIN_LEVELS
+        .filter((level) => prevMasteryLevel < level && nextMasteryLevel >= level)
+        .map((level) => characterSkinId(result.characterId, level === 100 ? 'onyx' : level === 500 ? 'ivory' : 'ascendant'));
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
       const recoveredElixirs = replenishPetElixirs(prev);
       const spentPetIds = new Set(prev.selectedLokPetIds);
@@ -1816,6 +1851,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
         selectedLokPetIds,
         ...recoveredElixirs,
         clearedAreaIds,
+        killsByCharacter,
+        clearedAreaIdsByCharacter,
         totalKills: prev.totalKills + result.kills,
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
@@ -1879,6 +1916,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
           newlyDiscoveredRelicIds: discoveredRelic && !prev.knownRelicIds.includes(discoveredRelic.id)
             ? [discoveredRelic.id]
             : [],
+          newlyUnlockedSkinIds,
         },
       };
     }

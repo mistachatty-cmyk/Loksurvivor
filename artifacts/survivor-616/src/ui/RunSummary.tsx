@@ -21,7 +21,7 @@ import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
-import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { getCharacterSkins, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 
 export interface RunSummaryProps {
@@ -95,6 +95,9 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
   };
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
+  const newlyUnlockedSkins = (result.newlyUnlockedSkinIds ?? [])
+    .map((id) => getCharacterSkins(character).find((skin) => skin.id === id))
+    .filter((skin): skin is NonNullable<typeof skin> => Boolean(skin));
   const lokPets = result.lokPets ?? [];
   const lokPetDiscoveries = result.lokPetDiscoveries ?? [];
   const hasLokPetProgress = lokPets.length > 0;
@@ -470,8 +473,28 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
         )}
 
         {/* Unlocks & Discoveries */}
-        {(ally || discovery || result.newlyUnlockedCharacterIds.length > 0) && (
+        {(ally || discovery || result.newlyUnlockedCharacterIds.length > 0 || newlyUnlockedSkins.length > 0) && (
           <div className="grid gap-4 sm:grid-cols-2">
+            {newlyUnlockedSkins.map((skin) => (
+              <div key={skin.id} className="border border-yellow-300/40 bg-card p-5 sm:col-span-2" data-testid={`text-new-skin-${skin.style}`}>
+                <div className="mb-2 flex items-center gap-2 text-yellow-300">
+                  <Trophy className="h-4 w-4" />
+                  <span className="text-xs font-bold uppercase tracking-widest">Mastery Skin Unlocked</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-16 shrink-0 overflow-hidden border border-white/20">
+                    {[skin.palette.body, skin.palette.accent, skin.palette.glow].map((color) => (
+                      <span key={color} className="flex-1" style={{ backgroundColor: color }} />
+                    ))}
+                  </span>
+                  <div>
+                    <p className="text-lg font-black text-white">{skin.name}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{skin.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+
             {ally && (
               <div className="border border-border bg-card p-5" data-testid="text-rescued-ally">
                 <div className="flex items-center gap-2 mb-2 text-primary">

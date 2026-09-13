@@ -29,13 +29,14 @@ test('run auras cover five paid styles across multiple cosmetic tiers', () => {
   assert.deepEqual(new Set(RUN_AURAS.map((aura) => aura.tier)), new Set(['standard', 'uncommon', 'rare', 'legendary']));
 });
 
-test('every fighter has four distinct personal skins and the fourth is episode-gated', () => {
+test('every fighter has four distinct personal skins plus three mastery-gated prestige skins', () => {
   for (const character of CHARACTERS) {
     const skins = getCharacterSkins(character);
-    assert.equal(skins.length, 4);
-    assert.equal(new Set(skins.map((skin) => skin.id)).size, 4);
+    assert.equal(skins.length, 7);
+    assert.equal(new Set(skins.map((skin) => skin.id)).size, 7);
     assert.equal(skins.filter((skin) => skin.episodeRequired).length, 1);
-    assert.equal(new Set(skins.map((skin) => skin.palette.body)).size, 4);
+    assert.deepEqual(skins.filter((skin) => skin.requiredMasteryLevel).map((skin) => skin.requiredMasteryLevel), [100, 500, 1000]);
+    assert.equal(new Set(skins.map((skin) => skin.palette.body)).size, 7);
   }
 
   const character = CHARACTERS[0]!;
@@ -46,6 +47,19 @@ test('every fighter has four distinct personal skins and the fourth is episode-g
   const unlockedMeta = { ...createInitialMeta(), completedEpisodeIds: [episode.id] };
   const unlocked = reducer({ meta: unlockedMeta, lastRun: null }, { type: 'selectCharacterSkin', characterId: character.id, skinId: episodeSkin.id });
   assert.equal(unlocked.meta.characterSkinByCharacterId[character.id], episodeSkin.id);
+});
+
+test('mastery-gated prestige skins unlock only once a character reaches that mastery level', () => {
+  const character = CHARACTERS[0]!;
+  const onyxSkin = getCharacterSkins(character).find((skin) => skin.requiredMasteryLevel === 100)!;
+
+  const locked = reducer({ meta: createInitialMeta(), lastRun: null }, { type: 'selectCharacterSkin', characterId: character.id, skinId: onyxSkin.id });
+  assert.equal(locked.meta.characterSkinByCharacterId[character.id], undefined);
+
+  // Mastery Level 100 needs 2,500 kills at 25 kills/level (see `data/characterMastery.ts`).
+  const masteredMeta = { ...createInitialMeta(), killsByCharacter: { [character.id]: 2500 } };
+  const unlocked = reducer({ meta: masteredMeta, lastRun: null }, { type: 'selectCharacterSkin', characterId: character.id, skinId: onyxSkin.id });
+  assert.equal(unlocked.meta.characterSkinByCharacterId[character.id], onyxSkin.id);
 });
 
 test('aura purchases charge once and only owned auras can be equipped', () => {

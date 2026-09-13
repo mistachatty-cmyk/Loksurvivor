@@ -1,6 +1,8 @@
-import type { CharacterDef, SpritePalette } from '@/game/types';
+import type { CharacterDef, MetaState, SpritePalette } from '@/game/types';
+import { CHARACTER_EPISODE_BY_CHARACTER_ID } from './episodes';
+import { characterMasteryLevel, MASTERY_SKIN_LEVELS, type MasterySkinLevel } from './characterMastery';
 
-export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'episode';
+export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'episode' | 'onyx' | 'ivory' | 'ascendant';
 
 export interface CharacterSkinDef {
   id: string;
@@ -9,6 +11,15 @@ export interface CharacterSkinDef {
   description: string;
   style: CharacterSkinStyle;
   episodeRequired: boolean;
+  /** Mastery level (see `data/characterMastery.ts`) required to equip this skin; omitted for skins with no mastery gate. */
+  requiredMasteryLevel?: MasterySkinLevel;
+  /**
+   * False for the prestige milestone skins below: their colorway is a
+   * deliberate, fixed reward (onyx/ivory/translucent-and-gold) and should
+   * never be re-tinted by the global Artisan world palette. Every other
+   * skin defaults to blendable when this is omitted.
+   */
+  blendWorldPalette?: boolean;
   palette: SpritePalette;
 }
 
@@ -64,6 +75,59 @@ export function characterSkinId(characterId: string, style: CharacterSkinStyle):
   return `${characterId}:${style}`;
 }
 
+const MILESTONE_GOLD = '#d4af37';
+const MILESTONE_GOLD_BRIGHT = '#f5dc86';
+
+const MILESTONE_SKIN_INFO: Record<MasterySkinLevel, { style: CharacterSkinStyle; name: string; description: string }> = {
+  100: { style: 'onyx', name: 'Onyx Vanguard', description: 'Black armor with a gold trim, earned at Mastery Level 100.' },
+  500: { style: 'ivory', name: 'Ivory Sovereign', description: 'White armor with a gold trim, earned at Mastery Level 500.' },
+  1000: { style: 'ascendant', name: 'Ascendant', description: 'A half-faded form wrapped in gold trim, earned at Mastery Level 1000.' },
+};
+
+/**
+ * A fixed prestige colorway per milestone tier -- unlike `paletteVariant`
+ * above, this deliberately ignores the character's own hue so every
+ * fighter's Onyx/Ivory/Ascendant skin reads the same at a glance. The
+ * Ascendant tier's `body`/`bodyDark`/`skin` are `rgba()` strings: canvas
+ * `fillStyle` (see `drawPartsSlow` in `render/sprite.ts`) accepts any CSS
+ * color, so this alone renders the silhouette genuinely translucent with
+ * no renderer change, while the opaque gold `ink` keeps its trim/outline
+ * solid (the outline is drawn from `palette.ink` before each part fills).
+ */
+function milestonePalette(base: SpritePalette, level: MasterySkinLevel): SpritePalette {
+  if (level === 100) {
+    return {
+      ink: '#050506',
+      body: '#131315',
+      bodyDark: '#020203',
+      accent: MILESTONE_GOLD,
+      accentBright: MILESTONE_GOLD_BRIGHT,
+      skin: mixColor(base.skin, '#161616', 0.4),
+      glow: MILESTONE_GOLD_BRIGHT,
+    };
+  }
+  if (level === 500) {
+    return {
+      ink: '#2b2617',
+      body: '#f6f1e3',
+      bodyDark: '#d9cfb2',
+      accent: MILESTONE_GOLD,
+      accentBright: '#ffe9a8',
+      skin: mixColor(base.skin, '#ffffff', 0.3),
+      glow: '#ffe9a8',
+    };
+  }
+  return {
+    ink: MILESTONE_GOLD_BRIGHT,
+    body: 'rgba(226, 233, 255, 0.42)',
+    bodyDark: 'rgba(180, 190, 230, 0.34)',
+    accent: MILESTONE_GOLD,
+    accentBright: '#fff8e0',
+    skin: 'rgba(232, 226, 255, 0.4)',
+    glow: '#fff3c4',
+  };
+}
+
 export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
   const seed = [...character.id].reduce((total, letter) => total + letter.charCodeAt(0), 0);
   const variants: Array<Pick<CharacterSkinDef, 'style' | 'name' | 'description' | 'episodeRequired'>> = [
@@ -72,17 +136,47 @@ export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
     { style: 'countertone', name: 'Countertone', description: 'A loud complementary remix unique to this fighter.', episodeRequired: false },
     { style: 'episode', name: 'Afterstory', description: 'The personal colorway earned by completing this character’s episode.', episodeRequired: true },
   ];
-  return variants.map((skin) => ({
+  const personalSkins = variants.map((skin) => ({
     ...skin,
     id: characterSkinId(character.id, skin.style),
     characterId: character.id,
     palette: paletteVariant(character.palette, skin.style, seed),
   }));
+
+  const milestoneSkins = MASTERY_SKIN_LEVELS.map((level): CharacterSkinDef => {
+    const info = MILESTONE_SKIN_INFO[level];
+    return {
+      id: characterSkinId(character.id, info.style),
+      characterId: character.id,
+      name: info.name,
+      description: info.description,
+      style: info.style,
+      episodeRequired: false,
+      requiredMasteryLevel: level,
+      blendWorldPalette: false,
+      palette: milestonePalette(character.palette, level),
+    };
+  });
+
+  return [...personalSkins, ...milestoneSkins];
 }
 
 export function getCharacterSkin(character: CharacterDef, skinId?: string): CharacterSkinDef {
   const skins = getCharacterSkins(character);
   return skins.find((skin) => skin.id === skinId) ?? skins[0]!;
+}
+
+type SkinUnlockContext = Pick<MetaState, 'devModeAllUnlocks' | 'completedEpisodeIds' | 'killsByCharacter'>;
+
+/** Single source of truth for whether a skin can be equipped -- used by both save normalization and the skin-select action, so the two can never disagree. */
+export function isCharacterSkinUnlocked(skin: CharacterSkinDef, meta: SkinUnlockContext): boolean {
+  if (meta.devModeAllUnlocks) return true;
+  if (skin.requiredMasteryLevel) return characterMasteryLevel(skin.characterId, meta) >= skin.requiredMasteryLevel;
+  if (skin.episodeRequired) {
+    const episode = CHARACTER_EPISODE_BY_CHARACTER_ID[skin.characterId];
+    return Boolean(episode && meta.completedEpisodeIds.includes(episode.id));
+  }
+  return true;
 }
 
 export function blendSpritePalettes(personal: SpritePalette, world: SpritePalette, amount = 0.42): SpritePalette {
@@ -103,6 +197,7 @@ export function resolveCharacterCosmeticPalette(
   worldPalette: SpritePalette | undefined,
   blendWorld: boolean,
 ): SpritePalette {
-  const personal = getCharacterSkin(character, skinId).palette;
-  return worldPalette && blendWorld ? blendSpritePalettes(personal, worldPalette) : personal;
+  const skin = getCharacterSkin(character, skinId);
+  const shouldBlend = blendWorld && skin.blendWorldPalette !== false;
+  return worldPalette && shouldBlend ? blendSpritePalettes(skin.palette, worldPalette) : skin.palette;
 }

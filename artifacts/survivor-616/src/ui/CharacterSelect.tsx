@@ -7,7 +7,8 @@ import { BookOpen, LockKeyhole, Zap } from 'lucide-react';
 
 import { describeUnlock, effectiveStats, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
-import { getCharacterSkins, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { getCharacterSkins, isCharacterSkinUnlocked, resolveCharacterCosmeticPalette, type CharacterSkinDef } from '@/game/data/characterSkins';
+import { characterMasteryKills, characterMasteryLevel, killsForMasteryLevel, MASTERY_SKIN_LEVELS } from '@/game/data/characterMastery';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import type { CharacterDef, MetaState } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
@@ -60,6 +61,15 @@ function CharacterDetail({
   const worldPalette = meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId);
   const displayPalette = resolveCharacterCosmeticPalette(character, selectedSkinId, worldPalette, meta.worldPaletteBlendEnabled);
   const paletteEffect = meta.paletteAnimationsEnabled ? getThemePalette(meta.activePaletteId)?.effect?.kind : undefined;
+  const masteryLevel = characterMasteryLevel(character.id, meta);
+  const masteryKills = characterMasteryKills(character.id, meta);
+  const nextMasteryTier = MASTERY_SKIN_LEVELS.find((tier) => masteryLevel < tier);
+  const nextMasterySkin = nextMasteryTier ? skins.find((skin) => skin.requiredMasteryLevel === nextMasteryTier) : undefined;
+  const skinLockReason = (skin: CharacterSkinDef) => {
+    if (skin.requiredMasteryLevel) return `reach Mastery Level ${skin.requiredMasteryLevel} to unlock`;
+    if (skin.episodeRequired) return 'complete episode to unlock';
+    return undefined;
+  };
 
   return (
     <div
@@ -80,9 +90,12 @@ function CharacterDetail({
           <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-primary">Personal skins</p>
           <span className="font-mono text-[8px] uppercase text-muted-foreground">{meta.worldPaletteBlendEnabled ? 'World blend on' : 'Personal only'}</span>
         </div>
+        <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground" data-testid={`character-mastery-${character.id}`}>
+          Mastery Level <span className="text-white">{masteryLevel}</span> · {masteryKills.toLocaleString()} kills
+        </p>
         <div className="mt-2 grid grid-cols-4 gap-1.5">
           {skins.map((skin) => {
-            const locked = skin.episodeRequired && status !== 'completed';
+            const locked = !isCharacterSkinUnlocked(skin, meta);
             const selected = selectedSkinId === skin.id;
             return (
               <button
@@ -91,7 +104,7 @@ function CharacterDetail({
                 onClick={() => { if (!locked) onSelectSkin(character.id, skin.id); }}
                 disabled={locked}
                 aria-pressed={selected}
-                aria-label={`${skin.name}${locked ? ', complete episode to unlock' : ''}`}
+                aria-label={`${skin.name}${locked ? `, ${skinLockReason(skin) ?? 'locked'}` : ''}`}
                 className={`min-w-0 border p-1.5 text-left transition-colors ${selected ? 'border-primary bg-primary/10' : 'border-white/15 bg-black/25'} disabled:opacity-35`}
                 data-testid={`button-character-skin-${skin.style}`}
               >
@@ -106,6 +119,11 @@ function CharacterDetail({
         {status !== 'completed' ? (
           <p className="mt-2 text-[9px] text-muted-foreground">
             {episode ? <>Complete <span className="text-primary">{episode.title}</span> to unlock Afterstory.</> : 'Afterstory unlocks when this character’s episode arrives.'}
+          </p>
+        ) : null}
+        {nextMasteryTier && nextMasterySkin ? (
+          <p className="mt-1 text-[9px] text-muted-foreground">
+            {(killsForMasteryLevel(nextMasteryTier) - masteryKills).toLocaleString()} more kills to <span className="text-primary">{nextMasterySkin.name}</span> (Mastery {nextMasteryTier}).
           </p>
         ) : null}
       </div>

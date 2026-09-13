@@ -5,6 +5,7 @@
 import { ACHIEVEMENTS } from '@/game/data/achievements';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
+import { characterChecklist } from '@/game/data/characterMastery';
 import { CHARACTER_EPISODES } from '@/game/data/episodes';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import {
@@ -22,7 +23,7 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, ListChecks, Check, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -176,10 +177,13 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   ];
 
   const completedAchievementCount = ACHIEVEMENTS.filter((achievement) => achievement.isComplete(meta)).length;
+  const checklists = CHARACTERS.map((character) => ({ character, checklist: characterChecklist(character, meta) }));
+  const completedChecklistCount = checklists.filter(({ checklist }) => checklist.allComplete).length;
 
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
     { key: 'achievements', label: 'Achievements', icon: Trophy, count: completedAchievementCount, total: ACHIEVEMENTS.length },
+    { key: 'checklists', label: 'Checklists', icon: ListChecks, count: completedChecklistCount, total: CHARACTERS.length },
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
@@ -302,6 +306,70 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                         </button>
                       )}
                     </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'checklists' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-checklists"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <ListChecks className="h-5 w-5 text-primary" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Character Checklists</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Episode, Mastery 100/500/1000, and every district cleared -- per operative
+              </p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">
+              {completedChecklistCount} / {CHARACTERS.length}
+            </span>
+          </div>
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {checklists.map(({ character, checklist }) => {
+              const unlocked = meta.unlockedCharacterIds.includes(character.id);
+              return (
+                <article
+                  key={character.id}
+                  className={`flex flex-col gap-2 border border-l-4 p-4 ${
+                    checklist.allComplete
+                      ? 'border-border border-l-yellow-400 bg-card text-white'
+                      : unlocked
+                        ? 'border-border border-l-primary bg-card text-white'
+                        : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
+                  }`}
+                  data-testid={`card-checklist-${character.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold uppercase tracking-wide text-sm">{unlocked ? character.name : 'Locked'}</p>
+                    <span className="shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
+                      {checklist.completedCount} / {checklist.totalCount}
+                    </span>
+                  </div>
+                  {unlocked ? (
+                    <ul className="space-y-1.5">
+                      {checklist.items.map((item) => (
+                        <li key={item.id} className="flex items-center gap-2 text-xs" data-testid={`checklist-item-${character.id}-${item.id}`}>
+                          <span
+                            className={`grid h-4 w-4 shrink-0 place-items-center border ${
+                              item.complete ? 'border-yellow-300 bg-yellow-300/20 text-yellow-200' : 'border-white/15 text-transparent'
+                            }`}
+                          >
+                            <Check className="h-3 w-3" />
+                          </span>
+                          <span className={item.complete ? 'text-white' : 'text-muted-foreground'}>{item.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs opacity-70">{describeUnlock(character.unlock)}</p>
                   )}
                 </article>
               );

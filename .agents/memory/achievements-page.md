@@ -30,6 +30,14 @@ plan's `hat`/`runAura`/`celebration`), since granting a cosmetic id needs the
 same "add to owned Ids" wiring each cosmetic shop already has per-type; that's
 a reasonable follow-up but out of scope for a first pass.
 
+Follow-up (see `character-mastery-and-milestone-skins.md`): character
+mastery/checklist achievements did end up granting a cosmetic, but not
+through this reward system -- the milestone skins unlock themselves purely
+by crossing a mastery level (`isCharacterSkinUnlocked()`), so the
+achievements built on top of that (`made-guard`, `white-collar`,
+`ascendant-mastery`, etc.) still only pay `cred`/`lootTokens`; they
+celebrate the same threshold rather than gating the skin itself.
+
 `achievements.test.ts` checks: ids are unique, every reward pays a positive
 amount, a freshly created save has zero achievements complete (so an
 `isComplete` never has an inverted/off-by-one comparison that's trivially

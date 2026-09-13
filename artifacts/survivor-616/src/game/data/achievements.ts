@@ -2,6 +2,7 @@ import type { MetaState } from '@/game/types';
 import { ALLIES } from './progression';
 import { AREAS } from './areas';
 import { CHARACTERS } from './characters';
+import { characterChecklist, characterMasteryLevel, hasClearedEveryAreaAs } from './characterMastery';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
 import { LOKPET_VARIANTS } from './lokPets';
@@ -219,6 +220,105 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     isComplete: (meta) => RENTABLE_GENERATORS.length > 0 && meta.ownedGeneratorIds.length >= RENTABLE_GENERATORS.length,
     progress: (meta) => ratio(meta.ownedGeneratorIds.length, RENTABLE_GENERATORS.length),
     reward: { kind: 'cred', amount: 300 },
+  },
+
+  // -- Character mastery -------------------------------------------------
+  // Each character's own mastery level (built from lifetime kills scored
+  // while playing them, see `data/characterMastery.ts`) unlocks that
+  // character's own Onyx/Ivory/Ascendant skin -- the "bonus" itself lives
+  // there, not in a currency payout. These achievements celebrate crossing
+  // that same bar account-wide instead of duplicating one entry per
+  // character x tier.
+  {
+    id: 'made-guard',
+    name: 'Made Guard',
+    description: 'Reach Mastery Level 100 with any character, unlocking their Onyx Vanguard skin.',
+    tier: 'bronze',
+    isComplete: (meta) => CHARACTERS.some((c) => characterMasteryLevel(c.id, meta) >= 100),
+    progress: (meta) => ratio(Math.max(0, ...CHARACTERS.map((c) => characterMasteryLevel(c.id, meta))), 100),
+    reward: { kind: 'cred', amount: 100 },
+  },
+  {
+    id: 'made-guard-five',
+    name: 'Standing Crew',
+    description: 'Reach Mastery Level 100 with 5 different characters.',
+    tier: 'silver',
+    isComplete: (meta) => CHARACTERS.filter((c) => characterMasteryLevel(c.id, meta) >= 100).length >= 5,
+    progress: (meta) => ratio(CHARACTERS.filter((c) => characterMasteryLevel(c.id, meta) >= 100).length, 5),
+    reward: { kind: 'cred', amount: 250 },
+  },
+  {
+    id: 'white-collar',
+    name: 'White Collar',
+    description: 'Reach Mastery Level 500 with any character, unlocking their Ivory Sovereign skin.',
+    tier: 'gold',
+    isComplete: (meta) => CHARACTERS.some((c) => characterMasteryLevel(c.id, meta) >= 500),
+    progress: (meta) => ratio(Math.max(0, ...CHARACTERS.map((c) => characterMasteryLevel(c.id, meta))), 500),
+    reward: { kind: 'cred', amount: 500 },
+  },
+  {
+    id: 'ascendant-mastery',
+    name: 'Ascendant',
+    description: 'Reach Mastery Level 1000 with any character, unlocking their Ascendant skin.',
+    tier: 'legendary',
+    isComplete: (meta) => CHARACTERS.some((c) => characterMasteryLevel(c.id, meta) >= 1000),
+    progress: (meta) => ratio(Math.max(0, ...CHARACTERS.map((c) => characterMasteryLevel(c.id, meta))), 1000),
+    reward: { kind: 'lootTokens', amount: 50 },
+  },
+
+  // -- Per-character map completion ---------------------------------------
+  {
+    id: 'borough-hopper',
+    name: 'Borough Hopper',
+    description: 'Clear at least one district with 3 different characters.',
+    tier: 'bronze',
+    isComplete: (meta) => Object.values(meta.clearedAreaIdsByCharacter).filter((ids) => ids.length > 0).length >= 3,
+    progress: (meta) => ratio(Object.values(meta.clearedAreaIdsByCharacter).filter((ids) => ids.length > 0).length, 3),
+    reward: { kind: 'cred', amount: 75 },
+  },
+  {
+    id: 'one-character-tour',
+    name: 'One-Character Tour',
+    description: 'Clear every district in 616 with a single character.',
+    tier: 'silver',
+    isComplete: (meta) => CHARACTERS.some((c) => hasClearedEveryAreaAs(c.id, meta)),
+    progress: (meta) => Math.max(0, ...CHARACTERS.map((c) => ratio((meta.clearedAreaIdsByCharacter[c.id] ?? []).length, AREAS.length))),
+    reward: { kind: 'cred', amount: 200 },
+  },
+
+  // -- Character checklists ------------------------------------------------
+  // Each character's checklist (see `data/characterMastery.ts`) bundles
+  // their episode, all three mastery tiers, and clearing every district
+  // with them into one completionist target.
+  {
+    id: 'model-citizen',
+    name: 'Model Citizen',
+    description: "Complete one character's full checklist -- episode, every mastery tier, and every district cleared with them.",
+    tier: 'gold',
+    isComplete: (meta) => CHARACTERS.some((c) => characterChecklist(c, meta).allComplete),
+    progress: (meta) => Math.max(0, ...CHARACTERS.map((c) => {
+      const checklist = characterChecklist(c, meta);
+      return ratio(checklist.completedCount, checklist.totalCount);
+    })),
+    reward: { kind: 'lootTokens', amount: 30 },
+  },
+  {
+    id: 'true-616',
+    name: 'True 616',
+    description: "Complete every character's full checklist.",
+    tier: 'legendary',
+    isComplete: (meta) => CHARACTERS.every((c) => characterChecklist(c, meta).allComplete),
+    progress: (meta) => {
+      const totals = CHARACTERS.reduce(
+        (sum, c) => {
+          const checklist = characterChecklist(c, meta);
+          return { done: sum.done + checklist.completedCount, total: sum.total + checklist.totalCount };
+        },
+        { done: 0, total: 0 },
+      );
+      return ratio(totals.done, totals.total);
+    },
+    reward: { kind: 'lootTokens', amount: 100 },
   },
 ];
 

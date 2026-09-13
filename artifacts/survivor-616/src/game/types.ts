@@ -1628,6 +1628,10 @@ export interface MetaState {
   characterSkinByCharacterId: Record<string, string>;
   unlockedCharacterIds: string[];
   clearedAreaIds: string[];
+  /** Character id -> lifetime kills scored while playing them. Drives that character's mastery level and milestone skin unlocks. See `data/characterMastery.ts`. */
+  killsByCharacter: Record<string, number>;
+  /** Character id -> district ids cleared while playing them. Powers the per-character map checklist. */
+  clearedAreaIdsByCharacter: Record<string, string[]>;
   rescuedAllyIds: string[];
   discoveryIds: string[];
   /** Variant discoveries recorded from generated LokPets between runs. */
@@ -1809,6 +1813,8 @@ export interface RunResult {
   };
   /** City relic knowledge found by clearing a district for the first time. */
   newlyDiscoveredRelicIds?: string[];
+  /** Milestone skin ids (see `data/characterMastery.ts`) whose mastery level this run's kills just crossed. */
+  newlyUnlockedSkinIds?: string[];
   /** Optional district setpiece encounter state from this run. */
   districtIncursion?: {
     id: string;
