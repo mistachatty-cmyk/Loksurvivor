@@ -317,28 +317,7 @@ export const LOK_DECK_CATALOG = {
  * mirrors.
  */
 export function isCardOwned(card: LokAssetManifest, meta: MetaState): boolean {
-  if (card.slug.startsWith('character-')) {
-    return meta.unlockedCharacterIds.includes(card.slug.slice('character-'.length));
-  }
-  if (card.slug.startsWith('enemy-')) {
-    return (meta.bestiary[card.slug.slice('enemy-'.length)] ?? 0) > 0;
-  }
-  if (card.slug.startsWith('ally-')) {
-    return meta.rescuedAllyIds.includes(card.slug.slice('ally-'.length));
-  }
-  if (card.slug.startsWith('pet-')) {
-    const variantId = card.slug.slice('pet-'.length);
-    return meta.lokPetCatalog.some((entry) => entry.variantId === variantId);
-  }
-  if (card.slug.startsWith('endless-band-')) {
-    const bandId = card.slug.slice('endless-band-'.length) as EndlessBandId;
-    return meta.endlessDiscoveryIds.includes(bandId);
-  }
-  const milestone = DISTANCE_MILESTONES.find((m) => card.slug === m.slug);
-  if (milestone) {
-    return meta.endlessRecordDistancePx >= milestone.px;
-  }
-  return false;
+  return meta.cardCollection.some((record) => record.cardId === card.id && record.copies > 0);
 }
 
 export interface CardCollectionSummary {

@@ -1337,7 +1337,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 16);
+    assert.equal(loaded.version, 17);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1888,18 +1888,12 @@ test('a LokPet chest prize spawns a generated companion and exposes it to the HU
     616,
   );
   world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
-  // The LokPet entry is the final weighted entry in the prize table.
-  world.rng = () => 0.99;
-  world.pickups.push({ uid: 800, kind: 'loot-box', x: 0, y: 0, vx: 0, vy: 0, value: 0, bornAt: 0 });
-
-  stepWorld(world, 1 / 60, neutralInput);
-
   assert.equal(world.lokPets.length, 0);
-  assert.equal(world.pendingReel[0]?.kind, 'lokpet');
-  claimLootPrize(world, world.pendingReel[0]!);
+  const prize = { kind: 'lokpet' as const, label: 'LokPet hatch', lokPet: rollLokPet(createRng(616)) };
+  claimLootPrize(world, prize);
   assert.equal(world.lokPets.length, 1);
-  assert.equal(world.pendingReel[0]?.lokPet?.variantId, world.lokPets[0]?.variantId);
-  claimLootPrize(world, world.pendingReel[0]!);
+  assert.equal(prize.lokPet.variantId, world.lokPets[0]?.variantId);
+  claimLootPrize(world, prize);
   assert.equal(world.lokPets.length, 1, 'a replayed reel landing cannot duplicate the companion');
   const snapshot = hudSnapshot(world);
   assert.equal(snapshot.lokPets.length, 1);

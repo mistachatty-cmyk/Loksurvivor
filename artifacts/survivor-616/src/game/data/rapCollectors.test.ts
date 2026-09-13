@@ -90,10 +90,10 @@ test('collector world and meta progression use the selected rank', () => {
   assert.equal(completed.meta.cardCredits, 18);
 });
 
-test('LokPet card shop spends credits and saves the pulled companion', () => {
+test('LokPet card shop spends credits and adds stackable cards', () => {
   const base = { ...createInitialMeta(), cardCredits: LOKPET_CARD_PACK_COST };
-  const next = reducer({ meta: base, lastRun: null }, { type: 'buyLokPetCardPack', now: 616 });
+  const next = reducer({ meta: base, lastRun: null }, { type: 'buyCardPack', packId: 'lokpet', now: 616 });
   assert.equal(next.meta.cardCredits, 0);
-  assert.equal(next.meta.savedLokPets.length, 1);
-  assert.equal(next.meta.lokPetCatalog.length, 1);
+  assert.equal(next.meta.cardCollection.reduce((sum, card) => sum + card.copies, 0), 2);
+  assert.equal(next.meta.savedLokPets.length, 0);
 });

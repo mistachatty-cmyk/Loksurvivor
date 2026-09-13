@@ -29,6 +29,7 @@ import { getFaction } from '@/game/data/factions';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
 import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
+import type { ActiveCardEffects } from '@/game/data/passiveCards';
 import {
   HORDE_SPIN_ACTIVE_MS_PER_STEP,
   HORDE_SPIN_BASE_CLUSTER,
@@ -329,7 +330,7 @@ function createDashSkillRuntime(def: DashSkillDef | undefined): DashSkillRuntime
   return { def, slotReadyAt: [0], wallReadyAt: 0, pendingLandings: [] };
 }
 
-export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'coin';
+export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'card-pack' | 'coin';
 
 export interface Pickup {
   uid: number;
@@ -995,6 +996,8 @@ export interface World {
   lootTokensGained: number;
   /** Rare currency (skeleton keys) earned this run, found by breaking street props. */
   skeletonKeysGained: number;
+  cardPacksFound: import('@/game/types').CardPackId[];
+  cardEffects: ActiveCardEffects;
 
   /* ---- Objective system ---- */
   objectives: RunObjective[];
@@ -1110,6 +1113,7 @@ export function createWorld(
     missionMarkers?: Array<{ assetId: string; x: number; y: number }>;
     /** Tier 2 economy: beacon placements lifted off the authored map. */
     missionBeacons?: Array<{ beaconId: string; x: number; y: number }>;
+    cardEffects?: ActiveCardEffects;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1396,6 +1400,8 @@ export function createWorld(
     openedPrizes: [],
     lootTokensGained: 0,
     skeletonKeysGained: 0,
+    cardPacksFound: [],
+    cardEffects: setup.cardEffects ?? { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false },
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
     episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
@@ -2209,7 +2215,9 @@ function spawnFollowers(w: World, weapon: WeaponDef) {
 
 const LOKPET_GHOST_AFTER_MS = 60_000;
 
-function lokPetStatusId(pet: LokPetInstance): string | undefined {
+function lokPetStatusId(pet: LokPetInstance, w?: World): string | undefined {
+  if (w?.cardEffects.allElementLokPets) return ['burning', 'freeze', 'slow'][Math.floor(w.now / 900) % 3];
+  if (w?.cardEffects.clockworkSlow && pet.silhouette === 'clockwork') return 'slow';
   if (pet.element === 'fire') return 'burning';
   if (pet.element === 'freeze') return 'freeze';
   if (pet.element === 'slow') return 'slow';
@@ -2224,7 +2232,7 @@ function lokPetDamage(w: World, pet: LokPetInstance): number {
       : pet.attackKind === 'explosion'
         ? 0.95
         : 1;
-  return Math.max(1, pet.stats.damage * attackMultiplier * damageMult(w));
+  return Math.max(1, pet.stats.damage * attackMultiplier * damageMult(w) * w.cardEffects.lokPetDamageMult);
 }
 
 function showLokPetBurst(
@@ -2283,7 +2291,7 @@ function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
     pierce: pet.attackKind === 'heavy-shot' ? 1 : 0,
     hitUids: new Set(),
     obstacleInteraction: 'block',
-    statusEffectId: lokPetStatusId(pet),
+    statusEffectId: lokPetStatusId(pet, w),
     explosionRadius: explosion ? pet.stats.explosionRadius : undefined,
     explosionDamage: explosion ? lokPetDamage(w, pet) : undefined,
   });
@@ -2437,13 +2445,13 @@ function updateLokPets(w: World, dt: number) {
         pet.stats.pulseRadius,
         lokPetDamage(w, pet),
         pet.palette.glow,
-        lokPetStatusId(pet),
+        lokPetStatusId(pet, w),
       );
-      pet.nextPulseAt = w.now + pet.stats.cooldownMs;
+      pet.nextPulseAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult;
       pet.readyAt = pet.nextPulseAt;
     } else {
       fireLokPetShot(w, pet, target);
-      pet.readyAt = w.now + pet.stats.cooldownMs;
+      pet.readyAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult;
     }
   }
 }
@@ -2849,9 +2857,10 @@ function killEnemy(w: World, enemy: EnemyActor) {
   }
 
   const collector = w.character.lokPetCollector;
-  if (enemy.def.family !== 'Boss' && collector && w.rng() < collector.floorPackChance) {
-    spawnLootBox(w, enemy.x, enemy.y);
-    pushAlert(w, `${collector.rank} found a floor LokPack`);
+  const packChance = 0.0015 + (collector?.floorPackChance ?? 0) + w.cardEffects.packDropBonus;
+  if (enemy.def.family !== 'Boss' && w.rng() < packChance) {
+    w.pickups.push({ uid: uid(w), kind: 'card-pack', x: enemy.x, y: enemy.y, vx: randRange(w.rng, -24, 24), vy: randRange(w.rng, -24, 24), value: 1, bornAt: w.now });
+    pushAlert(w, collector ? `${collector.rank} found a floor Lock Pack` : 'Lock Pack signal dropped');
   }
 
   if (enemy.def.family === 'Boss') {
@@ -3868,6 +3877,10 @@ export function claimLootPrize(w: World, prize: LootPrizeDef) {
       });
       break;
     }
+    case 'card-pack':
+      if (prize.cardPackId) w.cardPacksFound.push(prize.cardPackId);
+      w.popups.push({ x: w.player.x, y: w.player.y + 30, text: prize.label, color: '#f0abfc', bornAt: w.now, vy: 28 });
+      break;
   }
 }
 
@@ -4128,7 +4141,7 @@ function applyPropImpact(
     const velocityMultiplier = reverseLaunch ? 4 : 1;
     if (reverseLaunch) b.clickPrimed = false;
     b.impactVelocityMultiplier = velocityMultiplier;
-    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier;
+    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier * w.cardEffects.propBounceMult;
     const pushScale = b.propVariant === 'heavy-metal' ? 0.62 : 0.78;
     b.vx += launchDirectionX * launchSpeed * pushScale;
     b.vy += launchDirectionY * launchSpeed * pushScale;
@@ -4159,6 +4172,7 @@ function damageBreakable(
   fromPlayer = true,
 ) {
   applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY, impactTrigger, fromPlayer);
+  if (w.cardEffects.unbreakableProps) return;
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
@@ -6809,7 +6823,7 @@ function updatePickups(w: World, dt: number) {
     pickup.vx *= Math.pow(0.02, dt);
     pickup.vy *= Math.pow(0.02, dt);
 
-    if (distance < p.radius + (pickup.kind === 'loot-box' ? 18 : 10)) {
+    if (distance < p.radius + (pickup.kind === 'loot-box' || pickup.kind === 'card-pack' ? 18 : 10)) {
       switch (pickup.kind) {
         case 'xp':
           gainXp(w, pickup.value);
@@ -6836,6 +6850,15 @@ function updatePickups(w: World, dt: number) {
           spawnParticles(w, p.x, p.y + 10, '#3b82f6', 14, 120);
           w.shake = Math.max(w.shake, 8);
           pushAlert(w, `Box — ${prize.label}`);
+          break;
+        }
+        case 'card-pack': {
+          const roll = w.rng();
+          const packId = roll < 0.45 ? 'street' : roll < 0.7 ? 'lokpet' : roll < 0.9 ? 'scenario' : 'collector';
+          w.cardPacksFound.push(packId);
+          w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCK PACK', color: '#f0abfc', bornAt: w.now, vy: 30 });
+          spawnParticles(w, p.x, p.y, '#f0abfc', 14, 110);
+          pushAlert(w, 'Lock Pack secured');
           break;
         }
         case 'sweep': {
@@ -8042,6 +8065,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     directorDefeated: w.director.victorious,
     lootBoxesOpened: w.lootBoxesOpened,
     openedPrizes: [...w.openedPrizes],
+    cardPacksFound: [...w.cardPacksFound],
     lokPets: w.lokPetHistory.map((pet) => ({
       origin: pet.origin,
       roll: {

@@ -86,7 +86,7 @@ export interface SpriteRig {
 /* ------------------------------------------------------------------ */
 
 export interface LootPrizeDef {
-  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon' | 'lokpet';
+  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon' | 'lokpet' | 'card-pack';
   amount?: number;
   label: string;
   /** Stat key when kind === 'stat'. */
@@ -95,6 +95,17 @@ export interface LootPrizeDef {
   add?: number;
   /** Generated companion payload when kind === 'lokpet'. */
   lokPet?: LokPetRoll;
+  cardPackId?: CardPackId;
+}
+
+export type CardPackId = 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher';
+export type CardVariant = 'standard' | 'foil' | 'neon' | 'glitch' | 'holo';
+export interface OwnedCardRecord {
+  cardId: string;
+  copies: number;
+  variants: Partial<Record<CardVariant, number>>;
+  bestVariant: CardVariant;
+  totalValue: number;
 }
 
 export type LokPetFamily = 'animal' | 'ghoul' | 'bat' | 'mote' | 'blob' | 'mechanical';
@@ -1827,6 +1838,8 @@ export interface MetaState {
   lootTokens: number;
   /** Currency earned from blue loot boxes and spent at the LokPet card shop. */
   cardCredits: number;
+  cardCollection: OwnedCardRecord[];
+  activePassiveCardIds: string[];
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */
@@ -1951,6 +1964,7 @@ export interface RunResult {
   lootBoxesOpened: number;
   /** Prize labels collected from loot boxes. */
   openedPrizes: string[];
+  cardPacksFound?: CardPackId[];
   /** LokPets generated from chest rewards during this run. */
   lokPets: Array<{
     origin: 'chest' | 'loadout';

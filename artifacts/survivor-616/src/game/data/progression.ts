@@ -370,7 +370,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     name: 'LokPet Card Shop',
     subtitle: 'The Neon Sleeve',
     description:
-      'A bright little storefront where blue sleeves, locked binders, and combat-ready LokPets change hands under a humming sign.',
+      'A bright little storefront where Lock Packs, passive decks, duplicate cards, and rare variants change hands under a humming sign.',
     backdrop: 'art/street.jpeg',
     biome: 'archive',
     // The shop is a Hideout destination for now, so a fresh player can always
