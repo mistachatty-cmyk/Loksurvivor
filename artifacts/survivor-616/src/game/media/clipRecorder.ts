@@ -13,7 +13,9 @@
  * revoked permission, or a mid-run recorder error -- per the additive
  * "protected baseline" rule in `docs/studio-remotion-architecture.md`, a
  * player who can't capture clips still gets the complete stat recap, just
- * without the highlight reel's real footage.
+ * without the highlight reel's real footage. That gap is a deliberate
+ * deferral, not a bug -- see `.agents/memory/highlight-clip-reel-2026-09-13.md`
+ * before "fixing" it with a polyfill or an alternate capture path.
  */
 import { saveMediaAsset } from '@/game/audio/localMediaStore';
 
