@@ -28,8 +28,16 @@ export const DUR = {
  * Reduced motion is checked at call time rather than cached in a module
  * constant — players toggle it mid-session, especially on mobile, and a cached
  * value would strand them until reload.
+ *
+ * Also honors the in-game "Reduce motion" override (Settings -> PC & Browser),
+ * applied as a `force-reduce-motion` class on `<html>` by `App.tsx` -- the OS
+ * setting stays the primary source of truth, this is just an escape hatch on
+ * top of it for a player whose OS setting doesn't reflect their preference.
+ * `document` doesn't exist under this file's plain `node:test` suite (no
+ * jsdom), so that half is guarded the same way the `window` check already is.
  */
 export const prefersReducedMotion = (): boolean =>
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (typeof document !== 'undefined' && document.documentElement.classList.contains('force-reduce-motion')) ||
+  (typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches);

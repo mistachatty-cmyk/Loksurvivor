@@ -257,6 +257,11 @@ export function createInitialMeta(): MetaState {
     dailyContractProgressById: {},
     completedDailyContractIds: [],
     claimedAchievementIds: [],
+    touchControlsScale: 'normal',
+    touchControlsOpacity: 'normal',
+    hapticsEnabled: true,
+    wakeLockEnabled: false,
+    reduceMotionEnabled: false,
   };
 }
 
@@ -885,6 +890,16 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       new Set(ACHIEVEMENTS.map((achievement) => achievement.id)),
       [],
     ),
+    touchControlsScale: parsed.touchControlsScale === 'small' || parsed.touchControlsScale === 'large'
+      ? parsed.touchControlsScale
+      : 'normal',
+    touchControlsOpacity: parsed.touchControlsOpacity === 'subtle' || parsed.touchControlsOpacity === 'bold'
+      ? parsed.touchControlsOpacity
+      : 'normal',
+    // No permission prompt and a silent no-op where unsupported, so a returning save defaults on.
+    hapticsEnabled: parsed.hapticsEnabled !== false,
+    wakeLockEnabled: parsed.wakeLockEnabled === true,
+    reduceMotionEnabled: parsed.reduceMotionEnabled === true,
   };
 }
 
@@ -1219,6 +1234,11 @@ type Action =
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
   | { type: 'claimAchievement'; id: string }
+  | { type: 'setTouchControlsScale'; value: MetaState['touchControlsScale'] }
+  | { type: 'setTouchControlsOpacity'; value: MetaState['touchControlsOpacity'] }
+  | { type: 'setHapticsEnabled'; enabled: boolean }
+  | { type: 'setWakeLockEnabled'; enabled: boolean }
+  | { type: 'setReduceMotionEnabled'; enabled: boolean }
   | { type: 'replaceMeta'; meta: Partial<MetaState> }
   | { type: 'reset' };
 
@@ -1659,6 +1679,21 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'setTouchControlsScale':
+      return { ...state, meta: { ...state.meta, touchControlsScale: action.value } };
+
+    case 'setTouchControlsOpacity':
+      return { ...state, meta: { ...state.meta, touchControlsOpacity: action.value } };
+
+    case 'setHapticsEnabled':
+      return { ...state, meta: { ...state.meta, hapticsEnabled: action.enabled } };
+
+    case 'setWakeLockEnabled':
+      return { ...state, meta: { ...state.meta, wakeLockEnabled: action.enabled } };
+
+    case 'setReduceMotionEnabled':
+      return { ...state, meta: { ...state.meta, reduceMotionEnabled: action.enabled } };
+
     case 'tickRecovery':
       return { ...state, meta: settleRecovery(state.meta, action.now) };
 
@@ -1969,6 +2004,11 @@ export interface MetaContextValue {
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
   claimAchievement: (id: string) => void;
+  setTouchControlsScale: (value: MetaState['touchControlsScale']) => void;
+  setTouchControlsOpacity: (value: MetaState['touchControlsOpacity']) => void;
+  setHapticsEnabled: (enabled: boolean) => void;
+  setWakeLockEnabled: (enabled: boolean) => void;
+  setReduceMotionEnabled: (enabled: boolean) => void;
   resetProgress: () => void;
   /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
   importMeta: (meta: Partial<MetaState>) => void;
@@ -2114,6 +2154,20 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
   const claimAchievement = useCallback((id: string) => dispatch({ type: 'claimAchievement', id }), []);
+  const setTouchControlsScale = useCallback(
+    (value: MetaState['touchControlsScale']) => dispatch({ type: 'setTouchControlsScale', value }),
+    [],
+  );
+  const setTouchControlsOpacity = useCallback(
+    (value: MetaState['touchControlsOpacity']) => dispatch({ type: 'setTouchControlsOpacity', value }),
+    [],
+  );
+  const setHapticsEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setHapticsEnabled', enabled }), []);
+  const setWakeLockEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setWakeLockEnabled', enabled }), []);
+  const setReduceMotionEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setReduceMotionEnabled', enabled }),
+    [],
+  );
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -2214,6 +2268,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       duplicateCustomMap,
       deleteCustomMap,
       claimAchievement,
+      setTouchControlsScale,
+      setTouchControlsOpacity,
+      setHapticsEnabled,
+      setWakeLockEnabled,
+      setReduceMotionEnabled,
       importMeta,
     };
   }, [
@@ -2282,6 +2341,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     duplicateCustomMap,
     deleteCustomMap,
     claimAchievement,
+    setTouchControlsScale,
+    setTouchControlsOpacity,
+    setHapticsEnabled,
+    setWakeLockEnabled,
+    setReduceMotionEnabled,
     importMeta,
   ]);
 

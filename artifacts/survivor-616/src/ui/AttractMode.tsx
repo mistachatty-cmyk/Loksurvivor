@@ -38,6 +38,7 @@ import {
   type World,
 } from '@/game/engine/world';
 import { renderWorld, type Viewport } from '@/game/render/draw';
+import { prefersReducedMotion } from '@/anim/motion';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 6;
@@ -149,8 +150,7 @@ export function AttractMode({ className }: AttractModeProps) {
     return window.localStorage.getItem(STORAGE_KEY) !== 'off';
   });
 
-  const reducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = prefersReducedMotion();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

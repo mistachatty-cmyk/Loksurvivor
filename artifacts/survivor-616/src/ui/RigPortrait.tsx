@@ -5,6 +5,7 @@
  */
 import { useEffect, useRef } from 'react';
 
+import { prefersReducedMotion } from '@/anim/motion';
 import { drawRig } from '@/game/render/sprite';
 import type { AnimName, SpritePalette, SpriteRig } from '@/game/types';
 
@@ -45,8 +46,7 @@ export function RigPortrait({
     const start = performance.now();
     let raf = 0;
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const shouldAnimate = animated && !reduceMotion;
+    const shouldAnimate = animated && !prefersReducedMotion();
     const frame = (time: number) => {
       if (shouldAnimate) raf = requestAnimationFrame(frame);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

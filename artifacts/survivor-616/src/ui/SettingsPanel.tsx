@@ -1,8 +1,10 @@
-import { useCallback, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { motion } from 'framer-motion';
 import {
+  Accessibility,
   Activity,
   AlertTriangle,
+  BatteryCharging,
   Bird,
   Check,
   CloudSun,
@@ -12,12 +14,15 @@ import {
   FlaskConical,
   FlipVertical2,
   Gamepad2,
+  Keyboard,
   LayoutDashboard,
   LayoutList,
   Lock,
   Map,
   Maximize2,
+  Minimize2,
   Monitor,
+  Move,
   MousePointer2,
   Palette,
   PanelRight,
@@ -27,12 +32,15 @@ import {
   Settings2,
   Smartphone,
   Upload,
+  Vibrate,
   Volume2,
   type LucideIcon,
 } from 'lucide-react';
 
 import { toast } from '@/hooks/use-toast';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
+import { hapticsSupported } from '@/game/input/haptics';
+import { wakeLockSupported } from '@/game/input/wakeLock';
 import { activeUiThemeSwatchId, parseMetaFile, serializeMeta, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import {
@@ -91,6 +99,11 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setPaletteInvertEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,
+    setTouchControlsScale,
+    setTouchControlsOpacity,
+    setHapticsEnabled,
+    setWakeLockEnabled,
+    setReduceMotionEnabled,
     importMeta,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
@@ -101,6 +114,23 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
   const [gyroDenied, setGyroDenied] = useState(false);
   const [devTapCount, setDevTapCount] = useState(0);
   const tiltAvailable = gyroSupported();
+  const fullscreenAvailable = typeof document !== 'undefined' && document.fullscreenEnabled;
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(typeof document !== 'undefined' && document.fullscreenElement));
+  const [fullscreenError, setFullscreenError] = useState(false);
+
+  useEffect(() => {
+    const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    setFullscreenError(false);
+    const action = document.fullscreenElement
+      ? document.exitFullscreen()
+      : document.documentElement.requestFullscreen();
+    action.catch(() => setFullscreenError(true));
+  }, []);
 
   /**
    * iOS only hands out orientation from inside a user gesture, so the request
@@ -962,6 +992,107 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 </div>
               </div>
             </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-touch-controls-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
+                  <Move className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">On-screen stick</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Touch controls</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Purely visual -- resizing or fading the on-screen stick never changes how far you have to drag it.
+                  </p>
+                  <div className="mt-5 space-y-3">
+                    <div>
+                      <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Size</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['small', 'normal', 'large'] as const).map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setTouchControlsScale(value)}
+                            aria-pressed={meta.touchControlsScale === value}
+                            className={`border p-2 font-mono text-[11px] font-bold uppercase tracking-widest ${meta.touchControlsScale === value ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100' : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'}`}
+                            data-testid={`button-touch-scale-${value}`}
+                          >
+                            {value}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Opacity</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['subtle', 'normal', 'bold'] as const).map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setTouchControlsOpacity(value)}
+                            aria-pressed={meta.touchControlsOpacity === value}
+                            className={`border p-2 font-mono text-[11px] font-bold uppercase tracking-widest ${meta.touchControlsOpacity === value ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100' : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'}`}
+                            data-testid={`button-touch-opacity-${value}`}
+                          >
+                            {value}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-device-feedback-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
+                  <Vibrate className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Device feedback</p>
+                    <h2 className="mt-1 text-xl font-black uppercase text-white">Haptics &amp; wake lock</h2>
+                  </div>
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-white">Vibrate on level-up &amp; run end</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {hapticsSupported() ? 'A short buzz on key run moments.' : 'This device does not support vibration feedback.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setHapticsEnabled(!meta.hapticsEnabled)}
+                      disabled={!hapticsSupported()}
+                      aria-pressed={meta.hapticsEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${meta.hapticsEnabled ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100' : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'}`}
+                      data-testid="button-toggle-haptics"
+                    >
+                      {meta.hapticsEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-white">Keep screen awake during a run</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {wakeLockSupported() ? 'Stops the screen dimming or locking mid-run.' : 'This browser does not support staying awake.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWakeLockEnabled(!meta.wakeLockEnabled)}
+                      disabled={!wakeLockSupported()}
+                      aria-pressed={meta.wakeLockEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${meta.wakeLockEnabled ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100' : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'}`}
+                      data-testid="button-toggle-wake-lock"
+                    >
+                      {meta.wakeLockEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
           </motion.div>
         )}
 
@@ -971,7 +1102,86 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
             animate={{ opacity: 1, y: 0 }}
             className="grid gap-6 lg:grid-cols-2"
             data-testid="section-settings-pc"
-          />
+          >
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-browser-performance-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                  <Monitor className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Browser</p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-xl font-black uppercase text-white">Fullscreen</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        {fullscreenAvailable ? 'Hide the browser chrome for a fully immersive run.' : 'This browser does not allow fullscreen here.'}
+                      </p>
+                      {fullscreenError ? (
+                        <p className="mt-2 text-sm text-amber-300" data-testid="text-fullscreen-error">
+                          Fullscreen was blocked. Some embedded previews don&rsquo;t allow it.
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleFullscreen}
+                      disabled={!fullscreenAvailable}
+                      aria-pressed={isFullscreen}
+                      className={`flex shrink-0 items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${isFullscreen ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'}`}
+                      data-testid="button-toggle-fullscreen"
+                    >
+                      {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                      {isFullscreen ? 'Exit' : 'Enter'}
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-sm font-bold uppercase tracking-wide text-white">Reduce motion</h2>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Overrides your OS setting -- forces calmer effects even if this device doesn&rsquo;t report a preference.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReduceMotionEnabled(!meta.reduceMotionEnabled)}
+                      aria-pressed={meta.reduceMotionEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.reduceMotionEnabled ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'}`}
+                      data-testid="button-toggle-reduce-motion"
+                    >
+                      <Accessibility className="mr-1 inline h-3.5 w-3.5" />
+                      {meta.reduceMotionEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-keyboard-controls-reference">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                  <Keyboard className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Reference</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Keyboard controls</h2>
+                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between border border-border/70 bg-background/50 p-3">
+                      <span>Move</span>
+                      <span className="font-mono text-xs uppercase text-white">WASD / Arrow keys</span>
+                    </div>
+                    <div className="flex items-center justify-between border border-border/70 bg-background/50 p-3">
+                      <span>Ultimate</span>
+                      <span className="font-mono text-xs uppercase text-white">Space</span>
+                    </div>
+                    <div className="flex items-center justify-between border border-border/70 bg-background/50 p-3">
+                      <span>Pause</span>
+                      <span className="font-mono text-xs uppercase text-white">Esc / P</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </motion.div>
         )}
 
         {activeCategory === 'data' && (

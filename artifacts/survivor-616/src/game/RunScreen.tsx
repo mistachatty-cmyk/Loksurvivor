@@ -36,6 +36,9 @@ import {
   type World,
 } from '@/game/engine/world';
 import { useGyroInput } from '@/game/input/gyro';
+import { vibrate } from '@/game/input/haptics';
+import { useWakeLock } from '@/game/input/wakeLock';
+import { prefersReducedMotion as sharedPrefersReducedMotion } from '@/anim/motion';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld } from '@/game/render/draw';
@@ -50,7 +53,7 @@ import {
   stealthConfig,
   useMeta,
 } from '@/game/state/metaStore';
-import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, StormCloudMode, UpgradeDef } from '@/game/types';
+import type { AreaDef, HudSnapshot, LootPrizeDef, MetaState, RunPhase, RunResult, StormCloudMode, UpgradeDef } from '@/game/types';
 import { ChestTally } from '@/ui/ChestTally';
 import { HordeSpinWheel } from '@/ui/HordeSpinWheel';
 import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
@@ -112,6 +115,15 @@ interface RandomUpgradeReveal {
 }
 
 const STICK_RADIUS = 54;
+
+/**
+ * Visual-only multipliers for the on-screen stick -- deliberately never
+ * touch `STICK_RADIUS` itself or the `stick.dx / STICK_RADIUS` deflection
+ * math elsewhere in this file, so changing how the stick looks never
+ * changes how it feels to steer.
+ */
+const TOUCH_SCALE: Record<MetaState['touchControlsScale'], number> = { small: 0.8, normal: 1, large: 1.25 };
+const TOUCH_OPACITY: Record<MetaState['touchControlsOpacity'], number> = { subtle: 0.5, normal: 1, bold: 1.6 };
 
 /** Storm Chaser's weather picker: label/color per mode, matching the cloud's own on-canvas colors. */
 const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: string }> = [
@@ -219,6 +231,10 @@ export function RunScreen({
     invertY: meta.gyroInvertY,
   });
 
+  // Kept awake for the whole run, including brief pauses -- re-acquiring per
+  // pause/resume would add churn for no real benefit.
+  useWakeLock(meta.wakeLockEnabled);
+
   const area = areaOverride ?? getArea(areaId);
   const baseCharacter = getCharacter(characterId);
   const character = {
@@ -239,8 +255,7 @@ export function RunScreen({
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
-  const prefersReducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = sharedPrefersReducedMotion();
 
   const setPhaseBoth = useCallback((next: RunPhase) => {
     // Once a run is over it stays over -- nothing may steal the hand-off.
@@ -248,6 +263,10 @@ export function RunScreen({
     phaseRef.current = next;
     setPhase(next);
   }, []);
+
+  useEffect(() => {
+    if (phase === 'levelup' && meta.hapticsEnabled) vibrate(20);
+  }, [phase, meta.hapticsEnabled]);
 
   // Build the world once per mount.
   if (worldRef.current === null) {
@@ -1205,21 +1224,26 @@ export function RunScreen({
       {/* Virtual stick */}
       {stickVisual.active ? (
         <div
-          className="pointer-events-none absolute rounded-full border border-white/25"
+          className="pointer-events-none absolute rounded-full"
           style={{
             width: STICK_RADIUS * 2,
             height: STICK_RADIUS * 2,
             left: stickVisual.originX - STICK_RADIUS,
             top: stickVisual.originY - STICK_RADIUS,
+            transform: `scale(${TOUCH_SCALE[meta.touchControlsScale]})`,
+            borderWidth: 1,
+            borderStyle: 'solid',
+            borderColor: `rgba(255, 255, 255, ${Math.min(1, 0.25 * TOUCH_OPACITY[meta.touchControlsOpacity])})`,
           }}
         >
           <div
-            className="absolute rounded-full bg-white/30"
+            className="absolute rounded-full"
             style={{
               width: 44,
               height: 44,
               left: STICK_RADIUS - 22 + stickVisual.dx,
               top: STICK_RADIUS - 22 + stickVisual.dy,
+              backgroundColor: `rgba(255, 255, 255, ${Math.min(1, 0.3 * TOUCH_OPACITY[meta.touchControlsOpacity])})`,
             }}
           />
         </div>

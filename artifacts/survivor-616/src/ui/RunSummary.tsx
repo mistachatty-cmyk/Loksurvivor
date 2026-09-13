@@ -2,6 +2,9 @@
  * Post-run debrief. Owned by the design pass -- keep the export name and
  * props stable.
  */
+import { useEffect } from 'react';
+import { prefersReducedMotion as sharedPrefersReducedMotion } from '@/anim/motion';
+import { vibrate } from '@/game/input/haptics';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
@@ -60,8 +63,13 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
   const { session, user } = useAuth();
-  const prefersReducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = sharedPrefersReducedMotion();
+
+  useEffect(() => {
+    if (meta.hapticsEnabled) vibrate(result.cleared ? [30, 40, 30] : 40);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const characterPalette = resolveCharacterCosmeticPalette(

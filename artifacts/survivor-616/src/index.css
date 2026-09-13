@@ -432,6 +432,16 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   .palette-preview-flicker,
   .palette-preview-wave { animation: none; }
 }
+/* Same rule, driven by the in-game "Reduce motion" override (Settings ->
+   PC & Browser) instead of the OS media query -- see `.force-reduce-motion`
+   on <html>, toggled in App.tsx off `meta.reduceMotionEnabled`. A media
+   query and a class selector can't be combined in one @media rule, hence
+   the duplicate block rather than one shared list. */
+:root.force-reduce-motion .palette-preview-glow,
+:root.force-reduce-motion .palette-preview-pulse,
+:root.force-reduce-motion .palette-preview-prism,
+:root.force-reduce-motion .palette-preview-flicker,
+:root.force-reduce-motion .palette-preview-wave { animation: none; }
 
 /* Hideout credits chip: a small pulse while at least one passive generator is owned. */
 @keyframes hub-cred-pulse { 50% { transform: scale(1.22); filter: brightness(1.5); } }
@@ -439,6 +449,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 @media (prefers-reduced-motion: reduce) {
   .hub-cred-pulse { animation: none; }
 }
+:root.force-reduce-motion .hub-cred-pulse { animation: none; }
 
 /* Arcade Cabinet's CRT flourishes: chrome frame, phosphor glow, scanlines. Inert under every other theme. */
 [data-ui-theme='arcade'] .terminal-frame {
@@ -587,3 +598,5 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   .hideout-ambient *, .hideout-ambient { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
   .music-reactive-root::before { opacity: 0 !important; }
 }
+:root.force-reduce-motion .hideout-ambient *, :root.force-reduce-motion .hideout-ambient { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+:root.force-reduce-motion .music-reactive-root::before { opacity: 0 !important; }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -101,6 +101,13 @@ function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
+
+  // Settings -> PC & Browser's "Reduce motion" override, read by every
+  // `prefersReducedMotion()` call site via this class rather than meta
+  // directly, so nothing else needs a `useMeta()` call just for this.
+  useEffect(() => {
+    document.documentElement.classList.toggle('force-reduce-motion', meta.reduceMotionEnabled);
+  }, [meta.reduceMotionEnabled]);
 
   const goHub = useCallback(() => {
     enterHideout();

@@ -1728,6 +1728,16 @@ export interface MetaState {
   completedDailyContractIds: string[];
   /** Achievement ids whose one-time currency reward has already been paid out. See `data/achievements.ts`. */
   claimedAchievementIds: string[];
+  /** Visual size of the on-screen touch joystick. Purely cosmetic -- never changes the movement-deflection math. */
+  touchControlsScale: 'small' | 'normal' | 'large';
+  /** Visual opacity of the on-screen touch joystick. */
+  touchControlsOpacity: 'subtle' | 'normal' | 'bold';
+  /** Short vibration on key run moments (level-up, run end). No permission prompt and a silent no-op on unsupported devices, so on by default. */
+  hapticsEnabled: boolean;
+  /** Requests a Screen Wake Lock for the duration of a run so a phone doesn't dim/sleep mid-run. Off by default -- battery-relevant. */
+  wakeLockEnabled: boolean;
+  /** Force-applies reduced motion regardless of the OS `prefers-reduced-motion` setting. The OS setting stays the primary source of truth; this is an in-game override on top of it. */
+  reduceMotionEnabled: boolean;
 }
 
 /* ------------------------------------------------------------------ */
