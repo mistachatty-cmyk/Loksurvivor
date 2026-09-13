@@ -367,14 +367,17 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-storefront',
-    name: 'The Storefront',
-    subtitle: 'Street-level records room',
+    name: 'LokPet Card Shop',
+    subtitle: 'The Neon Sleeve',
     description:
-      'A shuttered storefront with the old ledger books still on the counter. Every name in the neighborhood ends up here eventually.',
+      'A bright little storefront where blue sleeves, locked binders, and combat-ready LokPets change hands under a humming sign.',
     backdrop: 'art/street.jpeg',
     biome: 'archive',
-    unlock: { kind: 'discovery', discoveryId: 'sire-ledger' },
-    features: ['bestiary', 'unlocks', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
+    // The shop is a Hideout destination for now, so a fresh player can always
+    // see where Card Credits and Lock Deck packs live. It can later become a
+    // city-travel destination without changing its UI or saved card data.
+    unlock: { kind: 'default' },
+    features: ['card-shop', 'bestiary', 'unlocks', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
   },
   {
     id: 'the-back-room',
