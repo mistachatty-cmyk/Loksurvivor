@@ -1990,7 +1990,7 @@ export function RunScreen({
               {reel.prize.lokPet ? (
                 <div className={`${meta.liveModeEnabled ? 'mt-1 px-2 py-1 text-[8px]' : 'mt-3 px-4 py-3 text-[11px]'} border border-pink-400/30 bg-pink-400/5 text-left font-mono uppercase tracking-widest text-white/80`}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-black text-pink-200">{reel.prize.lokPet.rarityLabel} {reel.prize.lokPet.family} signal</span>
+                    <span className="font-black text-pink-200">{reel.prize.lokPet.rarityLabel} {reel.prize.lokPet.family} companion</span>
                     <span className="text-pink-300">{reel.prize.lokPet.elementLabel}</span>
                   </div>
                   <p className="mt-1 text-white">{reel.prize.lokPet.traitLabel}</p>

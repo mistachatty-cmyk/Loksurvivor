@@ -18,7 +18,14 @@ import {
 import { ALLIES, DISCOVERIES, allyRig } from '@/game/data/progression';
 import { STATUS_EFFECTS } from '@/game/data/statusEffects';
 import { WorkshopOverview } from './WorkshopPanel';
-import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
+import {
+  BASE_CARD_CREDITS_PER_LOOT_BOX,
+  LOKPET_CARD_PACK_COST,
+  describeUnlock,
+  episodeProgress,
+  episodeStatus,
+  useMeta,
+} from '@/game/state/metaStore';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { LockDeckCollection } from './LockDeckCollection';
@@ -47,7 +54,7 @@ const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }>
 };
 
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
-  const { meta, resetProgress, claimAchievement, importVisitingLokCard } = useMeta();
+  const { meta, resetProgress, claimAchievement, importVisitingLokCard, buyLokPetCardPack } = useMeta();
   const isListView = meta.uiDensity === 'list';
   const [showHistory, setShowHistory] = useState(false);
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
@@ -383,6 +390,27 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               {ownedCardCount} / {CARD_MANIFESTS.length}
             </span>
           </div>
+          <section className="mb-6 border border-sky-300/35 bg-sky-300/5 p-4" aria-labelledby="lokpet-card-shop-heading" data-testid="section-lokpet-card-shop">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 id="lokpet-card-shop-heading" className="font-black uppercase text-sky-100">LokPet Card Shop</h3>
+                <p className="text-xs text-muted-foreground">Blue Sleeve Cipher Pack · one combat-ready LokPet and its permanent binder imprint.</p>
+                <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-sky-200">Earn {BASE_CARD_CREDITS_PER_LOOT_BOX} Card Credits per blue box. Collector ranks earn more.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-sm font-bold text-sky-200">{meta.cardCredits} CC</span>
+                <button
+                  type="button"
+                  onClick={buyLokPetCardPack}
+                  disabled={meta.cardCredits < LOKPET_CARD_PACK_COST || meta.savedLokPets.length >= 48}
+                  className="inline-flex items-center gap-2 border border-sky-300/50 bg-sky-300/10 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100 transition-colors hover:bg-sky-300/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  data-testid="button-buy-lokpet-card-pack"
+                >
+                  <Gift className="h-3.5 w-3.5" /> Open · {LOKPET_CARD_PACK_COST} CC
+                </button>
+              </div>
+            </div>
+          </section>
           <LockDeckCollection meta={meta} listView={isListView} />
         </motion.section>
       )}
@@ -422,7 +450,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className={`truncate text-sm font-black uppercase tracking-wide ${found ? 'text-white' : 'text-muted-foreground'}`}>
-                            {found ? variant.name : 'Unknown signal'}
+                            {found ? variant.name : 'Unknown creature'}
                           </h3>
                           <p className={`mt-1 text-[10px] font-bold uppercase tracking-widest ${found ? 'text-pink-300' : 'text-muted-foreground/60'}`}>
                             {found ? `${variant.family} · ${LOKPET_SILHOUETTE_LABELS[variant.silhouette]}` : 'Undiscovered LokPet'}
@@ -474,7 +502,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                     </div>
                   ) : (
                     <p className="mt-4 border-t border-white/10 pt-3 text-xs italic text-muted-foreground/60">
-                      Open a blue loot box during a run to catalogue this signal.
+                      Open a blue loot box during a run to catalogue this trail.
                     </p>
                   )}
                 </article>
@@ -518,7 +546,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
             <div className="mt-3 space-y-3" data-testid="lokpet-history-list">
               {meta.lokPetHistory.length === 0 ? (
                 <div className="border border-dashed border-white/15 bg-black/20 p-5 text-center">
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">No signals logged yet</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">No echoes logged yet</p>
                   <p className="mt-1 text-xs text-muted-foreground/70">Generated LokPets will appear here after the run ends.</p>
                 </div>
               ) : (

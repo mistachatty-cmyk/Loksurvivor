@@ -23,7 +23,8 @@ import { getCharacterSkins } from '@/game/data/characterSkins';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
-import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
+import { LOKPET_VARIANTS_BY_ID, rollLokPet } from '@/game/data/lokPets';
+import { createRng } from '@/game/engine/math';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
 import {
   crewActivityEffects,
@@ -76,6 +77,7 @@ import type {
   LokPetElement,
   LokPetRarity,
   LokPetRunDiscovery,
+  LokPetRoll,
   SavedLokPet,
   VisitingLokCard,
   MetaState,
@@ -91,9 +93,21 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 15;
+const META_VERSION = 16;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
+export const BASE_LOKPET_TEAM_SLOTS = 3;
+export const BASE_CARD_CREDITS_PER_LOOT_BOX = 2;
+export const LOKPET_CARD_PACK_COST = 12;
+
+export function lokPetTeamCapacity(character: CharacterDef): number {
+  return BASE_LOKPET_TEAM_SLOTS + (character.lokPetCollector?.extraTeamSlots ?? 0);
+}
+
+export function cardCreditsForRun(character: CharacterDef, lootBoxesOpened: number): number {
+  const perBox = BASE_CARD_CREDITS_PER_LOOT_BOX + (character.lokPetCollector?.bonusCardCreditsPerLootBox ?? 0);
+  return Math.max(0, Math.floor(lootBoxesOpened)) * perBox;
+}
 
 const FACILITY_ORDER: FacilityTier[] = RECOVERY_FACILITIES.map((facility) => facility.id);
 
@@ -221,6 +235,9 @@ export function createInitialMeta(): MetaState {
     bestSurvivalSec: 0,
     cred: 0,
     lootTokens: 0,
+    cardCredits: 0,
+    lokCollectorRuns: 0,
+    lokCollectorPetsFound: 0,
     skeletonKeys: 0,
     ownedGeneratorIds: [],
     generatorAccrualAt: Date.now(),
@@ -523,7 +540,9 @@ export function normalizeLokPetCatalog(value: unknown): LokPetCatalogEntry[] {
   return [...entries.values()];
 }
 
-function recordLokPetCatalog(existing: LokPetCatalogEntry[], pets: RunResult['lokPets']): LokPetCatalogEntry[] {
+type CatalogPetImprint = Pick<LokPetRoll, 'variantId' | 'rarity' | 'attackKind' | 'element'>;
+
+function recordLokPetCatalog(existing: LokPetCatalogEntry[], pets: readonly CatalogPetImprint[]): LokPetCatalogEntry[] {
   const entries = new Map(
     existing.map((entry) => [
       entry.variantId,
@@ -873,7 +892,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
     lokPetHistory: normalizeLokPetHistory(parsed.lokPetHistory),
     savedLokPets,
-    selectedLokPetIds: savedLokPets.filter((pet) => pet.stamina > 0 && Array.isArray(parsed.selectedLokPetIds) && parsed.selectedLokPetIds.includes(pet.id)).map((pet) => pet.id).slice(0, 3),
+    selectedLokPetIds: savedLokPets
+      .filter((pet) => pet.stamina > 0 && Array.isArray(parsed.selectedLokPetIds) && parsed.selectedLokPetIds.includes(pet.id))
+      .map((pet) => pet.id)
+      .slice(0, lokPetTeamCapacity(getCharacter(selectedCharacterId))),
     visitingLokCards: normalizeVisitingLokCards(parsed.visitingLokCards),
     ...recoveredElixirs,
     bestiary,
@@ -882,6 +904,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
     ...settledGeneratorIncome,
     lootTokens: counter(parsed.lootTokens),
+    cardCredits: counter(parsed.cardCredits),
+    lokCollectorRuns: counter(parsed.lokCollectorRuns),
+    lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     skeletonKeys: counter(parsed.skeletonKeys),
     ownedGeneratorIds,
     runModifiers: normalizeRunModifiers(parsed.runModifiers),
@@ -1007,6 +1032,10 @@ export function isUnlocked(rule: UnlockRule, meta: MetaState): boolean {
       return meta.discoveryIds.includes(rule.discoveryId);
     case 'kills':
       return meta.totalKills >= rule.count;
+    case 'lokPetCards':
+      return meta.lokPetCatalog.length >= rule.count;
+    case 'lokCollector':
+      return meta.lokCollectorRuns >= rule.runs && meta.lokCollectorPetsFound >= rule.lokPets;
     default:
       return false;
   }
@@ -1024,6 +1053,10 @@ export function describeUnlock(rule: UnlockRule): string {
       return 'Find a hidden location';
     case 'kills':
       return `Defeat ${rule.count} enemies`;
+    case 'lokPetCards':
+      return `Catalogue ${rule.count} LokPet cards`;
+    case 'lokCollector':
+      return `Collector challenge: ${rule.runs} runs and ${rule.lokPets} LokPets caught`;
     default:
       return 'Locked';
   }
@@ -1214,6 +1247,7 @@ type Action =
   | { type: 'selectCharacterSkin'; characterId: string; skinId: string }
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
+  | { type: 'buyLokPetCardPack'; now: number }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
   | { type: 'refreshPetElixirs'; now: number }
@@ -1287,8 +1321,18 @@ function addUnique(list: string[], value?: string): string[] {
 
 export function reducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
-    case 'selectCharacter':
-      return { ...state, meta: { ...state.meta, selectedCharacterId: action.id } };
+    case 'selectCharacter': {
+      const character = CHARACTERS.find((candidate) => candidate.id === action.id);
+      if (!character) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          selectedCharacterId: action.id,
+          selectedLokPetIds: state.meta.selectedLokPetIds.slice(0, lokPetTeamCapacity(character)),
+        },
+      };
+    }
 
     case 'selectCharacterSkin': {
       const character = CHARACTERS.find((entry) => entry.id === action.characterId);
@@ -1308,10 +1352,31 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'toggleSavedLokPet': {
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
       if (!pet || pet.stamina <= 0) return state;
+      const capacity = lokPetTeamCapacity(getCharacter(state.meta.selectedCharacterId));
       const selected = state.meta.selectedLokPetIds.includes(action.id)
         ? state.meta.selectedLokPetIds.filter((id) => id !== action.id)
-        : state.meta.selectedLokPetIds.length < 3 ? [...state.meta.selectedLokPetIds, action.id] : state.meta.selectedLokPetIds;
+        : state.meta.selectedLokPetIds.length < capacity ? [...state.meta.selectedLokPetIds, action.id] : state.meta.selectedLokPetIds;
       return { ...state, meta: { ...state.meta, selectedLokPetIds: selected } };
+    }
+
+    case 'buyLokPetCardPack': {
+      if (state.meta.cardCredits < LOKPET_CARD_PACK_COST || state.meta.savedLokPets.length >= 48) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ state.meta.cardCredits) >>> 0;
+      const roll = rollLokPet(createRng(seed));
+      const saved: SavedLokPet = {
+        id: `shop-pet-${action.now.toString(36)}-${state.meta.savedLokPets.length}-${roll.variantId}`,
+        roll,
+        stamina: PET_STAMINA_MAX,
+      };
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cardCredits: state.meta.cardCredits - LOKPET_CARD_PACK_COST,
+          savedLokPets: [saved, ...state.meta.savedLokPets],
+          lokPetCatalog: recordLokPetCatalog(state.meta.lokPetCatalog, [roll]),
+        },
+      };
     }
 
     case 'restoreSavedLokPet': {
@@ -1824,6 +1889,11 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'completeRun': {
       const result = action.result;
       const prev = state.meta;
+      const runCharacter = getCharacter(result.characterId);
+      const collectorRun = Boolean(runCharacter.lokPetCollector);
+      const collectorPetsFound = collectorRun
+        ? result.lokPets.filter((pet) => pet.origin === 'chest').length
+        : 0;
 
       const bestiary = { ...prev.bestiary };
       for (const [enemyId, count] of Object.entries(result.killsByEnemy)) {
@@ -1905,6 +1975,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         cred: prev.cred + result.cred + dailyContracts.rewardCred,
         lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
+        cardCredits: prev.cardCredits + cardCreditsForRun(runCharacter, result.lootBoxesOpened),
+        lokCollectorRuns: prev.lokCollectorRuns + (collectorRun ? 1 : 0),
+        lokCollectorPetsFound: prev.lokCollectorPetsFound + collectorPetsFound,
         skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
         // Endless records
         endlessRecordDistancePx: result.endless
@@ -1993,6 +2066,7 @@ export interface MetaContextValue {
   selectCharacter: (id: string) => void;
   selectCharacterSkin: (characterId: string, skinId: string) => void;
   completeRun: (result: RunResult) => void;
+  buyLokPetCardPack: () => void;
   toggleSavedLokPet: (id: string) => void;
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
@@ -2083,6 +2157,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const selectCharacterSkin = useCallback((characterId: string, skinId: string) => dispatch({ type: 'selectCharacterSkin', characterId, skinId }), []);
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
+  const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyLokPetCardPack', now: Date.now() }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
   const refreshPetElixirs = useCallback(() => dispatch({ type: 'refreshPetElixirs', now: Date.now() }), []);
@@ -2246,6 +2321,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectCharacter,
       selectCharacterSkin,
       completeRun,
+      buyLokPetCardPack,
       toggleSavedLokPet,
       restoreSavedLokPet,
       refreshPetElixirs,
@@ -2318,6 +2394,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     enterHideout,
     selectCharacterSkin,
     completeRun,
+    buyLokPetCardPack,
     toggleSavedLokPet,
     restoreSavedLokPet,
     refreshPetElixirs,

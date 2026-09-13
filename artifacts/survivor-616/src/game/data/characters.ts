@@ -177,6 +177,111 @@ function neonLeviathanRig(): SpriteRig {
   return rig;
 }
 
+/** Tall split-coat profile with a pendulum mic ticking beside the body. */
+function meterMonkRig(): SpriteRig {
+  const rig = humanoidRig({ height: 27, width: 7, hood: true, flarePants: true, torsoColor: 'bodyDark' });
+  rig.parts.push(
+    { key: 'crest', x: -2, y: 31, w: 4, h: 2, color: 'glow', z: 9 },
+    { key: 'aura', x: 10, y: 5, w: 2, h: 22, color: 'accent', z: 0 },
+    { key: 'aura', x: 7, y: 4, w: 8, h: 2, color: 'accentBright', z: 0 },
+  );
+  rig.pixelHeight = 33;
+  return rig;
+}
+
+/** Wide turntable shoulders and a vinyl disc halo create a low, broad read. */
+function vinylHexRig(): SpriteRig {
+  const rig = humanoidRig({ height: 18, width: 18, bulk: true, cap: true, torsoColor: 'body' });
+  rig.parts.unshift(
+    { key: 'aura', x: -17, y: 12, w: 34, h: 4, color: 'bodyDark', z: 0 },
+    { key: 'aura', x: -13, y: 22, w: 26, h: 3, color: 'accent', z: 0 },
+  );
+  rig.parts.push(
+    { key: 'crest', x: -3, y: 25, w: 6, h: 2, color: 'glow', z: 9 },
+    { key: 'crest', x: -1, y: 23, w: 2, h: 6, color: 'accentBright', z: 9 },
+  );
+  rig.pixelHeight = 29;
+  return rig;
+}
+
+/** Hooded singer with two tall speaker-wings and an empty glowing face. */
+function hookGhostRig(): SpriteRig {
+  const rig = humanoidRig({ height: 23, width: 8, hood: true, seated: true, headColor: 'ink', torsoColor: 'bodyDark' });
+  rig.parts.unshift(
+    { key: 'aura', x: -17, y: 3, w: 7, h: 25, color: 'body', z: 0 },
+    { key: 'aura', x: 10, y: 3, w: 7, h: 25, color: 'body', z: 0 },
+  );
+  rig.parts.push(
+    { key: 'face', x: -3, y: 22, w: 6, h: 2, color: 'glow', z: 9 },
+    { key: 'crest', x: -15, y: 9, w: 3, h: 3, color: 'accentBright', z: 8 },
+    { key: 'crest', x: 12, y: 16, w: 3, h: 3, color: 'accentBright', z: 8 },
+  );
+  rig.pixelHeight = 30;
+  return rig;
+}
+
+/** Asymmetric card-fan coat with one oversized glowing binder sleeve. */
+function sleeveCollectorRig(): SpriteRig {
+  const rig = humanoidRig({ height: 21, width: 10, cap: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift({ key: 'aura', x: 5, y: 3, w: 13, h: 22, color: 'body', z: 0 });
+  for (let card = 0; card < 4; card += 1) {
+    rig.parts.push({ key: 'crest', x: -16 + card * 3, y: 7 + card * 4, w: 6, h: 8, color: card % 2 ? 'accent' : 'accentBright', z: 8 });
+  }
+  rig.parts.push(
+    { key: 'face', x: -3, y: 23, w: 6, h: 2, color: 'glow', z: 9 },
+    { key: 'aura', x: 8, y: 7, w: 7, h: 13, color: 'glow', z: 1 },
+  );
+  rig.pixelHeight = 31;
+  return rig;
+}
+
+function crateSageRig(): SpriteRig {
+  const rig = humanoidRig({ height: 18, width: 17, bulk: true, hood: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift({ key: 'aura', x: -14, y: 0, w: 28, h: 16, color: 'body', z: 0 });
+  rig.parts.push(
+    { key: 'crest', x: -12, y: 5, w: 4, h: 9, color: 'accent', z: 8 },
+    { key: 'crest', x: 8, y: 5, w: 4, h: 9, color: 'accentBright', z: 8 },
+    { key: 'face', x: -5, y: 20, w: 10, h: 2, color: 'glow', z: 9 },
+  );
+  rig.pixelHeight = 27;
+  return rig;
+}
+
+function foilOracleRig(): SpriteRig {
+  const rig = humanoidRig({ height: 28, width: 5, halo: true, staff: true, torsoColor: 'bodyDark' });
+  rig.parts.push(
+    { key: 'aura', x: -15, y: 7, w: 10, h: 2, color: 'accent', z: 0 },
+    { key: 'aura', x: -12, y: 12, w: 8, h: 2, color: 'glow', z: 0 },
+    { key: 'aura', x: -9, y: 17, w: 6, h: 2, color: 'accentBright', z: 0 },
+  );
+  rig.pixelHeight = 36;
+  return rig;
+}
+
+function crownBinderRig(): SpriteRig {
+  const rig = humanoidRig({ height: 24, width: 15, flarePants: true, torsoColor: 'body' });
+  rig.parts.push(
+    { key: 'crest', x: -9, y: 27, w: 4, h: 8, color: 'accent', z: 8 },
+    { key: 'crest', x: -2, y: 29, w: 4, h: 10, color: 'glow', z: 9 },
+    { key: 'crest', x: 5, y: 27, w: 4, h: 8, color: 'accent', z: 8 },
+    { key: 'aura', x: -18, y: 4, w: 6, h: 18, color: 'accentBright', z: 0 },
+    { key: 'aura', x: 12, y: 4, w: 6, h: 18, color: 'accentBright', z: 0 },
+  );
+  rig.pixelHeight = 39;
+  return rig;
+}
+
+function packSupremeRig(): SpriteRig {
+  const rig = humanoidRig({ height: 30, width: 20, bulk: true, wings: true, halo: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift(
+    { key: 'aura', x: -22, y: 0, w: 44, h: 4, color: 'glow', z: 0 },
+    { key: 'aura', x: -19, y: 35, w: 38, h: 5, color: 'accent', z: 0 },
+  );
+  rig.parts.push({ key: 'face', x: -5, y: 30, w: 10, h: 3, color: 'accentBright', z: 9 });
+  rig.pixelHeight = 43;
+  return rig;
+}
+
 /**
  * The playable roster. Each entry is fully data-driven: silhouette, palette,
  * base stats, signature weapon, ultimate and unlock condition.
@@ -1456,6 +1561,236 @@ export const CHARACTERS: CharacterDef[] = [
       effect: { damageMult: 2.2, novaDamage: 55, novaRadius: 170, cooldownMult: 0.65 },
     },
     unlock: { kind: 'clearArea', areaId: 'neon-arcade' },
+  },
+  {
+    id: 'meter-monk',
+    react: [
+      { source: 'downbeat', target: 'scale', amount: 0.12, decayMs: 180 },
+      { source: 'band', band: 'mid', target: 'glow', amount: 0.34 },
+    ],
+    name: 'Meter Monk',
+    handle: 'The Sixteenth Step',
+    tagline: 'Never wastes a beat, a breath, or a warning.',
+    bio: 'The patient pen of the Sixth Ward Cypher. During the blackout at LokPet Card Shop, Monk held the doorway for sixteen bars while the others got the neighborhood inside.',
+    palette: palette({ ink: '#080713', body: '#35265f', bodyDark: '#171127', accent: '#ffb000', accentBright: '#fff1a8', skin: '#7a4931', glow: '#ffd84d' }),
+    rig: meterMonkRig(),
+    stats: { maxHp: 112, speed: 92, power: 1.08, area: 1.15, haste: 0.96, magnet: 52, armor: 0.1, crit: 0.06, lifesteal: 0 },
+    weapon: {
+      id: 'bar-line',
+      name: 'Bar Line',
+      kind: 'wave',
+      description: 'Four measured sound walls land like bars across the street, slowing anything that misses the count.',
+      damage: 15,
+      cooldownMs: 1080,
+      range: 190,
+      count: 4,
+      levelDamageScale: 0.27,
+      impactIntensity: 2,
+      color: '#ffb000',
+      statusEffectId: 'slow',
+    },
+    ultimate: {
+      id: 'sixteen-bars',
+      name: 'Sixteen Bars',
+      description: 'The meter locks in: attacks accelerate and a final bass hit clears the circle.',
+      cooldownMs: 23500,
+      durationMs: 4200,
+      effect: { cooldownMult: 0.48, damageMult: 1.55, novaDamage: 48, novaRadius: 155 },
+    },
+    unlock: { kind: 'default' },
+    rarity: 'legendary',
+    signatureTraits: ['Pendulum mic', 'Four-beat pressure'],
+    crew: { id: 'sixth-ward-cypher', name: 'Sixth Ward Cypher', role: 'Lyricist' },
+  },
+  {
+    id: 'vinyl-hex',
+    react: [
+      { source: 'beat', target: 'scale', amount: 0.1, decayMs: 110 },
+      { source: 'band', band: 'high', target: 'glow', amount: 0.4 },
+    ],
+    name: 'Vinyl Hex',
+    handle: 'Backspin Architect',
+    tagline: 'If the room has corners, the beat has exits.',
+    bio: 'Producer and route planner for the Sixth Ward Cypher. Hex wired the card shop turntables into the block grid; every ricochet still carries a piece of that impossible set.',
+    palette: palette({ ink: '#070b18', body: '#123a63', bodyDark: '#0b1830', accent: '#ff2e91', accentBright: '#7df9ff', skin: '#9b5c3f', glow: '#00efff' }),
+    rig: vinylHexRig(),
+    stats: { maxHp: 98, speed: 104, power: 1, area: 1.05, haste: 0.9, magnet: 48, armor: 0.05, crit: 0.12, lifesteal: 0 },
+    weapon: {
+      id: 'backspin-pressing',
+      name: 'Backspin Pressing',
+      kind: 'projectile',
+      description: 'Twin vinyl cutters ricochet from walls, punch through one target, then cross the room again.',
+      damage: 13,
+      cooldownMs: 570,
+      range: 380,
+      speed: 390,
+      count: 2,
+      lifetimeMs: 1700,
+      levelDamageScale: 0.25,
+      impactIntensity: 2,
+      pierce: 1,
+      color: '#ff2e91',
+      obstacleInteraction: 'reflect',
+    },
+    ultimate: {
+      id: 'needle-drop',
+      name: 'Needle Drop',
+      description: 'Drops the whole city onto the needle, bursting nearby enemies before the tempo doubles.',
+      cooldownMs: 22000,
+      durationMs: 3600,
+      effect: { novaDamage: 58, novaRadius: 180, cooldownMult: 0.55, speedMult: 1.25 },
+    },
+    unlock: { kind: 'clearArea', areaId: 'neon-arcade' },
+    rarity: 'legendary',
+    signatureTraits: ['Turntable shoulders', 'Wall-cutting vinyl'],
+    crew: { id: 'sixth-ward-cypher', name: 'Sixth Ward Cypher', role: 'Producer' },
+  },
+  {
+    id: 'hook-ghost',
+    react: [
+      { source: 'onset', target: 'scale', amount: 0.16, decayMs: 170 },
+      { source: 'energy', target: 'glow', amount: 0.38 },
+    ],
+    name: 'Hook Ghost',
+    handle: 'Call-and-Response',
+    tagline: 'The crowd always knows the next line.',
+    bio: 'The Cypher never found out whether Ghost escaped the blackout or became part of its echo. Their hooks turn hostile crowds into a temporary choir that fights on cue.',
+    palette: palette({ ink: '#05030d', body: '#5b167c', bodyDark: '#1e0a35', accent: '#61ff8b', accentBright: '#eafff0', skin: '#2b1740', glow: '#9dffbc' }),
+    rig: hookGhostRig(),
+    stats: { maxHp: 102, speed: 98, power: 0.96, area: 1.18, haste: 1.04, magnet: 58, armor: 0.07, crit: 0.05, lifesteal: 0.03 },
+    weapon: {
+      id: 'crowd-hook',
+      name: 'Crowd Hook',
+      kind: 'convert',
+      description: 'Calls two weak enemies into the chorus; they turn and perform the response against their own side.',
+      damage: 14,
+      cooldownMs: 2300,
+      range: 255,
+      count: 2,
+      durationMs: 5200,
+      levelDamageScale: 0.23,
+      impactIntensity: 1,
+      color: '#61ff8b',
+      statusEffectId: 'slow',
+    },
+    ultimate: {
+      id: 'everybody-say',
+      name: 'Everybody Say',
+      description: 'A spectral chorus floods the block, healing Ghost while the crowd takes amplified damage.',
+      cooldownMs: 25000,
+      durationMs: 4300,
+      effect: { invulnerable: true, damageMult: 1.85, novaDamage: 38, novaRadius: 210 },
+    },
+    unlock: { kind: 'kills', count: 616 },
+    rarity: 'legendary',
+    signatureTraits: ['Speaker-wing silhouette', 'Enemy chorus'],
+    crew: { id: 'sixth-ward-cypher', name: 'Sixth Ward Cypher', role: 'Hook / Hype' },
+  },
+  {
+    id: 'sleeve',
+    react: [
+      { source: 'beat', target: 'scale', amount: 0.08, decayMs: 130 },
+      { source: 'band', band: 'high', target: 'glow', amount: 0.5 },
+    ],
+    name: 'Sleeve',
+    handle: 'The Binder',
+    tagline: 'Nothing rare stays loose for long.',
+    bio: 'Card-shop keeper, merch table guardian, and unofficial fourth member of the Sixth Ward Cypher. Sleeve catalogued every strange LokPet that crossed the blackout—and learned to throw the duplicates.',
+    palette: palette({ ink: '#101006', body: '#e7e3d5', bodyDark: '#28351d', accent: '#ff4db8', accentBright: '#fff45c', skin: '#6f432f', glow: '#8cff4d' }),
+    rig: sleeveCollectorRig(),
+    stats: { maxHp: 106, speed: 101, power: 1.02, area: 1, haste: 0.94, magnet: 74, armor: 0.06, crit: 0.11, lifesteal: 0 },
+    weapon: {
+      id: 'misprint-deck',
+      name: 'Misprint Deck',
+      kind: 'projectile',
+      description: 'A fan of foil misprints skips through enemies and bounces once off the shop walls.',
+      damage: 11,
+      cooldownMs: 610,
+      range: 350,
+      speed: 420,
+      count: 3,
+      lifetimeMs: 1350,
+      levelDamageScale: 0.24,
+      impactIntensity: 1,
+      pierce: 2,
+      color: '#fff45c',
+      obstacleInteraction: 'reflect',
+    },
+    ultimate: {
+      id: 'perfect-pull',
+      name: 'Perfect Pull',
+      description: 'Cracks a mythic pack: foil light detonates outward and every card flies faster for a short run.',
+      cooldownMs: 23000,
+      durationMs: 4000,
+      effect: { novaDamage: 62, novaRadius: 175, damageMult: 1.7, cooldownMult: 0.62 },
+    },
+    unlock: { kind: 'default' },
+    rarity: 'legendary',
+    signatureTraits: ['Asymmetric card-fan coat', 'Double Card Credits'],
+    crew: { id: 'sixth-ward-cypher', name: 'Sixth Ward Cypher', role: 'Collector / Shopkeeper' },
+    lokPetCollector: {
+      rank: 'LokPet Collector',
+      extraTeamSlots: 1,
+      floorPackChance: 0.006,
+      lokPetPrizeWeightMultiplier: 1.35,
+      bonusCardCreditsPerLootBox: 2,
+    },
+  },
+  {
+    id: 'crate-sage', react: REACTION_PRESETS.playerBob,
+    name: 'Crate Sage', handle: 'Sealed Knowledge', tagline: 'Reads the pull before the wrapper tears.',
+    bio: 'Sleeve’s first apprentice learned every delivery route into the shop, then learned how to hear a living LokPet through cardboard and foil.',
+    palette: palette({ ink: '#0b0905', body: '#8a5b2d', bodyDark: '#332113', accent: '#51f6c4', accentBright: '#d8fff3', skin: '#7b4b34', glow: '#72ffd2' }),
+    rig: crateSageRig(),
+    stats: { maxHp: 126, speed: 88, power: 1.08, area: 1.08, haste: 1, magnet: 78, armor: 0.13, crit: 0.05, lifesteal: 0 },
+    weapon: { id: 'seal-breaker', name: 'Seal Breaker', kind: 'melee', description: 'A box-cutter arc opens armor like a stubborn collector case.', damage: 21, cooldownMs: 760, range: 66, count: 2, levelDamageScale: 0.3, impactIntensity: 3, color: '#51f6c4' },
+    ultimate: { id: 'fresh-case', name: 'Fresh Case', description: 'Drops a sealed case with enough force to clear the counter.', cooldownMs: 24000, durationMs: 3500, effect: { novaDamage: 70, novaRadius: 160, damageMult: 1.65 } },
+    unlock: { kind: 'lokCollector', runs: 3, lokPets: 3 }, rarity: 'legendary',
+    signatureTraits: ['Crate-body silhouette', '+2 LokPet slots'],
+    crew: { id: 'card-shop-keepers', name: 'LokPet Card Shop Keepers', role: 'LokMaster' },
+    lokPetCollector: { rank: 'LokMaster', extraTeamSlots: 2, floorPackChance: 0.009, lokPetPrizeWeightMultiplier: 1.6, bonusCardCreditsPerLootBox: 3 },
+  },
+  {
+    id: 'foil-oracle', react: REACTION_PRESETS.playerBob,
+    name: 'Foil Oracle', handle: 'Tomorrow’s Pull', tagline: 'Sees seven packs ahead and still enjoys the reveal.',
+    bio: 'A quiet reader of foil glare who joined the shop after predicting the blackout’s final record. Every card in the fan is a future that almost happened.',
+    palette: palette({ ink: '#090616', body: '#5f4a9c', bodyDark: '#21163f', accent: '#76f7ff', accentBright: '#fff8cc', skin: '#80513c', glow: '#d77cff' }),
+    rig: foilOracleRig(),
+    stats: { maxHp: 94, speed: 108, power: 1.02, area: 1.22, haste: 0.9, magnet: 86, armor: 0.05, crit: 0.14, lifesteal: 0 },
+    weapon: { id: 'forecast-spread', name: 'Forecast Spread', kind: 'wave', description: 'Three translucent card futures unfold outward and slow whatever chooses the wrong one.', damage: 18, cooldownMs: 1050, range: 210, count: 3, levelDamageScale: 0.27, impactIntensity: 2, color: '#76f7ff', statusEffectId: 'slow' },
+    ultimate: { id: 'chase-card', name: 'Chase Card', description: 'Reveals the rare timeline: speed, damage, and foil light surge together.', cooldownMs: 22500, durationMs: 4400, effect: { damageMult: 1.9, speedMult: 1.4, cooldownMult: 0.65 } },
+    unlock: { kind: 'lokCollector', runs: 8, lokPets: 8 }, rarity: 'legendary',
+    signatureTraits: ['Tall foil diviner', '+3 LokPet slots'],
+    crew: { id: 'card-shop-keepers', name: 'LokPet Card Shop Keepers', role: 'LokCaster' },
+    lokPetCollector: { rank: 'LokCaster', extraTeamSlots: 3, floorPackChance: 0.012, lokPetPrizeWeightMultiplier: 1.9, bonusCardCreditsPerLootBox: 4 },
+  },
+  {
+    id: 'crown-binder', react: REACTION_PRESETS.playerBob,
+    name: 'Crown Binder', handle: 'The Living Catalogue', tagline: 'Every crown jewel has a page number.',
+    bio: 'The Keepers’ walking archive wears a crown of top-loaders and remembers every LokPet call ever caught beneath Sixth Ward streetlights.',
+    palette: palette({ ink: '#100b02', body: '#f2d058', bodyDark: '#51330c', accent: '#ff3f8f', accentBright: '#fff7c2', skin: '#9d6241', glow: '#ff8fc5' }),
+    rig: crownBinderRig(),
+    stats: { maxHp: 138, speed: 94, power: 1.18, area: 1.18, haste: 0.94, magnet: 94, armor: 0.14, crit: 0.1, lifesteal: 0.02 },
+    weapon: { id: 'royal-toploader', name: 'Royal Toploader', kind: 'laser', description: 'A rigid beam stamps a brilliant catalogue line through the entire aisle.', damage: 29, cooldownMs: 1320, range: 460, levelDamageScale: 0.3, impactIntensity: 4, color: '#ff3f8f', obstacleInteraction: 'block' },
+    ultimate: { id: 'living-catalogue', name: 'Living Catalogue', description: 'Every recorded call answers at once in a crown-shaped blast.', cooldownMs: 24500, durationMs: 3800, effect: { novaDamage: 86, novaRadius: 205, damageMult: 2 } },
+    unlock: { kind: 'lokCollector', runs: 16, lokPets: 18 }, rarity: 'legendary',
+    signatureTraits: ['Top-loader crown', '+5 LokPet slots'],
+    crew: { id: 'card-shop-keepers', name: 'LokPet Card Shop Keepers', role: 'LokLegendary' },
+    lokPetCollector: { rank: 'LokLegendary', extraTeamSlots: 5, floorPackChance: 0.016, lokPetPrizeWeightMultiplier: 2.3, bonusCardCreditsPerLootBox: 5 },
+  },
+  {
+    id: 'pack-supreme', react: REACTION_PRESETS.playerBob,
+    name: 'Pack Supreme', handle: 'Seven-Slot Sovereign', tagline: 'Opens the whole case. Keeps every promise.',
+    bio: 'The final Keeper rank is less a title than a moving sanctuary. Seven extra companions orbit Supreme, each one rescued, named, and ready to answer.',
+    palette: palette({ ink: '#03070b', body: '#153f56', bodyDark: '#071a25', accent: '#ffdd3d', accentBright: '#ffffff', skin: '#6b412f', glow: '#5cfff2' }),
+    rig: packSupremeRig(),
+    stats: { maxHp: 156, speed: 91, power: 1.2, area: 1.28, haste: 0.88, magnet: 110, armor: 0.16, crit: 0.12, lifesteal: 0.03 },
+    weapon: { id: 'seven-seal-orbit', name: 'Seven-Seal Orbit', kind: 'projectile', description: 'Seven sealed rays fan outward like a collector case snapping open.', damage: 10, cooldownMs: 680, range: 390, speed: 430, count: 7, lifetimeMs: 1250, levelDamageScale: 0.23, impactIntensity: 2, pierce: 1, color: '#ffdd3d' },
+    ultimate: { id: 'open-every-pack', name: 'Open Every Pack', description: 'A supreme resonance storm makes the whole LokPet team hit harder and faster.', cooldownMs: 25000, durationMs: 5200, effect: { novaDamage: 74, novaRadius: 230, damageMult: 2.2, cooldownMult: 0.5 } },
+    unlock: { kind: 'lokCollector', runs: 30, lokPets: 36 }, rarity: 'legendary',
+    signatureTraits: ['Sanctuary-wing silhouette', '+7 LokPet slots'],
+    crew: { id: 'card-shop-keepers', name: 'LokPet Card Shop Keepers', role: 'LokSupreme' },
+    lokPetCollector: { rank: 'LokSupreme', extraTeamSlots: 7, floorPackChance: 0.022, lokPetPrizeWeightMultiplier: 2.8, bonusCardCreditsPerLootBox: 7 },
   },
   {
     id: 'zero-day',
