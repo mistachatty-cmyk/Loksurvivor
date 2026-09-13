@@ -37,6 +37,13 @@ export interface GameRunSummaryLike {
     type: string;
     label: string;
   }>;
+  /**
+   * Real captured gameplay clips, already resolved to playable `src` URLs --
+   * the game resolves each highlight's `clipAssetId` via `localMediaStore`
+   * before building this summary, since this package must not depend on the
+   * game's IndexedDB to stay buildable from plain JSON.
+   */
+  highlightClips?: Array<{ atMs: number; kind: string; label: string; src: string }>;
 }
 
 const MILESTONE_KINDS: Milestone['kind'][] = [
@@ -105,6 +112,7 @@ export const toRecapProps = (summary: GameRunSummaryLike): RunRecapProps =>
         }
       : null,
     milestones: pickMilestones(summary.events ?? []),
+    highlightClips: [...(summary.highlightClips ?? [])].sort((a, b) => a.atMs - b.atMs),
   });
 
 /** mm:ss — shared by the video and any caller that wants matching copy. */

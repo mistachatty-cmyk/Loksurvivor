@@ -13,8 +13,9 @@
  * Output is a small, capped list -- never a frame-by-frame recording --
  * matching the `highlights` shape sketched in `RunPresentationRecord` in
  * the architecture doc, so a future Remotion recap can consume this
- * unchanged. Today it's surfaced directly in `RunSummary` as a plain
- * timeline; no video, no extra dependency.
+ * unchanged. Surfaced directly in `RunSummary` as a plain timeline, and (once
+ * `RunScreen` assigns `clipAssetId`s via `game/media/clipRecorder.ts`) as the
+ * real gameplay clips cycled through in the `@lok/recap` highlight reel.
  */
 import { ENEMIES_BY_ID } from './enemies';
 
@@ -33,6 +34,14 @@ export interface RunHighlight {
   atMs: number;
   label: string;
   detail?: string;
+  /**
+   * Local media-store id (see `game/audio/localMediaStore.ts`) for a captured
+   * gameplay clip around this moment. Set by `RunScreen` after the run ends,
+   * from `game/media/clipRecorder.ts` -- absent when clip capture wasn't
+   * supported on this device or didn't cover this moment. This module stays
+   * unaware of the recorder itself; it only carries the id once assigned.
+   */
+  clipAssetId?: string;
 }
 
 /** Minimal read surface this needs from `World` -- kept narrow on purpose so this file never needs `engine/world`'s full type surface. */

@@ -18,7 +18,8 @@ import { AccountNudge } from './AccountNudge';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ShareRecapButton } from './ShareRecapButton';
 import type { GameRunSummaryLike } from '@lok/recap';
-import { lazy, Suspense, useState } from 'react';
+import { loadMediaAssets } from '@/game/audio/localMediaStore';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
@@ -65,6 +66,38 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
   const { meta } = useMeta();
   const { session, user } = useAuth();
   const [showAfterAction, setShowAfterAction] = useState(false);
+  const [clipUrlsByAssetId, setClipUrlsByAssetId] = useState<Record<string, string>>({});
+
+  // Resolve captured-clip ids to local blob URLs for the after-action report's
+  // highlight reel. `saveMediaAsset`/`loadMediaAssets` live in the game's own
+  // IndexedDB (`localMediaStore`) -- `@lok/recap` never reaches into it
+  // itself, so the resolved `src` is handed to it as a plain prop.
+  useEffect(() => {
+    const assetIds = [...new Set((result.highlights ?? [])
+      .map((highlight) => highlight.clipAssetId)
+      .filter((id): id is string => Boolean(id)))];
+    if (assetIds.length === 0) return;
+    let cancelled = false;
+    const createdUrls: string[] = [];
+    loadMediaAssets(assetIds)
+      .then((records) => {
+        if (cancelled) return;
+        const next: Record<string, string> = {};
+        for (const record of records) {
+          const url = URL.createObjectURL(record.blob);
+          createdUrls.push(url);
+          next[record.id] = url;
+        }
+        setClipUrlsByAssetId(next);
+      })
+      .catch(() => {
+        // Local media unavailable -- the report falls back to a text beat list.
+      });
+    return () => {
+      cancelled = true;
+      for (const url of createdUrls) URL.revokeObjectURL(url);
+    };
+  }, [result.highlights]);
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const area = areaOverride ?? getArea(result.areaId);
@@ -96,6 +129,10 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
         : highlight.kind === 'close-call' ? 'close-call'
         : null;
       return type ? [{ atSeconds: highlight.atMs / 1000, type, label: highlight.label }] : [];
+    }),
+    highlightClips: (result.highlights ?? []).flatMap((highlight) => {
+      const src = highlight.clipAssetId ? clipUrlsByAssetId[highlight.clipAssetId] : undefined;
+      return src ? [{ atMs: highlight.atMs, kind: highlight.kind, label: highlight.label, src }] : [];
     }),
   };
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;

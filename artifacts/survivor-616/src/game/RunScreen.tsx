@@ -20,6 +20,7 @@ import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { nextRescueAllyId } from '@/game/data/progression';
 import { createRunHighlightRecorder } from '@/game/data/runHighlights';
+import { createClipRecorder } from '@/game/media/clipRecorder';
 import { beaconsOf, customMapToArea, objectiveMarkersOf, spawnPointsOf } from '@/game/data/customMaps';
 import { CUSTOM_MAP_ASSETS_BY_ID } from '@/game/data/customMaps';
 import { SECTOR_MAPS_BY_ID } from '@/game/data/sectorMaps';
@@ -200,6 +201,8 @@ export function RunScreen({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const highlightRecorderRef = useRef(createRunHighlightRecorder());
+  const clipRecorderRef = useRef(createClipRecorder(() => canvasRef.current));
+  const capturedHighlightCountRef = useRef(0);
   const phaseRef = useRef<RunPhase>('countdown');
   const finishedRef = useRef(false);
   const keysRef = useRef(new Set<string>());
@@ -727,6 +730,8 @@ export function RunScreen({
 
     let view = resize();
 
+    clipRecorderRef.current.start(world.now);
+
     const frame = (time: number) => {
       raf = requestAnimationFrame(frame);
       const dt = Math.min((time - last) / 1000, 0.1);
@@ -840,6 +845,13 @@ export function RunScreen({
       renderWorld(ctx, world, commanderTargetView ? { ...view, targetViewOverride: commanderTargetView } : view);
 
       highlightRecorderRef.current.observe(world);
+      clipRecorderRef.current.tick(world.now);
+      const highlightsSoFar = highlightRecorderRef.current.getHighlights();
+      for (let i = capturedHighlightCountRef.current; i < highlightsSoFar.length; i += 1) {
+        const highlight = highlightsSoFar[i]!;
+        clipRecorderRef.current.requestClip(highlight.kind, highlight.atMs, highlight.label);
+      }
+      capturedHighlightCountRef.current = highlightsSoFar.length;
 
       if (time - hudAt > 60) {
         hudAt = time;
@@ -857,12 +869,18 @@ export function RunScreen({
     if (phase !== 'over' || finishedRef.current) return;
     const world = worldRef.current;
     if (!world) return;
-    const timer = window.setTimeout(() => {
+    const timer = window.setTimeout(async () => {
       if (finishedRef.current) return;
       finishedRef.current = true;
       for (const prize of [...world.pendingReel, ...queuedPrizes, ...(reel ? [reel.prize] : [])]) claimReelPrize(prize);
       const result = buildResult(world, finalRewardMultiplier);
-      result.highlights = highlightRecorderRef.current.getHighlights();
+      const highlights = highlightRecorderRef.current.getHighlights();
+      const clips = await clipRecorderRef.current.finalize(world.now);
+      const clipAssetIdByKey = new Map(clips.map((clip) => [`${clip.kind}:${clip.atMs}`, clip.assetId]));
+      result.highlights = highlights.map((highlight) => {
+        const clipAssetId = clipAssetIdByKey.get(`${highlight.kind}:${highlight.atMs}`);
+        return clipAssetId ? { ...highlight, clipAssetId } : highlight;
+      });
       onFinish(result);
     }, 1100);
     return () => window.clearTimeout(timer);
