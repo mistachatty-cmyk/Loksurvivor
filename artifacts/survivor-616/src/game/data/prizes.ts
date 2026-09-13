@@ -25,6 +25,9 @@ export const PRIZE_TABLE: PrizeEntry[] = [
   { weight: 4, prize: { kind: 'stat', stat: 'speed', add: 12, label: '+12 Speed' } },
   // Temporary companions — the chest generates the complete variant sheet.
   { weight: 9, prize: { kind: 'lokpet', label: 'LokPet hatch' } },
+  { weight: 7, prize: { kind: 'card-pack', cardPackId: 'street', label: 'Street Sleeve' } },
+  { weight: 4, prize: { kind: 'card-pack', cardPackId: 'scenario', label: 'Beyond the Grid Pack' } },
+  { weight: 4, prize: { kind: 'card-pack', cardPackId: 'lokpet', label: 'LokPack' } },
 ];
 
 /** Visual face shown on each reel strip panel. */
@@ -35,6 +38,7 @@ export const REEL_FACES = [
   { symbol: '^', color: '#6ee7ff', label: 'Stat'  },
   { symbol: 'W', color: '#a78bfa', label: 'Weapon' },
   { symbol: 'P', color: '#ff7ab8', label: 'LokPet' },
+  { symbol: 'C', color: '#f0abfc', label: 'Card Pack' },
 ];
 
 export function prizeToFaceIndex(prize: LootPrizeDef): number {
@@ -43,13 +47,14 @@ export function prizeToFaceIndex(prize: LootPrizeDef): number {
   if (prize.kind === 'heal') return 2;
   if (prize.kind === 'stat') return 3;
   if (prize.kind === 'weapon') return 4;
-  return 5; // LokPet
+  if (prize.kind === 'lokpet') return 5;
+  return 6;
 }
 
 export function rollPrize(rng: () => number, lokPetWeightMultiplier = 1): LootPrizeDef {
   const weightedEntries = PRIZE_TABLE.map((entry) => ({
     entry,
-    weight: entry.prize.kind === 'lokpet' ? entry.weight * Math.max(1, lokPetWeightMultiplier) : entry.weight,
+    weight: entry.prize.kind === 'lokpet' || entry.prize.kind === 'card-pack' ? entry.weight * Math.max(1, lokPetWeightMultiplier) : entry.weight,
   }));
   const totalWeight = weightedEntries.reduce((sum, candidate) => sum + candidate.weight, 0);
   let roll = rng() * totalWeight;

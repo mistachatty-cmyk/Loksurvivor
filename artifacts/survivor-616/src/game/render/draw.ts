@@ -2330,6 +2330,15 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
         ctx.fillRect(x - 2, y + 1, 4, 4);
         break;
       }
+      case 'card-pack': {
+        const pulse = 0.75 + Math.sin((w.now - pickup.bornAt) / 150) * 0.25;
+        ctx.rotate(-0.12); ctx.shadowColor = '#f0abfc'; ctx.shadowBlur = 20 * pulse; ctx.fillStyle = '#4a044e'; ctx.fillRect(x - 8, y - 11, 16, 22); ctx.strokeStyle = '#f0abfc'; ctx.lineWidth = 2; ctx.strokeRect(x - 8, y - 11, 16, 22); ctx.fillStyle = '#fdf4ff'; ctx.font = 'bold 7px monospace'; ctx.textAlign = 'center'; ctx.fillText('LP', x, y + 2);
+        break;
+      }
+      case 'coin': {
+        ctx.fillStyle = '#e8d48a'; ctx.shadowColor = '#fde68a'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#7c5f18'; ctx.stroke();
+        break;
+      }
     }
     ctx.restore();
   }

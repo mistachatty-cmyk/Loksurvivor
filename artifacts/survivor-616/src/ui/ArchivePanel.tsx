@@ -394,7 +394,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 id="lokpet-card-shop-heading" className="font-black uppercase text-sky-100">LokPet Card Shop</h3>
-                <p className="text-xs text-muted-foreground">Blue Sleeve Cipher Pack · one combat-ready LokPet and its permanent binder imprint.</p>
+                <p className="text-xs text-muted-foreground">LokPack shortcut · two stackable passive LokPet cards. Visit the hideout shop for every pack type and your deck.</p>
                 <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-sky-200">Earn {BASE_CARD_CREDITS_PER_LOOT_BOX} Card Credits per blue box. Collector ranks earn more.</p>
               </div>
               <div className="flex items-center gap-3">
@@ -402,7 +402,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                 <button
                   type="button"
                   onClick={buyLokPetCardPack}
-                  disabled={meta.cardCredits < LOKPET_CARD_PACK_COST || meta.savedLokPets.length >= 48}
+                  disabled={meta.cardCredits < LOKPET_CARD_PACK_COST}
                   className="inline-flex items-center gap-2 border border-sky-300/50 bg-sky-300/10 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100 transition-colors hover:bg-sky-300/20 disabled:cursor-not-allowed disabled:opacity-40"
                   data-testid="button-buy-lokpet-card-pack"
                 >

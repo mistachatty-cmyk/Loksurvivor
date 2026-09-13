@@ -93,7 +93,7 @@ function PackTile({ pack, selected, owned, onSelect }: { pack: LokDeckSet; selec
   );
 }
 
-function CollectionCard({ card, owned, onOpen }: { card: LokAssetManifest; owned: boolean; onOpen: () => void }) {
+function CollectionCard({ card, owned, copies, variant, onOpen }: { card: LokAssetManifest; owned: boolean; copies: number; variant?: string; onOpen: () => void }) {
   const rarity = RARITY_STYLE[card.rarity] ?? RARITY_STYLE.common;
   const info = metadata(card);
   return (
@@ -122,11 +122,11 @@ function CollectionCard({ card, owned, onOpen }: { card: LokAssetManifest; owned
       </div>
       <div className="absolute inset-x-3 bottom-3 z-10">
         <p className="line-clamp-2 min-h-7 text-[8px] leading-relaxed text-white/55">
-          {owned ? card.description : 'Complete its discovery condition to break the seal.'}
+          {owned ? card.description : 'Find or buy a matching Lock Pack to break the seal.'}
         </p>
         <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-1.5 font-mono text-[7px] uppercase tracking-widest text-white/40">
           <span>{cardPackFor(card).name}</span>
-          {owned ? <Check className="h-3 w-3 text-emerald-300" /> : <Lock className="h-3 w-3" />}
+          {owned ? <span className="text-emerald-300">x{copies} · {variant}</span> : <Lock className="h-3 w-3" />}
         </div>
       </div>
     </button>
@@ -152,7 +152,7 @@ function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; owned: b
           <span className={`font-mono text-[10px] font-black uppercase tracking-[.24em] ${rarity.ink}`}>{card.rarity} · {cardPackFor(card).name}</span>
           <h3 className="mt-3 font-display text-3xl font-black uppercase leading-none text-white">{owned ? card.name : 'Unknown Signal'}</h3>
           <p className="mt-2 font-mono text-[9px] uppercase tracking-widest text-white/40">{info?.cardNumber} · definition v{card.version}</p>
-          <p className="mt-6 text-sm leading-relaxed text-white/65">{owned ? card.description : 'This slot is sealed. Progress in Survivor 616 to catalog the subject and reveal the card.'}</p>
+          <p className="mt-6 text-sm leading-relaxed text-white/65">{owned ? card.description : 'This slot is sealed. Find or buy a Lock Pack to reveal a copy.'}</p>
           <div className="mt-auto grid grid-cols-2 gap-3 pt-8 text-[9px] uppercase tracking-widest">
             <div className="border border-white/10 p-3"><span className="block text-white/35">Source</span><span className="mt-1 block text-white">Survivor 616</span></div>
             <div className="border border-white/10 p-3"><span className="block text-white/35">Status</span><span className="mt-1 block text-white">{owned ? 'Collected' : 'Locked'}</span></div>
@@ -170,6 +170,7 @@ export function LockDeckCollection({ meta, listView = false }: { meta: MetaState
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [detailCard, setDetailCard] = useState<LokAssetManifest | null>(null);
   const ownedIds = useMemo(() => new Set(CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).map((card) => card.id)), [meta]);
+  const ownedRecords = useMemo(() => new Map(meta.cardCollection.map((record) => [record.cardId, record])), [meta.cardCollection]);
   const selectedPack = CARD_PACKS.find((pack) => pack.id === selectedPackId) ?? CARD_PACKS[0];
   const visibleCards = selectedPack.cardIds
     .map((id) => CARD_MANIFESTS_BY_ID[id])
@@ -199,12 +200,12 @@ export function LockDeckCollection({ meta, listView = false }: { meta: MetaState
       </div>
       {visibleCards.length ? (
         <div className={`grid gap-3 ${listView ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}`}>
-          {visibleCards.map((card) => <CollectionCard key={card.id} card={card} owned={ownedIds.has(card.id)} onOpen={() => setDetailCard(card)} />)}
+          {visibleCards.map((card) => { const record = ownedRecords.get(card.id); return <CollectionCard key={card.id} card={card} owned={ownedIds.has(card.id)} copies={record?.copies ?? 0} variant={record?.bestVariant} onOpen={() => setDetailCard(card)} />; })}
         </div>
       ) : (
         <div className="grid min-h-48 place-items-center border border-dashed border-white/15 text-center text-xs uppercase tracking-widest text-white/35">No cards match this view.</div>
       )}
-      <p className="mt-5 flex items-center gap-2 text-[9px] uppercase tracking-widest text-white/35"><CreditCard className="h-3.5 w-3.5" />Unlocks fill these packs automatically. Lock Decks will use the same stable card IDs.</p>
+      <p className="mt-5 flex items-center gap-2 text-[9px] uppercase tracking-widest text-white/35"><CreditCard className="h-3.5 w-3.5" />Only pack pulls fill the binder. Lock Decks will use the same stable card IDs.</p>
       {detailCard && <CardDetail card={detailCard} owned={ownedIds.has(detailCard.id)} onClose={() => setDetailCard(null)} />}
     </div>
   );

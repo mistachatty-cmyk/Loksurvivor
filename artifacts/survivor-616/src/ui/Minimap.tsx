@@ -241,7 +241,7 @@ export function Minimap({
           })}
           {map.nearbyPickups.map((pickup, index) => {
             const point = toMap(pickup.x, pickup.y);
-            const color = pickup.kind === 'health' ? '#4ade80' : pickup.kind === 'loot-box' ? '#c084fc' : '#facc15';
+            const color = pickup.kind === 'health' ? '#4ade80' : pickup.kind === 'loot-box' ? '#60a5fa' : pickup.kind === 'card-pack' ? '#f0abfc' : '#facc15';
             return (
               <rect
                 key={`pickup:${index}`}

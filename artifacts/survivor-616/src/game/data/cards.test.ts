@@ -25,26 +25,18 @@ test('card ids are unique, namespaced, and schema-valid', () => {
   }
 });
 
-test('a fresh save owns only its default-unlocked characters', () => {
+test('a fresh save begins with a sealed binder', () => {
   const meta = createInitialMeta();
-  const defaultCharacterIds = new Set(CHARACTERS.filter((c) => c.unlock.kind === 'default').map((c) => c.id));
-
   for (const card of CARD_MANIFESTS) {
-    const owned = isCardOwned(card, meta);
-    if (card.slug.startsWith('character-')) {
-      const characterId = card.slug.slice('character-'.length);
-      assert.equal(owned, defaultCharacterIds.has(characterId), `${card.id} ownership mismatch on a fresh save`);
-    } else {
-      assert.equal(owned, false, `${card.id} should not be owned on a fresh save`);
-    }
+    assert.equal(isCardOwned(card, meta), false, `${card.id} should not be owned on a fresh save`);
   }
 
   const summary = cardCollectionSummary(meta);
   assert.equal(summary.total, CARD_MANIFESTS.length);
-  assert.equal(summary.owned, defaultCharacterIds.size);
+  assert.equal(summary.owned, 0);
 });
 
-test('defeating an enemy and reaching endless milestones grant their cards', () => {
+test('progress reveals subjects but only explicit pack copies grant cards', () => {
   const enemyId = 'nightcrawler';
   const meta = {
     ...createInitialMeta(),
@@ -55,15 +47,17 @@ test('defeating an enemy and reaching endless milestones grant their cards', () 
 
   const enemyCard = CARD_MANIFESTS.find((c) => c.slug === `enemy-${enemyId}`);
   assert.ok(enemyCard, 'expected a card for the nightcrawler enemy');
-  assert.equal(isCardOwned(enemyCard, meta), true);
+  assert.equal(isCardOwned(enemyCard, meta), false);
 
   const bandCard = CARD_MANIFESTS.find((c) => c.slug === 'endless-band-core');
   assert.ok(bandCard, 'expected an endless band card for core');
-  assert.equal(isCardOwned(bandCard, meta), true);
+  assert.equal(isCardOwned(bandCard, meta), false);
 
   const milestoneCard = CARD_MANIFESTS.find((c) => c.slug === 'endless-milestone-5000');
   assert.ok(milestoneCard, 'expected a 5,000-unit endless milestone card');
-  assert.equal(isCardOwned(milestoneCard, meta), true);
+  assert.equal(isCardOwned(milestoneCard, meta), false);
+  const collected = { ...meta, cardCollection: [{ cardId: enemyCard.id, copies: 2, variants: { standard: 1, foil: 1 }, bestVariant: 'foil' as const, totalValue: 3 }] };
+  assert.equal(isCardOwned(enemyCard, collected), true);
 });
 
 test('Lock Deck catalog has stable unique IDs, card numbers, and one pack per card', () => {

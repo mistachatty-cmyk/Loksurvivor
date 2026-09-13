@@ -63,11 +63,15 @@ import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game
 import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import { DIRECTORS } from '@/game/data/directors';
+import { CARD_MANIFESTS } from '@/game/data/cards';
+import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack } from '@/game/data/passiveCards';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type {
   AllyDef,
   AreaDef,
   BaseStats,
+  CardPackId,
+  CardVariant,
   CharacterEpisodeDef,
   CharacterDef,
   HubRoomDef,
@@ -94,12 +98,12 @@ import type {
 } from '@/game/types';
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 16;
+const META_VERSION = 17;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
 export const BASE_CARD_CREDITS_PER_LOOT_BOX = 2;
-export const LOKPET_CARD_PACK_COST = 12;
+export const LOKPET_CARD_PACK_COST = 14;
 
 export function lokPetTeamCapacity(character: CharacterDef): number {
   return BASE_LOKPET_TEAM_SLOTS + (character.lokPetCollector?.extraTeamSlots ?? 0);
@@ -238,6 +242,8 @@ export function createInitialMeta(): MetaState {
     cred: 0,
     lootTokens: 0,
     cardCredits: 0,
+    cardCollection: [],
+    activePassiveCardIds: [],
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     skeletonKeys: 0,
@@ -314,6 +320,21 @@ function counter(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : fallback;
+}
+
+function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
+  if (!Array.isArray(value)) return [];
+  const validIds = new Set([...CARD_MANIFESTS.map((card) => card.id), ...Object.keys(PASSIVE_CARDS_BY_ID)]);
+  const validVariants = new Set<CardVariant>(['standard', 'foil', 'neon', 'glitch', 'holo']);
+  return value.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.cardId !== 'string' || !validIds.has(entry.cardId)) return [];
+    const variants: Partial<Record<CardVariant, number>> = {};
+    if (isRecord(entry.variants)) for (const variant of validVariants) { const count = counter(entry.variants[variant]); if (count > 0) variants[variant] = count; }
+    const copies = Math.max(counter(entry.copies), Object.values(variants).reduce((sum, count) => sum + (count ?? 0), 0));
+    if (!copies) return [];
+    const bestVariant = typeof entry.bestVariant === 'string' && validVariants.has(entry.bestVariant as CardVariant) ? entry.bestVariant as CardVariant : 'standard';
+    return [{ cardId: entry.cardId, copies, variants, bestVariant, totalValue: Math.max(copies, counter(entry.totalValue, copies)) }];
+  }).slice(0, 500);
 }
 
 function normalizedPosition(value: unknown, fallback: { x: number; y: number }): { x: number; y: number } {
@@ -831,6 +852,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     .filter((evolutionId): evolutionId is string => Boolean(evolutionId));
   const unlockedEvolutionIds = [...new Set([...explicitEvolutionIds, ...completedEvolutionIds])];
   const savedLokPets = normalizeSavedLokPets(parsed.savedLokPets);
+  const cardCollection = normalizeCardCollection(parsed.cardCollection);
+  const ownedPassiveIds = new Set(cardCollection.filter((record) => PASSIVE_CARDS_BY_ID[record.cardId]).map((record) => record.cardId));
   const recoveredElixirs = replenishPetElixirs({
     ...defaults,
     petElixirs: Math.min(ELIXIR_CAP, counter(parsed.petElixirs ?? 3)),
@@ -910,6 +933,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ...settledGeneratorIncome,
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
+    cardCollection,
+    activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     skeletonKeys: counter(parsed.skeletonKeys),
@@ -1137,6 +1162,9 @@ export function effectiveStats(character: CharacterDef, meta: MetaState): BaseSt
       if (effect.cap !== undefined) stats[effect.stat] = Math.min(stats[effect.stat], effect.cap);
     }
   }
+  const cards = activeCardEffects(meta);
+  for (const [stat, multiplier] of Object.entries(cards.statMults) as Array<[keyof BaseStats, number]>) stats[stat] *= multiplier;
+  stats.magnet *= cards.magnetMult;
   stats.armor = Math.min(stats.armor, 0.6);
   const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
   stats.maxHp *= 1 - fatigue;
@@ -1179,7 +1207,7 @@ export function rewardCredMultiplier(meta: MetaState): number {
       0,
     );
   }, 0);
-  return 1 + bonus;
+  return (1 + bonus) * activeCardEffects(meta).creditMult;
 }
 
 /** Extra world units the "prime a movable prop" tap/click radius reaches, from Grabby Hands stacks. */
@@ -1261,7 +1289,8 @@ type Action =
   | { type: 'selectCharacterSkin'; characterId: string; skinId: string }
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
-  | { type: 'buyLokPetCardPack'; now: number }
+  | { type: 'buyCardPack'; packId: CardPackId; now: number }
+  | { type: 'togglePassiveCard'; cardId: string }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
   | { type: 'refreshPetElixirs'; now: number }
@@ -1374,24 +1403,26 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, selectedLokPetIds: selected } };
     }
 
-    case 'buyLokPetCardPack': {
-      if (state.meta.cardCredits < LOKPET_CARD_PACK_COST || state.meta.savedLokPets.length >= 48) return state;
-      const seed = (action.now ^ state.meta.totalRuns ^ state.meta.cardCredits) >>> 0;
-      const roll = rollLokPet(createRng(seed));
-      const saved: SavedLokPet = {
-        id: `shop-pet-${action.now.toString(36)}-${state.meta.savedLokPets.length}-${roll.variantId}`,
-        roll,
-        stamina: PET_STAMINA_MAX,
-      };
+    case 'buyCardPack': {
+      const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
+      if (!pack || state.meta.cardCredits < pack.cost) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ state.meta.cardCredits ^ state.meta.cardCollection.length) >>> 0;
+      const pulls = rollCardPack(pack.id, createRng(seed), CARD_MANIFESTS.map((card) => card.id));
       return {
         ...state,
         meta: {
           ...state.meta,
-          cardCredits: state.meta.cardCredits - LOKPET_CARD_PACK_COST,
-          savedLokPets: [saved, ...state.meta.savedLokPets],
-          lokPetCatalog: recordLokPetCatalog(state.meta.lokPetCatalog, [roll]),
+          cardCredits: state.meta.cardCredits - pack.cost,
+          cardCollection: mergeCardPulls(state.meta.cardCollection, pulls),
         },
       };
+    }
+
+    case 'togglePassiveCard': {
+      if (!PASSIVE_CARDS_BY_ID[action.cardId] || !state.meta.cardCollection.some((record) => record.cardId === action.cardId && record.copies > 0)) return state;
+      const active = state.meta.activePassiveCardIds;
+      const next = active.includes(action.cardId) ? active.filter((id) => id !== action.cardId) : active.length < passiveDeckSlots(state.meta) ? [...active, action.cardId] : active;
+      return { ...state, meta: { ...state.meta, activePassiveCardIds: next } };
     }
 
     case 'restoreSavedLokPet': {
@@ -2002,6 +2033,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         cred: prev.cred + result.cred + dailyContracts.rewardCred,
         lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
         cardCredits: prev.cardCredits + cardCreditsForRun(runCharacter, result.lootBoxesOpened),
+        cardCollection: (result.cardPacksFound ?? []).reduce((collection, packId, index) => mergeCardPulls(collection, rollCardPack(packId, createRng(((prev.totalRuns + 1) * 616 + result.kills * 17 + index * 97) >>> 0), CARD_MANIFESTS.map((card) => card.id))), prev.cardCollection),
         lokCollectorRuns: prev.lokCollectorRuns + (collectorRun ? 1 : 0),
         lokCollectorPetsFound: prev.lokCollectorPetsFound + collectorPetsFound,
         skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
@@ -2117,7 +2149,9 @@ export interface MetaContextValue {
   selectCharacter: (id: string) => void;
   selectCharacterSkin: (characterId: string, skinId: string) => void;
   completeRun: (result: RunResult) => void;
+  buyCardPack: (packId: CardPackId) => void;
   buyLokPetCardPack: () => void;
+  togglePassiveCard: (cardId: string) => void;
   toggleSavedLokPet: (id: string) => void;
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
@@ -2209,7 +2243,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const selectCharacterSkin = useCallback((characterId: string, skinId: string) => dispatch({ type: 'selectCharacterSkin', characterId, skinId }), []);
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
-  const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyLokPetCardPack', now: Date.now() }), []);
+  const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
+  const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyCardPack', packId: 'lokpet', now: Date.now() }), []);
+  const togglePassiveCard = useCallback((cardId: string) => dispatch({ type: 'togglePassiveCard', cardId }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
   const refreshPetElixirs = useCallback(() => dispatch({ type: 'refreshPetElixirs', now: Date.now() }), []);
@@ -2374,7 +2410,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectCharacter,
       selectCharacterSkin,
       completeRun,
+      buyCardPack,
       buyLokPetCardPack,
+      togglePassiveCard,
       toggleSavedLokPet,
       restoreSavedLokPet,
       refreshPetElixirs,
@@ -2448,7 +2486,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     enterHideout,
     selectCharacterSkin,
     completeRun,
+    buyCardPack,
     buyLokPetCardPack,
+    togglePassiveCard,
     toggleSavedLokPet,
     restoreSavedLokPet,
     refreshPetElixirs,

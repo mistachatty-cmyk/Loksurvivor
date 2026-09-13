@@ -17,6 +17,7 @@ import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
+import { activeCardEffects } from '@/game/data/passiveCards';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { nextRescueAllyId } from '@/game/data/progression';
 import { createRunHighlightRecorder } from '@/game/data/runHighlights';
@@ -388,6 +389,7 @@ export function RunScreen({
         mission,
         missionMarkers,
         missionBeacons,
+        cardEffects: activeCardEffects(meta),
       },
     );
   }
