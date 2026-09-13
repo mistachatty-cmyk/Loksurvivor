@@ -251,6 +251,15 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     cost: 90,
     maxStacks: 1,
   },
+  {
+    id: 'fragmented-backup',
+    name: 'Fragmented Backup',
+    description: 'A salvaged drive from Null Sector, mostly corrupted. What survives is just enough: once per run, a lethal hit restores you to 25% HP instead of ending things.',
+    category: 'utility',
+    cost: 320,
+    maxStacks: 1,
+    effects: [{ kind: 'utility', utility: 'extra-life', amount: 1 }],
+  },
 ];
 
 export const VENDOR_CATALOG_BY_ID: Record<string, VendorItemDef> = Object.fromEntries(

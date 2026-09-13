@@ -26,12 +26,31 @@ const GROUND_ASSETS: CustomMapAsset[] = AREAS
     areaId: area.id,
   }));
 
-const STRUCTURE_KINDS: Array<ObstacleDef['kind']> = [
-  'car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign',
-  'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable',
-  'security-camera', 'cover', 'reflective-surface', 'flora', 'building',
-  'metal-box', 'bench',
-];
+const TILE_ASSETS: CustomMapAsset[] = AREAS
+  .filter((area) => !area.endless)
+  .filter((area, index, list) => list.findIndex((candidate) =>
+    candidate.ground.base === area.ground.base &&
+    candidate.ground.tile === area.ground.tile &&
+    candidate.ground.seam === area.ground.seam &&
+    candidate.ground.glow === area.ground.glow,
+  ) === index)
+  .map((area) => ({
+    id: `tile:${area.id}`,
+    category: 'tile',
+    name: `${area.name} tile`,
+    description: `Paint one 64-unit cell with ${area.district}'s complete ground treatment.`,
+    color: area.ground.glow,
+    areaId: area.id,
+    groundStyle: { ...area.ground },
+    w: 64,
+    h: 64,
+  }));
+
+const STRUCTURE_KINDS: Array<ObstacleDef['kind']> = Array.from(new Set(
+  AREAS.flatMap((area) => area.obstacles)
+    .map((obstacle) => obstacle.kind)
+    .filter((kind) => kind !== 'pothole'),
+));
 
 const STRUCTURE_LABELS: Partial<Record<ObstacleDef['kind'], string>> = {
   'ac-unit': 'A/C unit',
@@ -142,13 +161,41 @@ const ENCOUNTER_ASSETS: CustomMapAsset[] = ENEMIES.map((enemy) => ({
   },
 }));
 
+/**
+ * Spawn points and objective markers are *metadata*, not world geometry --
+ * `customMapToArea` deliberately skips them so they never become obstacles or
+ * waves. Sector Command missions read them off the map to decide where the
+ * player starts, where hostiles enter, and what an objective points at.
+ */
+const SPAWN_POINT_ASSETS: CustomMapAsset[] = [
+  { id: 'spawn-point:player', category: 'spawn-point', name: 'Player start', description: 'Where the run begins. Only the first one placed is used.', color: '#4ade80', w: 48, h: 48, spawnSide: 'player' },
+  { id: 'spawn-point:hostile', category: 'spawn-point', name: 'Hostile entry', description: 'A lane hostiles walk in from. Place several to spread pressure.', color: '#f87171', w: 48, h: 48, spawnSide: 'hostile' },
+];
+
+const OBJECTIVE_MARKER_ASSETS: CustomMapAsset[] = [
+  { id: 'objective-marker:hold', category: 'objective-marker', name: 'Hold point', description: 'Stand here to make progress on a hold objective.', color: '#fbbf24', w: 64, h: 64, markerRole: 'hold' },
+  { id: 'objective-marker:destroy', category: 'objective-marker', name: 'Demolition target', description: 'A prop a mission can ask you to break.', color: '#fb7185', w: 56, h: 56, markerRole: 'destroy' },
+  { id: 'objective-marker:escort', category: 'objective-marker', name: 'Escort waypoint', description: 'A point an escorted unit routes through.', color: '#38bdf8', w: 56, h: 56, markerRole: 'escort' },
+  { id: 'objective-marker:extract', category: 'objective-marker', name: 'Extraction', description: 'Reach this to finish an extraction objective.', color: '#a78bfa', w: 64, h: 64, markerRole: 'extract' },
+];
+
+/** Tier 2 economy: one entry per `SectorStructureDef`, so a map can place them. */
+export const BEACON_ASSETS: CustomMapAsset[] = [
+  { id: 'beacon:relay-beacon', category: 'beacon', name: 'Choir Relay', description: 'Trickles a light unit every 12s while it stands. Never exceeds the squad cap.', color: '#facc15', w: 56, h: 56, beaconId: 'relay-beacon' },
+  { id: 'beacon:repeater-beacon', category: 'beacon', name: 'Null Repeater', description: 'Slower reinforcements, sturdier body.', color: '#38bdf8', w: 56, h: 56, beaconId: 'repeater-beacon' },
+];
+
 export const CUSTOM_MAP_ASSETS: CustomMapAsset[] = [
   ...GROUND_ASSETS,
+  ...TILE_ASSETS,
   ...STRUCTURE_ASSETS,
   ...HAZARD_ASSETS,
   ...LANDMARK_ASSETS,
   ...ENEMY_ASSETS,
   ...ENCOUNTER_ASSETS,
+  ...SPAWN_POINT_ASSETS,
+  ...OBJECTIVE_MARKER_ASSETS,
+  ...BEACON_ASSETS,
 ];
 
 export const CUSTOM_MAP_ASSETS_BY_ID: Record<string, CustomMapAsset> = Object.fromEntries(
@@ -157,12 +204,37 @@ export const CUSTOM_MAP_ASSETS_BY_ID: Record<string, CustomMapAsset> = Object.fr
 
 export const CUSTOM_MAP_ASSET_CATEGORIES = [
   { id: 'ground', label: 'Ground styles' },
+  { id: 'tile', label: 'Paintable ground tiles' },
+  { id: 'beacon', label: 'Reinforcement beacons' },
   { id: 'structure', label: 'Structures & props' },
   { id: 'hazard', label: 'Hazards' },
   { id: 'landmark', label: 'Landmarks' },
   { id: 'enemy', label: 'Enemies' },
   { id: 'encounter', label: 'Encounters & waves' },
+  { id: 'spawn-point', label: 'Spawn points' },
+  { id: 'objective-marker', label: 'Objective markers' },
 ] as const;
+
+/** Sector Command reads these off an authored map; they are never world geometry. */
+export function spawnPointsOf(map: CustomMap, side: 'player' | 'hostile'): CustomMapPlacement[] {
+  return map.placements.filter((placement) => {
+    if (placement.category !== 'spawn-point') return false;
+    return assetFromId(placement.assetId)?.spawnSide === side;
+  });
+}
+
+/** Sector Command reads beacon placements off an authored map; never world geometry. */
+export function beaconsOf(map: CustomMap): CustomMapPlacement[] {
+  return map.placements.filter((placement) => placement.category === 'beacon');
+}
+
+export function objectiveMarkersOf(map: CustomMap, role?: NonNullable<CustomMapAsset['markerRole']>): CustomMapPlacement[] {
+  return map.placements.filter((placement) => {
+    if (placement.category !== 'objective-marker') return false;
+    if (!role) return true;
+    return assetFromId(placement.assetId)?.markerRole === role;
+  });
+}
 
 export function assetFromId(assetId: string): CustomMapAsset | undefined {
   return CUSTOM_MAP_ASSETS_BY_ID[assetId];
@@ -192,10 +264,20 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   return Math.round(Math.min(max, Math.max(min, finite(value, fallback))));
 }
 
+/**
+ * Derived from the catalog on purpose. This used to be a hand-written list,
+ * and it silently omitted `spawn-point` and `objective-marker` when those
+ * categories were added -- so the editor could place them but `saveCustomMap`
+ * (which normalises) dropped them on the way to storage. Deriving it means a
+ * new category can never be forgotten here again.
+ */
+const PLACEABLE_CATEGORIES = new Set<string>(
+  CUSTOM_MAP_ASSET_CATEGORIES.map((category) => category.id).filter((id) => id !== 'ground'),
+);
+
 function validCategory(value: unknown): CustomMapPlacement['category'] | null {
-  return value === 'structure' || value === 'hazard' || value === 'landmark' ||
-    value === 'enemy' || value === 'encounter'
-    ? value
+  return typeof value === 'string' && PLACEABLE_CATEGORIES.has(value)
+    ? (value as CustomMapPlacement['category'])
     : null;
 }
 
@@ -300,6 +382,12 @@ export function customMapToArea(map: CustomMap): AreaDef {
   const obstacles = normalized.placements
     .map((placement) => obstacleFromPlacement(placement, assetFromId(placement.assetId) ?? {} as CustomMapAsset))
     .filter((obstacle): obstacle is ObstacleDef => Boolean(obstacle));
+  const authoredGroundTiles = normalized.placements
+    .filter((placement) => placement.category === 'tile')
+    .map((placement) => {
+      const style = assetFromId(placement.assetId)?.groundStyle ?? sourceArea?.ground ?? AREAS[0]!.ground;
+      return { x: placement.x, y: placement.y, w: placement.w, h: placement.h, ...style };
+    });
   const waves: WaveDef[] = normalized.placements
     .filter((placement) => placement.category === 'enemy' || placement.category === 'encounter')
     .map((placement, index) => {
@@ -325,6 +413,7 @@ export function customMapToArea(map: CustomMap): AreaDef {
     bounds: normalized.bounds,
     ground: sourceArea?.ground ?? AREAS[0]!.ground,
     obstacles,
+    authoredGroundTiles,
     landmark: landmarkSource ? { ...landmarkSource } : undefined,
     durationSec: normalized.durationSec,
     waves: waves.length > 0 ? waves : [{

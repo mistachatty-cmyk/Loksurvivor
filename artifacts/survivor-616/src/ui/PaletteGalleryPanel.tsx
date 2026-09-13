@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CloudRain, Flame, Lock, Palette, Radar, ScanLine, Sparkles } from 'lucide-react';
 
 import { RUN_AURAS } from '@/game/data/runAuras';
@@ -7,7 +7,7 @@ import { CELEBRATIONS, getCelebrationStyle } from '@/game/data/celebrations';
 import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { getCharacter } from '@/game/data/characters';
-import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { blendSpritePalettes, getCharacterSkin } from '@/game/data/characterSkins';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { isPrimeFlickerVisit, isPrimeTakeoverActive, useMeta } from '@/game/state/metaStore';
 import type { AnimName, CosmeticTier, PaletteEffectKind, RunAuraStyle, SpritePalette } from '@/game/types';
@@ -150,9 +150,16 @@ export function PaletteGalleryPanel({ onBack }: Props) {
 
   const previewWorldPalette = previewPaletteId === 'default' ? undefined : THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette;
   const previewPaletteEffect = meta.paletteAnimationsEnabled ? THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.effect?.kind : undefined;
-  const previewPalette = primeShowing
-    ? resolveCharacterCosmeticPalette(PRIME, meta.characterSkinByCharacterId[PRIME.id], previewWorldPalette, meta.worldPaletteBlendEnabled)
-    : ARTISAN_VALOR_PALETTE;
+  // Memoized so RigPortrait's animation loop (keyed on palette identity)
+  // doesn't restart on every unrelated re-render (a quip firing, a purchase
+  // completing) -- only when the colors it actually resolves to change.
+  const skinId = meta.characterSkinByCharacterId[PRIME.id];
+  const previewPalette = useMemo(() => {
+    const personal = primeShowing ? getCharacterSkin(PRIME, skinId).palette : ARTISAN_VALOR_PALETTE;
+    // A shop preview must visibly demonstrate the selected commission for
+    // both Valor forms even if the player's in-run blending preference is off.
+    return previewWorldPalette ? blendSpritePalettes(personal, previewWorldPalette, 0.72) : personal;
+  }, [primeShowing, skinId, previewWorldPalette]);
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);

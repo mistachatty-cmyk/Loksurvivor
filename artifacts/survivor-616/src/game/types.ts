@@ -652,6 +652,31 @@ export interface CharacterDef {
    * any future character could opt in the same way. See run-presentation.md.
    */
   stormCloud?: StormCloudConfig;
+  /**
+   * Zero Day's freeze-then-throw ability: a directional cast that petrifies
+   * a handful of enemies in front of the player, which can then be
+   * drag-selected RTS-style and thrown at other enemies. Optional -- any
+   * future character could opt in the same way `stormCloud` does. See
+   * zero-day-freeze-throw.md.
+   */
+  freezeThrow?: FreezeThrowConfig;
+}
+
+export interface FreezeThrowConfig {
+  /** How far in front of the player the freeze cone reaches, in world units. */
+  coneRangeUnits: number;
+  /** Full cone angle, in degrees (split evenly around the facing direction). */
+  coneAngleDeg: number;
+  /** Maximum enemies frozen per cast, nearest-first. */
+  maxFreezeTargets: number;
+  /** How long a frozen enemy stays "stone" before thawing if never thrown. */
+  freezeDurationMs: number;
+  /** Cooldown between casts. */
+  castCooldownMs: number;
+  /** Damage a thrown enemy deals to whatever it hits. */
+  throwDamage: number;
+  /** Travel speed of a thrown enemy, in world units/sec. */
+  throwSpeed: number;
 }
 
 /**
@@ -806,7 +831,9 @@ export interface ObstacleDef {
      | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole'
      | 'trash-can' | 'mailbox' | 'fire-hydrant' | 'parking-meter'
      /** A heavy, wonky sentry block: zaps the player with a short-range bolt on a cadence. See oddity-arenas.md. */
-     | 'attack-block';
+     | 'attack-block'
+     /** Null Sector only: a tall breakable server cabinet that overloads into a small AoE burst when destroyed. */
+     | 'server-rack';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
@@ -842,6 +869,17 @@ export interface AreaDef {
     seam: string;
     glow: string;
   };
+  /** Optional player-authored ground patches drawn over the base street grid. */
+  authoredGroundTiles?: Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    base: string;
+    tile: string;
+    seam: string;
+    glow: string;
+  }>;
   /** Overhead conditions; defaults to 'clear' when omitted. */
   sky?: AreaSky;
   obstacles: ObstacleDef[];
@@ -874,7 +912,19 @@ export interface AreaDef {
   randomDrops?: { intervalMs: number };
 }
 
-export type CustomMapAssetCategory = 'ground' | 'structure' | 'hazard' | 'landmark' | 'enemy' | 'encounter';
+export type CustomMapAssetCategory =
+  | 'ground'
+  | 'tile'
+  | 'beacon'
+  | 'structure'
+  | 'hazard'
+  | 'landmark'
+  | 'enemy'
+  | 'encounter'
+  /** Where the player (or a Sector Command faction) enters the map. */
+  | 'spawn-point'
+  /** A named point a mission objective can reference (hold, escort, destroy). */
+  | 'objective-marker';
 
 export interface CustomMapPlacement {
   id: string;
@@ -908,8 +958,16 @@ export interface CustomMapAsset {
   w?: number;
   h?: number;
   areaId?: string;
+  /** tile only: the complete source ground treatment to paint into this cell. */
+  groundStyle?: AreaDef['ground'];
   enemyId?: string;
   wave?: WaveDef;
+  /** spawn-point only: which side enters here. 'player' is the run's start position. */
+  spawnSide?: 'player' | 'hostile';
+  /** objective-marker only: what a mission objective can do with this point. */
+  markerRole?: 'hold' | 'destroy' | 'escort' | 'extract';
+  /** beacon only: which `SectorStructureDef` this placement builds. */
+  beaconId?: string;
 }
 
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
@@ -1397,7 +1455,7 @@ export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'a
 
 export type VendorEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
-  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult'; amount: number };
+  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult' | 'extra-life'; amount: number };
 
 export interface VendorItemDef {
   id: string;
@@ -1605,6 +1663,10 @@ export interface MetaState {
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */
   worldPaletteBlendEnabled: boolean;
+  /** Extends the active world palette to recolor enemies and environment accents too, not just the player. Off by default to preserve the original look. */
+  worldColorFullRecolorEnabled: boolean;
+  /** Sector Command missions cleared at least once. */
+  completedSectorMissionIds: string[];
   /** Whether device tilt steers the player on supported hardware. */
   gyroEnabled: boolean;
   /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */
@@ -1740,6 +1802,14 @@ export interface RunResult {
   cleared: boolean;
   /** Present for a failed run; distinguishes lethal environmental deaths. */
   deathCause?: 'lethal-pothole' | 'ordinary-hazard';
+  /** Sector Command: which mission this run was, if any. */
+  missionId?: string;
+  /**
+   * Sector Command: whether the mission's required objectives were all met.
+   * Campaign credit follows this, never `cleared` -- surviving the clock ends
+   * the run but does not complete the mission.
+   */
+  missionComplete?: boolean;
   survivedSec: number;
   kills: number;
   level: number;
@@ -2039,3 +2109,126 @@ export interface HudSnapshot {
 }
 
 export type RunPhase = 'countdown' | 'playing' | 'levelup' | 'paused' | 'reel' | 'over';
+
+/* ------------------------------------------------------------------ */
+/* Sector Command (RTS/campaign mode)                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * How a mission gets its army. Only 'stolen' is implemented; the other two
+ * are declared now so missions can be authored against them and the runtime
+ * can fail loudly rather than silently mis-handling an unbuilt tier.
+ * See .agents/memory/sector-command-design.md.
+ */
+export type SectorEconomyTier =
+  /** Tier 1 (built): no production. Every unit is an enemy you captured. */
+  | 'stolen'
+  /** Tier 2 (reserved): a placeable beacon trickles basic units. */
+  | 'beacon'
+  /** Tier 3 (reserved): real build queue against a resource. */
+  | 'production';
+
+/** What a captured enemy becomes once it is fighting for you. */
+export interface SectorUnitDef {
+  /** The `EnemyDef` id this unit is captured from. */
+  enemyId: string;
+  name: string;
+  /** Cost against the mission's `squadCap`; elites cost more than swarm units. */
+  squadCost: number;
+  /** Applied to the captured enemy's stats when it changes sides. */
+  hpMult: number;
+  damageMult: number;
+  speedMult: number;
+  /** Capture only becomes available at or below this fraction of max HP. */
+  captureHpFraction: number;
+  role: 'line' | 'skirmisher' | 'siege' | 'support';
+  blurb: string;
+}
+
+export type MissionObjectiveKind =
+  | 'kill-any'
+  | 'kill-enemy'
+  | 'survive-sec'
+  | 'capture-units'
+  | 'hold-marker'
+  | 'reach-marker'
+  | 'destroy-marker';
+
+export interface MissionObjectiveDef {
+  id: string;
+  label: string;
+  kind: MissionObjectiveKind;
+  targetCount: number;
+  enemyId?: string;
+  /** For marker kinds: the `objective-marker:*` asset id placed on the map. */
+  markerAssetId?: string;
+  /** Bonus objectives never block completion; they upgrade the mission grade. */
+  optional?: boolean;
+}
+
+/**
+ * A scripted mid-mission beat. Modelled on `DistrictIncursionDef`'s proven
+ * phase machine, but a mission may hold several and they can fire off
+ * objective progress rather than only elapsed time. `line`/`speakerAllyId`
+ * are the seam where authored story (and later, cutscenes) plug in.
+ */
+export type MissionBeatTrigger =
+  | { kind: 'at-sec'; sec: number }
+  | { kind: 'objective-complete'; objectiveId: string }
+  | { kind: 'squad-wiped' };
+
+export interface MissionBeatDef {
+  id: string;
+  trigger: MissionBeatTrigger;
+  line: string;
+  speakerAllyId?: string;
+  /** Optional extra pressure the beat drops in when it fires. */
+  spawnWave?: WaveDef;
+}
+
+export interface SectorMissionDef {
+  id: string;
+  name: string;
+  /** Checked against the `FACTIONS` registry by `sectorMissions.test.ts`. */
+  factionId: string;
+  /** Must be an ally the player has actually rescued -- the campaign consumes base-game progression. */
+  commanderAllyId: string;
+  /** Id of an authored map in `data/sectorMaps.ts`. */
+  mapId: string;
+  economyTier: SectorEconomyTier;
+  /**
+   * Hides unscouted ground. Presentation and targeting only -- enemy AI is
+   * unchanged, so the fog never lies about what the simulation knows.
+   */
+  fogOfWar?: boolean;
+  durationSec: number;
+  /** Max total `squadCost` the player may command at once. Keep low for touch. */
+  squadCap: number;
+  briefing: string;
+  debrief: string;
+  objectives: MissionObjectiveDef[];
+  beats: MissionBeatDef[];
+  /** Standard gate (kills/clearArea/etc). Mission-to-mission order uses `requiresMissionIds`. */
+  unlock: UnlockRule;
+  requiresMissionIds?: string[];
+}
+
+/* Reserved for tiers 2-3 -- authored against, not yet consumed by the engine. */
+export interface SectorStructureDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Seconds between unit trickles. */
+  spawnIntervalSec: number;
+  /** Enemy id the structure produces. */
+  unitEnemyId: string;
+  hp: number;
+}
+
+export interface SectorResourceDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Gained per enemy killed while the tier is active. */
+  perKill: number;
+}
