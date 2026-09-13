@@ -8,6 +8,7 @@ import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
+import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
 import type { RunHighlightKind } from '@/game/data/runHighlights';
 import { ScreenLayout } from './ScreenLayout';
@@ -17,12 +18,15 @@ import { AccountNudge } from './AccountNudge';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ShareRecapButton } from './ShareRecapButton';
 import type { GameRunSummaryLike } from '@lok/recap';
+import { lazy, Suspense, useState } from 'react';
 import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+
+const RunRecapPlayer = lazy(() => import('@lok/recap/player').then((module) => ({ default: module.RunRecapPlayer })));
 
 export interface RunSummaryProps {
   result: RunResult;
@@ -60,6 +64,7 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
   const { session, user } = useAuth();
+  const [showAfterAction, setShowAfterAction] = useState(false);
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const area = areaOverride ?? getArea(result.areaId);
@@ -101,15 +106,54 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
   const rumorAlly = result.crewRumor ? ALLIES_BY_ID[result.crewRumor.allyId] : undefined;
   const RumorIcon = result.crewRumor ? (RUMOR_ICONS[result.crewRumor.icon] ?? Sparkles) : Sparkles;
   const firstNight = result.firstNight;
+  // Sector Command: a mission run is judged on its objectives, so it gets its
+  // own headline and its authored debrief instead of the block-cleared copy.
+  const mission = result.missionId ? SECTOR_MISSIONS_BY_ID[result.missionId] : undefined;
+  const missionWon = Boolean(mission && result.missionComplete);
+  const title = mission
+    ? (missionWon ? 'Mission complete' : 'Mission failed')
+    : (result.cleared ? 'Block cleared' : 'You went down');
+  const positive = mission ? missionWon : result.cleared;
 
   return (
     <ScreenLayout 
-      title={result.cleared ? 'Block cleared' : 'You went down'}
-      subtitle={area.name}
+      title={title}
+      subtitle={mission ? mission.name : area.name}
       backdrop={area.backdrop}
-      className={result.cleared ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
+      className={positive ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
     >
       <div className="max-w-4xl mx-auto w-full space-y-8 mt-4">
+
+        {mission ? (
+          <section
+            className={`border p-5 ${missionWon ? 'border-amber-200/45 bg-amber-950/15' : 'border-destructive/45 bg-destructive/10'}`}
+            data-testid="section-mission-debrief"
+          >
+            <div className="flex items-center gap-2">
+              <Radio className={`h-4 w-4 ${missionWon ? 'text-amber-200' : 'text-destructive'}`} />
+              <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-white">
+                {missionWon ? 'Objectives met' : 'Objectives outstanding'}
+              </h2>
+            </div>
+            {!missionWon ? (
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-destructive/90">
+                Nothing banked — the campaign only advances on a completed mission.
+              </p>
+            ) : null}
+            <ul className="mt-3 space-y-1">
+              {mission.objectives.map((objective) => (
+                <li key={objective.id} className="font-mono text-[11px] text-white/80">
+                  · {objective.label}{objective.optional ? ' (optional)' : ''}
+                </li>
+              ))}
+            </ul>
+            {missionWon ? (
+              <p className="mt-3 border-t border-amber-200/20 pt-3 text-[13px] leading-relaxed text-white/80">
+                {mission.debrief}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         {result.completedDailyContracts && result.completedDailyContracts.length > 0 ? (
           <section className="border border-cyan-200/40 bg-cyan-950/15 p-5" data-testid="section-daily-contract-rewards">
@@ -341,6 +385,28 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
             </ol>
           </section>
         ) : null}
+        <section className="border border-cyan-200/30 bg-cyan-950/10 p-5" data-testid="section-after-action-report">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">Live after-action report</p>
+              <p className="mt-1 text-sm text-white/75">Replay the run’s outcome, stats, and recorded match highlights as the built Remotion sequence.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAfterAction((visible) => !visible)}
+              aria-expanded={showAfterAction}
+              className="shrink-0 border border-cyan-200/40 bg-cyan-200/10 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100 hover:border-cyan-100"
+              data-testid="button-toggle-after-action"
+            >
+              {showAfterAction ? 'Close report' : 'Play report'}
+            </button>
+          </div>
+          {showAfterAction ? (
+            <Suspense fallback={<div className="mt-4 aspect-video animate-pulse bg-black/40" aria-label="Loading after-action report" />}>
+              <RunRecapPlayer summary={recapSummary} autoPlay={!prefersReducedMotion} className="mt-4 overflow-hidden border border-cyan-100/20" />
+            </Suspense>
+          ) : null}
+        </section>
         {result.endless && (result.endless.discoveredBandIds.length > 1 || result.endless.discoveredRouteEventIds.length > 0) ? (
           <section className="border border-violet-300/25 bg-violet-300/5 p-5" data-testid="section-endless-discoveries">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-violet-200">Outer-city knowledge recovered</p>

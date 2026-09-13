@@ -1457,6 +1457,62 @@ export const CHARACTERS: CharacterDef[] = [
     },
     unlock: { kind: 'clearArea', areaId: 'neon-arcade' },
   },
+  {
+    id: 'zero-day',
+    react: REACTION_PRESETS.playerBob,
+    name: 'Zero Day',
+    handle: 'The Null Patch',
+    tagline: 'Found the exploit nobody patched. Everything down here answers to it now.',
+    bio: 'Walked into Null Sector looking for a way out and found a vulnerability nobody had named yet. Now anything in front of them can be frozen mid-process, picked up, and repurposed as a weapon against whatever comes next.',
+    referenceArt: 'art/shadow-man.jpeg',
+    palette: {
+      ink: '#020617',
+      body: '#052e1a',
+      bodyDark: '#031a0f',
+      accent: '#22c55e',
+      accentBright: '#bbf7d0',
+      skin: '#0f3d24',
+      glow: '#4ade80',
+    },
+    rig: humanoidRig({ height: 20, width: 10, hood: true, torsoColor: 'bodyDark' }),
+    stats: { maxHp: 104, speed: 96, power: 1, area: 1, haste: 1, magnet: 48, armor: 0.08, crit: 0.06, lifesteal: 0 },
+    weapon: {
+      id: 'buffer-overflow',
+      name: 'Buffer Overflow',
+      kind: 'projectile',
+      description: 'Writes past the end of whatever it hits.',
+      damage: 14,
+      cooldownMs: 620,
+      range: 300,
+      speed: 300,
+      count: 2,
+      lifetimeMs: 1400,
+      levelDamageScale: 0.24,
+      impactIntensity: 2,
+      color: '#22c55e',
+    },
+    ultimate: {
+      id: 'root-access',
+      name: 'Root Access',
+      description: 'Full permissions, briefly. Nothing down here can stop them.',
+      cooldownMs: 24000,
+      durationMs: 3800,
+      effect: { invulnerable: true, damageMult: 1.8, cooldownMult: 0.6 },
+    },
+    // Cast an ability button freezes up to 7 enemies in a cone in front of
+    // Zero Day; drag-select the resulting "stone" enemies RTS-style, then
+    // tap a target to throw the whole group. See zero-day-freeze-throw.md.
+    freezeThrow: {
+      coneRangeUnits: 260,
+      coneAngleDeg: 100,
+      maxFreezeTargets: 7,
+      freezeDurationMs: 6000,
+      castCooldownMs: 14000,
+      throwDamage: 45,
+      throwSpeed: 520,
+    },
+    unlock: { kind: 'clearArea', areaId: 'null-sector' },
+  },
 ];
 
 export const CHARACTERS_BY_ID: Record<string, CharacterDef> = Object.fromEntries(

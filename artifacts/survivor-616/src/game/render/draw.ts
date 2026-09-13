@@ -6,15 +6,16 @@
  * reads as pixel art without needing image atlases.
  */
 
-import { LANDED_HEAT_RADIUS, type FluidKind, type World } from '@/game/engine/world';
+import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type World } from '@/game/engine/world';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { ALLIES_BY_ID } from '@/game/data/progression';
-import type { AreaSky, ObstacleDef, StormCloudMode } from '@/game/types';
+import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
+import { blendSpritePalettes } from '@/game/data/characterSkins';
 
 import { drawRig, drawShadow } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
@@ -46,6 +47,12 @@ export interface Viewport {
   width: number;
   height: number;
   dpr: number;
+  /**
+   * How many world units wide the view should show. Normally derived from
+   * `width` so every screen sees roughly the same slice of the world; the
+   * map editor overrides it to fit a whole authored map in one frame.
+   */
+  targetViewOverride?: number;
 }
 
 function hashCell(x: number, y: number): number {
@@ -106,6 +113,28 @@ function drawGround(ctx: CanvasRenderingContext2D, w: World, left: number, top: 
   }
   ctx.stroke();
   ctx.globalAlpha = 1;
+}
+
+function drawAuthoredGroundTiles(ctx: CanvasRenderingContext2D, w: World) {
+  for (const patch of w.area.authoredGroundTiles ?? []) {
+    const left = patch.x - patch.w / 2;
+    const top = patch.y - patch.h / 2;
+    ctx.fillStyle = patch.base;
+    ctx.fillRect(left, top, patch.w, patch.h);
+    ctx.globalAlpha = 0.72;
+    ctx.fillStyle = patch.tile;
+    ctx.fillRect(left + 4, top + 4, Math.max(0, patch.w - 8), Math.max(0, patch.h - 8));
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = patch.seam;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(left, top, patch.w, patch.h);
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = patch.glow;
+    ctx.beginPath();
+    ctx.ellipse(patch.x, patch.y, Math.max(4, patch.w * 0.28), Math.max(3, patch.h * 0.12), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 }
 
 /** Small, deterministic bits of city dressing that sit between the combat props. */
@@ -1358,7 +1387,16 @@ function inferObstacleKind(obs: { w: number; h: number }): ObstacleDef['kind'] {
   return 'crate';
 }
 
-function drawArenaEdges(ctx: CanvasRenderingContext2D, w: World) {
+/**
+ * `view` is the visible world rect. The out-of-bounds blackout has to reach
+ * the edge of *that*, not a fixed distance: a zoomed-out camera (Sector
+ * Command's commander view) otherwise shows lit ground past the arena wall.
+ */
+function drawArenaEdges(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  view: { left: number; top: number; right: number; bottom: number },
+) {
   // Endless mode has no walls.
   if (w.area.endless) return;
 
@@ -1367,12 +1405,17 @@ function drawArenaEdges(ctx: CanvasRenderingContext2D, w: World) {
   const thickness = 26;
 
   ctx.fillStyle = '#0a0a0d';
-  ctx.fillRect(-halfW - 400, -halfH - 400, w.bounds.w + 800, 400);
-  ctx.fillRect(-halfW - 400, halfH, w.bounds.w + 800, 400);
-  ctx.fillRect(-halfW - 400, -halfH, 400, w.bounds.h);
-  ctx.fillRect(halfW, -halfH, 400, w.bounds.h);
+  const outLeft = Math.min(view.left, -halfW) - 400;
+  const outRight = Math.max(view.right, halfW) + 400;
+  const outTop = Math.min(view.top, -halfH) - 400;
+  const outBottom = Math.max(view.bottom, halfH) + 400;
+  ctx.fillRect(outLeft, outTop, outRight - outLeft, -halfH - outTop);
+  ctx.fillRect(outLeft, halfH, outRight - outLeft, outBottom - halfH);
+  ctx.fillRect(outLeft, -halfH, -halfW - outLeft, w.bounds.h);
+  ctx.fillRect(halfW, -halfH, outRight - halfW, w.bounds.h);
 
-  ctx.fillStyle = w.area.ground.seam;
+  const groundTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
+  ctx.fillStyle = groundTint ? mixHex(w.area.ground.seam, groundTint.bodyDark, 0.3) : w.area.ground.seam;
   ctx.globalAlpha = 0.85;
   ctx.fillRect(-halfW, -halfH, w.bounds.w, 4);
   ctx.fillRect(-halfW, halfH - 4, w.bounds.w, 4);
@@ -1383,7 +1426,7 @@ function drawArenaEdges(ctx: CanvasRenderingContext2D, w: World) {
   // Hazard striping just inside the boundary.
   ctx.save();
   ctx.globalAlpha = 0.18;
-  ctx.fillStyle = w.area.ground.glow;
+  ctx.fillStyle = groundTint ? mixHex(w.area.ground.glow, groundTint.accent, 0.35) : w.area.ground.glow;
   for (let x = -halfW; x < halfW; x += 46) {
     ctx.fillRect(x, -halfH + 4, 24, thickness * 0.35);
     ctx.fillRect(x, halfH - 4 - thickness * 0.35, 24, thickness * 0.35);
@@ -1538,6 +1581,7 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'fire-hydrant': { top: '#8c1f1f', side: '#4a0f0f', trim: '#ffb3b3' },
   'parking-meter': { top: '#4a4a52', side: '#28282e', trim: '#c9c9d2' },
   'attack-block': { top: '#3a1620', side: '#1e0b11', trim: '#ff5c5c' },
+  'server-rack': { top: '#0e1b26', side: '#081119', trim: '#1fe6ff' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -1666,8 +1710,12 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
       : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
 
+  const worldTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
   for (const obstacle of obstacleList) {
-    const colors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
+    const baseColors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
+    const colors = worldTint
+      ? { top: mixHex(baseColors.top, worldTint.accent, 0.25), side: mixHex(baseColors.side, worldTint.bodyDark, 0.25), trim: mixHex(baseColors.trim, worldTint.accentBright, 0.3) }
+      : baseColors;
     const x = obstacle.x - obstacle.w / 2;
     const y = obstacle.y - obstacle.h / 2;
 
@@ -1962,14 +2010,16 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.save(); ctx.globalAlpha = Math.max(0, fade) * 0.32; ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block'].includes(b.kind));
+  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind));
   let dynamicCount = 0;
   for (const b of sources) {
     const isBarrel = b.kind === 'barrel';
     const radius = b.kind === 'street-lamp' ? 200 : b.kind === 'barrel' ? 120 + Math.sin(w.now / 80) * 10
-      : b.kind === 'neon-sign' ? 90 : b.kind === 'attack-block' ? 100 + Math.sin(w.now / 140) * 18 : 80;
+      : b.kind === 'neon-sign' ? 90 : b.kind === 'attack-block' ? 100 + Math.sin(w.now / 140) * 18
+      : b.kind === 'server-rack' ? 80 : 80;
     const color = b.kind === 'barrel' ? '#f0760a' : b.kind === 'neon-sign' ? '#4de1ff'
-      : b.kind === 'fuse-box' ? '#7ef0bd' : b.kind === 'attack-block' ? '#ff5c5c' : '#ffd166';
+      : b.kind === 'fuse-box' ? '#7ef0bd' : b.kind === 'attack-block' ? '#ff5c5c'
+      : b.kind === 'server-rack' ? '#1fe6ff' : '#ffd166';
     const pulse = b.kind === 'neon-sign' ? neonFlicker(w.now, b.uid) : 1;
     const gradient = ctx.createRadialGradient(b.x, b.y, 4, b.x, b.y, radius);
     gradient.addColorStop(0, `${color}55`);
@@ -2004,7 +2054,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   // each nearby obstacle are projected away from the moving light source, so
   // shadows rotate, stretch, and vanish immediately when a breakable breaks.
   const shadowSources = sources.slice(0, 5);
-  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block'].includes(b.kind));
+  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind));
   for (const source of shadowSources) {
     for (const object of shadowObjects) {
       const distance = Math.hypot(object.x - source.x, object.y - source.y);
@@ -2069,6 +2119,89 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.fillRect(-10, -pole.h - 4, 20, 8);
     ctx.restore();
   }
+}
+
+/**
+ * Tier 2 economy: reinforcement beacons. A standing beacon pulses and carries a
+ * health bar, because "why did my reinforcements stop" must be answerable at a
+ * glance; a broken one leaves a dark stump so the ground still reads as lost.
+ */
+function drawBeacons(ctx: CanvasRenderingContext2D, w: World) {
+  for (const beacon of w.beacons) {
+    const half = 22;
+    if (beacon.broken) {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#2b2b33';
+      ctx.fillRect(beacon.x - half, beacon.y - 6, half * 2, 12);
+      ctx.restore();
+      continue;
+    }
+
+    const pulse = 0.5 + 0.5 * Math.sin(w.now / 420);
+    ctx.save();
+    // Ground glow, so it reads as a place and not just a prop.
+    const glow = ctx.createRadialGradient(beacon.x, beacon.y, 4, beacon.x, beacon.y, 90);
+    glow.addColorStop(0, `rgba(250, 204, 21, ${0.16 + pulse * 0.1})`);
+    glow.addColorStop(1, 'rgba(250, 204, 21, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(beacon.x - 90, beacon.y - 90, 180, 180);
+
+    ctx.fillStyle = w.now < beacon.hitFlashUntil ? '#fff' : '#3f3f18';
+    ctx.fillRect(beacon.x - half, beacon.y - 34, half * 2, 44);
+    ctx.fillStyle = '#facc15';
+    ctx.globalAlpha = 0.6 + pulse * 0.4;
+    ctx.fillRect(beacon.x - half + 4, beacon.y - 30, half * 2 - 8, 6);
+    ctx.globalAlpha = 1;
+    ctx.fillRect(beacon.x - 3, beacon.y - 52, 6, 20);
+
+    // Health bar.
+    const ratio = Math.max(0, beacon.hp / beacon.maxHp);
+    ctx.fillStyle = '#00000099';
+    ctx.fillRect(beacon.x - half, beacon.y + 16, half * 2, 5);
+    ctx.fillStyle = ratio > 0.35 ? '#facc15' : '#ff4d5e';
+    ctx.fillRect(beacon.x - half, beacon.y + 16, half * 2 * ratio, 5);
+    ctx.restore();
+  }
+}
+
+/**
+ * Fog of war. Drawn after the world and the arena edges, so it covers terrain,
+ * props and actors alike, and before the screen-space overlays so the HUD stays
+ * readable. Cells are painted at grid resolution with a blur, which is what
+ * stops a 64-unit grid reading as a checkerboard.
+ */
+function drawFog(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+) {
+  const fog = w.fog;
+  if (!fog) return;
+  const halfW = w.bounds.w / 2;
+  const halfH = w.bounds.h / 2;
+  const minCol = Math.max(0, Math.floor((left + halfW) / fog.cell));
+  const maxCol = Math.min(fog.cols - 1, Math.ceil((right + halfW) / fog.cell));
+  const minRow = Math.max(0, Math.floor((top + halfH) / fog.cell));
+  const maxRow = Math.min(fog.rows - 1, Math.ceil((bottom + halfH) / fog.cell));
+
+  ctx.save();
+  ctx.filter = 'blur(12px)';
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      const state = fog.cells[row * fog.cols + col] ?? 0;
+      if (state === 2) continue;
+      ctx.fillStyle = state === 1 ? 'rgba(4, 6, 12, 0.62)' : 'rgba(3, 4, 9, 0.97)';
+      const x = col * fog.cell - halfW;
+      const y = row * fog.cell - halfH;
+      // Overdraw by a cell edge so the blur has neighbours to blend into.
+      ctx.fillRect(x - 1, y - 1, fog.cell + 2, fog.cell + 2);
+    }
+  }
+  ctx.restore();
 }
 
 function drawAwarenessArrow(ctx: CanvasRenderingContext2D, w: World) {
@@ -2534,6 +2667,23 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
 
 function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
   for (const proj of w.projectiles) {
+    // Zero Day: a thrown frozen enemy renders as its own rig in flight
+    // instead of a normal weapon-projectile sprite.
+    if (proj.carriedEnemyUid !== undefined) {
+      const carried = w.enemies.find((e) => e.uid === proj.carriedEnemyUid);
+      ctx.save();
+      if (carried) {
+        drawRig(ctx, carried.def.rig, carried.def.palette, 'idle', 0, proj.x, proj.y, proj.vx >= 0 ? 1 : -1,
+          SPRITE_SCALE * sizeClassScale(carried.def) * 0.85, { tint: { color: '#22c55e', alpha: 0.6 } });
+      } else {
+        ctx.fillStyle = proj.color;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      continue;
+    }
     ctx.save();
     ctx.globalAlpha = 0.4;
     ctx.strokeStyle = proj.color;
@@ -3064,7 +3214,25 @@ function drawActors(
     }
   };
 
+  // Full-recolor setting: blend each enemy's own palette with the active
+  // world-color theme, same math as the player's own blend
+  // (characterSkins.ts's blendSpritePalettes). Cached per enemy id per frame
+  // since many enemies on screen share one EnemyDef.
+  const enemyPaletteCache = w.worldColorFullRecolor && w.worldColorPalette ? new Map<string, SpritePalette>() : null;
+  const resolveEnemyPalette = (def: EnemyDef): SpritePalette => {
+    if (!enemyPaletteCache || !w.worldColorPalette) return def.palette;
+    const cached = enemyPaletteCache.get(def.id);
+    if (cached) return cached;
+    const blended = blendSpritePalettes(def.palette, w.worldColorPalette, 0.35);
+    enemyPaletteCache.set(def.id, blended);
+    return blended;
+  };
+
   for (const enemy of sorted) {
+    // Fog of war: hostiles are only drawn where you can currently see. An
+    // "explored" cell remembers the terrain, never the units standing on it.
+    // Your own units are always drawn -- they are what does the seeing.
+    if (w.fog && !enemy.commanded && fogAt(w, enemy.x, enemy.y) < 2) continue;
     if (enemy.y > w.player.y) drawPlayer();
     const converted = enemy.convertedUntil > w.now && !enemy.dying;
     if (!enemy.dying && enemy.def.behavior === 'sentry' && enemy.def.traits?.coneDetect) {
@@ -3108,6 +3276,76 @@ function drawActors(
     // literally alpha 0 -- a keen-eyed player can still catch a shimmer.
     const hidden = enemy.invisibleUntil > w.now && !enemy.dying;
     const freeze = enemy.activeEffects.find((effect) => effect.id === 'freeze');
+    // Zero Day: "stone" enemies -- a flat tint reusing drawRig's existing
+    // tint option, plus a frozen anim frame (no idle/attack progression).
+    const stoned = enemy.frozenUntil > w.now && !enemy.dying;
+    // Sector Command: a selected unit gets a bright ring, and a unit walking
+    // to an order gets a thin line to where it is going. Captured units
+    // already read as allies via the existing `converted` tint below.
+    // Sector Command: a primed enemy is one you can grab *right now*. Without
+    // this the capture button was a lottery -- you could not tell who was in
+    // the window, or that a window existed.
+    if (!enemy.commanded && !enemy.dying && enemy.capturableUntil > w.now) {
+      const pulse = 0.55 + 0.35 * Math.sin(w.now / 130);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#65f6d1';
+      ctx.shadowColor = '#65f6d1';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
+      const r = enemy.radius + 10;
+      // Four corner brackets read as a reticle without hiding the sprite.
+      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+        ctx.beginPath();
+        ctx.moveTo(enemy.x + sx * r, enemy.y + 2 + sy * r - sy * 6);
+        ctx.lineTo(enemy.x + sx * r, enemy.y + 2 + sy * r);
+        ctx.lineTo(enemy.x + sx * r - sx * 6, enemy.y + 2 + sy * r);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (enemy.commanded && !enemy.dying) {
+      if (enemy.selectedForCommand) {
+        ctx.save();
+        ctx.globalAlpha = 0.6 + 0.25 * Math.sin(w.now / 110);
+        ctx.strokeStyle = '#e5faff';
+        ctx.shadowColor = '#65f6d1';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (enemy.orderKind === 'move' || enemy.orderKind === 'attack-move') {
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        // Attack-move reads red: you are taking ground, not repositioning.
+        ctx.strokeStyle = enemy.orderKind === 'attack-move' ? '#ff8f6b' : '#65f6d1';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(enemy.x, enemy.y);
+        ctx.lineTo(enemy.orderX, enemy.orderY);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    if (stoned && enemy.selectedForThrow) {
+      const pulse = 0.55 + 0.25 * Math.sin(w.now / 90);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = '#e5faff';
+      ctx.shadowColor = '#7ef9a0';
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 4]);
+      ctx.lineDashOffset = -w.now / 20;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     if (converted) {
       const pulse = 0.72 + Math.sin(w.now / 130) * 0.18;
       ctx.save();
@@ -3152,12 +3390,13 @@ function drawActors(
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
     ctx.save();
     ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
+    const enemyPalette = resolveEnemyPalette(enemy.def);
     drawRig(
       ctx,
       enemy.def.rig,
-      enemy.def.palette,
+      enemyPalette,
       enemy.anim,
-      w.now - enemy.animStartedAt,
+      stoned ? 0 : w.now - enemy.animStartedAt,
       enemy.x,
       enemy.y + 2 + fallProgress * 10,
       enemy.facing,
@@ -3166,7 +3405,9 @@ function drawActors(
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss' || enemy.def.sizeClass === 'giant',
         dissolve,
-        tint: converted
+        tint: stoned
+          ? { color: '#22c55e', alpha: 0.68 }
+          : converted
           ? { color: '#65f6d1', alpha: 0.42 }
           : freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
       },
@@ -3179,7 +3420,7 @@ function drawActors(
       const top = enemy.y - enemy.radius * 2.6;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
       ctx.fillRect(enemy.x - width / 2, top, width, 4);
-      ctx.fillStyle = converted ? '#65f6d1' : enemy.def.palette.accent;
+      ctx.fillStyle = converted ? '#65f6d1' : enemyPalette.accent;
       ctx.fillRect(enemy.x - width / 2, top, width * (enemy.hp / enemy.maxHp), 4);
     }
   }
@@ -3218,8 +3459,10 @@ function drawPopups(ctx: CanvasRenderingContext2D, w: World) {
 export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewport) {
   const { width, height, dpr } = view;
 
-  // Show roughly the same slice of the world regardless of screen size.
-  const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+  // Show roughly the same slice of the world regardless of screen size,
+  // unless a caller (the map editor's whole-map preview) asks for a
+  // specific slice width.
+  const targetView = view.targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78));
   const zoom = width / targetView;
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -3251,6 +3494,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const showFireflies = profile.fireflies || !w.wildlifeSheltersInRain;
   const cloudPuffs = computeCloudPuffs(w, profile, left, top, right, bottom);
   drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
+  drawAuthoredGroundTiles(ctx, w);
   if (w.endless?.inDungeon) {
     ctx.fillStyle = '#000';
     ctx.globalAlpha = 0.1 + Math.min(0.08, w.endless.dungeonEraIndex * 0.015);
@@ -3278,7 +3522,9 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
     drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
   }
-  drawArenaEdges(ctx, w);
+  drawBeacons(ctx, w);
+  drawArenaEdges(ctx, w, { left, top, right, bottom });
+  drawFog(ctx, w, left, top, right, bottom);
   drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);

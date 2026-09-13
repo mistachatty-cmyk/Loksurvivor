@@ -20,7 +20,7 @@ function parseHex(color: string): [number, number, number] {
   return [Number.parseInt(hex.slice(0, 2), 16), Number.parseInt(hex.slice(2, 4), 16), Number.parseInt(hex.slice(4, 6), 16)];
 }
 
-function mixColor(a: string, b: string, amount: number): string {
+export function mixColor(a: string, b: string, amount: number): string {
   const left = parseHex(a);
   const right = parseHex(b);
   const mixed = left.map((channel, index) => clampByte(channel + (right[index]! - channel) * amount));

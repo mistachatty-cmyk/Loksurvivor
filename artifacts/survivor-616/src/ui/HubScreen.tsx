@@ -32,6 +32,8 @@ export interface HubScreenProps {
   onChangeRoom: (roomId: string) => void;
   onOpen: (panel: HubPanel) => void;
   onOpenMapEditor: () => void;
+  /** Opens the playable tactical campaign from the Sanctum computer. */
+  onOpenSectorCommand: () => void;
 }
 
 const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string; description: string }> = {
@@ -85,7 +87,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
@@ -175,7 +177,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
             aria-hidden="true"
           />
            <div
-             className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)} ${primeTakeoverActive ? 'palette-preview-pulse' : ''}`}
+             className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)}`}
              style={{
                '--scene-accent': primePalette?.accent ?? scene.homeAccent,
                '--scene-sky': primePalette?.bodyDark ?? scene.skyAccent,
@@ -357,6 +359,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
                       <span className="block text-[10px] text-cyan-100/60">Open map builder</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-cyan-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenSectorCommand}
+                    data-testid="button-hideout-sector-command"
+                    className="group flex items-center gap-3 border border-amber-200/35 bg-amber-950/30 px-3 py-2 text-left transition hover:border-amber-200/80 hover:bg-amber-950/60"
+                  >
+                    <Radio className="h-5 w-5 text-amber-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-100">Sector Command</span>
+                      <span className="block text-[10px] text-amber-100/60">Direct captured units · campaign</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
                   </button>
                 )}
               </div>
