@@ -33,6 +33,7 @@ import { SettingsPanel } from '@/ui/SettingsPanel';
 import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
 import { AccountPanel } from '@/ui/AccountPanel';
 import { FeedbackPanel } from '@/ui/FeedbackPanel';
+import { CardShopPanel } from '@/ui/CardShopPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
@@ -56,6 +57,7 @@ type Screen =
   | { name: 'recovery' }
   | { name: 'vendor' }
   | { name: 'workshop' }
+  | { name: 'card-shop' }
   | { name: 'settings' }
   | { name: 'palette-store' }
   | { name: 'account' }
@@ -89,6 +91,7 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'recovery' ||
       requested === 'vendor' ||
       requested === 'workshop' ||
+      requested === 'card-shop' ||
       requested === 'settings' ||
       requested === 'account' ||
       requested === 'feedback'
@@ -138,6 +141,9 @@ function Game() {
         break;
       case 'workshop':
         setScreen({ name: 'workshop' });
+        break;
+      case 'card-shop':
+        setScreen({ name: 'card-shop' });
         break;
       case 'settings':
         setScreen({ name: 'settings' });
@@ -265,6 +271,9 @@ function Game() {
 
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
+
+    case 'card-shop':
+      return <CardShopPanel onBack={goHub} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} />;

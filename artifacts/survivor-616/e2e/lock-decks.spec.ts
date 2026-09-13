@@ -25,4 +25,12 @@ test.describe('Lock Deck card packs', () => {
     const bodyOverflows = await page.evaluate(() => document.body.scrollWidth > document.body.clientWidth);
     expect(bodyOverflows).toBe(false);
   });
+
+  test('has a dedicated card-shop destination outside the Archive', async ({ page }) => {
+    await page.goto('/?screen=card-shop');
+    await expect(page.getByTestId('section-card-shop')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'LokPet Card Shop' })).toBeVisible();
+    await expect(page.getByTestId('button-card-shop-open-pack')).toBeVisible();
+    await expect(page.locator('[data-testid^="button-card-pack-"]')).toHaveCount(5);
+  });
 });
