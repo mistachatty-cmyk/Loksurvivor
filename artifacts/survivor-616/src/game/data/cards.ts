@@ -20,6 +20,40 @@ import { ENDLESS_BANDS } from './endlessBands';
 
 const NS = G6_616_SURVIVOR_NAMESPACE;
 
+export type LokDeckSetId = 'operatives' | 'threats' | 'crew' | 'lokpets' | 'endless';
+
+/**
+ * Presentation metadata shared by Survivor 616's binder and the future
+ * Lock Decks application. It describes a card definition, never a player's
+ * owned/tradeable instance.
+ */
+export interface LokDeckCardMetadata extends Record<string, unknown> {
+  setId: LokDeckSetId;
+  cardNumber: string;
+  subjectType: 'character' | 'enemy' | 'ally' | 'lokpet' | 'discovery';
+  subjectId: string;
+  sourceApp: 'survivor-616';
+  playableInSurvivor616: boolean;
+}
+
+export interface LokDeckSet {
+  id: LokDeckSetId;
+  name: string;
+  kicker: string;
+  description: string;
+  cardIds: string[];
+}
+
+function deckMetadata(
+  setId: LokDeckSetId,
+  subjectType: LokDeckCardMetadata['subjectType'],
+  subjectId: string,
+  cardNumber: string,
+  playableInSurvivor616 = false,
+): LokDeckCardMetadata {
+  return { setId, subjectType, subjectId, cardNumber, sourceApp: 'survivor-616', playableInSurvivor616 };
+}
+
 function acquisitionForUnlock(rule: UnlockRule): LokAssetAcquisitionMethod[] {
   switch (rule.kind) {
     case 'default': return ['starter'];
@@ -53,7 +87,7 @@ const DISTANCE_MILESTONES: Array<{ px: number; rarity: LokAssetRarity; slug: str
 ];
 
 /** Character roster, one card per playable operative. */
-export const CHARACTER_CARDS: LokAssetManifest[] = CHARACTERS.map((character) => ({
+export const CHARACTER_CARDS: LokAssetManifest<LokDeckCardMetadata>[] = CHARACTERS.map((character, index) => ({
   schema: 'lok.asset',
   schemaVersion: 1,
   id: lokAssetId(NS, `character-${character.id}`),
@@ -68,6 +102,8 @@ export const CHARACTER_CARDS: LokAssetManifest[] = CHARACTERS.map((character) =>
   acquisition: acquisitionForUnlock(character.unlock),
   ownership: definitionOwnership(false),
   provenance: { sourceGame: '616-survivor' },
+  visual: { previewKey: `character:${character.id}`, paletteId: character.id },
+  metadata: deckMetadata('operatives', 'character', character.id, `S616-OP-${String(index + 1).padStart(3, '0')}`, true),
 }));
 
 function enemyRarity(enemy: (typeof ENEMIES)[number]): LokAssetRarity {
@@ -78,7 +114,7 @@ function enemyRarity(enemy: (typeof ENEMIES)[number]): LokAssetRarity {
 }
 
 /** Bestiary, one card per enemy -- owned once the player has recorded a defeat. */
-export const ENEMY_CARDS: LokAssetManifest[] = ENEMIES.map((enemy) => ({
+export const ENEMY_CARDS: LokAssetManifest<LokDeckCardMetadata>[] = ENEMIES.map((enemy, index) => ({
   schema: 'lok.asset',
   schemaVersion: 1,
   id: lokAssetId(NS, `enemy-${enemy.id}`),
@@ -93,6 +129,8 @@ export const ENEMY_CARDS: LokAssetManifest[] = ENEMIES.map((enemy) => ({
   acquisition: ['scenario'],
   ownership: definitionOwnership(false),
   provenance: { sourceGame: '616-survivor' },
+  visual: { previewKey: `enemy:${enemy.id}`, paletteId: enemy.id },
+  metadata: deckMetadata('threats', 'enemy', enemy.id, `S616-TH-${String(index + 1).padStart(3, '0')}`),
 }));
 
 /**
@@ -101,7 +139,7 @@ export const ENEMY_CARDS: LokAssetManifest[] = ENEMIES.map((enemy) => ({
  * upstream). 616 Survivor doesn't render companion behavior itself; this only
  * describes the portable identity a receiving game could hang one on.
  */
-export const ALLY_CARDS: LokAssetManifest[] = ALLIES.map((ally) => ({
+export const ALLY_CARDS: LokAssetManifest<LokDeckCardMetadata>[] = ALLIES.map((ally, index) => ({
   schema: 'lok.asset',
   schemaVersion: 1,
   id: lokAssetId(NS, `ally-${ally.id}`),
@@ -116,6 +154,8 @@ export const ALLY_CARDS: LokAssetManifest[] = ALLIES.map((ally) => ({
   acquisition: ['scenario'],
   ownership: definitionOwnership(false),
   provenance: { sourceGame: '616-survivor' },
+  visual: { previewKey: `ally:${ally.id}`, paletteId: ally.id },
+  metadata: deckMetadata('crew', 'ally', ally.id, `S616-CR-${String(index + 1).padStart(3, '0')}`),
 }));
 
 /**
@@ -124,7 +164,7 @@ export const ALLY_CARDS: LokAssetManifest[] = ALLIES.map((ally) => ({
  * receiving game can recognize the species even without 616 Survivor's own
  * stat model.
  */
-export const LOKPET_CARDS: LokAssetManifest<LokPetCardMetadata>[] = LOKPET_VARIANTS.map((variant) => ({
+export const LOKPET_CARDS: LokAssetManifest<LokPetCardMetadata & LokDeckCardMetadata>[] = LOKPET_VARIANTS.map((variant, index) => ({
   schema: 'lok.asset',
   schemaVersion: 1,
   id: lokAssetId(NS, `pet-${variant.id}`),
@@ -139,11 +179,16 @@ export const LOKPET_CARDS: LokAssetManifest<LokPetCardMetadata>[] = LOKPET_VARIA
   acquisition: ['generated'],
   ownership: definitionOwnership(false),
   provenance: { sourceGame: '616-survivor' },
-  metadata: { species: variant.family, variant: variant.silhouette },
+  visual: { previewKey: `lokpet:${variant.id}`, paletteId: variant.id },
+  metadata: {
+    ...deckMetadata('lokpets', 'lokpet', variant.id, `S616-LP-${String(index + 1).padStart(3, '0')}`),
+    species: variant.family,
+    variant: variant.silhouette,
+  },
 }));
 
 /** Endless-mode exclusive cards -- one per distance band, awarded on first discovery. */
-export const ENDLESS_BAND_CARDS: LokAssetManifest[] = ENDLESS_BANDS.map((band) => ({
+export const ENDLESS_BAND_CARDS: LokAssetManifest<LokDeckCardMetadata>[] = ENDLESS_BANDS.map((band, index) => ({
   schema: 'lok.asset',
   schemaVersion: 1,
   id: lokAssetId(NS, `endless-band-${band.id}`),
@@ -158,10 +203,12 @@ export const ENDLESS_BAND_CARDS: LokAssetManifest[] = ENDLESS_BANDS.map((band) =
   acquisition: ['achievement'],
   ownership: definitionOwnership(false),
   provenance: { sourceGame: '616-survivor' },
+  visual: { previewKey: `endless-band:${band.id}` },
+  metadata: deckMetadata('endless', 'discovery', band.id, `S616-EN-${String(index + 1).padStart(3, '0')}`),
 }));
 
 /** Endless-mode exclusive cards -- one per lifetime distance milestone. */
-export const ENDLESS_MILESTONE_CARDS: LokAssetManifest[] = DISTANCE_MILESTONES.map((milestone) => ({
+export const ENDLESS_MILESTONE_CARDS: LokAssetManifest<LokDeckCardMetadata>[] = DISTANCE_MILESTONES.map((milestone, index) => ({
   schema: 'lok.asset',
   schemaVersion: 1,
   id: lokAssetId(NS, milestone.slug),
@@ -176,6 +223,8 @@ export const ENDLESS_MILESTONE_CARDS: LokAssetManifest[] = DISTANCE_MILESTONES.m
   acquisition: ['achievement'],
   ownership: definitionOwnership(false),
   provenance: { sourceGame: '616-survivor' },
+  visual: { previewKey: `endless-milestone:${milestone.px}` },
+  metadata: deckMetadata('endless', 'discovery', milestone.slug, `S616-EN-${String(ENDLESS_BANDS.length + index + 1).padStart(3, '0')}`),
 }));
 
 export const CARD_MANIFESTS: LokAssetManifest[] = [
@@ -190,6 +239,74 @@ export const CARD_MANIFESTS: LokAssetManifest[] = [
 export const CARD_MANIFESTS_BY_ID: Record<string, LokAssetManifest> = Object.fromEntries(
   CARD_MANIFESTS.map((card) => [card.id, card]),
 );
+
+function cardsForSet(setId: LokDeckSetId): string[] {
+  return CARD_MANIFESTS
+    .filter((card) => (card.metadata as LokDeckCardMetadata | undefined)?.setId === setId)
+    .map((card) => card.id);
+}
+
+/** Pack/set definitions are portable catalog organization, not loot odds. */
+export const CARD_PACKS: LokDeckSet[] = [
+  {
+    id: 'operatives',
+    name: 'Sector Operatives',
+    kicker: 'Playable character pack',
+    description: 'Every survivor you can field, rendered from their real in-game rig.',
+    cardIds: cardsForSet('operatives'),
+  },
+  {
+    id: 'threats',
+    name: 'Night Shift Threats',
+    kicker: 'Bestiary pack',
+    description: 'Hostiles catalogued by defeating them in the city.',
+    cardIds: cardsForSet('threats'),
+  },
+  {
+    id: 'crew',
+    name: 'Hideout Crew',
+    kicker: 'Companion pack',
+    description: 'Rescued allies and future cross-app companion profiles.',
+    cardIds: cardsForSet('crew'),
+  },
+  {
+    id: 'lokpets',
+    name: 'Signal Beasts',
+    kicker: 'LokPet discovery pack',
+    description: 'Survivor 616 LokPet families, ready to bridge into Lock Decks later.',
+    cardIds: cardsForSet('lokpets'),
+  },
+  {
+    id: 'endless',
+    name: 'Beyond the Grid',
+    kicker: 'Endless chase pack',
+    description: 'Distance beacons and strange districts found past the city core.',
+    cardIds: cardsForSet('endless'),
+  },
+];
+
+export const CARD_PACKS_BY_ID: Record<LokDeckSetId, LokDeckSet> = Object.fromEntries(
+  CARD_PACKS.map((pack) => [pack.id, pack]),
+) as Record<LokDeckSetId, LokDeckSet>;
+
+export function cardPackFor(card: LokAssetManifest): LokDeckSet {
+  const setId = (card.metadata as LokDeckCardMetadata | undefined)?.setId ?? 'endless';
+  return CARD_PACKS_BY_ID[setId];
+}
+
+/**
+ * Serializable definition catalog for G6.online / Lock Decks. Player ownership
+ * is intentionally excluded: account sync will layer instances onto these IDs.
+ */
+export const LOK_DECK_CATALOG = {
+  schema: 'lok.deck-catalog' as const,
+  schemaVersion: 1 as const,
+  namespace: NS,
+  catalogVersion: 1,
+  sourceApp: 'survivor-616' as const,
+  sets: CARD_PACKS,
+  cards: CARD_MANIFESTS,
+};
 
 /**
  * Pure function over `MetaState`, same contract as `AchievementDef.isComplete`
