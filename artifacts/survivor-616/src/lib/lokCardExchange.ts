@@ -1,11 +1,18 @@
-import type { LokPetPalette, LokPetSilhouette, VisitingLokCard } from '@/game/types';
+import type { LokPetPalette, LokPetRarity, LokPetSilhouette, VisitingLokCard } from '@/game/types';
+import { G6_616_SURVIVOR_NAMESPACE, lokAssetId } from '@/game/lok/types';
+import type { LokAssetManifest, LokAssetProvenance, LokPetCardMetadata } from '@/game/lok/types';
 
 /**
- * Self-contained implementation of the `lok.card-exchange` protocol that
- * Spend It All's LOKdex documents in docs/LOK_CARD_EXCHANGE_PROTOCOL.md and
- * docs/LOK_PORTABLE_ASSET_SPEC.md. Deliberately has zero dependency on that
- * repository or any shared package -- the contract is plain JSON, and any
- * G-Six game (this one included) implements its own copy of it.
+ * Implementation of the `lok.card-exchange` protocol that Spend It All's
+ * LOKdex documents in docs/LOK_CARD_EXCHANGE_PROTOCOL.md and
+ * docs/LOK_PORTABLE_ASSET_SPEC.md. The manifest shape itself is
+ * `@/game/lok/types` (the read-only Card Binder's mirror of the upstream
+ * contract, see `.agents/memory/tcg-lokpet-crossover.md`) -- this file only
+ * adds the parts that mirror doesn't need: the transfer envelope
+ * (`LokOwnedAsset`, `LokPortableCardExport`) and actual JSON
+ * export/import/serialize. Deliberately has zero dependency on the Spend It
+ * All repository or any shared package -- the contract is plain JSON, and
+ * any G-Six game (this one included) implements its own copy of it.
  *
  * 616 Survivor's side of the exchange is one-directional in spirit with the
  * rest of this game's rules: an imported card only ever becomes a
@@ -23,43 +30,7 @@ export const LOK_CARD_EXCHANGE_FORMAT_VERSION = 1;
 export const LOK_ASSET_SCHEMA = 'lok.asset';
 export const LOK_ASSET_SCHEMA_VERSION = 1;
 /** This game's own namespace when it becomes the sender. */
-export const LOK_NAMESPACE = 'g6.616-survivor';
-
-type LokAssetProvenance = {
-  sourceGame: string;
-  sourceVersion?: string;
-  createdAt?: number;
-  generation?: number;
-  generationSeed?: string;
-  eventId?: string;
-  achievementId?: string;
-  scenarioId?: string;
-  originalOwnerId?: string | null;
-};
-
-type LokAssetManifest = {
-  schema: string;
-  schemaVersion: number;
-  id: string;
-  namespace: string;
-  slug: string;
-  kind: string;
-  version: number;
-  name: string;
-  description?: string;
-  rarity: string;
-  tags?: string[];
-  acquisition: string[];
-  ownership: {
-    transferPolicy: string;
-    uniqueInstance: boolean;
-    stackable: boolean;
-    requiresServerAuthorityForTransfer: boolean;
-    survivesRunReset: boolean;
-  };
-  provenance: LokAssetProvenance;
-  metadata?: Record<string, unknown>;
-};
+export const LOK_NAMESPACE = G6_616_SURVIVOR_NAMESPACE;
 
 type LokOwnedAsset = {
   instanceId: string;
@@ -92,7 +63,7 @@ export const VISITING_CARD_PALETTE: LokPetPalette = {
 export type LokPortableCardExport = {
   format: typeof LOK_CARD_EXCHANGE_FORMAT;
   formatVersion: typeof LOK_CARD_EXCHANGE_FORMAT_VERSION;
-  manifest: LokAssetManifest;
+  manifest: LokAssetManifest<LokPetCardMetadata>;
   owned: LokOwnedAsset;
   printVariant: string;
 };
@@ -101,13 +72,27 @@ function slugify(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+/**
+ * 616 Survivor's in-run LokPet rarity tiers don't line up 1:1 with the
+ * portable spec's -- there is no local 'charged' concept upstream, and the
+ * spec has 'epic'/'legendary'/'secret' tiers this game's LokPets never use.
+ * Map onto the closest portable tier rather than exposing 'charged' as if it
+ * were valid `LokAssetRarity`.
+ */
+const PORTABLE_RARITY_BY_LOKPET_RARITY: Record<LokPetRarity, LokAssetManifest['rarity']> = {
+  common: 'common',
+  charged: 'uncommon',
+  rare: 'rare',
+  mythic: 'mythic',
+};
+
 /** Flavor-only fields safe to hand to another game -- never combat stats. */
 export type ExportableLokPet = {
   id: string;
   name: string;
   variantId: string;
   family: string;
-  rarity: string;
+  rarity: LokPetRarity;
   description: string;
 };
 
@@ -120,10 +105,10 @@ export type ExportableLokPet = {
  */
 export function exportLokPetAsPortableCard(pet: ExportableLokPet): LokPortableCardExport {
   const slug = slugify(pet.id);
-  const id = `${LOK_NAMESPACE}:${slug}`;
+  const id = lokAssetId(LOK_NAMESPACE, slug);
   const now = Date.now();
   const provenance: LokAssetProvenance = { sourceGame: LOK_NAMESPACE, createdAt: now };
-  const manifest: LokAssetManifest = {
+  const manifest: LokAssetManifest<LokPetCardMetadata> = {
     schema: LOK_ASSET_SCHEMA,
     schemaVersion: LOK_ASSET_SCHEMA_VERSION,
     id,
@@ -133,7 +118,7 @@ export function exportLokPetAsPortableCard(pet: ExportableLokPet): LokPortableCa
     version: 1,
     name: pet.name,
     description: pet.description,
-    rarity: pet.rarity,
+    rarity: PORTABLE_RARITY_BY_LOKPET_RARITY[pet.rarity],
     tags: ['lokpet', pet.family, pet.variantId],
     acquisition: ['generated'],
     ownership: {
@@ -150,7 +135,7 @@ export function exportLokPetAsPortableCard(pet: ExportableLokPet): LokPortableCa
     metadata: { species: pet.family, variant: pet.variantId },
   };
   const owned: LokOwnedAsset = {
-    instanceId: `${id}#${slugify(pet.id)}-${now}`,
+    instanceId: `${id}#${slug}-${now}`,
     assetId: id,
     assetVersion: 1,
     acquiredAt: now,

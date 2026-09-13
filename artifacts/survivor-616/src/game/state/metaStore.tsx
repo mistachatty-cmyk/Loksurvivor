@@ -61,6 +61,7 @@ import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
+import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type {
   AllyDef,
   AreaDef,
@@ -195,6 +196,7 @@ export function createInitialMeta(): MetaState {
     hideoutWeatherEnabled: true,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
+    worldColorFullRecolorEnabled: false,
     gyroEnabled: false,
     studioPluginsEnabled: false,
     studioLayout: 'auto',
@@ -241,6 +243,7 @@ export function createInitialMeta(): MetaState {
     completedEpisodeIds: [],
     unlockedEvolutionIds: [],
     episodeProgressById: {},
+    completedSectorMissionIds: [],
     knownRelicIds: [],
     customMaps: [],
     uiPanelLayout: 'rail',
@@ -764,6 +767,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       );
     }
   }
+  const completedSectorMissionIds = idList(
+    parsed.completedSectorMissionIds,
+    new Set(SECTOR_MISSIONS.map((mission) => mission.id)),
+    [],
+  );
   const knownRelicIds = idList(
     parsed.knownRelicIds,
     new Set(CITY_RELICS.map((relic) => relic.id)),
@@ -843,6 +851,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
+    // Opt-in: recoloring enemies/environment is a bigger visual change than
+    // the player-only blend, so a returning save keeps the original look
+    // until the player turns this on deliberately.
+    worldColorFullRecolorEnabled: parsed.worldColorFullRecolorEnabled === true,
     gyroEnabled: parsed.gyroEnabled === true,
     // Defaults to false on every load, including projects saved before this
     // existed -- remote code is never enabled by an upgrade.
@@ -896,6 +908,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     completedEpisodeIds,
     unlockedEvolutionIds,
     episodeProgressById,
+    completedSectorMissionIds,
     knownRelicIds,
     customMaps,
     uiPanelLayout: parsed.uiPanelLayout === 'slideout' ? 'slideout' : 'rail',
@@ -1101,6 +1114,15 @@ export function startingWeaponLevel(meta: MetaState): number {
   return Math.min(8, 1 + levelBoost);
 }
 
+/** Whether the player owns the "extra life" vendor item for this run. */
+export function hasExtraLife(meta: MetaState): boolean {
+  return VENDOR_CATALOG.some((item) => {
+    const stacks = Math.min(item.maxStacks, Math.max(0, Math.floor(meta.vendorPurchases[item.id] ?? 0)));
+    if (stacks <= 0) return false;
+    return (item.effects ?? []).some((effect) => effect.kind === 'utility' && effect.utility === 'extra-life');
+  });
+}
+
 /** Permanent utility bonuses applied to the final cred payout. */
 export function rewardCredMultiplier(meta: MetaState): number {
   const bonus = VENDOR_CATALOG.reduce((total, item) => {
@@ -1230,6 +1252,7 @@ type Action =
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
+  | { type: 'setWorldColorFullRecolor'; enabled: boolean }
   | { type: 'setGyroEnabled'; enabled: boolean }
   | { type: 'setStudioPlugins'; enabled: boolean }
   | { type: 'setStudioLayout'; value: MetaState['studioLayout'] }
@@ -1248,6 +1271,7 @@ type Action =
   | { type: 'tickRecovery'; now: number }
   | { type: 'upgradeFacility' }
   | { type: 'createCustomMap' }
+  | { type: 'completeSectorMission'; missionId: string }
   | { type: 'saveCustomMap'; map: CustomMap }
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
@@ -1595,6 +1619,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setWorldPaletteBlend':
       return { ...state, meta: { ...state.meta, worldPaletteBlendEnabled: action.enabled } };
 
+    case 'setWorldColorFullRecolor':
+      return { ...state, meta: { ...state.meta, worldColorFullRecolorEnabled: action.enabled } };
+
     case 'setGyroEnabled':
       return { ...state, meta: { ...state.meta, gyroEnabled: action.enabled } };
 
@@ -1747,6 +1774,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return map
         ? { ...state, meta: { ...state.meta, customMaps: [map, ...state.meta.customMaps] } }
         : state;
+    }
+
+    case 'completeSectorMission': {
+      if (!SECTOR_MISSIONS_BY_ID[action.missionId]) return state;
+      if (state.meta.completedSectorMissionIds.includes(action.missionId)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          completedSectorMissionIds: [...state.meta.completedSectorMissionIds, action.missionId],
+        },
+      };
     }
 
     case 'saveCustomMap': {
@@ -1992,6 +2031,7 @@ export interface MetaContextValue {
   setHideoutWeather: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
+  setWorldColorFullRecolor: (enabled: boolean) => void;
   setGyroEnabled: (enabled: boolean) => void;
   setStudioPlugins: (enabled: boolean) => void;
   setStudioLayout: (value: MetaState['studioLayout']) => void;
@@ -2010,6 +2050,7 @@ export interface MetaContextValue {
   tickRecovery: () => void;
   upgradeFacility: () => void;
   createCustomMap: () => void;
+  completeSectorMission: (missionId: string) => void;
   saveCustomMap: (map: CustomMap) => void;
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
@@ -2104,6 +2145,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setPaletteAnimations = useCallback((enabled: boolean) => dispatch({ type: 'setPaletteAnimations', enabled }), []);
   const setWorldPaletteBlend = useCallback((enabled: boolean) => dispatch({ type: 'setWorldPaletteBlend', enabled }), []);
+  const setWorldColorFullRecolor = useCallback((enabled: boolean) => dispatch({ type: 'setWorldColorFullRecolor', enabled }), []);
   const setStudioPlugins = useCallback(
     (enabled: boolean) => dispatch({ type: 'setStudioPlugins', enabled }),
     [],
@@ -2156,6 +2198,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const tickRecovery = useCallback(() => dispatch({ type: 'tickRecovery', now: Date.now() }), []);
   const upgradeFacility = useCallback(() => dispatch({ type: 'upgradeFacility' }), []);
   const createCustomMap = useCallback(() => dispatch({ type: 'createCustomMap' }), []);
+  const completeSectorMission = useCallback(
+    (missionId: string) => dispatch({ type: 'completeSectorMission', missionId }),
+    [],
+  );
   const saveCustomMap = useCallback((map: CustomMap) => dispatch({ type: 'saveCustomMap', map }), []);
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
@@ -2238,6 +2284,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutWeather,
       setPaletteAnimations,
       setWorldPaletteBlend,
+      setWorldColorFullRecolor,
       setGyroEnabled,
       setStudioPlugins,
       setStudioLayout,
@@ -2257,6 +2304,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       tickRecovery,
       upgradeFacility,
       createCustomMap,
+      completeSectorMission,
       saveCustomMap,
       duplicateCustomMap,
       deleteCustomMap,
@@ -2308,6 +2356,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutWeather,
     setPaletteAnimations,
     setWorldPaletteBlend,
+    setWorldColorFullRecolor,
     setGyroEnabled,
     setStudioLayout,
     setGyroSensitivity,
@@ -2326,6 +2375,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     tickRecovery,
     upgradeFacility,
     createCustomMap,
+    completeSectorMission,
     saveCustomMap,
     duplicateCustomMap,
     deleteCustomMap,

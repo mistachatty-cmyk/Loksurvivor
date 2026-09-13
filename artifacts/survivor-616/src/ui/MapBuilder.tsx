@@ -35,6 +35,7 @@ import {
 import { AREAS } from '@/game/data/areas';
 import { useMeta } from '@/game/state/metaStore';
 import type { CustomMap, CustomMapPlacement } from '@/game/types';
+import { MapLivePreview } from './MapLivePreview';
 
 interface MapBuilderProps {
   onBack: () => void;
@@ -45,11 +46,15 @@ type PlacementCategory = CustomMapPlacement['category'];
 
 const CATEGORY_ICONS: Record<string, typeof Box> = {
   ground: Layers3,
+  tile: Grip,
+  beacon: Radio,
   structure: Box,
   hazard: AlertTriangle,
   landmark: MapPinned,
   enemy: Swords,
   encounter: Radio,
+  'spawn-point': Crosshair,
+  'objective-marker': MapPinned,
 };
 
 const THREAT_OPTIONS: Array<{ value: CustomMap['threat']; label: string; detail: string }> = [
@@ -107,13 +112,20 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
   const [search, setSearch] = useState('');
   const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null);
   const [snapEnabled, setSnapEnabled] = useState(true);
+  // Draw the draft through the real game renderer behind the (still
+  // draggable) placement markers, so authors can see the actual map.
+  const [livePreview, setLivePreview] = useState(true);
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
     ground: true,
+    tile: true,
+    beacon: true,
     structure: true,
     hazard: true,
     landmark: true,
     enemy: true,
     encounter: true,
+    'spawn-point': true,
+    'objective-marker': true,
   });
   const [notice, setNotice] = useState('');
   const [isDirty, setIsDirty] = useState(false);
@@ -460,7 +472,8 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                 onPointerCancel={endDrag}
                 onPointerDown={() => setSelectedPlacementId(null)}
               >
-                <div className="pointer-events-none absolute inset-0 opacity-30" style={{ backgroundImage: `linear-gradient(rgba(132, 220, 226, .2) 1px, transparent 1px), linear-gradient(90deg, rgba(132, 220, 226, .2) 1px, transparent 1px)`, backgroundSize: `${(CUSTOM_MAP_GRID / activeMap.bounds.w) * 100}% ${(CUSTOM_MAP_GRID / activeMap.bounds.h) * 100}%` }} />
+                {livePreview && <MapLivePreview map={activeMap} />}
+                <div className="pointer-events-none absolute inset-0 z-[1] opacity-30" style={{ backgroundImage: `linear-gradient(rgba(132, 220, 226, .2) 1px, transparent 1px), linear-gradient(90deg, rgba(132, 220, 226, .2) 1px, transparent 1px)`, backgroundSize: `${(CUSTOM_MAP_GRID / activeMap.bounds.w) * 100}% ${(CUSTOM_MAP_GRID / activeMap.bounds.h) * 100}%` }} />
                 <div className="pointer-events-none absolute inset-0 border-[12px] border-[#071116]/60" />
                 <div className="pointer-events-none absolute left-4 top-4 border border-cyan-100/20 bg-[#071116]/70 px-2 py-1 font-mono text-[9px] uppercase tracking-[.2em] text-cyan-100/65">north / {activeMap.bounds.w} × {activeMap.bounds.h}</div>
                 <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-cyan-100/60"><Crosshair className="h-3 w-3" /> origin 0, 0</div>
@@ -498,6 +511,10 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                   <label className="flex cursor-pointer items-center gap-2 text-cyan-100/70">
                     <input type="checkbox" checked={snapEnabled} onChange={(event) => setSnapEnabled(event.target.checked)} className="accent-orange-300" />
                     Snap
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-cyan-100/70" title="Draw the route through the real game renderer instead of flat boxes">
+                    <input type="checkbox" checked={livePreview} onChange={(event) => setLivePreview(event.target.checked)} className="accent-orange-300" data-testid="toggle-live-preview" />
+                    Live art
                   </label>
                 </div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-orange-200/70">{activeMap.threat} threat · {activeMap.durationSec}s route</div>
@@ -614,10 +631,24 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                 {selectedPlacement ? (
                   <>
                     <div className="mt-3 grid grid-cols-2 gap-2 font-mono text-[9px] uppercase tracking-wider text-slate-500">
-                      <span>x <strong className="text-slate-200">{displayCoordinate(selectedPlacement.x)}</strong></span>
-                      <span>y <strong className="text-slate-200">{displayCoordinate(selectedPlacement.y)}</strong></span>
-                      <span>w <strong className="text-slate-200">{selectedPlacement.w}</strong></span>
-                      <span>h <strong className="text-slate-200">{selectedPlacement.h}</strong></span>
+                      {(['x', 'y', 'w', 'h'] as const).map((field) => (
+                        <label key={field} className="border border-cyan-100/10 bg-[#071116] px-2 py-1.5">
+                          <span className="block text-[8px] tracking-widest">{field}</span>
+                          <input
+                            type="number"
+                            step={field === 'x' || field === 'y' ? CUSTOM_MAP_GRID : 4}
+                            min={field === 'w' || field === 'h' ? 12 : undefined}
+                            max={field === 'w' || field === 'h' ? 260 : undefined}
+                            value={selectedPlacement[field]}
+                            onChange={(event) => {
+                              const value = Number(event.target.value);
+                              if (Number.isFinite(value)) updatePlacement(selectedPlacement.id, { [field]: value });
+                            }}
+                            className="mt-1 w-full bg-transparent text-xs text-slate-200 outline-none"
+                            aria-label={`Placement ${field}`}
+                          />
+                        </label>
+                      ))}
                     </div>
                     <div className="mt-4 flex gap-2">
                       <button type="button" onClick={duplicatePlacement} data-testid="button-duplicate-placement" className="flex flex-1 items-center justify-center gap-2 border border-cyan-100/20 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-slate-300 transition hover:border-cyan-100/50 hover:text-cyan-100"><Copy className="h-3.5 w-3.5" /> Clone</button>

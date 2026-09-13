@@ -16,10 +16,7 @@ import {
 
 test('custom map catalog has an asset for every supported editor category', () => {
   for (const category of CUSTOM_MAP_ASSET_CATEGORIES) {
-    assert.ok(
-      CUSTOM_MAP_ASSETS.some((asset) => asset.category === category.id),
-      `missing ${category.id} asset`,
-    );
+    assert.ok(CUSTOM_MAP_ASSETS.some((asset) => asset.category === category.id), `missing ${category.id} asset`);
   }
   assert.ok(CUSTOM_MAP_ASSETS.some((asset) => asset.category === 'ground' && asset.areaId));
   assert.ok(CUSTOM_MAP_ASSETS.some((asset) => asset.category === 'enemy' && asset.enemyId));
@@ -41,10 +38,7 @@ test('normalization safely removes invalid and oversized placements', () => {
   const normalized = normalizeCustomMap({
     ...source,
     placements: [
-      ...Array.from({ length: MAX_CUSTOM_MAP_PLACEMENTS + 5 }, (_, index) => ({
-        ...validPlacement,
-        id: `enemy-${index}`,
-      })),
+      ...Array.from({ length: MAX_CUSTOM_MAP_PLACEMENTS + 5 }, (_, index) => ({ ...validPlacement, id: `enemy-${index}` })),
       { id: 'bad', assetId: 'not-real', category: 'enemy', x: 0, y: 0, w: 10, h: 10 },
     ],
   }, source.id)!;
@@ -88,4 +82,25 @@ test('launch validation rejects routes without threat assets and preserves norma
   assert.equal(normalizeCustomMaps([{ ...source, id: 'not-custom' }])[0]?.id, 'custom-import-1');
   assert.equal(normalizeCustomMaps([source, source]).length, 1);
   assert.equal(CUSTOM_MAP_GRID, 20);
+});
+
+test('the visual editor exposes every obstacle kind already used by an area', () => {
+  const representedKinds = new Set(
+    CUSTOM_MAP_ASSETS.filter((asset) => asset.category === 'structure').map((asset) => asset.id.replace('structure:', '')),
+  );
+  const usedKinds = new Set(AREAS.flatMap((area) => area.obstacles.map((obstacle) => obstacle.kind)));
+  usedKinds.delete('pothole');
+  assert.deepEqual([...representedKinds].sort(), [...usedKinds].sort());
+});
+
+test('painted ground tiles survive normalization and reach the real renderer area', () => {
+  const map = createCustomMap('custom-painted-ground');
+  const tile = CUSTOM_MAP_ASSETS.find((asset) => asset.category === 'tile');
+  assert.ok(tile?.groundStyle);
+  map.placements.push({ id: 'paint-1', assetId: tile.id, category: 'tile', x: 40, y: -20, w: 64, h: 64 });
+
+  const normalized = normalizeCustomMap(map, map.id);
+  assert.equal(normalized?.placements[0]?.category, 'tile');
+  const area = customMapToArea(normalized!);
+  assert.deepEqual(area.authoredGroundTiles?.[0], { x: 40, y: -20, w: 64, h: 64, ...tile.groundStyle });
 });
