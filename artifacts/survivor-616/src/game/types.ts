@@ -175,6 +175,25 @@ export interface SavedLokPet {
   stamina: number;
 }
 
+/**
+ * A collectible card imported from another G-Six game via the shared
+ * `lok.card-exchange` protocol (see src/lib/lokCardExchange.ts). This is a
+ * display-only Archive record, never a `SavedLokPet` -- it cannot be
+ * selected for a run and never grants combat stats, since nothing on the
+ * receiving side can trust another game's numbers for balance.
+ */
+export interface VisitingLokCard {
+  /** From the export's `owned.instanceId`; used to de-duplicate re-imports. */
+  instanceId: string;
+  assetId: string;
+  name: string;
+  description?: string;
+  rarity: string;
+  sourceGame: string;
+  tags: string[];
+  importedAt: number;
+}
+
 /** A run-independent record of a LokPet variant seen in any run. */
 export interface LokPetCatalogTrait {
   attackKind: LokPetAttackKind;
@@ -1638,6 +1657,8 @@ export interface MetaState {
   savedLokPets: SavedLokPet[];
   /** Up to three saved companions selected for the next run. */
   selectedLokPetIds: string[];
+  /** Cards imported from other G-Six games. Display-only; see VisitingLokCard. */
+  visitingLokCards: VisitingLokCard[];
   /** Recovery currency, regenerated in groups of three every twenty minutes. */
   petElixirs: number;
   petElixirUpdatedAt: number;

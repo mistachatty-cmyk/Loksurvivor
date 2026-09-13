@@ -21,8 +21,15 @@ import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
+import {
+  exportLokPetAsPortableCard,
+  importLokCardExport,
+  serializeLokCardExport,
+  VISITING_CARD_PALETTE,
+  VISITING_CARD_SILHOUETTE,
+} from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -38,10 +45,53 @@ const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }>
 };
 
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
-  const { meta, resetProgress, claimAchievement } = useMeta();
+  const { meta, resetProgress, claimAchievement, importVisitingLokCard } = useMeta();
   const isListView = meta.uiDensity === 'list';
   const [showHistory, setShowHistory] = useState(false);
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
+  const [exchangePetId, setExchangePetId] = useState('');
+  const [exchangeOutput, setExchangeOutput] = useState('');
+  const [importInput, setImportInput] = useState('');
+  const [exchangeMessage, setExchangeMessage] = useState('');
+
+  const generateCardExport = () => {
+    const pet = meta.savedLokPets.find((candidate) => candidate.id === exchangePetId);
+    if (!pet) {
+      setExchangeMessage('Pick a kennel companion to export first.');
+      return;
+    }
+    const payload = exportLokPetAsPortableCard({
+      id: pet.id,
+      name: pet.roll.name,
+      variantId: pet.roll.variantId,
+      family: pet.roll.family,
+      rarity: pet.roll.rarity,
+      description: pet.roll.description,
+    });
+    setExchangeOutput(serializeLokCardExport(payload));
+    setExchangeMessage(`${pet.roll.name} is ready to hand to another LOK game.`);
+  };
+
+  const copyCardExport = async () => {
+    if (!exchangeOutput) return;
+    try {
+      await navigator.clipboard.writeText(exchangeOutput);
+      setExchangeMessage('Copied -- paste it into the receiving game.');
+    } catch {
+      setExchangeMessage('Copy failed; select the text and copy it manually.');
+    }
+  };
+
+  const importCard = () => {
+    const result = importLokCardExport(importInput);
+    if (!result.success) {
+      setExchangeMessage(result.error);
+      return;
+    }
+    importVisitingLokCard(result.card);
+    setImportInput('');
+    setExchangeMessage(`${result.card.name} arrived from ${result.card.sourceGame}.`);
+  };
   const formatHistoryDate = (timestamp: number) => {
     if (!Number.isFinite(timestamp) || timestamp <= 0 || timestamp > 8640000000000000) return 'Earlier run';
     return new Date(timestamp).toLocaleDateString();
@@ -182,6 +232,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     { key: 'achievements', label: 'Achievements', icon: Trophy, count: completedAchievementCount, total: ACHIEVEMENTS.length },
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
+    { key: 'universe', label: 'Universe', icon: Globe, count: meta.visitingLokCards.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
   ];
 
@@ -506,6 +557,119 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               )}
             </div>
           )}
+        </motion.section>
+      )}
+
+      {activeChapter === 'universe' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-universe-exchange"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Globe className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">LOK Universe Exchange</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Cosmetic collection identity, shared with the rest of G-Six</p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">{meta.visitingLokCards.length} visiting</span>
+          </div>
+
+          <p className="mb-4 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            A kennel companion can leave this game as a portable <code className="text-white/80">lok.card-exchange</code> file
+            another G-Six game can read, and a card from another LOK game can arrive here the same way. Only flavor crosses
+            over -- name, family, and rarity label. An imported card never joins the kennel and never fights in a run.
+          </p>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="border border-border bg-card p-4">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Send a companion out</p>
+              {meta.savedLokPets.length === 0 ? (
+                <p className="text-xs italic text-muted-foreground/70">Capture a companion from a blue loot box first.</p>
+              ) : (
+                <>
+                  <select
+                    value={exchangePetId}
+                    onChange={(event) => { setExchangePetId(event.target.value); setExchangeOutput(''); }}
+                    className="w-full border border-border bg-black/30 px-2 py-2 text-xs text-white"
+                  >
+                    <option value="">Choose a kennel companion…</option>
+                    {meta.savedLokPets.map((pet) => (
+                      <option key={pet.id} value={pet.id}>{pet.roll.name} · {pet.roll.rarityLabel}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={generateCardExport}
+                    disabled={!exchangePetId}
+                    className="mt-3 border border-sky-300/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-200 hover:bg-sky-300/10 disabled:opacity-40"
+                  >
+                    Generate export
+                  </button>
+                  {exchangeOutput && (
+                    <>
+                      <textarea
+                        readOnly
+                        value={exchangeOutput}
+                        onFocus={(event) => event.currentTarget.select()}
+                        className="mt-3 h-32 w-full border border-border bg-black/40 p-2 font-mono text-[10px] text-white/80"
+                      />
+                      <button
+                        type="button"
+                        onClick={copyCardExport}
+                        className="mt-2 border border-border px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary/50"
+                      >
+                        Copy to clipboard
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="border border-border bg-card p-4">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Bring one in</p>
+              <textarea
+                value={importInput}
+                onChange={(event) => setImportInput(event.target.value)}
+                placeholder="Paste a LOK card export here…"
+                className="h-32 w-full border border-border bg-black/40 p-2 font-mono text-[10px] text-white/80"
+              />
+              <button
+                type="button"
+                onClick={importCard}
+                disabled={!importInput.trim()}
+                className="mt-3 border border-sky-300/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-200 hover:bg-sky-300/10 disabled:opacity-40"
+              >
+                Import card
+              </button>
+            </div>
+          </div>
+
+          {exchangeMessage && (
+            <p className="mt-4 border border-border bg-black/20 px-3 py-2 text-[10px] uppercase tracking-widest text-sky-200" aria-live="polite">
+              {exchangeMessage}
+            </p>
+          )}
+
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Visiting cards</p>
+            {meta.visitingLokCards.length === 0 ? (
+              <p className="text-xs italic text-muted-foreground/70">No visiting cards yet. Import one from another LOK game above.</p>
+            ) : (
+              <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-3'}`}>
+                {meta.visitingLokCards.map((card) => (
+                  <article key={card.instanceId} className="flex items-center gap-3 border border-l-4 border-border border-l-sky-300 bg-card p-3" data-testid={`card-visiting-${card.instanceId}`}>
+                    <LokPetIcon silhouette={VISITING_CARD_SILHOUETTE} palette={VISITING_CARD_PALETTE} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-black uppercase tracking-wide text-white">{card.name}</p>
+                      <p className="truncate text-[9px] font-bold uppercase tracking-widest text-sky-300">from {card.sourceGame} · {card.rarity}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </motion.section>
       )}
 
