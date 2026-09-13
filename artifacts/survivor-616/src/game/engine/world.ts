@@ -24,6 +24,8 @@ import { SECTOR_STRUCTURES_BY_ID } from '@/game/data/sectorStructures';
 import { SECTOR_UNITS_BY_ENEMY_ID } from '@/game/data/sectorUnits';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
+import { DIRECTORS } from '@/game/data/directors';
+import { getFaction } from '@/game/data/factions';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
 import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
@@ -48,6 +50,7 @@ import type {
   CompletedObjective,
   DashSkillDef,
   DistrictIncursionState,
+  DirectorRunState,
   EnemyDef,
   EndlessState,
   EvolutionBehavior,
@@ -974,6 +977,8 @@ export interface World {
   graphicsQuality: 'high' | 'balanced' | 'performance';
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
   wheelSpin: WheelSpinState | null;
+  /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
+  director: DirectorRunState;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -1377,6 +1382,13 @@ export function createWorld(
           colorFluctuation: false,
         }
       : null,
+    director: {
+      phase: 'pending',
+      nextRollAt: 0,
+      activeDirectorId: null,
+      bossUid: null,
+      victorious: false,
+    },
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     claimedLootPrizes: new WeakSet(),
@@ -2793,6 +2805,16 @@ function killEnemy(w: World, enemy: EnemyActor) {
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
   spawnParticles(w, enemy.x, enemy.y + enemy.radius, enemy.def.palette.accent, 8, 110);
+
+  if (w.director.phase === 'active' && enemy.uid === w.director.bossUid) {
+    w.director.phase = 'resolved';
+    w.director.victorious = true;
+    const director = DIRECTORS.find((d) => d.id === w.director.activeDirectorId);
+    if (director) {
+      pushAlert(w, director.victoryText);
+      w.shake = Math.max(w.shake, 14);
+    }
+  }
 
   // Loot.
   w.pickups.push({
@@ -6506,6 +6528,66 @@ function updateWheelSpin(w: World) {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Director events                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Spawns a Director's whole faction roster together in one formation, the
+ * same way `spawnHordeSpinBurst` above spawns a wave burst -- generic engine
+ * plumbing, the actual cast lives in `data/enemies.ts`/`data/factions.ts`.
+ * Returns the uid of the spawned boss enemy so the encounter can be tracked
+ * to completion in `killEnemy`.
+ */
+function spawnDirectorSquad(w: World, def: (typeof DIRECTORS)[number]): number | null {
+  const faction = getFaction(def.factionId);
+  const positions = formationPositions(w, def.formation ?? 'ring', faction.roster.length);
+  let bossUid: number | null = null;
+  faction.roster.forEach((enemyId, i) => {
+    spawnEnemy(w, getEnemy(enemyId), def.hpMult, positions[i]);
+    if (enemyId === def.bossEnemyId) {
+      bossUid = w.enemies[w.enemies.length - 1]!.uid;
+    }
+  });
+  return bossUid;
+}
+
+/**
+ * State machine for the (at most one, currently) Director escalation:
+ * pending -> active (once triggered, tracked until its boss dies) ->
+ * resolved. Follows the same `w.now`-driven re-roll shape as
+ * `updateWheelSpin` above. Runs unconditionally -- unlike HordeSpin this is
+ * base content, not opt-in -- but `modifiers.directorModeEnabled` (only
+ * offered once a Director has been defeated at least once, see
+ * `MetaState.directorModeUnlocked`) raises the odds of a hit.
+ */
+function updateDirector(w: World) {
+  const state = w.director;
+  if (state.phase !== 'pending') return;
+  if (w.now < state.nextRollAt) return;
+
+  const director = DIRECTORS[0];
+  if (!director) return;
+
+  if (w.time < director.triggerAfterSec) {
+    state.nextRollAt = w.now + director.rerollIntervalSec * 1000;
+    return;
+  }
+
+  state.nextRollAt = w.now + director.rerollIntervalSec * 1000;
+  const chance = director.chance * (w.modifiers.directorModeEnabled ? director.directorModeChanceMult : 1);
+  if (w.rng() >= chance) return;
+
+  state.phase = 'active';
+  state.activeDirectorId = director.id;
+  pushAlert(w, director.warningText);
+  w.shake = Math.max(w.shake, 10);
+  state.bossUid = spawnDirectorSquad(w, director);
+  // No boss in the roster (a data mistake) would otherwise strand the
+  // encounter in 'active' forever with nothing left to clear it.
+  if (state.bossUid === null) state.phase = 'resolved';
+}
+
 /** Resolves 'meteor' weapon strikes once their telegraph window elapses. See run-presentation.md. */
 function updateMeteors(w: World) {
   for (let i = w.pendingMeteors.length - 1; i >= 0; i -= 1) {
@@ -7654,6 +7736,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateFollowers(w, dt);
   updateStormCloud(w, dt);
   updateWheelSpin(w);
+  updateDirector(w);
   updateEnemies(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
@@ -7955,6 +8038,8 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),
     },
+    directorEncounterId: w.director.activeDirectorId ?? undefined,
+    directorDefeated: w.director.victorious,
     lootBoxesOpened: w.lootBoxesOpened,
     openedPrizes: [...w.openedPrizes],
     lokPets: w.lokPetHistory.map((pet) => ({

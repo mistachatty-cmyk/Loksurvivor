@@ -1087,6 +1087,72 @@ export interface RunModifiers {
   infiniteMode?: boolean;
   /** Enables the periodic HordeSpin wheel event. */
   hordeSpinEnabled?: boolean;
+  /**
+   * Raises the odds the Director (see `data/directors.ts`) crashes the run
+   * with an unscripted squad once eligible. Unlocked permanently in
+   * `MetaState.directorModeUnlocked` after the player first defeats the
+   * Director's boss; the Director can still trigger at its base chance
+   * before that unlock, since the toggle only exists once there's an
+   * encounter on record to want more of.
+   */
+  directorModeEnabled?: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* Director events                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A scripted, low-probability mid-run escalation: a named "Director" cuts
+ * in with its own unique squad (see `data/factions.ts`), built from the
+ * existing `WaveDef`/`squadWave` machinery rather than bespoke sim code.
+ * Content lives in `data/directors.ts`; the engine only re-rolls the timer
+ * and spawns the roster -- see `updateDirector` in `engine/world.ts`.
+ */
+export interface DirectorDef {
+  id: string;
+  name: string;
+  /** Seconds into the run before the Director may trigger at all. */
+  triggerAfterSec: number;
+  /** Seconds between eligibility re-rolls once past `triggerAfterSec`. */
+  rerollIntervalSec: number;
+  /** Chance (0..1) the Director fires on each re-roll. */
+  chance: number;
+  /** Multiplier applied to `chance` when `RunModifiers.directorModeEnabled` is on. */
+  directorModeChanceMult: number;
+  /** Faction registered in `data/factions.ts` whose whole roster arrives together. */
+  factionId: string;
+  /** Enemy id (must be in the faction roster) whose defeat clears the encounter. */
+  bossEnemyId: string;
+  hpMult: number;
+  formation?: WaveDef['formation'];
+  warningText: string;
+  victoryText: string;
+  /** Meta unlock id recorded permanently once this Director's boss is defeated. */
+  unlockId: string;
+  /** Label shown on the Roster screen's Director Mode toggle once unlocked. */
+  toggleLabel: string;
+  toggleDescription: string;
+}
+
+/** Live per-run state for the (at most one, currently) active Director encounter. */
+export interface DirectorRunState {
+  phase: 'pending' | 'active' | 'resolved';
+  /** w.now the next eligibility roll happens. */
+  nextRollAt: number;
+  activeDirectorId: string | null;
+  /** uid of the spawned boss enemy for the active encounter, if any. */
+  bossUid: number | null;
+  /** True once the active/most recent encounter's boss was defeated. */
+  victorious: boolean;
+}
+
+/** A one-shot meta-progression announcement, drained and shown by the hub on return. See `MetaState.pendingNotifications`. */
+export interface PendingNotification {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: number;
 }
 
 export type HordeSpinTierId = '1x' | '2x' | '3x' | '4x' | '5x5' | '666';
@@ -1843,6 +1909,12 @@ export interface MetaState {
   completedDailyContractIds: string[];
   /** Achievement ids whose one-time currency reward has already been paid out. See `data/achievements.ts`. */
   claimedAchievementIds: string[];
+  /** Director ids whose boss has been permanently defeated at least once. See `data/directors.ts`. */
+  defeatedDirectorIds: string[];
+  /** True once any Director has been defeated, unlocking the Director Mode run toggle. */
+  directorModeUnlocked: boolean;
+  /** Generic queue of unlock/achievement announcements, drained by the hub screen on return. */
+  pendingNotifications: PendingNotification[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -1910,6 +1982,10 @@ export interface RunResult {
   fatigueAddedPct?: number;
   /** Operative's fatigue after this run, before recovery begins. */
   fatigueAfterPct?: number;
+  /** Director id that triggered during this run, if any. See `data/directors.ts`. */
+  directorEncounterId?: string;
+  /** True if this run's Director boss was defeated. */
+  directorDefeated?: boolean;
   /** Objectives completed this run. */
   completedObjectives: CompletedObjective[];
   /** Broadcast contracts completed by this run. */
