@@ -4,6 +4,7 @@
  */
 import { ACHIEVEMENTS } from '@/game/data/achievements';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
+import type { LokAssetManifest } from '@/game/lok/types';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { CHARACTER_EPISODES } from '@/game/data/episodes';
@@ -44,6 +45,26 @@ const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }>
   gold: { border: 'border-l-yellow-400', label: 'text-yellow-300' },
   legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
 };
+
+/**
+ * The Card Binder had no imagery at all -- every entry was rarity-colored
+ * text. Reuse whatever portrait renderer this same file already wires up
+ * for a card's underlying record (LokPet variant, rescued ally) instead of
+ * building a new one; a card kind with no existing renderer here (roster
+ * operatives, bestiary, endless milestones) falls back to the tab's own
+ * icon rather than left blank.
+ */
+function cardBinderVisual(card: LokAssetManifest) {
+  if (card.slug.startsWith('pet-')) {
+    const variant = LOKPET_VARIANTS_BY_ID[card.slug.slice('pet-'.length)];
+    if (variant) return <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} size={40} />;
+  }
+  if (card.slug.startsWith('ally-')) {
+    const ally = ALLIES.find((entry) => entry.id === card.slug.slice('ally-'.length));
+    if (ally) return <RigPortrait rig={allyRig(ally)} palette={ally.palette} anim="idle" size={40} />;
+  }
+  return <div className="grid h-10 w-10 place-items-center border border-white/10 bg-black/20"><CreditCard className="h-4 w-4 text-sky-300" /></div>;
+}
 
 const CARD_RARITY_STYLES: Record<string, { border: string; label: string }> = {
   common: { border: 'border-l-slate-400', label: 'text-slate-300' },
@@ -404,15 +425,22 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                   }`}
                   data-testid={`card-lok-${card.slug}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold uppercase tracking-wide text-sm">{owned ? card.name : 'Uncatalogued'}</p>
-                    <span className={`shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest ${rarityStyle.label}`}>
-                      {card.rarity}
-                    </span>
+                  <div className="flex items-start gap-3">
+                    <div className={`shrink-0 ${owned ? '' : 'opacity-25 grayscale'}`}>
+                      {cardBinderVisual(card)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-bold uppercase tracking-wide text-sm">{owned ? card.name : 'Uncatalogued'}</p>
+                        <span className={`shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest ${rarityStyle.label}`}>
+                          {card.rarity}
+                        </span>
+                      </div>
+                      <p className={`mt-1 text-xs ${owned ? 'text-muted-foreground' : 'opacity-70'}`}>
+                        {owned ? card.description : 'Earn this in a run to add it to the binder.'}
+                      </p>
+                    </div>
                   </div>
-                  <p className={`text-xs ${owned ? 'text-muted-foreground' : 'opacity-70'}`}>
-                    {owned ? card.description : 'Earn this in a run to add it to the binder.'}
-                  </p>
                   <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">
                     {card.id}
                   </span>
