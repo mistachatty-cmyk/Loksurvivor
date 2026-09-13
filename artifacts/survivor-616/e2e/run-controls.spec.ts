@@ -37,6 +37,7 @@ test.describe('interactive run controls', () => {
 
   test('shows and persists the hideout palette selection', async ({ page }) => {
     await page.goto('/?screen=settings');
+    await page.getByTestId('button-settings-tab-display').click();
 
     await expect(page.getByTestId('card-ui-theme-house')).toBeVisible();
     await expect(page.getByTestId('card-ui-theme-night-drive')).toBeVisible();

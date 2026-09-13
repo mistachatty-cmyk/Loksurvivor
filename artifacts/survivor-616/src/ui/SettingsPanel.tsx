@@ -1,19 +1,23 @@
 import { useCallback, useState, type ChangeEvent } from 'react';
+import { motion } from 'framer-motion';
 import {
   Activity,
   AlertTriangle,
   Bird,
   Check,
+  CloudSun,
   Compass,
   Dices,
   Download,
   FlaskConical,
   FlipVertical2,
+  Gamepad2,
   LayoutDashboard,
   LayoutList,
   Lock,
   Map,
   Maximize2,
+  Monitor,
   MousePointer2,
   Palette,
   PanelRight,
@@ -23,6 +27,8 @@ import {
   Settings2,
   Smartphone,
   Upload,
+  Volume2,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { toast } from '@/hooks/use-toast';
@@ -43,6 +49,17 @@ import { ScreenLayout } from './ScreenLayout';
 export interface SettingsPanelProps {
   onBack: () => void;
 }
+
+const SETTINGS_CATEGORIES: { key: string; label: string; icon: LucideIcon }[] = [
+  { key: 'gameplay', label: 'Gameplay', icon: Gamepad2 },
+  { key: 'audio', label: 'Audio', icon: Volume2 },
+  { key: 'display', label: 'Display', icon: Palette },
+  { key: 'mobile', label: 'Mobile controls', icon: Smartphone },
+  { key: 'pc', label: 'PC & Browser', icon: Monitor },
+  { key: 'data', label: 'Data & Account', icon: Save },
+  { key: 'developer', label: 'Developer', icon: FlaskConical },
+];
+
 export function SettingsPanel({ onBack }: SettingsPanelProps) {
   const {
     meta,
@@ -80,6 +97,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
   const effectiveUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
   const ownedLookCount = uiLooksForOwnedThemeIds(effectiveUiThemeIds).length;
 
+  const [activeCategory, setActiveCategory] = useState<string>('gameplay');
   const [gyroDenied, setGyroDenied] = useState(false);
   const [devTapCount, setDevTapCount] = useState(0);
   const tiltAvailable = gyroSupported();
@@ -146,834 +164,929 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
 
   return (
     <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
-      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <PauseCircle className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run presentation</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Live Mode</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Keep combat live while reward choices and chest reveals stay in the screen edges. Tactics stays live; opening the full Settings screen pauses safely.
-                  </p>
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-8 flex flex-wrap gap-2 border-b border-border pb-4" data-testid="settings-category-tabs">
+          {SETTINGS_CATEGORIES.map((category) => {
+            const Icon = category.icon;
+            const active = category.key === activeCategory;
+            return (
+              <button
+                key={category.key}
+                type="button"
+                onClick={() => setActiveCategory(category.key)}
+                className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+                  active
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+                }`}
+                data-testid={`button-settings-tab-${category.key}`}
+              >
+                <Icon className="h-4 w-4" />
+                {category.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeCategory === 'gameplay' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-6 lg:grid-cols-2"
+            data-testid="section-settings-gameplay"
+          >
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                  <PauseCircle className="h-5 w-5" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setLiveMode(!meta.liveModeEnabled)}
-                  aria-pressed={meta.liveModeEnabled}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.liveModeEnabled ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                  }`}
-                  data-testid="button-toggle-live-mode"
-                >
-                  {meta.liveModeEnabled ? 'Live on' : 'Live off'}
-                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run presentation</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Live Mode</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        Keep combat live while reward choices and chest reveals stay in the screen edges. Tactics stays live; opening the full Settings screen pauses safely.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLiveMode(!meta.liveModeEnabled)}
+                      aria-pressed={meta.liveModeEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.liveModeEnabled ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                      }`}
+                      data-testid="button-toggle-live-mode"
+                    >
+                      {meta.liveModeEnabled ? 'Live on' : 'Live off'}
+                    </button>
+                  </div>
+                  <div className="mt-5 space-y-3 text-xs text-muted-foreground">
+                    <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
+                    <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
+                    <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                    <div>
+                      <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['high', 'balanced', 'performance'] as const).map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setGraphicsQuality(value)}
+                            aria-pressed={meta.graphicsQuality === value}
+                            className={`border p-2 uppercase ${meta.graphicsQuality === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                            data-testid={`button-graphics-quality-${value}`}
+                          >
+                            {value === 'high' ? 'High' : value === 'balanced' ? 'Balanced' : 'Performance'}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                        High matches how the game has always looked. Balanced and Performance
+                        trim decorative density (particles, damage numbers, enemy outlines/
+                        shadows) starting at a lower enemy count -- useful on a slower device
+                        or a very dense swarm run. Never affects difficulty or rewards.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="mt-5 space-y-3 text-xs text-muted-foreground">
-                <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
-                <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
-                <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
-                <div>
-                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
-                  <div className="grid grid-cols-3 gap-1">
-                    {(['high', 'balanced', 'performance'] as const).map((value) => (
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-cyan-200/40 bg-cyan-300/10 text-cyan-200">
+                  <Map className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-200">Navigation display</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Endless minimap</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        Show or hide the map, and choose a compact view or the expanded city detail view. You can drag it
+                        anywhere during a run.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMinimapVisible(!meta.minimapVisible)}
+                      aria-pressed={meta.minimapVisible}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.minimapVisible
+                          ? 'border-cyan-200/60 bg-cyan-300/15 text-cyan-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-cyan-200/60 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-minimap"
+                    >
+                      {meta.minimapVisible ? 'Visible' : 'Hidden'}
+                    </button>
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMinimapExpanded(false)}
+                      aria-pressed={!meta.minimapExpanded}
+                      className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        !meta.minimapExpanded
+                          ? 'border-cyan-200/60 bg-cyan-300/15 text-cyan-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-cyan-200/60 hover:text-white'
+                      }`}
+                      data-testid="button-minimap-compact"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      Compact
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMinimapExpanded(true)}
+                      aria-pressed={meta.minimapExpanded}
+                      className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.minimapExpanded
+                          ? 'border-cyan-200/60 bg-cyan-300/15 text-cyan-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-cyan-200/60 hover:text-white'
+                      }`}
+                      data-testid="button-minimap-expanded"
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                      Expanded
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                  <MousePointer2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Physics interaction</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Clickable prop launches</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        Tap or click a movable object to prime it. Your next hit launches it at 4× its normal impact velocity,
+                        in the opposite direction from its last hit, and lets it plow through enemies.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPhysicsObjectClicks(!meta.physicsObjectClicksEnabled)}
+                      aria-pressed={meta.physicsObjectClicksEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.physicsObjectClicksEnabled
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                      }`}
+                      data-testid="button-toggle-physics-object-clicks"
+                    >
+                      {meta.physicsObjectClicksEnabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+                  <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                      <Settings2 className="h-4 w-4 text-primary" />
+                      <span>Click once, then hit the object to arm the launch.</span>
+                    </div>
+                    <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                      <Smartphone className="h-4 w-4 text-primary" />
+                      <span>Tap targets on mobile; drag elsewhere to steer.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
+              <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
+                <div className="flex items-start gap-4">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
+                    <FlipVertical2 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-300">Quartermaster cheats</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Chaos toggles</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        Unlocked in the Field ops shop. Purely cosmetic, purely for chaos — flip either back off any time.
+                      </p>
+                    </div>
+                    {vendorPurchaseCount(meta, 'invert-world') > 0 ? (
+                      <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold uppercase tracking-wide text-white">Flip the Script</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Rotate the whole run 180°.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setWorldInvertEnabled(!meta.worldInvertEnabled)}
+                          aria-pressed={meta.worldInvertEnabled}
+                          className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                            meta.worldInvertEnabled
+                              ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
+                              : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
+                          }`}
+                          data-testid="button-toggle-world-invert"
+                        >
+                          {meta.worldInvertEnabled ? 'Flipped' : 'Off'}
+                        </button>
+                      </div>
+                    ) : null}
+                    {vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
+                      <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold uppercase tracking-wide text-white">Negative Exposure</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Invert every color on screen.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPaletteInvertEnabled(!meta.paletteInvertEnabled)}
+                          aria-pressed={meta.paletteInvertEnabled}
+                          className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                            meta.paletteInvertEnabled
+                              ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
+                              : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
+                          }`}
+                          data-testid="button-toggle-palette-invert"
+                        >
+                          {meta.paletteInvertEnabled ? 'Inverted' : 'Off'}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            ) : null}
+          </motion.div>
+        )}
+
+        {activeCategory === 'audio' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-6 lg:grid-cols-2"
+            data-testid="section-settings-audio"
+          >
+            {/* Studio plugins -- off unless deliberately enabled, because this is
+                the one feature that runs code from off the device. */}
+            <section className="border border-border bg-card/60 p-6">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-400/10 text-amber-200">
+                  <Plug className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-200">Studio</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Third-party plugins</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        Lets the studio load Web Audio Modules -- the browser's answer to VST effects -- from an
+                        address you provide. Leave this off unless you want it.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStudioPlugins(!meta.studioPluginsEnabled)}
+                      aria-pressed={meta.studioPluginsEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.studioPluginsEnabled
+                          ? 'border-amber-300/60 bg-amber-400/15 text-amber-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-studio-plugins"
+                    >
+                      {meta.studioPluginsEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                  <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div className="flex items-center gap-2 border border-amber-300/30 bg-amber-400/5 p-3">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
+                      <span>
+                        A plugin runs code fetched from its address. Nothing else in 616 leaves your device.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                      <Settings2 className="h-4 w-4 text-amber-200" />
+                      <span>Nothing is bundled and no plugin loads until you paste one in.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-music-reactive-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-400/10 text-fuchsia-200">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-200">Soundtrack</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">React to the music</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        The game listens to whatever track is playing and locks onto its tempo. Enemies move on the beat,
+                        the streetlight pool breathes with the low end, and hits landed on the beat do extra damage.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMusicReactive(!meta.musicReactiveEnabled)}
+                      aria-pressed={meta.musicReactiveEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.musicReactiveEnabled
+                          ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-music-reactive"
+                    >
+                      {meta.musicReactiveEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                  <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                      <Activity className="h-4 w-4 text-fuchsia-200" />
+                      <span>Tempo is detected in your browser -- your audio files never leave the device.</span>
+                    </div>
+                    <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
+                      <Settings2 className="h-4 w-4 text-fuchsia-200" />
+                      <span>Turn this off and the run plays exactly as it does in silence.</span>
+                    </div>
+                  </div>
+                  <div className="mt-5 border border-border/70 bg-background/50 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout ambience</h3>
+                        <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                          Optional room sound in the hideout, synthesized in your browser -- rain on the awning upstairs,
+                          river fog on the perch, and the cellar's pipe hum and slow drips. It sits well under whatever
+                          you have playing, and stops when you leave the tab.
+                        </p>
+                      </div>
                       <button
-                        key={value}
                         type="button"
-                        onClick={() => setGraphicsQuality(value)}
-                        aria-pressed={meta.graphicsQuality === value}
-                        className={`border p-2 uppercase ${meta.graphicsQuality === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
-                        data-testid={`button-graphics-quality-${value}`}
+                        onClick={() => setHideoutAmbience(!meta.hideoutAmbienceEnabled)}
+                        aria-pressed={meta.hideoutAmbienceEnabled}
+                        className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                          meta.hideoutAmbienceEnabled
+                            ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                            : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                        }`}
+                        data-testid="button-toggle-hideout-ambience"
                       >
-                        {value === 'high' ? 'High' : value === 'balanced' ? 'Balanced' : 'Performance'}
+                        {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </motion.div>
+        )}
+
+        {activeCategory === 'display' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-6 lg:grid-cols-2"
+            data-testid="section-settings-display"
+          >
+            <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-ui-theme-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                  <Palette className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Hideout customization</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Theme &amp; palette</h2>
+                  <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                      Set the hideout&rsquo;s mood without changing the action. Themes change the menu chrome; palettes
+                      change its signal color and are remembered independently for every theme.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={cycleUiLook}
+                      disabled={ownedLookCount <= 1}
+                      className="flex shrink-0 items-center justify-center gap-2 border border-primary px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground"
+                      data-testid="button-cycle-ui-look"
+                    >
+                      <Dices className="h-4 w-4" />
+                      Roll the look
+                    </button>
+                  </div>
+                  <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                    Theme combinations: {ownedLookCount} owned
+                  </p>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2" data-testid="character-palette-behavior-settings">
+                    <button
+                      type="button"
+                      onClick={() => setWorldPaletteBlend(!meta.worldPaletteBlendEnabled)}
+                      aria-pressed={meta.worldPaletteBlendEnabled}
+                      className={`border px-3 py-3 text-left transition-colors ${meta.worldPaletteBlendEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
+                    >
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">World + personal skin</span>
+                      <span className="mt-1 block text-xs">{meta.worldPaletteBlendEnabled ? 'Blended together' : 'Personal skin only'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaletteAnimations(!meta.paletteAnimationsEnabled)}
+                      aria-pressed={meta.paletteAnimationsEnabled}
+                      className={`border px-3 py-3 text-left transition-colors ${meta.paletteAnimationsEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
+                    >
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">Animated palette motion</span>
+                      <span className="mt-1 block text-xs">{meta.paletteAnimationsEnabled ? 'Effects moving' : 'Colors remain, motion off'}</span>
+                    </button>
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {UI_THEMES.map((theme) => {
+                      const owned = hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds);
+                      const equipped = meta.uiTheme === theme.id;
+                      const affordable = meta.cred >= theme.cost;
+                      return (
+                        <div key={theme.id} className={`border p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`} data-testid={`card-ui-theme-${theme.id}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-sm font-black uppercase tracking-wide text-white">{theme.name}</h3>
+                            {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{theme.description}</p>
+                          {theme.swatches ? (
+                            <div
+                              className="mt-3 flex h-2 overflow-hidden border border-border/70"
+                              aria-label={`${theme.name} palette preview`}
+                            >
+                              {theme.swatches.map((swatch) => (
+                                <span
+                                  key={swatch.id}
+                                  className="min-w-0 flex-1"
+                                  style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {owned ? (
+                            <button
+                              type="button"
+                              onClick={() => equipUiTheme(theme.id)}
+                              disabled={equipped}
+                              className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                                equipped
+                                  ? 'cursor-default border-primary/40 text-primary/70'
+                                  : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
+                              }`}
+                              data-testid={`button-equip-ui-theme-${theme.id}`}
+                            >
+                              {equipped ? 'Equipped' : 'Equip'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => buyUiTheme(theme.id)}
+                              disabled={!affordable}
+                              className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                                affordable
+                                  ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
+                                  : 'cursor-not-allowed border-border text-muted-foreground/50'
+                              }`}
+                              data-testid={`button-buy-ui-theme-${theme.id}`}
+                            >
+                              {!affordable ? <Lock className="h-3 w-3" /> : null}
+                              {affordable ? `Buy for ${theme.cost} cred` : `Need ${theme.cost} cred`}
+                            </button>
+                          )}
+
+                          {owned && equipped && theme.swatches ? (
+                            <div className="mt-3 border-t border-border pt-3">
+                              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                Active palette
+                              </p>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {theme.swatches.map((swatch) => (
+                                <button
+                                  key={swatch.id}
+                                  type="button"
+                                  onClick={() => selectUiThemeSwatch(theme.id, swatch.id)}
+                                  aria-pressed={activeSwatchId === swatch.id}
+                                  aria-label={`Use ${swatch.name} palette`}
+                                  title={swatch.name}
+                                  className={`flex items-center gap-2 border px-2 py-2 text-left transition-colors ${
+                                    activeSwatchId === swatch.id
+                                      ? 'border-white bg-white/10 text-white'
+                                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                                  }`}
+                                  data-testid={`button-ui-theme-swatch-${theme.id}-${swatch.id}`}
+                                >
+                                  <span
+                                    className="h-4 w-4 shrink-0 border border-white/30"
+                                    style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
+                                  />
+                                  <span className="truncate font-mono text-[10px] font-bold uppercase tracking-wider">
+                                    {swatch.name}
+                                  </span>
+                                  {activeSwatchId === swatch.id ? <Check className="ml-auto h-3 w-3 shrink-0" /> : null}
+                                </button>
+                              ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-300/10 text-emerald-200">
+                  <LayoutDashboard className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Hub panel layout</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Card grid or legacy list</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        The Relic Workshop, Archive, and Bestiary show multi-column card grids by default so you can see
+                        most of what's there without scrolling. Switch back to the original single-column list any time.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUiDensity('grid')}
+                      aria-pressed={meta.uiDensity === 'grid'}
+                      className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.uiDensity === 'grid'
+                          ? 'border-emerald-300/60 bg-emerald-300/15 text-emerald-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                      }`}
+                      data-testid="button-ui-density-grid"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      Card grid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUiDensity('list')}
+                      aria-pressed={meta.uiDensity === 'list'}
+                      className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.uiDensity === 'list'
+                          ? 'border-emerald-300/60 bg-emerald-300/15 text-emerald-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                      }`}
+                      data-testid="button-ui-density-list"
+                    >
+                      <LayoutList className="h-4 w-4" />
+                      Legacy list
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                  <PanelRight className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Quartermaster & Roster</p>
+                    <h2 className="mt-1 text-xl font-black uppercase text-white">Detail panel layout</h2>
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Choose whether the buy/stats panel sits in a fixed rail beside the grid, or slides open under
+                      whichever item or character you select.
+                    </p>
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUiPanelLayout('rail')}
+                      aria-pressed={meta.uiPanelLayout === 'rail'}
+                      className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.uiPanelLayout === 'rail'
+                          ? 'border-primary bg-primary/15 text-primary'
+                          : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                      }`}
+                      data-testid="button-panel-layout-rail"
+                    >
+                      <PanelRight className="h-4 w-4" />
+                      Side rail
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUiPanelLayout('slideout')}
+                      aria-pressed={meta.uiPanelLayout === 'slideout'}
+                      className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.uiPanelLayout === 'slideout'
+                          ? 'border-primary bg-primary/15 text-primary'
+                          : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
+                      }`}
+                      data-testid="button-panel-layout-slideout"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      Slide-out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-hideout-weather-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-sky-300/40 bg-sky-400/10 text-sky-200">
+                  <CloudSun className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-sky-200">Hideout backdrop</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Hideout weather</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        Drifting clouds, room-specific weather (rain, fog, heat haze, embers), and the small
+                        birds/drones/motes over each room's backdrop. Purely visual, silent CSS decoration --
+                        turn it off for a calmer or faster hideout screen.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setHideoutWeather(!meta.hideoutWeatherEnabled)}
+                      aria-pressed={meta.hideoutWeatherEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.hideoutWeatherEnabled
+                          ? 'border-sky-300/60 bg-sky-400/15 text-sky-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-sky-300/60 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-hideout-weather"
+                    >
+                      {meta.hideoutWeatherEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
+                  <Bird className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-200">Street ambiance</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Birds &amp; fireflies in bad weather</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        By default, birds and the road fireflies duck out of sight during rain and fog. Turn this off to
+                        keep them visible through any weather.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWildlifeSheltersInRain(!meta.wildlifeSheltersInRain)}
+                      aria-pressed={meta.wildlifeSheltersInRain}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.wildlifeSheltersInRain
+                          ? 'border-amber-300/60 bg-amber-300/15 text-amber-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-wildlife-shelters"
+                    >
+                      {meta.wildlifeSheltersInRain ? 'Shelters in rain' : 'Stays visible'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </motion.div>
+        )}
+
+        {activeCategory === 'mobile' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-6 lg:grid-cols-2"
+            data-testid="section-settings-mobile"
+          >
+            <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-gyro-settings">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
+                  <Compass className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Motion controls</p>
+                      <h2 className="mt-1 text-xl font-black uppercase text-white">Steer by tilt</h2>
+                      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                        {tiltAvailable
+                          ? 'Tilt your device to move. The on-screen stick still overrides tilt whenever you touch it, so you can take back manual control at any time.'
+                          : 'This device does not report orientation, so tilt steering is unavailable here. Try it on a phone or tablet.'}
+                      </p>
+                      {gyroDenied ? (
+                        <p className="mt-2 text-sm text-amber-300" data-testid="text-gyro-denied">
+                          Motion access was declined. Allow it in your browser settings, then try again.
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void toggleGyro()}
+                      disabled={!tiltAvailable}
+                      aria-pressed={meta.gyroEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                        meta.gyroEnabled
+                          ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-gyro"
+                    >
+                      {meta.gyroEnabled ? 'On' : 'Off'}
+                    </button>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Sensitivity
+                    </span>
+                    {([['Gentle', 0.7], ['Normal', 1], ['Twitchy', 1.5]] as const).map(([label, value]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setGyroSensitivity(value)}
+                        disabled={!meta.gyroEnabled}
+                        aria-pressed={meta.gyroSensitivity === value}
+                        className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                          meta.gyroSensitivity === value
+                            ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
+                            : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
+                        }`}
+                        data-testid={`button-gyro-sensitivity-${label.toLowerCase()}`}
+                      >
+                        {label}
                       </button>
                     ))}
-                  </div>
-                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-                    High matches how the game has always looked. Balanced and Performance
-                    trim decorative density (particles, damage numbers, enemy outlines/
-                    shadows) starting at a lower enemy count -- useful on a slower device
-                    or a very dense swarm run. Never affects difficulty or rewards.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Studio plugins -- off unless deliberately enabled, because this is
-            the one feature that runs code from off the device. */}
-        <section className="border border-border bg-card/60 p-6">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-400/10 text-amber-200">
-              <Plug className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-200">Studio</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Third-party plugins</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Lets the studio load Web Audio Modules -- the browser's answer to VST effects -- from an
-                    address you provide. Leave this off unless you want it.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStudioPlugins(!meta.studioPluginsEnabled)}
-                  aria-pressed={meta.studioPluginsEnabled}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.studioPluginsEnabled
-                      ? 'border-amber-300/60 bg-amber-400/15 text-amber-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'
-                  }`}
-                  data-testid="button-toggle-studio-plugins"
-                >
-                  {meta.studioPluginsEnabled ? 'On' : 'Off'}
-                </button>
-              </div>
-              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div className="flex items-center gap-2 border border-amber-300/30 bg-amber-400/5 p-3">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-200" />
-                  <span>
-                    A plugin runs code fetched from its address. Nothing else in 616 leaves your device.
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <Settings2 className="h-4 w-4 text-amber-200" />
-                  <span>Nothing is bundled and no plugin loads until you paste one in.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-music-reactive-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-400/10 text-fuchsia-200">
-              <Activity className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-200">Soundtrack</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">React to the music</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    The game listens to whatever track is playing and locks onto its tempo. Enemies move on the beat,
-                    the streetlight pool breathes with the low end, and hits landed on the beat do extra damage.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMusicReactive(!meta.musicReactiveEnabled)}
-                  aria-pressed={meta.musicReactiveEnabled}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.musicReactiveEnabled
-                      ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
-                  }`}
-                  data-testid="button-toggle-music-reactive"
-                >
-                  {meta.musicReactiveEnabled ? 'On' : 'Off'}
-                </button>
-              </div>
-              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <Activity className="h-4 w-4 text-fuchsia-200" />
-                  <span>Tempo is detected in your browser -- your audio files never leave the device.</span>
-                </div>
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <Settings2 className="h-4 w-4 text-fuchsia-200" />
-                  <span>Turn this off and the run plays exactly as it does in silence.</span>
-                </div>
-              </div>
-              <div className="mt-5 border border-border/70 bg-background/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout ambience</h3>
-                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Optional room sound in the hideout, synthesized in your browser -- rain on the awning upstairs,
-                      river fog on the perch, and the cellar's pipe hum and slow drips. It sits well under whatever
-                      you have playing, and stops when you leave the tab.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setHideoutAmbience(!meta.hideoutAmbienceEnabled)}
-                    aria-pressed={meta.hideoutAmbienceEnabled}
-                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                      meta.hideoutAmbienceEnabled
-                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
-                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
-                    }`}
-                    data-testid="button-toggle-hideout-ambience"
-                  >
-                    {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
-                  </button>
-                </div>
-              </div>
-              <div className="mt-3 border border-border/70 bg-background/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout weather</h3>
-                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Drifting clouds, room-specific weather (rain, fog, heat haze, embers), and the small
-                      birds/drones/motes over each room's backdrop. Purely visual, silent CSS decoration --
-                      turn it off for a calmer or faster hideout screen.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setHideoutWeather(!meta.hideoutWeatherEnabled)}
-                    aria-pressed={meta.hideoutWeatherEnabled}
-                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                      meta.hideoutWeatherEnabled
-                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
-                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
-                    }`}
-                    data-testid="button-toggle-hideout-weather"
-                  >
-                    {meta.hideoutWeatherEnabled ? 'On' : 'Off'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-gyro-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
-              <Compass className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Motion controls</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Steer by tilt</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    {tiltAvailable
-                      ? 'Tilt your device to move. The on-screen stick still overrides tilt whenever you touch it, so you can take back manual control at any time.'
-                      : 'This device does not report orientation, so tilt steering is unavailable here. Try it on a phone or tablet.'}
-                  </p>
-                  {gyroDenied ? (
-                    <p className="mt-2 text-sm text-amber-300" data-testid="text-gyro-denied">
-                      Motion access was declined. Allow it in your browser settings, then try again.
-                    </p>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void toggleGyro()}
-                  disabled={!tiltAvailable}
-                  aria-pressed={meta.gyroEnabled}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                    meta.gyroEnabled
-                      ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
-                  }`}
-                  data-testid="button-toggle-gyro"
-                >
-                  {meta.gyroEnabled ? 'On' : 'Off'}
-                </button>
-              </div>
-
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Sensitivity
-                </span>
-                {([['Gentle', 0.7], ['Normal', 1], ['Twitchy', 1.5]] as const).map(([label, value]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setGyroSensitivity(value)}
-                    disabled={!meta.gyroEnabled}
-                    aria-pressed={meta.gyroSensitivity === value}
-                    className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                      meta.gyroSensitivity === value
-                        ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
-                        : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
-                    }`}
-                    data-testid={`button-gyro-sensitivity-${label.toLowerCase()}`}
-                  >
-                    {label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setGyroInvertY(!meta.gyroInvertY)}
-                  disabled={!meta.gyroEnabled}
-                  aria-pressed={meta.gyroInvertY}
-                  className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                    meta.gyroInvertY
-                      ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
-                  }`}
-                  data-testid="button-toggle-gyro-invert"
-                >
-                  {meta.gyroInvertY ? 'Inverted Y' : 'Normal Y'}
-                </button>
-              </div>
-              <p className="mt-4 flex items-center gap-2 border border-border/70 bg-background/50 p-3 text-xs text-muted-foreground">
-                <Smartphone className="h-4 w-4 text-emerald-200" />
-                <span>However you are holding the device when a run starts becomes the neutral position.</span>
-              </p>
-
-              {/* Tilt cannot be verified from a desk, so the numbers go on
-                  screen and the player checks it on their own device. */}
-              <TiltReadout
-                enabled={meta.gyroEnabled}
-                sensitivity={meta.gyroSensitivity}
-                invertY={meta.gyroInvertY}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-cyan-200/40 bg-cyan-300/10 text-cyan-200">
-              <Map className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-200">Navigation display</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Endless minimap</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Show or hide the map, and choose a compact view or the expanded city detail view. You can drag it
-                    anywhere during a run.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMinimapVisible(!meta.minimapVisible)}
-                  aria-pressed={meta.minimapVisible}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.minimapVisible
-                      ? 'border-cyan-200/60 bg-cyan-300/15 text-cyan-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-cyan-200/60 hover:text-white'
-                  }`}
-                  data-testid="button-toggle-minimap"
-                >
-                  {meta.minimapVisible ? 'Visible' : 'Hidden'}
-                </button>
-              </div>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMinimapExpanded(false)}
-                  aria-pressed={!meta.minimapExpanded}
-                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    !meta.minimapExpanded
-                      ? 'border-cyan-200/60 bg-cyan-300/15 text-cyan-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-cyan-200/60 hover:text-white'
-                  }`}
-                  data-testid="button-minimap-compact"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Compact
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMinimapExpanded(true)}
-                  aria-pressed={meta.minimapExpanded}
-                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.minimapExpanded
-                      ? 'border-cyan-200/60 bg-cyan-300/15 text-cyan-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-cyan-200/60 hover:text-white'
-                  }`}
-                  data-testid="button-minimap-expanded"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                  Expanded
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <MousePointer2 className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Physics interaction</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Clickable prop launches</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Tap or click a movable object to prime it. Your next hit launches it at 4× its normal impact velocity,
-                    in the opposite direction from its last hit, and lets it plow through enemies.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPhysicsObjectClicks(!meta.physicsObjectClicksEnabled)}
-                  aria-pressed={meta.physicsObjectClicksEnabled}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.physicsObjectClicksEnabled
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                  }`}
-                  data-testid="button-toggle-physics-object-clicks"
-                >
-                  {meta.physicsObjectClicksEnabled ? 'Enabled' : 'Disabled'}
-                </button>
-              </div>
-              <div className="mt-5 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <Settings2 className="h-4 w-4 text-primary" />
-                  <span>Click once, then hit the object to arm the launch.</span>
-                </div>
-                <div className="flex items-center gap-2 border border-border/70 bg-background/50 p-3">
-                  <Smartphone className="h-4 w-4 text-primary" />
-                  <span>Tap targets on mobile; drag elsewhere to steer.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
-          <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
-            <div className="flex items-start gap-4">
-              <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
-                <FlipVertical2 className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1 space-y-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-300">Quartermaster cheats</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Chaos toggles</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Unlocked in the Field ops shop. Purely cosmetic, purely for chaos — flip either back off any time.
-                  </p>
-                </div>
-                {vendorPurchaseCount(meta, 'invert-world') > 0 ? (
-                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-wide text-white">Flip the Script</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Rotate the whole run 180°.</p>
-                    </div>
                     <button
                       type="button"
-                      onClick={() => setWorldInvertEnabled(!meta.worldInvertEnabled)}
-                      aria-pressed={meta.worldInvertEnabled}
-                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                        meta.worldInvertEnabled
-                          ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
-                          : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
+                      onClick={() => setGyroInvertY(!meta.gyroInvertY)}
+                      disabled={!meta.gyroEnabled}
+                      aria-pressed={meta.gyroInvertY}
+                      className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                        meta.gyroInvertY
+                          ? 'border-emerald-300/60 bg-emerald-400/15 text-emerald-100'
+                          : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
                       }`}
-                      data-testid="button-toggle-world-invert"
+                      data-testid="button-toggle-gyro-invert"
                     >
-                      {meta.worldInvertEnabled ? 'Flipped' : 'Off'}
+                      {meta.gyroInvertY ? 'Inverted Y' : 'Normal Y'}
                     </button>
                   </div>
-                ) : null}
-                {vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
-                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold uppercase tracking-wide text-white">Negative Exposure</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Invert every color on screen.</p>
-                    </div>
+                  <p className="mt-4 flex items-center gap-2 border border-border/70 bg-background/50 p-3 text-xs text-muted-foreground">
+                    <Smartphone className="h-4 w-4 text-emerald-200" />
+                    <span>However you are holding the device when a run starts becomes the neutral position.</span>
+                  </p>
+
+                  {/* Tilt cannot be verified from a desk, so the numbers go on
+                      screen and the player checks it on their own device. */}
+                  <TiltReadout
+                    enabled={meta.gyroEnabled}
+                    sensitivity={meta.gyroSensitivity}
+                    invertY={meta.gyroInvertY}
+                  />
+                </div>
+              </div>
+            </section>
+          </motion.div>
+        )}
+
+        {activeCategory === 'pc' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-6 lg:grid-cols-2"
+            data-testid="section-settings-pc"
+          />
+        )}
+
+        {activeCategory === 'data' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-6 lg:grid-cols-2"
+            data-testid="section-settings-data"
+          >
+            <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                  <Save className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Save data</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Back up or transfer your progress</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Export a save file to keep as a backup or move to another browser or device. Signing in
+                    under Account keeps your progress synced automatically instead.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setPaletteInvertEnabled(!meta.paletteInvertEnabled)}
-                      aria-pressed={meta.paletteInvertEnabled}
-                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                        meta.paletteInvertEnabled
-                          ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
-                          : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
-                      }`}
-                      data-testid="button-toggle-palette-invert"
+                      onClick={handleExportSave}
+                      className="flex items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
+                      data-testid="button-export-save"
                     >
-                      {meta.paletteInvertEnabled ? 'Inverted' : 'Off'}
+                      <Download className="h-4 w-4" /> Export save
                     </button>
+                    <label
+                      className="flex cursor-pointer items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
+                      data-testid="button-import-save"
+                    >
+                      <Upload className="h-4 w-4" /> Import save
+                      <input type="file" accept="application/json" className="hidden" onChange={handleImportSave} />
+                    </label>
                   </div>
-                ) : null}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
-              <Bird className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-amber-200">Street ambiance</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Birds &amp; fireflies in bad weather</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    By default, birds and the road fireflies duck out of sight during rain and fog. Turn this off to
-                    keep them visible through any weather.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setWildlifeSheltersInRain(!meta.wildlifeSheltersInRain)}
-                  aria-pressed={meta.wildlifeSheltersInRain}
-                  className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.wildlifeSheltersInRain
-                      ? 'border-amber-300/60 bg-amber-300/15 text-amber-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'
-                  }`}
-                  data-testid="button-toggle-wildlife-shelters"
-                >
-                  {meta.wildlifeSheltersInRain ? 'Shelters in rain' : 'Stays visible'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-300/10 text-emerald-200">
-              <LayoutDashboard className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Hub panel layout</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Card grid or legacy list</h2>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    The Relic Workshop, Archive, and Bestiary show multi-column card grids by default so you can see
-                    most of what's there without scrolling. Switch back to the original single-column list any time.
-                  </p>
                 </div>
               </div>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUiDensity('grid')}
-                  aria-pressed={meta.uiDensity === 'grid'}
-                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.uiDensity === 'grid'
-                      ? 'border-emerald-300/60 bg-emerald-300/15 text-emerald-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
-                  }`}
-                  data-testid="button-ui-density-grid"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Card grid
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUiDensity('list')}
-                  aria-pressed={meta.uiDensity === 'list'}
-                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.uiDensity === 'list'
-                      ? 'border-emerald-300/60 bg-emerald-300/15 text-emerald-100'
-                      : 'border-border bg-background text-muted-foreground hover:border-emerald-300/60 hover:text-white'
-                  }`}
-                  data-testid="button-ui-density-list"
-                >
-                  <LayoutList className="h-4 w-4" />
-                  Legacy list
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
+            </section>
+          </motion.div>
+        )}
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <PanelRight className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Quartermaster & Roster</p>
-                <h2 className="mt-1 text-xl font-black uppercase text-white">Detail panel layout</h2>
-                <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  Choose whether the buy/stats panel sits in a fixed rail beside the grid, or slides open under
-                  whichever item or character you select.
-                </p>
-              </div>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUiPanelLayout('rail')}
-                  aria-pressed={meta.uiPanelLayout === 'rail'}
-                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.uiPanelLayout === 'rail'
-                      ? 'border-primary bg-primary/15 text-primary'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                  }`}
-                  data-testid="button-panel-layout-rail"
-                >
-                  <PanelRight className="h-4 w-4" />
-                  Side rail
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUiPanelLayout('slideout')}
-                  aria-pressed={meta.uiPanelLayout === 'slideout'}
-                  className={`flex items-center gap-2 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                    meta.uiPanelLayout === 'slideout'
-                      ? 'border-primary bg-primary/15 text-primary'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                  }`}
-                  data-testid="button-panel-layout-slideout"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Slide-out
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-ui-theme-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <Palette className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Hideout customization</p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">Theme &amp; palette</h2>
-              <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  Set the hideout&rsquo;s mood without changing the action. Themes change the menu chrome; palettes
-                  change its signal color and are remembered independently for every theme.
-                </p>
-                <button
-                  type="button"
-                  onClick={cycleUiLook}
-                  disabled={ownedLookCount <= 1}
-                  className="flex shrink-0 items-center justify-center gap-2 border border-primary px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground"
-                  data-testid="button-cycle-ui-look"
-                >
-                  <Dices className="h-4 w-4" />
-                  Roll the look
-                </button>
-              </div>
-              <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Theme combinations: {ownedLookCount} owned
-              </p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2" data-testid="character-palette-behavior-settings">
-                <button
-                  type="button"
-                  onClick={() => setWorldPaletteBlend(!meta.worldPaletteBlendEnabled)}
-                  aria-pressed={meta.worldPaletteBlendEnabled}
-                  className={`border px-3 py-3 text-left transition-colors ${meta.worldPaletteBlendEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
-                >
-                  <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">World + personal skin</span>
-                  <span className="mt-1 block text-xs">{meta.worldPaletteBlendEnabled ? 'Blended together' : 'Personal skin only'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaletteAnimations(!meta.paletteAnimationsEnabled)}
-                  aria-pressed={meta.paletteAnimationsEnabled}
-                  className={`border px-3 py-3 text-left transition-colors ${meta.paletteAnimationsEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
-                >
-                  <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">Animated palette motion</span>
-                  <span className="mt-1 block text-xs">{meta.paletteAnimationsEnabled ? 'Effects moving' : 'Colors remain, motion off'}</span>
-                </button>
-              </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {UI_THEMES.map((theme) => {
-                  const owned = hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds);
-                  const equipped = meta.uiTheme === theme.id;
-                  const affordable = meta.cred >= theme.cost;
-                  return (
-                    <div key={theme.id} className={`border p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`} data-testid={`card-ui-theme-${theme.id}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-sm font-black uppercase tracking-wide text-white">{theme.name}</h3>
-                        {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
+        {activeCategory === 'developer' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="grid gap-6 lg:grid-cols-2"
+            data-testid="section-settings-developer"
+          >
+            {meta.devModeAccessUnlocked ? (
+              <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
+                <div className="flex items-start gap-4">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                    <FlaskConical className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Developer access unlocked</p>
+                        <h2 className="mt-1 text-xl font-black uppercase text-white">Catalog registry</h2>
+                        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                          Temporarily expose every registered character, area, room, theme, palette, and aura. Turning
+                          this off restores your real progression and never grants permanent ownership.
+                        </p>
                       </div>
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{theme.description}</p>
-                      {theme.swatches ? (
-                        <div
-                          className="mt-3 flex h-2 overflow-hidden border border-border/70"
-                          aria-label={`${theme.name} palette preview`}
-                        >
-                          {theme.swatches.map((swatch) => (
-                            <span
-                              key={swatch.id}
-                              className="min-w-0 flex-1"
-                              style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
-                            />
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {owned ? (
-                        <button
-                          type="button"
-                          onClick={() => equipUiTheme(theme.id)}
-                          disabled={equipped}
-                          className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                            equipped
-                              ? 'cursor-default border-primary/40 text-primary/70'
-                              : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
-                          }`}
-                          data-testid={`button-equip-ui-theme-${theme.id}`}
-                        >
-                          {equipped ? 'Equipped' : 'Equip'}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => buyUiTheme(theme.id)}
-                          disabled={!affordable}
-                          className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                            affordable
-                              ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'
-                              : 'cursor-not-allowed border-border text-muted-foreground/50'
-                          }`}
-                          data-testid={`button-buy-ui-theme-${theme.id}`}
-                        >
-                          {!affordable ? <Lock className="h-3 w-3" /> : null}
-                          {affordable ? `Buy for ${theme.cost} cred` : `Need ${theme.cost} cred`}
-                        </button>
-                      )}
-
-                      {owned && equipped && theme.swatches ? (
-                        <div className="mt-3 border-t border-border pt-3">
-                          <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            Active palette
-                          </p>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          {theme.swatches.map((swatch) => (
-                            <button
-                              key={swatch.id}
-                              type="button"
-                              onClick={() => selectUiThemeSwatch(theme.id, swatch.id)}
-                              aria-pressed={activeSwatchId === swatch.id}
-                              aria-label={`Use ${swatch.name} palette`}
-                              title={swatch.name}
-                              className={`flex items-center gap-2 border px-2 py-2 text-left transition-colors ${
-                                activeSwatchId === swatch.id
-                                  ? 'border-white bg-white/10 text-white'
-                                  : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'
-                              }`}
-                              data-testid={`button-ui-theme-swatch-${theme.id}-${swatch.id}`}
-                            >
-                              <span
-                                className="h-4 w-4 shrink-0 border border-white/30"
-                                style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }}
-                              />
-                              <span className="truncate font-mono text-[10px] font-bold uppercase tracking-wider">
-                                {swatch.name}
-                              </span>
-                              {activeSwatchId === swatch.id ? <Check className="ml-auto h-3 w-3 shrink-0" /> : null}
-                            </button>
-                          ))}
-                          </div>
-                        </div>
-                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setDevModeAllUnlocks(!meta.devModeAllUnlocks)}
+                        className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.devModeAllUnlocks ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'}`}
+                        aria-pressed={meta.devModeAllUnlocks}
+                        data-testid="button-toggle-dev-unlocks"
+                      >
+                        Dev Mode: {meta.devModeAllUnlocks ? 'On' : 'Off'}
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <Save className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Save data</p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">Back up or transfer your progress</h2>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                Export a save file to keep as a backup or move to another browser or device. Signing in
-                under Account keeps your progress synced automatically instead.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-4 border-t border-primary/20 pt-3" data-testid="dev-run-tool-registry">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Registered run diagnostics</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Enable Dev Mode, start a run, then open Intel to use these without changing progression.</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {DEV_RUN_TOOL_REGISTRY.map((tool) => (
+                          <span key={tool.id} className="border border-primary/25 bg-background/70 px-2 py-1 font-mono text-[9px] uppercase text-white/65" title={tool.description}>{tool.label}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section className="border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-gate">
                 <button
                   type="button"
-                  onClick={handleExportSave}
-                  className="flex items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
-                  data-testid="button-export-save"
+                  onClick={handleDevAccessTap}
+                  className="flex w-full items-center gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label="Tap four times to unlock developer mode"
+                  data-testid="button-unlock-dev-mode"
                 >
-                  <Download className="h-4 w-4" /> Export save
+                  <span className="grid h-11 w-11 shrink-0 place-items-center border border-border bg-background text-muted-foreground">
+                    <FlaskConical className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">Build channel</span>
+                    <span className="mt-1 block text-lg font-black uppercase text-white">Developer Mode</span>
+                    <span className="mt-1 block text-xs text-muted-foreground" aria-live="polite">
+                      {devTapCount === 0
+                        ? 'Tap four times to reveal testing controls.'
+                        : `${Math.max(0, DEV_ACCESS_TAPS_REQUIRED - devTapCount)} tap${DEV_ACCESS_TAPS_REQUIRED - devTapCount === 1 ? '' : 's'} remaining.`}
+                    </span>
+                  </span>
+                  <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
-                <label
-                  className="flex cursor-pointer items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
-                  data-testid="button-import-save"
-                >
-                  <Upload className="h-4 w-4" /> Import save
-                  <input type="file" accept="application/json" className="hidden" onChange={handleImportSave} />
-                </label>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {meta.devModeAccessUnlocked ? (
-          <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
-            <div className="flex items-start gap-4">
-              <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-                <FlaskConical className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Developer access unlocked</p>
-                    <h2 className="mt-1 text-xl font-black uppercase text-white">Catalog registry</h2>
-                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Temporarily expose every registered character, area, room, theme, palette, and aura. Turning
-                      this off restores your real progression and never grants permanent ownership.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setDevModeAllUnlocks(!meta.devModeAllUnlocks)}
-                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.devModeAllUnlocks ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'}`}
-                    aria-pressed={meta.devModeAllUnlocks}
-                    data-testid="button-toggle-dev-unlocks"
-                  >
-                    Dev Mode: {meta.devModeAllUnlocks ? 'On' : 'Off'}
-                  </button>
-                </div>
-                <div className="mt-4 border-t border-primary/20 pt-3" data-testid="dev-run-tool-registry">
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Registered run diagnostics</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Enable Dev Mode, start a run, then open Intel to use these without changing progression.</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {DEV_RUN_TOOL_REGISTRY.map((tool) => (
-                      <span key={tool.id} className="border border-primary/25 bg-background/70 px-2 py-1 font-mono text-[9px] uppercase text-white/65" title={tool.description}>{tool.label}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        ) : (
-          <section className="border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-gate">
-            <button
-              type="button"
-              onClick={handleDevAccessTap}
-              className="flex w-full items-center gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              aria-label="Tap four times to unlock developer mode"
-              data-testid="button-unlock-dev-mode"
-            >
-              <span className="grid h-11 w-11 shrink-0 place-items-center border border-border bg-background text-muted-foreground">
-                <FlaskConical className="h-5 w-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground">Build channel</span>
-                <span className="mt-1 block text-lg font-black uppercase text-white">Developer Mode</span>
-                <span className="mt-1 block text-xs text-muted-foreground" aria-live="polite">
-                  {devTapCount === 0
-                    ? 'Tap four times to reveal testing controls.'
-                    : `${Math.max(0, DEV_ACCESS_TAPS_REQUIRED - devTapCount)} tap${DEV_ACCESS_TAPS_REQUIRED - devTapCount === 1 ? '' : 's'} remaining.`}
-                </span>
-              </span>
-              <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </button>
-          </section>
+              </section>
+            )}
+          </motion.div>
         )}
       </div>
     </ScreenLayout>
