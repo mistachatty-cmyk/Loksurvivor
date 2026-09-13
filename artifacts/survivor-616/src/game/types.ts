@@ -643,7 +643,29 @@ export type UnlockRule =
   | { kind: 'rescue'; allyId: string }
   | { kind: 'clearArea'; areaId: string }
   | { kind: 'discovery'; discoveryId: string }
-  | { kind: 'kills'; count: number };
+  | { kind: 'kills'; count: number }
+  | { kind: 'lokPetCards'; count: number }
+  | { kind: 'lokCollector'; runs: number; lokPets: number };
+
+export interface CharacterCrewIdentity {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export type LokPetCollectorRank = 'LokPet Collector' | 'LokMaster' | 'LokCaster' | 'LokLegendary' | 'LokSupreme';
+
+export interface LokPetCollectorConfig {
+  rank: LokPetCollectorRank;
+  /** Added to the normal three LokPet loadout slots, from one through seven. */
+  extraTeamSlots: number;
+  /** Chance after a non-boss kill to drop an extra LokPack on the floor. */
+  floorPackChance: number;
+  /** Multiplies the LokPet prize weight inside every opened pack. */
+  lokPetPrizeWeightMultiplier: number;
+  /** Added to the base Card Credit reward for every blue loot box opened. */
+  bonusCardCreditsPerLootBox: number;
+}
 
 export interface CharacterDef {
   id: string;
@@ -660,6 +682,10 @@ export interface CharacterDef {
   rarity?: 'legendary';
   /** Two locked identity hooks surfaced in the roster without changing older characters. */
   signatureTraits?: readonly [string, string];
+  /** Optional group identity shown on the roster. */
+  crew?: CharacterCrewIdentity;
+  /** Marks this operative as part of the separately-listed LokPet Collector class. */
+  lokPetCollector?: LokPetCollectorConfig;
   /** Optional always-on ability the dash button also triggers or empowers. */
   dashSkill?: DashSkillDef;
   /** Path to the reference art the rig was built from, if any. */
@@ -1733,6 +1759,12 @@ export interface MetaState {
   cred: number;
   /** Loot tokens spendable in the hideout. */
   lootTokens: number;
+  /** Currency earned from blue loot boxes and spent at the LokPet card shop. */
+  cardCredits: number;
+  /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
+  lokCollectorRuns: number;
+  /** Chest-origin LokPets caught during collector runs. */
+  lokCollectorPetsFound: number;
   /** Rare currency found by breaking street props, weighted toward endless mode. Spendable in the hideout vendor's relic category. */
   skeletonKeys: number;
   /** Rentable/buildable passive cred generators the player owns. See `data/generators.ts`. */

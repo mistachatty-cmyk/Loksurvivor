@@ -841,6 +841,8 @@ export interface World {
   /** Cosmetic background life; never collided with or damaged. */
   ambient: AmbientActor[];
   lokPets: LokPetInstance[];
+  /** Dynamic companion cap: normal four in-run companions plus Collector slots. */
+  maxLokPets: number;
   /** All LokPets generated this run, including companions that have expired. */
   lokPetHistory: LokPetInstance[];
 
@@ -1253,6 +1255,7 @@ export function createWorld(
     followers: [],
     ambient: [],
     lokPets: [],
+    maxLokPets: 4 + (character.lokPetCollector?.extraTeamSlots ?? 0),
     lokPetHistory: [],
     obstacles: obstacleDefs
       .filter((o) => o.kind !== 'pothole')
@@ -2192,7 +2195,6 @@ function spawnFollowers(w: World, weapon: WeaponDef) {
   spawnParticles(w, w.player.x, w.player.y, weapon.color ?? w.character.palette.accent, Math.min(10, spec.count * 2), 70);
 }
 
-const MAX_LOKPETS = 4;
 const LOKPET_GHOST_AFTER_MS = 60_000;
 
 function lokPetStatusId(pet: LokPetInstance): string | undefined {
@@ -2278,13 +2280,13 @@ function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
 
 /** Spawn one generated chest companion, replacing the oldest at the mobile-safe cap. */
 export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['origin'] = 'chest'): LokPetInstance {
-  if (w.lokPets.length >= MAX_LOKPETS) {
+  if (w.lokPets.length >= w.maxLokPets) {
     const oldest = w.lokPets.shift();
     if (oldest) spawnParticles(w, oldest.x, oldest.y, oldest.palette.glow, 6, 65);
-    pushAlert(w, 'LokPet signal rotated');
+    pushAlert(w, 'LokPet orbit rotated');
   }
   const index = w.lokPets.length;
-  const orbitAngle = (Math.PI * 2 * index) / MAX_LOKPETS + w.rng() * 0.2;
+  const orbitAngle = (Math.PI * 2 * index) / w.maxLokPets + w.rng() * 0.2;
   const pet: LokPetInstance = {
     ...roll,
     origin,
@@ -2822,6 +2824,12 @@ function killEnemy(w: World, enemy: EnemyActor) {
       uid: uid(w), kind: 'sweep', x: enemy.x, y: enemy.y,
       vx: 0, vy: 0, value: 0, bornAt: w.now,
     });
+  }
+
+  const collector = w.character.lokPetCollector;
+  if (enemy.def.family !== 'Boss' && collector && w.rng() < collector.floorPackChance) {
+    spawnLootBox(w, enemy.x, enemy.y);
+    pushAlert(w, `${collector.rank} found a floor LokPack`);
   }
 
   if (enemy.def.family === 'Boss') {
@@ -6739,7 +6747,7 @@ function updatePickups(w: World, dt: number) {
         case 'loot-box': {
           // The prize is deliberately not granted until its reel lands. RunScreen
           // settles any unseen prize before it hands the result back to meta.
-          const prize = rollPrize(w.rng);
+          const prize = rollPrize(w.rng, w.character.lokPetCollector?.lokPetPrizeWeightMultiplier);
           w.lootBoxesOpened += 1;
           // Queue for the reel overlay in RunScreen.
           w.pendingReel.push(prize);
@@ -7435,7 +7443,7 @@ function updateEndlessDungeon(w: World) {
       Math.hypot(p.x - chest.x, p.y - chest.y) < 34 + p.radius) {
       chest.opened = true;
       for (let i = 0; i < 3; i += 1) {
-        const prize = rollPrize(w.rng);
+        const prize = rollPrize(w.rng, w.character.lokPetCollector?.lokPetPrizeWeightMultiplier);
         w.pendingReel.push(prize);
       }
       w.lootBoxesOpened += 1;

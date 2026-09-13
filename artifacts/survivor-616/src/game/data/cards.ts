@@ -61,6 +61,8 @@ function acquisitionForUnlock(rule: UnlockRule): LokAssetAcquisitionMethod[] {
     case 'clearArea': return ['scenario'];
     case 'discovery': return ['secret'];
     case 'kills': return ['achievement'];
+    case 'lokPetCards': return ['achievement'];
+    case 'lokCollector': return ['achievement'];
   }
 }
 
