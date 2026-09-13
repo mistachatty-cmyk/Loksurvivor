@@ -837,6 +837,36 @@ function drawChunkLandmark(
     ctx.fillRect(x - 8, y - 92, 16, 160);
     ctx.strokeRect(x - 26, y - 108, 52, 16);
     ctx.fillRect(x - 34, y - 88, 68, 5);
+  } else if (landmark.kind === 'scrapyard') {
+    // A crooked stack of crushed-car silhouettes behind a chain fence line.
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x - 130, y + 60);
+    ctx.lineTo(x + 130, y + 60);
+    ctx.stroke();
+    for (let fenceX = -120; fenceX <= 120; fenceX += 20) {
+      ctx.beginPath();
+      ctx.moveTo(x + fenceX, y + 60);
+      ctx.lineTo(x + fenceX, y + 20);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.92;
+    ctx.fillRect(x - 44, y - 18, 88, 40);
+    ctx.strokeRect(x - 44, y - 18, 88, 40);
+    ctx.fillRect(x - 28, y - 52, 56, 36);
+    ctx.strokeRect(x - 28, y - 52, 56, 36);
+    ctx.fillRect(x - 12, y - 82, 24, 32);
+    ctx.strokeRect(x - 12, y - 82, 24, 32);
+  } else if (landmark.kind === 'overpass') {
+    // A raised roadway slab on paired support pillars.
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(x - 150, y - 96, 300, 26);
+    ctx.strokeRect(x - 150, y - 96, 300, 26);
+    ctx.globalAlpha = 0.6;
+    for (const pillarX of [x - 96, x, x + 96]) {
+      ctx.fillRect(pillarX - 10, y - 70, 20, 158);
+      ctx.strokeRect(pillarX - 10, y - 70, 20, 158);
+    }
   } else {
     // Four approach paths and a rotunda make the plaza a useful visual anchor.
     ctx.globalAlpha = 0.42;

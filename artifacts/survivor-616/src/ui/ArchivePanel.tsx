@@ -3,6 +3,7 @@
  * Owned by the design pass -- keep the export name and props stable.
  */
 import { ACHIEVEMENTS } from '@/game/data/achievements';
+import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { CHARACTER_EPISODES } from '@/game/data/episodes';
@@ -22,7 +23,7 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, CreditCard, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -35,6 +36,16 @@ const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }>
   silver: { border: 'border-l-slate-300', label: 'text-slate-300' },
   gold: { border: 'border-l-yellow-400', label: 'text-yellow-300' },
   legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
+};
+
+const CARD_RARITY_STYLES: Record<string, { border: string; label: string }> = {
+  common: { border: 'border-l-slate-400', label: 'text-slate-300' },
+  uncommon: { border: 'border-l-emerald-400', label: 'text-emerald-300' },
+  rare: { border: 'border-l-sky-400', label: 'text-sky-300' },
+  epic: { border: 'border-l-purple-400', label: 'text-purple-300' },
+  legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
+  mythic: { border: 'border-l-yellow-300', label: 'text-yellow-200' },
+  secret: { border: 'border-l-red-400', label: 'text-red-300' },
 };
 
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
@@ -176,10 +187,12 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   ];
 
   const completedAchievementCount = ACHIEVEMENTS.filter((achievement) => achievement.isComplete(meta)).length;
+  const ownedCardCount = CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).length;
 
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
     { key: 'achievements', label: 'Achievements', icon: Trophy, count: completedAchievementCount, total: ACHIEVEMENTS.length },
+    { key: 'cards', label: 'Cards', icon: CreditCard, count: ownedCardCount, total: CARD_MANIFESTS.length },
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
@@ -303,6 +316,55 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                       )}
                     </div>
                   )}
+                </article>
+              );
+            })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'cards' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-cards"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <CreditCard className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Card Binder</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Every operative, bestiary entry, crew member and LokPet as a portable Lok Ecosystem card
+              </p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">
+              {ownedCardCount} / {CARD_MANIFESTS.length}
+            </span>
+          </div>
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {CARD_MANIFESTS.map((card) => {
+              const owned = isCardOwned(card, meta);
+              const rarityStyle = CARD_RARITY_STYLES[card.rarity];
+              return (
+                <article
+                  key={card.id}
+                  className={`flex flex-col gap-2 border border-l-4 p-4 ${
+                    owned ? `border-border ${rarityStyle.border} bg-card text-white` : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
+                  }`}
+                  data-testid={`card-lok-${card.slug}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold uppercase tracking-wide text-sm">{owned ? card.name : 'Uncatalogued'}</p>
+                    <span className={`shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest ${rarityStyle.label}`}>
+                      {card.rarity}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${owned ? 'text-muted-foreground' : 'opacity-70'}`}>
+                    {owned ? card.description : 'Earn this in a run to add it to the binder.'}
+                  </p>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">
+                    {card.id}
+                  </span>
                 </article>
               );
             })}

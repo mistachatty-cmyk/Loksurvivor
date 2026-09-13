@@ -23,9 +23,9 @@ export const CHUNK_SIZE = 640;
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
 
-export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot' | 'market' | 'rail' | 'plaza';
+export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot' | 'market' | 'rail' | 'plaza' | 'scrapyard' | 'overpass';
 export type BlockKind = 'storefronts' | 'residential' | 'parking' | 'industrial' | 'park' | 'bridge' | 'river-edge';
-export type ChunkLandmarkKind = 'bridge' | 'market' | 'rail-yard' | 'plaza';
+export type ChunkLandmarkKind = 'bridge' | 'market' | 'rail-yard' | 'plaza' | 'scrapyard' | 'overpass';
 export type BuildingPrefabId = 'corner-store' | 'duplex' | 'warehouse' | 'apartment' | 'laundromat' | 'clinic' | 'bar' | 'auto-shop';
 
 export interface BuildingPrefab {
@@ -98,7 +98,7 @@ export interface StreetChunk {
 /* Chunk generation                                                    */
 /* ------------------------------------------------------------------ */
 
-const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot', 'market', 'rail', 'plaza'];
+const VARIANTS: ChunkVariant[] = ['strip', 'alley', 'parking', 'lot', 'market', 'rail', 'plaza', 'scrapyard', 'overpass'];
 const BLOCK_KINDS: BlockKind[] = ['storefronts', 'residential', 'parking', 'industrial', 'park', 'bridge', 'river-edge'];
 const KINDS: ObstacleDef['kind'][] = ['car', 'dumpster', 'crate', 'planter', 'barrier', 'ac-unit', 'neon-sign', 'barrel', 'fuse-box', 'street-lamp', 'car-wreck', 'crate-breakable', 'cover', 'reflective-surface', 'flora', 'metal-box', 'bench', 'trash-can', 'mailbox', 'fire-hydrant', 'parking-meter'];
 
@@ -300,7 +300,11 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
         ? { name: 'East Yard', kind: 'rail-yard', accent: '#ffd166' }
         : !hasRiver && (variant === 'plaza' || blockKind === 'park')
           ? { name: 'Civic Plaza', kind: 'plaza', accent: '#a7f3d0' }
-          : undefined;
+          : !hasRiver && variant === 'scrapyard'
+            ? { name: 'Salvage Row', kind: 'scrapyard', accent: '#fb923c' }
+            : !hasRiver && variant === 'overpass'
+              ? { name: 'Overpass Underlot', kind: 'overpass', accent: '#94a3b8' }
+              : undefined;
 
   const obstacles: ObstacleDef[] = [];
   const districtInfo = band.id === 'floodwall' || hasRiver
@@ -405,8 +409,12 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
   } else if (variant === 'market' || variant === 'plaza') {
     obstacles.push({ x: -142, y: -6, w: 18, h: 220, kind: 'barrier' });
     obstacles.push({ x: 142, y: 6, w: 18, h: 220, kind: 'barrier' });
-  } else if (variant === 'alley') {
+  } else if (variant === 'alley' || variant === 'scrapyard') {
     obstacles.push({ x: -188, y: 0, w: 18, h: 250, kind: 'barrier' });
+  } else if (variant === 'overpass') {
+    for (const x of [-150, 150]) {
+      obstacles.push({ x, y: 0, w: 34, h: 260, kind: 'metal-box' });
+    }
   }
 
   // Sidewalk barriers along top/bottom edges (y = ±CHUNK_SIZE/2 ± padding).
@@ -439,6 +447,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     market: [5, 8],
     rail: [4, 7],
     plaza: [3, 6],
+    scrapyard: [5, 9],
+    overpass: [3, 6],
   };
   const [minProps, maxProps] = propCounts[variant];
   const bandPropBonus = band.id === 'industrial-fringe' || band.id === 'outer-threshold' ? 2 : 0;
@@ -461,6 +471,10 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
      rail: [1, 0, 1, 0, 5, 1, 0, 1, 3, 2, 4, 1, 3, 2, 2, 3, 1, 0, 0, 0, 0],
     // plaza: open lanes with lamps and planters
      plaza: [0, 0, 1, 5, 3, 0, 1, 0, 1, 4, 0, 1, 2, 1, 4, 1, 3, 2, 1, 1, 0],
+    // scrapyard: car wrecks, dumpsters, and stacked scrap metal
+     scrapyard: [2, 4, 2, 0, 2, 1, 0, 4, 1, 1, 6, 3, 2, 1, 1, 5, 0, 2, 0, 0, 0],
+    // overpass: support pillars, cover, and rain-slick reflective ground
+     overpass: [1, 1, 1, 0, 6, 0, 0, 1, 2, 3, 1, 1, 5, 4, 0, 2, 1, 2, 0, 1, 0],
   };
   const weights = kindWeights[variant];
 
