@@ -15,6 +15,23 @@ export const milestoneSchema = z.object({
   label: z.string(),
 });
 
+/**
+ * A real captured clip of the moment, not a stat. `src` is a playable URL
+ * resolved by the caller (the game resolves its `clipAssetId` to a local
+ * blob: URL via `localMediaStore` before building recap props) -- this
+ * package never reaches into the game's IndexedDB itself, so it stays
+ * buildable and renderable from a plain JSON blob. `kind` is a free string
+ * (mirrors the game's `RunHighlightKind`) rather than a shared enum, since
+ * this package must not depend on game internals to typecheck.
+ */
+export const highlightClipSchema = z.object({
+  /** Milliseconds into the run. */
+  atMs: z.number().min(0),
+  kind: z.string(),
+  label: z.string(),
+  src: z.string(),
+});
+
 export const runRecapSchema = z.object({
   player: z.object({
     name: z.string(),
@@ -48,10 +65,19 @@ export const runRecapSchema = z.object({
     .default(null),
   /** Level-ups, bosses, evolves. Sorted ascending by `at`; capped at 12 in the arc scene. */
   milestones: z.array(milestoneSchema).default([]),
+  /**
+   * Real gameplay clips around the run's biggest moments -- boss kills, close
+   * calls, the ultimate going off. Empty when the browser couldn't capture
+   * any (unsupported MediaRecorder/captureStream, or storage was full); the
+   * highlight-reel scene falls back to a text beat list in that case, so
+   * every run still gets a complete recap.
+   */
+  highlightClips: z.array(highlightClipSchema).default([]),
 });
 
 export type RunRecapProps = z.infer<typeof runRecapSchema>;
 export type Milestone = z.infer<typeof milestoneSchema>;
+export type HighlightClip = z.infer<typeof highlightClipSchema>;
 
 /** Studio default so the composition is never empty on open. */
 export const sampleRecap: RunRecapProps = {
@@ -83,4 +109,5 @@ export const sampleRecap: RunRecapProps = {
     { at: 1010, kind: 'evolve', label: 'Ledger Halo evolved' },
     { at: 1284, kind: 'level', label: 'Lv 41' },
   ],
+  highlightClips: [],
 };

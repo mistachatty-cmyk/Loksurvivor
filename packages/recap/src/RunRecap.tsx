@@ -4,6 +4,7 @@ import { color, scene } from './theme';
 import { Grain } from './components/primitives';
 import { ColdOpen } from './scenes/ColdOpen';
 import { StatSlam } from './scenes/StatSlam';
+import { HighlightReel } from './scenes/HighlightReel';
 import { RunArc } from './scenes/RunArc';
 import { Sendoff } from './scenes/Sendoff';
 import type { RunRecapProps } from './schema';
@@ -27,6 +28,9 @@ export const RunRecap: React.FC<RunRecapProps> = (data) => {
       </Sequence>
       <Sequence {...scene.statSlam}>
         <StatSlam data={data} width={unit} />
+      </Sequence>
+      <Sequence {...scene.highlightReel}>
+        <HighlightReel data={data} width={unit} durationInFrames={scene.highlightReel.durationInFrames} />
       </Sequence>
       <Sequence {...scene.arc}>
         <RunArc data={data} width={unit} />

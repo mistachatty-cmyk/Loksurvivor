@@ -39,8 +39,9 @@ export const FPS = 30;
 export const scene = {
   coldOpen: { from: 0, durationInFrames: 60 },
   statSlam: { from: 60, durationInFrames: 150 },
-  arc: { from: 210, durationInFrames: 120 },
-  sendoff: { from: 330, durationInFrames: 90 },
+  highlightReel: { from: 210, durationInFrames: 150 },
+  arc: { from: 360, durationInFrames: 120 },
+  sendoff: { from: 480, durationInFrames: 90 },
 } as const;
 
-export const TOTAL_FRAMES = 420; // 14s at 30fps
+export const TOTAL_FRAMES = 570; // 19s at 30fps
