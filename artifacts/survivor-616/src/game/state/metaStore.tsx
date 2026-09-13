@@ -77,6 +77,7 @@ import type {
   LokPetRarity,
   LokPetRunDiscovery,
   SavedLokPet,
+  VisitingLokCard,
   MetaState,
   RunResult,
   RunModifiers,
@@ -211,6 +212,7 @@ export function createInitialMeta(): MetaState {
     lokPetHistory: [],
     savedLokPets: [],
     selectedLokPetIds: [],
+    visitingLokCards: [],
     petElixirs: 3,
     petElixirUpdatedAt: Date.now(),
     bestiary: {},
@@ -632,6 +634,36 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
   }).slice(0, 48);
 }
 
+/**
+ * Cards imported from another G-Six game. Kept strictly separate from
+ * savedLokPets -- see VisitingLokCard's doc comment in types.ts -- so a
+ * malformed or hostile save payload can never smuggle a combat-usable
+ * kennel entry in through this field.
+ */
+function normalizeVisitingLokCards(value: unknown): VisitingLokCard[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((entry): VisitingLokCard[] => {
+    if (!isRecord(entry)) return [];
+    const { instanceId, assetId, name, sourceGame } = entry;
+    if (typeof instanceId !== 'string' || !instanceId || seen.has(instanceId)) return [];
+    if (typeof assetId !== 'string' || !assetId) return [];
+    if (typeof name !== 'string' || !name) return [];
+    if (typeof sourceGame !== 'string' || !sourceGame) return [];
+    seen.add(instanceId);
+    return [{
+      instanceId,
+      assetId,
+      name,
+      description: typeof entry.description === 'string' ? entry.description : undefined,
+      rarity: typeof entry.rarity === 'string' && entry.rarity ? entry.rarity : 'common',
+      sourceGame,
+      tags: Array.isArray(entry.tags) ? entry.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+      importedAt: Number.isFinite(entry.importedAt) ? Number(entry.importedAt) : Date.now(),
+    }];
+  }).slice(0, 120);
+}
+
 function replenishPetElixirs(meta: MetaState, now = Date.now()): Pick<MetaState, 'petElixirs' | 'petElixirUpdatedAt'> {
   const elapsed = Math.max(0, now - meta.petElixirUpdatedAt);
   const grants = Math.floor(elapsed / ELIXIR_GRANT_MS);
@@ -842,6 +874,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lokPetHistory: normalizeLokPetHistory(parsed.lokPetHistory),
     savedLokPets,
     selectedLokPetIds: savedLokPets.filter((pet) => pet.stamina > 0 && Array.isArray(parsed.selectedLokPetIds) && parsed.selectedLokPetIds.includes(pet.id)).map((pet) => pet.id).slice(0, 3),
+    visitingLokCards: normalizeVisitingLokCards(parsed.visitingLokCards),
     ...recoveredElixirs,
     bestiary,
     totalKills: counter(parsed.totalKills),
@@ -1243,6 +1276,7 @@ type Action =
   | { type: 'duplicateCustomMap'; id: string }
   | { type: 'deleteCustomMap'; id: string }
   | { type: 'claimAchievement'; id: string }
+  | { type: 'importVisitingLokCard'; card: VisitingLokCard }
   | { type: 'replaceMeta'; meta: Partial<MetaState> }
   | { type: 'reset' };
 
@@ -1686,6 +1720,17 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'importVisitingLokCard': {
+      if (state.meta.visitingLokCards.some((card) => card.instanceId === action.card.instanceId)) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          visitingLokCards: [...state.meta.visitingLokCards, action.card].slice(0, 120),
+        },
+      };
+    }
+
     case 'tickRecovery':
       return { ...state, meta: settleRecovery(state.meta, action.now) };
 
@@ -2010,6 +2055,7 @@ export interface MetaContextValue {
   duplicateCustomMap: (id: string) => void;
   deleteCustomMap: (id: string) => void;
   claimAchievement: (id: string) => void;
+  importVisitingLokCard: (card: VisitingLokCard) => void;
   resetProgress: () => void;
   /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
   importMeta: (meta: Partial<MetaState>) => void;
@@ -2160,6 +2206,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const duplicateCustomMap = useCallback((id: string) => dispatch({ type: 'duplicateCustomMap', id }), []);
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
   const claimAchievement = useCallback((id: string) => dispatch({ type: 'claimAchievement', id }), []);
+  const importVisitingLokCard = useCallback((card: VisitingLokCard) => dispatch({ type: 'importVisitingLokCard', card }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -2262,6 +2309,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       duplicateCustomMap,
       deleteCustomMap,
       claimAchievement,
+      importVisitingLokCard,
       importMeta,
     };
   }, [
@@ -2332,6 +2380,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     duplicateCustomMap,
     deleteCustomMap,
     claimAchievement,
+    importVisitingLokCard,
     importMeta,
   ]);
 
