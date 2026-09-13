@@ -208,8 +208,8 @@ function LoginForm() {
         <Button variant="outline" onClick={() => void handleOAuth('google')} data-testid="button-sign-in-google">
           Continue with Google
         </Button>
-        <Button variant="outline" onClick={() => void handleOAuth('apple')} data-testid="button-sign-in-apple">
-          Continue with Apple
+        <Button variant="outline" disabled title="Apple sign-in is coming soon" data-testid="button-sign-in-apple">
+          Continue with Apple &middot; Coming Soon
         </Button>
       </div>
       {!available && <p className="text-xs text-destructive">Login isn't configured in this environment yet.</p>}
