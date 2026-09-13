@@ -466,7 +466,27 @@ export function useStudio(): StudioController {
 
     importFiles,
     placeClip,
-    dropClip: useCallback((clipId) => setProject((c) => removeClip(c, clipId)), []),
+    dropClip: useCallback(
+      (clipId: string) => {
+        const current = projectRef.current;
+        const removed = current.tracks.flatMap((track) => track.clips).find((clip) => clip.id === clipId);
+        setProject((c) => removeClip(c, clipId));
+        if (!removed) return;
+        // A buffer isn't owned by one clip: it can sit on several tracks at
+        // once, or still be visible in the unplaced-clips library for
+        // re-placement. Only release it once nothing references it anymore --
+        // otherwise a mic take (which never enters the library) leaks its
+        // buffer forever once its one placement is deleted, but releasing
+        // unconditionally would break playback of any other clip sharing it.
+        const stillNeeded =
+          clips.some((imported) => imported.id === removed.bufferId) ||
+          current.tracks.some((track) =>
+            track.clips.some((clip) => clip.bufferId === removed.bufferId && clip.id !== clipId),
+          );
+        if (!stillNeeded) releaseBuffer(removed.bufferId);
+      },
+      [clips],
+    ),
     relocateClip: useCallback(
       (clipId, startBeat, trackId) => setProject((c) => moveClip(c, clipId, startBeat, trackId)),
       [],
