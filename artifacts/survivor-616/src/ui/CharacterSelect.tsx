@@ -236,9 +236,12 @@ const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; descr
   { key: 'scalerMode', name: 'Scaler', description: "Enemy hp scales up with your level as the run goes." },
   { key: 'infiniteMode', name: 'Infinite Mode', description: 'The clock never runs out -- the final wave repeats and escalates instead.' },
   { key: 'hordeSpinEnabled', name: 'HordeSpin', description: 'Every 45s, spin a wheel for a scaled horde event and a reward. 5x5 and 666 are rare.' },
+  // Only shown once meta.directorModeUnlocked -- see RunModifiersChecklist below.
+  { key: 'directorModeEnabled', name: 'Director Mode', description: 'Raises the odds the Director crashes the run with its crew, once eligible.' },
 ];
 
-function RunModifiersChecklist({ modifiers, onToggle }: { modifiers: RunModifiers; onToggle: (key: keyof RunModifiers) => void }) {
+function RunModifiersChecklist({ modifiers, directorModeUnlocked, onToggle }: { modifiers: RunModifiers; directorModeUnlocked: boolean; onToggle: (key: keyof RunModifiers) => void }) {
+  const options = RUN_MODIFIER_OPTIONS.filter((option) => option.key !== 'directorModeEnabled' || directorModeUnlocked);
   return (
     <section className="border border-primary/30 bg-card p-4" data-testid="section-run-modifiers">
       <div className="flex items-center justify-between gap-2">
@@ -249,7 +252,7 @@ function RunModifiersChecklist({ modifiers, onToggle }: { modifiers: RunModifier
         <span className="font-mono text-[10px] uppercase text-muted-foreground">Applies to every run</span>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {RUN_MODIFIER_OPTIONS.map((option) => {
+        {options.map((option) => {
           const checked = modifiers[option.key] === true;
           return (
             <button
@@ -316,7 +319,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
             <button type="button" onClick={() => setUiPanelLayout('rail')} aria-pressed={layout === 'rail'} className={`border px-3 py-2 font-mono text-[9px] uppercase ${layout === 'rail' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>Original</button>
           </div>
         </div>
-        <RunModifiersChecklist modifiers={meta.runModifiers} onToggle={toggleRunModifier} />
+        <RunModifiersChecklist modifiers={meta.runModifiers} directorModeUnlocked={meta.directorModeUnlocked} onToggle={toggleRunModifier} />
         <details className="border border-border bg-card/40 p-3" data-testid="character-combat-preview">
           <summary className="cursor-pointer font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Weapon &amp; ability preview</summary>
           <div className="mt-3"><CharacterAbilityVisualizer character={{ ...selectedCharacter, palette: resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled) }} /></div>

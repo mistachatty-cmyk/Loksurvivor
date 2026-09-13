@@ -321,6 +321,44 @@ test('a grouped wave releases its mixed formation together', () => {
   assert.equal(world.enemies.filter((enemy) => enemy.defId === 'spiral-moth').length, 2);
 });
 
+test('the Director escalation triggers on schedule and spawns its registered squad', () => {
+  const area: AreaDef = { ...AREAS[0]!, id: 'director-trigger-test', durationSec: 999, waves: [], obstacles: [], rescueAllyId: undefined };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 1);
+  // Deterministic: any chance roll passes, so the Director fires on its
+  // first eligible reroll rather than depending on the seed.
+  world.rng = () => 0;
+
+  for (let i = 0; i < 8000 && world.director.phase === 'pending'; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.equal(world.director.phase, 'active');
+  assert.equal(world.director.activeDirectorId, 'take-two');
+  assert.ok(world.director.bossUid !== null);
+  assert.ok(world.enemies.some((enemy) => enemy.defId === 'the-director'));
+  assert.ok(world.enemies.some((enemy) => enemy.defId === 'boom-mic-runner'));
+  assert.ok(world.enemies.some((enemy) => enemy.defId === 'gaffer-brute'));
+});
+
+test('killing the Director boss resolves the encounter and marks the run result defeated', () => {
+  const area: AreaDef = { ...AREAS[0]!, id: 'director-defeat-test', durationSec: 999, waves: [], obstacles: [], rescueAllyId: undefined };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 1);
+  const boss = addEnemy(world, 'the-director', 30, 0);
+  boss.hp = 1;
+  world.director.phase = 'active';
+  world.director.activeDirectorId = 'take-two';
+  world.director.bossUid = boss.uid;
+  world.weapons[0]!.readyAt = 0;
+
+  for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.director.phase, 'resolved');
+  assert.equal(world.director.victorious, true);
+  const result = buildResult(world);
+  assert.equal(result.directorEncounterId, 'take-two');
+  assert.equal(result.directorDefeated, true);
+});
+
 test('a reflective surface redirects a compatible projectile', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 24, h: 40, kind: 'reflective-surface' }),

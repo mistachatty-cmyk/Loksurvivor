@@ -106,6 +106,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#22d3ee',
     roster: ['packet-wraith', 'firewall-brute', 'null-spitter', 'corrupted-lookout', 'drift-shard'],
   },
+  {
+    id: 'reel-syndicate',
+    name: 'Reel Syndicate',
+    description: "The Director's own crew -- an unscripted arrival, never part of an area's authored waves. See data/directors.ts.",
+    accent: '#ff2ec4',
+    roster: ['the-director', 'boom-mic-runner', 'gaffer-brute'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

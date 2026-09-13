@@ -12,6 +12,7 @@ import { RigPortrait } from './RigPortrait';
 import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
+import { NotificationToasts } from './NotificationToasts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard } from 'lucide-react';
@@ -161,6 +162,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       animate={{ opacity: 1 }}
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
+      <NotificationToasts />
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}

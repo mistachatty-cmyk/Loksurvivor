@@ -62,6 +62,7 @@ import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
 import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
+import { DIRECTORS } from '@/game/data/directors';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type {
   AllyDef,
@@ -177,6 +178,7 @@ function normalizeRunModifiers(value: unknown): RunModifiers {
   if (value.scalerMode === true) modifiers.scalerMode = true;
   if (value.infiniteMode === true) modifiers.infiniteMode = true;
   if (value.hordeSpinEnabled === true) modifiers.hordeSpinEnabled = true;
+  if (value.directorModeEnabled === true) modifiers.directorModeEnabled = true;
   return modifiers;
 }
 
@@ -279,6 +281,9 @@ export function createInitialMeta(): MetaState {
     dailyContractProgressById: {},
     completedDailyContractIds: [],
     claimedAchievementIds: [],
+    defeatedDirectorIds: [],
+    directorModeUnlocked: false,
+    pendingNotifications: [],
   };
 }
 
@@ -956,6 +961,15 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       new Set(ACHIEVEMENTS.map((achievement) => achievement.id)),
       [],
     ),
+    defeatedDirectorIds: idList(
+      parsed.defeatedDirectorIds,
+      new Set(DIRECTORS.map((director) => director.id)),
+      [],
+    ),
+    directorModeUnlocked: parsed.directorModeUnlocked === true,
+    // Never carried across a reload -- a stale toast from a session that
+    // never got to see it should not resurface out of context later.
+    pendingNotifications: [],
   };
 }
 
@@ -1297,6 +1311,7 @@ type Action =
   | { type: 'setWorldInvertEnabled'; enabled: boolean }
   | { type: 'setPaletteInvertEnabled'; enabled: boolean }
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
+  | { type: 'dismissNotifications'; ids: string[] }
   | { type: 'buyGenerator'; id: string; now: number }
   | { type: 'refreshGeneratorIncome'; now: number }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
@@ -1748,6 +1763,17 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'dismissNotifications': {
+      const ids = new Set(action.ids);
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          pendingNotifications: state.meta.pendingNotifications.filter((n) => !ids.has(n.id)),
+        },
+      };
+    }
+
     case 'refreshGeneratorIncome':
       return { ...state, meta: { ...state.meta, ...settleGeneratorIncome(state.meta, action.now) } };
 
@@ -2027,6 +2053,31 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
       next.unlockedCharacterIds = [...next.unlockedCharacterIds, ...newlyUnlocked];
 
+      // Director defeat -> a one-time permanent unlock plus a queued
+      // announcement the hub screen drains on the player's next visit. See
+      // "Add a notification system" -- this queue is generic on purpose, so
+      // a future unlock trigger only needs to push another entry here.
+      if (
+        result.directorDefeated &&
+        result.directorEncounterId &&
+        !prev.defeatedDirectorIds.includes(result.directorEncounterId)
+      ) {
+        const director = DIRECTORS.find((d) => d.id === result.directorEncounterId);
+        next.defeatedDirectorIds = addUnique(prev.defeatedDirectorIds, result.directorEncounterId);
+        next.directorModeUnlocked = true;
+        next.pendingNotifications = [
+          ...prev.pendingNotifications,
+          {
+            id: `director-${result.directorEncounterId}-${Date.now()}`,
+            title: director ? `${director.name} defeated` : 'Director defeated',
+            body: director
+              ? `${director.toggleLabel} is now available as a run toggle on the Roster screen.`
+              : 'A new run toggle is now available on the Roster screen.',
+            createdAt: Date.now(),
+          },
+        ];
+      }
+
       return {
         meta: next,
         lastRun: {
@@ -2116,6 +2167,7 @@ export interface MetaContextValue {
   setWorldInvertEnabled: (enabled: boolean) => void;
   setPaletteInvertEnabled: (enabled: boolean) => void;
   toggleRunModifier: (key: keyof RunModifiers) => void;
+  dismissNotifications: (ids: string[]) => void;
   buyGenerator: (id: string) => void;
   refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
@@ -2262,6 +2314,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     [],
   );
   const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
+  const dismissNotifications = useCallback((ids: string[]) => dispatch({ type: 'dismissNotifications', ids }), []);
   const buyGenerator = useCallback((id: string) => dispatch({ type: 'buyGenerator', id, now: Date.now() }), []);
   const refreshGeneratorIncome = useCallback(() => dispatch({ type: 'refreshGeneratorIncome', now: Date.now() }), []);
   const setUiDensity = useCallback(
@@ -2371,6 +2424,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setWorldInvertEnabled,
       setPaletteInvertEnabled,
       toggleRunModifier,
+      dismissNotifications,
       buyGenerator,
       refreshGeneratorIncome,
       setUiDensity,
@@ -2443,6 +2497,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setWorldInvertEnabled,
     setPaletteInvertEnabled,
     toggleRunModifier,
+    dismissNotifications,
     buyGenerator,
     refreshGeneratorIncome,
     setUiDensity,
