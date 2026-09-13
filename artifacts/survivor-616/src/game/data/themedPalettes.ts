@@ -2,7 +2,13 @@ import type { ThemedPaletteDef } from '@/game/types';
 
 /**
  * Purchasable character/world color palettes for cosmetic customization.
- * Applied globally to affect character sprites, enemies, and environmental colors.
+ * Always blended into the player's own sprite and light-ring effect
+ * (`worldPaletteBlendEnabled`, on by default). Recoloring enemies and
+ * environmental accents (obstacles, arena edges) too is a separate,
+ * off-by-default settings toggle (`worldColorFullRecolorEnabled` in
+ * `MetaState`, "Full world recolor" in Settings) since it's a much bigger
+ * visual change -- see the blend logic gated on `World.worldColorFullRecolor`
+ * in `render/draw.ts`.
  */
 export const THEMED_PALETTES: ThemedPaletteDef[] = [
   {

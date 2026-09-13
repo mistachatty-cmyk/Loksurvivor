@@ -265,5 +265,15 @@ export const EVOLUTIONS: EvolutionDef[] = [
     behavior: { kind: 'field', radius: 0.5 },
     result: { ...WEAPONS_BY_ID['hard-light-stylus']!, id: 'scratch-track', name: 'Scratch Track', description: 'The disc leaves a lingering, jagged trail of neon audio-wave sparks that keep damaging enemies who walk over it.', damage: 24, cooldownMs: 860, color: '#ff5c7a' },
   },
+  {
+    id: 'data-wipe',
+    name: 'Data Wipe',
+    description: 'Every pass corrupts what it hits, scrambling its position for a few seconds.',
+    identity: 'A corrupting sweep that destabilizes anything it clips.',
+    baseWeaponId: 'the-bus',
+    requiredPassiveId: 'backup-drive',
+    color: '#ff2fd0',
+    result: { ...WEAPONS_BY_ID['the-bus']!, id: 'data-wipe', name: 'Data Wipe', description: 'Every pass corrupts what it hits, scrambling its position for a few seconds.', damage: 46, cooldownMs: 4000, color: '#ff2fd0', statusEffectId: 'corrupted' },
+  },
 ];
 export const EVOLUTIONS_BY_ID: Record<string, EvolutionDef> = Object.fromEntries(EVOLUTIONS.map((evolution) => [evolution.id, evolution]));

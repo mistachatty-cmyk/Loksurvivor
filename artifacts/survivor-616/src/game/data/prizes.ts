@@ -24,7 +24,7 @@ export const PRIZE_TABLE: PrizeEntry[] = [
   { weight: 5, prize: { kind: 'stat', stat: 'haste', add: -0.08, label: '-8% Cooldowns' } },
   { weight: 4, prize: { kind: 'stat', stat: 'speed', add: 12, label: '+12 Speed' } },
   // Temporary companions — the chest generates the complete variant sheet.
-  { weight: 9, prize: { kind: 'lokpet', label: 'LokPet signal' } },
+  { weight: 9, prize: { kind: 'lokpet', label: 'LokPet hatch' } },
 ];
 
 /** Visual face shown on each reel strip panel. */
@@ -46,11 +46,16 @@ export function prizeToFaceIndex(prize: LootPrizeDef): number {
   return 5; // LokPet
 }
 
-export function rollPrize(rng: () => number): LootPrizeDef {
-  const totalWeight = PRIZE_TABLE.reduce((s, e) => s + e.weight, 0);
+export function rollPrize(rng: () => number, lokPetWeightMultiplier = 1): LootPrizeDef {
+  const weightedEntries = PRIZE_TABLE.map((entry) => ({
+    entry,
+    weight: entry.prize.kind === 'lokpet' ? entry.weight * Math.max(1, lokPetWeightMultiplier) : entry.weight,
+  }));
+  const totalWeight = weightedEntries.reduce((sum, candidate) => sum + candidate.weight, 0);
   let roll = rng() * totalWeight;
-  for (const entry of PRIZE_TABLE) {
-    roll -= entry.weight;
+  for (const candidate of weightedEntries) {
+    const { entry } = candidate;
+    roll -= candidate.weight;
     if (roll <= 0) {
       if (entry.prize.kind === 'lokpet') {
         const lokPet = rollLokPet(rng);

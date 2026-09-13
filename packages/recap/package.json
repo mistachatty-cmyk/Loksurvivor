@@ -7,6 +7,7 @@
   "types": "src/adapter.ts",
   "exports": {
     ".": "./src/adapter.ts",
+    "./player": "./src/player.tsx",
     "./schema": "./src/schema.ts",
     "./poster": "./src/poster/drawPosterCard.ts"
   },
@@ -21,6 +22,7 @@
   },
   "dependencies": {
     "@remotion/cli": "catalog:",
+    "@remotion/player": "catalog:",
     "remotion": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

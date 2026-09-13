@@ -178,14 +178,18 @@ roster id that no longer exists. `squadWave`'s own `burst` still means
 ### Cross-cutting rules to respect when adding an `ObstacleDef` kind
 
 Adding a new obstacle kind touches several exhaustive/lookup structures at
-once — confirmed by hitting each of these when `vending-machine` was added:
-`types.ts` (`ObstacleDef['kind']` union), `world.ts` (`BREAKABLE_HP`,
-`PUSHABLE_KINDS` if it should be shovable, the damage-particle/xp-drop
-branches in `damageBreakable`), `draw.ts` (`OBSTACLE_COLORS`, and the
-light-source/shadow-exclusion filters if it glows), and `chunks.ts` (the
-`sizes` record is an exhaustive `Record<ObstacleDef['kind'], ...>` for
-endless-mode chunk generation, even if the kind isn't added to `KINDS`/the
-per-variant weight tables).
+once — confirmed by hitting each of these both when `vending-machine` and
+later `server-rack` (Null Sector, see null-sector.md) were added: `types.ts`
+(`ObstacleDef['kind']` union), `world.ts` (`OBSTACLE_WEIGHT_PROFILES` sets HP
+and movability variant together — an entry with no `hp` reads as
+indestructible; movability comes from `propProfile()`'s `propVariant`
+mapping, not a separate pushable-kinds list — plus any per-kind branch in
+`damageBreakable` for on-destroy effects), `draw.ts` (`OBSTACLE_COLORS`, and
+*both* the light-source list and its shadow-exclusion counterpart if it
+glows — they're two separate `.includes([...])` filters that must stay in
+sync), and `chunks.ts` (the `sizes` record is an exhaustive
+`Record<ObstacleDef['kind'], ...>` for endless-mode chunk generation, even if
+the kind isn't added to `KINDS`/the per-variant weight tables).
 
 ### Adding an enemy, checklist
 
@@ -236,4 +240,17 @@ just *what*, so the reasoning doesn't need to be re-derived:
   dimensions in `draw.ts` instead), and the endless-mode difficulty caps
   (`hpMult` ≤ 1.7, spawn rate ≤ 3.2/s) — any new difficulty multiplier must
   be composed *inside* those `Math.min()` calls, never stacked on top.
+- `rts-mechanics-roadmap.md` — before building any character ability that
+  casts, then drag-selects a result, then issues a follow-up command
+  (RTS-shaped, multi-step, stateful across input frames), read this first:
+  it's neither a `DashSkillDef` kind nor an `UltimateDef.effect` (both are
+  proven poor fits, see `zero-day-freeze-throw.md`), and reuses concrete
+  pieces (the `PointerMode` extension pattern, world-space box selection,
+  the DOM marquee overlay) that already exist rather than re-deriving them.
+- `sector-command-design.md` — read before touching Sector Command (the
+  dev-gated RTS/campaign mode) or anything it hooks into: why captured units
+  are excluded at `damageEnemy()` and not just at targeting, why `commanded`
+  is separate from the allymaker's `convertedUntil`, the mobile rule that the
+  movement stick and the RTS pointer grammar never share a pointer-down, and
+  the Tier 2/3 economies that are typed but deliberately unbuilt.
 - `MEMORY.md` — index/entry point for the above.

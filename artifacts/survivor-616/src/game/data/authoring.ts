@@ -83,3 +83,53 @@ export function squadWave(seed: {
     faction: faction.name,
   };
 }
+
+/**
+ * Builds a repeating escalation rhythm: one enemy's spawn rate climbs in
+ * `steps` equal jumps across a `cycleSec` window, then resets back to the
+ * base rate and starts over, for as many cycles as fit in `matchLengthSec`.
+ * Returns a flat `WaveDef[]` -- spread it directly into an `AreaDef.waves`
+ * array alongside any flat, non-escalating waves for baseline pressure.
+ *
+ * Example: `baseRatePerSec: 0.4, cycleSec: 120, steps: 4` produces, every
+ * 120s, four 30s-wide waves at 0.4/0.8/1.2/1.6 enemies-per-second before
+ * dropping back to 0.4 for the next cycle -- "every 30 seconds it gets
+ * worse, four times, then it resets."
+ */
+export function escalatingWaves(opts: {
+  enemyId: string;
+  baseRatePerSec: number;
+  matchLengthSec: number;
+  /** Length of one escalate-then-reset cycle, in seconds. Defaults to 120. */
+  cycleSec?: number;
+  /** Escalation steps per cycle. Defaults to 4. */
+  steps?: number;
+  hpMult?: number;
+  formation?: WaveDef['formation'];
+  faction?: string;
+}): WaveDef[] {
+  const cycleSec = opts.cycleSec ?? 120;
+  const steps = opts.steps ?? 4;
+  const stepSec = cycleSec / steps;
+  const cycleCount = Math.ceil(opts.matchLengthSec / cycleSec);
+  const waves: WaveDef[] = [];
+  for (let cycle = 0; cycle < cycleCount; cycle += 1) {
+    const cycleStart = cycle * cycleSec;
+    for (let step = 0; step < steps; step += 1) {
+      const fromSec = cycleStart + step * stepSec;
+      if (fromSec >= opts.matchLengthSec) break;
+      const toSec = Math.min(cycleStart + (step + 1) * stepSec, opts.matchLengthSec);
+      waves.push({
+        fromSec,
+        toSec,
+        enemyId: opts.enemyId,
+        ratePerSec: opts.baseRatePerSec * (step + 1),
+        burst: 1,
+        hpMult: opts.hpMult,
+        formation: opts.formation,
+        faction: opts.faction,
+      });
+    }
+  }
+  return waves;
+}

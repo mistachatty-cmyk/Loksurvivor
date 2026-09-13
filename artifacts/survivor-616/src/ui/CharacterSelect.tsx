@@ -5,7 +5,7 @@
 import { Fragment, useEffect } from 'react';
 import { BookOpen, LockKeyhole, Zap } from 'lucide-react';
 
-import { describeUnlock, effectiveStats, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
+import { describeUnlock, effectiveStats, episodeProgress, episodeStatus, lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
 import { getCharacterSkins, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
@@ -72,6 +72,7 @@ function CharacterDetail({
           {character.rarity === 'legendary' ? <span className="font-mono text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">Legendary</span> : null}
           <h3 className="terminal-glow truncate text-lg font-black uppercase leading-tight text-white">{character.name}</h3>
           <p className="truncate text-[11px] font-bold uppercase tracking-wider text-primary">{character.handle}</p>
+          {character.crew ? <p className="truncate font-mono text-[8px] uppercase tracking-widest text-sky-300">{character.crew.name} · {character.crew.role}</p> : null}
         </div>
       </div>
 
@@ -112,6 +113,11 @@ function CharacterDetail({
 
       <div className={inline ? 'min-w-[14rem] flex-1' : ''}>
         <p className="text-xs italic text-muted-foreground">&ldquo;{character.tagline}&rdquo;</p>
+        {character.lokPetCollector ? (
+          <div className="mt-2 border border-pink-300/35 bg-pink-300/10 p-2 font-mono text-[9px] uppercase tracking-wider text-pink-100" data-testid={`collector-rank-${character.id}`}>
+            {character.lokPetCollector.rank} · +{character.lokPetCollector.extraTeamSlots} team slots · {character.lokPetCollector.lokPetPrizeWeightMultiplier.toFixed(2)}× LokPet pulls
+          </div>
+        ) : null}
         {character.signatureTraits ? (
           <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`character-traits-${character.id}`}>
             {character.signatureTraits.map((trait) => (
@@ -280,6 +286,11 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
     return () => window.clearInterval(timer);
   }, [refreshPetElixirs]);
   const layout = meta.uiPanelLayout;
+  const unlockedCollectors = unlockedCharacters.filter((character) => character.lokPetCollector);
+  const lockedCollectors = lockedCharacters.filter((character) => character.lokPetCollector);
+  const unlockedOperatives = unlockedCharacters.filter((character) => !character.lokPetCollector);
+  const lockedOperatives = lockedCharacters.filter((character) => !character.lokPetCollector);
+  const petTeamCapacity = lokPetTeamCapacity(selectedCharacter);
 
   return (
     <ScreenLayout
@@ -315,7 +326,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-black uppercase text-white">LokPet loadout</h2>
-                <p className="text-xs text-muted-foreground">Select up to three saved companions. Elixirs regenerate 3 every 20 minutes.</p>
+                <p className="text-xs text-muted-foreground">Select up to {petTeamCapacity} saved companions. Elixirs regenerate 3 every 20 minutes.</p>
               </div>
               <span className="font-mono text-sm text-pink-200">{meta.petElixirs} elixir</span>
             </div>
@@ -349,24 +360,26 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
         {layout === 'rail' ? (
           <div className="grid gap-4 lg:grid-cols-[20rem_1fr]" data-testid="section-roster-grid">
             <CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} onSelectSkin={selectCharacterSkin} />
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {unlockedCharacters.map((character) => (
-                <CharacterTile
-                  key={character.id}
-                  character={character}
-                  selected={character.id === selectedCharacter.id}
-                  onSelect={() => selectCharacter(character.id)}
-                  palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
-                />
-              ))}
-              {lockedCharacters.map((character) => (
-                <LockedCharacterTile key={character.id} character={character} />
-              ))}
+            <div className="space-y-5">
+              <section aria-labelledby="standard-roster-heading">
+                <h2 id="standard-roster-heading" className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Operatives</h2>
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                  {unlockedOperatives.map((character) => <CharacterTile key={character.id} character={character} selected={character.id === selectedCharacter.id} onSelect={() => selectCharacter(character.id)} palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)} />)}
+                  {lockedOperatives.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                </div>
+              </section>
+              <section aria-labelledby="collector-roster-heading" className="border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
+                <div className="mb-2 flex items-end justify-between gap-3"><div><h2 id="collector-roster-heading" className="font-black uppercase text-pink-100">LokPet Collectors</h2><p className="text-[9px] text-muted-foreground">Complete collector runs and catch LokPets to climb ranks.</p></div><span className="font-mono text-[9px] text-pink-200">{meta.lokCollectorRuns} runs · {meta.lokCollectorPetsFound} caught</span></div>
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                  {unlockedCollectors.map((character) => <CharacterTile key={character.id} character={character} selected={character.id === selectedCharacter.id} onSelect={() => selectCharacter(character.id)} palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)} />)}
+                  {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                </div>
+              </section>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 [grid-auto-flow:dense]" data-testid="section-roster-grid">
-            {unlockedCharacters.map((character) => (
+            {unlockedOperatives.map((character) => (
               <Fragment key={character.id}>
                 <CharacterTile
                   character={character}
@@ -381,9 +394,21 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                 ) : null}
               </Fragment>
             ))}
-            {lockedCharacters.map((character) => (
+            {lockedOperatives.map((character) => (
               <LockedCharacterTile key={character.id} character={character} />
             ))}
+            <div className="col-span-full mt-3 border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
+              <div className="mb-2 flex items-end justify-between gap-3"><div><h2 className="font-black uppercase text-pink-100">LokPet Collectors</h2><p className="text-[9px] text-muted-foreground">Complete collector runs and catch LokPets to climb ranks.</p></div><span className="font-mono text-[9px] text-pink-200">{meta.lokCollectorRuns} runs · {meta.lokCollectorPetsFound} caught</span></div>
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 [grid-auto-flow:dense]">
+                {unlockedCollectors.map((character) => (
+                  <Fragment key={character.id}>
+                    <CharacterTile character={character} selected={character.id === selectedCharacter.id} onSelect={() => selectCharacter(character.id)} palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)} />
+                    {character.id === selectedCharacter.id ? <div className="col-span-full"><CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} onSelectSkin={selectCharacterSkin} inline /></div> : null}
+                  </Fragment>
+                ))}
+                {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+              </div>
+            </div>
           </div>
         )}
       </div>

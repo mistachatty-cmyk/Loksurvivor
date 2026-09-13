@@ -269,6 +269,20 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#fef9c3', skin: '#c2410c', glow: '#fde047',
     },
   },
+  {
+    id: 'archivist',
+    name: 'Archivist',
+    role: 'Rogue process',
+    blurb: 'Something in Null Sector that kept a log nobody asked it to. Followed the exit route out and never stopped indexing the hideout.',
+    room: 'the-cellar',
+    boost: { crit: 0.04 },
+    boostLabel: '+4% crit chance',
+    preferredActivityIds: ['study-anomalies', 'press-new-records'],
+    palette: {
+      ink: '#020617', body: '#052e1a', bodyDark: '#031a0f', accent: '#22c55e',
+      accentBright: '#bbf7d0', skin: '#0f3d24', glow: '#4ade80',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
@@ -316,7 +330,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'studio', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'studio', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
   },
   {
     id: 'rooftop-perch',
@@ -371,7 +385,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/street.jpeg',
     biome: 'archive',
     unlock: { kind: 'discovery', discoveryId: 'arcade-high-score' },
-    features: ['allies', 'vendor', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['allies', 'vendor', 'studio', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
   },
 ];
 
@@ -397,6 +411,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'choir-hymn', name: 'The Choir\'s Hymn', blurb: 'Twenty verses, one voice each, none of them singing anything you could ever hum back.' },
   { id: 'arcade-high-score', name: 'The High Score', blurb: 'A cabinet screen still glowing under the dust, top of the board initials burned into the phosphor.' },
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
+  { id: 'null-sector-log', name: 'The Null Sector Log', blurb: 'A maintenance log with no author field. Every entry ends the same way: "still running."' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

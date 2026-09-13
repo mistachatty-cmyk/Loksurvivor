@@ -9,6 +9,7 @@ export const PASSIVES: PassiveDef[] = [
   { id: 'torn-page', name: 'Torn Page', description: '+15% damage. Evolves Ledger Page into Full Ledger.', weight: 7, maxStacks: 1, effects: [{ kind: 'stat', stat: 'power', mult: 1.15 }] },
   { id: 'master-key', name: 'Master Key', description: '+16% area. Evolves House Key into Master Key.', weight: 7, maxStacks: 1, effects: [{ kind: 'stat', stat: 'area', mult: 1.16 }] },
   { id: 'disco-ball', name: 'Disco Ball', description: '+14% area. Evolves Riot Disc into Mirror Ball.', weight: 7, maxStacks: 1, effects: [{ kind: 'stat', stat: 'area', mult: 1.14 }] },
+  { id: 'backup-drive', name: 'Backup Drive', description: '+12% damage. Evolves The Bus into Data Wipe.', weight: 7, maxStacks: 1, effects: [{ kind: 'stat', stat: 'power', mult: 1.12 }] },
 ];
 
 export const PASSIVES_BY_ID: Record<string, PassiveDef> = Object.fromEntries(PASSIVES.map((passive) => [passive.id, passive]));
