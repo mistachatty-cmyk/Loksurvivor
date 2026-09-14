@@ -1897,7 +1897,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (!def.isComplete(state.meta)) return state;
       const currencyPatch = def.reward.kind === 'cred'
         ? { cred: state.meta.cred + def.reward.amount }
-        : { lootTokens: state.meta.lootTokens + def.reward.amount };
+        : def.reward.kind === 'lootTokens'
+          ? { lootTokens: state.meta.lootTokens + def.reward.amount }
+          : { cardCredits: state.meta.cardCredits + def.reward.amount };
       return {
         ...state,
         meta: {

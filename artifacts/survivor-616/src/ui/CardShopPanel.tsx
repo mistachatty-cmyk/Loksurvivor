@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Check, CreditCard, Layers3, LockKeyhole, PackageOpen, Sparkles } from 'lucide-react';
+import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { CARD_SHOP_PACKS, PASSIVE_CARDS, activeCardEffects, passiveDeckSlots } from '@/game/data/passiveCards';
+import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { BASE_CARD_CREDITS_PER_LOOT_BOX, useMeta } from '@/game/state/metaStore';
 import { LockDeckCollection } from './LockDeckCollection';
 import { PackOpeningReveal } from './PackOpeningReveal';
@@ -17,6 +19,7 @@ const SHOP_TABS: { id: ShopTab; label: string; icon: typeof PackageOpen }[] = [
 
 export function CardShopPanel({ onBack }: { onBack: () => void }) {
   const { meta, buyCardPack, togglePassiveCard, lastCardPackReveal, clearCardPackReveal } = useMeta();
+  const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const [tab, setTab] = useState<ShopTab>('binder');
   const [showAll, setShowAll] = useState(false);
   const owned = new Map(meta.cardCollection.map((record) => [record.cardId, record]));
@@ -46,9 +49,9 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
             <button
               key={card.id}
               type="button"
-              onClick={() => togglePassiveCard(card.id)}
+              onClick={() => { togglePassiveCard(card.id); sfx.play('uiClick'); }}
               disabled={!record || (!active && meta.activePassiveCardIds.length >= slots)}
-              className={`border p-3 text-left ${active ? 'border-fuchsia-300 bg-fuchsia-300/10' : record ? 'border-white/15' : 'border-white/[.07] opacity-45'}`}
+              className={`border p-3 text-left transition-all active:scale-[0.97] ${active ? 'border-fuchsia-300 bg-fuchsia-300/10' : record ? 'border-white/15' : 'border-white/[.07] opacity-45'}`}
             >
               <span className={`text-[9px] uppercase ${RARITY_COLOR[card.rarity]}`}>{card.type} · {card.rarity}{record ? ` · x${record.copies} · ${record.bestVariant}` : ''}</span>
               <span className="mt-1 flex justify-between font-display text-sm font-black uppercase text-white">{record ? card.name : 'Unknown Signal'}{active && <Check className="h-4 w-4" />}</span>
@@ -66,7 +69,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         <div className="flex items-center gap-2"><PackageOpen className="h-5 w-5 text-fuchsia-200" /><h2 className="font-black uppercase text-white">Lock Deck Binder</h2></div>
         <span className="font-mono text-xs text-white/55">{CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).length}/{CARD_MANIFESTS.length} subjects · {meta.cardCollection.reduce((sum, card) => sum + card.copies, 0)} copies</span>
       </div>
-      <LockDeckCollection meta={meta} listView={meta.uiDensity === 'list'} />
+      <LockDeckCollection meta={meta} listView={meta.uiDensity === 'list'} sfx={sfx} />
     </div>
   );
 
@@ -84,25 +87,23 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         </div>
       </section>
 
-      <div className="mb-8 overflow-x-auto pb-3">
-        <div className="grid min-w-[1100px] grid-cols-6 gap-3">
-          {CARD_SHOP_PACKS.map((pack) => (
-            <article key={pack.id} className="flex min-h-56 flex-col border border-white/15 bg-black/30 p-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-fuchsia-200">{pack.cards} cards</span>
-              <h3 className="mt-5 font-display text-xl font-black uppercase text-white">{pack.name}</h3>
-              <p className="mt-3 text-[11px] text-white/50">{pack.description}</p>
-              <button
-                type="button"
-                onClick={() => buyCardPack(pack.id)}
-                disabled={meta.cardCredits < pack.cost}
-                className="mt-auto border border-fuchsia-200/50 bg-fuchsia-300/10 px-3 py-2.5 font-mono text-[10px] font-black uppercase text-fuchsia-100 disabled:opacity-35"
-                data-testid={`button-buy-pack-${pack.id}`}
-              >
-                Open · {pack.cost} CC
-              </button>
-            </article>
-          ))}
-        </div>
+      <div className="mb-8 flex snap-x gap-3 overflow-x-auto pb-3 sm:grid sm:snap-none sm:grid-cols-3 sm:overflow-visible sm:pb-0 lg:grid-cols-6">
+        {CARD_SHOP_PACKS.map((pack) => (
+          <article key={pack.id} className="flex min-h-56 w-[220px] shrink-0 snap-start flex-col border border-white/15 bg-black/30 p-4 sm:w-auto">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-fuchsia-200">{pack.cards} cards</span>
+            <h3 className="mt-5 font-display text-xl font-black uppercase text-white">{pack.name}</h3>
+            <p className="mt-3 text-[11px] text-white/50">{pack.description}</p>
+            <button
+              type="button"
+              onClick={() => { buyCardPack(pack.id); sfx.play('purchase'); }}
+              disabled={meta.cardCredits < pack.cost}
+              className="mt-auto border border-fuchsia-200/50 bg-fuchsia-300/10 px-3 py-2.5 font-mono text-[10px] font-black uppercase text-fuchsia-100 transition-all active:scale-[0.97] disabled:opacity-35 disabled:active:scale-100"
+              data-testid={`button-buy-pack-${pack.id}`}
+            >
+              Open · {pack.cost} CC
+            </button>
+          </article>
+        ))}
       </div>
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3" data-testid="card-shop-nav">
@@ -114,8 +115,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
               <button
                 key={t.id}
                 type="button"
-                onClick={() => { setTab(t.id); setShowAll(false); }}
-                className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${active ? 'border-fuchsia-300 bg-fuchsia-300/10 text-fuchsia-100' : 'border-white/15 text-white/50 hover:border-white/35 hover:text-white'}`}
+                onClick={() => { setTab(t.id); setShowAll(false); sfx.play('uiNav'); }}
+                className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-all active:scale-[0.97] ${active ? 'border-fuchsia-300 bg-fuchsia-300/10 text-fuchsia-100' : 'border-white/15 text-white/50 hover:border-white/35 hover:text-white'}`}
                 data-testid={`button-shop-tab-${t.id}`}
               >
                 <Icon className="h-4 w-4" />
@@ -126,8 +127,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         </div>
         <button
           type="button"
-          onClick={() => setShowAll((value) => !value)}
-          className={`font-mono text-[9px] font-black uppercase tracking-widest ${showAll ? 'text-fuchsia-200' : 'text-white/40 hover:text-white/70'}`}
+          onClick={() => { setShowAll((value) => !value); sfx.play('uiClick'); }}
+          className={`font-mono text-[9px] font-black uppercase tracking-widest transition-all active:scale-[0.97] ${showAll ? 'text-fuchsia-200' : 'text-white/40 hover:text-white/70'}`}
           data-testid="button-shop-show-all"
         >
           {showAll ? 'Showing both · scroll to browse' : 'Show both instead'}
@@ -145,6 +146,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         <PackOpeningReveal
           reveal={lastCardPackReveal}
           cardCredits={meta.cardCredits}
+          sfx={sfx}
           onOpenAnother={() => buyCardPack(lastCardPackReveal.packId)}
           onClose={clearCardPackReveal}
         />

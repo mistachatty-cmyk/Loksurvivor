@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { PackageOpen, Sparkles, X } from 'lucide-react';
 
+import type { SfxPlayer } from '@/game/audio/useSfxPlayer';
 import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
 import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, type CardPull } from '@/game/data/passiveCards';
 import type { CardPackReveal } from '@/game/state/metaStore';
@@ -35,7 +36,7 @@ function PulledCardFace({ pull, size }: { pull: CardPull; size: 'focal' | 'tray'
       <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 30%, ${rarity.glow}, transparent 70%)` }} aria-hidden="true" />
       <div className="relative grid flex-1 place-items-center p-2">
         {info.manifest ? (
-          <CardArtwork card={info.manifest} size={size === 'focal' ? 150 : 56} animated={size === 'focal'} />
+          <CardArtwork card={info.manifest} size={size === 'focal' ? 120 : 44} animated={size === 'focal'} />
         ) : (
           <Sparkles className={size === 'focal' ? 'h-12 w-12' : 'h-5 w-5'} style={{ color: rarity.edge }} />
         )}
@@ -61,7 +62,7 @@ function PackCardBack() {
 function FocalCard({ pull, flipped, isNew, onTap }: { pull: CardPull; flipped: boolean; isNew: boolean; onTap: () => void }) {
   const variant = VARIANT_STYLE[pull.variant];
   return (
-    <button type="button" onClick={onTap} className="relative h-full w-full [perspective:1000px]" data-testid="button-reveal-card" aria-label={flipped ? 'Reveal next card' : 'Reveal card'}>
+    <button type="button" onClick={onTap} className="relative h-full w-full [perspective:1000px] transition-transform active:scale-[0.97]" data-testid="button-reveal-card" aria-label={flipped ? 'Reveal next card' : 'Reveal card'}>
       <motion.div className="relative h-full w-full [transform-style:preserve-3d]" animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.45, ease: 'easeInOut' }}>
         <div className="absolute inset-0 [backface-visibility:hidden]">
           <PackCardBack />
@@ -91,11 +92,13 @@ function FocalCard({ pull, flipped, isNew, onTap }: { pull: CardPull; flipped: b
 export function PackOpeningReveal({
   reveal,
   cardCredits,
+  sfx,
   onOpenAnother,
   onClose,
 }: {
   reveal: CardPackReveal;
   cardCredits: number;
+  sfx?: SfxPlayer;
   onOpenAnother: () => void;
   onClose: () => void;
 }) {
@@ -106,6 +109,11 @@ export function PackOpeningReveal({
   const done = focusIndex >= reveal.pulls.length;
   const canReopen = cardCredits >= pack.cost;
 
+  const flipUp = () => {
+    setFocalFlipped(true);
+    sfx?.play('cardPack');
+  };
+
   useEffect(() => {
     setFocusIndex(0);
   }, [reveal]);
@@ -114,13 +122,18 @@ export function PackOpeningReveal({
     if (done) return;
     setFocalFlipped(false);
     advancedRef.current = false;
-    const flipTimer = setTimeout(() => setFocalFlipped(true), FLIP_DELAY_MS);
+    const flipTimer = setTimeout(flipUp, FLIP_DELAY_MS);
     return () => clearTimeout(flipTimer);
+    // flipUp is a stable per-render closure over refs/setState/sfx only; re-running
+    // this effect on every render would be harmless but pointless, so it's scoped to
+    // the two values that actually change the outcome.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusIndex, done]);
 
   const advance = () => {
     if (advancedRef.current) return;
     advancedRef.current = true;
+    sfx?.play('uiClick');
     setFocusIndex((i) => i + 1);
   };
 
@@ -134,14 +147,14 @@ export function PackOpeningReveal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focalFlipped, done]);
 
-  const handleFocalTap = () => (focalFlipped ? advance() : setFocalFlipped(true));
+  const handleFocalTap = () => (focalFlipped ? advance() : flipUp());
 
   return (
-    <div className="fixed inset-0 z-[95] grid place-items-center bg-black/90 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Lock Pack opening">
+    <div className="fixed inset-0 z-[95] grid place-items-center overflow-y-auto bg-black/90 p-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Lock Pack opening">
       <button
         type="button"
-        onClick={onClose}
-        className="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center border border-white/20 bg-black/70 text-white hover:border-white/50"
+        onClick={() => { onClose(); sfx?.play('uiNav'); }}
+        className="absolute right-4 top-4 z-20 grid h-10 w-10 place-items-center border border-white/20 bg-black/70 text-white transition-all active:scale-[0.97] hover:border-white/50"
         aria-label="Close pack opening"
         data-testid="button-close-pack-reveal"
       >
@@ -162,7 +175,7 @@ export function PackOpeningReveal({
           <p className="mt-4 text-[10px] uppercase tracking-widest text-white/35">Tap the card to reveal it</p>
         )}
 
-        <div className="mt-6 flex min-h-56 w-full flex-wrap items-center justify-center gap-3">
+        <div className="mt-6 flex min-h-44 w-full flex-wrap items-center justify-center gap-2 sm:min-h-56 sm:gap-3">
           {reveal.pulls.map((pull, index) => {
             const state = index < focusIndex || done ? 'settled' : index === focusIndex ? 'focal' : 'queued';
             return (
@@ -170,7 +183,7 @@ export function PackOpeningReveal({
                 key={index}
                 layout
                 transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-                className={state === 'focal' ? 'h-52 w-40' : state === 'settled' ? 'h-20 w-16' : 'h-16 w-12 opacity-40'}
+                className={state === 'focal' ? 'h-40 w-32 sm:h-52 sm:w-40' : state === 'settled' ? 'h-16 w-12 sm:h-20 sm:w-16' : 'h-14 w-10 opacity-40 sm:h-16 sm:w-12'}
               >
                 {state === 'focal' ? (
                   <FocalCard pull={pull} flipped={focalFlipped} isNew={reveal.newFlags[index] ?? false} onTap={handleFocalTap} />
@@ -189,7 +202,7 @@ export function PackOpeningReveal({
             <button
               type="button"
               onClick={handleFocalTap}
-              className="border border-white/20 px-4 py-2.5 font-mono text-[10px] font-black uppercase tracking-widest text-white/60 hover:border-white/40"
+              className="border border-white/20 px-4 py-2.5 font-mono text-[10px] font-black uppercase tracking-widest text-white/60 transition-all active:scale-[0.97] hover:border-white/40"
               data-testid="button-skip-card-reveal"
             >
               Skip
@@ -199,17 +212,17 @@ export function PackOpeningReveal({
             <>
               <button
                 type="button"
-                onClick={onOpenAnother}
+                onClick={() => { onOpenAnother(); sfx?.play('purchase'); }}
                 disabled={!canReopen}
-                className="border border-fuchsia-200/50 bg-fuchsia-300/10 px-5 py-2.5 font-mono text-[10px] font-black uppercase text-fuchsia-100 disabled:opacity-35"
+                className="border border-fuchsia-200/50 bg-fuchsia-300/10 px-5 py-2.5 font-mono text-[10px] font-black uppercase text-fuchsia-100 transition-all active:scale-[0.97] disabled:opacity-35 disabled:active:scale-100"
                 data-testid="button-open-another-pack"
               >
                 Open Another · {pack.cost} CC
               </button>
               <button
                 type="button"
-                onClick={onClose}
-                className="border border-white/20 px-5 py-2.5 font-mono text-[10px] font-black uppercase tracking-widest text-white/70 hover:border-white/40"
+                onClick={() => { onClose(); sfx?.play('uiNav'); }}
+                className="border border-white/20 px-5 py-2.5 font-mono text-[10px] font-black uppercase tracking-widest text-white/70 transition-all active:scale-[0.97] hover:border-white/40"
                 data-testid="button-done-pack-reveal"
               >
                 Done
