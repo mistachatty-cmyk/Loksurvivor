@@ -10,6 +10,8 @@ import { getCharacter } from '@/game/data/characters';
 import { blendSpritePalettes, getCharacterSkin } from '@/game/data/characterSkins';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { isPrimeFlickerVisit, isPrimeTakeoverActive, useMeta } from '@/game/state/metaStore';
+import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
+import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import type { AnimName, CosmeticTier, PaletteEffectKind, RunAuraStyle, SpritePalette } from '@/game/types';
 import { CosmeticPreview } from './CosmeticPreview';
 import { ScreenLayout } from './ScreenLayout';
@@ -95,6 +97,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
 
 export function PaletteGalleryPanel({ onBack }: Props) {
   const { meta, buyPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
+  const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const [category, setCategory] = useState<ShopCategory>('palettes');
   const [previewPaletteId, setPreviewPaletteId] = useState(meta.activePaletteId);
   const [previewAuraId, setPreviewAuraId] = useState(meta.activeRunAuraId);
@@ -137,6 +140,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     const palette = THEMED_PALETTES.find((entry) => entry.id === paletteId);
     if (!palette || meta.ownedPaletteIds.includes(palette.id) || meta.lootTokens < palette.cost) return;
     buyPalette(palette.id);
+    sfx.play('purchase');
     triggerReaction(`${palette.name} purchased for ${palette.cost} loot token${palette.cost === 1 ? '' : 's'}.`);
   };
 
@@ -144,9 +148,13 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     const aura = RUN_AURAS.find((entry) => entry.id === auraId);
     if (!aura || meta.ownedRunAuraIds.includes(aura.id) || meta.lootTokens < aura.cost) return;
     buyRunAura(aura.id);
+    sfx.play('purchase');
     triggerReaction(`${aura.name} purchased for ${aura.cost} loot token${aura.cost === 1 ? '' : 's'}.`);
   };
-  const buyCosmetic = (id: string, kind: 'hat' | 'celebration') => kind === 'hat' ? buyHat(id) : buyCelebration(id);
+  const buyCosmetic = (id: string, kind: 'hat' | 'celebration') => {
+    sfx.play('purchase');
+    if (kind === 'hat') buyHat(id); else buyCelebration(id);
+  };
 
   const previewWorldPalette = previewPaletteId === 'default' ? undefined : THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette;
   const previewPaletteEffect = meta.paletteAnimationsEnabled ? THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.effect?.kind : undefined;

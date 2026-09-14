@@ -40,6 +40,7 @@ import {
   pickHordeSpinTier,
 } from '@/game/data/hordeSpin';
 import { SILENT_FRAME, msFromNearestBeat, type AudioFrame } from '@/game/audio/beatBus';
+import type { SfxCueId, SfxEvent } from '@/game/audio/sfxCues';
 import { reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type {
   ActiveCrewRumor,
@@ -897,6 +898,13 @@ export interface World {
 
   rescue: RescueState;
   alerts: Alert[];
+  /**
+   * Gameplay-SFX cues raised this tick, drained and played once per rendered
+   * frame in `RunScreen` (same pattern as `pendingReel`/`pendingLevelUps` --
+   * never read mid-substep, or a slow frame would retrigger a cue several
+   * times).
+   */
+  sfxEvents: SfxEvent[];
   outcome: RunOutcome;
   deathCause?: RunResult['deathCause'];
 
@@ -1304,6 +1312,7 @@ export function createWorld(
       allyId: 'rescueAllyId' in setup ? setup.rescueAllyId : area.rescueAllyId,
     },
     alerts: [],
+    sfxEvents: [],
     outcome: 'running',
     upgradeStacks: {},
     spawnCredit: area.waves.map(() => 0),
@@ -1539,6 +1548,18 @@ function createPothole(w: World, obstacle: ObstacleDef): PotholeObstacle {
 function pushAlert(w: World, text: string) {
   w.alerts.push({ text, bornAt: w.now });
   if (w.alerts.length > 4) w.alerts.shift();
+}
+
+/**
+ * Queues a gameplay-SFX cue. `onBeat` is read from `isOnBeat(w)` here so
+ * every call site gets beat-reactivity for free -- same on-beat-bonus idiom
+ * `damageEnemy`'s crit check already uses, never a fresh alternative. The
+ * length cap is a safety net (`RunScreen` drains this every rendered frame,
+ * so it should never approach 24), not a normal-path limit.
+ */
+function pushSfx(w: World, cue: SfxCueId, onBeat: boolean = isOnBeat(w)) {
+  w.sfxEvents.push({ cue, onBeat });
+  if (w.sfxEvents.length > 24) w.sfxEvents.shift();
 }
 
 /**
@@ -1868,6 +1889,9 @@ function updateSpawning(w: World, dt: number) {
     // same way endless mode caps its own difficulty (endless-mode-engine.md).
     const infiniteActive = infiniteMode && wave.toSec === maxToSec && w.time > wave.toSec;
     if (!infiniteActive && (w.time < wave.fromSec || w.time > wave.toSec)) continue;
+    // Edge-trigger: this substep is the one that crossed into the wave's
+    // spawn window. `w.time - dt` puts the previous substep still outside it.
+    if (!infiniteActive && w.time - dt < wave.fromSec) pushSfx(w, 'waveStart');
     const infiniteTier = infiniteActive ? Math.floor((w.time - wave.toSec) / 20) : 0;
     const infiniteHpMult = infiniteActive ? Math.min(1.7, 1 + infiniteTier * 0.07) : 1;
     const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
@@ -2715,6 +2739,7 @@ function damageEnemy(
   const stealthBonus = w.now < w.stealthUntil ? 1 + (w.stealthConfig?.damageBonusPct ?? 0) : 1;
   const dealt = Math.max(1, Math.round((isCrit ? amount * 2 : amount) * beatBonus * stealthBonus));
   if (onBeat) w.onBeatHits += 1;
+  pushSfx(w, isCrit ? 'critHit' : 'hit', onBeat);
   enemy.hp -= dealt;
   // Sector Command: an enemy you have already worked into its capture window,
   // while standing next to it, must not evaporate to the next auto-fired shot.
@@ -2812,6 +2837,7 @@ function killEnemy(w: World, enemy: EnemyActor) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  pushSfx(w, enemy.def.family === 'Boss' ? 'bossKill' : 'kill');
   spawnParticles(w, enemy.x, enemy.y + enemy.radius, enemy.def.palette.accent, 8, 110);
 
   if (w.director.phase === 'active' && enemy.uid === w.director.bossUid) {
@@ -2948,6 +2974,7 @@ function damagePlayer(
   if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
   p.hp -= reduced;
+  pushSfx(w, 'playerHurt');
   p.invulnUntil = w.now + 420;
   p.hitFlashUntil = w.now + 160;
   p.anim = 'hurt';
@@ -2970,6 +2997,7 @@ function damagePlayer(
       p.invulnUntil = w.now + 1200;
       spawnParticles(w, p.x, p.y, '#4ade80', 16, 140);
       pushAlert(w, 'FRAGMENTED BACKUP RESTORED');
+      pushSfx(w, 'extraLifeSave');
       return;
     }
     p.hp = 0;
@@ -2977,6 +3005,7 @@ function damagePlayer(
     w.deathCause = 'ordinary-hazard';
     p.anim = 'death';
     p.animStartedAt = w.now;
+    pushSfx(w, 'playerDown');
   }
 }
 
@@ -3626,6 +3655,7 @@ export function activateUltimate(w: World): boolean {
   }
   w.shake = Math.max(w.shake, 12);
   pushAlert(w, ult.name);
+  pushSfx(w, 'ultimate');
   return true;
 }
 
@@ -3940,6 +3970,7 @@ function gainXp(w: World, amount: number) {
     w.level += 1;
     w.xpToNext = xpForLevel(w.level);
     w.pendingLevelUps += 1;
+    pushSfx(w, 'levelUp');
   }
 }
 
@@ -4183,6 +4214,7 @@ function damageBreakable(
     }
     b.broken = true;
     b.brokenAt = w.now;
+    pushSfx(w, 'obstacleBreak');
     const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : 10;
     spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : '#c99055', count, 130);
     if (b.kind === 'barrel') {
@@ -4849,6 +4881,7 @@ export function dashPlayer(w: World, directionX: number, directionY: number): bo
   w.player.vy = w.player.dashDirectionY * DASH_SPEED;
   w.shake = Math.max(w.shake, 9);
   spawnParticles(w, w.player.x, w.player.y, w.character.palette.accentBright, 12, 150);
+  pushSfx(w, 'dash');
   w.popups.push({
     x: w.player.x,
     y: w.player.y - 28,
@@ -6595,6 +6628,7 @@ function updateDirector(w: World) {
   state.phase = 'active';
   state.activeDirectorId = director.id;
   pushAlert(w, director.warningText);
+  pushSfx(w, 'bossWarning');
   w.shake = Math.max(w.shake, 10);
   state.bossUid = spawnDirectorSquad(w, director);
   // No boss in the roster (a data mistake) would otherwise strand the
@@ -6827,18 +6861,22 @@ function updatePickups(w: World, dt: number) {
       switch (pickup.kind) {
         case 'xp':
           gainXp(w, pickup.value);
+          pushSfx(w, 'pickupXp');
           break;
         case 'health':
           w.player.hp = clamp(w.player.hp + pickup.value, 0, w.player.maxHp);
           w.popups.push({ x: p.x, y: p.y + 26, text: `+${pickup.value}`, color: '#7dffb2', bornAt: w.now, vy: 30 });
+          pushSfx(w, 'pickupHealth');
           break;
         case 'cred':
           w.cred += pickup.value;
+          pushSfx(w, 'pickupCred');
           break;
         case 'coin':
           w.skeletonKeysGained += pickup.value;
           w.popups.push({ x: p.x, y: p.y - 20, text: `+${pickup.value} KEY`, color: '#e8d48a', bornAt: w.now, vy: 30 });
           pushAlert(w, 'Skeleton key found');
+          pushSfx(w, 'pickupKey');
           break;
         case 'loot-box': {
           // The prize is deliberately not granted until its reel lands. RunScreen
@@ -6850,6 +6888,7 @@ function updatePickups(w: World, dt: number) {
           spawnParticles(w, p.x, p.y + 10, '#3b82f6', 14, 120);
           w.shake = Math.max(w.shake, 8);
           pushAlert(w, `Box — ${prize.label}`);
+          pushSfx(w, 'lootBox');
           break;
         }
         case 'card-pack': {
@@ -6859,6 +6898,7 @@ function updatePickups(w: World, dt: number) {
           w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCK PACK', color: '#f0abfc', bornAt: w.now, vy: 30 });
           spawnParticles(w, p.x, p.y, '#f0abfc', 14, 110);
           pushAlert(w, 'Lock Pack secured');
+          pushSfx(w, 'cardPack');
           break;
         }
         case 'sweep': {
@@ -7734,6 +7774,12 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  // A heartbeat, not a per-frame alarm: `shouldPlayCue`'s throttle (see
+  // sfxCues.ts's MIN_RETRIGGER_MS) turns this plain per-frame condition into
+  // a slow pulse rather than a constant tone while low.
+  if (w.outcome === 'running' && w.player.hp > 0 && w.player.hp <= w.player.maxHp * 0.25) {
+    pushSfx(w, 'lowHealth');
+  }
   if (w.now >= w.nextPlayerTrailAt) {
     w.playerTrail.push({ x: w.player.x, y: w.player.y, at: w.now });
     w.nextPlayerTrailAt = w.now + 100;

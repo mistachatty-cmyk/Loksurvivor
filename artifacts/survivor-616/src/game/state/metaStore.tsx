@@ -54,6 +54,7 @@ import {
   uiLooksForOwnedThemeIds,
 } from '@/game/data/uiThemes';
 import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
+import { DEFAULT_SOUND_PACK_ID, SOUND_PACKS_BY_ID } from '@/game/data/soundPacks';
 import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
 import { DEFAULT_HAT_ID, HATS, HATS_BY_ID } from '@/game/data/hats';
 import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game/data/celebrations';
@@ -212,6 +213,7 @@ export function createInitialMeta(): MetaState {
     paletteInvertEnabled: false,
     uiDensity: 'grid',
     musicReactiveEnabled: true,
+    sfxEnabled: true,
     hideoutAmbienceEnabled: false,
     hideoutWeatherEnabled: true,
     paletteAnimationsEnabled: true,
@@ -277,6 +279,8 @@ export function createInitialMeta(): MetaState {
     uiThemeSwatchByTheme: {},
     ownedPaletteIds: [DEFAULT_PALETTE_ID],
     activePaletteId: DEFAULT_PALETTE_ID,
+    ownedSoundPackIds: [DEFAULT_SOUND_PACK_ID],
+    activeSoundPackId: DEFAULT_SOUND_PACK_ID,
     ownedRunAuraIds: [DEFAULT_RUN_AURA_ID],
     activeRunAuraId: DEFAULT_RUN_AURA_ID,
     ownedHatIds: [DEFAULT_HAT_ID],
@@ -398,6 +402,20 @@ function normalizeOwnedPaletteIds(value: unknown): string[] {
 
 function normalizePaletteId(value: unknown, ownedPaletteIds: string[]): string {
   return typeof value === 'string' && ownedPaletteIds.includes(value) ? value : DEFAULT_PALETTE_ID;
+}
+
+function normalizeOwnedSoundPackIds(value: unknown): string[] {
+  const owned = new Set<string>([DEFAULT_SOUND_PACK_ID]);
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === 'string' && SOUND_PACKS_BY_ID[entry]) owned.add(entry);
+    }
+  }
+  return [...owned];
+}
+
+function normalizeSoundPackId(value: unknown, ownedSoundPackIds: string[]): string {
+  return typeof value === 'string' && ownedSoundPackIds.includes(value) ? value : DEFAULT_SOUND_PACK_ID;
 }
 
 function normalizeOwnedRunAuraIds(value: unknown): string[] {
@@ -892,6 +910,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     paletteInvertEnabled: parsed.paletteInvertEnabled === true,
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
+    sfxEnabled: parsed.sfxEnabled !== false,
     // Opt-in, unlike the other audio toggles: ambience should never start
     // making noise on its own for a returning save that predates it.
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
@@ -972,6 +991,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
     ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
     activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
+    ownedSoundPackIds: normalizeOwnedSoundPackIds(parsed.ownedSoundPackIds),
+    activeSoundPackId: normalizeSoundPackId(parsed.activeSoundPackId, normalizeOwnedSoundPackIds(parsed.ownedSoundPackIds)),
     ownedRunAuraIds,
     activeRunAuraId: normalizeRunAuraId(parsed.activeRunAuraId, ownedRunAuraIds),
     ownedHatIds,
@@ -1306,6 +1327,9 @@ type Action =
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'buyPalette'; id: string }
   | { type: 'equipPalette'; id: string }
+  | { type: 'buySoundPack'; id: string }
+  | { type: 'equipSoundPack'; id: string }
+  | { type: 'setSfxEnabled'; enabled: boolean }
   | { type: 'buyRunAura'; id: string }
   | { type: 'equipRunAura'; id: string }
   | { type: 'buyHat'; id: string }
@@ -1600,6 +1624,26 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (!hasCatalogItem(state.meta, 'palettes', action.id, state.meta.ownedPaletteIds)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
 
+    case 'buySoundPack': {
+      const pack = SOUND_PACKS_BY_ID[action.id];
+      if (!pack || state.meta.ownedSoundPackIds.includes(pack.id) || state.meta.lootTokens < pack.cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lootTokens: state.meta.lootTokens - pack.cost,
+          ownedSoundPackIds: [...state.meta.ownedSoundPackIds, pack.id],
+        },
+      };
+    }
+
+    case 'equipSoundPack':
+      if (!hasCatalogItem(state.meta, 'soundPacks', action.id, state.meta.ownedSoundPackIds)) return state;
+      return { ...state, meta: { ...state.meta, activeSoundPackId: action.id } };
+
+    case 'setSfxEnabled':
+      return { ...state, meta: { ...state.meta, sfxEnabled: action.enabled } };
+
     case 'buyRunAura': {
       const aura = RUN_AURAS_BY_ID[action.id];
       if (!aura || state.meta.ownedRunAuraIds.includes(aura.id) || state.meta.lootTokens < aura.cost) return state;
@@ -1673,6 +1717,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
             ? {
                 uiTheme: state.meta.ownedUiThemeIds.includes(state.meta.uiTheme) ? state.meta.uiTheme : DEFAULT_UI_THEME_ID,
                 activePaletteId: state.meta.ownedPaletteIds.includes(state.meta.activePaletteId) ? state.meta.activePaletteId : DEFAULT_PALETTE_ID,
+                activeSoundPackId: state.meta.ownedSoundPackIds.includes(state.meta.activeSoundPackId) ? state.meta.activeSoundPackId : DEFAULT_SOUND_PACK_ID,
                 activeRunAuraId: state.meta.ownedRunAuraIds.includes(state.meta.activeRunAuraId) ? state.meta.activeRunAuraId : DEFAULT_RUN_AURA_ID,
               }
             : {}),
@@ -2167,6 +2212,9 @@ export interface MetaContextValue {
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   buyPalette: (id: string) => void;
   equipPalette: (id: string) => void;
+  buySoundPack: (id: string) => void;
+  equipSoundPack: (id: string) => void;
+  setSfxEnabled: (enabled: boolean) => void;
   buyRunAura: (id: string) => void;
   equipRunAura: (id: string) => void;
   buyHat: (id: string) => void;
@@ -2264,6 +2312,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
+  const buySoundPack = useCallback((id: string) => dispatch({ type: 'buySoundPack', id }), []);
+  const equipSoundPack = useCallback((id: string) => dispatch({ type: 'equipSoundPack', id }), []);
+  const setSfxEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setSfxEnabled', enabled }), []);
   const buyRunAura = useCallback((id: string) => dispatch({ type: 'buyRunAura', id }), []);
   const equipRunAura = useCallback((id: string) => dispatch({ type: 'equipRunAura', id }), []);
   const buyHat = useCallback((id: string) => dispatch({ type: 'buyHat', id }), []);
@@ -2428,6 +2479,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectUiThemeSwatch,
       buyPalette,
       equipPalette,
+      buySoundPack,
+      equipSoundPack,
+      setSfxEnabled,
       buyRunAura,
       equipRunAura,
       buyHat,
@@ -2504,6 +2558,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectUiThemeSwatch,
     buyPalette,
     equipPalette,
+    buySoundPack,
+    equipSoundPack,
+    setSfxEnabled,
     buyRunAura,
     equipRunAura,
     buyHat,
