@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronRight, CreditCard, Lock, PackageOpen, Search, Sparkles, X } from 'lucide-react';
 
+import type { SfxPlayer } from '@/game/audio/useSfxPlayer';
 import {
   CARD_MANIFESTS,
   CARD_MANIFESTS_BY_ID,
@@ -20,7 +21,7 @@ import type { MetaState } from '@/game/types';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 
-const RARITY_STYLE: Record<string, { ink: string; edge: string; glow: string }> = {
+export const RARITY_STYLE: Record<string, { ink: string; edge: string; glow: string }> = {
   common: { ink: 'text-slate-200', edge: '#94a3b8', glow: 'rgba(148,163,184,.22)' },
   uncommon: { ink: 'text-emerald-200', edge: '#34d399', glow: 'rgba(52,211,153,.25)' },
   rare: { ink: 'text-sky-200', edge: '#38bdf8', glow: 'rgba(56,189,248,.28)' },
@@ -42,7 +43,7 @@ function metadata(card: LokAssetManifest): LokDeckCardMetadata | undefined {
   return card.metadata as LokDeckCardMetadata | undefined;
 }
 
-function CardArtwork({ card, size = 150, animated = true }: { card: LokAssetManifest; size?: number; animated?: boolean }) {
+export function CardArtwork({ card, size = 150, animated = true }: { card: LokAssetManifest; size?: number; animated?: boolean }) {
   const info = metadata(card);
   if (info?.subjectType === 'character') {
     const character = CHARACTERS.find((entry) => entry.id === info.subjectId);
@@ -75,7 +76,7 @@ function PackTile({ pack, selected, owned, onSelect }: { pack: LokDeckSet; selec
     <button
       type="button"
       onClick={onSelect}
-      className={`lok-card-pack group relative min-h-44 overflow-hidden border p-4 text-left transition-all ${selected ? 'border-white/60 -translate-y-1' : 'border-white/15 hover:border-white/35 hover:-translate-y-0.5'}`}
+      className={`lok-card-pack group relative min-h-44 w-[200px] shrink-0 snap-start overflow-hidden border p-4 text-left transition-all active:scale-[0.97] sm:w-auto sm:shrink ${selected ? 'border-white/60 -translate-y-1' : 'border-white/15 hover:border-white/35 hover:-translate-y-0.5'}`}
       style={{ '--pack-accent': theme.accent, '--pack-glow': theme.glow } as React.CSSProperties}
       aria-pressed={selected}
       data-testid={`button-card-pack-${pack.id}`}
@@ -164,7 +165,7 @@ function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; owned: b
   );
 }
 
-export function LockDeckCollection({ meta, listView = false }: { meta: MetaState; listView?: boolean }) {
+export function LockDeckCollection({ meta, listView = false, sfx }: { meta: MetaState; listView?: boolean; sfx?: SfxPlayer }) {
   const [selectedPackId, setSelectedPackId] = useState<LokDeckSetId>('operatives');
   const [query, setQuery] = useState('');
   const [ownedOnly, setOwnedOnly] = useState(false);
@@ -180,10 +181,16 @@ export function LockDeckCollection({ meta, listView = false }: { meta: MetaState
 
   return (
     <div>
-      <div className="mb-5 overflow-x-auto pb-3">
-        <div className="grid min-w-[760px] grid-cols-5 gap-3">
-          {CARD_PACKS.map((pack) => <PackTile key={pack.id} pack={pack} selected={pack.id === selectedPackId} owned={pack.cardIds.filter((id) => ownedIds.has(id)).length} onSelect={() => setSelectedPackId(pack.id)} />)}
-        </div>
+      <div className="mb-5 flex snap-x gap-3 overflow-x-auto pb-3 sm:grid sm:snap-none sm:grid-cols-3 sm:overflow-visible sm:pb-0 lg:grid-cols-5">
+        {CARD_PACKS.map((pack) => (
+          <PackTile
+            key={pack.id}
+            pack={pack}
+            selected={pack.id === selectedPackId}
+            owned={pack.cardIds.filter((id) => ownedIds.has(id)).length}
+            onSelect={() => { setSelectedPackId(pack.id); sfx?.play('uiClick'); }}
+          />
+        ))}
       </div>
       <div className="mb-5 flex flex-col gap-3 border-y border-white/10 py-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">

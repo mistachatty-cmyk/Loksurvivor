@@ -1,6 +1,7 @@
 import type { MetaState } from '@/game/types';
 import { ALLIES } from './progression';
 import { AREAS } from './areas';
+import { CARD_MANIFESTS, cardCollectionSummary } from './cards';
 import { CHARACTERS } from './characters';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
@@ -8,7 +9,7 @@ import { LOKPET_VARIANTS } from './lokPets';
 import { RENTABLE_GENERATORS } from './generators';
 
 export interface AchievementReward {
-  kind: 'cred' | 'lootTokens';
+  kind: 'cred' | 'lootTokens' | 'cardCredits';
   amount: number;
 }
 
@@ -219,6 +220,56 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     isComplete: (meta) => RENTABLE_GENERATORS.length > 0 && meta.ownedGeneratorIds.length >= RENTABLE_GENERATORS.length,
     progress: (meta) => ratio(meta.ownedGeneratorIds.length, RENTABLE_GENERATORS.length),
     reward: { kind: 'cred', amount: 300 },
+  },
+  {
+    id: 'sealed-no-more',
+    name: 'Sealed No More',
+    description: 'Own your first Lock Deck card.',
+    tier: 'bronze',
+    isComplete: (meta) => cardCollectionSummary(meta).owned >= 1,
+    reward: { kind: 'cardCredits', amount: 30 },
+  },
+  {
+    id: 'triple-stamped',
+    name: 'Triple Stamped',
+    description: 'Own 3 copies of the same Lock Deck card.',
+    tier: 'silver',
+    isComplete: (meta) => meta.cardCollection.some((record) => record.copies >= 3),
+    reward: { kind: 'cardCredits', amount: 20 },
+  },
+  {
+    id: 'first-holo',
+    name: 'First Holo',
+    description: 'Pull a Holo-variant card from a Lock Pack.',
+    tier: 'gold',
+    isComplete: (meta) => meta.cardCollection.some((record) => record.bestVariant === 'holo'),
+    reward: { kind: 'cardCredits', amount: 40 },
+  },
+  {
+    id: 'passive-powerhouse',
+    name: 'Passive Powerhouse',
+    description: 'Equip 3 passive cards at once.',
+    tier: 'silver',
+    isComplete: (meta) => meta.activePassiveCardIds.length >= 3,
+    reward: { kind: 'cardCredits', amount: 20 },
+  },
+  {
+    id: 'half-the-deck',
+    name: 'Half the Deck',
+    description: 'Fill half the Lock Deck Binder.',
+    tier: 'gold',
+    isComplete: (meta) => cardCollectionSummary(meta).owned >= Math.ceil(CARD_MANIFESTS.length / 2),
+    progress: (meta) => ratio(cardCollectionSummary(meta).owned, Math.ceil(CARD_MANIFESTS.length / 2)),
+    reward: { kind: 'cardCredits', amount: 60 },
+  },
+  {
+    id: 'complete-collector',
+    name: 'Complete Collector',
+    description: 'Fill every slot in the Lock Deck Binder.',
+    tier: 'legendary',
+    isComplete: (meta) => cardCollectionSummary(meta).owned >= CARD_MANIFESTS.length,
+    progress: (meta) => ratio(cardCollectionSummary(meta).owned, CARD_MANIFESTS.length),
+    reward: { kind: 'cardCredits', amount: 150 },
   },
 ];
 

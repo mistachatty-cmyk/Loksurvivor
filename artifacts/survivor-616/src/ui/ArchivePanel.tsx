@@ -349,7 +349,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                   {achievement.reward && (
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                        Reward: {achievement.reward.amount} {achievement.reward.kind === 'cred' ? 'Cred' : 'Loot Tokens'}
+                        Reward: {achievement.reward.amount} {achievement.reward.kind === 'cred' ? 'Cred' : achievement.reward.kind === 'lootTokens' ? 'Loot Tokens' : 'Card Credits'}
                         {claimed ? ' · claimed' : ''}
                       </span>
                       {claimable && (
