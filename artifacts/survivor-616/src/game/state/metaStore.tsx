@@ -65,7 +65,7 @@ import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/gene
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS } from '@/game/data/cards';
-import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack } from '@/game/data/passiveCards';
+import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type {
   AllyDef,
@@ -1299,10 +1299,19 @@ export function recoveryRemainingMs(meta: MetaState): number {
 /* Reducer                                                             */
 /* ------------------------------------------------------------------ */
 
+export interface CardPackReveal {
+  packId: CardPackId;
+  pulls: CardPull[];
+  /** Parallel to `pulls`: true where that pull is the player's first-ever copy of the card. */
+  newFlags: boolean[];
+}
+
 interface StoreState {
   meta: MetaState;
   /** Result of the most recent run; not persisted. */
   lastRun: RunResult | null;
+  /** Cards from the most recent pack purchase, for the pack-opening reveal UI; not persisted. */
+  lastCardPackReveal: CardPackReveal | null;
 }
 
 type Action =
@@ -1316,6 +1325,7 @@ type Action =
   | { type: 'restoreSavedLokPet'; id: string; now: number }
   | { type: 'refreshPetElixirs'; now: number }
   | { type: 'clearLastRun' }
+  | { type: 'clearCardPackReveal' }
   | { type: 'markOnboarded' }
   | { type: 'spendTokens'; amount: number }
   | { type: 'buyVendorItem'; id: string }
@@ -1432,6 +1442,13 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (!pack || state.meta.cardCredits < pack.cost) return state;
       const seed = (action.now ^ state.meta.totalRuns ^ state.meta.cardCredits ^ state.meta.cardCollection.length) >>> 0;
       const pulls = rollCardPack(pack.id, createRng(seed), CARD_MANIFESTS.map((card) => card.id));
+      const ownedBeforeIds = new Set(state.meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
+      const seenThisPack = new Set<string>();
+      const newFlags = pulls.map((pull) => {
+        const isNew = !ownedBeforeIds.has(pull.cardId) && !seenThisPack.has(pull.cardId);
+        seenThisPack.add(pull.cardId);
+        return isNew;
+      });
       return {
         ...state,
         meta: {
@@ -1439,8 +1456,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
           cardCredits: state.meta.cardCredits - pack.cost,
           cardCollection: mergeCardPulls(state.meta.cardCollection, pulls),
         },
+        lastCardPackReveal: { packId: pack.id, pulls, newFlags },
       };
     }
+
+    case 'clearCardPackReveal':
+      return { ...state, lastCardPackReveal: null };
 
     case 'togglePassiveCard': {
       if (!PASSIVE_CARDS_BY_ID[action.cardId] || !state.meta.cardCollection.some((record) => record.cardId === action.cardId && record.copies > 0)) return state;
@@ -1500,7 +1521,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, onboarded: true } };
 
     case 'reset':
-      return { meta: createInitialMeta(), lastRun: null };
+      return { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
 
     // Wholesale replace, used by a cloud-save pull or a manual save import --
     // normalised the same way a freshly-loaded localStorage save would be,
@@ -2157,6 +2178,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
       return {
         meta: next,
+        lastCardPackReveal: state.lastCardPackReveal,
         lastRun: {
           ...result,
           lokPetDiscoveries,
@@ -2180,6 +2202,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
 export interface MetaContextValue {
   meta: MetaState;
   lastRun: RunResult | null;
+  lastCardPackReveal: CardPackReveal | null;
   selectedCharacter: CharacterDef;
   unlockedCharacters: CharacterDef[];
   lockedCharacters: CharacterDef[];
@@ -2201,6 +2224,7 @@ export interface MetaContextValue {
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
   clearLastRun: () => void;
+  clearCardPackReveal: () => void;
   markOnboarded: () => void;
   spendTokens: (amount: number) => void;
   buyVendorItem: (id: string) => void;
@@ -2275,6 +2299,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, null, () => ({
     meta: loadMeta(),
     lastRun: null,
+    lastCardPackReveal: null,
   }));
 
   useEffect(() => {
@@ -2298,6 +2323,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
   const refreshPetElixirs = useCallback(() => dispatch({ type: 'refreshPetElixirs', now: Date.now() }), []);
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
+  const clearCardPackReveal = useCallback(() => dispatch({ type: 'clearCardPackReveal' }), []);
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
   const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
@@ -2447,6 +2473,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     return {
       meta,
       lastRun: state.lastRun,
+      lastCardPackReveal: state.lastCardPackReveal,
       selectedCharacter,
       unlockedCharacters,
       lockedCharacters,
@@ -2468,6 +2495,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       restoreSavedLokPet,
       refreshPetElixirs,
       clearLastRun,
+      clearCardPackReveal,
       markOnboarded,
       spendTokens,
       buyVendorItem,
@@ -2547,6 +2575,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     restoreSavedLokPet,
     refreshPetElixirs,
     clearLastRun,
+    clearCardPackReveal,
     markOnboarded,
     spendTokens,
     buyVendorItem,

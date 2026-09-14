@@ -20,7 +20,7 @@ import type { MetaState } from '@/game/types';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 
-const RARITY_STYLE: Record<string, { ink: string; edge: string; glow: string }> = {
+export const RARITY_STYLE: Record<string, { ink: string; edge: string; glow: string }> = {
   common: { ink: 'text-slate-200', edge: '#94a3b8', glow: 'rgba(148,163,184,.22)' },
   uncommon: { ink: 'text-emerald-200', edge: '#34d399', glow: 'rgba(52,211,153,.25)' },
   rare: { ink: 'text-sky-200', edge: '#38bdf8', glow: 'rgba(56,189,248,.28)' },
@@ -42,7 +42,7 @@ function metadata(card: LokAssetManifest): LokDeckCardMetadata | undefined {
   return card.metadata as LokDeckCardMetadata | undefined;
 }
 
-function CardArtwork({ card, size = 150, animated = true }: { card: LokAssetManifest; size?: number; animated?: boolean }) {
+export function CardArtwork({ card, size = 150, animated = true }: { card: LokAssetManifest; size?: number; animated?: boolean }) {
   const info = metadata(card);
   if (info?.subjectType === 'character') {
     const character = CHARACTERS.find((entry) => entry.id === info.subjectId);
