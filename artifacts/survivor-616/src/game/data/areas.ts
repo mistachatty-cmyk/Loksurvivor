@@ -203,7 +203,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 40, toSec: 130, enemyId: 'bloodhound', ratePerSec: 1.1, burst: 2, hpMult: 1.4 },
       { fromSec: 60, toSec: 150, enemyId: 'crypt-spitter', ratePerSec: 0.7, burst: 2, hpMult: 1.3 },
       { fromSec: 78, toSec: 180, enemyId: 'bass-bruiser', ratePerSec: 0.24, burst: 1, hpMult: 1.2 },
-      { fromSec: 88, toSec: 180, enemyId: 'smoke-horn', ratePerSec: 0.12, burst: 1, group: ['ember-hauler'] },
+      { fromSec: 88, toSec: 180, enemyId: 'smoke-horn', ratePerSec: 0.12, burst: 1, group: ['ember-hauler', 'ash-caller'] },
       { fromSec: 90, toSec: 180, enemyId: 'crypt-bouncer', ratePerSec: 0.4, burst: 1, hpMult: 1.4 },
       { fromSec: 140, toSec: 141, enemyId: 'the-sire', ratePerSec: 1, burst: 1 },
     ],

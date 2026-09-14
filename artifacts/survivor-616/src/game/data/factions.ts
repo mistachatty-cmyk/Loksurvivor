@@ -48,7 +48,7 @@ export const FACTIONS: FactionDef[] = [
     name: 'Cinder Procession',
     description: 'Armored chargers built from the east side fire that never fully went out.',
     accent: '#f43f5e',
-    roster: ['smoke-horn', 'ember-hauler'],
+    roster: ['smoke-horn', 'ember-hauler', 'ash-caller'],
   },
   {
     id: 'river-antler-court',
