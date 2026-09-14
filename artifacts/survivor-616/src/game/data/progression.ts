@@ -390,6 +390,19 @@ export const HUB_ROOMS: HubRoomDef[] = [
     unlock: { kind: 'discovery', discoveryId: 'arcade-high-score' },
     features: ['allies', 'vendor', 'studio', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
   },
+  {
+    id: 'the-sound-booth',
+    name: 'The Sound Booth',
+    subtitle: 'Patch bay and foldback',
+    description:
+      'A converted phone-booth-sized closet wired with a patch bay and a foldback speaker. Every hit and pickup out on the streets gets its character mixed in here.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    // Same reasoning as the-storefront: a Hideout destination from the start
+    // so a fresh player can always find where their loot-token SFX packs live.
+    unlock: { kind: 'default' },
+    features: ['sound-booth', 'unlocks', 'settings', 'account', 'feedback'],
+  },
 ];
 
 export const HUB_ROOMS_BY_ID: Record<string, HubRoomDef> = Object.fromEntries(

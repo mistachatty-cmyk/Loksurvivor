@@ -8,8 +8,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
+import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { getRunAuraStyle } from '@/game/data/runAuras';
@@ -199,6 +201,7 @@ export function RunScreen({
     setMinimapPosition,
   } = useMeta();
   const music = useMusicPlayer();
+  const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const highlightRecorderRef = useRef(createRunHighlightRecorder());
@@ -786,6 +789,14 @@ export function RunScreen({
           stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate, audio });
           ultimate = false;
           if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
+        }
+
+        // Drain gameplay-SFX cues once per rendered frame, same reasoning as
+        // reading `audio` once above: draining inside the substep loop would
+        // let a slow frame retrigger the same cue several times.
+        if (world.sfxEvents.length > 0) {
+          const events = world.sfxEvents.splice(0);
+          for (const event of events) sfx.play(event.cue, event.onBeat);
         }
 
         // Detect dungeon room transitions and briefly flash the screen.

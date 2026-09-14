@@ -8,6 +8,7 @@
 
 import type { BeatReaction } from '@/game/data/reactivity';
 import type { RunHighlight } from '@/game/data/runHighlights';
+import type { SfxStyleDef } from '@/game/audio/sfxCues';
 
 export interface Vec2 {
   x: number;
@@ -1519,7 +1520,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'account' | 'feedback'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1663,6 +1664,25 @@ export interface ThemedPaletteDef {
   effect?: PaletteEffectDef;
   /** Color palette to apply to sprites and world when active. */
   palette: SpritePalette;
+}
+
+/**
+ * A purchasable gameplay-SFX reskin sold in the Sound Booth. Mirrors
+ * `ThemedPaletteDef`'s shape exactly, one currency (`lootTokens`), one
+ * catalog pattern (`ownedSoundPackIds`/`activeSoundPackId`). `style` is the
+ * small set of synthesis knobs from `audio/sfxCues.ts` that reskins every
+ * cue uniformly -- a pack never redefines individual cues.
+ */
+export interface SoundPackDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Loot token cost to unlock. 0 = always owned. */
+  cost: number;
+  /** When true, this pack is included in the default owned set. */
+  owned?: boolean;
+  tier?: CosmeticTier;
+  style: SfxStyleDef;
 }
 
 /** Procedural player aura rendered during runs. These styles are visual only. */
@@ -1904,6 +1924,12 @@ export interface MetaState {
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */
   activePaletteId: string;
+  /** Purchased sound pack ids, bought from the Sound Booth. The free 'house-pa' pack is always included. */
+  ownedSoundPackIds: string[];
+  /** Currently equipped gameplay-SFX sound pack id. */
+  activeSoundPackId: string;
+  /** Master on/off for gameplay sound effects (hits, pickups, UI...). Independent of music/ambience. */
+  sfxEnabled: boolean;
   /** Purchased procedural run aura ids. The street halo is always included. */
   ownedRunAuraIds: string[];
   /** Currently equipped procedural run aura id. */

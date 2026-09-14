@@ -64,6 +64,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     unlockDevModeAccess,
     setDevModeAllUnlocks,
     setMusicReactive,
+    setSfxEnabled,
     setHideoutAmbience,
     setHideoutWeather,
     setGyroEnabled,
@@ -293,6 +294,31 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 </div>
               </div>
               <div className="mt-5 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Gameplay SFX</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Hits, pickups, level-ups, dashes and menu sounds -- all synthesized in your browser, styled by
+                      whichever pack you have equipped from the Sound Booth. Turn this off for a silent run; your
+                      soundtrack keeps playing either way.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSfxEnabled(!meta.sfxEnabled)}
+                    aria-pressed={meta.sfxEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.sfxEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-sfx-enabled"
+                  >
+                    {meta.sfxEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout ambience</h3>

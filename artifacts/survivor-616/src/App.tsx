@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
+import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
+import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { AuthProvider } from '@/state/authStore';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
 import {
@@ -31,6 +33,7 @@ import { VendorPanel } from '@/ui/VendorPanel';
 import { WorkshopPanel } from '@/ui/WorkshopPanel';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
+import { SoundBoothPanel } from '@/ui/SoundBoothPanel';
 import { AccountPanel } from '@/ui/AccountPanel';
 import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { CardShopPanel } from '@/ui/CardShopPanel';
@@ -60,6 +63,7 @@ type Screen =
   | { name: 'card-shop' }
   | { name: 'settings' }
   | { name: 'palette-store' }
+  | { name: 'sound-booth' }
   | { name: 'account' }
   | { name: 'feedback' }
   | { name: 'map-editor' }
@@ -107,13 +111,16 @@ function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
+  const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
 
   const goHub = useCallback(() => {
+    sfx.play('uiNav');
     enterHideout();
     setScreen({ name: 'hub' });
-  }, [enterHideout]);
+  }, [enterHideout, sfx]);
 
   const openPanel = useCallback((panel: HubPanel) => {
+    sfx.play('uiNav');
     switch (panel) {
       case 'runs':
         setScreen({ name: 'areas' });
@@ -151,6 +158,9 @@ function Game() {
       case 'palette-store':
         setScreen({ name: 'palette-store' });
         break;
+      case 'sound-booth':
+        setScreen({ name: 'sound-booth' });
+        break;
       case 'account':
         setScreen({ name: 'account' });
         break;
@@ -158,7 +168,7 @@ function Game() {
         setScreen({ name: 'feedback' });
         break;
     }
-  }, []);
+  }, [sfx]);
 
   const handleFinish = useCallback(
     (result: RunResult) => {
@@ -216,7 +226,7 @@ function Game() {
       return (
         <HubScreen
           roomId={roomId}
-          onChangeRoom={setRoomId}
+          onChangeRoom={(nextRoomId) => { sfx.play('uiNav'); setRoomId(nextRoomId); }}
           onOpen={openPanel}
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
@@ -280,6 +290,9 @@ function Game() {
 
     case 'palette-store':
       return <PaletteGalleryPanel onBack={goHub} />;
+
+    case 'sound-booth':
+      return <SoundBoothPanel onBack={goHub} />;
 
     case 'account':
       return <AccountPanel onBack={goHub} />;
