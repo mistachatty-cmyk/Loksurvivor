@@ -250,7 +250,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 18, toSec: 100, enemyId: 'river-wraith', ratePerSec: 0.48, burst: 1 },
       { fromSec: 38, toSec: 125, enemyId: 'bridge-lookout', ratePerSec: 0.52, burst: 1, group: ['current-stag'] },
       { fromSec: 68, toSec: 175, enemyId: 'lightless-prowler', ratePerSec: 0.72, burst: 2 },
-      { fromSec: 58, toSec: 175, enemyId: 'current-stag', ratePerSec: 0.35, burst: 1 },
+      { fromSec: 58, toSec: 175, enemyId: 'current-stag', ratePerSec: 0.35, burst: 1, group: ['antler-fawn'] },
       { fromSec: 92, toSec: 175, enemyId: 'river-wraith', ratePerSec: 0.8, burst: 2, hpMult: 1.25 },
       { fromSec: 130, toSec: 175, enemyId: 'bass-bruiser', ratePerSec: 0.32, burst: 1, hpMult: 1.35 },
     ],
