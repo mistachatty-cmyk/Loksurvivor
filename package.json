@@ -10,10 +10,11 @@
     "scripts"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=@workspace/survivor-616",
-    "build": "npm run build --workspace=@workspace/survivor-616 && mkdir -p dist && cp -r artifacts/survivor-616/dist/public/* dist/",
-    "typecheck": "npm run typecheck --workspace=@workspace/survivor-616",
-    "lint": "npm run typecheck"
+    "dev": "pnpm --filter @workspace/survivor-616 run dev",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build && mkdir -p dist && cp -r artifacts/survivor-616/dist/public/* dist/",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "lint": "pnpm run typecheck"
   },
   "overrides": {
     "esbuild": "0.27.3"
