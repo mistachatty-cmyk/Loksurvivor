@@ -8152,6 +8152,13 @@ function updateEndlessLandmarkCue(w: World) {
 function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 'exit') {
   const e = w.endless!;
   const p = w.player;
+  // Re-anchor the movement-clamp center (clampToArena/arenaWallBounds read
+  // dungeonCenterX/Y) to match wherever this room's geometry is about to be
+  // placed below -- otherwise room 2+ centers its exit on the player's
+  // drifted position while the clamp still confines them to room 1's box,
+  // and the exit renders outside the reachable area.
+  e.dungeonCenterX = p.x;
+  e.dungeonCenterY = p.y;
   resolvePotholes(w);
   e.dungeonRoom = room;
   const era = DUNGEON_ERAS[e.dungeonEraIndex]!;
@@ -8204,8 +8211,6 @@ function enterDungeon(w: World) {
   const e = w.endless!;
   e.streetReturnX = w.player.x;
   e.streetReturnY = w.player.y;
-  e.dungeonCenterX = w.player.x;
-  e.dungeonCenterY = w.player.y;
   e.dungeonDepth += 1;
   e.dungeonRoom = 1;
   e.dungeonBossDefeated = false;

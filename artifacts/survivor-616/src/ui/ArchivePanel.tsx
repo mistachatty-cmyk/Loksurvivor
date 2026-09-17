@@ -7,7 +7,9 @@ import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { CHARACTER_EPISODES } from '@/game/data/episodes';
+import { ENEMIES } from '@/game/data/enemies';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
+import { FACTIONS } from '@/game/data/factions';
 import {
   LOKPET_ELEMENT_COLORS,
   LOKPET_RARITY_COLORS,
@@ -38,7 +40,7 @@ import {
   VISITING_CARD_SILHOUETTE,
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, Ghost, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -236,6 +238,9 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
 
   const completedAchievementCount = ACHIEVEMENTS.filter((achievement) => achievement.isComplete(meta)).length;
   const ownedCardCount = CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).length;
+  const discoveredFactionCount = FACTIONS.filter((faction) =>
+    faction.roster.some((enemyId) => (meta.bestiary[enemyId] ?? 0) > 0),
+  ).length;
 
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
@@ -244,6 +249,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
     { key: 'universe', label: 'Universe', icon: Globe, count: meta.visitingLokCards.length },
+    { key: 'factions', label: 'Factions', icon: Users, count: discoveredFactionCount, total: FACTIONS.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
   ];
 
@@ -723,6 +729,63 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                 ))}
               </div>
             )}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'factions' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-factions"
+        >
+          <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
+            {FACTIONS.map((faction) => {
+              const roster = faction.roster
+                .map((enemyId) => ENEMIES.find((enemy) => enemy.id === enemyId))
+                .filter((enemy): enemy is (typeof ENEMIES)[number] => Boolean(enemy));
+              const discoveredCount = roster.filter((enemy) => (meta.bestiary[enemy.id] ?? 0) > 0).length;
+              return (
+                <article
+                  key={faction.id}
+                  className="border border-border bg-card"
+                  data-testid={`card-faction-${faction.id}`}
+                >
+                  <div className="border-l-4 p-4" style={{ borderLeftColor: faction.accent }}>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-lg font-black uppercase tracking-tight text-white">{faction.name}</h3>
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {discoveredCount} / {roster.length}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{faction.description}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 border-t border-border/60 p-4 sm:grid-cols-4">
+                    {roster.map((enemy) => {
+                      const known = (meta.bestiary[enemy.id] ?? 0) > 0;
+                      return (
+                        <div
+                          key={enemy.id}
+                          className="flex flex-col items-center gap-1.5 text-center"
+                          data-testid={`faction-roster-${faction.id}-${enemy.id}`}
+                        >
+                          <div className="grid h-16 w-16 place-items-center overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.08),transparent_62%)]">
+                            {known ? (
+                              <RigPortrait rig={enemy.rig} palette={enemy.palette} anim="idle" size={56} />
+                            ) : (
+                              <Ghost className="h-6 w-6 text-muted-foreground/30" />
+                            )}
+                          </div>
+                          <span className={`text-[9px] font-bold uppercase tracking-widest ${known ? 'text-white' : 'text-muted-foreground/50'}`}>
+                            {known ? enemy.name : 'Unidentified'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </motion.section>
       )}
