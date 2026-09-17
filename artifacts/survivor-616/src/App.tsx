@@ -37,6 +37,7 @@ import { SoundBoothPanel } from '@/ui/SoundBoothPanel';
 import { AccountPanel } from '@/ui/AccountPanel';
 import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { CardShopPanel } from '@/ui/CardShopPanel';
+import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
@@ -66,6 +67,7 @@ type Screen =
   | { name: 'sound-booth' }
   | { name: 'account' }
   | { name: 'feedback' }
+  | { name: 'threat-matrix' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
@@ -98,7 +100,8 @@ function initialScreen(onboarded: boolean): Screen {
       requested === 'card-shop' ||
       requested === 'settings' ||
       requested === 'account' ||
-      requested === 'feedback'
+      requested === 'feedback' ||
+      requested === 'threat-matrix'
     ) {
       return { name: requested };
     }
@@ -166,6 +169,9 @@ function Game() {
         break;
       case 'feedback':
         setScreen({ name: 'feedback' });
+        break;
+      case 'threat-matrix':
+        setScreen({ name: 'threat-matrix' });
         break;
     }
   }, [sfx]);
@@ -277,7 +283,7 @@ function Game() {
       return <RecoveryPanel onBack={goHub} />;
 
     case 'vendor':
-      return <VendorPanel onBack={goHub} />;
+      return <VendorPanel onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />;
 
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
@@ -299,6 +305,9 @@ function Game() {
 
     case 'feedback':
       return <FeedbackPanel onBack={goHub} />;
+
+    case 'threat-matrix':
+      return <ThreatMatrixScreen onBack={goHub} />;
 
     case 'run':
       {

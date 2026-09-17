@@ -26,7 +26,22 @@ export const CHUNK_SIZE = 640;
 export type ChunkVariant = 'strip' | 'alley' | 'parking' | 'lot' | 'market' | 'rail' | 'plaza' | 'scrapyard' | 'overpass';
 export type BlockKind = 'storefronts' | 'residential' | 'parking' | 'industrial' | 'park' | 'bridge' | 'river-edge';
 export type ChunkLandmarkKind = 'bridge' | 'market' | 'rail-yard' | 'plaza' | 'scrapyard' | 'overpass';
-export type BuildingPrefabId = 'corner-store' | 'duplex' | 'warehouse' | 'apartment' | 'laundromat' | 'clinic' | 'bar' | 'auto-shop';
+export type BuildingPrefabId =
+  | 'corner-store'
+  | 'duplex'
+  | 'warehouse'
+  | 'apartment'
+  | 'laundromat'
+  | 'clinic'
+  | 'bar'
+  | 'auto-shop'
+  | 'penthouse'
+  | 'antenna-hub'
+  | 'catacomb-crypt'
+  | 'server-cluster'
+  | 'harbor-office'
+  | 'toll-plaza'
+  | (string & {});
 
 export interface BuildingPrefab {
   id: BuildingPrefabId;
@@ -215,20 +230,152 @@ export const BUILDING_PREFABS: BuildingPrefab[] = [
       { x: 98, y: 86, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
     ],
   },
+  {
+    id: 'penthouse',
+    name: 'Skyline Penthouse',
+    sign: 'PENTHOUSE 616',
+    accent: '#c084fc',
+    footprint: { w: 196, h: 148 },
+    interiorBounds: { w: 400, h: 300 },
+    interiorProps: [
+      { x: -110, y: -64, w: 72, h: 28, kind: 'bench', propVariant: 'fixed-bench' },
+      { x: 100, y: -50, w: 44, h: 44, kind: 'ac-unit' },
+      { x: 0, y: 70, w: 140, h: 18, kind: 'barrier', propVariant: 'fixed-bench' },
+    ],
+  },
+  {
+    id: 'antenna-hub',
+    name: 'Relay Broadcast Hub',
+    sign: 'BROADCAST 616',
+    accent: '#38bdf8',
+    footprint: { w: 180, h: 140 },
+    interiorBounds: { w: 380, h: 280 },
+    interiorProps: [
+      { x: -90, y: -60, w: 44, h: 60, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 90, y: 60, w: 52, h: 52, kind: 'fuse-box', propVariant: 'light-breakable' },
+      { x: 0, y: -70, w: 60, h: 60, kind: 'attack-block' },
+    ],
+  },
+  {
+    id: 'catacomb-crypt',
+    name: 'Ancient Stone Crypt',
+    sign: 'SEPULCHER',
+    accent: '#2dd4bf',
+    footprint: { w: 200, h: 156 },
+    interiorBounds: { w: 420, h: 320 },
+    interiorProps: [
+      { x: 0, y: 0, w: 64, h: 64, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -120, y: -60, w: 48, h: 48, kind: 'flora' },
+      { x: 120, y: 60, w: 48, h: 48, kind: 'crate-breakable', propVariant: 'light-breakable' },
+    ],
+  },
+  {
+    id: 'server-cluster',
+    name: 'Mainframe Server Hub',
+    sign: 'NODE 0x616',
+    accent: '#ff2fd0',
+    footprint: { w: 210, h: 150 },
+    interiorBounds: { w: 440, h: 310 },
+    interiorProps: [
+      { x: -110, y: -60, w: 50, h: 70, kind: 'server-rack' },
+      { x: -40, y: -60, w: 50, h: 70, kind: 'server-rack' },
+      { x: 40, y: -60, w: 50, h: 70, kind: 'server-rack' },
+      { x: 110, y: -60, w: 50, h: 70, kind: 'server-rack' },
+      { x: 0, y: 70, w: 160, h: 18, kind: 'barrier', propVariant: 'fixed-bench' },
+    ],
+  },
+  {
+    id: 'harbor-office',
+    name: 'Harbor Freight Office',
+    sign: 'PORT AUTHORITY',
+    accent: '#38bdf8',
+    footprint: { w: 190, h: 144 },
+    interiorBounds: { w: 390, h: 290 },
+    interiorProps: [
+      { x: -100, y: -60, w: 60, h: 60, kind: 'crate', propVariant: 'fixed-bench' },
+      { x: 100, y: 60, w: 60, h: 60, kind: 'crate-breakable', propVariant: 'light-breakable' },
+      { x: -90, y: 60, w: 48, h: 48, kind: 'barrel', propVariant: 'light-breakable' },
+    ],
+  },
+  {
+    id: 'toll-plaza',
+    name: 'Highway Toll Station',
+    sign: 'STOP - 616 TOLL',
+    accent: '#f97316',
+    footprint: { w: 204, h: 144 },
+    interiorBounds: { w: 410, h: 290 },
+    interiorProps: [
+      { x: -110, y: -60, w: 80, h: 24, kind: 'barrier', propVariant: 'fixed-bench' },
+      { x: 100, y: 60, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 0, y: 70, w: 48, h: 48, kind: 'fuse-box', propVariant: 'light-breakable' },
+    ],
+  },
 ];
 
 const BUILDING_PREFABS_BY_ID = Object.fromEntries(
   BUILDING_PREFABS.map((prefab) => [prefab.id, prefab]),
 ) as Record<BuildingPrefabId, BuildingPrefab>;
 
-const DISTRICTS: Array<{ name: string; accent: string }> = [
-  { name: 'Downtown Core', accent: '#ff8bd8' },
-  { name: 'Westside Row', accent: '#a7f3d0' },
-  { name: 'River Market', accent: '#4de1ff' },
-  { name: 'Rail Cut', accent: '#ffd166' },
-  { name: 'Warehouse Belt', accent: '#fb923c' },
-  { name: 'Uptown Blocks', accent: '#c084fc' },
-];
+export const THEME_DISTRICTS: Record<string, Array<{ name: string; accent: string }>> = {
+  streets: [
+    { name: 'Downtown Core', accent: '#ff8bd8' },
+    { name: 'Westside Row', accent: '#a7f3d0' },
+    { name: 'River Market', accent: '#4de1ff' },
+    { name: 'Rail Cut', accent: '#ffd166' },
+    { name: 'Warehouse Belt', accent: '#fb923c' },
+    { name: 'Uptown Blocks', accent: '#c084fc' },
+  ],
+  rooftops: [
+    { name: 'Penthouse Terraces', accent: '#c084fc' },
+    { name: 'Neon Spire Walk', accent: '#38bdf8' },
+    { name: 'Highline Grid', accent: '#a7f3d0' },
+    { name: 'Broadcast Array', accent: '#facc15' },
+    { name: 'Zeppelin Slip', accent: '#fb7185' },
+    { name: 'Stratosphere Deck', accent: '#22d3ee' },
+  ],
+  catacombs: [
+    { name: 'Resonance Caverns', accent: '#34d399' },
+    { name: 'Sunken Sepulchers', accent: '#2dd4bf' },
+    { name: 'Crystal Grotto', accent: '#00f2fe' },
+    { name: 'Abyssal Verge', accent: '#818cf8' },
+    { name: 'Bedrock Sanctuary', accent: '#f43f5e' },
+    { name: 'Luminescent Hollow', accent: '#a7f3d0' },
+  ],
+  alleys: [
+    { name: 'Fulton Backdoor Row', accent: '#4de1ff' },
+    { name: 'Dumpster Labyrinth', accent: '#a3e635' },
+    { name: 'Iron Chute Cut', accent: '#f97316' },
+    { name: 'Fire-Escape Maze', accent: '#f43f5e' },
+    { name: 'Steam Passage', accent: '#ffd166' },
+    { name: 'Slum Central Core', accent: '#c084fc' },
+  ],
+  'null-sector': [
+    { name: 'Node 0x00 Sub-Floor', accent: '#38bdf8' },
+    { name: 'Logic Conduit Line', accent: '#22d3ee' },
+    { name: 'Thermal Rack Array', accent: '#f59e0b' },
+    { name: 'Memory Cascade', accent: '#ec4899' },
+    { name: 'Kernel Basin', accent: '#a855f7' },
+    { name: 'Overclocked Ring', accent: '#ff2fd0' },
+  ],
+  docks: [
+    { name: 'Wharf Boardwalks', accent: '#2dd4bf' },
+    { name: 'Shipping Container Slip', accent: '#f59e0b' },
+    { name: 'Gantry Crane Basin', accent: '#38bdf8' },
+    { name: 'Deep Fog Channel', accent: '#94a3b8' },
+    { name: 'Ghost Fleet Sound', accent: '#34d399' },
+    { name: 'Port Authority Reach', accent: '#4de1ff' },
+  ],
+  wasteland: [
+    { name: 'Interstate On-Ramp', accent: '#fb923c' },
+    { name: 'Gridlock Graveyard', accent: '#facc15' },
+    { name: 'Collapsed Viaduct', accent: '#ef4444' },
+    { name: 'Dust Storm Choke', accent: '#e2e8f0' },
+    { name: 'Ruined Horizon', accent: '#a855f7' },
+    { name: 'Checkpoint Verge', accent: '#f97316' },
+  ],
+};
+
+const DISTRICTS = THEME_DISTRICTS.streets!;
 
 export function getBuildingPrefab(id: BuildingPrefabId): BuildingPrefab {
   return BUILDING_PREFABS_BY_ID[id] ?? BUILDING_PREFABS[0]!;
@@ -270,52 +417,93 @@ export function buildingWallObstacles(building: Pick<ChunkBuilding, 'x' | 'y' | 
   return walls;
 }
 
+function getThemeLandmark(hasBridge: boolean, variant: ChunkVariant, blockKind: BlockKind, themeId: string): ChunkLandmark | undefined {
+  if (hasBridge) {
+    if (themeId === 'rooftops') return { name: 'Suspended Sky Bridge', kind: 'bridge', accent: '#38bdf8' };
+    if (themeId === 'catacombs') return { name: 'Ancient Arch Span', kind: 'bridge', accent: '#00f2fe' };
+    if (themeId === 'null-sector') return { name: 'Data Conduit Bridge', kind: 'bridge', accent: '#22d3ee' };
+    if (themeId === 'docks') return { name: 'Grand River Canal Bridge', kind: 'bridge', accent: '#2dd4bf' };
+    if (themeId === 'alleys') return { name: 'Elevated Catwalk Crossing', kind: 'bridge', accent: '#4de1ff' };
+    if (themeId === 'wasteland') return { name: 'Overpass Concrete Span', kind: 'bridge', accent: '#f97316' };
+    return { name: 'Northline Bridge', kind: 'bridge', accent: '#4de1ff' };
+  }
+  if (themeId === 'rooftops') {
+    if (variant === 'market') return { name: 'Sky Lounge Market', kind: 'market', accent: '#ff8bd8' };
+    if (variant === 'rail') return { name: 'Cable Car Terminal', kind: 'rail-yard', accent: '#ffd166' };
+    if (variant === 'plaza' || blockKind === 'park') return { name: 'Rooftop Helipad', kind: 'plaza', accent: '#a7f3d0' };
+    if (variant === 'scrapyard') return { name: 'Antenna Array Mast', kind: 'scrapyard', accent: '#38bdf8' };
+    if (variant === 'overpass') return { name: 'Suspended Catwalk', kind: 'overpass', accent: '#c084fc' };
+  } else if (themeId === 'catacombs') {
+    if (variant === 'market') return { name: 'Cavern Relic Bazaar', kind: 'market', accent: '#34d399' };
+    if (variant === 'rail') return { name: 'Sub-Mine Ore Track', kind: 'rail-yard', accent: '#ffd166' };
+    if (variant === 'plaza' || blockKind === 'park') return { name: 'Pillar Sanctuary', kind: 'plaza', accent: '#00f2fe' };
+    if (variant === 'scrapyard') return { name: 'Obsidian Monolith', kind: 'scrapyard', accent: '#818cf8' };
+    if (variant === 'overpass') return { name: 'Natural Rock Vault', kind: 'overpass', accent: '#2dd4bf' };
+  } else if (themeId === 'null-sector') {
+    if (variant === 'market') return { name: 'Packet Exchange Hub', kind: 'market', accent: '#1fe6ff' };
+    if (variant === 'rail') return { name: 'High-Speed Bus Line', kind: 'rail-yard', accent: '#f59e0b' };
+    if (variant === 'plaza' || blockKind === 'park') return { name: 'Central Mainframe Plaza', kind: 'plaza', accent: '#ff2fd0' };
+    if (variant === 'scrapyard') return { name: 'Melted Core Dump', kind: 'scrapyard', accent: '#ec4899' };
+    if (variant === 'overpass') return { name: 'Bus Cable Overhead', kind: 'overpass', accent: '#a855f7' };
+  } else if (themeId === 'docks') {
+    if (variant === 'market') return { name: 'Wharf Fish Market', kind: 'market', accent: '#2dd4bf' };
+    if (variant === 'rail') return { name: 'Freight Slip Spur', kind: 'rail-yard', accent: '#ffd166' };
+    if (variant === 'plaza' || blockKind === 'park') return { name: 'Harbor Promenade', kind: 'plaza', accent: '#38bdf8' };
+    if (variant === 'scrapyard') return { name: 'Rusted Hull Yard', kind: 'scrapyard', accent: '#f59e0b' };
+    if (variant === 'overpass') return { name: 'Gantry Overhead Crane', kind: 'overpass', accent: '#64748b' };
+  } else if (themeId === 'alleys') {
+    if (variant === 'market') return { name: 'Black Market Row', kind: 'market', accent: '#ff8bd8' };
+    if (variant === 'rail') return { name: 'Loading Dock Spur', kind: 'rail-yard', accent: '#ffd166' };
+    if (variant === 'plaza' || blockKind === 'park') return { name: 'Tenement Courtyard', kind: 'plaza', accent: '#4de1ff' };
+    if (variant === 'scrapyard') return { name: 'Dumpster Compactor Row', kind: 'scrapyard', accent: '#a3e635' };
+    if (variant === 'overpass') return { name: 'Fire Escape Chute', kind: 'overpass', accent: '#f97316' };
+  } else if (themeId === 'wasteland') {
+    if (variant === 'market') return { name: 'Scavenger Waystation', kind: 'market', accent: '#fb923c' };
+    if (variant === 'rail') return { name: 'Derailment Depot', kind: 'rail-yard', accent: '#ef4444' };
+    if (variant === 'plaza' || blockKind === 'park') return { name: 'Toll Plaza Ruins', kind: 'plaza', accent: '#facc15' };
+    if (variant === 'scrapyard') return { name: 'Vehicle Pileup Dune', kind: 'scrapyard', accent: '#f97316' };
+    if (variant === 'overpass') return { name: 'Collapsed Flyover Deck', kind: 'overpass', accent: '#e2e8f0' };
+  } else {
+    if (variant === 'market') return { name: 'Night Market', kind: 'market', accent: '#ff8bd8' };
+    if (variant === 'rail') return { name: 'East Yard', kind: 'rail-yard', accent: '#ffd166' };
+    if (variant === 'plaza' || blockKind === 'park') return { name: 'Civic Plaza', kind: 'plaza', accent: '#a7f3d0' };
+    if (variant === 'scrapyard') return { name: 'Salvage Row', kind: 'scrapyard', accent: '#fb923c' };
+    if (variant === 'overpass') return { name: 'Overpass Underlot', kind: 'overpass', accent: '#94a3b8' };
+  }
+  return undefined;
+}
+
 /**
- * Generate a single chunk.  The run seed is mixed with the chunk
+ * Generate a single chunk. The run seed is mixed with the chunk
  * position so the output is stable but varies across the world.
  */
-export function generateChunk(cx: number, cy: number, runSeed: number): StreetChunk {
+export function generateChunk(cx: number, cy: number, runSeed: number, themeId: string = 'streets'): StreetChunk {
   // Mix seed with position using primes so small deltas give big bit changes.
   const mixedSeed = (runSeed ^ (cx * 73856093)) ^ (cy * 19349663);
   const rng = createRng(mixedSeed >>> 0);
-  const band = endlessBandForChunk(cx, cy, CHUNK_SIZE);
+  const band = endlessBandForChunk(cx, cy, CHUNK_SIZE, themeId);
 
   const variantIndex = Math.floor(rng() * VARIANTS.length);
   const variant = VARIANTS[variantIndex] ?? 'strip';
 
-  // A river is a persistent horizontal band. Only every fourth block on the
+  // A river/canal is a persistent horizontal band. Only every fourth block on the
   // band has a bridge; the other blocks are river edges and stay impassable.
-  const hasRiver = band.id !== 'outer-threshold' && cy !== 0 && ((cy % 6) + 6) % 6 === 3;
+  const riverFrequency = themeId === 'docks' ? 4 : 6;
+  const isOuterBoundary = band.thresholdPx >= 6000;
+  const hasRiver = !isOuterBoundary && cy !== 0 && ((cy % riverFrequency) + riverFrequency) % riverFrequency === (themeId === 'docks' ? 2 : 3);
   const hasBridge = hasRiver && ((cx % 4) + 4) % 4 === 0;
   const riverCrossingX = hasBridge ? 0 : null;
   const blockKind = hasRiver
     ? (hasBridge ? 'bridge' : 'river-edge')
     : BLOCK_KINDS[(variantIndex + Math.abs(cx) + Math.abs(cy)) % BLOCK_KINDS.length]!;
 
-  const landmark: ChunkLandmark | undefined = hasBridge
-    ? { name: 'Northline Bridge', kind: 'bridge', accent: '#4de1ff' }
-    : !hasRiver && variant === 'market'
-      ? { name: 'Night Market', kind: 'market', accent: '#ff8bd8' }
-      : !hasRiver && variant === 'rail'
-        ? { name: 'East Yard', kind: 'rail-yard', accent: '#ffd166' }
-        : !hasRiver && (variant === 'plaza' || blockKind === 'park')
-          ? { name: 'Civic Plaza', kind: 'plaza', accent: '#a7f3d0' }
-          : !hasRiver && variant === 'scrapyard'
-            ? { name: 'Salvage Row', kind: 'scrapyard', accent: '#fb923c' }
-            : !hasRiver && variant === 'overpass'
-              ? { name: 'Overpass Underlot', kind: 'overpass', accent: '#94a3b8' }
-              : undefined;
+  const landmark: ChunkLandmark | undefined = getThemeLandmark(hasBridge, variant, blockKind, themeId);
 
   const obstacles: ObstacleDef[] = [];
-  const districtInfo = band.id === 'floodwall' || hasRiver
-    ? DISTRICTS[2]!
-    : band.id === 'rail-shadow'
-      ? { name: 'Elevated Rail Shadows', accent: band.accent }
-      : band.id === 'industrial-fringe'
-        ? { name: 'Abandoned Industrial Fringe', accent: band.accent }
-        : band.id === 'outer-threshold'
-          ? { name: 'Outer-City Threshold', accent: band.accent }
-          : DISTRICTS[(Math.abs(cx * 3 + cy * 5) + variantIndex) % DISTRICTS.length]!;
+  const currentDistricts = THEME_DISTRICTS[themeId] ?? THEME_DISTRICTS.streets!;
+  const districtInfo = hasRiver
+    ? currentDistricts[2]!
+    : currentDistricts[(Math.abs(cx * 3 + cy * 5) + variantIndex) % currentDistricts.length]!;
 
   // Each block gets a different street spine. These are still ordinary
   // obstacles for collision, but the profiles make streamed blocks read as
@@ -336,11 +524,19 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
     bridge: ['corner-store'],
     'river-edge': [],
   };
-  const prefabPool = band.id === 'industrial-fringe'
-    ? ['warehouse', 'auto-shop'] as BuildingPrefabId[]
-    : band.id === 'outer-threshold'
-      ? [] as BuildingPrefabId[]
-      : prefabPools[blockKind];
+
+  const themePrefabPools: Record<string, BuildingPrefabId[]> = {
+    rooftops: ['penthouse', 'antenna-hub', 'clinic', 'bar'],
+    catacombs: ['catacomb-crypt', 'warehouse'],
+    'null-sector': ['server-cluster', 'laundromat'],
+    docks: ['harbor-office', 'warehouse', 'bar', 'corner-store'],
+    alleys: ['apartment', 'bar', 'auto-shop', 'corner-store'],
+    wasteland: ['toll-plaza', 'auto-shop', 'warehouse'],
+  };
+
+  const prefabPool = isOuterBoundary
+    ? [] as BuildingPrefabId[]
+    : (themePrefabPools[themeId] ?? prefabPools[blockKind]);
   const anchors = streetAxis === 'horizontal'
     ? [
         { x: -198, y: -196, side: 'south' as const },
@@ -491,6 +687,32 @@ export function generateChunk(cx: number, cy: number, runSeed: number): StreetCh
       }
     }
     let kind = KINDS[kindIdx] ?? 'crate';
+    if (themeId === 'rooftops') {
+      if (kind === 'car' || kind === 'mailbox' || kind === 'fire-hydrant') kind = 'ac-unit';
+      if (kind === 'dumpster') kind = 'neon-sign';
+      if (kind === 'parking-meter') kind = 'reflective-surface';
+    } else if (themeId === 'catacombs') {
+      if (kind === 'car' || kind === 'dumpster' || kind === 'parking-meter' || kind === 'mailbox') kind = 'metal-box';
+      if (kind === 'fire-hydrant' || kind === 'street-lamp') kind = 'flora';
+      if (kind === 'neon-sign') kind = 'attack-block';
+    } else if (themeId === 'null-sector') {
+      if (kind === 'car' || kind === 'dumpster' || kind === 'mailbox' || kind === 'planter') kind = 'server-rack';
+      if (kind === 'parking-meter' || kind === 'fire-hydrant') kind = 'ac-unit';
+    } else if (themeId === 'docks') {
+      if (kind === 'car') kind = 'crate-breakable';
+      if (kind === 'mailbox') kind = 'barrel';
+      if (kind === 'parking-meter') kind = 'metal-box';
+    } else if (themeId === 'wasteland') {
+      if (kind === 'planter' || kind === 'mailbox' || kind === 'street-lamp') kind = 'car-wreck';
+      if (kind === 'parking-meter') kind = 'pothole';
+    } else if (themeId === 'alleys') {
+      if (kind === 'car') kind = 'dumpster';
+      if (kind === 'planter') kind = 'trash-can';
+    }
+
+    if (band.id.endsWith('-rail') && i % 3 === 0) kind = 'barrier';
+    if (band.id.endsWith('-fringe') && i % 3 === 0) kind = 'metal-box';
+    if (band.id.endsWith('-threshold') && i % 2 === 0) kind = 'reflective-surface';
     if (band.id === 'rail-shadow' && i % 3 === 0) kind = 'barrier';
     if (band.id === 'industrial-fringe' && i % 3 === 0) kind = 'metal-box';
     if (band.id === 'outer-threshold' && i % 2 === 0) kind = 'reflective-surface';

@@ -393,6 +393,12 @@ export function RunScreen({
         missionMarkers,
         missionBeacons,
         cardEffects: activeCardEffects(meta),
+        disabledEnemyIds: meta.disabledEnemyIds,
+        disabledWeaponIds: meta.disabledWeaponIds,
+        disabledPassiveIds: meta.disabledPassiveIds,
+        threatCalibrations: meta.threatCalibrations,
+        threatUpgrades: meta.threatUpgrades,
+        dvdEasterEggUnlocked: meta.dvdEasterEggUnlocked,
       },
     );
   }

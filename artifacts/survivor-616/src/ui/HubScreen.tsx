@@ -15,7 +15,7 @@ import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -25,7 +25,7 @@ import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -55,6 +55,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   'sound-booth': { label: 'The Sound Booth', icon: Disc3, testId: 'button-open-sound-booth', description: 'Buy & preview SFX packs' },
   account: { label: 'Account', icon: Mail, testId: 'button-open-account', description: 'Waitlist & sign in' },
   feedback: { label: 'Feedback', icon: MessageSquareHeart, testId: 'button-open-feedback', description: 'Ideas & bug reports' },
+  'threat-matrix': { label: 'Threat Matrix', icon: ShieldAlert, testId: 'button-open-threat-matrix', description: 'Override & quarantine enemies' },
 };
 
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
@@ -490,6 +491,33 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             })}
           </div>
         </section>
+
+        {(meta.threatMatrixUnlocked || (meta.vendorPurchases?.['threat-matrix-console'] ?? 0) > 0) && (
+          <section className="mb-8 border border-cyan-500/40 bg-cyan-950/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg shadow-lg" data-testid="section-threat-matrix-banner">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded border border-cyan-400/50 bg-cyan-900/40 text-cyan-300">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">Security Override Terminal</span>
+                  <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-200">ONLINE</span>
+                </div>
+                <h3 className="text-base font-black uppercase text-white tracking-wide">Threat Matrix Quarantine Console</h3>
+                <p className="text-xs text-cyan-200/70">
+                  Override spawn tables, quarantine enemy specimens, or trigger Universal Cross-Map Incursions.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpen('threat-matrix')}
+              className="flex shrink-0 items-center justify-center gap-2 rounded border border-cyan-400 bg-cyan-500/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/35 transition-all shadow-md"
+            >
+              Access Terminal
+            </button>
+          </section>
+        )}
 
          {newlyRescuedAlly && (
            <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">

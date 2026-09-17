@@ -31,9 +31,9 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
       <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 font-display text-xl font-black uppercase text-white"><Layers3 className="h-5 w-5 text-fuchsia-200" />Passive Lock Deck</p>
-          <p className="mt-1 text-[10px] uppercase tracking-widest text-white/45">Equip {slots} cards · slot 4 at 8 Collector runs/6 catches · slot 5 at 25 runs/20 catches</p>
+          <p className="mt-1 text-[10px] uppercase tracking-widest text-white/45">Equip {slots} cards · slot 4 at 8 Collector runs/6 catches · slot 5 at 25/20 · slot 6 at 40/45 · slot 7 at 60/65</p>
         </div>
-        <div className="flex gap-2">{Array.from({ length: 5 }, (_, i) => <span key={i} className={`grid h-9 w-9 place-items-center border text-xs ${i < slots ? 'border-fuchsia-300/50' : 'border-white/10 text-white/20'}`}>{i < slots ? i + 1 : <LockKeyhole className="h-3.5 w-3.5" />}</span>)}</div>
+        <div className="flex gap-1.5">{Array.from({ length: 7 }, (_, i) => <span key={i} className={`grid h-8 w-8 place-items-center border text-xs ${i < slots ? 'border-fuchsia-300/50 text-fuchsia-200' : 'border-white/10 text-white/20'}`}>{i < slots ? i + 1 : <LockKeyhole className="h-3 w-3" />}</span>)}</div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2 font-mono text-[9px] uppercase text-white/50">
         {effects.lokPetDamageMult > 1 && <span>Pet damage +{Math.round((effects.lokPetDamageMult - 1) * 100)}%</span>}
@@ -87,7 +87,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         </div>
       </section>
 
-      <div className="mb-8 flex snap-x gap-3 overflow-x-auto pb-3 sm:grid sm:snap-none sm:grid-cols-3 sm:overflow-visible sm:pb-0 lg:grid-cols-6">
+      <div className="mb-8 flex snap-x gap-3 overflow-x-auto pb-3 sm:grid sm:snap-none sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 sm:overflow-visible sm:pb-0">
         {CARD_SHOP_PACKS.map((pack) => (
           <article key={pack.id} className="flex min-h-56 w-[220px] shrink-0 snap-start flex-col border border-white/15 bg-black/30 p-4 sm:w-auto">
             <span className="font-mono text-[9px] uppercase tracking-widest text-fuchsia-200">{pack.cards} cards</span>

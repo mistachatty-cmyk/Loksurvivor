@@ -2530,6 +2530,40 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.strokeStyle = '#fffdf0';
         ctx.globalAlpha = Math.max(0, fade * 0.6);
         ctx.stroke();
+
+        if (effect.color === '#e2e8f0' || effect.weaponId === 'monitor-crack') {
+          // 4th-Wall Breaking: Radial Monitor Screen Fracture Lines
+          ctx.save();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.5 * fade;
+          ctx.shadowColor = '#38bdf8';
+          ctx.shadowBlur = 8;
+          const crackCount = 7;
+          for (let c = 0; c < crackCount; c += 1) {
+            const baseAngle = (c * Math.PI * 2) / crackCount + 0.2;
+            let cx = effect.x;
+            let cy = effect.y;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            const segments = 4;
+            const segLen = (outer * 1.5) / segments;
+            for (let s = 0; s < segments; s += 1) {
+              const segAngle = baseAngle + Math.sin(c * 17 + s * 31) * 0.35;
+              cx += Math.cos(segAngle) * segLen;
+              cy += Math.sin(segAngle) * segLen;
+              ctx.lineTo(cx, cy);
+              if (s === 2) {
+                const bx = cx + Math.cos(segAngle + 0.8) * segLen * 0.8;
+                const by = cy + Math.sin(segAngle + 0.8) * segLen * 0.8;
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(bx, by);
+                ctx.moveTo(cx, cy);
+              }
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
         break;
       }
       case 'aura':
@@ -2607,6 +2641,121 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.radius * (1 - fade) + 8, 0, Math.PI * 2);
         ctx.stroke();
+        break;
+      }
+      case 'glitch': {
+        // 4th-Wall Breaking: Desktop Marquee Selection Box & CRT Scanline Disruption
+        const boxW = Math.max(90, effect.radius * 1.6);
+        const boxH = Math.max(70, effect.radius * 1.2);
+        const left = effect.x - boxW / 2;
+        const top = effect.y - boxH / 2;
+
+        ctx.save();
+        ctx.fillStyle = effect.weaponId === 'kernel-panic' ? 'rgba(37, 99, 235, 0.35)' : 'rgba(14, 165, 233, 0.22)';
+        ctx.fillRect(left, top, boxW, boxH);
+
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.lineDashOffset = -w.now / 40;
+        ctx.strokeRect(left, top, boxW, boxH);
+
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ffffff';
+        const handleSize = 5;
+        ctx.fillRect(left - handleSize / 2, top - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(left + boxW - handleSize / 2, top - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(left - handleSize / 2, top + boxH - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(left + boxW - handleSize / 2, top + boxH - handleSize / 2, handleSize, handleSize);
+
+        const curX = left + Math.sin(w.now / 120) * 4;
+        const curY = top + Math.cos(w.now / 120) * 4;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(curX, curY);
+        ctx.lineTo(curX + 16, curY + 11);
+        ctx.lineTo(curX + 10, curY + 11);
+        ctx.lineTo(curX + 14, curY + 20);
+        ctx.lineTo(curX + 10, curY + 22);
+        ctx.lineTo(curX + 6, curY + 13);
+        ctx.lineTo(curX, curY + 17);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        const jitterLines = 4;
+        for (let j = 0; j < jitterLines; j += 1) {
+          const jy = top + ((w.now / 8 + j * 23) % boxH);
+          const jOffset = (Math.sin(w.now / 30 + j) * 8);
+          ctx.fillStyle = j % 2 === 0 ? 'rgba(236, 72, 153, 0.45)' : 'rgba(6, 182, 212, 0.45)';
+          ctx.fillRect(left + jOffset, jy, boxW, 2);
+        }
+
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = effect.color;
+        ctx.shadowBlur = 6;
+        const bannerText = effect.weaponId === 'kernel-panic' ? '*** BSOD: 0x0000007E ***' : '[DELETE SELECTED: 0xNULL]';
+        ctx.fillText(bannerText, left + 6, top - 6);
+        ctx.restore();
+        break;
+      }
+      case 'waveform': {
+        // Real-Time Stereo Audio Oscilloscope Waveform Ribbon
+        ctx.save();
+        const segments = 28;
+        const stepLen = effect.radius / segments;
+        const perpX = -Math.sin(effect.angle);
+        const perpY = Math.cos(effect.angle);
+
+        const channels = [
+          { color: effect.color, phase: 0, ampMult: 1, offset: -2 },
+          { color: '#f43f5e', phase: Math.PI * 0.5, ampMult: 0.8, offset: 2 },
+        ];
+
+        for (const ch of channels) {
+          ctx.strokeStyle = ch.color;
+          ctx.lineWidth = (3.5 * fade + 1.5);
+          ctx.shadowColor = ch.color;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          for (let s = 0; s <= segments; s += 1) {
+            const dist = s * stepLen;
+            const progress = s / segments;
+            const envelope = Math.sin(progress * Math.PI);
+            const wave = Math.sin(s * 0.75 + w.now / 50 + ch.phase) * 16 * envelope
+              + Math.sin(s * 1.5 - w.now / 35) * 7 * envelope;
+            const px = effect.x + Math.cos(effect.angle) * dist + perpX * (wave + ch.offset);
+            const py = effect.y + Math.sin(effect.angle) * dist + perpY * (wave + ch.offset);
+            if (s === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+
+            if (s % 5 === 0 && s > 0) {
+              const tickH = 6 * envelope;
+              ctx.strokeRect(px - 1, py - tickH / 2, 2, tickH);
+            }
+          }
+          ctx.stroke();
+        }
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5 * fade;
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        for (let s = 0; s <= segments; s += 1) {
+          const dist = s * stepLen;
+          const progress = s / segments;
+          const envelope = Math.sin(progress * Math.PI);
+          const wave = Math.sin(s * 0.75 + w.now / 50) * 16 * envelope;
+          const px = effect.x + Math.cos(effect.angle) * dist + perpX * wave;
+          const py = effect.y + Math.sin(effect.angle) * dist + perpY * wave;
+          if (s === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.restore();
         break;
       }
     }
@@ -2693,6 +2842,57 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.restore();
       continue;
     }
+
+    if (proj.customKind === 'dvd-logo') {
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      const isEvolved = proj.weaponId === 'dvd-screensaver';
+      const logoW = isEvolved ? 48 : 42;
+      const logoH = isEvolved ? 28 : 24;
+      ctx.shadowColor = proj.color;
+      ctx.shadowBlur = isEvolved ? 22 : 14;
+
+      // Outer glowing pill box
+      ctx.fillStyle = '#090d16';
+      ctx.strokeStyle = proj.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.roundRect(-logoW / 2, -logoH / 2, logoW, logoH, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      // Disc ellipse beneath
+      ctx.strokeStyle = proj.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 4, 15, 4.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Bold text "DVD"
+      ctx.fillStyle = proj.color;
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('DVD', 0, -3.5);
+
+      // Subtext "VIDEO"
+      ctx.font = 'bold 6px sans-serif';
+      ctx.fillText(isEvolved ? 'ULTRA' : 'VIDEO', 0, 5.5);
+
+      if (isEvolved) {
+        // Holographic sheen streak
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-logoW / 2 + 5, logoH / 2 - 2);
+        ctx.lineTo(logoW / 2 - 5, -logoH / 2 + 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+      continue;
+    }
     ctx.save();
     ctx.globalAlpha = 0.4;
     ctx.strokeStyle = proj.color;
@@ -2711,7 +2911,51 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
     const heading = Math.atan2(proj.vy, proj.vx);
     const bodyColor = proj.fromPlayer ? proj.color : '#ff7a7a';
 
-    if (proj.radius >= 20) {
+    if (proj.radius >= 20 && proj.color === '#ec4899') {
+      // V-Sync Slayer: 4th-Wall Horizontal Screen Tear Seam
+      ctx.translate(proj.x, proj.y);
+      ctx.rotate(heading);
+      const tearLen = proj.radius * 3.4;
+      const tearH = proj.radius * 0.9;
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-tearLen * 0.5, -tearH * 0.5, tearLen, tearH * 0.5);
+      ctx.fillRect(-tearLen * 0.5 - 6, 0, tearLen, tearH * 0.5);
+      ctx.strokeStyle = '#ec4899';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-tearLen * 0.5 - 6, 0);
+      for (let tx = -tearLen * 0.5; tx <= tearLen * 0.5; tx += 12) {
+        ctx.lineTo(tx, (Math.sin(tx * 0.3 + w.now / 20) * 3));
+      }
+      ctx.stroke();
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else if (proj.color === '#c084fc') {
+      // Solitaire Cascade: Bouncing retro dialog window with cascade shadow frames
+      ctx.translate(proj.x, proj.y);
+      ctx.rotate(heading * 0.25);
+      const winW = 24;
+      const winH = 20;
+      for (let cf = 2; cf >= 1; cf -= 1) {
+        ctx.globalAlpha = 0.25 * cf;
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(-winW / 2 - cf * 4, -winH / 2 - cf * 4, winW, winH);
+        ctx.strokeStyle = '#64748b';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-winW / 2 - cf * 4, -winH / 2 - cf * 4, winW, winH);
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(-winW / 2, -winH / 2, winW, winH);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-winW / 2, -winH / 2, winW, winH);
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(-winW / 2 + 1, -winH / 2 + 1, winW - 2, 5);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(winW / 2 - 4, -winH / 2 + 1.5, 3, 3);
+    } else if (proj.radius >= 20) {
       // "The Bus" and similarly huge sweep shots: an elongated vehicle silhouette, not a dot.
       ctx.translate(proj.x, proj.y);
       ctx.rotate(heading);
@@ -3462,6 +3706,94 @@ function drawPopups(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Electric chains & Bubble wash mechanics                             */
+/* ------------------------------------------------------------------ */
+
+function drawElectricChains(ctx: CanvasRenderingContext2D, w: World) {
+  if (!w.electricChains || w.electricChains.length === 0) return;
+  ctx.save();
+  for (const chain of w.electricChains) {
+    const age = w.now - chain.bornAt;
+    const dur = chain.expiresAt - chain.bornAt;
+    const progress = age / Math.max(1, dur);
+    const alpha = Math.max(0, 1 - progress);
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.shadowColor = '#0284c7';
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 2.5;
+    ctx.globalAlpha = alpha;
+
+    const dx = chain.x2 - chain.x1;
+    const dy = chain.y2 - chain.y1;
+    const dist = Math.hypot(dx, dy);
+    const segments = Math.max(4, Math.floor(dist / 14));
+
+    ctx.beginPath();
+    ctx.moveTo(chain.x1, chain.y1);
+    const normalX = -dy / (dist || 1);
+    const normalY = dx / (dist || 1);
+
+    for (let i = 1; i < segments; i += 1) {
+      const t = i / segments;
+      const jitter = (Math.sin(w.now / 30 + i * 3) * 7) + (Math.random() - 0.5) * 5;
+      const sx = chain.x1 + dx * t + normalX * jitter;
+      const sy = chain.y1 + dy * t + normalY * jitter;
+      ctx.lineTo(sx, sy);
+    }
+    ctx.lineTo(chain.x2, chain.y2);
+    ctx.stroke();
+
+    // Hot white inner lightning core
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBubbleWash(ctx: CanvasRenderingContext2D, w: World) {
+  if (!w.bubbleWash) return;
+  const bw = w.bubbleWash;
+
+  // Draw suds foam particles
+  if (bw.foamParticles.length > 0) {
+    ctx.save();
+    for (const fp of bw.foamParticles) {
+      ctx.save();
+      ctx.translate(fp.x, fp.y);
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = fp.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, fp.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Specular shine highlight
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(-fp.r * 0.35, -fp.r * 0.35, fp.r * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Draw warning or surge wash overlay
+  if (bw.state === 'warning' || bw.state === 'surging') {
+    ctx.save();
+    const isSurging = bw.state === 'surging';
+    const pulse = (Math.sin(w.now / (isSurging ? 60 : 130)) + 1) * 0.5;
+    const alpha = isSurging ? 0.2 + pulse * 0.15 : 0.08 + pulse * 0.12;
+    ctx.fillStyle = bw.direction > 0 ? `rgba(236, 72, 153, ${alpha})` : `rgba(56, 189, 248, ${alpha})`;
+    const halfW = w.bounds.w / 2;
+    const halfH = w.bounds.h / 2;
+    ctx.fillRect(-halfW, -halfH, w.bounds.w, w.bounds.h);
+    ctx.restore();
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -3550,6 +3882,8 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
   drawEffects(ctx, w);
+  drawBubbleWash(ctx, w);
+  drawElectricChains(ctx, w);
   drawProjectiles(ctx, w);
   drawPendingMeteors(ctx, w);
   drawParticles(ctx, w);

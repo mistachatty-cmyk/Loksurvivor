@@ -34,14 +34,14 @@ export const FACTIONS: FactionDef[] = [
     name: 'The Watch',
     description: 'Cone-sighted sentries that sweep for movement and can catch what stealth hides.',
     accent: '#f59e0b',
-    roster: ['watchlight', 'floodline', 'sodium-lamp'],
+    roster: ['watchlight', 'floodline', 'sodium-lamp', 'phalanx-bulwark'],
   },
   {
     id: 'afterimage-choir',
     name: 'Afterimage Choir',
     description: 'Shadow-born flankers that never approach in a straight line.',
     accent: '#a78bfa',
-    roster: ['spiral-moth', 'neon-comet', 'hollow-echo'],
+    roster: ['spiral-moth', 'neon-comet', 'hollow-echo', 'pincer-stalker'],
   },
   {
     id: 'cinder-procession',
@@ -60,16 +60,16 @@ export const FACTIONS: FactionDef[] = [
   {
     id: 'bubblenaught-tide',
     name: 'Bubblenaught Tide',
-    description: 'The native population of Haven of the Bubs, generations deep.',
+    description: 'The native population of Haven of the Bubs, generations deep. Deep blue surfactant globes wielding dense fluid shields.',
     accent: '#38bdf8',
-    roster: ['bubblenaught-drifter', 'bubblenaught-warden', 'marshal-undertow'],
+    roster: ['bubblenaught-drifter', 'bubblenaught-warden', 'marshal-undertow', 'cyan-lye-glob', 'soap-bubble-titan'],
   },
   {
     id: 'bubbleteer-parade',
     name: 'Bubbleteer Parade',
-    description: "Bulbosa's line, crossing into the Bubblenaughts' kingdom same as her father did.",
+    description: "Bulbosa's line, crossing into the Bubblenaughts' kingdom. Pressurized pink foam entities that pop into split swarms.",
     accent: '#f472b6',
-    roster: ['bubbleteer-cadet', 'bubbleteer-shocker', 'captain-frothbite'],
+    roster: ['bubbleteer-cadet', 'bubbleteer-shocker', 'captain-frothbite', 'bubble-hopper', 'froth-behemoth'],
   },
   {
     id: 'loop-chorus',
@@ -104,14 +104,28 @@ export const FACTIONS: FactionDef[] = [
     name: 'Null Sector',
     description: 'A decommissioned data-center basement, corrupted by a rogue signal. Nothing down here is plugged in, and everything is still running.',
     accent: '#22d3ee',
-    roster: ['packet-wraith', 'firewall-brute', 'null-spitter', 'corrupted-lookout', 'drift-shard'],
+    roster: ['packet-wraith', 'firewall-brute', 'null-spitter', 'corrupted-lookout', 'drift-shard', 'prism-sentinel'],
   },
   {
     id: 'reel-syndicate',
     name: 'Reel Syndicate',
     description: "The Director's own crew -- an unscripted arrival, never part of an area's authored waves. See data/directors.ts.",
     accent: '#ff2ec4',
-    roster: ['the-director', 'boom-mic-runner', 'gaffer-brute'],
+    roster: ['the-director', 'boom-mic-runner', 'gaffer-brute', 'strobe-shutter', 'the-foley-artist'],
+  },
+  {
+    id: 'glitch-breach',
+    name: 'Glitch Breach',
+    description: 'Anomalous memory leaks and rendering bugs that broke free of the game engine itself. They tear through reality coordinates and ignore normal rules.',
+    accent: '#38bdf8',
+    roster: ['cursor-hound', 'unrendered-mesh', 'dead-pixel-swarm', 'dropped-frame', 'heap-colossus', 'stack-overflow', 'singularity-core'],
+  },
+  {
+    id: 'digitized-damned',
+    name: 'Digitized Damned',
+    description: 'Human survivors harvested by The Director, their organic souls fragmented into raw data packets and memory addresses.',
+    accent: '#06b6d4',
+    roster: ['soul-extractor', 'digitized-phantom', 'bit-rot', 'dust-mite', 'director-clapper', 'quantum-weaver'],
   },
 ];
 

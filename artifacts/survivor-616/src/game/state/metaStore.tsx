@@ -67,6 +67,8 @@ import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS } from '@/game/data/cards';
 import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
+import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { PASSIVES } from '@/game/data/passives';
 import type {
   AllyDef,
   AreaDef,
@@ -96,7 +98,41 @@ import type {
   UnlockRule,
   CustomMap,
   UIPanelLayout,
+  ThreatCalibrations,
+  ThreatEventId,
 } from '@/game/types';
+
+export const DEFAULT_THREAT_CALIBRATIONS: ThreatCalibrations = {
+  hpMult: 1,
+  massMult: 1,
+  densityMult: 1,
+  angleMode: 'standard',
+  activeEvents: [],
+};
+
+export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
+  if (!raw || typeof raw !== 'object') {
+    return { ...DEFAULT_THREAT_CALIBRATIONS };
+  }
+  const obj = raw as Partial<ThreatCalibrations>;
+  const hpMult = typeof obj.hpMult === 'number' && Number.isFinite(obj.hpMult) ? Math.max(0.2, Math.min(5, obj.hpMult)) : 1;
+  const massMult = typeof obj.massMult === 'number' && Number.isFinite(obj.massMult) ? Math.max(0.2, Math.min(5, obj.massMult)) : 1;
+  const densityMult = typeof obj.densityMult === 'number' && Number.isFinite(obj.densityMult) ? Math.max(0.2, Math.min(5, obj.densityMult)) : 1;
+  const validModes: ThreatCalibrations['angleMode'][] = ['standard', 'pincer', 'cardinal', 'spiral', 'corners'];
+  const angleMode = validModes.includes(obj.angleMode as any) ? (obj.angleMode as ThreatCalibrations['angleMode']) : 'standard';
+  const validEvents: ThreatEventId[] = ['emp-storm', 'gravity-anomaly', 'glitch-surge', 'solar-flare', 'blood-overclock', 'swarm-frenzy'];
+  const activeEvents: ThreatEventId[] = Array.isArray(obj.activeEvents)
+    ? (obj.activeEvents.filter((ev): ev is ThreatEventId => typeof ev === 'string' && (validEvents as string[]).includes(ev)))
+    : [];
+
+  return {
+    hpMult,
+    massMult,
+    densityMult,
+    angleMode,
+    activeEvents,
+  };
+}
 
 const STORAGE_KEY = 'survivor616.meta.v1';
 const META_VERSION = 17;
@@ -293,6 +329,13 @@ export function createInitialMeta(): MetaState {
     claimedAchievementIds: [],
     defeatedDirectorIds: [],
     directorModeUnlocked: false,
+    threatMatrixUnlocked: false,
+    disabledEnemyIds: [],
+    disabledWeaponIds: [],
+    disabledPassiveIds: [],
+    threatCalibrations: { ...DEFAULT_THREAT_CALIBRATIONS },
+    threatUpgrades: {},
+    dvdEasterEggUnlocked: false,
     pendingNotifications: [],
   };
 }
@@ -1013,6 +1056,21 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       [],
     ),
     directorModeUnlocked: parsed.directorModeUnlocked === true,
+    threatMatrixUnlocked: parsed.threatMatrixUnlocked === true,
+    disabledEnemyIds: Array.isArray(parsed.disabledEnemyIds)
+      ? parsed.disabledEnemyIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    disabledWeaponIds: Array.isArray(parsed.disabledWeaponIds)
+      ? parsed.disabledWeaponIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    disabledPassiveIds: Array.isArray(parsed.disabledPassiveIds)
+      ? parsed.disabledPassiveIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    threatCalibrations: normalizeThreatCalibrations(parsed.threatCalibrations),
+    threatUpgrades: typeof parsed.threatUpgrades === 'object' && parsed.threatUpgrades !== null
+      ? (parsed.threatUpgrades as Record<string, boolean>)
+      : {},
+    dvdEasterEggUnlocked: parsed.dvdEasterEggUnlocked === true,
     // Never carried across a reload -- a stale toast from a session that
     // never got to see it should not resurface out of context later.
     pendingNotifications: [],
@@ -1162,7 +1220,7 @@ export function allyBoostTotals(meta: MetaState): Partial<BaseStats> {
 }
 
 /** A character's stats after permanent ally boosts are applied. */
-export function effectiveStats(character: CharacterDef, meta: MetaState): BaseStats {
+export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreFatigue = false): BaseStats {
   const settled = settleRecovery(meta);
   const boosts = allyBoostTotals(meta);
   const stats: BaseStats = { ...character.stats };
@@ -1187,15 +1245,56 @@ export function effectiveStats(character: CharacterDef, meta: MetaState): BaseSt
   for (const [stat, multiplier] of Object.entries(cards.statMults) as Array<[keyof BaseStats, number]>) stats[stat] *= multiplier;
   stats.magnet *= cards.magnetMult;
   stats.armor = Math.min(stats.armor, 0.6);
-  const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
-  stats.maxHp *= 1 - fatigue;
-  stats.speed *= 1 - fatigue;
-  stats.power *= 1 - fatigue;
-  stats.area *= 1 - fatigue;
-  stats.magnet *= 1 - fatigue;
-  stats.armor = Math.max(0, stats.armor * (1 - fatigue));
-  stats.haste *= 1 + fatigue;
+  if (!ignoreFatigue) {
+    const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
+    stats.maxHp *= 1 - fatigue;
+    stats.speed *= 1 - fatigue;
+    stats.power *= 1 - fatigue;
+    stats.area *= 1 - fatigue;
+    stats.magnet *= 1 - fatigue;
+    stats.armor = Math.max(0, stats.armor * (1 - fatigue));
+    stats.haste *= 1 + fatigue;
+  }
   return stats;
+}
+
+export interface CharacterFatigueSummary {
+  fatiguePct: number;
+  maxFatiguePct: number;
+  isFatigued: boolean;
+  effectiveStats: BaseStats;
+  restedStats: BaseStats;
+  diffs: {
+    maxHp: number;
+    speed: number;
+    power: number;
+    armor: number;
+    haste: number;
+    area: number;
+    magnet: number;
+  };
+}
+
+export function getCharacterFatigueSummary(character: CharacterDef, meta: MetaState): CharacterFatigueSummary {
+  const fatiguePct = currentFatiguePct(meta, character.id);
+  const effective = effectiveStats(character, meta, false);
+  const rested = effectiveStats(character, meta, true);
+  return {
+    fatiguePct,
+    maxFatiguePct: MAX_FATIGUE_PCT,
+    isFatigued: fatiguePct > 0,
+    effectiveStats: effective,
+    restedStats: rested,
+    diffs: {
+      maxHp: effective.maxHp - rested.maxHp,
+      speed: effective.speed - rested.speed,
+      power: effective.power - rested.power,
+      armor: effective.armor - rested.armor,
+      haste: effective.haste - rested.haste,
+      area: effective.area - rested.area,
+      magnet: effective.magnet - rested.magnet,
+    },
+  };
 }
 
 /** Permanent utility bonuses used when constructing a new run. */
@@ -1389,6 +1488,18 @@ type Action =
   | { type: 'deleteCustomMap'; id: string }
   | { type: 'claimAchievement'; id: string }
   | { type: 'importVisitingLokCard'; card: VisitingLokCard }
+  | { type: 'unlockThreatMatrixWithKeys' }
+  | { type: 'toggleEnemyDisabled'; enemyId: string }
+  | { type: 'setAllEnemiesDisabled'; disabled: boolean }
+  | { type: 'toggleWeaponDisabled'; weaponId: string }
+  | { type: 'setAllWeaponsDisabled'; disabled: boolean }
+  | { type: 'togglePassiveDisabled'; passiveId: string }
+  | { type: 'setAllPassivesDisabled'; disabled: boolean }
+  | { type: 'setThreatCalibrations'; calibrations: Partial<ThreatCalibrations> }
+  | { type: 'resetThreatCalibrations' }
+  | { type: 'resetArsenalQuarantine' }
+  | { type: 'toggleThreatUpgrade'; upgradeId: string }
+  | { type: 'unlockDvdEasterEgg' }
   | { type: 'replaceMeta'; meta: Partial<MetaState> }
   | { type: 'reset' };
 
@@ -1546,12 +1657,162 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const currency = item.currency ?? 'cred';
       const balance = state.meta[currency];
       if (owned >= item.maxStacks || balance < item.cost) return state;
+      const nextPurchases = { ...state.meta.vendorPurchases, [item.id]: owned + 1 };
+      const nextMeta = {
+        ...state.meta,
+        [currency]: balance - item.cost,
+        vendorPurchases: nextPurchases,
+      };
+      if (item.id === 'threat-matrix-console') {
+        nextMeta.threatMatrixUnlocked = true;
+      }
+      if (['universal-incursion', 'corner-magnet', 'tidal-anchor', 'static-inverter'].includes(item.id)) {
+        nextMeta.threatUpgrades = { ...(nextMeta.threatUpgrades ?? {}), [item.id]: true };
+      }
+      return {
+        ...state,
+        meta: nextMeta,
+      };
+    }
+
+    case 'unlockThreatMatrixWithKeys': {
+      if (state.meta.threatMatrixUnlocked || state.meta.skeletonKeys < 4) return state;
       return {
         ...state,
         meta: {
           ...state.meta,
-          [currency]: balance - item.cost,
-          vendorPurchases: { ...state.meta.vendorPurchases, [item.id]: owned + 1 },
+          skeletonKeys: state.meta.skeletonKeys - 4,
+          threatMatrixUnlocked: true,
+          pendingNotifications: [
+            ...state.meta.pendingNotifications,
+            {
+              id: `threat-matrix-${Date.now()}`,
+              title: 'Threat Matrix Quarantine Terminal Online',
+              body: 'Security override granted. You can now quarantine or unleash any enemy across all maps.',
+              createdAt: Date.now(),
+            },
+          ],
+        },
+      };
+    }
+
+    case 'toggleEnemyDisabled': {
+      const { enemyId } = action;
+      const current = state.meta.disabledEnemyIds ?? [];
+      const disabledEnemyIds = current.includes(enemyId)
+        ? current.filter((id) => id !== enemyId)
+        : [...current, enemyId];
+      return { ...state, meta: { ...state.meta, disabledEnemyIds } };
+    }
+
+    case 'setAllEnemiesDisabled': {
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          disabledEnemyIds: action.disabled ? ENEMIES.map((e) => e.id) : [],
+        },
+      };
+    }
+
+    case 'toggleWeaponDisabled': {
+      const { weaponId } = action;
+      const current = state.meta.disabledWeaponIds ?? [];
+      const disabledWeaponIds = current.includes(weaponId)
+        ? current.filter((id) => id !== weaponId)
+        : [...current, weaponId];
+      return { ...state, meta: { ...state.meta, disabledWeaponIds } };
+    }
+
+    case 'setAllWeaponsDisabled': {
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          disabledWeaponIds: action.disabled ? Object.keys(WEAPONS_BY_ID) : [],
+        },
+      };
+    }
+
+    case 'togglePassiveDisabled': {
+      const { passiveId } = action;
+      const current = state.meta.disabledPassiveIds ?? [];
+      const disabledPassiveIds = current.includes(passiveId)
+        ? current.filter((id) => id !== passiveId)
+        : [...current, passiveId];
+      return { ...state, meta: { ...state.meta, disabledPassiveIds } };
+    }
+
+    case 'setAllPassivesDisabled': {
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          disabledPassiveIds: action.disabled ? PASSIVES.map((p) => p.id) : [],
+        },
+      };
+    }
+
+    case 'setThreatCalibrations': {
+      const current = state.meta.threatCalibrations ?? DEFAULT_THREAT_CALIBRATIONS;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          threatCalibrations: { ...current, ...action.calibrations },
+        },
+      };
+    }
+
+    case 'resetThreatCalibrations': {
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          threatCalibrations: { ...DEFAULT_THREAT_CALIBRATIONS },
+        },
+      };
+    }
+
+    case 'resetArsenalQuarantine': {
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          disabledWeaponIds: [],
+          disabledPassiveIds: [],
+        },
+      };
+    }
+
+    case 'toggleThreatUpgrade': {
+      const current = state.meta.threatUpgrades ?? {};
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          threatUpgrades: { ...current, [action.upgradeId]: !current[action.upgradeId] },
+        },
+      };
+    }
+
+    case 'unlockDvdEasterEgg': {
+      if (state.meta.dvdEasterEggUnlocked) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          dvdEasterEggUnlocked: true,
+          unlockedEvolutionIds: addUnique(state.meta.unlockedEvolutionIds, 'dvd-screensaver'),
+          pendingNotifications: [
+            ...state.meta.pendingNotifications,
+            {
+              id: `dvd-easter-egg-${Date.now()}`,
+              title: '★ SPECIAL EASTER EGG UNLOCKED! ★',
+              body: 'DVD Bouncing Logo weapon & DVD Corner Strike evolution unlocked! The iconic screensaver is now armed and bouncing in your arsenal.',
+              createdAt: Date.now(),
+            },
+          ],
         },
       };
     }
@@ -2178,6 +2439,25 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ];
       }
 
+      // Check DVD Bouncing Logo Easter Egg Unlock:
+      // Condition 1: Finished every authored area
+      // Condition 2: Cleared bubbleWash (especially with optional side quest objectives completed)
+      const allAuthoredAreasCleared = AREAS.every((a) => clearedAreaIds.includes(a.id));
+      const bubbleWashCleared = result.areaId === 'bubbleWash' && result.cleared;
+      if (!next.dvdEasterEggUnlocked && (allAuthoredAreasCleared || bubbleWashCleared)) {
+        next.dvdEasterEggUnlocked = true;
+        next.unlockedEvolutionIds = addUnique(next.unlockedEvolutionIds, 'dvd-screensaver');
+        next.pendingNotifications = [
+          ...next.pendingNotifications,
+          {
+            id: `dvd-easter-egg-${Date.now()}`,
+            title: '★ SPECIAL EASTER EGG UNLOCKED! ★',
+            body: 'DVD Bouncing Logo & DVD Corner Strike unlocked! The legendary screensaver ricochets across the screen and detonates full-screen rainbow kinetic bursts on corner hits!',
+            createdAt: Date.now(),
+          },
+        ];
+      }
+
       return {
         meta: next,
         lastCardPackReveal: state.lastCardPackReveal,
@@ -2290,6 +2570,18 @@ export interface MetaContextValue {
   deleteCustomMap: (id: string) => void;
   claimAchievement: (id: string) => void;
   importVisitingLokCard: (card: VisitingLokCard) => void;
+  unlockThreatMatrixWithKeys: () => void;
+  toggleEnemyDisabled: (enemyId: string) => void;
+  setAllEnemiesDisabled: (disabled: boolean) => void;
+  toggleWeaponDisabled: (weaponId: string) => void;
+  setAllWeaponsDisabled: (disabled: boolean) => void;
+  togglePassiveDisabled: (passiveId: string) => void;
+  setAllPassivesDisabled: (disabled: boolean) => void;
+  setThreatCalibrations: (calibrations: Partial<ThreatCalibrations>) => void;
+  resetThreatCalibrations: () => void;
+  resetArsenalQuarantine: () => void;
+  toggleThreatUpgrade: (upgradeId: string) => void;
+  unlockDvdEasterEgg: () => void;
   resetProgress: () => void;
   /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
   importMeta: (meta: Partial<MetaState>) => void;
@@ -2450,6 +2742,18 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const deleteCustomMap = useCallback((id: string) => dispatch({ type: 'deleteCustomMap', id }), []);
   const claimAchievement = useCallback((id: string) => dispatch({ type: 'claimAchievement', id }), []);
   const importVisitingLokCard = useCallback((card: VisitingLokCard) => dispatch({ type: 'importVisitingLokCard', card }), []);
+  const unlockThreatMatrixWithKeys = useCallback(() => dispatch({ type: 'unlockThreatMatrixWithKeys' }), []);
+  const toggleEnemyDisabled = useCallback((enemyId: string) => dispatch({ type: 'toggleEnemyDisabled', enemyId }), []);
+  const setAllEnemiesDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllEnemiesDisabled', disabled }), []);
+  const toggleThreatUpgrade = useCallback((upgradeId: string) => dispatch({ type: 'toggleThreatUpgrade', upgradeId }), []);
+  const toggleWeaponDisabled = useCallback((weaponId: string) => dispatch({ type: 'toggleWeaponDisabled', weaponId }), []);
+  const setAllWeaponsDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllWeaponsDisabled', disabled }), []);
+  const togglePassiveDisabled = useCallback((passiveId: string) => dispatch({ type: 'togglePassiveDisabled', passiveId }), []);
+  const setAllPassivesDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllPassivesDisabled', disabled }), []);
+  const setThreatCalibrations = useCallback((calibrations: Partial<ThreatCalibrations>) => dispatch({ type: 'setThreatCalibrations', calibrations }), []);
+  const resetThreatCalibrations = useCallback(() => dispatch({ type: 'resetThreatCalibrations' }), []);
+  const resetArsenalQuarantine = useCallback(() => dispatch({ type: 'resetArsenalQuarantine' }), []);
+  const unlockDvdEasterEgg = useCallback(() => dispatch({ type: 'unlockDvdEasterEgg' }), []);
   const resetProgress = useCallback(() => dispatch({ type: 'reset' }), []);
 
   const value = useMemo<MetaContextValue>(() => {
@@ -2562,6 +2866,18 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       deleteCustomMap,
       claimAchievement,
       importVisitingLokCard,
+      unlockThreatMatrixWithKeys,
+      toggleEnemyDisabled,
+      setAllEnemiesDisabled,
+      toggleWeaponDisabled,
+      setAllWeaponsDisabled,
+      togglePassiveDisabled,
+      setAllPassivesDisabled,
+      setThreatCalibrations,
+      resetThreatCalibrations,
+      resetArsenalQuarantine,
+      toggleThreatUpgrade,
+      unlockDvdEasterEgg,
       importMeta,
     };
   }, [
@@ -2641,6 +2957,18 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     deleteCustomMap,
     claimAchievement,
     importVisitingLokCard,
+    unlockThreatMatrixWithKeys,
+    toggleEnemyDisabled,
+    setAllEnemiesDisabled,
+    toggleWeaponDisabled,
+    setAllWeaponsDisabled,
+    togglePassiveDisabled,
+    setAllPassivesDisabled,
+    setThreatCalibrations,
+    resetThreatCalibrations,
+    resetArsenalQuarantine,
+    toggleThreatUpgrade,
+    unlockDvdEasterEgg,
     importMeta,
   ]);
 

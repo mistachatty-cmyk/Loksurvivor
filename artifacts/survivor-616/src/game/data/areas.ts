@@ -1,6 +1,7 @@
 import type { AreaDef } from '@/game/types';
 import { AREAS_2X } from './areas-2x';
 import { WEIRD_AREAS } from './areas-weird';
+import { AREAS_ENDLESS } from './areas-endless';
 import { AREAS_NULL_SECTOR } from './areas-null-sector';
 import { squadWave } from './authoring';
 
@@ -516,6 +517,87 @@ export const AREAS: AreaDef[] = [
       { fromSec: 180, toSec: 210, enemyId: 'bubbleteer-shocker', ratePerSec: 0.4, burst: 1, hpMult: 1.4 },
     ],
   },
+  {
+    id: 'bubbleWash',
+    name: 'Bubble Wash',
+    district: 'Industrial Suds Basin',
+    description:
+      'A massive industrial runoff basin where pink Bubbleteers and blue Bubblenaughts wage turf wars. Alarms sound before devastating walls of suds wash the arena left and right!',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 1060, h: 760 },
+    ground: { base: '#0b192c', tile: '#1e3e62', seam: '#000000', glow: '#38bdf8' },
+    sky: 'roofed',
+    obstacles: [
+      { x: -360, y: -240, w: 120, h: 48, kind: 'barrier' },
+      { x: 360, y: -240, w: 120, h: 48, kind: 'barrier' },
+      { x: -360, y: 240, w: 120, h: 48, kind: 'barrier' },
+      { x: 360, y: 240, w: 120, h: 48, kind: 'barrier' },
+      { x: -280, y: 0, w: 60, h: 80, kind: 'planter' },
+      { x: 280, y: 0, w: 60, h: 80, kind: 'planter' },
+      { x: 0, y: -280, w: 64, h: 64, kind: 'neon-sign' },
+      { x: 0, y: 280, w: 64, h: 64, kind: 'neon-sign' },
+      { x: -160, y: -120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: 160, y: 120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: -160, y: 120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: 160, y: -120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: -420, y: 0, w: 50, h: 50, kind: 'barrel' },
+      { x: 420, y: 0, w: 50, h: 50, kind: 'barrel' },
+      { x: 0, y: 0, w: 80, h: 28, kind: 'cover' },
+    ],
+    durationSec: 180,
+    threat: 'severe',
+    discoveryId: 'bubble-wash-cleanse',
+    unlock: { kind: 'default' },
+    waves: [
+      { fromSec: 0, toSec: 60, enemyId: 'bubblenaught-drifter', ratePerSec: 2.0, burst: 2, formation: 'wedge', faction: 'Bubblenaught Tide' },
+      { fromSec: 10, toSec: 70, enemyId: 'bubbleteer-cadet', ratePerSec: 2.0, burst: 2, formation: 'pincer', faction: 'Bubbleteer Parade' },
+      { fromSec: 30, toSec: 90, enemyId: 'bubble-hopper', ratePerSec: 1.5, burst: 3, faction: 'Bubbleteer Parade' },
+      { fromSec: 40, toSec: 110, enemyId: 'cyan-lye-glob', ratePerSec: 0.8, burst: 1, faction: 'Bubblenaught Tide' },
+      { fromSec: 60, toSec: 130, enemyId: 'dust-mite', ratePerSec: 2.2, burst: 4, faction: 'Digitized Damned' },
+      { fromSec: 80, toSec: 150, enemyId: 'froth-behemoth', ratePerSec: 0.45, burst: 1, hpMult: 1.2, faction: 'Bubbleteer Parade' },
+      { fromSec: 90, toSec: 160, enemyId: 'soap-bubble-titan', ratePerSec: 0.4, burst: 1, hpMult: 1.3, faction: 'Bubblenaught Tide' },
+      { fromSec: 120, toSec: 180, enemyId: 'marshal-undertow', ratePerSec: 0.35, burst: 1, group: ['bubblenaught-drifter', 'cyan-lye-glob'] },
+      { fromSec: 130, toSec: 180, enemyId: 'captain-frothbite', ratePerSec: 0.35, burst: 1, group: ['bubbleteer-cadet', 'bubble-hopper'] },
+    ],
+  },
+  {
+    id: 'soul-foundry',
+    name: 'The Soul Foundry',
+    district: 'Digital Hellspace -- Sector 0xDEAD',
+    description:
+      'A surreal subterranean server labyrinth where The Director traps organic human souls, seeking to harvest their essence and compile them into living digital entities.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 1020, h: 780 },
+    ground: { base: '#050508', tile: '#0c0f1d', seam: '#00f0ff', glow: '#ff0055' },
+    sky: 'fog',
+    obstacles: [
+      { x: -320, y: -220, w: 130, h: 46, kind: 'barrier' },
+      { x: 320, y: -220, w: 130, h: 46, kind: 'barrier' },
+      { x: -320, y: 220, w: 130, h: 46, kind: 'barrier' },
+      { x: 320, y: 220, w: 130, h: 46, kind: 'barrier' },
+      { x: 0, y: -260, w: 58, h: 64, kind: 'neon-sign' },
+      { x: 0, y: 260, w: 58, h: 64, kind: 'neon-sign' },
+      { x: -180, y: 0, w: 60, h: 80, kind: 'crate-breakable' },
+      { x: 180, y: 0, w: 60, h: 80, kind: 'crate-breakable' },
+      { x: -380, y: 0, w: 58, h: 52, kind: 'barrel' },
+      { x: 380, y: 0, w: 58, h: 52, kind: 'barrel' },
+      { x: 0, y: 0, w: 96, h: 24, kind: 'cover' },
+    ],
+    durationSec: 200,
+    threat: 'severe',
+    discoveryId: 'digital-soul-core',
+    unlock: { kind: 'default' },
+    waves: [
+      { fromSec: 0, toSec: 70, enemyId: 'dust-mite', ratePerSec: 2.5, burst: 4, faction: 'Digitized Damned' },
+      { fromSec: 15, toSec: 90, enemyId: 'digitized-phantom', ratePerSec: 1.2, burst: 2, faction: 'Digitized Damned' },
+      { fromSec: 40, toSec: 120, enemyId: 'soul-extractor', ratePerSec: 0.8, burst: 1, faction: 'Digitized Damned' },
+      { fromSec: 60, toSec: 150, enemyId: 'bit-rot', ratePerSec: 0.7, burst: 1, faction: 'Digitized Damned' },
+      { fromSec: 90, toSec: 170, enemyId: 'cursor-hound', ratePerSec: 1.0, burst: 2, faction: 'Glitch Breach' },
+      { fromSec: 110, toSec: 200, enemyId: 'director-clapper', ratePerSec: 0.45, burst: 1, hpMult: 1.3, faction: 'Digitized Damned' },
+      { fromSec: 130, toSec: 200, enemyId: 'heap-colossus', ratePerSec: 0.35, burst: 1, hpMult: 1.4, faction: 'Glitch Breach' },
+      { fromSec: 150, toSec: 200, enemyId: 'the-director', ratePerSec: 0.15, burst: 1, hpMult: 1.6, faction: 'Reel Syndicate' },
+    ],
+  },
 
   /**
    * Oddity flats -- see .agents/memory/oddity-arenas.md. Timed arenas with no
@@ -735,24 +817,8 @@ export const AREAS: AreaDef[] = [
 
   ...WEIRD_AREAS,
 
-  // Endless mode -- no time limit, no walls, procedurally generated world.
-  {
-    id: 'endless-streets',
-    name: 'Endless Streets',
-    district: 'All of 616',
-    description:
-      'A living grid of streets, marked facades, and districts that keep going. Walk into a building, find its way back out, and see how deep the city goes.',
-    backdrop: 'art/street.jpeg',
-    bounds: { w: 99999, h: 99999 }, // not used directly -- world is unbounded
-    ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848' },
-    sky: 'clear',
-     obstacles: [{ x: -140, y: 90, w: 100, h: 24, kind: 'cover' }, { x: 140, y: -90, w: 52, h: 52, kind: 'reflective-surface' }],
-    durationSec: 0, // endless -- win condition is "head home", loss is death
-    threat: 'rising',
-    unlock: { kind: 'clearArea', areaId: 'monroe-strip' },
-    waves: [], // spawning is procedural
-    endless: true,
-  },
+  // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.
+  ...AREAS_ENDLESS,
   ...AREAS_2X,
   ...AREAS_NULL_SECTOR,
 ];
