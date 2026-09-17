@@ -20,34 +20,39 @@ import {
 } from '@/game/state/metaStore';
 import { advanceDailyContracts } from '@/game/data/contracts';
 import type { RunResult } from '@/game/types';
-import { ArchivePanel } from '@/ui/ArchivePanel';
-import { AreaSelect } from '@/ui/AreaSelect';
-import { BestiaryPanel } from '@/ui/BestiaryPanel';
-import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
-import { MusicPanel } from '@/ui/MusicPanel';
-import { RunSummary } from '@/ui/RunSummary';
-import { RecoveryPanel } from '@/ui/RecoveryPanel';
-import { VendorPanel } from '@/ui/VendorPanel';
-import { WorkshopPanel } from '@/ui/WorkshopPanel';
-import { SettingsPanel } from '@/ui/SettingsPanel';
-import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
-import { SoundBoothPanel } from '@/ui/SoundBoothPanel';
-import { AccountPanel } from '@/ui/AccountPanel';
-import { FeedbackPanel } from '@/ui/FeedbackPanel';
-import { CardShopPanel } from '@/ui/CardShopPanel';
-import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
-import { MapBuilder } from '@/ui/MapBuilder';
-import { SectorCommandScreen } from '@/ui/SectorCommandScreen';
+
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
+const ArchivePanel = lazy(() => import('@/ui/ArchivePanel').then(m => ({ default: m.ArchivePanel })));
+const AreaSelect = lazy(() => import('@/ui/AreaSelect').then(m => ({ default: m.AreaSelect })));
+const BestiaryPanel = lazy(() => import('@/ui/BestiaryPanel').then(m => ({ default: m.BestiaryPanel })));
+const CharacterSelect = lazy(() => import('@/ui/CharacterSelect').then(m => ({ default: m.CharacterSelect })));
+const MusicPanel = lazy(() => import('@/ui/MusicPanel').then(m => ({ default: m.MusicPanel })));
+const RunSummary = lazy(() => import('@/ui/RunSummary').then(m => ({ default: m.RunSummary })));
+const RecoveryPanel = lazy(() => import('@/ui/RecoveryPanel').then(m => ({ default: m.RecoveryPanel })));
+const VendorPanel = lazy(() => import('@/ui/VendorPanel').then(m => ({ default: m.VendorPanel })));
+const WorkshopPanel = lazy(() => import('@/ui/WorkshopPanel').then(m => ({ default: m.WorkshopPanel })));
+const SettingsPanel = lazy(() => import('@/ui/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
+const PaletteGalleryPanel = lazy(() => import('@/ui/PaletteGalleryPanel').then(m => ({ default: m.PaletteGalleryPanel })));
+const SoundBoothPanel = lazy(() => import('@/ui/SoundBoothPanel').then(m => ({ default: m.SoundBoothPanel })));
+const AccountPanel = lazy(() => import('@/ui/AccountPanel').then(m => ({ default: m.AccountPanel })));
+const FeedbackPanel = lazy(() => import('@/ui/FeedbackPanel').then(m => ({ default: m.FeedbackPanel })));
+const CardShopPanel = lazy(() => import('@/ui/CardShopPanel').then(m => ({ default: m.CardShopPanel })));
+const ThreatMatrixScreen = lazy(() => import('@/ui/ThreatMatrixScreen').then(m => ({ default: m.ThreatMatrixScreen })));
+const MapBuilder = lazy(() => import('@/ui/MapBuilder').then(m => ({ default: m.MapBuilder })));
+const SectorCommandScreen = lazy(() => import('@/ui/SectorCommandScreen').then(m => ({ default: m.SectorCommandScreen })));
 
 const queryClient = new QueryClient();
+
+function ScreenFallback() {
+  return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
+}
 
 type Screen =
   | { name: 'intro' }
@@ -242,72 +247,136 @@ function Game() {
 
     case 'sector-command':
       return (
-        <SectorCommandScreen
-          onBack={goHub}
-          onLaunch={(missionId) => setScreen({ name: 'run', areaId: missionId, missionId })}
-        />
+        <Suspense fallback={<ScreenFallback />}>
+          <SectorCommandScreen
+            onBack={goHub}
+            onLaunch={(missionId) => setScreen({ name: 'run', areaId: missionId, missionId })}
+          />
+        </Suspense>
       );
 
     case 'map-editor':
-      return <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />
+        </Suspense>
+      );
 
     case 'roster':
       return (
-        <CharacterSelect
-          onBack={goHub}
-          onConfirm={() => setScreen({ name: 'areas' })}
-          onLaunchEpisode={(episodeId, areaId) => setScreen({ name: 'run', areaId, episodeId })}
-        />
+        <Suspense fallback={<ScreenFallback />}>
+          <CharacterSelect
+            onBack={goHub}
+            onConfirm={() => setScreen({ name: 'areas' })}
+            onLaunchEpisode={(episodeId, areaId) => setScreen({ name: 'run', areaId, episodeId })}
+          />
+        </Suspense>
       );
 
     case 'areas':
-      return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />
+        </Suspense>
+      );
 
     case 'bestiary':
-      return <BestiaryPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <BestiaryPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'archive':
-      return <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} />
+        </Suspense>
+      );
 
     case 'music':
-      return <MusicPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <MusicPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'studio':
       return (
-        <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading studio...</div>}>
+        <Suspense fallback={<ScreenFallback />}>
           <StudioScreen onBack={goHub} />
         </Suspense>
       );
 
     case 'recovery':
-      return <RecoveryPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <RecoveryPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'vendor':
-      return <VendorPanel onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <VendorPanel onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />
+        </Suspense>
+      );
 
     case 'workshop':
-      return <WorkshopPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <WorkshopPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'card-shop':
-      return <CardShopPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <CardShopPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'settings':
-      return <SettingsPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <SettingsPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'palette-store':
-      return <PaletteGalleryPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <PaletteGalleryPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'sound-booth':
-      return <SoundBoothPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <SoundBoothPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'account':
-      return <AccountPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <AccountPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'feedback':
-      return <FeedbackPanel onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <FeedbackPanel onBack={goHub} />
+        </Suspense>
+      );
 
     case 'threat-matrix':
-      return <ThreatMatrixScreen onBack={goHub} />;
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <ThreatMatrixScreen onBack={goHub} />
+        </Suspense>
+      );
 
     case 'run':
       {
@@ -340,23 +409,25 @@ function Game() {
       const canRetry = unlockedAreas.some((a) => a.id === screen.result.areaId) ||
         meta.customMaps.some((map) => map.id === screen.result.areaId);
       return (
-        <RunSummary
-          result={screen.result}
-          areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
-          onReturnToHub={goHub}
-          onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
-          onOpenAccount={() => setScreen({ name: 'account' })}
-          onRetry={() =>
-            canRetry
-              ? setScreen({
-                  name: 'run',
-                  areaId: screen.result.areaId,
-                  episodeId: screen.result.episode?.id,
-                  challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
-                })
-              : goHub()
-          }
-        />
+        <Suspense fallback={<ScreenFallback />}>
+          <RunSummary
+            result={screen.result}
+            areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
+            onReturnToHub={goHub}
+            onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
+            onOpenAccount={() => setScreen({ name: 'account' })}
+            onRetry={() =>
+              canRetry
+                ? setScreen({
+                    name: 'run',
+                    areaId: screen.result.areaId,
+                    episodeId: screen.result.episode?.id,
+                    challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
+                  })
+                : goHub()
+            }
+          />
+        </Suspense>
       );
     }
 

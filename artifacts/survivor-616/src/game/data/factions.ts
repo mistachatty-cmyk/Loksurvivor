@@ -55,7 +55,7 @@ export const FACTIONS: FactionDef[] = [
     name: 'River Antler Court',
     description: 'Floodwall wildlife running sideways through the street grid.',
     accent: '#2dd4bf',
-    roster: ['current-stag', 'ring-scribe'],
+    roster: ['current-stag', 'ring-scribe', 'antler-fawn'],
   },
   {
     id: 'bubblenaught-tide',

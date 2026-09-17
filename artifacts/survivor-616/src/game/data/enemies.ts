@@ -519,6 +519,23 @@ export const ENEMIES: EnemyDef[] = [
     role: 'sniper',
     traits: { ghostMs: 420 },
   },
+  {
+    id: 'antler-fawn',
+    name: 'Antler Fawn',
+    family: 'River',
+    behavior: 'chase',
+    hp: 16,
+    speed: 88,
+    damage: 5,
+    radius: 8,
+    xp: 5,
+    mass: 0.5,
+    palette: palette({ ink: '#03131a', body: '#0e7490', bodyDark: '#042f2e', accent: '#2dd4bf' }),
+    rig: expressiveRig('river', 13),
+    faction: 'River Antler Court',
+    role: 'swarm',
+    lore: 'Too young to run sideways yet. Just runs.',
+  },
   // Haven of the Bubs -- two factions at war when the player arrives.
   // Bubblenaughts (blue): the map's native population, generations deep.
   {
