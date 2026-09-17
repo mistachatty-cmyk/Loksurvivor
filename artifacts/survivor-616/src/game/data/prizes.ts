@@ -28,6 +28,9 @@ export const PRIZE_TABLE: PrizeEntry[] = [
   { weight: 7, prize: { kind: 'card-pack', cardPackId: 'street', label: 'Street Sleeve' } },
   { weight: 4, prize: { kind: 'card-pack', cardPackId: 'scenario', label: 'Beyond the Grid Pack' } },
   { weight: 4, prize: { kind: 'card-pack', cardPackId: 'lokpet', label: 'LokPack' } },
+  { weight: 3, prize: { kind: 'card-pack', cardPackId: 'elemental-pack', label: 'Elemental LokPack' } },
+  { weight: 2, prize: { kind: 'card-pack', cardPackId: 'prism-lokpack', label: 'Prism LokPack' } },
+  { weight: 1, prize: { kind: 'card-pack', cardPackId: 'apex-binder', label: 'Apex Vault Pack' } },
 ];
 
 /** Visual face shown on each reel strip panel. */

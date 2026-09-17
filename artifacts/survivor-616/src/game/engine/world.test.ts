@@ -45,7 +45,6 @@ import {
   selectCommandedUnitAt,
   selectCommandedUnitByUid,
   selectControlGroup,
-  squadCostUsed,
   updateCommandSelection,
   castFreezeCone,
   updateFreezeSelection,
@@ -62,6 +61,7 @@ import { createRng } from '@/game/engine/math';
 import {
   createInitialMeta,
   effectiveStats,
+  getCharacterFatigueSummary,
   getLokPetDiscoveries,
   loadMeta,
   normalizeMeta,
@@ -1779,6 +1779,51 @@ test('vendor stat caps and utilities affect runs without developer unlock grants
 
   const noPurchases = effectiveStats(CHARACTERS[0]!, { ...base, devModeAllUnlocks: true });
   assert.equal(noPurchases.maxHp, CHARACTERS[0]!.stats.maxHp);
+});
+
+test('character fatigue summary accurately reflects current fatigue penalties on stats before starting a run', () => {
+  const base = createInitialMeta();
+  const character = CHARACTERS[0]!;
+
+  // 1. Fresh character
+  const freshSummary = getCharacterFatigueSummary(character, base);
+  assert.equal(freshSummary.isFatigued, false);
+  assert.equal(freshSummary.fatiguePct, 0);
+  assert.equal(freshSummary.effectiveStats.maxHp, character.stats.maxHp);
+  assert.equal(freshSummary.diffs.maxHp, 0);
+
+  // 2. Fatigued character (e.g. 4% fatigue)
+  const fatiguedMeta = {
+    ...base,
+    fatigueByCharacter: {
+      [character.id]: 4,
+    },
+  };
+  const fatiguedSummary = getCharacterFatigueSummary(character, fatiguedMeta);
+  assert.equal(fatiguedSummary.isFatigued, true);
+  assert.equal(fatiguedSummary.fatiguePct, 4);
+  assert.equal(fatiguedSummary.maxFatiguePct, 5);
+
+  // HP should be reduced by exactly 4%
+  const expectedHp = character.stats.maxHp * (1 - 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.maxHp, expectedHp);
+  assert.ok(Math.abs(fatiguedSummary.diffs.maxHp - (-0.04 * character.stats.maxHp)) < 1e-6);
+
+  // Speed should be reduced by 4%
+  const expectedSpeed = character.stats.speed * (1 - 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.speed, expectedSpeed);
+
+  // Power should be reduced by 4%
+  const expectedPower = character.stats.power * (1 - 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.power, expectedPower);
+
+  // Cooldown delay should increase haste by 4%
+  const expectedHaste = character.stats.haste * (1 + 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.haste, expectedHaste);
+
+  // Unaffected stats like crit and lifesteal should remain unchanged
+  assert.equal(fatiguedSummary.effectiveStats.crit, character.stats.crit);
+  assert.equal(fatiguedSummary.effectiveStats.lifesteal, character.stats.lifesteal);
 });
 
 test('owned challenge contracts scale enemy pressure and payout', () => {

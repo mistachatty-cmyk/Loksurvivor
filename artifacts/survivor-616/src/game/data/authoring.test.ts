@@ -46,5 +46,5 @@ test('escalatingWaves covers the full 600s match with 5 complete cycles at the d
 test('squadWave still spawns the whole roster as one lead + group (regression guard alongside escalatingWaves)', () => {
   const wave = squadWave({ fromSec: 0, toSec: 10, factionId: 'null-sector', ratePerSec: 1 });
   assert.equal(wave.enemyId, 'packet-wraith');
-  assert.deepEqual(wave.group, ['firewall-brute', 'null-spitter', 'corrupted-lookout', 'drift-shard']);
+  assert.deepEqual(wave.group, ['firewall-brute', 'null-spitter', 'corrupted-lookout', 'drift-shard', 'prism-sentinel']);
 });
