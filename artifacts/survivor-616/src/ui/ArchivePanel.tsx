@@ -29,7 +29,8 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import { characterRankTitle } from '@/game/data/characterMastery';
-import { CHANGELOG, STUDIO_NAME, updateNumber } from '@/game/data/changelog';
+import { CHANGELOG, updateNumber } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
 import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
@@ -44,7 +45,7 @@ import {
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
 import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Wrench, type LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface ArchivePanelProps {
   onBack: () => void;
@@ -243,6 +244,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   const ownedCardCount = CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).length;
   const playerLevel = playerLevelProgress(meta.totalLevelUps);
   const playerLevelPct = (playerLevel.levelUpsIntoLevel / Math.max(1, playerLevel.levelUpsToNext)) * 100;
+  // Picked once per mount, not per render -- see data/creditRotation.ts.
+  const updatesCredit = useMemo(() => pickCreditName(), []);
 
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
@@ -863,7 +866,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
             <div>
               <h2 className="text-2xl font-black uppercase tracking-tight text-white">Updates</h2>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                {CHANGELOG.length} updates and counting, straight from {STUDIO_NAME}
+                {CHANGELOG.length} updates and counting, straight from {updatesCredit}
               </p>
             </div>
           </div>

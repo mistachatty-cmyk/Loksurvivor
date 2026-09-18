@@ -15,9 +15,11 @@ import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { UpdatePopup } from './UpdatePopup';
 import { pickSplashText } from '@/game/data/splashText';
+import { CHANGELOG, CURRENT_VERSION } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Megaphone } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -159,6 +161,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   // Picked once per Hub mount, not per render -- a fresh one shows up
   // whenever you come back, Minecraft-main-menu-splash style.
   const splashText = useMemo(() => pickSplashText(), []);
+  const footerCredit = useMemo(() => pickCreditName(), []);
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
     [roomAllies.length, scene.flavorLines, selectedCharacter.id],
@@ -667,6 +670,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => onOpen('unlocks')}
+          className="mt-6 flex w-full items-center gap-3 border-t border-border/60 pt-4 text-left transition-colors hover:text-primary"
+          data-testid="footer-updates"
+        >
+          <Megaphone className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            v{CURRENT_VERSION} · {CHANGELOG.length} updates · brought to you by {footerCredit} — see what's new
+          </span>
+        </button>
       </div>
     </motion.div>
   );
