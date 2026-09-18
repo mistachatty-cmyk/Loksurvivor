@@ -42,6 +42,7 @@ import {
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import { CHARACTER_MASTERY_STAT_EFFECTS, characterRankTitle } from '@/game/data/characterMastery';
+import { CURRENT_VERSION } from '@/game/data/changelog';
 import {
   advanceDailyContracts,
   contractDayKey,
@@ -340,6 +341,7 @@ export function createInitialMeta(): MetaState {
     threatUpgrades: {},
     dvdEasterEggUnlocked: false,
     pendingNotifications: [],
+    lastSeenChangelogVersion: CURRENT_VERSION,
   };
 }
 
@@ -1085,6 +1087,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // Never carried across a reload -- a stale toast from a session that
     // never got to see it should not resurface out of context later.
     pendingNotifications: [],
+    // Missing on any save from before this field existed -- '0.0.0' means
+    // "older than every real version," so those players see the update
+    // popup summarizing everything they missed, once.
+    lastSeenChangelogVersion: typeof parsed.lastSeenChangelogVersion === 'string' ? parsed.lastSeenChangelogVersion : '0.0.0',
   };
 }
 
@@ -1550,6 +1556,7 @@ type Action =
   | { type: 'setPaletteInvertEnabled'; enabled: boolean }
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
   | { type: 'dismissNotifications'; ids: string[] }
+  | { type: 'acknowledgeChangelog' }
   | { type: 'buyGenerator'; id: string; now: number }
   | { type: 'refreshGeneratorIncome'; now: number }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
@@ -2208,6 +2215,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'acknowledgeChangelog':
+      return {
+        ...state,
+        meta: { ...state.meta, lastSeenChangelogVersion: CURRENT_VERSION },
+      };
+
     case 'refreshGeneratorIncome':
       return { ...state, meta: { ...state.meta, ...settleGeneratorIncome(state.meta, action.now) } };
 
@@ -2653,6 +2666,7 @@ export interface MetaContextValue {
   setPaletteInvertEnabled: (enabled: boolean) => void;
   toggleRunModifier: (key: keyof RunModifiers) => void;
   dismissNotifications: (ids: string[]) => void;
+  acknowledgeChangelog: () => void;
   buyGenerator: (id: string) => void;
   refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
@@ -2819,6 +2833,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
   const dismissNotifications = useCallback((ids: string[]) => dispatch({ type: 'dismissNotifications', ids }), []);
+  const acknowledgeChangelog = useCallback(() => dispatch({ type: 'acknowledgeChangelog' }), []);
   const buyGenerator = useCallback((id: string) => dispatch({ type: 'buyGenerator', id, now: Date.now() }), []);
   const refreshGeneratorIncome = useCallback(() => dispatch({ type: 'refreshGeneratorIncome', now: Date.now() }), []);
   const setUiDensity = useCallback(
@@ -2948,6 +2963,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setPaletteInvertEnabled,
       toggleRunModifier,
       dismissNotifications,
+      acknowledgeChangelog,
       buyGenerator,
       refreshGeneratorIncome,
       setUiDensity,
@@ -3039,6 +3055,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setPaletteInvertEnabled,
     toggleRunModifier,
     dismissNotifications,
+    acknowledgeChangelog,
     buyGenerator,
     refreshGeneratorIncome,
     setUiDensity,
