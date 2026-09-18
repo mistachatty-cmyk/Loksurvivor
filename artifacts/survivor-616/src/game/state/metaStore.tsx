@@ -254,6 +254,7 @@ export function createInitialMeta(): MetaState {
     sfxEnabled: true,
     hideoutAmbienceEnabled: false,
     hideoutWeatherEnabled: true,
+    splashTextEnabled: true,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
     worldColorFullRecolorEnabled: false,
@@ -969,6 +970,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // making noise on its own for a returning save that predates it.
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
+    splashTextEnabled: parsed.splashTextEnabled !== false,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
     // Opt-in: recoloring enemies/environment is a bigger visual change than
@@ -1542,6 +1544,7 @@ type Action =
   | { type: 'setMusicReactive'; enabled: boolean }
   | { type: 'setHideoutAmbience'; enabled: boolean }
   | { type: 'setHideoutWeather'; enabled: boolean }
+  | { type: 'setSplashTextEnabled'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
   | { type: 'setWorldColorFullRecolor'; enabled: boolean }
@@ -2134,6 +2137,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setHideoutWeather':
       return { ...state, meta: { ...state.meta, hideoutWeatherEnabled: action.enabled } };
 
+    case 'setSplashTextEnabled':
+      return { ...state, meta: { ...state.meta, splashTextEnabled: action.enabled } };
+
     case 'setPaletteAnimations':
       return { ...state, meta: { ...state.meta, paletteAnimationsEnabled: action.enabled } };
 
@@ -2652,6 +2658,7 @@ export interface MetaContextValue {
   setMusicReactive: (enabled: boolean) => void;
   setHideoutAmbience: (enabled: boolean) => void;
   setHideoutWeather: (enabled: boolean) => void;
+  setSplashTextEnabled: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
   setWorldColorFullRecolor: (enabled: boolean) => void;
@@ -2781,6 +2788,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setHideoutWeather = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutWeather', enabled }),
+    [],
+  );
+  const setSplashTextEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setSplashTextEnabled', enabled }),
     [],
   );
 
@@ -2949,6 +2960,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMusicReactive,
       setHideoutAmbience,
       setHideoutWeather,
+      setSplashTextEnabled,
       setPaletteAnimations,
       setWorldPaletteBlend,
       setWorldColorFullRecolor,
@@ -3042,6 +3054,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMusicReactive,
     setHideoutAmbience,
     setHideoutWeather,
+    setSplashTextEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,
     setWorldColorFullRecolor,

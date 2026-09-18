@@ -14,7 +14,6 @@ import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { UpdatePopup } from './UpdatePopup';
-import { pickSplashText } from '@/game/data/splashText';
 import { CHANGELOG, CURRENT_VERSION } from '@/game/data/changelog';
 import { pickCreditName } from '@/game/data/creditRotation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -158,9 +157,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext]);
 
   const weatherIcon = WEATHER_ICONS[scene.weather];
-  // Picked once per Hub mount, not per render -- a fresh one shows up
-  // whenever you come back, Minecraft-main-menu-splash style.
-  const splashText = useMemo(() => pickSplashText(), []);
   const footerCredit = useMemo(() => pickCreditName(), []);
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
@@ -244,15 +240,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                 </button>
               )}
               <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">The Sanctum</p>
-              <div className="relative inline-block">
-                <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">Hideout</h1>
-                <p
-                  className="pointer-events-none absolute -right-2 top-full -translate-y-1 rotate-[-8deg] whitespace-nowrap font-mono text-[10px] font-black italic text-amber-300 drop-shadow-md"
-                  data-testid="text-hub-splash"
-                >
-                  {splashText}
-                </p>
-              </div>
+              <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">Hideout</h1>
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Session Stats</p>
@@ -268,7 +256,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   <Zap className="h-3.5 w-3.5" />
                   Player Lv <AnimatedNumber value={playerLevel.level} className="text-sm text-white" data-testid="text-player-level" />
                 </p>
-                <div className="ml-auto mt-1 h-1 w-32 overflow-hidden rounded-full bg-black/50 sm:w-40">
+                <div className="mr-auto mt-1 h-1 w-32 overflow-hidden rounded-full bg-black/50 sm:mr-0 sm:ml-auto sm:w-40">
                   <div
                     className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
                     style={{ width: `${playerLevelPct}%` }}

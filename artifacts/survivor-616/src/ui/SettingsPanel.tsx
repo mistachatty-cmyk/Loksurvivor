@@ -67,6 +67,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setSfxEnabled,
     setHideoutAmbience,
     setHideoutWeather,
+    setSplashTextEnabled,
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,
@@ -365,6 +366,30 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     data-testid="button-toggle-hideout-weather"
                   >
                     {meta.hideoutWeatherEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Splash text</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      The rotating one-liner next to the title on the opening screen -- a fresh one shows up each
+                      time you load the game. Purely cosmetic; turn it off if you'd rather see a clean title screen.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSplashTextEnabled(!meta.splashTextEnabled)}
+                    aria-pressed={meta.splashTextEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.splashTextEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-splash-text"
+                  >
+                    {meta.splashTextEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>
