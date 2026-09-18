@@ -1844,6 +1844,8 @@ export interface MetaState {
   hideoutAmbienceEnabled: boolean;
   /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
   hideoutWeatherEnabled: boolean;
+  /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
+  splashTextEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */

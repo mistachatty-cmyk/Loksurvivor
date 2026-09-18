@@ -2,10 +2,12 @@
  * Cold open. Sets the premise before the player ever sees the hideout.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { motion } from 'framer-motion';
 
 import { useAuth } from '@/state/authStore';
+import { useMeta } from '@/game/state/metaStore';
+import { pickSplashText } from '@/game/data/splashText';
 
 // Pulls in the full simulation engine (createWorld/stepWorld/renderWorld),
 // which is otherwise only paid for once a real run starts. Lazy-loading it
@@ -26,6 +28,10 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   // actually configured, and never shown to someone already signed in.
   const { available, session } = useAuth();
   const showSignIn = Boolean(onSignIn) && available && !session;
+  const { meta } = useMeta();
+  // Picked once per mount, not per render -- a fresh one shows up whenever
+  // the title screen loads, Minecraft-main-menu-splash style.
+  const splashText = useMemo(() => pickSplashText(), []);
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 text-center bg-black text-white relative overflow-hidden">
@@ -58,9 +64,19 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
       >
         <p className="text-primary text-xs uppercase tracking-[0.4em] font-bold mb-6">Grand Rapids · 616</p>
         
-        <h1 className="text-6xl md:text-8xl font-black mb-8 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-          616<br/>Survivor
-        </h1>
+        <div className="relative mb-8">
+          <h1 className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+            616<br/>Survivor
+          </h1>
+          {meta.splashTextEnabled ? (
+            <p
+              className="pointer-events-none absolute -right-2 bottom-0 translate-y-1/2 rotate-[-8deg] whitespace-nowrap font-mono text-sm font-black italic text-amber-300 drop-shadow-md sm:text-base"
+              data-testid="text-intro-splash"
+            >
+              {splashText}
+            </p>
+          ) : null}
+        </div>
         
         <p className="text-muted-foreground text-sm md:text-base leading-relaxed mb-12 max-w-sm">
           The block turned after dark. You have a basement bar, a crew worth saving, and one night at a time.
