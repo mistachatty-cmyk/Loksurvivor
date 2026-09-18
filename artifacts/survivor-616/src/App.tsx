@@ -19,6 +19,13 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import { advanceDailyContracts } from '@/game/data/contracts';
+import { createRng } from '@/game/engine/math';
+import { TRAVEL_ENCOUNTER_TRIGGERS, type TravelEncounterSource } from '@/game/data/travelEncounters';
+import {
+  pickTravelEncounterOpponent,
+  resolveTravelEncounterOpponent,
+  type ResolvedTravelEncounterOpponent,
+} from '@/game/travelEncounter';
 import type { RunResult } from '@/game/types';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
@@ -48,6 +55,7 @@ const CardShopPanel = lazy(() => import('@/ui/CardShopPanel').then(m => ({ defau
 const ThreatMatrixScreen = lazy(() => import('@/ui/ThreatMatrixScreen').then(m => ({ default: m.ThreatMatrixScreen })));
 const MapBuilder = lazy(() => import('@/ui/MapBuilder').then(m => ({ default: m.MapBuilder })));
 const SectorCommandScreen = lazy(() => import('@/ui/SectorCommandScreen').then(m => ({ default: m.SectorCommandScreen })));
+const TravelEncounterOverlay = lazy(() => import('@/ui/TravelEncounterOverlay').then(m => ({ default: m.TravelEncounterOverlay })));
 
 const queryClient = new QueryClient();
 
@@ -78,6 +86,14 @@ type Screen =
   | { name: 'sector-command' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
+
+interface PendingTravelEncounter {
+  opponent: ResolvedTravelEncounterOpponent;
+  rng: () => number;
+  label: string;
+  /** The navigation that was intercepted; run once the popup resolves (win/lose/flee). */
+  onResolved: () => void;
+}
 
 /**
  * Lets a screen be opened directly (e.g. `?screen=areas`) so any part of the
@@ -120,6 +136,7 @@ function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
+  const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
 
   const goHub = useCallback(() => {
@@ -219,6 +236,27 @@ function Game() {
     [completeRun, completeSectorMission, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
+  const attemptTravelEncounter = useCallback(
+    (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void) => {
+      if (!meta.travelEncountersEnabled) {
+        proceed();
+        return;
+      }
+      const trigger = TRAVEL_ENCOUNTER_TRIGGERS.find(
+        (candidate) => candidate.source === source && (source !== 'hub-room' || candidate.roomId === targetRoomId),
+      );
+      if (!trigger || Math.random() >= trigger.chance) {
+        proceed();
+        return;
+      }
+      const rng = createRng(Date.now());
+      const opponent = resolveTravelEncounterOpponent(pickTravelEncounterOpponent(rng), rng);
+      setTravelEncounter({ opponent, rng, label: trigger.label, onResolved: proceed });
+    },
+    [meta.travelEncountersEnabled],
+  );
+
+  function renderScreen(): ReactNode {
   switch (screen.name) {
     case 'intro':
       return (
@@ -238,7 +276,7 @@ function Game() {
       return (
         <HubScreen
           roomId={roomId}
-          onChangeRoom={(nextRoomId) => { sfx.play('uiNav'); setRoomId(nextRoomId); }}
+          onChangeRoom={(nextRoomId) => attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); })}
           onOpen={openPanel}
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
@@ -277,7 +315,12 @@ function Game() {
     case 'areas':
       return (
         <Suspense fallback={<ScreenFallback />}>
-          <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />
+          <AreaSelect
+            onBack={goHub}
+            onLaunch={(areaId, challengeIds) =>
+              attemptTravelEncounter('run-launch', undefined, () => setScreen({ name: 'run', areaId, challengeIds }))
+            }
+          />
         </Suspense>
       );
 
@@ -435,6 +478,27 @@ function Game() {
     default:
       return null;
   }
+  }
+
+  return (
+    <>
+      {renderScreen()}
+      {travelEncounter && (
+        <Suspense fallback={null}>
+          <TravelEncounterOverlay
+            opponent={travelEncounter.opponent}
+            rng={travelEncounter.rng}
+            label={travelEncounter.label}
+            onClose={() => {
+              const proceed = travelEncounter.onResolved;
+              setTravelEncounter(null);
+              proceed();
+            }}
+          />
+        </Suspense>
+      )}
+    </>
+  );
 }
 
 function Providers({ children }: { children: ReactNode }) {

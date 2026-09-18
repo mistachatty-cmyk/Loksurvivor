@@ -1846,6 +1846,8 @@ export interface MetaState {
   hideoutWeatherEnabled: boolean;
   /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
   splashTextEnabled: boolean;
+  /** Popup travel-encounter minigame on select hideout/run-launch triggers. On by default. See game/travelEncounter.ts. */
+  travelEncountersEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */
@@ -1907,6 +1909,8 @@ export interface MetaState {
   cardCredits: number;
   cardCollection: OwnedCardRecord[];
   activePassiveCardIds: string[];
+  /** Up to BATTLE_DECK_SLOTS owned card ids equipped for the travel-encounter minigame's Attack action. Empty deck falls back to an unarmed punch -- never blocks the player. See data/travelEncounters.ts. */
+  battleDeckCardIds: string[];
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */
