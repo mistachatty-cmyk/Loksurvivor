@@ -54,6 +54,7 @@
     "@lok/recap": "workspace:*",
     "@workspace/api-client-react": "workspace:*",
     "@workspace/lok-client": "workspace:*",
+    "@workspace/lok-focus-widget": "workspace:*",
     "animejs": "catalog:",
     "@types/animejs": "catalog:",
     "class-variance-authority": "catalog:",

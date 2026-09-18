@@ -35,6 +35,7 @@ import { AccountPanel } from '@/ui/AccountPanel';
 import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { CardShopPanel } from '@/ui/CardShopPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
+import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
@@ -352,6 +353,7 @@ function Providers({ children }: { children: ReactNode }) {
             <MusicProvider>
               {children}
               <MusicNowPlaying />
+              <FocusWidgetMount />
             </MusicProvider>
           </CloudSyncProvider>
         </MetaProvider>
