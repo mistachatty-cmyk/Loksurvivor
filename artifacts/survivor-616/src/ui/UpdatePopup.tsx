@@ -3,18 +3,24 @@
  * the Hub after `CURRENT_VERSION` (see `data/changelog.ts`) moves past
  * `meta.lastSeenChangelogVersion`. Modeled on the classic "new version"
  * splash a lot of live-service games show on launch: blocking, a little
- * loud, signed by the studio. Dismissing it marks every currently-unseen
- * entry as seen at once (`acknowledgeChangelog`), so it never reappears
- * until the next real update ships.
+ * loud, signed by a rotating "sponsor" credit (see `data/creditRotation.ts`
+ * -- sometimes this game's own name, sometimes the studio, sometimes a
+ * sibling IP, picked once per mount). Dismissing it marks every
+ * currently-unseen entry as seen at once (`acknowledgeChangelog`), so it
+ * never reappears until the next real update ships.
  */
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Megaphone, Wrench, X } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
-import { CHANGELOG, CURRENT_VERSION, STUDIO_NAME, changelogEntriesSince, updateNumber } from '@/game/data/changelog';
+import { CHANGELOG, CURRENT_VERSION, changelogEntriesSince, updateNumber } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
 
 export function UpdatePopup() {
   const { meta, acknowledgeChangelog } = useMeta();
   const unseen = changelogEntriesSince(meta.lastSeenChangelogVersion);
+  // Picked once per mount, not per render -- see data/creditRotation.ts.
+  const credit = useMemo(() => pickCreditName(), []);
 
   if (unseen.length === 0) return null;
 
@@ -49,7 +55,7 @@ export function UpdatePopup() {
           <Megaphone className="h-6 w-6 shrink-0 text-cyan-300" />
           <div>
             <p className="font-mono text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
-              A Message From {STUDIO_NAME}
+              A Message From {credit}
             </p>
             <h2 className="text-2xl font-black uppercase text-white">Game Updated!</h2>
           </div>
