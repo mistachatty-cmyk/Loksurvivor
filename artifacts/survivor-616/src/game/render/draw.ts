@@ -3678,6 +3678,40 @@ function drawActors(
     }
   }
   drawPlayer();
+  drawGuests(ctx, w);
+}
+
+/**
+ * LokSurvivorArena: guests get a plain rig draw -- shadow, rig, name/kill
+ * tag -- deliberately skipping the host's aura/dash/palette-effect
+ * cosmetics in `drawPlayer` above, since none of that state exists on a
+ * `GuestPlayerActor`. Drawn after the enemy/host painter's-order pass
+ * rather than interleaved into it, so a guest can occasionally draw in
+ * front of/behind a nearby enemy it shouldn't -- a cosmetic compromise, not
+ * a gameplay one, and fine for the arena skeleton.
+ */
+function drawGuests(ctx: CanvasRenderingContext2D, w: World) {
+  for (const guest of w.guests) {
+    drawShadow(ctx, guest.x, guest.y + 2, guest.radius);
+    drawRig(
+      ctx,
+      guest.character.rig,
+      guest.character.palette,
+      guest.anim,
+      w.now - guest.animStartedAt,
+      guest.x,
+      guest.y + 2,
+      guest.facing,
+      SPRITE_SCALE,
+      { flash: w.now < guest.hitFlashUntil, outline: true, alpha: 1 },
+    );
+    ctx.save();
+    ctx.font = 'bold 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillStyle = guest.character.palette.accentBright;
+    ctx.textAlign = 'center';
+    ctx.fillText(guest.id, guest.x, guest.y - guest.radius - 12);
+    ctx.restore();
+  }
 }
 
 function drawParticles(ctx: CanvasRenderingContext2D, w: World) {

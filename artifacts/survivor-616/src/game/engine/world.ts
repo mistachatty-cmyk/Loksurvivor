@@ -150,6 +150,20 @@ export interface PlayerActor extends Actor {
   dashHitUids: Set<number>;
 }
 
+/**
+ * LokSurvivorArena: an additional local/networked player sharing the host's
+ * `World`, outside the normal single-player weapon/leveling system -- see
+ * `arena/` for the movement/attack loop that drives these. Only ever
+ * non-empty when `World.arenaMode` is set; the campaign path never
+ * constructs one.
+ */
+export interface GuestPlayerActor extends Actor {
+  id: string;
+  /** Fixed for the whole match -- guests don't level up or evolve weapons, see arena/arenaWorld.ts. */
+  character: CharacterDef;
+  attackReadyAt: number;
+}
+
 export interface EnemyActor extends Actor {
   defId: string;
   def: EnemyDef;
@@ -811,6 +825,15 @@ export interface World {
   cycle: { phase: number; cycleMs: number };
 
   player: PlayerActor;
+  /**
+   * LokSurvivorArena: additional local/networked players sharing this world.
+   * Always empty outside arena mode -- the campaign path never touches this.
+   */
+  guests: GuestPlayerActor[];
+  /** LokSurvivorArena: gates every arena-only branch in stepWorld/draw. */
+  arenaMode: boolean;
+  /** LokSurvivorArena: kills attributed to each guest by id. The host's own kills stay in `kills`, unchanged. */
+  guestKills: Record<string, number>;
   /** Short deterministic route history used only by Tidal Memory. */
   playerTrail: Array<{ x: number; y: number; at: number }>;
   nextPlayerTrailAt: number;
@@ -1335,6 +1358,9 @@ export function createWorld(
     nextAmbientDropAt: area.randomDrops ? 2500 : Number.POSITIVE_INFINITY,
     fluids: [],
     bounds: area.bounds,
+    guests: [],
+    arenaMode: false,
+    guestKills: {},
     camera: { x: 0, y: 0 },
     shake: 0,
     audio: SILENT_FRAME,
@@ -1559,6 +1585,47 @@ export function createWorld(
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
   for (const pet of setup.startingLokPets ?? []) spawnLokPet(world, pet, 'loadout');
   return world;
+}
+
+/**
+ * LokSurvivorArena: turns a freshly-created single-player `World` into an
+ * arena one by adding a guest sharing it with the host `player`. Call once
+ * per extra local/networked player (2-4 total including the host) right
+ * after `createWorld`, before the first `stepWorld` -- see
+ * `game/arena/arenaWorld.ts` for the actual match-setup call site. Never
+ * called from the campaign path, so campaign `World`s never carry guests.
+ */
+export function addGuestPlayer(
+  w: World,
+  id: string,
+  character: CharacterDef,
+  x: number,
+  y: number,
+): GuestPlayerActor {
+  w.arenaMode = true;
+  const guest: GuestPlayerActor = {
+    uid: uid(w),
+    id,
+    character,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    kx: 0,
+    ky: 0,
+    radius: 12,
+    hp: character.stats.maxHp,
+    maxHp: character.stats.maxHp,
+    facing: 1,
+    anim: 'idle',
+    animStartedAt: 0,
+    hitFlashUntil: 0,
+    falling: false,
+    fallStartedAt: 0,
+    attackReadyAt: 0,
+  };
+  w.guests.push(guest);
+  return guest;
 }
 
 function uid(w: World): number {
@@ -2928,6 +2995,8 @@ function damageEnemy(
   fromY: number,
   statusEffectId?: string,
   burstDepth = 0,
+  /** LokSurvivorArena: which guest dealt this damage, if any -- see killEnemy. */
+  killerId?: string,
 ) {
   if (enemy.dying) return;
   // Sector Command: this is the single choke point for player-caused damage,
@@ -3021,7 +3090,7 @@ function damageEnemy(
   }
 
   if (enemy.hp <= 0) {
-    killEnemy(w, enemy);
+    killEnemy(w, enemy, killerId);
   }
 }
 
@@ -3065,7 +3134,7 @@ function statusSpeedMultiplier(enemy: EnemyActor): number {
   }, 1);
 }
 
-function killEnemy(w: World, enemy: EnemyActor) {
+function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   if (enemy.dying) return;
   enemy.dying = true;
   // Effects do not linger on a defeated actor or leak into later snapshots.
@@ -3075,6 +3144,10 @@ function killEnemy(w: World, enemy: EnemyActor) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  // LokSurvivorArena: a guest kill also counts toward `kills`/`killsByEnemy`
+  // above (so campaign-style read models keep working unmodified) *and*
+  // toward its own attributed counter for the arena scoreboard.
+  if (killerId) w.guestKills[killerId] = (w.guestKills[killerId] ?? 0) + 1;
   pushSfx(w, enemy.def.family === 'Boss' ? 'bossKill' : 'kill');
   spawnParticles(w, enemy.x, enemy.y + enemy.radius, enemy.def.palette.accent, 8, 110);
 
@@ -5388,6 +5461,50 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   if (p.anim !== nextAnim) {
     p.anim = nextAnim;
     p.animStartedAt = w.now;
+  }
+}
+
+const GUEST_ATTACK_RANGE = 60;
+const GUEST_ATTACK_INTERVAL_MS = 420;
+const GUEST_ATTACK_DAMAGE = 6;
+
+/**
+ * LokSurvivorArena: moves one guest and lets them fight back with a simple
+ * fixed melee pulse -- guests don't run the full `CharacterDef` weapon/
+ * leveling system (see `.agents/memory/loksurvivor-arena.md`), just the
+ * shared movement/collision physics `updatePlayer` already uses, plus a
+ * kill-attributed damage tick so the arena scoreboard has something real to
+ * count.
+ */
+function updateGuest(w: World, dt: number, moveX: number, moveY: number, guest: GuestPlayerActor) {
+  const speed = w.stats.speed * speedMult(w) * fluidSpeedMultiplierAt(w, guest.x, guest.y);
+  const len = Math.hypot(moveX, moveY);
+  const nx = len > 1 ? moveX / len : moveX;
+  const ny = len > 1 ? moveY / len : moveY;
+  guest.vx = nx * speed;
+  guest.vy = ny * speed;
+  guest.x += guest.vx * dt;
+  guest.y += guest.vy * dt;
+  applyKnockback(guest, dt);
+  if (Math.abs(nx) > 0.05) guest.facing = nx > 0 ? 1 : -1;
+  collideObstacles(w, guest);
+  clampToArena(w, guest);
+
+  const moving = len > 0.08;
+  const nextAnim: AnimState = moving ? 'walk' : 'idle';
+  if (guest.anim !== nextAnim) {
+    guest.anim = nextAnim;
+    guest.animStartedAt = w.now;
+  }
+
+  if (w.now >= guest.attackReadyAt) {
+    const target = nearestEnemy(w, guest.x, guest.y, GUEST_ATTACK_RANGE);
+    if (target) {
+      guest.attackReadyAt = w.now + GUEST_ATTACK_INTERVAL_MS;
+      guest.anim = 'attack';
+      guest.animStartedAt = w.now;
+      damageEnemy(w, target, GUEST_ATTACK_DAMAGE * w.stats.power, 1, guest.x, guest.y, undefined, 0, guest.id);
+    }
   }
 }
 
@@ -8540,6 +8657,13 @@ export interface StepInput {
    * that does not care about audio can omit it and get silence.
    */
   audio?: AudioFrame;
+  /**
+   * LokSurvivorArena: one entry per `World.guests[i]`, local-device or
+   * network in origin -- the engine doesn't care which. Missing entries (or
+   * a missing array entirely) just mean "no input this frame," same as
+   * `moveX`/`moveY` defaulting to 0 would.
+   */
+  guestInputs?: Array<{ moveX: number; moveY: number }>;
 }
 
 function updateThreatEvents(w: World, dt: number) {
@@ -8648,6 +8772,12 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  if (w.arenaMode) {
+    for (let i = 0; i < w.guests.length; i += 1) {
+      const gi = input.guestInputs?.[i];
+      updateGuest(w, dt, gi?.moveX ?? 0, gi?.moveY ?? 0, w.guests[i]!);
+    }
+  }
   // A heartbeat, not a per-frame alarm: `shouldPlayCue`'s throttle (see
   // sfxCues.ts's MIN_RETRIGGER_MS) turns this plain per-frame condition into
   // a slow pulse rather than a constant tone while low.
@@ -8714,9 +8844,22 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateParticles(w, dt);
   updateRescue(w, dt);
 
-  // Camera lags slightly behind and leads the direction of travel.
-  const targetX = w.player.x + w.player.vx * 0.12;
-  const targetY = w.player.y + w.player.vy * 0.12;
+  // Camera lags slightly behind and leads the direction of travel. In arena
+  // mode this leads off the centroid of every player sharing the screen
+  // instead of just the host, so everyone stays in frame.
+  let targetX = w.player.x + w.player.vx * 0.12;
+  let targetY = w.player.y + w.player.vy * 0.12;
+  if (w.arenaMode && w.guests.length > 0) {
+    let sumX = targetX;
+    let sumY = targetY;
+    for (const guest of w.guests) {
+      sumX += guest.x + guest.vx * 0.12;
+      sumY += guest.y + guest.vy * 0.12;
+    }
+    const count = w.guests.length + 1;
+    targetX = sumX / count;
+    targetY = sumY / count;
+  }
   const follow = 1 - Math.pow(0.0001, dt);
   w.camera.x += (targetX - w.camera.x) * follow;
   w.camera.y += (targetY - w.camera.y) * follow;
