@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Check, CreditCard, Layers3, LockKeyhole, PackageOpen, Sparkles } from 'lucide-react';
+import { Check, CreditCard, Layers3, LockKeyhole, PackageOpen, Sparkles, Swords } from 'lucide-react';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { CARD_SHOP_PACKS, PASSIVE_CARDS, activeCardEffects, passiveDeckSlots } from '@/game/data/passiveCards';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
+import { BATTLE_DECK_SLOTS, cardThrowDamage, describeOwnedCard } from '@/game/data/travelEncounters';
 import { BASE_CARD_CREDITS_PER_LOOT_BOX, useMeta } from '@/game/state/metaStore';
 import { LockDeckCollection } from './LockDeckCollection';
 import { PackOpeningReveal } from './PackOpeningReveal';
@@ -11,14 +12,15 @@ import { ScreenLayout } from './ScreenLayout';
 
 const RARITY_COLOR: Record<string, string> = { common: 'text-slate-200', uncommon: 'text-emerald-200', rare: 'text-sky-200', epic: 'text-purple-200', legendary: 'text-pink-200' };
 
-type ShopTab = 'binder' | 'passive';
+type ShopTab = 'binder' | 'passive' | 'battle';
 const SHOP_TABS: { id: ShopTab; label: string; icon: typeof PackageOpen }[] = [
   { id: 'binder', label: 'Lock Deck Binder', icon: PackageOpen },
   { id: 'passive', label: 'Passive Lock Deck', icon: Layers3 },
+  { id: 'battle', label: 'Battle Deck', icon: Swords },
 ];
 
 export function CardShopPanel({ onBack }: { onBack: () => void }) {
-  const { meta, buyCardPack, togglePassiveCard, lastCardPackReveal, clearCardPackReveal } = useMeta();
+  const { meta, buyCardPack, togglePassiveCard, toggleBattleDeckCard, lastCardPackReveal, clearCardPackReveal } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const [tab, setTab] = useState<ShopTab>('binder');
   const [showAll, setShowAll] = useState(false);
@@ -59,6 +61,41 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
             </button>
           );
         })}
+      </div>
+    </section>
+  );
+
+  const battleSection = (
+    <section className="mb-9 border border-white/15 bg-white/[.025] p-4" data-testid="section-battle-deck">
+      <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="flex items-center gap-2 font-display text-xl font-black uppercase text-white"><Swords className="h-5 w-5 text-fuchsia-200" />Battle Deck</p>
+          <p className="mt-1 text-[10px] uppercase tracking-widest text-white/45">Equip {BATTLE_DECK_SLOTS} cards to throw during travel encounters -- any owned card works, thrown for flat, rarity-scaled damage.</p>
+        </div>
+        <div className="flex gap-1.5">{Array.from({ length: BATTLE_DECK_SLOTS }, (_, i) => <span key={i} className={`grid h-8 w-8 place-items-center border text-xs ${i < meta.battleDeckCardIds.length ? 'border-fuchsia-300/50 text-fuchsia-200' : 'border-white/10 text-white/20'}`}>{i + 1}</span>)}</div>
+      </div>
+      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {meta.cardCollection.filter((record) => record.copies > 0).map((record) => {
+          const info = describeOwnedCard(record.cardId);
+          if (!info) return null;
+          const active = meta.battleDeckCardIds.includes(record.cardId);
+          return (
+            <button
+              key={record.cardId}
+              type="button"
+              onClick={() => { toggleBattleDeckCard(record.cardId); sfx.play('uiClick'); }}
+              disabled={!active && meta.battleDeckCardIds.length >= BATTLE_DECK_SLOTS}
+              className={`border p-3 text-left transition-all active:scale-[0.97] ${active ? 'border-fuchsia-300 bg-fuchsia-300/10' : 'border-white/15'}`}
+            >
+              <span className={`text-[9px] uppercase ${RARITY_COLOR[info.rarity] ?? 'text-slate-200'}`}>{info.rarity} · x{record.copies} · {record.bestVariant}</span>
+              <span className="mt-1 flex justify-between font-display text-sm font-black uppercase text-white">{info.name}{active && <Check className="h-4 w-4" />}</span>
+              <span className="mt-1 block text-[10px] text-white/50">Throw · {cardThrowDamage(record)} dmg</span>
+            </button>
+          );
+        })}
+        {meta.cardCollection.filter((record) => record.copies > 0).length === 0 && (
+          <p className="text-[10px] uppercase tracking-widest text-white/40">Open a pack to build your first Battle Deck.</p>
+        )}
       </div>
     </section>
   );
@@ -140,7 +177,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
           {passiveSection}
           {binderSection}
         </>
-      ) : tab === 'passive' ? passiveSection : binderSection}
+      ) : tab === 'passive' ? passiveSection : tab === 'battle' ? battleSection : binderSection}
 
       {lastCardPackReveal && (
         <PackOpeningReveal

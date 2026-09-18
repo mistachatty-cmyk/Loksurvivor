@@ -23,11 +23,21 @@ export interface HideoutVignetteProps {
   /** Canvas height in CSS pixels; width is derived from it. */
   size?: number;
   className?: string;
+  /**
+   * When provided (non-undefined), disables the internal ambient gesture
+   * timer entirely; the vignette instead plays exactly this gesture once and
+   * then holds idle until a new value arrives. Bump `nonce` to replay the
+   * same side/anim pair back-to-back (e.g. two attacks in a row). Callers
+   * should memoize this object keyed on `[side, anim, nonce]` so incidental
+   * re-renders don't restart the clip. Omit the prop entirely for the
+   * original ambient random-gesture behavior.
+   */
+  controlledGesture?: { side: 'left' | 'right'; anim: GestureAnim; nonce: number } | null;
 }
 
-type GestureAnim = Extract<AnimName, 'attack' | 'hurt'>;
+export type GestureAnim = Extract<AnimName, 'attack' | 'hurt'>;
 
-export function HideoutVignette({ left, right, size = 110, className = '' }: HideoutVignetteProps) {
+export function HideoutVignette({ left, right, size = 110, className = '', controlledGesture }: HideoutVignetteProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -50,8 +60,9 @@ export function HideoutVignette({ left, right, size = 110, className = '' }: Hid
 
     const start = performance.now();
     let raf = 0;
-    let activeGesture: { side: 'left' | 'right'; anim: GestureAnim; since: number } | null = null;
-    let nextGestureAt = start + 2200 + Math.random() * 2400;
+    let activeGesture: { side: 'left' | 'right'; anim: GestureAnim; since: number } | null =
+      controlledGesture ? { side: controlledGesture.side, anim: controlledGesture.anim, since: start } : null;
+    let nextGestureAt = controlledGesture !== undefined ? Infinity : start + 2200 + Math.random() * 2400;
 
     const drawGroundShadow = (x: number, rigHeight: number, scale: number) => {
       ctx.save();
@@ -68,7 +79,7 @@ export function HideoutVignette({ left, right, size = 110, className = '' }: Hid
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
 
-      if (!activeGesture && time >= nextGestureAt) {
+      if (controlledGesture === undefined && !activeGesture && time >= nextGestureAt) {
         const side: 'left' | 'right' = Math.random() < 0.5 ? 'left' : 'right';
         const anim: GestureAnim = Math.random() < 0.7 ? 'attack' : 'hurt';
         activeGesture = { side, anim, since: time };
@@ -79,7 +90,7 @@ export function HideoutVignette({ left, right, size = 110, className = '' }: Hid
         const duration = clip.frames.length * clip.frameMs;
         if (time - activeGesture.since > duration) {
           activeGesture = null;
-          nextGestureAt = time + 3200 + Math.random() * 3600;
+          if (controlledGesture === undefined) nextGestureAt = time + 3200 + Math.random() * 3600;
         }
       }
 
@@ -98,7 +109,7 @@ export function HideoutVignette({ left, right, size = 110, className = '' }: Hid
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [left, right, size]);
+  }, [left, right, size, controlledGesture]);
 
   return (
     <canvas

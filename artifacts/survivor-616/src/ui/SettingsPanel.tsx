@@ -68,6 +68,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setHideoutAmbience,
     setHideoutWeather,
     setSplashTextEnabled,
+    setTravelEncountersEnabled,
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,
@@ -390,6 +391,31 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     data-testid="button-toggle-splash-text"
                   >
                     {meta.splashTextEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      A short pop-up scrap can trigger when you enter the LokPet Card Shop or head out on a run --
+                      throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
+                      off to skip it entirely.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTravelEncountersEnabled(!meta.travelEncountersEnabled)}
+                    aria-pressed={meta.travelEncountersEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.travelEncountersEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-travel-encounters"
+                  >
+                    {meta.travelEncountersEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>

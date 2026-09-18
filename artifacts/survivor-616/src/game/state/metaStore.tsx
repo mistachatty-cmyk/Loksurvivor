@@ -68,6 +68,8 @@ import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS } from '@/game/data/cards';
 import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
+import { BATTLE_DECK_SLOTS } from '@/game/data/travelEncounters';
+import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { PASSIVES } from '@/game/data/passives';
@@ -255,6 +257,7 @@ export function createInitialMeta(): MetaState {
     hideoutAmbienceEnabled: false,
     hideoutWeatherEnabled: true,
     splashTextEnabled: true,
+    travelEncountersEnabled: true,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
     worldColorFullRecolorEnabled: false,
@@ -286,6 +289,7 @@ export function createInitialMeta(): MetaState {
     cardCredits: 0,
     cardCollection: [],
     activePassiveCardIds: [],
+    battleDeckCardIds: [],
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     skeletonKeys: 0,
@@ -927,6 +931,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const savedLokPets = normalizeSavedLokPets(parsed.savedLokPets);
   const cardCollection = normalizeCardCollection(parsed.cardCollection);
   const ownedPassiveIds = new Set(cardCollection.filter((record) => PASSIVE_CARDS_BY_ID[record.cardId]).map((record) => record.cardId));
+  const ownedCardIds = new Set(cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
   const recoveredElixirs = replenishPetElixirs({
     ...defaults,
     petElixirs: Math.min(ELIXIR_CAP, counter(parsed.petElixirs ?? 3)),
@@ -971,6 +976,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
+    travelEncountersEnabled: parsed.travelEncountersEnabled !== false,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
     // Opt-in: recoloring enemies/environment is a bigger visual change than
@@ -1011,6 +1017,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     cardCredits: counter(parsed.cardCredits),
     cardCollection,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
+    battleDeckCardIds: Array.isArray(parsed.battleDeckCardIds) ? [...new Set(parsed.battleDeckCardIds.filter((id): id is string => typeof id === 'string' && ownedCardIds.has(id)))].slice(0, BATTLE_DECK_SLOTS) : [],
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     skeletonKeys: counter(parsed.skeletonKeys),
@@ -1504,6 +1511,8 @@ type Action =
   | { type: 'completeRun'; result: RunResult }
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
   | { type: 'togglePassiveCard'; cardId: string }
+  | { type: 'toggleBattleDeckCard'; cardId: string }
+  | { type: 'completeTravelEncounter'; result: TravelEncounterResult }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
   | { type: 'refreshPetElixirs'; now: number }
@@ -1545,6 +1554,7 @@ type Action =
   | { type: 'setHideoutAmbience'; enabled: boolean }
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setSplashTextEnabled'; enabled: boolean }
+  | { type: 'setTravelEncountersEnabled'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
   | { type: 'setWorldColorFullRecolor'; enabled: boolean }
@@ -1665,6 +1675,32 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const active = state.meta.activePassiveCardIds;
       const next = active.includes(action.cardId) ? active.filter((id) => id !== action.cardId) : active.length < passiveDeckSlots(state.meta) ? [...active, action.cardId] : active;
       return { ...state, meta: { ...state.meta, activePassiveCardIds: next } };
+    }
+
+    case 'toggleBattleDeckCard': {
+      if (!state.meta.cardCollection.some((record) => record.cardId === action.cardId && record.copies > 0)) return state;
+      const active = state.meta.battleDeckCardIds;
+      const next = active.includes(action.cardId) ? active.filter((id) => id !== action.cardId) : active.length < BATTLE_DECK_SLOTS ? [...active, action.cardId] : active;
+      return { ...state, meta: { ...state.meta, battleDeckCardIds: next } };
+    }
+
+    // No penalty on loss/flee beyond no reward -- enforced here at the state
+    // layer, not just the UI, per the "classic version" scope. See
+    // .agents/memory/travel-encounters.md.
+    case 'completeTravelEncounter': {
+      if (action.result.outcome !== 'won') return state;
+      const caughtPet = action.result.caughtLokPet && action.result.lokPetRoll
+        ? [{ id: `pet-${Date.now().toString(36)}-0-${action.result.lokPetRoll.variantId}`, roll: action.result.lokPetRoll, stamina: PET_STAMINA_MAX }]
+        : [];
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred + action.result.rewardCred,
+          cardCredits: state.meta.cardCredits + action.result.rewardCardCredits,
+          savedLokPets: [...caughtPet, ...state.meta.savedLokPets].slice(0, 48),
+        },
+      };
     }
 
     case 'restoreSavedLokPet': {
@@ -2139,6 +2175,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setSplashTextEnabled':
       return { ...state, meta: { ...state.meta, splashTextEnabled: action.enabled } };
+
+    case 'setTravelEncountersEnabled':
+      return { ...state, meta: { ...state.meta, travelEncountersEnabled: action.enabled } };
 
     case 'setPaletteAnimations':
       return { ...state, meta: { ...state.meta, paletteAnimationsEnabled: action.enabled } };
@@ -2615,9 +2654,11 @@ export interface MetaContextValue {
   selectCharacter: (id: string) => void;
   selectCharacterSkin: (characterId: string, skinId: string) => void;
   completeRun: (result: RunResult) => void;
+  resolveTravelEncounter: (result: TravelEncounterResult) => void;
   buyCardPack: (packId: CardPackId) => void;
   buyLokPetCardPack: () => void;
   togglePassiveCard: (cardId: string) => void;
+  toggleBattleDeckCard: (cardId: string) => void;
   toggleSavedLokPet: (id: string) => void;
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
@@ -2659,6 +2700,7 @@ export interface MetaContextValue {
   setHideoutAmbience: (enabled: boolean) => void;
   setHideoutWeather: (enabled: boolean) => void;
   setSplashTextEnabled: (enabled: boolean) => void;
+  setTravelEncountersEnabled: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
   setWorldColorFullRecolor: (enabled: boolean) => void;
@@ -2731,6 +2773,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
   const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyCardPack', packId: 'lokpet', now: Date.now() }), []);
   const togglePassiveCard = useCallback((cardId: string) => dispatch({ type: 'togglePassiveCard', cardId }), []);
+  const toggleBattleDeckCard = useCallback((cardId: string) => dispatch({ type: 'toggleBattleDeckCard', cardId }), []);
+  const resolveTravelEncounter = useCallback((result: TravelEncounterResult) => dispatch({ type: 'completeTravelEncounter', result }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
   const refreshPetElixirs = useCallback(() => dispatch({ type: 'refreshPetElixirs', now: Date.now() }), []);
@@ -2792,6 +2836,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setSplashTextEnabled = useCallback(
     (enabled: boolean) => dispatch({ type: 'setSplashTextEnabled', enabled }),
+    [],
+  );
+  const setTravelEncountersEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setTravelEncountersEnabled', enabled }),
     [],
   );
 
@@ -2917,9 +2965,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectCharacter,
       selectCharacterSkin,
       completeRun,
+      resolveTravelEncounter,
       buyCardPack,
       buyLokPetCardPack,
       togglePassiveCard,
+      toggleBattleDeckCard,
       toggleSavedLokPet,
       restoreSavedLokPet,
       refreshPetElixirs,
@@ -2961,6 +3011,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutAmbience,
       setHideoutWeather,
       setSplashTextEnabled,
+      setTravelEncountersEnabled,
       setPaletteAnimations,
       setWorldPaletteBlend,
       setWorldColorFullRecolor,
@@ -3011,9 +3062,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     enterHideout,
     selectCharacterSkin,
     completeRun,
+    resolveTravelEncounter,
     buyCardPack,
     buyLokPetCardPack,
     togglePassiveCard,
+    toggleBattleDeckCard,
     toggleSavedLokPet,
     restoreSavedLokPet,
     refreshPetElixirs,
@@ -3055,6 +3108,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutAmbience,
     setHideoutWeather,
     setSplashTextEnabled,
+    setTravelEncountersEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,
     setWorldColorFullRecolor,
