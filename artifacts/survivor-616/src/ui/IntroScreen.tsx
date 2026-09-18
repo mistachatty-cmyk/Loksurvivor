@@ -70,7 +70,8 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
           </h1>
           {meta.splashTextEnabled ? (
             <p
-              className="pointer-events-none absolute top-full right-1 mt-1 max-w-[70%] rotate-[-6deg] text-right font-mono text-[10px] font-black italic leading-tight text-amber-300 drop-shadow-md sm:text-xs"
+              className="pointer-events-none absolute top-full right-1 mt-1 max-w-[70%] rotate-[-6deg] text-right font-mono text-[10px] font-black italic leading-tight sm:text-xs"
+              style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
               data-testid="text-intro-splash"
             >
               {splashText}
