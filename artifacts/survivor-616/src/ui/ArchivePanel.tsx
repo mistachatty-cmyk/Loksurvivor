@@ -21,11 +21,17 @@ import { WorkshopOverview } from './WorkshopPanel';
 import {
   BASE_CARD_CREDITS_PER_LOOT_BOX,
   LOKPET_CARD_PACK_COST,
+  characterLevelProgress,
   describeUnlock,
   episodeProgress,
   episodeStatus,
+  playerLevelProgress,
   useMeta,
 } from '@/game/state/metaStore';
+import { characterRankTitle } from '@/game/data/characterMastery';
+import { CHANGELOG, updateNumber } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
+import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { LockDeckCollection } from './LockDeckCollection';
@@ -38,8 +44,8 @@ import {
   VISITING_CARD_SILHOUETTE,
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, type LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Wrench, type LucideIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface ArchivePanelProps {
   onBack: () => void;
@@ -236,6 +242,10 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
 
   const completedAchievementCount = ACHIEVEMENTS.filter((achievement) => achievement.isComplete(meta)).length;
   const ownedCardCount = CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).length;
+  const playerLevel = playerLevelProgress(meta.totalLevelUps);
+  const playerLevelPct = (playerLevel.levelUpsIntoLevel / Math.max(1, playerLevel.levelUpsToNext)) * 100;
+  // Picked once per mount, not per render -- see data/creditRotation.ts.
+  const updatesCredit = useMemo(() => pickCreditName(), []);
 
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
@@ -244,6 +254,9 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
     { key: 'universe', label: 'Universe', icon: Globe, count: meta.visitingLokCards.length },
+    { key: 'stats', label: 'Stats', icon: TrendingUp },
+    { key: 'mastery', label: 'Mastery', icon: Award },
+    { key: 'updates', label: 'Updates', icon: Megaphone, count: CHANGELOG.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
   ];
 
@@ -349,7 +362,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                   {achievement.reward && (
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                        Reward: {achievement.reward.amount} {achievement.reward.kind === 'cred' ? 'Cred' : 'Loot Tokens'}
+                        Reward: {achievement.reward.amount} {achievement.reward.kind === 'cred' ? 'Cred' : achievement.reward.kind === 'lootTokens' ? 'Loot Tokens' : 'Card Credits'}
                         {claimed ? ' · claimed' : ''}
                       </span>
                       {claimable && (
@@ -723,6 +736,169 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                 ))}
               </div>
             )}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'stats' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-stats"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <TrendingUp className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">All-Time Stats</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Everything you've done, across every run, forever</p>
+            </div>
+          </div>
+
+          <div className="mb-6 border border-l-4 border-border border-l-sky-300 bg-card p-5" data-testid="card-player-level">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-sky-300">Player Level</p>
+                <p className="text-3xl font-black text-white">
+                  <AnimatedNumber value={playerLevel.level} data-testid="text-archive-player-level" />
+                </p>
+              </div>
+              <Zap className="h-8 w-8 text-sky-300" />
+            </div>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/50">
+              <div
+                className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                style={{ width: `${playerLevelPct}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+              {playerLevel.levelUpsIntoLevel} / {playerLevel.levelUpsToNext} level-ups to next
+            </p>
+          </div>
+
+          <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {([
+              { label: 'Total Level-Ups', value: meta.totalLevelUps, icon: Zap },
+              { label: 'Enemies Defeated', value: meta.totalKills, icon: Skull },
+              { label: 'Runs Played', value: meta.totalRuns, icon: Swords },
+              { label: 'Best Survival', value: Math.round(meta.bestSurvivalSec), suffix: 's', icon: Clock },
+              { label: 'Hideout Visits', value: meta.hideoutVisitCount, icon: DoorOpen },
+              { label: 'Endless Depth Record', value: meta.endlessRecordDepth, icon: Layers },
+              { label: 'Endless Distance Record', value: Math.round(meta.endlessRecordDistancePx), suffix: 'px', icon: Milestone },
+            ] as { label: string; value: number; suffix?: string; icon: LucideIcon }[]).map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="flex items-center gap-3 border border-border bg-card p-4"
+                  data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <Icon className="h-5 w-5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{stat.label}</p>
+                    <p className="text-lg font-black text-white">
+                      <AnimatedNumber value={stat.value} suffix={stat.suffix} />
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'mastery' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-mastery"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Award className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Mastery</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Every operative's own persistent level, from playing them specifically</p>
+            </div>
+          </div>
+
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {[...CHARACTERS]
+              .map((character) => ({ character, progress: characterLevelProgress(meta, character.id) }))
+              .sort((a, b) => b.progress.level - a.progress.level || b.progress.levelUpsIntoLevel - a.progress.levelUpsIntoLevel)
+              .map(({ character, progress }) => {
+                const rank = characterRankTitle(progress.level);
+                const pct = (progress.levelUpsIntoLevel / Math.max(1, progress.levelUpsToNext)) * 100;
+                return (
+                  <div
+                    key={character.id}
+                    className="flex items-center gap-3 border border-border bg-card p-3"
+                    data-testid={`card-character-level-${character.id}`}
+                  >
+                    <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={40} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-xs font-black uppercase text-white">{character.name}</p>
+                        <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider text-sky-300">
+                          Lv {progress.level} · {rank}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-black/50">
+                        <div
+                          className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'updates' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-updates"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Megaphone className="h-5 w-5 text-cyan-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Updates</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {CHANGELOG.length} updates and counting, straight from {updatesCredit}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {[...CHANGELOG].reverse().map((entry) => (
+              <div
+                key={entry.version}
+                className={`border p-4 ${entry.kind === 'hotfix' ? 'border-amber-400/40 bg-amber-400/5' : 'border-border bg-card'}`}
+                data-testid={`archive-update-${entry.version}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest ${
+                      entry.kind === 'hotfix'
+                        ? 'border-amber-400/60 bg-amber-400/15 text-amber-300'
+                        : 'border-cyan-300/60 bg-cyan-300/15 text-cyan-200'
+                    }`}
+                  >
+                    {entry.kind === 'hotfix' ? <Wrench className="h-2.5 w-2.5" /> : <Megaphone className="h-2.5 w-2.5" />}
+                    {entry.kind === 'hotfix' ? 'Hotfix' : 'Update'} #{updateNumber(entry)}
+                  </span>
+                  <span className="font-mono text-[9px] text-muted-foreground">v{entry.version} · {entry.date}</span>
+                </div>
+                <h3 className="mt-1.5 text-sm font-black uppercase text-white">{entry.title}</h3>
+                <ul className="mt-1.5 space-y-1">
+                  {entry.body.map((line) => (
+                    <li key={line} className="text-xs leading-snug text-muted-foreground">{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </motion.section>
       )}

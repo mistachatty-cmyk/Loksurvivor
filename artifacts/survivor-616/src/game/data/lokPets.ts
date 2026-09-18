@@ -30,6 +30,16 @@ export const LOKPET_VARIANTS: LokPetVariantDef[] = [
   { id: 'void-pup', name: 'Void Pup', family: 'animal', silhouette: 'void-pup', palette: { body: '#22205b', bodyDark: '#070814', accent: '#712fc2', glow: '#2d9dff', eye: '#e8f4ff' }, description: 'A medium star-filled wolf with smoke in place of paws.', sizeScale: 0.92, legendary: true, specialAbility: 'void-fetch', weight: 1 },
   { id: 'ember-koi', name: 'Ember Koi', family: 'animal', silhouette: 'ember-koi', palette: { body: '#ff792b', bodyDark: '#ad2134', accent: '#f3c347', glow: '#25c9ba', eye: '#fff8d8' }, description: 'A large ribbon-bodied koi with oversized fins and a long flame tail.', sizeScale: 1.28, legendary: true, specialAbility: 'ember-rescue', weight: 1 },
   { id: 'clockwork-beetle', name: 'Clockwork Beetle', family: 'mechanical', silhouette: 'clock-beetle', palette: { body: '#b08235', bodyDark: '#5b321f', accent: '#177c78', glow: '#b9e339', eye: '#efffb0' }, description: 'A tiny six-legged beetle built around a clock-face shell whose hands never stop.', sizeScale: 0.76, legendary: true, specialAbility: 'clock-pause', weight: 1 },
+  { id: 'solar-owl', name: 'Solar Owl', family: 'bat', silhouette: 'solar-owl', palette: { body: '#d97706', bodyDark: '#78350f', accent: '#fef08a', glow: '#fde047', eye: '#ffffff' }, description: 'A winged solar watcher that radiates a blinding dawn sunburst.', sizeScale: 0.95, legendary: true, specialAbility: 'solar-flare', weight: 1 },
+  { id: 'shadow-mantis', name: 'Shadow Mantis', family: 'mechanical', silhouette: 'shadow-mantis', palette: { body: '#0f172a', bodyDark: '#020617', accent: '#38bdf8', glow: '#818cf8', eye: '#e0f2fe' }, description: 'A sleek insectoid unit wielding razor scythes that carve through armor.', sizeScale: 0.88, legendary: true, specialAbility: 'mantis-slice', weight: 1 },
+  { id: 'glitch-fox', name: 'Glitch Fox', family: 'animal', silhouette: 'glitch-fox', palette: { body: '#1e1b4b', bodyDark: '#0f0e26', accent: '#ec4899', glow: '#06b6d4', eye: '#fdf2f8' }, description: 'A quick-stepping runner flickering between frames of reality.', sizeScale: 0.92, legendary: true, specialAbility: 'phase-dash', weight: 1 },
+  { id: 'magnet-ursa', name: 'Magnet Ursa', family: 'animal', silhouette: 'magnet-ursa', palette: { body: '#334155', bodyDark: '#1e293b', accent: '#a855f7', glow: '#38bdf8', eye: '#f8fafc' }, description: 'A heavy celestial beast whose core generates crushing magnetic gravitational wells.', sizeScale: 1.18, legendary: true, specialAbility: 'polar-pull', weight: 1 },
+  { id: 'dusk-pouncer', name: 'Dusk Pouncer', family: 'animal', silhouette: 'pouncer', palette: { body: '#312e81', bodyDark: '#1e1b4b', accent: '#a855f7', glow: '#c084fc', eye: '#fae8ff' }, description: 'An agile alley stalker that thrives when city neon flickers low.' },
+  { id: 'echo-skull', name: 'Echo Skull', family: 'ghoul', silhouette: 'skull', palette: { body: '#475569', bodyDark: '#1e293b', accent: '#34d399', glow: '#10b981', eye: '#ecfdf5' }, description: 'A curious specter that vibrates in resonance with distant sirens.' },
+  { id: 'volt-wing', name: 'Volt Wing', family: 'bat', silhouette: 'winglet', palette: { body: '#1e3a5f', bodyDark: '#0b192c', accent: '#facc15', glow: '#38bdf8', eye: '#ffffff' }, description: 'A high-voltage bat that discharges static arcs upon contact.' },
+  { id: 'nova-mote', name: 'Nova Mote', family: 'mote', silhouette: 'spark', palette: { body: '#ea580c', bodyDark: '#7c2d12', accent: '#fde047', glow: '#f97316', eye: '#fffbeb' }, description: 'A miniature star fragment burning with unharnessed fusion energy.' },
+  { id: 'tar-jelly', name: 'Tar Jelly', family: 'blob', silhouette: 'jelly', palette: { body: '#18181b', bodyDark: '#09090b', accent: '#e11d48', glow: '#fb7185', eye: '#ffe4e6' }, description: 'A viscous droplet that adheres to enemy footsteps to slow momentum.' },
+  { id: 'gyro-sentry', name: 'Gyro Sentry', family: 'mechanical', silhouette: 'clockwork', palette: { body: '#52525b', bodyDark: '#27272a', accent: '#22c55e', glow: '#4ade80', eye: '#f0fdf4' }, description: 'A dual-axis stabilizer drone patrolling alongside its operative.' },
 ];
 
 export const LOKPET_STAT_SHEETS: LokPetStatSheet[] = [
@@ -94,6 +104,10 @@ const SPECIAL_LOKPET_LOADOUTS: Record<string, {
   'void-pup': { attackKind: 'pulse', element: 'slow', elementLabel: 'void slow', traitLabel: 'Eventide Fetch · hollow howl', stats: { health: 98, moveSpeed: 150, damage: 17, cooldownMs: 980, range: 300, projectileSpeed: 360, explosionRadius: 0, pulseRadius: 112, lifetimeMs: 108000 } },
   'ember-koi': { attackKind: 'explosion', element: 'fire', elementLabel: 'restorative fire', traitLabel: 'Cinder Current · last catch', stats: { health: 126, moveSpeed: 136, damage: 21, cooldownMs: 820, range: 320, projectileSpeed: 360, explosionRadius: 72, pulseRadius: 0, lifetimeMs: 108000 } },
   'clockwork-beetle': { attackKind: 'heavy-shot', element: 'slow', elementLabel: 'time slow', traitLabel: 'Overclock Chime · borrowed moment', stats: { health: 112, moveSpeed: 118, damage: 24, cooldownMs: 940, range: 285, projectileSpeed: 320, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 108000 } },
+  'solar-owl': { attackKind: 'pulse', element: 'fire', elementLabel: 'radiant sunfire', traitLabel: 'Solar Flare · morning ward', stats: { health: 88, moveSpeed: 165, damage: 19, cooldownMs: 720, range: 340, projectileSpeed: 380, explosionRadius: 0, pulseRadius: 120, lifetimeMs: 112000 } },
+  'shadow-mantis': { attackKind: 'rapid-shot', element: 'freeze', elementLabel: 'chilled alloy', traitLabel: 'Scythe Dance · razor pierce', stats: { health: 105, moveSpeed: 185, damage: 18, cooldownMs: 540, range: 290, projectileSpeed: 440, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 110000 } },
+  'glitch-fox': { attackKind: 'heavy-shot', element: 'slow', elementLabel: 'phase kinetic', traitLabel: 'Glitch Step · shockwave flicker', stats: { health: 115, moveSpeed: 172, damage: 26, cooldownMs: 820, range: 310, projectileSpeed: 410, explosionRadius: 58, pulseRadius: 0, lifetimeMs: 115000 } },
+  'magnet-ursa': { attackKind: 'explosion', element: 'none', elementLabel: 'graviton crush', traitLabel: 'Polar Core · vacuum crush', stats: { health: 140, moveSpeed: 124, damage: 28, cooldownMs: 880, range: 310, projectileSpeed: 340, explosionRadius: 84, pulseRadius: 90, lifetimeMs: 120000 } },
 };
 
 function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element: LokPetElement; label: string } {
@@ -196,6 +210,10 @@ export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
   'void-pup': 'Void Pup',
   'ember-koi': 'Ember Koi',
   'clock-beetle': 'Clock Beetle',
+  'solar-owl': 'Solar Owl',
+  'shadow-mantis': 'Shadow Mantis',
+  'glitch-fox': 'Glitch Fox',
+  'magnet-ursa': 'Magnet Ursa',
 };
 
 /**
@@ -249,6 +267,50 @@ function clockBeetleRig(): SpriteRig {
   return rig;
 }
 
+function solarOwlRig(): SpriteRig {
+  const rig = blobRig({ height: 13, width: 14, wings: true, spikes: true });
+  rig.parts.push(
+    { key: 'aura', x: -14, y: 4, w: 28, h: 6, color: 'glow', z: 0 },
+    { key: 'crest', x: -6, y: 13, w: 12, h: 4, color: 'accentBright', z: 8 },
+    { key: 'face', x: -5, y: 7, w: 10, h: 4, color: 'skin', z: 9 },
+  );
+  rig.pixelHeight = 18;
+  return rig;
+}
+
+function shadowMantisRig(): SpriteRig {
+  const rig = arachnidRig({ height: 12, span: 14, legPairs: 2 });
+  rig.parts.push(
+    { key: 'crest', x: -11, y: 8, w: 4, h: 10, color: 'accent', z: 8 },
+    { key: 'crest', x: 7, y: 8, w: 4, h: 10, color: 'accent', z: 8 },
+    { key: 'aura', x: -8, y: 2, w: 16, h: 4, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 19;
+  return rig;
+}
+
+function glitchFoxRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 13, length: 18, ears: true });
+  rig.parts.push(
+    { key: 'aura', x: -14, y: 5, w: 8, h: 11, color: 'glow', z: 0 },
+    { key: 'crest', x: 6, y: 10, w: 3, h: 4, color: 'accentBright', z: 8 },
+    { key: 'aura', x: -4, y: 1, w: 8, h: 3, color: 'accent', z: 0 },
+  );
+  rig.pixelHeight = 17;
+  return rig;
+}
+
+function magnetUrsaRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 16, length: 20, ears: true });
+  rig.parts.push(
+    { key: 'aura', x: -12, y: 7, w: 24, h: 8, color: 'glow', z: 0 },
+    { key: 'crest', x: -5, y: 14, w: 10, h: 5, color: 'accentBright', z: 8 },
+    { key: 'torso', x: -6, y: 4, w: 12, h: 8, color: 'bodyDark', z: 6 },
+  );
+  rig.pixelHeight = 20;
+  return rig;
+}
+
 const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   pouncer: blobRig({ height: 15, width: 12, tendrils: true }),
   skull: blobRig({ height: 14, width: 11, spikes: true }),
@@ -260,6 +322,10 @@ const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   'void-pup': voidPupRig(),
   'ember-koi': emberKoiRig(),
   'clock-beetle': clockBeetleRig(),
+  'solar-owl': solarOwlRig(),
+  'shadow-mantis': shadowMantisRig(),
+  'glitch-fox': glitchFoxRig(),
+  'magnet-ursa': magnetUrsaRig(),
 };
 
 export function lokPetRig(silhouette: LokPetSilhouette): SpriteRig {

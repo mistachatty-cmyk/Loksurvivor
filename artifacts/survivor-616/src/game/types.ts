@@ -8,6 +8,7 @@
 
 import type { BeatReaction } from '@/game/data/reactivity';
 import type { RunHighlight } from '@/game/data/runHighlights';
+import type { SfxStyleDef } from '@/game/audio/sfxCues';
 
 export interface Vec2 {
   x: number;
@@ -98,7 +99,7 @@ export interface LootPrizeDef {
   cardPackId?: CardPackId;
 }
 
-export type CardPackId = 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher';
+export type CardPackId = 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher' | 'prism-lokpack' | 'elemental-pack' | 'apex-binder';
 export type CardVariant = 'standard' | 'foil' | 'neon' | 'glitch' | 'holo';
 export interface OwnedCardRecord {
   cardId: string;
@@ -110,11 +111,13 @@ export interface OwnedCardRecord {
 
 export type LokPetFamily = 'animal' | 'ghoul' | 'bat' | 'mote' | 'blob' | 'mechanical';
 export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jelly' | 'clockwork'
-  | 'prism-moth' | 'void-pup' | 'ember-koi' | 'clock-beetle';
+  | 'prism-moth' | 'void-pup' | 'ember-koi' | 'clock-beetle'
+  | 'solar-owl' | 'shadow-mantis' | 'glitch-fox' | 'magnet-ursa';
 export type LokPetAttackKind = 'shot' | 'rapid-shot' | 'heavy-shot' | 'pulse' | 'explosion';
 export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow';
 export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
-export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescue' | 'clock-pause';
+export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescue' | 'clock-pause'
+  | 'solar-flare' | 'mantis-slice' | 'phase-dash' | 'polar-pull';
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
@@ -412,7 +415,11 @@ export type WeaponKind =
   | 'follower'
   /** Telegraphs a ground reticle on a nearby enemy, then a comet drops from
    *  off-screen and strikes it. See run-presentation.md. */
-  | 'meteor';
+  | 'meteor'
+  /** 4th-wall breaking / system error attack: drags selection marquees, blue-screens, and corrupts memory. */
+  | 'glitch'
+  /** Easter egg weapon: classic DVD bouncing screensaver icon that ricochets and explodes on corner hits. */
+  | 'dvd-bounce';
 
 /**
  * Shared physical-impact spectrum for authored attacks.
@@ -664,7 +671,14 @@ export interface CharacterCrewIdentity {
   role: string;
 }
 
-export type LokPetCollectorRank = 'LokPet Collector' | 'LokMaster' | 'LokCaster' | 'LokLegendary' | 'LokSupreme';
+export type LokPetCollectorRank =
+  | 'LokPet Collector'
+  | 'LokMaster'
+  | 'LokCaster'
+  | 'LokLegendary'
+  | 'LokSupreme'
+  | 'LokArchivist'
+  | 'LokApex';
 
 export interface LokPetCollectorConfig {
   rank: LokPetCollectorRank;
@@ -792,7 +806,17 @@ export type EnemyBehavior =
   /** Slow patrol that sweeps a facing cone (`traits.coneDetect`); spotting the
    *  player's *true* position inside it -- even through stealth -- ends the
    *  player's active stealth for every enemy, not just this one. */
-  | 'sentry';
+  | 'sentry'
+  /** Coordinated flank attack from opposing angles. */
+  | 'pincer'
+  /** Gravitational singularity that draws player, projectiles, and pickups. */
+  | 'singularity'
+  /** Armored vanguard that heavily resists frontal damage. */
+  | 'phalanx'
+  /** Photonic prism that reflects player shots into splitting laser needles. */
+  | 'prism'
+  /** Quantum tether that links to nearby allies with a hazardous beam. */
+  | 'weaver';
 
 export interface EnemyDef {
   id: string;
@@ -872,7 +896,7 @@ export interface WaveDef {
   group?: string[];
   /** Multiplier applied to enemy hp for this wave. */
   hpMult?: number;
-  formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait';
+  formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait' | 'spiral' | 'phalanx' | 'crossfire' | 'vortex';
   faction?: string;
 }
 
@@ -962,11 +986,25 @@ export interface AreaDef {
    */
   endless?: true;
   /**
+   * Procedural theme key for endless maps that determines chunk generation,
+   * building prefabs, hazard profiles, and distance band progressions.
+   */
+  endlessTheme?: EndlessThemeId;
+  /**
    * When set, pickups spawn at random points in the arena on a cadence,
    * independent of kills or breakables. See oddity-arenas.md.
    */
   randomDrops?: { intervalMs: number };
 }
+
+export type EndlessThemeId =
+  | 'streets'
+  | 'rooftops'
+  | 'catacombs'
+  | 'alleys'
+  | 'null-sector'
+  | 'docks'
+  | 'wasteland';
 
 export type CustomMapAssetCategory =
   | 'ground'
@@ -1229,7 +1267,13 @@ export interface DungeonEra {
   bounds: { w: number; h: number };
 }
 
-export type EndlessBandId = 'core' | 'floodwall' | 'rail-shadow' | 'industrial-fringe' | 'outer-threshold';
+export type EndlessBandId =
+  | 'core'
+  | 'floodwall'
+  | 'rail-shadow'
+  | 'industrial-fringe'
+  | 'outer-threshold'
+  | (string & {});
 
 export interface EndlessBandDef {
   id: EndlessBandId;
@@ -1519,7 +1563,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'account' | 'feedback'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1577,7 +1621,7 @@ export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'a
 
 export type VendorEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
-  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult' | 'extra-life'; amount: number };
+  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult' | 'extra-life' | 'threat-matrix' | 'universal-incursion' | 'corner-magnet' | 'tidal-anchor' | 'static-inverter'; amount: number };
 
 export interface VendorItemDef {
   id: string;
@@ -1663,6 +1707,25 @@ export interface ThemedPaletteDef {
   effect?: PaletteEffectDef;
   /** Color palette to apply to sprites and world when active. */
   palette: SpritePalette;
+}
+
+/**
+ * A purchasable gameplay-SFX reskin sold in the Sound Booth. Mirrors
+ * `ThemedPaletteDef`'s shape exactly, one currency (`lootTokens`), one
+ * catalog pattern (`ownedSoundPackIds`/`activeSoundPackId`). `style` is the
+ * small set of synthesis knobs from `audio/sfxCues.ts` that reskins every
+ * cue uniformly -- a pack never redefines individual cues.
+ */
+export interface SoundPackDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Loot token cost to unlock. 0 = always owned. */
+  cost: number;
+  /** When true, this pack is included in the default owned set. */
+  owned?: boolean;
+  tier?: CosmeticTier;
+  style: SfxStyleDef;
 }
 
 /** Procedural player aura rendered during runs. These styles are visual only. */
@@ -1781,6 +1844,8 @@ export interface MetaState {
   hideoutAmbienceEnabled: boolean;
   /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
   hideoutWeatherEnabled: boolean;
+  /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
+  splashTextEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */
@@ -1832,6 +1897,8 @@ export interface MetaState {
   totalKills: number;
   totalRuns: number;
   bestSurvivalSec: number;
+  /** Every level-up across every run, ever -- never resets. Feeds the persistent player level. */
+  totalLevelUps: number;
   /** Soft currency earned per run. */
   cred: number;
   /** Loot tokens spendable in the hideout. */
@@ -1862,6 +1929,8 @@ export interface MetaState {
   endlessDiscoveryIds: string[];
   /** Character id -> current fatigue penalty percentage, capped at 5. */
   fatigueByCharacter: Record<string, number>;
+  /** Character id -> lifetime level-ups earned while playing that character specifically -- never resets. Feeds each character's own persistent mastery level. */
+  characterLevelUps: Record<string, number>;
   /** The active recovery session, if anyone is resting. */
   recovery: RecoverySession;
   /** Highest hideout facility purchased by the player. */
@@ -1904,6 +1973,12 @@ export interface MetaState {
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */
   activePaletteId: string;
+  /** Purchased sound pack ids, bought from the Sound Booth. The free 'house-pa' pack is always included. */
+  ownedSoundPackIds: string[];
+  /** Currently equipped gameplay-SFX sound pack id. */
+  activeSoundPackId: string;
+  /** Master on/off for gameplay sound effects (hits, pickups, UI...). Independent of music/ambience. */
+  sfxEnabled: boolean;
   /** Purchased procedural run aura ids. The street halo is always included. */
   ownedRunAuraIds: string[];
   /** Currently equipped procedural run aura id. */
@@ -1926,8 +2001,40 @@ export interface MetaState {
   defeatedDirectorIds: string[];
   /** True once any Director has been defeated, unlocking the Director Mode run toggle. */
   directorModeUnlocked: boolean;
+  /** Whether the Threat Matrix quarantine terminal is unlocked with lootkeys. */
+  threatMatrixUnlocked: boolean;
+  /** Bestiary enemy IDs contained/disabled from spawning in runs. */
+  disabledEnemyIds: string[];
+  /** Weapons quarantined / disabled from level-up rolls and loot chests. */
+  disabledWeaponIds: string[];
+  /** Passives quarantined / disabled from level-up rolls and loot chests. */
+  disabledPassiveIds: string[];
+  /** Threat Matrix sector calibrations (mass, hp, density, wave angles, special events). */
+  threatCalibrations: ThreatCalibrations;
+  /** Toggled reality upgrades in the Threat Matrix (e.g. universal-incursion, tidal-anchor). */
+  threatUpgrades: Record<string, boolean>;
+  /** Easter egg weapon unlocked status (DVD Bouncing Logo). */
+  dvdEasterEggUnlocked: boolean;
   /** Generic queue of unlock/achievement announcements, drained by the hub screen on return. */
   pendingNotifications: PendingNotification[];
+  /** Highest changelog version (see `data/changelog.ts`) the player has acknowledged via the update popup. */
+  lastSeenChangelogVersion: string;
+}
+
+export type ThreatAngleMode = 'standard' | 'pincer' | 'cardinal' | 'spiral' | 'corners';
+export type ThreatEventId = 'emp-storm' | 'gravity-anomaly' | 'glitch-surge' | 'solar-flare' | 'blood-overclock' | 'swarm-frenzy';
+
+export interface ThreatCalibrations {
+  /** Multiplier on enemy maximum health, 0.5x to 3.0x. Default 1.0 */
+  hpMult: number;
+  /** Multiplier on enemy physics mass and collision scale, 0.5x to 2.5x. Default 1.0 */
+  massMult: number;
+  /** Multiplier on enemy wave spawn rates and pack density, 0.5x to 2.5x. Default 1.0 */
+  densityMult: number;
+  /** Wave incursion angle vector mode. Default 'standard' */
+  angleMode: ThreatAngleMode;
+  /** Special events active during the run. */
+  activeEvents: ThreatEventId[];
 }
 
 /* ------------------------------------------------------------------ */

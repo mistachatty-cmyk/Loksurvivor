@@ -40,6 +40,14 @@ export const PASSIVE_CARDS: PassiveCardDef[] = [
   pet('clock-beetle-oath', 'Clock Beetle Oath', 'epic', 'Clockwork slowing pulses and 5% faster pet attacks.', { clockworkSlow: true, lokPetHasteMult: 0.95 }, ['clockwork']),
   pet('alpha-sleeve', 'Alpha Sleeve', 'legendary', 'LokPets deal 20% more damage.', { lokPetDamageMult: 1.20 }, ['damage']),
   pet('every-color-at-once', 'Every Color at Once', 'legendary', 'Element cycling, +8% pet damage, and +5% pet speed.', { allElementLokPets: true, lokPetDamageMult: 1.08, lokPetHasteMult: 0.95 }, ['elements']),
+  pet('solar-lens', 'Solar Lens', 'uncommon', 'LokPets deal +12% damage with radiant burning light.', { lokPetDamageMult: 1.12 }, ['elements', 'damage']),
+  pet('mantis-edge', 'Mantis Edge', 'rare', 'LokPets attack 10% faster and pack-drop odds rise.', { lokPetHasteMult: 0.90, packDropBonus: 0.003 }, ['haste', 'packs']),
+  pet('quantum-entangle', 'Quantum Entangle', 'epic', 'LokPet attacks cycle all elements and deal 14% more damage.', { allElementLokPets: true, lokPetDamageMult: 1.14 }, ['elements']),
+  pet('apex-communion', 'Apex Communion', 'legendary', 'All LokPets deal 24% more damage and attack 8% faster with +0.5% pack drops.', { lokPetDamageMult: 1.24, lokPetHasteMult: 0.92, packDropBonus: 0.005 }, ['damage', 'haste', 'packs']),
+  pet('polar-resonance', 'Polar Resonance', 'rare', 'LokPet hits release clockwork slowing pulses and expand magnet reach 10%.', { clockworkSlow: true, magnetMult: 1.10 }, ['clockwork', 'pickup']),
+  pet('flock-formation', 'Flock Formation', 'epic', 'Props bounce 20% harder and LokPets attack 14% faster.', { propBounceMult: 1.20, lokPetHasteMult: 0.86 }, ['hybrid', 'haste']),
+  pet('elemental-overload', 'Elemental Overload', 'legendary', 'Tri-elemental LokPet cycling with +18% damage and +10% Cred payout.', { allElementLokPets: true, lokPetDamageMult: 1.18, creditMult: 1.10 }, ['elements', 'economy']),
+  pet('glitch-scramble', 'Glitch Scramble', 'rare', 'Clockwork slowing pulses trigger alongside +0.4% floor pack drops.', { clockworkSlow: true, packDropBonus: 0.004 }, ['clockwork', 'packs']),
 ];
 export const PASSIVE_CARDS_BY_ID: Record<string, PassiveCardDef> = Object.fromEntries(PASSIVE_CARDS.map((card) => [card.id, card]));
 
@@ -49,8 +57,11 @@ export const CARD_SHOP_PACKS: PurchasableCardPack[] = [
   { id: 'operative', name: 'Roster Roll', description: 'Two character cards from the playable roster.', cost: 12, cards: 2, pool: 'operative', rarityBoost: 0.02 },
   { id: 'scenario', name: 'Beyond the Grid', description: 'Two rule-bending Scenario Cards.', cost: 14, cards: 2, pool: 'scenario', rarityBoost: 0.03 },
   { id: 'lokpet', name: 'LokPack', description: 'Two LokPet subject or passive cards.', cost: 14, cards: 2, pool: 'lokpet', rarityBoost: 0.03 },
+  { id: 'elemental-pack', name: 'Elemental LokPack', description: 'Three elemental synergy and companion cards.', cost: 18, cards: 3, pool: 'lokpet', rarityBoost: 0.06 },
   { id: 'collector', name: 'Collector Cache', description: 'Three mixed cards with stronger variant odds.', cost: 22, cards: 3, pool: 'all', rarityBoost: 0.08 },
-  { id: 'cipher', name: 'Neon Cipher', description: 'Three passive cards with the best rare and Holo odds.', cost: 30, cards: 3, pool: 'all', rarityBoost: 0.16 },
+  { id: 'prism-lokpack', name: 'Prism LokPack', description: 'Three LokPet cards with boosted mythic & holo odds.', cost: 26, cards: 3, pool: 'lokpet', rarityBoost: 0.12 },
+  { id: 'cipher', name: 'Neon Cipher', description: 'Three passive cards with high rare and Holo odds.', cost: 30, cards: 3, pool: 'all', rarityBoost: 0.16 },
+  { id: 'apex-binder', name: 'Apex Vault Pack', description: 'Five premium cards with maximum variant & holo rates.', cost: 42, cards: 5, pool: 'all', rarityBoost: 0.22 },
 ];
 export const CARD_SHOP_PACKS_BY_ID = Object.fromEntries(CARD_SHOP_PACKS.map((pack) => [pack.id, pack])) as Record<CardPackId, PurchasableCardPack>;
 const VARIANT_VALUE: Record<CardVariant, number> = { standard: 1, foil: 2, neon: 4, glitch: 7, holo: 12 };
@@ -59,8 +70,8 @@ export interface CardPull { cardId: string; variant: CardVariant; value: number 
 export function rollCardPack(packId: CardPackId, rng: () => number, extraCardIds: string[] = []): CardPull[] {
   const pack = CARD_SHOP_PACKS_BY_ID[packId] ?? CARD_SHOP_PACKS_BY_ID.street;
   let pool = pack.pool === 'operative' ? extraCardIds.filter((id) => id.includes(':character-')) : PASSIVE_CARDS.filter((card) => pack.pool === 'all' || card.type === pack.pool).map((card) => card.id);
-  if (pack.id === 'street' || pack.id === 'collector') pool = [...pool, ...extraCardIds];
-  if (pack.id === 'lokpet') pool = [...pool, ...extraCardIds.filter((id) => id.includes(':pet-'))];
+  if (pack.id === 'street' || pack.id === 'collector' || pack.id === 'apex-binder') pool = [...pool, ...extraCardIds];
+  if (pack.id === 'lokpet' || pack.id === 'prism-lokpack' || pack.id === 'elemental-pack') pool = [...pool, ...extraCardIds.filter((id) => id.includes(':pet-'))];
   if (!pool.length) return [];
   return Array.from({ length: pack.cards }, () => { const cardId = pool[Math.floor(rng() * pool.length)]!; const roll = rng() - pack.rarityBoost; const variant: CardVariant = roll < 0.025 ? 'holo' : roll < 0.075 ? 'glitch' : roll < 0.17 ? 'neon' : roll < 0.34 ? 'foil' : 'standard'; return { cardId, variant, value: VARIANT_VALUE[variant] }; });
 }
@@ -69,7 +80,13 @@ export function mergeCardPulls(collection: OwnedCardRecord[], pulls: CardPull[])
   for (const pull of pulls) { const current = byId.get(pull.cardId) ?? { cardId: pull.cardId, copies: 0, variants: {}, bestVariant: 'standard' as CardVariant, totalValue: 0 }; current.copies += 1; current.variants[pull.variant] = (current.variants[pull.variant] ?? 0) + 1; current.totalValue += pull.value; if (VARIANT_VALUE[pull.variant] > VARIANT_VALUE[current.bestVariant]) current.bestVariant = pull.variant; byId.set(pull.cardId, current); }
   return [...byId.values()];
 }
-export function passiveDeckSlots(meta: Pick<MetaState, 'lokCollectorRuns' | 'lokCollectorPetsFound'>): number { if (meta.lokCollectorRuns >= 25 || meta.lokCollectorPetsFound >= 20) return 5; if (meta.lokCollectorRuns >= 8 || meta.lokCollectorPetsFound >= 6) return 4; return 3; }
+export function passiveDeckSlots(meta: Pick<MetaState, 'lokCollectorRuns' | 'lokCollectorPetsFound'>): number {
+  if (meta.lokCollectorRuns >= 60 || meta.lokCollectorPetsFound >= 65) return 7;
+  if (meta.lokCollectorRuns >= 40 || meta.lokCollectorPetsFound >= 45) return 6;
+  if (meta.lokCollectorRuns >= 25 || meta.lokCollectorPetsFound >= 20) return 5;
+  if (meta.lokCollectorRuns >= 8 || meta.lokCollectorPetsFound >= 6) return 4;
+  return 3;
+}
 export interface ActiveCardEffects { statMults: Partial<Record<keyof BaseStats, number>>; lokPetDamageMult: number; lokPetHasteMult: number; magnetMult: number; creditMult: number; packDropBonus: number; propBounceMult: number; unbreakableProps: boolean; allElementLokPets: boolean; clockworkSlow: boolean }
 export function activeCardEffects(meta: Pick<MetaState, 'activePassiveCardIds' | 'cardCollection' | 'lokCollectorRuns' | 'lokCollectorPetsFound'>): ActiveCardEffects {
   const owned = new Set(meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId)); const ids = meta.activePassiveCardIds.filter((id) => owned.has(id)).slice(0, passiveDeckSlots(meta));

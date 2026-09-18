@@ -2,7 +2,7 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
+import { isPrimeTakeoverActive, useMeta, describeUnlock, playerLevelProgress } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
@@ -13,9 +13,12 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
+import { UpdatePopup } from './UpdatePopup';
+import { CHANGELOG, CURRENT_VERSION } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Megaphone } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -24,8 +27,9 @@ import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes
 import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
+import { AnimatedNumber } from './AnimatedNumber';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'account' | 'feedback';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -52,8 +56,10 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   'card-shop': { label: 'LokPet Card Shop', icon: CreditCard, testId: 'button-open-card-shop', description: 'Open packs & build your Lock Deck' },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
   'palette-store': { label: 'Customization Shop', icon: Palette, testId: 'button-open-palette-store', description: 'Palettes & run auras' },
+  'sound-booth': { label: 'The Sound Booth', icon: Disc3, testId: 'button-open-sound-booth', description: 'Buy & preview SFX packs' },
   account: { label: 'Account', icon: Mail, testId: 'button-open-account', description: 'Waitlist & sign in' },
   feedback: { label: 'Feedback', icon: MessageSquareHeart, testId: 'button-open-feedback', description: 'Ideas & bug reports' },
+  'threat-matrix': { label: 'Threat Matrix', icon: ShieldAlert, testId: 'button-open-threat-matrix', description: 'Override & quarantine enemies' },
 };
 
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
@@ -95,6 +101,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
+  const playerLevel = playerLevelProgress(meta.totalLevelUps);
+  const playerLevelPct = (playerLevel.levelUpsIntoLevel / Math.max(1, playerLevel.levelUpsToNext)) * 100;
   const roomNavRef = useRef<HTMLElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
@@ -149,6 +157,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext]);
 
   const weatherIcon = WEATHER_ICONS[scene.weather];
+  const footerCredit = useMemo(() => pickCreditName(), []);
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
     [roomAllies.length, scene.flavorLines, selectedCharacter.id],
@@ -163,6 +172,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
+      <UpdatePopup />
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}
@@ -241,6 +251,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               <p className="text-sm font-bold">
                 <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated
               </p>
+              <div className="mt-2" data-testid="widget-player-level">
+                <p className="flex items-center justify-start sm:justify-end gap-1.5 text-xs font-bold uppercase tracking-widest text-sky-300">
+                  <Zap className="h-3.5 w-3.5" />
+                  Player Lv <AnimatedNumber value={playerLevel.level} className="text-sm text-white" data-testid="text-player-level" />
+                </p>
+                <div className="mr-auto mt-1 h-1 w-32 overflow-hidden rounded-full bg-black/50 sm:mr-0 sm:ml-auto sm:w-40">
+                  <div
+                    className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                    style={{ width: `${playerLevelPct}%` }}
+                    data-testid="bar-player-level"
+                  />
+                </div>
+              </div>
               {meta.lootTokens > 0 && (
                 <p className="text-xs font-mono text-amber-400 mt-1">
                   <Package className="inline w-3 h-3 mr-1" />{meta.lootTokens} loot tokens
@@ -490,6 +513,33 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           </div>
         </section>
 
+        {(meta.threatMatrixUnlocked || (meta.vendorPurchases?.['threat-matrix-console'] ?? 0) > 0) && (
+          <section className="mb-8 border border-cyan-500/40 bg-cyan-950/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg shadow-lg" data-testid="section-threat-matrix-banner">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded border border-cyan-400/50 bg-cyan-900/40 text-cyan-300">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">Security Override Terminal</span>
+                  <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-200">ONLINE</span>
+                </div>
+                <h3 className="text-base font-black uppercase text-white tracking-wide">Threat Matrix Quarantine Console</h3>
+                <p className="text-xs text-cyan-200/70">
+                  Override spawn tables, quarantine enemy specimens, or trigger Universal Cross-Map Incursions.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpen('threat-matrix')}
+              className="flex shrink-0 items-center justify-center gap-2 rounded border border-cyan-400 bg-cyan-500/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/35 transition-all shadow-md"
+            >
+              Access Terminal
+            </button>
+          </section>
+        )}
+
          {newlyRescuedAlly && (
            <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
              <div className="mb-3 flex items-center gap-2">
@@ -608,6 +658,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => onOpen('unlocks')}
+          className="mt-6 flex w-full items-center gap-3 border-t border-border/60 pt-4 text-left transition-colors hover:text-primary"
+          data-testid="footer-updates"
+        >
+          <Megaphone className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            v{CURRENT_VERSION} · {CHANGELOG.length} updates · brought to you by {footerCredit} — see what's new
+          </span>
+        </button>
       </div>
     </motion.div>
   );

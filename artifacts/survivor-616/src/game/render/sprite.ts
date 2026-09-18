@@ -250,7 +250,23 @@ export function drawRig(
     return;
   }
 
+  if (scale <= 0 || !Number.isFinite(scale)) {
+    ctx.globalAlpha = previousAlpha;
+    return;
+  }
+
   const k = scale / BAKE_SCALE;
+  if (k <= 0 || !Number.isFinite(k)) {
+    ctx.globalAlpha = previousAlpha;
+    return;
+  }
+  const dw = baked.canvas.width * k;
+  const dh = baked.canvas.height * k;
+  if (dw <= 0 || dh <= 0 || !Number.isFinite(dw) || !Number.isFinite(dh)) {
+    ctx.globalAlpha = previousAlpha;
+    return;
+  }
+
   ctx.save();
   // Every rig part is a flat-color axis-aligned rectangle -- force nearest-
   // neighbor scaling so blitting the baked bitmap reproduces the same crisp,
@@ -259,7 +275,7 @@ export function drawRig(
   ctx.imageSmoothingEnabled = false;
   ctx.translate(screenX, screenY);
   if (facing === -1) ctx.scale(-1, 1);
-  ctx.drawImage(baked.canvas, -baked.originX * k, -baked.originY * k, baked.canvas.width * k, baked.canvas.height * k);
+  ctx.drawImage(baked.canvas, -baked.originX * k, -baked.originY * k, dw, dh);
   ctx.restore();
 
   ctx.globalAlpha = previousAlpha;
@@ -301,15 +317,19 @@ export function drawShadow(
   screenY: number,
   radius: number,
 ) {
+  if (radius <= 0 || !Number.isFinite(radius)) return;
   const blob = getShadowBlob();
   if (!blob) return;
+  const w = radius * 2;
+  const h = radius * 0.42 * 2;
+  if (w <= 0 || h <= 0 || !Number.isFinite(w) || !Number.isFinite(h)) return;
   // The non-uniform vertical scale gives the ellipse shape for free, same
   // trick as `paintSoftCloud`'s soft blobs in draw.ts.
   ctx.drawImage(
     blob,
     screenX - radius,
     screenY - radius * 0.42,
-    radius * 2,
-    radius * 0.42 * 2,
+    w,
+    h,
   );
 }

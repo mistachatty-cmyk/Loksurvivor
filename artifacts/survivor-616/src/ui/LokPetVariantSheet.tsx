@@ -38,7 +38,7 @@ export function LokPetVariantSheet() {
           <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet signal sheet</h2>
         </div>
         <span className="text-[10px] uppercase tracking-widest text-pink-300">original companions + legendary signals</span>
-        <span className="ml-auto text-[10px] uppercase tracking-widest text-muted-foreground">{LOKPET_VARIANTS.length} variants · 10 silhouettes</span>
+        <span className="ml-auto text-[10px] uppercase tracking-widest text-muted-foreground">{LOKPET_VARIANTS.length} variants · {new Set(LOKPET_VARIANTS.map((v) => v.silhouette)).size} silhouettes</span>
       </div>
       <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-muted-foreground">
         Every blue box can generate a different little ally. The silhouette and palette are rolled separately from its combat trait, so a bat might freeze, a ghoul might burn, or a jelly might fire rapidly.

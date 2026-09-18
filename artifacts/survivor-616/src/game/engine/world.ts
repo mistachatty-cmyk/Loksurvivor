@@ -9,7 +9,7 @@
  * snapshots out of it.
  */
 
-import { getEnemy } from '@/game/data/enemies';
+import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
@@ -28,7 +28,7 @@ import { DIRECTORS } from '@/game/data/directors';
 import { getFaction } from '@/game/data/factions';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
-import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
+import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand, getEndlessBandById, getEndlessBandsForTheme } from '@/game/data/endlessBands';
 import type { ActiveCardEffects } from '@/game/data/passiveCards';
 import {
   HORDE_SPIN_ACTIVE_MS_PER_STEP,
@@ -40,11 +40,13 @@ import {
   pickHordeSpinTier,
 } from '@/game/data/hordeSpin';
 import { SILENT_FRAME, msFromNearestBeat, type AudioFrame } from '@/game/audio/beatBus';
+import type { SfxCueId, SfxEvent } from '@/game/audio/sfxCues';
 import { reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type {
   ActiveCrewRumor,
   AreaDef,
   BaseStats,
+  CardPackId,
   CharacterEpisodeDef,
   ChallengeContractDef,
   CharacterDef,
@@ -87,6 +89,7 @@ import type {
   MissionObjectiveDef,
   SectorMissionDef,
   SectorStructureDef,
+  ThreatCalibrations,
 } from '@/game/types';
 
 import {
@@ -238,15 +241,24 @@ export interface Projectile {
   pausedUntil?: number;
   /** Zero Day: when set, this projectile IS a thrown frozen enemy (that uid), resolved by resolveThrownEnemyImpact instead of the normal hit path. */
   carriedEnemyUid?: number;
+  /** Custom projectile kind, such as the retro DVD bouncing screensaver icon. */
+  customKind?: 'dvd-logo';
+  weaponId?: string;
+  bounceCount?: number;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact'
   /** A thin ambient connector line between two points -- no damage, purely a "you're webbed in" visual. */
-  | 'web';
+  | 'web'
+  /** Glitch / 4th-wall desktop marquee selection and CRT corruption box. */
+  | 'glitch'
+  /** Real-time stereo audio oscilloscope waveform ribbons. */
+  | 'waveform';
 
 export interface Effect {
   uid: number;
   kind: EffectKind;
+  weaponId?: string;
   x: number;
   y: number;
   radius: number;
@@ -897,6 +909,13 @@ export interface World {
 
   rescue: RescueState;
   alerts: Alert[];
+  /**
+   * Gameplay-SFX cues raised this tick, drained and played once per rendered
+   * frame in `RunScreen` (same pattern as `pendingReel`/`pendingLevelUps` --
+   * never read mid-substep, or a slow frame would retrigger a cue several
+   * times).
+   */
+  sfxEvents: SfxEvent[];
   outcome: RunOutcome;
   deathCause?: RunResult['deathCause'];
 
@@ -1007,6 +1026,42 @@ export interface World {
     def: CharacterEpisodeDef;
     startingProgress: number;
   };
+  /* ---- Threat Matrix & Special mechanics ---- */
+  disabledEnemyIds?: string[];
+  disabledWeaponIds?: string[];
+  disabledPassiveIds?: string[];
+  threatCalibrations?: ThreatCalibrations;
+  threatEventTimers?: {
+    nextEmpAt: number;
+    nextGravityAt: number;
+    nextGlitchAt: number;
+    glitchActiveUntil: number;
+    nextSolarAt: number;
+    nextSwarmAt: number;
+    swarmActiveUntil: number;
+  };
+  threatUpgrades?: Record<string, boolean>;
+  dvdEasterEggUnlocked?: boolean;
+  bubbleWash?: BubbleWashState;
+  electricChains?: ElectricChain[];
+}
+
+export interface BubbleWashState {
+  nextSurgeAt: number;
+  warningStartedAt: number;
+  surgeActiveUntil: number;
+  direction: -1 | 1;
+  state: 'idle' | 'warning' | 'surging';
+  foamParticles: Array<{ x: number; y: number; vx: number; vy: number; r: number; color: string; bornAt: number }>;
+}
+
+export interface ElectricChain {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  bornAt: number;
+  expiresAt: number;
 }
 
 export const NORMAL_ENEMY_CAP = 190;
@@ -1114,6 +1169,12 @@ export function createWorld(
     /** Tier 2 economy: beacon placements lifted off the authored map. */
     missionBeacons?: Array<{ beaconId: string; x: number; y: number }>;
     cardEffects?: ActiveCardEffects;
+    disabledEnemyIds?: string[];
+    disabledWeaponIds?: string[];
+    disabledPassiveIds?: string[];
+    threatCalibrations?: ThreatCalibrations;
+    threatUpgrades?: Record<string, boolean>;
+    dvdEasterEggUnlocked?: boolean;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1304,6 +1365,7 @@ export function createWorld(
       allyId: 'rescueAllyId' in setup ? setup.rescueAllyId : area.rescueAllyId,
     },
     alerts: [],
+    sfxEvents: [],
     outcome: 'running',
     upgradeStacks: {},
     spawnCredit: area.waves.map(() => 0),
@@ -1402,6 +1464,30 @@ export function createWorld(
     skeletonKeysGained: 0,
     cardPacksFound: [],
     cardEffects: setup.cardEffects ?? { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false },
+    disabledEnemyIds: setup.disabledEnemyIds ?? [],
+    disabledWeaponIds: setup.disabledWeaponIds ?? [],
+    disabledPassiveIds: setup.disabledPassiveIds ?? [],
+    threatCalibrations: setup.threatCalibrations,
+    threatEventTimers: {
+      nextEmpAt: 7000,
+      nextGravityAt: 12000,
+      nextGlitchAt: 15000,
+      glitchActiveUntil: 0,
+      nextSolarAt: 20000,
+      nextSwarmAt: 25000,
+      swarmActiveUntil: 0,
+    },
+    threatUpgrades: setup.threatUpgrades ?? {},
+    dvdEasterEggUnlocked: setup.dvdEasterEggUnlocked ?? false,
+    bubbleWash: area.id === 'bubbleWash' ? {
+      nextSurgeAt: 20000,
+      warningStartedAt: 0,
+      surgeActiveUntil: 0,
+      direction: 1,
+      state: 'idle',
+      foamParticles: [],
+    } : undefined,
+    electricChains: [],
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
     episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
@@ -1423,10 +1509,11 @@ export function createWorld(
   world.potholes = obstacleDefs.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
 
   if (area.endless) {
+    const initialBand = getEndlessBand(0, area.endlessTheme);
     world.endless = {
       maxDistancePx: 0,
-      currentBandId: 'core',
-      discoveredBandIds: new Set(['core']),
+      currentBandId: initialBand.id,
+      discoveredBandIds: new Set([initialBand.id]),
       discoveredRouteEventIds: new Set(),
       routeEvent: null,
       hazardNextAt: 0,
@@ -1542,6 +1629,18 @@ function pushAlert(w: World, text: string) {
 }
 
 /**
+ * Queues a gameplay-SFX cue. `onBeat` is read from `isOnBeat(w)` here so
+ * every call site gets beat-reactivity for free -- same on-beat-bonus idiom
+ * `damageEnemy`'s crit check already uses, never a fresh alternative. The
+ * length cap is a safety net (`RunScreen` drains this every rendered frame,
+ * so it should never approach 24), not a normal-path limit.
+ */
+function pushSfx(w: World, cue: SfxCueId, onBeat: boolean = isOnBeat(w)) {
+  w.sfxEvents.push({ cue, onBeat });
+  if (w.sfxEvents.length > 24) w.sfxEvents.shift();
+}
+
+/**
  * How long a one-shot story/event banner (first night beat, a fired rumor,
  * a finished district incursion) stays on the HUD before it fades. Past
  * this window the outcome is history, not something the player still needs
@@ -1592,7 +1691,9 @@ function modifierSpawnMult(w: World): number {
 }
 
 function enemyCap(w: World): number {
-  return w.modifiers.unleashedMode ? UNLEASHED_ENEMY_CAP : NORMAL_ENEMY_CAP;
+  const base = w.modifiers.unleashedMode ? UNLEASHED_ENEMY_CAP : NORMAL_ENEMY_CAP;
+  const densityMult = w.threatCalibrations?.densityMult ?? 1;
+  return Math.round(base * densityMult);
 }
 
 function canSpawnEnemyProjectile(w: World): boolean {
@@ -1700,8 +1801,43 @@ function forEachNearby(w: World, x: number, y: number, radius: number, fn: (e: E
 /* Spawning                                                            */
 /* ------------------------------------------------------------------ */
 
-function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
+function computeSpawnAngle(w: World): number {
+  const mode = w.threatCalibrations?.angleMode ?? 'standard';
+  if (mode === 'pincer') {
+    const base = w.rng() < 0.5 ? 0 : Math.PI;
+    return base + randRange(w.rng, -0.35, 0.35);
+  }
+  if (mode === 'cardinal') {
+    const cardinals = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+    const pick = cardinals[Math.floor(w.rng() * 4)]!;
+    return pick + randRange(w.rng, -0.15, 0.15);
+  }
+  if (mode === 'corners') {
+    const corners = [Math.PI / 4, (3 * Math.PI) / 4, -(3 * Math.PI) / 4, -Math.PI / 4];
+    const pick = corners[Math.floor(w.rng() * 4)]!;
+    return pick + randRange(w.rng, -0.15, 0.15);
+  }
+  if (mode === 'spiral') {
+    return (w.now * 0.0018 + w.enemies.length * 0.45) % (Math.PI * 2);
+  }
+  return w.rng() * Math.PI * 2;
+}
+
+function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
   if (w.enemies.length >= enemyCap(w)) return;
+
+  let def = incomingDef;
+  if (w.disabledEnemyIds && w.disabledEnemyIds.includes(incomingDef.id)) {
+    // If quarantined by threat matrix console, substitute with an enabled enemy or abort
+    const enabledPool = ENEMIES.filter((e) => !w.disabledEnemyIds?.includes(e.id));
+    if (enabledPool.length === 0) return;
+    def = enabledPool[Math.floor(w.rng() * enabledPool.length)]!;
+  } else if (w.threatUpgrades?.['universal-incursion'] && w.rng() < 0.22) {
+    const enabledPool = ENEMIES.filter((e) => !w.disabledEnemyIds?.includes(e.id));
+    if (enabledPool.length > 0) {
+      def = enabledPool[Math.floor(w.rng() * enabledPool.length)]!;
+    }
+  }
 
   let x = 0;
   let y = 0;
@@ -1712,7 +1848,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
   } else if (w.area.endless) {
     // No arena walls — spawn on a ring around the player, clamped only inside dungeon rooms.
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const angle = w.rng() * Math.PI * 2;
+      const angle = computeSpawnAngle(w);
       const radius = randRange(w.rng, 310, 430);
       x = w.player.x + Math.cos(angle) * radius;
       y = w.player.y + Math.sin(angle) * radius;
@@ -1730,7 +1866,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     const halfH = w.bounds.h / 2;
     // Spawn on a ring outside the player's view but inside the arena.
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const angle = w.rng() * Math.PI * 2;
+      const angle = computeSpawnAngle(w);
       const radius = randRange(w.rng, 310, 430);
       x = clamp(w.player.x + Math.cos(angle) * radius, -halfW + 24, halfW - 24);
       y = clamp(w.player.y + Math.sin(angle) * radius, -halfH + 24, halfH - 24);
@@ -1744,7 +1880,9 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
   // hpMult and would otherwise never see doubleMode/scalerMode at all. This
   // mirrors how w.challenges' enemyHealthMultiplier already stacks on top of
   // endless mode's own Math.min(1.7, ...) cap uncapped -- see run-modifiers.md.
-  const hp = def.hp * hpMult * modifierHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1);
+  const calHpMult = w.threatCalibrations?.hpMult ?? 1;
+  const calMassMult = w.threatCalibrations?.massMult ?? 1;
+  const hp = def.hp * hpMult * modifierHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -1765,7 +1903,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     speed: def.speed * (w.modifiers.speedMode ? 1.25 : 1),
     damage: def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1),
     xp: def.xp,
-    mass: def.mass,
+    mass: def.mass * calMassMult,
     contactReadyAt: 0,
     chargeReadyAt: w.now + randRange(w.rng, 800, 2600),
     chargeUntil: 0,
@@ -1829,11 +1967,17 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
       const a = angle + (Math.PI * 2 * i) / count;
       x = Math.cos(a) * distance;
       y = Math.sin(a) * distance;
-    } else if (formation === 'wedge' || formation === 'pincer') {
+    } else if (formation === 'wedge') {
       const side = i % 2 === 0 ? -1 : 1;
       const spread = (Math.floor(i / 2) + 1) * 34;
       x += Math.cos(angle + side * 0.55) * spread;
       y += Math.sin(angle + side * 0.55) * spread;
+    } else if (formation === 'pincer') {
+      const side = i % 2 === 0 ? 0 : Math.PI;
+      const offset = (Math.floor(i / 2) - Math.floor(count / 4)) * 36;
+      const armAngle = angle + side;
+      x = Math.cos(armAngle) * distance + Math.cos(armAngle + Math.PI / 2) * offset;
+      y = Math.sin(armAngle) * distance + Math.sin(armAngle + Math.PI / 2) * offset;
     } else if (formation === 'wall') {
       x += Math.cos(angle + Math.PI / 2) * ((t - 0.5) * 260);
       y += Math.sin(angle + Math.PI / 2) * ((t - 0.5) * 260);
@@ -1843,6 +1987,31 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
     } else if (formation === 'bait') {
       const bait = i === 0 ? 0.6 : 1;
       x *= bait; y *= bait;
+    } else if (formation === 'spiral') {
+      const a = angle + i * 0.45;
+      const r = 180 + i * (180 / Math.max(1, count));
+      x = Math.cos(a) * r;
+      y = Math.sin(a) * r;
+    } else if (formation === 'phalanx') {
+      const cols = Math.ceil(count / 2);
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const colOffset = (col - (cols - 1) / 2) * 34;
+      const rowOffset = row * 38;
+      x = Math.cos(angle) * (distance + rowOffset) + Math.cos(angle + Math.PI / 2) * colOffset;
+      y = Math.sin(angle) * (distance + rowOffset) + Math.sin(angle + Math.PI / 2) * colOffset;
+    } else if (formation === 'crossfire') {
+      const quadrant = i % 4;
+      const qAngle = angle + quadrant * (Math.PI / 2);
+      const spread = (Math.floor(i / 4) - 1) * 32;
+      x = Math.cos(qAngle) * distance + Math.cos(qAngle + Math.PI / 2) * spread;
+      y = Math.sin(qAngle) * distance + Math.sin(qAngle + Math.PI / 2) * spread;
+    } else if (formation === 'vortex') {
+      const arm = i % 2 === 0 ? 1 : -1;
+      const a = angle + arm * (i * 0.35);
+      const r = 220 + (i % 3) * 45;
+      x = Math.cos(a) * r;
+      y = Math.sin(a) * r;
     }
     positions.push({ x: w.player.x + x, y: w.player.y + y });
   }
@@ -1868,11 +2037,15 @@ function updateSpawning(w: World, dt: number) {
     // same way endless mode caps its own difficulty (endless-mode-engine.md).
     const infiniteActive = infiniteMode && wave.toSec === maxToSec && w.time > wave.toSec;
     if (!infiniteActive && (w.time < wave.fromSec || w.time > wave.toSec)) continue;
+    // Edge-trigger: this substep is the one that crossed into the wave's
+    // spawn window. `w.time - dt` puts the previous substep still outside it.
+    if (!infiniteActive && w.time - dt < wave.fromSec) pushSfx(w, 'waveStart');
     const infiniteTier = infiniteActive ? Math.floor((w.time - wave.toSec) / 20) : 0;
     const infiniteHpMult = infiniteActive ? Math.min(1.7, 1 + infiniteTier * 0.07) : 1;
     const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
     const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
-    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult;
+    const densityMult = w.threatCalibrations?.densityMult ?? 1;
+    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult;
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
@@ -2385,6 +2558,67 @@ function triggerSpecialLokPetAbility(w: World, pet: LokPetInstance) {
     w.popups.push({ x: w.player.x, y: w.player.y + 28, text: `+${heal} WARM CURRENT`, color: pet.palette.glow, bornAt: w.now, vy: 26 });
     showLokPetSpecial(w, pet, 'LAST CATCH', 106);
     pet.specialReadyAt = w.now + 4800;
+  } else if (pet.specialAbility === 'solar-flare') {
+    const heal = 3;
+    w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+    showLokPetBurst(w, pet.x, pet.y, 150, lokPetDamage(w, pet) * 0.85, pet.palette.glow, 'fire');
+    w.popups.push({ x: w.player.x, y: w.player.y + 28, text: `+${heal} DAWN SUNBURST`, color: pet.palette.glow, bornAt: w.now, vy: 26 });
+    showLokPetSpecial(w, pet, 'SOLAR FLARE', 150);
+    pet.specialReadyAt = w.now + 4400;
+  } else if (pet.specialAbility === 'mantis-slice') {
+    const target = nearestEnemy(w, pet.x, pet.y, 340);
+    if (target) {
+      const baseAngle = Math.atan2(target.y - pet.y, target.x - pet.x);
+      for (let i = -1.5; i <= 1.5; i += 1) {
+        const spreadAngle = baseAngle + i * 0.18;
+        w.projectiles.push({
+          uid: uid(w),
+          x: pet.x,
+          y: pet.y,
+          vx: Math.cos(spreadAngle) * 440,
+          vy: Math.sin(spreadAngle) * 440,
+          radius: 10,
+          damage: lokPetDamage(w, pet) * 0.9,
+          impactIntensity: 4,
+          fromPlayer: true,
+          expiresAt: w.now + 650,
+          targetUid: target.uid,
+          turnRate: 0,
+          color: pet.palette.glow,
+          trail: [],
+          pierce: 1,
+          hitUids: new Set(),
+          obstacleInteraction: 'block',
+          statusEffectId: 'freeze',
+        });
+      }
+    }
+    showLokPetSpecial(w, pet, 'MANTIS SCYTHE', 130);
+    pet.specialReadyAt = w.now + 3800;
+  } else if (pet.specialAbility === 'phase-dash') {
+    showLokPetBurst(w, pet.x, pet.y, 130, lokPetDamage(w, pet) * 0.75, pet.palette.glow, 'slow');
+    const pickups = w.pickups
+      .filter((p) => p.kind !== 'loot-box' && dist2(p.x, p.y, pet.x, pet.y) <= 320 ** 2)
+      .slice(0, 4);
+    for (const p of pickups) {
+      const dx = w.player.x - p.x; const dy = w.player.y - p.y; const len = Math.hypot(dx, dy) || 1;
+      p.vx += (dx / len) * 720; p.vy += (dy / len) * 720;
+    }
+    showLokPetSpecial(w, pet, 'PHASE STEP', 130);
+    pet.specialReadyAt = w.now + 4000;
+  } else if (pet.specialAbility === 'polar-pull') {
+    showLokPetBurst(w, pet.x, pet.y, 145, lokPetDamage(w, pet) * 0.9, pet.palette.glow, 'none');
+    for (const pickup of w.pickups) {
+      if (pickup.kind === 'loot-box') continue;
+      const d2 = dist2(pickup.x, pickup.y, pet.x, pet.y);
+      if (d2 <= 400 ** 2) {
+        const dx = pet.x - pickup.x; const dy = pet.y - pickup.y; const len = Math.hypot(dx, dy) || 1;
+        pickup.vx += (dx / len) * 820;
+        pickup.vy += (dy / len) * 820;
+      }
+    }
+    showLokPetSpecial(w, pet, 'POLAR GRAVITON', 145);
+    pet.specialReadyAt = w.now + 4500;
   } else {
     const pauseUntil = w.now + 850;
     for (const projectile of w.projectiles) {
@@ -2708,13 +2942,42 @@ function damageEnemy(
   // they're resolved directly via killEnemy() when thrown, not damageEnemy().
   if (w.now < enemy.frozenUntil) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
+
+  let adjustedAmount = amount;
+  if (enemy.def.behavior === 'phalanx') {
+    const facingAngle = Math.atan2(w.player.y - enemy.y, w.player.x - enemy.x);
+    const hitAngle = Math.atan2(fromY - enemy.y, fromX - enemy.x);
+    let diff = Math.abs(hitAngle - facingAngle) % (Math.PI * 2);
+    if (diff > Math.PI) diff = Math.PI * 2 - diff;
+    if (diff < Math.PI * 0.45) {
+      adjustedAmount = Math.max(1, Math.round(amount * 0.3));
+      spawnParticles(w, enemy.x, enemy.y, '#f59e0b', 3, 40);
+    }
+  }
+
+  if (enemy.def.behavior === 'prism' && burstDepth === 0 && w.now >= enemy.chargeReadyAt) {
+    enemy.chargeReadyAt = w.now + 900;
+    const baseAngle = Math.atan2(enemy.y - fromY, enemy.x - fromX);
+    for (let i = -1; i <= 1; i += 1) {
+      const bAngle = baseAngle + i * 0.42;
+      w.projectiles.push({
+        uid: uid(w), x: enemy.x, y: enemy.y,
+        vx: Math.cos(bAngle) * 160, vy: Math.sin(bAngle) * 160,
+        radius: 6, damage: 4, impactIntensity: 0, fromPlayer: false,
+        expiresAt: w.now + 2400, targetUid: null, turnRate: 0,
+        color: '#06b6d4', trail: [], pierce: 0, hitUids: new Set(),
+      });
+    }
+  }
+
   const isCrit = burstDepth === 0 && w.rng() < w.stats.crit;
   // Landing a hit on the beat is its own bonus, stacking with a rolled crit.
   const onBeat = burstDepth === 0 && isOnBeat(w);
   const beatBonus = onBeat ? ON_BEAT_CRIT_MULT : 1;
   const stealthBonus = w.now < w.stealthUntil ? 1 + (w.stealthConfig?.damageBonusPct ?? 0) : 1;
-  const dealt = Math.max(1, Math.round((isCrit ? amount * 2 : amount) * beatBonus * stealthBonus));
+  const dealt = Math.max(1, Math.round((isCrit ? adjustedAmount * 2 : adjustedAmount) * beatBonus * stealthBonus));
   if (onBeat) w.onBeatHits += 1;
+  pushSfx(w, isCrit ? 'critHit' : 'hit', onBeat);
   enemy.hp -= dealt;
   // Sector Command: an enemy you have already worked into its capture window,
   // while standing next to it, must not evaporate to the next auto-fired shot.
@@ -2812,6 +3075,7 @@ function killEnemy(w: World, enemy: EnemyActor) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  pushSfx(w, enemy.def.family === 'Boss' ? 'bossKill' : 'kill');
   spawnParticles(w, enemy.x, enemy.y + enemy.radius, enemy.def.palette.accent, 8, 110);
 
   if (w.director.phase === 'active' && enemy.uid === w.director.bossUid) {
@@ -2948,6 +3212,7 @@ function damagePlayer(
   if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
   p.hp -= reduced;
+  pushSfx(w, 'playerHurt');
   p.invulnUntil = w.now + 420;
   p.hitFlashUntil = w.now + 160;
   p.anim = 'hurt';
@@ -2970,6 +3235,7 @@ function damagePlayer(
       p.invulnUntil = w.now + 1200;
       spawnParticles(w, p.x, p.y, '#4ade80', 16, 140);
       pushAlert(w, 'FRAGMENTED BACKUP RESTORED');
+      pushSfx(w, 'extraLifeSave');
       return;
     }
     p.hp = 0;
@@ -2977,6 +3243,7 @@ function damagePlayer(
     w.deathCause = 'ordinary-hazard';
     p.anim = 'death';
     p.animStartedAt = w.now;
+    pushSfx(w, 'playerDown');
   }
 }
 
@@ -3324,10 +3591,11 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       const count = Math.max(1, runWeapon.count);
       const target = nearestEnemy(w, p.x, p.y, reach + 100);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      const isWaveform = weapon.id.includes('oscilloscope');
       for (let i = 0; i < count; i += 1) {
         w.effects.push({
-          uid: uid(w), kind: 'wave', x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
-          angle, spread: 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
+          uid: uid(w), kind: isWaveform ? 'waveform' : 'wave', weaponId: weapon.id, x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
+          angle, spread: isWaveform ? 0.48 : 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
           color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
           evolutionBehavior: behavior,
         });
@@ -3545,6 +3813,92 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
+
+    case 'glitch': {
+      const target = nearestEnemy(w, p.x, p.y, reach + 120);
+      const cx = target ? target.x : p.x + (p.facing > 0 ? reach * 0.6 : -reach * 0.6);
+      const cy = target ? target.y : p.y;
+      w.effects.push({
+        uid: uid(w),
+        kind: 'glitch',
+        weaponId: weapon.id,
+        x: cx,
+        y: cy,
+        radius: reach * 0.75 * areaMult(w),
+        angle: 0,
+        spread: 0,
+        bornAt: w.now,
+        expiresAt: w.now + 480,
+        color: weapon.color ?? palette.accent,
+        damage,
+        impactIntensity: weaponImpact(weapon),
+        impactTrigger: weapon.impactTrigger,
+        hitUids: new Set(),
+        followPlayer: false,
+        statusEffectId: weapon.statusEffectId,
+        evolutionBehavior: behavior,
+      });
+      w.popups.push({
+        x: cx,
+        y: cy - 28,
+        text: weapon.id === 'dev-cursor' ? 'DEL [■]' : (weapon.id === 'kernel-panic' ? '0xBSOD' : 'GLITCH'),
+        color: weapon.color ?? '#38bdf8',
+        bornAt: w.now,
+        vy: 38,
+      });
+      p.anim = 'attack';
+      p.animStartedAt = w.now;
+      w.shake = Math.max(w.shake, 6);
+      break;
+    }
+
+    case 'dvd-bounce': {
+      const activeDvds = w.projectiles.filter((pr) => pr.customKind === 'dvd-logo');
+      const maxCount = Math.max(1, runWeapon.count);
+      if (activeDvds.length < maxCount) {
+        // Spawn persistent bouncing DVD screensaver icon
+        const angle = (w.rng() * Math.PI * 0.4) + (Math.PI * 0.1) + (Math.floor(w.rng() * 4) * (Math.PI / 2));
+        const speed = (weapon.speed ?? 290) * (1 + (runWeapon.level - 1) * 0.08);
+        const dvdColors = ['#38bdf8', '#f43f5e', '#a855f7', '#22c55e', '#eab308', '#ec4899', '#06b6d4'];
+        const startColor = dvdColors[Math.floor(w.rng() * dvdColors.length)] ?? '#38bdf8';
+        w.projectiles.push({
+          uid: uid(w),
+          weaponId: weapon.id,
+          customKind: 'dvd-logo',
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 22,
+          damage,
+          impactIntensity: weaponImpact(weapon),
+          fromPlayer: true,
+          expiresAt: w.now + 999999999,
+          targetUid: null,
+          turnRate: 0,
+          color: startColor,
+          trail: [],
+          pierce: 9999,
+          hitUids: new Set(),
+          evolutionBehavior: behavior,
+        });
+        pushAlert(w, weapon.id === 'dvd-screensaver' ? '★ DVD SCREENSAVER OVERDRIVE ACTIVE ★' : 'DVD BOUNCING LOGO DEPLOYED');
+      } else {
+        // Update stats on active DVD projectiles
+        for (const proj of activeDvds) {
+          proj.damage = damage;
+          const curSpeed = Math.hypot(proj.vx, proj.vy) || 290;
+          const targetSpeed = (weapon.speed ?? 290) * (1 + (runWeapon.level - 1) * 0.08);
+          const ratio = targetSpeed / curSpeed;
+          proj.vx *= ratio;
+          proj.vy *= ratio;
+          proj.evolutionBehavior = behavior;
+        }
+      }
+      p.anim = 'attack';
+      p.animStartedAt = w.now;
+      break;
+    }
   }
 }
 
@@ -3626,6 +3980,7 @@ export function activateUltimate(w: World): boolean {
   }
   w.shake = Math.max(w.shake, 12);
   pushAlert(w, ult.name);
+  pushSfx(w, 'ultimate');
   return true;
 }
 
@@ -3674,18 +4029,21 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   }
   if (w.weapons.length < 6) {
     for (const weapon of Object.values(WEAPONS_BY_ID)) {
+      if (w.disabledWeaponIds && w.disabledWeaponIds.includes(weapon.id)) continue;
       if (!w.weapons.some((entry) => entry.def.id === weapon.id)) {
         pool.push({ id: `weapon-${weapon.id}`, name: weapon.name, description: weapon.description, weight: 5, maxStacks: 1, effects: [], cardKind: 'weapon', weaponId: weapon.id });
       }
     }
   }
   for (const passive of PASSIVES) {
+    if (w.disabledPassiveIds && w.disabledPassiveIds.includes(passive.id)) continue;
     const owned = w.passives.find((entry) => entry.def.id === passive.id);
     if ((!owned && w.passives.length < 6) || (owned && owned.stacks < passive.maxStacks)) {
       pool.push({ id: `passive-${passive.id}`, name: passive.name, description: passive.description, weight: passive.weight, maxStacks: passive.maxStacks, effects: passive.effects, cardKind: 'passive', passiveId: passive.id });
     }
   }
   for (const evolution of EVOLUTIONS) {
+    if (w.disabledWeaponIds && w.disabledWeaponIds.includes(evolution.id)) continue;
     const weapon = w.weapons.find((entry) => entry.def.id === evolution.baseWeaponId);
     const passive = w.passives.find((entry) => entry.def.id === evolution.requiredPassiveId);
     if (weapon && passive && weapon.def.id !== evolution.id) {
@@ -3940,6 +4298,7 @@ function gainXp(w: World, amount: number) {
     w.level += 1;
     w.xpToNext = xpForLevel(w.level);
     w.pendingLevelUps += 1;
+    pushSfx(w, 'levelUp');
   }
 }
 
@@ -4183,6 +4542,7 @@ function damageBreakable(
     }
     b.broken = true;
     b.brokenAt = w.now;
+    pushSfx(w, 'obstacleBreak');
     const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : 10;
     spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : '#c99055', count, 130);
     if (b.kind === 'barrel') {
@@ -4398,6 +4758,216 @@ function updateFluids(w: World) {
       if (tile.kind !== 'fire-storm' && tile.kind !== 'acid-storm' && tile.kind !== 'frost') return true;
       return !waterTiles.some((water) => dist2(water.x, water.y, tile.x, tile.y) <= (water.radius + tile.radius) ** 2);
     });
+  }
+}
+
+function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+}
+
+function updateDustMites(w: World, dt: number) {
+  if (w.electricChains) {
+    w.electricChains = w.electricChains.filter((c) => w.now < c.expiresAt);
+  } else {
+    w.electricChains = [];
+  }
+
+  const mites = w.enemies.filter((e) => (e.def.id === 'dust-mite' || e.def.id === 'dust-roller') && !e.dying);
+  if (mites.length < 2) return;
+
+  for (let i = 0; i < mites.length; i += 1) {
+    const a = mites[i]!;
+    for (let j = i + 1; j < mites.length; j += 1) {
+      const b = mites[j]!;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= 78) {
+        const existing = w.electricChains.find(
+          (c) => (Math.hypot(c.x1 - a.x, c.y1 - a.y) < 16 && Math.hypot(c.x2 - b.x, c.y2 - b.y) < 16) ||
+                 (Math.hypot(c.x1 - b.x, c.y1 - b.y) < 16 && Math.hypot(c.x2 - a.x, c.y2 - a.y) < 16)
+        );
+        if (!existing) {
+          w.electricChains.push({
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            bornAt: w.now,
+            expiresAt: w.now + 400,
+          });
+          spawnParticles(w, (a.x + b.x) / 2, (a.y + b.y) / 2, '#38bdf8', 4, 60);
+
+          const p = w.player;
+          const distToLine = distToSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+          if (distToLine <= p.radius + 8) {
+            if (w.threatUpgrades?.['static-inverter']) {
+              if (w.now > p.invulnUntil) {
+                p.hp = Math.min(p.maxHp, p.hp + 2);
+                p.invulnUntil = w.now + 350;
+                w.popups.push({
+                  x: p.x,
+                  y: p.y - 20,
+                  text: '+STATIC CHARGE',
+                  color: '#38bdf8',
+                  bornAt: w.now,
+                  vy: 30,
+                });
+                spawnParticles(w, p.x, p.y, '#38bdf8', 6, 80);
+              }
+            } else {
+              if (w.now > p.invulnUntil) {
+                p.hp -= 6;
+                p.hitFlashUntil = w.now + 120;
+                p.invulnUntil = w.now + 400;
+                w.shake = Math.max(w.shake, 3.5);
+                w.popups.push({
+                  x: p.x,
+                  y: p.y - 20,
+                  text: 'ZAP! -6',
+                  color: '#38bdf8',
+                  bornAt: w.now,
+                  vy: 35,
+                });
+              }
+            }
+          }
+
+          for (const other of w.enemies) {
+            if (other.uid === a.uid || other.uid === b.uid || other.dying) continue;
+            if (distToSegment(other.x, other.y, a.x, a.y, b.x, b.y) <= other.radius + 6) {
+              damageEnemy(w, other, 16, 2, other.x, other.y, 'shock');
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function updateBubbleWash(w: World, dt: number) {
+  if (!w.bubbleWash) return;
+  const bw = w.bubbleWash;
+  const p = w.player;
+
+  for (let i = bw.foamParticles.length - 1; i >= 0; i -= 1) {
+    const fp = bw.foamParticles[i]!;
+    fp.x += fp.vx * dt;
+    fp.y += fp.vy * dt;
+    if (w.now - fp.bornAt > 3500) {
+      bw.foamParticles.splice(i, 1);
+    }
+  }
+
+  if (bw.state === 'idle') {
+    if (w.now >= bw.nextSurgeAt - 4000) {
+      bw.state = 'warning';
+      bw.warningStartedAt = w.now;
+      bw.direction = w.rng() > 0.5 ? 1 : -1;
+      const dirText = bw.direction > 0 ? 'EAST ➔' : 'WEST ⬅';
+      pushAlert(w, `⚠️ TORRENTIAL BUBBLE WASH IMMINENT! HEADING ${dirText}`);
+      w.shake = Math.max(w.shake, 3);
+    }
+  } else if (bw.state === 'warning') {
+    w.shake = Math.max(w.shake, 2);
+    if (w.rng() < 0.35 && bw.foamParticles.length < 120) {
+      const halfW = w.bounds.w / 2;
+      const halfH = w.bounds.h / 2;
+      const startX = bw.direction > 0 ? -halfW - 50 : halfW + 50;
+      bw.foamParticles.push({
+        x: startX,
+        y: (w.rng() * 2 - 1) * halfH,
+        vx: bw.direction * (320 + w.rng() * 180),
+        vy: (w.rng() - 0.5) * 80,
+        r: 8 + w.rng() * 16,
+        color: w.rng() > 0.5 ? '#f472b6' : '#38bdf8',
+        bornAt: w.now,
+      });
+    }
+
+    if (w.now >= bw.nextSurgeAt) {
+      bw.state = 'surging';
+      bw.surgeActiveUntil = w.now + 5000;
+      pushAlert(w, '🌊 SUDS SURGE ACTIVE! WASHOUT IN PROGRESS!');
+      w.shake = Math.max(w.shake, 7);
+    }
+  } else if (bw.state === 'surging') {
+    w.shake = Math.max(w.shake, 4);
+    const halfW = w.bounds.w / 2;
+    const halfH = w.bounds.h / 2;
+    for (let c = 0; c < 4; c += 1) {
+      if (bw.foamParticles.length < 180) {
+        const startX = bw.direction > 0 ? -halfW - 30 : halfW + 30;
+        bw.foamParticles.push({
+          x: startX,
+          y: (w.rng() * 2 - 1) * halfH,
+          vx: bw.direction * (620 + w.rng() * 280),
+          vy: (w.rng() - 0.5) * 120,
+          r: 12 + w.rng() * 26,
+          color: w.rng() > 0.5 ? '#f472b6' : '#38bdf8',
+          bornAt: w.now,
+        });
+      }
+    }
+
+    const anchorReduction = w.threatUpgrades?.['tidal-anchor'] ? 0.25 : 1;
+    const pushP = bw.direction * 520 * anchorReduction * dt;
+    p.x += pushP;
+    p.x = clamp(p.x, -halfW + p.radius, halfW - p.radius);
+
+    for (const e of w.enemies) {
+      if (e.dying) continue;
+      e.x += bw.direction * 420 * dt;
+      e.x = clamp(e.x, -halfW + e.radius, halfW - e.radius);
+    }
+
+    if (w.now >= bw.surgeActiveUntil) {
+      bw.state = 'idle';
+      bw.nextSurgeAt = w.now + 18000;
+      pushAlert(w, 'Suds surge subsided.');
+    }
+  }
+
+  // Pink and Blue bubbles infighting
+  const PINK_BUBBLES = new Set(['bubble-scout', 'bubble-splitter', 'bubble-matriarch']);
+  const BLUE_BUBBLES = new Set(['bubble-grunt', 'bubble-drifter', 'bubble-colossus']);
+
+  const pinks = w.enemies.filter((e) => PINK_BUBBLES.has(e.def.id) && !e.dying);
+  const blues = w.enemies.filter((e) => BLUE_BUBBLES.has(e.def.id) && !e.dying);
+
+  if (pinks.length > 0 && blues.length > 0) {
+    for (const pink of pinks) {
+      let nearestB: EnemyActor | null = null;
+      let minDist2 = 150 * 150;
+      for (const blue of blues) {
+        const d2 = dist2(pink.x, pink.y, blue.x, blue.y);
+        if (d2 < minDist2) {
+          minDist2 = d2;
+          nearestB = blue;
+        }
+      }
+      if (nearestB) {
+        const reach = pink.radius + nearestB.radius + 8;
+        if (minDist2 <= reach * reach) {
+          pink.hp -= 24 * dt;
+          nearestB.hp -= 24 * dt;
+          if (w.rng() < 0.2) {
+            spawnParticles(w, (pink.x + nearestB.x) / 2, (pink.y + nearestB.y) / 2, '#ec4899', 3, 50);
+            spawnParticles(w, (pink.x + nearestB.x) / 2, (pink.y + nearestB.y) / 2, '#38bdf8', 3, 50);
+          }
+          if (pink.hp <= 0) {
+            killEnemy(w, pink);
+          }
+          if (nearestB.hp <= 0) {
+            killEnemy(w, nearestB);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -4849,6 +5419,7 @@ export function dashPlayer(w: World, directionX: number, directionY: number): bo
   w.player.vy = w.player.dashDirectionY * DASH_SPEED;
   w.shake = Math.max(w.shake, 9);
   spawnParticles(w, w.player.x, w.player.y, w.character.palette.accentBright, 12, 150);
+  pushSfx(w, 'dash');
   w.popups.push({
     x: w.player.x,
     y: w.player.y - 28,
@@ -5309,6 +5880,76 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'pincer': {
+        enemy.weave += dt * 2.5;
+        if (w.now < enemy.chargeUntil) {
+          speed = enemy.speed * 2.8;
+        } else if (w.now >= enemy.chargeReadyAt && distance < 280) {
+          enemy.chargeUntil = w.now + 480;
+          enemy.chargeReadyAt = w.now + randRange(w.rng, 2000, 3400);
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+        }
+        break;
+      }
+      case 'singularity': {
+        speed *= 0.4;
+        const pullRadius = 240;
+        if (distance < pullRadius && distance > 10) {
+          const pullForce = (1 - distance / pullRadius) * 60;
+          p.x += -dirX * pullForce * dt;
+          p.y += -dirY * pullForce * dt;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 1200;
+          spawnParticles(w, enemy.x, enemy.y, '#9333ea', 6, 40);
+        }
+        break;
+      }
+      case 'phalanx': {
+        speed *= 0.72;
+        break;
+      }
+      case 'prism': {
+        speed *= 0.65;
+        if (w.now >= enemy.fireReadyAt && distance < 380) {
+          enemy.fireReadyAt = w.now + 2800;
+          const laserAngle = Math.atan2(dirY, dirX);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 220, angle: laserAngle, spread: 0.15,
+              bornAt: w.now, expiresAt: w.now + 320, color: '#06b6d4', damage: 8, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'weaver': {
+        speed *= 0.85;
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 350;
+          for (let oi = 0; oi < w.enemies.length; oi += 1) {
+            const other = w.enemies[oi]!;
+            if (other === enemy || other.dying || other.def.behavior !== 'weaver') continue;
+            const odx = other.x - enemy.x;
+            const ody = other.y - enemy.y;
+            const odist = Math.hypot(odx, ody);
+            if (odist < 220 && odist > 20) {
+              if (canSpawnEnemyEffect(w)) {
+                w.effects.push({
+                  uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: odist,
+                  angle: Math.atan2(ody, odx), spread: 0.08,
+                  bornAt: w.now, expiresAt: w.now + 180, color: '#a855f7', damage: 3, impactIntensity: 0,
+                  hitUids: new Set(), followPlayer: false,
+                });
+              }
+              break;
+            }
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
@@ -5316,6 +5957,15 @@ function updateEnemies(w: World, dt: number) {
 
     let moveX = dirX;
     let moveY = dirY;
+    if (enemy.def.behavior === 'pincer' && w.now >= enemy.chargeUntil) {
+      const pincerSide = (enemy.uid % 2 === 0 ? 1 : -1);
+      const wobble = pincerSide * 0.95;
+      moveX = dirX * 0.3 + -dirY * wobble;
+      moveY = dirY * 0.3 + dirX * wobble;
+      const l = Math.hypot(moveX, moveY) || 1;
+      moveX /= l;
+      moveY /= l;
+    }
     if (enemy.def.behavior === 'drifter') {
       // Weave perpendicular to the approach for a swarming feel.
       const wobble = Math.sin(enemy.weave) * 0.65;
@@ -5419,6 +6069,59 @@ function updateEnemies(w: World, dt: number) {
 /* Projectiles, effects, pickups                                       */
 /* ------------------------------------------------------------------ */
 
+function triggerDvdCornerStrike(w: World, proj: Projectile) {
+  const isEvolved = proj.weaponId === 'dvd-screensaver';
+  pushAlert(w, isEvolved ? '★★ HYPER-EVOLVED DVD CORNER CRITICAL! SCREEN CLEARED! ★★' : '★ PERFECT DVD CORNER HIT! 100% KINETIC DETONATION! ★');
+  w.shake = 18;
+  const radius = isEvolved ? 1200 : 450;
+  const blastDmg = proj.damage * (isEvolved ? 6 : 4);
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: proj.x,
+    y: proj.y,
+    radius: 180,
+    angle: 0,
+    spread: Math.PI * 2,
+    bornAt: w.now,
+    expiresAt: w.now + 650,
+    color: '#facc15',
+    damage: 0,
+    impactIntensity: 5,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  w.effects.push({
+    uid: uid(w),
+    kind: 'wave',
+    x: proj.x,
+    y: proj.y,
+    radius: 340,
+    angle: 0,
+    spread: Math.PI * 2,
+    bornAt: w.now,
+    expiresAt: w.now + 750,
+    color: '#ec4899',
+    damage: 0,
+    impactIntensity: 5,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  novaDamage(w, proj.x, proj.y, radius, blastDmg, 5, 'burn');
+  damageBreakable(w, proj.x, proj.y, radius, blastDmg, 5, proj.x, proj.y, 'ground-shock');
+  spawnParticles(w, proj.x, proj.y, '#facc15', 30, 200);
+  spawnParticles(w, proj.x, proj.y, '#38bdf8', 30, 200);
+  spawnParticles(w, proj.x, proj.y, '#ec4899', 30, 200);
+  w.popups.push({
+    x: proj.x,
+    y: proj.y - 40,
+    text: 'CORNER HIT!!',
+    color: '#facc15',
+    bornAt: w.now,
+    vy: 55,
+  });
+}
+
 function updateProjectiles(w: World, dt: number) {
   const p = w.player;
 
@@ -5465,7 +6168,80 @@ function updateProjectiles(w: World, dt: number) {
     // This runs before actor hits so a wall cannot be shot through.
     if (!remove && collideProjectileObstacle(w, proj)) remove = true;
 
-    if (!remove) {
+    if (proj.customKind === 'dvd-logo') {
+      remove = false; // Never cull DVD bouncing logo
+      const halfW = (w.area.endless ? 480 : w.bounds.w / 2) - 30;
+      const halfH = (w.area.endless ? 360 : w.bounds.h / 2) - 24;
+      const originX = w.area.endless ? p.x : 0;
+      const originY = w.area.endless ? p.y : 0;
+      const minX = originX - halfW;
+      const maxX = originX + halfW;
+      const minY = originY - halfH;
+      const maxY = originY + halfH;
+
+      let bouncedX = false;
+      let bouncedY = false;
+
+      // Corner Magnet upgrade: gently steer toward closest corner
+      if (w.threatUpgrades?.['corner-magnet']) {
+        const targetCornerX = proj.vx > 0 ? maxX : minX;
+        const targetCornerY = proj.vy > 0 ? maxY : minY;
+        const dx = targetCornerX - proj.x;
+        const dy = targetCornerY - proj.y;
+        const distToCorner = Math.hypot(dx, dy);
+        if (distToCorner < 220 && distToCorner > 10) {
+          const speed = Math.hypot(proj.vx, proj.vy);
+          const cornerAngle = Math.atan2(dy, dx);
+          const currentAngle = Math.atan2(proj.vy, proj.vx);
+          let angleDiff = cornerAngle - currentAngle;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          const steer = clamp(angleDiff, -2.5 * dt, 2.5 * dt);
+          const newAngle = currentAngle + steer;
+          proj.vx = Math.cos(newAngle) * speed;
+          proj.vy = Math.sin(newAngle) * speed;
+        }
+      }
+
+      if (proj.x <= minX && proj.vx < 0) {
+        proj.x = minX;
+        proj.vx = Math.abs(proj.vx);
+        bouncedX = true;
+      } else if (proj.x >= maxX && proj.vx > 0) {
+        proj.x = maxX;
+        proj.vx = -Math.abs(proj.vx);
+        bouncedX = true;
+      }
+
+      if (proj.y <= minY && proj.vy < 0) {
+        proj.y = minY;
+        proj.vy = Math.abs(proj.vy);
+        bouncedY = true;
+      } else if (proj.y >= maxY && proj.vy > 0) {
+        proj.y = maxY;
+        proj.vy = -Math.abs(proj.vy);
+        bouncedY = true;
+      }
+
+      if (bouncedX || bouncedY) {
+        proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+        proj.hitUids.clear(); // Clear hit records on bounce so it can slice through enemies again
+        const DVD_COLORS = ['#38bdf8', '#f43f5e', '#a855f7', '#22c55e', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
+        const nextColor = DVD_COLORS[Math.floor(w.rng() * DVD_COLORS.length)] ?? '#38bdf8';
+        proj.color = nextColor;
+        spawnParticles(w, proj.x, proj.y, proj.color, 10, 80);
+        w.shake = Math.max(w.shake, 2.5);
+
+        // Corner hit detection: both edges hit or close to corner
+        const distCornerX = Math.min(Math.abs(proj.x - minX), Math.abs(proj.x - maxX));
+        const distCornerY = Math.min(Math.abs(proj.y - minY), Math.abs(proj.y - maxY));
+        const isCornerHit = (bouncedX && bouncedY) || (distCornerX < 34 && distCornerY < 34);
+
+        if (isCornerHit) {
+          triggerDvdCornerStrike(w, proj);
+        }
+      }
+    } else if (!remove) {
       if (w.area.endless) {
         // In endless mode, cull by distance from player rather than fixed arena walls.
         if (dist2(proj.x, proj.y, w.player.x, w.player.y) > 900 * 900) remove = true;
@@ -6595,6 +7371,7 @@ function updateDirector(w: World) {
   state.phase = 'active';
   state.activeDirectorId = director.id;
   pushAlert(w, director.warningText);
+  pushSfx(w, 'bossWarning');
   w.shake = Math.max(w.shake, 10);
   state.bossUid = spawnDirectorSquad(w, director);
   // No boss in the roster (a data mistake) would otherwise strand the
@@ -6632,7 +7409,7 @@ function updateEffects(w: World) {
     }
 
     const active = w.now >= effect.bornAt;
-    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'laser' || effect.kind === 'impact') && effect.damage > 0) {
+    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'waveform' || effect.kind === 'laser' || effect.kind === 'impact') && effect.damage > 0) {
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
         if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
         const reach = effect.radius + enemy.radius;
@@ -6659,6 +7436,31 @@ function updateEffects(w: World) {
         );
       });
         damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
+    }
+
+    if (active && effect.kind === 'glitch' && effect.damage > 0 && !effect.hitUids.has(-1)) {
+      effect.hitUids.add(-1);
+      const boxW = Math.max(90, effect.radius * 1.6);
+      const boxH = Math.max(70, effect.radius * 1.2);
+      forEachNearby(w, effect.x, effect.y, effect.radius * 1.2, (enemy) => {
+        if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
+        if (Math.abs(enemy.x - effect.x) <= boxW / 2 && Math.abs(enemy.y - effect.y) <= boxH / 2) {
+          effect.hitUids.add(enemy.uid);
+          damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId ?? 'freeze');
+          triggerEvolutionHit(
+            w,
+            effect.evolutionBehavior,
+            enemy.x,
+            enemy.y,
+            effect.damage,
+            effect.color,
+            effect.impactIntensity,
+            effect.statusEffectId,
+            enemy.uid,
+          );
+        }
+      });
+      damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
     }
 
     if (active && effect.kind === 'hazard' && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
@@ -6827,18 +7629,22 @@ function updatePickups(w: World, dt: number) {
       switch (pickup.kind) {
         case 'xp':
           gainXp(w, pickup.value);
+          pushSfx(w, 'pickupXp');
           break;
         case 'health':
           w.player.hp = clamp(w.player.hp + pickup.value, 0, w.player.maxHp);
           w.popups.push({ x: p.x, y: p.y + 26, text: `+${pickup.value}`, color: '#7dffb2', bornAt: w.now, vy: 30 });
+          pushSfx(w, 'pickupHealth');
           break;
         case 'cred':
           w.cred += pickup.value;
+          pushSfx(w, 'pickupCred');
           break;
         case 'coin':
           w.skeletonKeysGained += pickup.value;
           w.popups.push({ x: p.x, y: p.y - 20, text: `+${pickup.value} KEY`, color: '#e8d48a', bornAt: w.now, vy: 30 });
           pushAlert(w, 'Skeleton key found');
+          pushSfx(w, 'pickupKey');
           break;
         case 'loot-box': {
           // The prize is deliberately not granted until its reel lands. RunScreen
@@ -6850,15 +7656,30 @@ function updatePickups(w: World, dt: number) {
           spawnParticles(w, p.x, p.y + 10, '#3b82f6', 14, 120);
           w.shake = Math.max(w.shake, 8);
           pushAlert(w, `Box — ${prize.label}`);
+          pushSfx(w, 'lootBox');
           break;
         }
         case 'card-pack': {
           const roll = w.rng();
-          const packId = roll < 0.45 ? 'street' : roll < 0.7 ? 'lokpet' : roll < 0.9 ? 'scenario' : 'collector';
+          const collector = w.character.lokPetCollector;
+          const packId: CardPackId = collector && collector.rank === 'LokApex' && roll < 0.12
+            ? 'apex-binder'
+            : collector && (collector.rank === 'LokArchivist' || collector.rank === 'LokApex' || collector.rank === 'LokSupreme') && roll < 0.28
+            ? 'prism-lokpack'
+            : roll < 0.14
+            ? 'elemental-pack'
+            : roll < 0.38
+            ? 'street'
+            : roll < 0.64
+            ? 'lokpet'
+            : roll < 0.84
+            ? 'scenario'
+            : 'collector';
           w.cardPacksFound.push(packId);
           w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCK PACK', color: '#f0abfc', bornAt: w.now, vy: 30 });
           spawnParticles(w, p.x, p.y, '#f0abfc', 14, 110);
           pushAlert(w, 'Lock Pack secured');
+          pushSfx(w, 'cardPack');
           break;
         }
         case 'sweep': {
@@ -7088,8 +7909,9 @@ function updateEndlessRoute(w: World) {
   const e = w.endless!;
   if (e.inDungeon || e.inBuilding) return;
 
+  const themeId = w.area.endlessTheme ?? 'streets';
   const distance = Math.hypot(w.player.x, w.player.y);
-  const band = getEndlessBand(distance);
+  const band = getEndlessBand(distance, themeId);
   if (band.id !== e.currentBandId) {
     e.currentBandId = band.id;
     const firstBandVisit = !e.discoveredBandIds.has(band.id);
@@ -7098,7 +7920,9 @@ function updateEndlessRoute(w: World) {
       pushAlert(w, `${band.label} — ${band.riskLabel}`);
     }
     const eventId = `beacon:${band.id}`;
-    if (firstBandVisit && band.id !== 'core' && !e.discoveredRouteEventIds.has(eventId)) {
+    const themeBands = getEndlessBandsForTheme(themeId);
+    const bandIndex = Math.max(0, themeBands.findIndex((candidate) => candidate.id === band.id));
+    if (firstBandVisit && band.thresholdPx > 0 && !e.discoveredRouteEventIds.has(eventId)) {
       e.routeEvent = {
         id: eventId,
         bandId: band.id,
@@ -7107,8 +7931,8 @@ function updateEndlessRoute(w: World) {
         x: w.player.x + 150,
         y: w.player.y,
         phase: 'available',
-        rewardCred: 35 + ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) * 15,
-        rewardTokens: 1 + Math.floor(ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) / 3),
+        rewardCred: 35 + bandIndex * 15,
+        rewardTokens: 1 + Math.floor(bandIndex / 3),
       };
       pushAlert(w, `OPTIONAL ROUTE — ${band.eventTitle}`);
     }
@@ -7138,17 +7962,19 @@ function updateEndlessBandHazard(w: World) {
     if (e.dungeonRoom === 3) damagePlayer(w, 2, hazardX, hazardY, 'hazard');
     return;
   }
-  const band = ENDLESS_BANDS_BY_ID[e.currentBandId];
-  if (!band || band.id === 'core') return;
+  const themeId = w.area.endlessTheme ?? 'streets';
+  const band = getEndlessBandById(e.currentBandId, themeId);
+  if (!band || band.thresholdPx === 0) return;
 
-  e.hazardNextAt = w.now + (band.id === 'outer-threshold' ? 2400 : 3100);
-  const radius = band.id === 'floodwall' ? 70 : band.id === 'rail-shadow' ? 56 : 48;
+  const isOuter = band.thresholdPx >= 6000;
+  e.hazardNextAt = w.now + (isOuter ? 2400 : 3100);
+  const radius = band.id.includes('floodwall') || band.id.includes('canal') ? 70 : 54;
   const hazardX = w.player.x + (w.player.vx === 0 ? 80 : Math.sign(w.player.vx) * 90);
   const hazardY = w.player.y + (w.player.vy === 0 ? -40 : Math.sign(w.player.vy) * 90);
   incursionEffect(w, hazardX, hazardY, radius, band.accent, 520);
-  if (band.id === 'outer-threshold') {
+  if (isOuter) {
     damagePlayer(w, 3, hazardX, hazardY, 'hazard');
-  } else if (band.id === 'industrial-fringe' || band.id === 'rail-shadow') {
+  } else if (band.thresholdPx >= 2800) {
     damagePlayer(w, 2, hazardX, hazardY, 'hazard');
   }
 }
@@ -7201,7 +8027,7 @@ function updateEndlessChunks(w: World) {
     const [cxStr, cyStr] = key.split(',');
     const cx = parseInt(cxStr!, 10);
     const cy = parseInt(cyStr!, 10);
-    const chunk = generateChunk(cx, cy, e.rngSeed);
+    const chunk = generateChunk(cx, cy, e.rngSeed, w.area.endlessTheme ?? 'streets');
     const origin = chunkOrigin(cx, cy);
     const cwx = origin.x + CHUNK_SIZE / 2;
     const cwy = origin.y + CHUNK_SIZE / 2;
@@ -7326,6 +8152,13 @@ function updateEndlessLandmarkCue(w: World) {
 function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 'exit') {
   const e = w.endless!;
   const p = w.player;
+  // Re-anchor the movement-clamp center (clampToArena/arenaWallBounds read
+  // dungeonCenterX/Y) to match wherever this room's geometry is about to be
+  // placed below -- otherwise room 2+ centers its exit on the player's
+  // drifted position while the clamp still confines them to room 1's box,
+  // and the exit renders outside the reachable area.
+  e.dungeonCenterX = p.x;
+  e.dungeonCenterY = p.y;
   resolvePotholes(w);
   e.dungeonRoom = room;
   const era = DUNGEON_ERAS[e.dungeonEraIndex]!;
@@ -7378,13 +8211,12 @@ function enterDungeon(w: World) {
   const e = w.endless!;
   e.streetReturnX = w.player.x;
   e.streetReturnY = w.player.y;
-  e.dungeonCenterX = w.player.x;
-  e.dungeonCenterY = w.player.y;
   e.dungeonDepth += 1;
   e.dungeonRoom = 1;
   e.dungeonBossDefeated = false;
   e.dungeonChest = null;
-  const bandIndex = ENDLESS_BANDS.findIndex((band) => band.id === e.currentBandId);
+  const themeBands = getEndlessBandsForTheme(w.area.endlessTheme);
+  const bandIndex = themeBands.findIndex((band) => band.id === e.currentBandId);
   e.dungeonEraIndex = (e.dungeonDepth - 1 + Math.max(0, bandIndex) * 2) % DUNGEON_ERAS.length;
   e.inDungeon = true;
   loadDungeonRoom(w, 1, 'enter');
@@ -7595,7 +8427,7 @@ function updateEndlessSpawning(w: World, dt: number) {
   const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
   const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
-  const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
+  const bandPool = getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.enemyPool;
   const pool = bandPool?.length
     ? bandPool
     : ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
@@ -7710,6 +8542,88 @@ export interface StepInput {
   audio?: AudioFrame;
 }
 
+function updateThreatEvents(w: World, dt: number) {
+  const events = w.threatCalibrations?.activeEvents;
+  if (!events || events.length === 0 || !w.threatEventTimers) return;
+  const timers = w.threatEventTimers;
+
+  // 1. EMP Storm: Periodic lightning strike discharges that blast nearby enemies
+  if (events.includes('emp-storm') && w.now >= timers.nextEmpAt) {
+    timers.nextEmpAt = w.now + randRange(w.rng, 7000, 11000);
+    const targetX = w.player.x + randRange(w.rng, -180, 180);
+    const targetY = w.player.y + randRange(w.rng, -180, 180);
+    w.effects.push({
+      uid: uid(w), kind: 'spark', x: targetX, y: targetY, radius: 95, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 280, color: '#38bdf8', damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, targetX, targetY, '#38bdf8', 16, 120);
+    pushSfx(w, 'bossWarning');
+    w.shake = Math.max(w.shake, 8);
+    forEachNearby(w, targetX, targetY, 95, (enemy) => {
+      damageEnemy(w, enemy, 35, 2, targetX, targetY, 'shock');
+    });
+  }
+
+  // 2. Gravity Anomaly: Creates an implosion point drawing in surrounding enemies & drops
+  if (events.includes('gravity-anomaly') && w.now >= timers.nextGravityAt) {
+    timers.nextGravityAt = w.now + randRange(w.rng, 12000, 16000);
+    const gX = w.player.x + randRange(w.rng, -150, 150);
+    const gY = w.player.y + randRange(w.rng, -150, 150);
+    w.effects.push({
+      uid: uid(w), kind: 'nova', x: gX, y: gY, radius: 140, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 450, color: '#a855f7', damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, gX, gY, '#c084fc', 20, 80);
+    pushAlert(w, 'GRAVITY ANOMALY');
+    pushSfx(w, 'ultimate');
+    forEachNearby(w, gX, gY, 180, (enemy) => {
+      const edx = gX - enemy.x;
+      const edy = gY - enemy.y;
+      const elen = Math.hypot(edx, edy) || 1;
+      enemy.kx += (edx / elen) * 110;
+      enemy.ky += (edy / elen) * 110;
+    });
+  }
+
+  // 3. Glitch Surge: Visual static pulses across the field, increasing speed and crit
+  if (events.includes('glitch-surge')) {
+    if (w.now >= timers.nextGlitchAt) {
+      timers.nextGlitchAt = w.now + randRange(w.rng, 16000, 22000);
+      timers.glitchActiveUntil = w.now + 4000;
+      pushAlert(w, 'GLITCH SURGE ACTIVE');
+      pushSfx(w, 'waveStart');
+      w.shake = Math.max(w.shake, 6);
+    }
+    if (w.now < timers.glitchActiveUntil) {
+      if (w.rng() < 0.3) {
+        spawnParticles(w, w.player.x + randRange(w.rng, -120, 120), w.player.y + randRange(w.rng, -120, 120), '#ec4899', 2, 40);
+      }
+    }
+  }
+
+  // 4. Solar Flare: Periodic flash incinerating minor enemy projectiles
+  if (events.includes('solar-flare') && w.now >= timers.nextSolarAt) {
+    timers.nextSolarAt = w.now + randRange(w.rng, 18000, 24000);
+    pushAlert(w, 'SOLAR FLARE BURST');
+    pushSfx(w, 'bossKill');
+    w.effects.push({
+      uid: uid(w), kind: 'nova', x: w.player.x, y: w.player.y, radius: 320, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 350, color: '#f59e0b', damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, w.player.x, w.player.y, '#f59e0b', 24, 180);
+    for (let pi = w.projectiles.length - 1; pi >= 0; pi -= 1) {
+      const proj = w.projectiles[pi]!;
+      if (!proj.fromPlayer) {
+        spawnParticles(w, proj.x, proj.y, '#fbbf24', 4, 30);
+        w.projectiles.splice(pi, 1);
+      }
+    }
+  }
+}
+
 export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (w.outcome !== 'running') return;
 
@@ -7734,6 +8648,12 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  // A heartbeat, not a per-frame alarm: `shouldPlayCue`'s throttle (see
+  // sfxCues.ts's MIN_RETRIGGER_MS) turns this plain per-frame condition into
+  // a slow pulse rather than a constant tone while low.
+  if (w.outcome === 'running' && w.player.hp > 0 && w.player.hp <= w.player.maxHp * 0.25) {
+    pushSfx(w, 'lowHealth');
+  }
   if (w.now >= w.nextPlayerTrailAt) {
     w.playerTrail.push({ x: w.player.x, y: w.player.y, at: w.now });
     w.nextPlayerTrailAt = w.now + 100;
@@ -7763,6 +8683,9 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateEnemies(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
+  updateDustMites(w, dt);
+  updateBubbleWash(w, dt);
+  updateThreatEvents(w, dt);
   // Runs after enemies/breakables so objectives read this frame's state.
   updateCapturePriming(w);
   updateFog(w);
@@ -7988,10 +8911,10 @@ export function hudSnapshot(w: World): HudSnapshot {
             ? (DUNGEON_ERAS[e.dungeonEraIndex]?.name ?? 'Unknown')
             : '',
           currentBandId: e.currentBandId,
-          currentBandLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.label ?? 'Unknown edge',
-          currentBandAccent: ENDLESS_BANDS_BY_ID[e.currentBandId]?.accent ?? '#fff',
-          riskLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.riskLabel ?? '',
-          hazardLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.hazardLabel ?? '',
+          currentBandLabel: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.label ?? 'Unknown edge',
+          currentBandAccent: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.accent ?? '#fff',
+          riskLabel: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.riskLabel ?? '',
+          hazardLabel: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.hazardLabel ?? '',
           routeEvent: e.routeEvent
             ? { ...e.routeEvent }
             : undefined,

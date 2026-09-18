@@ -282,6 +282,34 @@ function packSupremeRig(): SpriteRig {
   return rig;
 }
 
+function vaultArchivistRig(): SpriteRig {
+  const rig = humanoidRig({ height: 28, width: 16, halo: true, hood: true, flarePants: true, torsoColor: 'body' });
+  rig.parts.unshift(
+    { key: 'aura', x: -18, y: 4, w: 36, h: 6, color: 'glow', z: 0 },
+    { key: 'aura', x: -14, y: 32, w: 28, h: 4, color: 'accent', z: 0 },
+  );
+  rig.parts.push(
+    { key: 'crest', x: -8, y: 26, w: 16, h: 6, color: 'accentBright', z: 8 },
+    { key: 'face', x: -4, y: 19, w: 8, h: 3, color: 'accent', z: 9 },
+  );
+  rig.pixelHeight = 40;
+  return rig;
+}
+
+function apexCollectorRig(): SpriteRig {
+  const rig = humanoidRig({ height: 32, width: 22, bulk: true, wings: true, halo: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift(
+    { key: 'aura', x: -26, y: -2, w: 52, h: 6, color: 'accent', z: 0 },
+    { key: 'aura', x: -22, y: 38, w: 44, h: 6, color: 'glow', z: 0 },
+  );
+  rig.parts.push(
+    { key: 'crest', x: -8, y: 32, w: 16, h: 8, color: 'accentBright', z: 8 },
+    { key: 'face', x: -5, y: 22, w: 10, h: 4, color: 'glow', z: 9 },
+  );
+  rig.pixelHeight = 46;
+  return rig;
+}
+
 /**
  * The playable roster. Each entry is fully data-driven: silhouette, palette,
  * base stats, signature weapon, ultimate and unlock condition.
@@ -1791,6 +1819,34 @@ export const CHARACTERS: CharacterDef[] = [
     signatureTraits: ['Sanctuary-wing silhouette', '+7 LokPet slots'],
     crew: { id: 'card-shop-keepers', name: 'LokPet Card Shop Keepers', role: 'LokSupreme' },
     lokPetCollector: { rank: 'LokSupreme', extraTeamSlots: 7, floorPackChance: 0.022, lokPetPrizeWeightMultiplier: 2.8, bonusCardCreditsPerLootBox: 7 },
+  },
+  {
+    id: 'vault-archivist', react: REACTION_PRESETS.playerBob,
+    name: 'Vault Archivist', handle: 'Curator of Prisms', tagline: 'Every rarity has a pulse; every sleeve is an altar.',
+    bio: 'A dedicated guardian who catalogued the mythic specimens lost to the upper terraces. Surrounds themselves with glowing protective archive vaults and high-frequency resonance beacons.',
+    palette: palette({ ink: '#0c071e', body: '#3b1c6e', bodyDark: '#1c0a38', accent: '#38bdf8', accentBright: '#e0f2fe', skin: '#a855f7', glow: '#ec4899' }),
+    rig: vaultArchivistRig(),
+    stats: { maxHp: 168, speed: 93, power: 1.24, area: 1.32, haste: 0.86, magnet: 120, armor: 0.17, crit: 0.13, lifesteal: 0.03 },
+    weapon: { id: 'archivist-beacon', name: 'Archivist Beacon', kind: 'laser', description: 'A prismatic vault scanner that pierces ranks with concentrated collector light.', damage: 32, cooldownMs: 1200, range: 480, levelDamageScale: 0.32, impactIntensity: 4, color: '#38bdf8', obstacleInteraction: 'block' },
+    ultimate: { id: 'grand-archive', name: 'Grand Archive', description: 'Unleashes the archive: all LokPets pulse devastating resonance and speed up.', cooldownMs: 25000, durationMs: 4800, effect: { novaDamage: 90, novaRadius: 220, damageMult: 2.1, speedMult: 1.3 } },
+    unlock: { kind: 'lokCollector', runs: 45, lokPets: 50 }, rarity: 'legendary',
+    signatureTraits: ['Vault Prism Crown', '+8 LokPet slots'],
+    crew: { id: 'card-shop-keepers', name: 'LokPet Card Shop Keepers', role: 'LokArchivist' },
+    lokPetCollector: { rank: 'LokArchivist', extraTeamSlots: 8, floorPackChance: 0.028, lokPetPrizeWeightMultiplier: 3.3, bonusCardCreditsPerLootBox: 9 },
+  },
+  {
+    id: 'apex-collector', react: REACTION_PRESETS.playerBob,
+    name: 'Apex Collector', handle: 'The Infinite Binder', tagline: 'The collection is complete. Now the city joins it.',
+    bio: 'Transcendence achieved through complete dedication to the Signal Beasts. Commands ten extra companion links simultaneously, drawing boundless cosmic power from every card ever printed.',
+    palette: palette({ ink: '#050508', body: '#0f172a', bodyDark: '#020617', accent: '#fbbf24', accentBright: '#ffffff', skin: '#f59e0b', glow: '#67e8f9' }),
+    rig: apexCollectorRig(),
+    stats: { maxHp: 185, speed: 96, power: 1.3, area: 1.4, haste: 0.82, magnet: 135, armor: 0.2, crit: 0.15, lifesteal: 0.04 },
+    weapon: { id: 'apex-supernova', name: 'Apex Supernova', kind: 'orbit', description: 'Ten orbiting card-sigils radiate gravitational pulses that crush incoming hordes.', damage: 18, cooldownMs: 0, range: 88, speed: 3.6, count: 5, levelDamageScale: 0.28, impactIntensity: 3, color: '#fbbf24' },
+    ultimate: { id: 'infinite-binder', name: 'Infinite Binder', description: 'Cracks open the infinite vault: massive field wipe, invulnerability, and maxed-out LokPet frenzy.', cooldownMs: 27000, durationMs: 5500, effect: { novaDamage: 120, novaRadius: 260, damageMult: 2.5, invulnerable: true, speedMult: 1.4 } },
+    unlock: { kind: 'lokCollector', runs: 65, lokPets: 75 }, rarity: 'legendary',
+    signatureTraits: ['Infinite Binder Wings', '+10 LokPet slots'],
+    crew: { id: 'card-shop-keepers', name: 'LokPet Card Shop Keepers', role: 'LokApex' },
+    lokPetCollector: { rank: 'LokApex', extraTeamSlots: 10, floorPackChance: 0.035, lokPetPrizeWeightMultiplier: 4.0, bonusCardCreditsPerLootBox: 12 },
   },
   {
     id: 'zero-day',

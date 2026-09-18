@@ -275,5 +275,28 @@ export const EVOLUTIONS: EvolutionDef[] = [
     color: '#ff2fd0',
     result: { ...WEAPONS_BY_ID['the-bus']!, id: 'data-wipe', name: 'Data Wipe', description: 'Every pass corrupts what it hits, scrambling its position for a few seconds.', damage: 46, cooldownMs: 4000, color: '#ff2fd0', statusEffectId: 'corrupted' },
   },
+  {
+    id: 'dvd-screensaver',
+    name: 'DVD Corner Strike',
+    description: 'Terminal velocity retro icon. Shifts dazzling neon hues on every rebound. Perfect corner bounces unleash full-screen rainbow kinetic detonations!',
+    identity: 'A legendary Easter egg evolution that ricochets across the perimeter. Perfect corner hits detonate screen-wide.',
+    color: '#f43f5e',
+    baseWeaponId: 'dvd-icon',
+    requiredPassiveId: 'backup-drive',
+    result: {
+      ...WEAPONS_BY_ID['dvd-icon']!,
+      id: 'dvd-screensaver',
+      name: 'DVD Corner Strike',
+      description: 'Terminal velocity retro icon. Shifts dazzling neon hues on every rebound. Perfect corner bounces unleash full-screen rainbow kinetic detonations!',
+      kind: 'dvd-bounce',
+      damage: 75,
+      cooldownMs: 700,
+      range: 480,
+      speed: 340,
+      count: 2,
+      levelDamageScale: 0.35,
+      color: '#f43f5e',
+    },
+  },
 ];
 export const EVOLUTIONS_BY_ID: Record<string, EvolutionDef> = Object.fromEntries(EVOLUTIONS.map((evolution) => [evolution.id, evolution]));

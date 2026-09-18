@@ -17,19 +17,18 @@
     "render:wide": "remotion render src/index.ts RunRecapWide out/recap-wide.mp4",
     "still": "remotion still src/index.ts RunRecapVertical out/recap-card.png --frame=180",
     "typecheck": "tsc --noEmit",
-    "postinstall": "remotion browser ensure",
     "render:run": "node scripts/render-run.mjs"
   },
   "dependencies": {
-    "@remotion/cli": "catalog:",
-    "@remotion/player": "catalog:",
-    "remotion": "catalog:",
-    "react": "catalog:",
-    "react-dom": "catalog:",
-    "zod": "4.5.4"
+    "@remotion/cli": "^4.0.523",
+    "@remotion/player": "^4.0.523",
+    "remotion": "^4.0.523",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/react": "catalog:",
+    "@types/react": "^19.2.0",
     "typescript": "~5.9.3"
   }
 }

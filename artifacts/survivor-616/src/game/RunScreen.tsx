@@ -8,8 +8,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
+import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { getRunAuraStyle } from '@/game/data/runAuras';
@@ -199,6 +201,7 @@ export function RunScreen({
     setMinimapPosition,
   } = useMeta();
   const music = useMusicPlayer();
+  const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
   const highlightRecorderRef = useRef(createRunHighlightRecorder());
@@ -390,6 +393,12 @@ export function RunScreen({
         missionMarkers,
         missionBeacons,
         cardEffects: activeCardEffects(meta),
+        disabledEnemyIds: meta.disabledEnemyIds,
+        disabledWeaponIds: meta.disabledWeaponIds,
+        disabledPassiveIds: meta.disabledPassiveIds,
+        threatCalibrations: meta.threatCalibrations,
+        threatUpgrades: meta.threatUpgrades,
+        dvdEasterEggUnlocked: meta.dvdEasterEggUnlocked,
       },
     );
   }
@@ -788,6 +797,14 @@ export function RunScreen({
           if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
         }
 
+        // Drain gameplay-SFX cues once per rendered frame, same reasoning as
+        // reading `audio` once above: draining inside the substep loop would
+        // let a slow frame retrigger the same cue several times.
+        if (world.sfxEvents.length > 0) {
+          const events = world.sfxEvents.splice(0);
+          for (const event of events) sfx.play(event.cue, event.onBeat);
+        }
+
         // Detect dungeon room transitions and briefly flash the screen.
         if (world.endless?.pendingTransition) {
           setDungeonTransition(world.endless.pendingTransition);
@@ -1121,7 +1138,7 @@ export function RunScreen({
               </div>
               <div className="h-0.5 w-full overflow-hidden bg-black/70">
                 <div
-                  className="h-full bg-[#6ee7ff] transition-[width] duration-150"
+                  className="h-full bg-gradient-to-r from-[#22b8d6] to-[#6ee7ff] shadow-[0_0_4px_rgba(110,231,255,0.7)] transition-[width] duration-150"
                   style={{ width: `${xpPct}%` }}
                   data-testid="bar-xp"
                 />
