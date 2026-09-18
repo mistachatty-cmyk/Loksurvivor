@@ -1895,6 +1895,8 @@ export interface MetaState {
   totalKills: number;
   totalRuns: number;
   bestSurvivalSec: number;
+  /** Every level-up across every run, ever -- never resets. Feeds the persistent player level. */
+  totalLevelUps: number;
   /** Soft currency earned per run. */
   cred: number;
   /** Loot tokens spendable in the hideout. */

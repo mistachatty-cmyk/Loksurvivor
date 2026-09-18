@@ -24,8 +24,10 @@ import {
   describeUnlock,
   episodeProgress,
   episodeStatus,
+  playerLevelProgress,
   useMeta,
 } from '@/game/state/metaStore';
+import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { LockDeckCollection } from './LockDeckCollection';
@@ -38,7 +40,7 @@ import {
   VISITING_CARD_SILHOUETTE,
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -236,6 +238,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
 
   const completedAchievementCount = ACHIEVEMENTS.filter((achievement) => achievement.isComplete(meta)).length;
   const ownedCardCount = CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).length;
+  const playerLevel = playerLevelProgress(meta.totalLevelUps);
+  const playerLevelPct = (playerLevel.levelUpsIntoLevel / Math.max(1, playerLevel.levelUpsToNext)) * 100;
 
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
@@ -244,6 +248,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
     { key: 'universe', label: 'Universe', icon: Globe, count: meta.visitingLokCards.length },
+    { key: 'stats', label: 'Stats', icon: TrendingUp },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
   ];
 
@@ -723,6 +728,72 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                 ))}
               </div>
             )}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'stats' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-stats"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <TrendingUp className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">All-Time Stats</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Everything you've done, across every run, forever</p>
+            </div>
+          </div>
+
+          <div className="mb-6 border border-l-4 border-border border-l-sky-300 bg-card p-5" data-testid="card-player-level">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-sky-300">Player Level</p>
+                <p className="text-3xl font-black text-white">
+                  <AnimatedNumber value={playerLevel.level} data-testid="text-archive-player-level" />
+                </p>
+              </div>
+              <Zap className="h-8 w-8 text-sky-300" />
+            </div>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/50">
+              <div
+                className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                style={{ width: `${playerLevelPct}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+              {playerLevel.levelUpsIntoLevel} / {playerLevel.levelUpsToNext} level-ups to next
+            </p>
+          </div>
+
+          <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {([
+              { label: 'Total Level-Ups', value: meta.totalLevelUps, icon: Zap },
+              { label: 'Enemies Defeated', value: meta.totalKills, icon: Skull },
+              { label: 'Runs Played', value: meta.totalRuns, icon: Swords },
+              { label: 'Best Survival', value: Math.round(meta.bestSurvivalSec), suffix: 's', icon: Clock },
+              { label: 'Hideout Visits', value: meta.hideoutVisitCount, icon: DoorOpen },
+              { label: 'Endless Depth Record', value: meta.endlessRecordDepth, icon: Layers },
+              { label: 'Endless Distance Record', value: Math.round(meta.endlessRecordDistancePx), suffix: 'px', icon: Milestone },
+            ] as { label: string; value: number; suffix?: string; icon: LucideIcon }[]).map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="flex items-center gap-3 border border-border bg-card p-4"
+                  data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <Icon className="h-5 w-5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{stat.label}</p>
+                    <p className="text-lg font-black text-white">
+                      <AnimatedNumber value={stat.value} suffix={stat.suffix} />
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </motion.section>
       )}

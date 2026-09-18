@@ -23,7 +23,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
-import { useMeta } from '@/game/state/metaStore';
+import { playerLevelProgress, useMeta } from '@/game/state/metaStore';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 
@@ -64,6 +64,12 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
 
 export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
+  // meta.totalLevelUps already includes this run's contribution (completeRun
+  // folds it in before RunSummary mounts) -- subtract it back out to find the
+  // player level going into this run, so we can tell whether it ticked up.
+  const levelUpsThisRun = Math.max(0, result.level - 1);
+  const playerLevelBefore = playerLevelProgress(Math.max(0, meta.totalLevelUps - levelUpsThisRun)).level;
+  const playerLevelAfter = playerLevelProgress(meta.totalLevelUps).level;
   const { session, user } = useAuth();
   const [showAfterAction, setShowAfterAction] = useState(false);
   const [clipUrlsByAssetId, setClipUrlsByAssetId] = useState<Record<string, string>>({});
@@ -405,6 +411,35 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
           </div>
         </div>
         {onOpenAccount ? <AccountNudge runNumber={meta.totalRuns} onOpenAccount={onOpenAccount} /> : null}
+        {levelUpsThisRun > 0 && (
+          <motion.section
+            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            className="border border-cyan-300/30 bg-gradient-to-br from-cyan-950/30 to-transparent p-5 text-center"
+            data-testid="section-level-up-reveal"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-300">Level Up</p>
+            <p className="mt-1 text-4xl font-black" style={{ color: '#5EEAD4', textShadow: '0 0 32px rgba(94,234,212,0.45)' }}>
+              Lv <AnimatedNumber value={result.level} disabled={prefersReducedMotion} />
+            </p>
+            <p className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">
+              +<AnimatedNumber value={levelUpsThisRun} disabled={prefersReducedMotion} /> level-up{levelUpsThisRun === 1 ? '' : 's'} this run
+            </p>
+            {playerLevelAfter > playerLevelBefore && (
+              <motion.p
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-3 inline-flex items-center gap-1.5 border border-sky-300/40 bg-sky-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-sky-200"
+                data-testid="text-player-level-up"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Player Level {playerLevelAfter}
+              </motion.p>
+            )}
+          </motion.section>
+        )}
         {result.highlights && result.highlights.length > 0 ? (
           <section className="border border-primary/25 bg-primary/5 p-5" data-testid="section-run-highlights">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Highlights</p>

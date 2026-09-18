@@ -2,7 +2,7 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
+import { isPrimeTakeoverActive, useMeta, describeUnlock, playerLevelProgress } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
@@ -24,6 +24,7 @@ import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes
 import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
+import { AnimatedNumber } from './AnimatedNumber';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
 
@@ -97,6 +98,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
+  const playerLevel = playerLevelProgress(meta.totalLevelUps);
+  const playerLevelPct = (playerLevel.levelUpsIntoLevel / Math.max(1, playerLevel.levelUpsToNext)) * 100;
   const roomNavRef = useRef<HTMLElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
@@ -243,6 +246,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               <p className="text-sm font-bold">
                 <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated
               </p>
+              <div className="mt-2" data-testid="widget-player-level">
+                <p className="flex items-center justify-start sm:justify-end gap-1.5 text-xs font-bold uppercase tracking-widest text-sky-300">
+                  <Zap className="h-3.5 w-3.5" />
+                  Player Lv <AnimatedNumber value={playerLevel.level} className="text-sm text-white" data-testid="text-player-level" />
+                </p>
+                <div className="ml-auto mt-1 h-1 w-32 overflow-hidden rounded-full bg-black/50 sm:w-40">
+                  <div
+                    className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                    style={{ width: `${playerLevelPct}%` }}
+                    data-testid="bar-player-level"
+                  />
+                </div>
+              </div>
               {meta.lootTokens > 0 && (
                 <p className="text-xs font-mono text-amber-400 mt-1">
                   <Package className="inline w-3 h-3 mr-1" />{meta.lootTokens} loot tokens
