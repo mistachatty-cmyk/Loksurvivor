@@ -6,6 +6,7 @@ import { Fragment, useEffect } from 'react';
 import { BookOpen, HeartPulse, LockKeyhole, Zap } from 'lucide-react';
 
 import {
+  characterLevelProgress,
   currentFatiguePct,
   describeUnlock,
   effectiveStats,
@@ -19,6 +20,7 @@ import {
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
 import { getCharacterSkins, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
+import { characterMasteryStatBonus, characterRankTitle } from '@/game/data/characterMastery';
 import type { CharacterDef, MetaState } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
@@ -26,6 +28,7 @@ import { CharacterAbilityVisualizer } from './CharacterAbilityVisualizer';
 import { LokPetIcon, LokPetVariantSheet } from './LokPetVariantSheet';
 import { WeaponIcon } from './WeaponIcon';
 import { CosmeticPreview } from './CosmeticPreview';
+import { AnimatedNumber } from './AnimatedNumber';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getHatStyle } from '@/game/data/hats';
 import { getCelebrationStyle } from '@/game/data/celebrations';
@@ -218,6 +221,52 @@ function FatigueIndicator({ summary }: { summary: CharacterFatigueSummary }) {
   );
 }
 
+function CharacterLevelIndicator({ character, meta }: { character: CharacterDef; meta: MetaState }) {
+  const progress = characterLevelProgress(meta, character.id);
+  const rank = characterRankTitle(progress.level);
+  const pct = (progress.levelUpsIntoLevel / Math.max(1, progress.levelUpsToNext)) * 100;
+  const powerBonusPct = Math.round(characterMasteryStatBonus(progress.level, 'power') * 100);
+  const hpBonus = Math.round(characterMasteryStatBonus(progress.level, 'maxHp'));
+
+  return (
+    <div
+      className="mt-3 border border-sky-500/30 bg-sky-500/5 p-3"
+      data-testid={`character-mastery-indicator-${character.id}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 shrink-0 text-sky-300" />
+          <div>
+            <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+              Mastery
+            </span>
+            <h4 className="text-xs font-black uppercase text-white mt-0.5">
+              Lv <AnimatedNumber value={progress.level} data-testid={`text-character-level-${character.id}`} /> · {rank}
+            </h4>
+          </div>
+        </div>
+        {progress.level > 1 ? (
+          <span
+            className="inline-block border border-sky-400/50 bg-sky-400/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300"
+            data-testid={`character-mastery-bonus-${character.id}`}
+          >
+            +{powerBonusPct}% power, +{hpBonus} HP
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-2.5 h-1.5 w-full overflow-hidden border border-white/10 bg-black/40">
+        <div
+          className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1.5 font-mono text-[9px] text-muted-foreground">
+        {progress.levelUpsIntoLevel} / {progress.levelUpsToNext} level-ups to next
+      </p>
+    </div>
+  );
+}
+
 function CharacterDetail({
   character,
   meta,
@@ -310,6 +359,8 @@ function CharacterDetail({
             ))}
           </div>
         ) : null}
+
+        <CharacterLevelIndicator character={character} meta={meta} />
 
         {/* Visual indicator showing how current fatigue levels affect character stats before starting a run */}
         <FatigueIndicator summary={fatigueSummary} />
@@ -408,14 +459,17 @@ function CharacterTile({
   onSelect,
   palette,
   fatiguePct,
+  characterLevel,
 }: {
   character: CharacterDef;
   selected: boolean;
   onSelect: () => void;
   palette: CharacterDef['palette'];
   fatiguePct?: number;
+  characterLevel?: number;
 }) {
   const hasFatigue = typeof fatiguePct === 'number' && fatiguePct > 0;
+  const hasLevel = typeof characterLevel === 'number' && characterLevel > 1;
 
   return (
     <button
@@ -438,6 +492,15 @@ function CharacterTile({
           >
             <HeartPulse className="h-2 w-2 text-amber-400" />
             -{fatiguePct.toFixed(1)}%
+          </span>
+        ) : null}
+        {hasLevel ? (
+          <span
+            className="absolute -top-1.5 -left-1.5 flex items-center gap-0.5 border border-sky-400/80 bg-black/90 px-1 py-0.5 font-mono text-[7px] font-bold text-sky-300 shadow"
+            title={`Mastery level ${characterLevel}`}
+            data-testid={`tile-level-${character.id}`}
+          >
+            Lv{characterLevel}
           </span>
         ) : null}
       </div>
@@ -610,6 +673,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       onSelect={() => selectCharacter(character.id)}
                       palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
                       fatiguePct={currentFatiguePct(meta, character.id)}
+                      characterLevel={characterLevelProgress(meta, character.id).level}
                     />
                   ))}
                   {lockedOperatives.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
@@ -626,6 +690,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       onSelect={() => selectCharacter(character.id)}
                       palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
                       fatiguePct={currentFatiguePct(meta, character.id)}
+                      characterLevel={characterLevelProgress(meta, character.id).level}
                     />
                   ))}
                   {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
@@ -665,6 +730,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       onSelect={() => selectCharacter(character.id)}
                       palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
                       fatiguePct={currentFatiguePct(meta, character.id)}
+                      characterLevel={characterLevelProgress(meta, character.id).level}
                     />
                     {character.id === selectedCharacter.id ? <div className="col-span-full"><CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} onSelectSkin={selectCharacterSkin} inline /></div> : null}
                   </Fragment>

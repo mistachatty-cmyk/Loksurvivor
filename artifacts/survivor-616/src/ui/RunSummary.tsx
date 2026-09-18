@@ -23,7 +23,8 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
-import { playerLevelProgress, useMeta } from '@/game/state/metaStore';
+import { characterLevelProgress, playerLevelProgress, useMeta } from '@/game/state/metaStore';
+import { characterRankTitle } from '@/game/data/characterMastery';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
 
@@ -70,6 +71,16 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
   const levelUpsThisRun = Math.max(0, result.level - 1);
   const playerLevelBefore = playerLevelProgress(Math.max(0, meta.totalLevelUps - levelUpsThisRun)).level;
   const playerLevelAfter = playerLevelProgress(meta.totalLevelUps).level;
+  // Same before/after trick, scoped to this run's character -- its own
+  // characterLevelUps entry already includes this run's contribution.
+  const characterLevelUpsAfter = meta.characterLevelUps[result.characterId] ?? 0;
+  const characterLevelBefore = characterLevelProgress(
+    { ...meta, characterLevelUps: { ...meta.characterLevelUps, [result.characterId]: Math.max(0, characterLevelUpsAfter - levelUpsThisRun) } },
+    result.characterId,
+  ).level;
+  const characterLevelAfter = characterLevelProgress(meta, result.characterId).level;
+  const characterRankBefore = characterRankTitle(characterLevelBefore);
+  const characterRankAfter = characterRankTitle(characterLevelAfter);
   const { session, user } = useAuth();
   const [showAfterAction, setShowAfterAction] = useState(false);
   const [clipUrlsByAssetId, setClipUrlsByAssetId] = useState<Record<string, string>>({});
@@ -436,6 +447,19 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
               >
                 <Zap className="h-3.5 w-3.5" />
                 Player Level {playerLevelAfter}
+              </motion.p>
+            )}
+            {characterLevelAfter > characterLevelBefore && (
+              <motion.p
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="mt-2 inline-flex items-center gap-1.5 border border-emerald-300/40 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-emerald-200"
+                data-testid="text-character-level-up"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                {character.name} Lv {characterLevelAfter}
+                {characterRankAfter !== characterRankBefore ? ` — ${characterRankAfter}` : ''}
               </motion.p>
             )}
           </motion.section>
