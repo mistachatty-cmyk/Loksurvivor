@@ -2996,6 +2996,22 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fill();
       ctx.restore();
     }
+    if (!enemy.dying && enemy.def.behavior === 'tracker' && enemy.def.traits?.lockCone) {
+      const lock = enemy.def.traits.lockCone;
+      const startHalf = (lock.startHalfAngleDeg * Math.PI) / 180;
+      const minHalf = (lock.minHalfAngleDeg * Math.PI) / 180;
+      const closeness = 1 - clamp((enemy.weave - minHalf) / Math.max(0.001, startHalf - minHalf), 0, 1);
+      const faceAngle = Math.atan2(w.player.y - enemy.y, w.player.x - enemy.x);
+      ctx.save();
+      ctx.globalAlpha = 0.2 + closeness * 0.35;
+      ctx.fillStyle = closeness > 0.7 ? '#ff2d55' : '#ef4444';
+      ctx.beginPath();
+      ctx.moveTo(enemy.x, enemy.y);
+      ctx.arc(enemy.x, enemy.y, lock.range, faceAngle - enemy.weave, faceAngle + enemy.weave);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;
       const radius = enemy.specialRadius || enemy.radius * 3;

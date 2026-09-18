@@ -679,7 +679,12 @@ export type EnemyBehavior =
   /** Slow patrol that sweeps a facing cone (`traits.coneDetect`); spotting the
    *  player's *true* position inside it -- even through stealth -- ends the
    *  player's active stealth for every enemy, not just this one. */
-  | 'sentry';
+  | 'sentry'
+  /** Locks its cone onto the player's *true* position (`traits.lockCone`) and
+   *  holds it there while in range; the cone narrows the whole time it stays
+   *  locked and detonates for a chunk of the player's max HP the moment it
+   *  closes to a line. Breaking the lock (leaving range) lets it reopen. */
+  | 'tracker';
 
 export interface EnemyDef {
   id: string;
@@ -729,6 +734,18 @@ export interface EnemyDef {
      *  (bypassing stealth's frozen-anchor tracking) and, on a hit, ends
      *  the player's active stealth for every enemy in the run. */
     coneDetect?: { range: number; halfAngleDeg: number; sweepSpeed?: number };
+    /** tracker: a cone that locks onto the player's real position and narrows
+     *  from `startHalfAngleDeg` to `minHalfAngleDeg` over `closeMs` while
+     *  locked; closing to a line deals `explodeDamagePct` of the player's
+     *  max HP and reopens after `resetMs` (default 1800). */
+    lockCone?: {
+      range: number;
+      startHalfAngleDeg: number;
+      minHalfAngleDeg: number;
+      closeMs: number;
+      explodeDamagePct: number;
+      resetMs?: number;
+    };
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];

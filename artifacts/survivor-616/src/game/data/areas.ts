@@ -132,6 +132,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 80, toSec: 165, enemyId: 'crypt-spitter', ratePerSec: 0.5, burst: 2 },
       { fromSec: 96, toSec: 165, enemyId: 'bridge-lookout', ratePerSec: 0.32, burst: 1 },
       { fromSec: 120, toSec: 165, enemyId: 'crypt-bouncer', ratePerSec: 0.3, burst: 1, hpMult: 1.2 },
+      squadWave({ fromSec: 60, toSec: 165, factionId: 'lockstep', ratePerSec: 0.22, formation: 'pincer' }),
     ],
   },
   {

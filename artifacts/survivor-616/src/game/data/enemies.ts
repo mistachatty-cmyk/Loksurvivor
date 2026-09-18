@@ -46,6 +46,45 @@ export const ENEMIES: EnemyDef[] = [
     lore: 'Bolted to a rooftop, its lens never blinks. Longest sightline of anything in 616.',
   },
   {
+    id: 'clampjaw',
+    name: 'Clampjaw',
+    family: 'Street',
+    behavior: 'tracker',
+    hp: 22,
+    speed: 40,
+    damage: 5,
+    radius: 10,
+    xp: 5,
+    mass: 1.2,
+    faction: 'Lockstep',
+    // Fast, tight, quick to close -- the "hit and back off" tracker. Its
+    // cone always faces the player's real position (see 'tracker' in
+    // engine/world.ts) and resets to open the moment you step out of range.
+    traits: { lockCone: { range: 220, startHalfAngleDeg: 30, minHalfAngleDeg: 1.5, closeMs: 2200, explodeDamagePct: 0.22, resetMs: 1200 } },
+    palette: palette({ ink: '#0a0a12', body: '#7f1d1d', bodyDark: '#450a0a', accent: '#ef4444', glow: '#fca5a5' }),
+    rig: arachnidRig({ height: 12, span: 14 }),
+    lore: 'Its pincers read your heat signature and close on it like a trap.',
+  },
+  {
+    id: 'deadlock',
+    name: 'Deadlock',
+    family: 'Street',
+    behavior: 'tracker',
+    hp: 40,
+    speed: 22,
+    damage: 8,
+    radius: 13,
+    xp: 7,
+    mass: 2.6,
+    faction: 'Lockstep',
+    // Slower to close but hits much harder -- gives more warning, punishes
+    // more for ignoring it.
+    traits: { lockCone: { range: 260, startHalfAngleDeg: 26, minHalfAngleDeg: 1.5, closeMs: 3600, explodeDamagePct: 0.32, resetMs: 2500 } },
+    palette: palette({ ink: '#0a0a12', body: '#78350f', bodyDark: '#431407', accent: '#ff2d55', glow: '#fda4af' }),
+    rig: giantRig(19),
+    lore: 'Old 616 ordinance, still armed. Give it a straight look and it remembers your outline.',
+  },
+  {
     id: 'nightcrawler',
     react: REACTION_PRESETS.beatTwitch,
     name: 'Nightcrawler',

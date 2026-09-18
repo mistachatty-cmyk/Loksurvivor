@@ -37,6 +37,13 @@ export const FACTIONS: FactionDef[] = [
     roster: ['watchlight', 'floodline'],
   },
   {
+    id: 'lockstep',
+    name: 'Lockstep',
+    description: 'Cones that lock onto you and narrow to a line before detonating for a chunk of your health.',
+    accent: '#ff2d55',
+    roster: ['clampjaw', 'deadlock'],
+  },
+  {
     id: 'afterimage-choir',
     name: 'Afterimage Choir',
     description: 'Shadow-born flankers that never approach in a straight line.',

@@ -4518,6 +4518,40 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'tracker': {
+        // Cone always faces the player's real position and narrows the whole
+        // time it's locked (in range, past the detonation cooldown); leaving
+        // range lets it reopen instead of resetting instantly, so backing
+        // off is a real counterplay. See traits.lockCone.
+        const lock = traits?.lockCone;
+        if (lock) {
+          const startHalf = (lock.startHalfAngleDeg * Math.PI) / 180;
+          const minHalf = (lock.minHalfAngleDeg * Math.PI) / 180;
+          if (enemy.weave <= 0) enemy.weave = startHalf;
+          const rdx = p.x - enemy.x;
+          const rdy = p.y - enemy.y;
+          const rdist = Math.hypot(rdx, rdy);
+          const shrinkPerSec = (startHalf - minHalf) / (lock.closeMs / 1000);
+          if (rdist < lock.range && w.now >= enemy.fireReadyAt) {
+            enemy.weave = Math.max(minHalf, enemy.weave - shrinkPerSec * dt);
+            if (enemy.weave <= minHalf + 0.001) {
+              damagePlayer(w, p.maxHp * lock.explodeDamagePct, enemy.x, enemy.y);
+              pushAlert(w, 'LOCK DETONATION');
+              spawnParticles(w, p.x, p.y, '#ff2d55', 20, 160);
+              w.shake = Math.max(w.shake, 12);
+              enemy.weave = startHalf;
+              enemy.fireReadyAt = w.now + (lock.resetMs ?? 1800);
+            }
+            if (w.now < w.stealthUntil) {
+              w.stealthUntil = w.now;
+              w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+            }
+          } else if (w.now >= enemy.fireReadyAt) {
+            enemy.weave = Math.min(startHalf, enemy.weave + shrinkPerSec * dt);
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
