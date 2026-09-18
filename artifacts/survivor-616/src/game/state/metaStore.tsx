@@ -277,6 +277,7 @@ export function createInitialMeta(): MetaState {
     totalKills: 0,
     totalRuns: 0,
     bestSurvivalSec: 0,
+    totalLevelUps: 0,
     cred: 0,
     lootTokens: 0,
     cardCredits: 0,
@@ -992,6 +993,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     totalKills: counter(parsed.totalKills),
     totalRuns: counter(parsed.totalRuns),
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
+    totalLevelUps: counter(parsed.totalLevelUps),
     ...settledGeneratorIncome,
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
@@ -1295,6 +1297,34 @@ export function getCharacterFatigueSummary(character: CharacterDef, meta: MetaSt
       magnet: effective.magnet - rested.magnet,
     },
   };
+}
+
+/**
+ * Level-ups needed to advance past `level`, for the lifetime player level.
+ * Mirrors the shape of `xpForLevel()` in engine/world.ts (a linear plus
+ * superlinear term, so it climbs quickly at first and increasingly slowly)
+ * but rescaled for `totalLevelUps` -- a lifetime count of level-ups across
+ * every run, not a single run's XP -- so there's no level cap, ever.
+ */
+function levelUpsForPlayerLevel(level: number): number {
+  return Math.round(4 + level * 3 + Math.pow(level, 1.5) * 1.2);
+}
+
+/** Derives the persistent player level from `meta.totalLevelUps`. */
+export function playerLevelProgress(totalLevelUps: number): {
+  level: number;
+  levelUpsIntoLevel: number;
+  levelUpsToNext: number;
+} {
+  let level = 1;
+  let remaining = Math.max(0, totalLevelUps);
+  let needed = levelUpsForPlayerLevel(level);
+  while (remaining >= needed) {
+    remaining -= needed;
+    level += 1;
+    needed = levelUpsForPlayerLevel(level);
+  }
+  return { level, levelUpsIntoLevel: remaining, levelUpsToNext: needed };
 }
 
 /** Permanent utility bonuses used when constructing a new run. */
@@ -2359,6 +2389,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         totalKills: prev.totalKills + result.kills,
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
+        totalLevelUps: prev.totalLevelUps + Math.max(0, result.level - 1),
         cred: prev.cred + result.cred + dailyContracts.rewardCred,
         lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
         cardCredits: prev.cardCredits + cardCreditsForRun(runCharacter, result.lootBoxesOpened),

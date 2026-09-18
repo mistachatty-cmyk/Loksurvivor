@@ -65,6 +65,7 @@ import {
   getLokPetDiscoveries,
   loadMeta,
   normalizeMeta,
+  playerLevelProgress,
   rewardCredMultiplier,
   reducer,
   startingWeaponLevel,
@@ -3258,4 +3259,44 @@ test('fog is presentation only — it never changes the simulation', () => {
   assert.equal(foggy.enemies.length, clear.enemies.length, 'fog changed enemy spawning');
   assert.equal(Math.round(foggy.player.x), Math.round(clear.player.x), 'fog changed player movement');
   assert.equal(Math.round(foggy.player.hp), Math.round(clear.player.hp), 'fog changed incoming damage');
+});
+
+test('playerLevelProgress climbs monotonically, starts at 1, and stays uncapped', () => {
+  assert.equal(playerLevelProgress(0).level, 1);
+
+  const totals = [0, 1, 10, 50, 200, 1000, 5000];
+  const levels = totals.map((total) => playerLevelProgress(total).level);
+  for (let i = 1; i < levels.length; i += 1) {
+    assert.ok(levels[i]! >= levels[i - 1]!, `level regressed going from ${totals[i - 1]} to ${totals[i]} level-ups`);
+  }
+  assert.ok(levels[levels.length - 1]! > levels[0]!, 'enough level-ups must eventually raise the player level');
+  assert.ok(playerLevelProgress(5000).level > 20, 'the curve has no hardcoded cap');
+
+  const progress = playerLevelProgress(100);
+  assert.ok(progress.levelUpsToNext > 0);
+  assert.ok(
+    progress.levelUpsIntoLevel >= 0 && progress.levelUpsIntoLevel < progress.levelUpsToNext,
+    'progress into the current level must never reach or exceed what the level needs',
+  );
+});
+
+test('completeRun folds this run\'s level-ups into the lifetime total forever', () => {
+  let state = { meta: createInitialMeta(), lastRun: null };
+
+  const firstRun = runResult([], true);
+  firstRun.level = 4; // 3 level-ups
+  state = reducer(state, { type: 'completeRun', result: firstRun });
+  assert.equal(state.meta.totalLevelUps, 3);
+
+  const secondRun = runResult([], false);
+  secondRun.level = 1; // reached level 1, i.e. no level-ups this run
+  state = reducer(state, { type: 'completeRun', result: secondRun });
+  assert.equal(state.meta.totalLevelUps, 3, 'a run with no level-ups must not change the lifetime total');
+
+  const thirdRun = runResult([], true);
+  thirdRun.level = 7; // 6 more level-ups
+  state = reducer(state, { type: 'completeRun', result: thirdRun });
+  assert.equal(state.meta.totalLevelUps, 9);
+
+  assert.equal(playerLevelProgress(state.meta.totalLevelUps).level, playerLevelProgress(9).level);
 });

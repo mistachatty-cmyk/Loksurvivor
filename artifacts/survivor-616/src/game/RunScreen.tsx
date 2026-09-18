@@ -1138,7 +1138,7 @@ export function RunScreen({
               </div>
               <div className="h-0.5 w-full overflow-hidden bg-black/70">
                 <div
-                  className="h-full bg-[#6ee7ff] transition-[width] duration-150"
+                  className="h-full bg-gradient-to-r from-[#22b8d6] to-[#6ee7ff] shadow-[0_0_4px_rgba(110,231,255,0.7)] transition-[width] duration-150"
                   style={{ width: `${xpPct}%` }}
                   data-testid="bar-xp"
                 />
