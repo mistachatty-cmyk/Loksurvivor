@@ -380,6 +380,9 @@ importers:
       '@workspace/lok-client':
         specifier: workspace:*
         version: link:../../lib/lok-client
+      '@workspace/lok-focus-widget':
+        specifier: workspace:*
+        version: link:../../lib/lok-focus-widget
       animejs:
         specifier: ^3.2.2
         version: 3.2.2
@@ -503,6 +506,12 @@ importers:
         version: 0.31.10
 
   lib/lok-client:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.58.0
+        version: 2.116.0
+
+  lib/lok-focus-widget:
     dependencies:
       '@supabase/supabase-js':
         specifier: ^2.58.0

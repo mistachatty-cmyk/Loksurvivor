@@ -23,6 +23,7 @@ import type { RunResult } from '@/game/types';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
+import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
@@ -445,6 +446,7 @@ function Providers({ children }: { children: ReactNode }) {
             <MusicProvider>
               {children}
               <MusicNowPlaying />
+              <FocusWidgetMount />
             </MusicProvider>
           </CloudSyncProvider>
         </MetaProvider>
