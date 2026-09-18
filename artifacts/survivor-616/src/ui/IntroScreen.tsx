@@ -64,13 +64,13 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
       >
         <p className="text-primary text-xs uppercase tracking-[0.4em] font-bold mb-6">Grand Rapids · 616</p>
         
-        <div className="relative mb-8">
+        <div className="relative mb-10">
           <h1 className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
             616<br/>Survivor
           </h1>
           {meta.splashTextEnabled ? (
             <p
-              className="pointer-events-none absolute -right-2 bottom-0 translate-y-1/2 rotate-[-8deg] whitespace-nowrap font-mono text-sm font-black italic text-amber-300 drop-shadow-md sm:text-base"
+              className="pointer-events-none absolute top-full right-1 mt-1 max-w-[70%] rotate-[-6deg] text-right font-mono text-[10px] font-black italic leading-tight text-amber-300 drop-shadow-md sm:text-xs"
               data-testid="text-intro-splash"
             >
               {splashText}
