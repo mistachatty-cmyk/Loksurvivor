@@ -29,6 +29,7 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import { characterRankTitle } from '@/game/data/characterMastery';
+import { CHANGELOG, STUDIO_NAME, updateNumber } from '@/game/data/changelog';
 import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
@@ -42,7 +43,7 @@ import {
   VISITING_CARD_SILHOUETTE,
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Wrench, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -252,6 +253,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     { key: 'universe', label: 'Universe', icon: Globe, count: meta.visitingLokCards.length },
     { key: 'stats', label: 'Stats', icon: TrendingUp },
     { key: 'mastery', label: 'Mastery', icon: Award },
+    { key: 'updates', label: 'Updates', icon: Megaphone, count: CHANGELOG.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
   ];
 
@@ -846,6 +848,54 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                   </div>
                 );
               })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'updates' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-updates"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Megaphone className="h-5 w-5 text-cyan-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Updates</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {CHANGELOG.length} updates and counting, straight from {STUDIO_NAME}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {[...CHANGELOG].reverse().map((entry) => (
+              <div
+                key={entry.version}
+                className={`border p-4 ${entry.kind === 'hotfix' ? 'border-amber-400/40 bg-amber-400/5' : 'border-border bg-card'}`}
+                data-testid={`archive-update-${entry.version}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest ${
+                      entry.kind === 'hotfix'
+                        ? 'border-amber-400/60 bg-amber-400/15 text-amber-300'
+                        : 'border-cyan-300/60 bg-cyan-300/15 text-cyan-200'
+                    }`}
+                  >
+                    {entry.kind === 'hotfix' ? <Wrench className="h-2.5 w-2.5" /> : <Megaphone className="h-2.5 w-2.5" />}
+                    {entry.kind === 'hotfix' ? 'Hotfix' : 'Update'} #{updateNumber(entry)}
+                  </span>
+                  <span className="font-mono text-[9px] text-muted-foreground">v{entry.version} · {entry.date}</span>
+                </div>
+                <h3 className="mt-1.5 text-sm font-black uppercase text-white">{entry.title}</h3>
+                <ul className="mt-1.5 space-y-1">
+                  {entry.body.map((line) => (
+                    <li key={line} className="text-xs leading-snug text-muted-foreground">{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </motion.section>
       )}

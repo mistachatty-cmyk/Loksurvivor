@@ -2015,6 +2015,8 @@ export interface MetaState {
   dvdEasterEggUnlocked: boolean;
   /** Generic queue of unlock/achievement announcements, drained by the hub screen on return. */
   pendingNotifications: PendingNotification[];
+  /** Highest changelog version (see `data/changelog.ts`) the player has acknowledged via the update popup. */
+  lastSeenChangelogVersion: string;
 }
 
 export type ThreatAngleMode = 'standard' | 'pincer' | 'cardinal' | 'spiral' | 'corners';
