@@ -417,6 +417,8 @@ export const AREAS: AreaDef[] = [
       { fromSec: 42, toSec: 190, enemyId: 'lightless-prowler', ratePerSec: 0.62, burst: 2 },
       { fromSec: 68, toSec: 190, enemyId: 'river-wraith', ratePerSec: 0.62, burst: 2 },
       { fromSec: 105, toSec: 190, enemyId: 'crypt-bouncer', ratePerSec: 0.27, burst: 1, hpMult: 1.45 },
+      squadWave({ fromSec: 50, toSec: 190, factionId: 'prism-choir', ratePerSec: 0.2, formation: 'wall' }),
+      { fromSec: 170, toSec: 171, enemyId: 'kaleidoscope', ratePerSec: 1, burst: 1 },
     ],
   },
   {

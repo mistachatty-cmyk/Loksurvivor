@@ -762,6 +762,12 @@ export interface World {
   rumorSpeedUntil: number;
   rumorPantryAvailable: boolean;
   rumorBroadcastAvailable: boolean;
+  /** Beacon cones: timestamp (w.now) the current slow/chill debuff ends -- refreshed
+   *  every frame the player stays inside the beam, decays on its own once they leave. */
+  playerConeUntil: number;
+  playerConeKind: 'slow' | 'chill' | null;
+  /** Fraction of move speed removed while `playerConeUntil` is active. */
+  playerConeMag: number;
   rumorMagnetNextAt: number;
   /** Authored opening-campaign cue for this area, when one exists. */
   firstNightChapter?: ReturnType<typeof getFirstNightChapter>;
@@ -1024,6 +1030,9 @@ export function createWorld(
     rumorSpeedUntil: activeCrewRumor?.rumorId === 'painted-shortcut' ? 6500 : 0,
     rumorPantryAvailable: activeCrewRumor?.rumorId === 'pantry-surge',
     rumorBroadcastAvailable: activeCrewRumor?.rumorId === 'basement-broadcast',
+    playerConeUntil: 0,
+    playerConeKind: null,
+    playerConeMag: 0,
     rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
     firstNightChapter: getFirstNightChapter(area.id),
     firstNightBeatTriggered: false,
@@ -3992,7 +4001,8 @@ function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y);
+  const coneSlow = w.now < w.playerConeUntil ? 1 - w.playerConeMag : 1;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow;
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -4548,6 +4558,44 @@ function updateEnemies(w: World, dt: number) {
             }
           } else if (w.now >= enemy.fireReadyAt) {
             enemy.weave = Math.min(startHalf, enemy.weave + shrinkPerSec * dt);
+          }
+        }
+        break;
+      }
+      case 'beacon': {
+        // Sweeps a cone like 'sentry', but standing inside it applies
+        // whichever effect the active color carries instead of breaking
+        // stealth. `kinds.length > 1` flickers the active color/effect on
+        // `flickerMs` -- the "prism" and boss tiers cycle every version.
+        speed *= 0.4;
+        const cone = traits?.colorCone;
+        if (cone) {
+          enemy.weave += dt * (cone.sweepSpeed ?? 0.5);
+          const faceAngle = enemy.weave;
+          const rdx = p.x - enemy.x;
+          const rdy = p.y - enemy.y;
+          const rdist = Math.hypot(rdx, rdy) || 1;
+          const activeKind = cone.kinds[Math.floor(w.now / (cone.flickerMs ?? 1400)) % cone.kinds.length] ?? cone.kinds[0];
+          if (rdist < cone.range && activeKind) {
+            const toPlayer = Math.atan2(rdy, rdx);
+            let diff = Math.abs(toPlayer - faceAngle) % (Math.PI * 2);
+            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+            const halfAngle = (cone.halfAngleDeg * Math.PI) / 180;
+            if (diff < halfAngle) {
+              if (activeKind === 'pull') {
+                const pull = cone.pullForce ?? 55;
+                p.kx += (-rdx / rdist) * pull * dt;
+                p.ky += (-rdy / rdist) * pull * dt;
+              } else if (activeKind === 'slow' || activeKind === 'chill') {
+                w.playerConeUntil = w.now + 260;
+                w.playerConeKind = activeKind;
+                w.playerConeMag = activeKind === 'chill' ? (cone.slowPct ?? 0.35) * 1.4 : (cone.slowPct ?? 0.35);
+              } else if (w.now >= enemy.fireReadyAt) {
+                enemy.fireReadyAt = w.now + 500;
+                damagePlayer(w, (cone.tickDamagePerSec ?? 6) * 0.5, enemy.x, enemy.y);
+                spawnParticles(w, p.x, p.y, activeKind === 'burn' ? '#fb923c' : '#a78bfa', 4, 40);
+              }
+            }
           }
         }
         break;

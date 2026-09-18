@@ -3012,6 +3012,25 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fill();
       ctx.restore();
     }
+    if (!enemy.dying && enemy.def.behavior === 'beacon' && enemy.def.traits?.colorCone) {
+      const cone = enemy.def.traits.colorCone;
+      const halfAngle = (cone.halfAngleDeg * Math.PI) / 180;
+      const activeKind = cone.kinds[Math.floor(w.now / (cone.flickerMs ?? 1400)) % cone.kinds.length] ?? cone.kinds[0];
+      const coneColor = activeKind === 'pull' ? '#f472b6'
+        : activeKind === 'slow' ? '#38bdf8'
+        : activeKind === 'chill' ? '#93c5fd'
+        : activeKind === 'burn' ? '#fb923c'
+        : '#a78bfa';
+      ctx.save();
+      ctx.globalAlpha = 0.26;
+      ctx.fillStyle = coneColor;
+      ctx.beginPath();
+      ctx.moveTo(enemy.x, enemy.y);
+      ctx.arc(enemy.x, enemy.y, cone.range, enemy.weave - halfAngle, enemy.weave + halfAngle);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;
       const radius = enemy.specialRadius || enemy.radius * 3;

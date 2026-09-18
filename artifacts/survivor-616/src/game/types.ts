@@ -684,7 +684,13 @@ export type EnemyBehavior =
    *  holds it there while in range; the cone narrows the whole time it stays
    *  locked and detonates for a chunk of the player's max HP the moment it
    *  closes to a line. Breaking the lock (leaving range) lets it reopen. */
-  | 'tracker';
+  | 'tracker'
+  /** Sweeps a color-coded cone (`traits.colorCone`); standing in it applies
+   *  whichever effect that color carries -- pull, slow, or an elemental
+   *  damage-over-time -- for as long as you stay inside. `kinds.length > 1`
+   *  flickers through every color/effect on `flickerMs`, for the "uses all
+   *  versions" prism and boss tiers. */
+  | 'beacon';
 
 export interface EnemyDef {
   id: string;
@@ -745,6 +751,22 @@ export interface EnemyDef {
       closeMs: number;
       explodeDamagePct: number;
       resetMs?: number;
+    };
+    /** beacon: a color-coded cone. `kinds` lists which effect(s) it cycles
+     *  through -- one entry for a single-color enemy, several for a "prism"
+     *  tier that flickers between them every `flickerMs`. 'pull' drags the
+     *  player toward the enemy at `pullForce`; 'slow'/'chill' cut move speed
+     *  by `slowPct` (`chill` hits harder) while standing in the beam;
+     *  'burn'/'shock' tick `tickDamagePerSec` while standing in the beam. */
+    colorCone?: {
+      range: number;
+      halfAngleDeg: number;
+      sweepSpeed?: number;
+      kinds: Array<'pull' | 'slow' | 'chill' | 'burn' | 'shock'>;
+      flickerMs?: number;
+      pullForce?: number;
+      slowPct?: number;
+      tickDamagePerSec?: number;
     };
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
