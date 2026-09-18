@@ -4,6 +4,7 @@
  */
 import { ENEMIES } from '@/game/data/enemies';
 import { CHARACTERS } from '@/game/data/characters';
+import { FACTIONS } from '@/game/data/factions';
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
@@ -12,6 +13,7 @@ import { motion } from 'framer-motion';
 import { Skull, Ghost, LockKeyhole, Sparkles, Users } from 'lucide-react';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+import { useState } from 'react';
 
 export interface BestiaryPanelProps {
   onBack: () => void;
@@ -30,11 +32,15 @@ function EnemyPreview({ enemy }: { enemy: (typeof ENEMIES)[number] }) {
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
   const isListView = meta.uiDensity === 'list';
+  const [view, setView] = useState<'threats' | 'factions'>('threats');
   // Enemies excluded from the ratio (e.g. Choir Wraith's HP is intentionally
   // beyond a run's reach) so 100% stays a reachable goal.
   const catalogueEnemies = ENEMIES.filter((e) => !e.excludeFromBestiary);
   const discovered = catalogueEnemies.filter((e) => (meta.bestiary[e.id] ?? 0) > 0).length;
   const unlockedIds = new Set(unlockedCharacters.map((character) => character.id));
+  const discoveredFactionCount = FACTIONS.filter((faction) =>
+    faction.roster.some((enemyId) => (meta.bestiary[enemyId] ?? 0) > 0),
+  ).length;
 
   return (
     <ScreenLayout 
@@ -128,11 +134,95 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         </div>
       </section>
 
-      <div className="mb-4 flex items-center gap-3">
-        <Users className="h-4 w-4 text-primary" />
-        <h2 className="text-xl font-black uppercase tracking-tight text-white">Known threats</h2>
-        <div className="h-px flex-1 bg-border" />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3" data-testid="bestiary-view-nav">
+        <div className="flex items-center gap-3">
+          <Users className="h-4 w-4 text-primary" />
+          <h2 className="text-xl font-black uppercase tracking-tight text-white">
+            {view === 'threats' ? 'Known threats' : 'Factions'}
+          </h2>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setView('threats')}
+            className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+              view === 'threats'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+            }`}
+            data-testid="button-bestiary-view-threats"
+          >
+            <Skull className="h-3.5 w-3.5" />
+            Threats
+            <span className="font-mono text-[10px] opacity-75">{discovered} / {catalogueEnemies.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('factions')}
+            className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+              view === 'factions'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+            }`}
+            data-testid="button-bestiary-view-factions"
+          >
+            <Users className="h-3.5 w-3.5" />
+            Factions
+            <span className="font-mono text-[10px] opacity-75">{discoveredFactionCount} / {FACTIONS.length}</span>
+          </button>
+        </div>
       </div>
+
+      {view === 'factions' ? (
+        <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2'}`} data-testid="section-bestiary-factions">
+          {FACTIONS.map((faction) => {
+            const roster = faction.roster
+              .map((enemyId) => ENEMIES.find((enemy) => enemy.id === enemyId))
+              .filter((enemy): enemy is (typeof ENEMIES)[number] => Boolean(enemy));
+            const discoveredCount = roster.filter((enemy) => (meta.bestiary[enemy.id] ?? 0) > 0).length;
+            return (
+              <article
+                key={faction.id}
+                className="border border-border bg-card"
+                data-testid={`card-faction-${faction.id}`}
+              >
+                <div className="border-l-4 p-4" style={{ borderLeftColor: faction.accent }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-black uppercase tracking-tight text-white">{faction.name}</h3>
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {discoveredCount} / {roster.length}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{faction.description}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-t border-border/60 p-4 sm:grid-cols-4">
+                  {roster.map((enemy) => {
+                    const known = (meta.bestiary[enemy.id] ?? 0) > 0;
+                    return (
+                      <div
+                        key={enemy.id}
+                        className="flex flex-col items-center gap-1.5 text-center"
+                        data-testid={`faction-roster-${faction.id}-${enemy.id}`}
+                      >
+                        <div className="grid h-16 w-16 place-items-center overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.08),transparent_62%)]">
+                          {known ? (
+                            <RigPortrait rig={enemy.rig} palette={enemy.palette} anim="idle" size={56} />
+                          ) : (
+                            <Ghost className="h-6 w-6 text-muted-foreground/30" />
+                          )}
+                        </div>
+                        <span className={`text-[9px] font-bold uppercase tracking-widest ${known ? 'text-white' : 'text-muted-foreground/50'}`}>
+                          {known ? enemy.name : 'Unidentified'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
       <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
         {ENEMIES.map((enemy, i) => {
           const kills = meta.bestiary[enemy.id] ?? 0;
@@ -206,6 +296,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
           );
         })}
       </div>
+      )}
     </ScreenLayout>
   );
 }
