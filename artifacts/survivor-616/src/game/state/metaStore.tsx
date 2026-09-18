@@ -41,6 +41,7 @@ import {
   RECOVERY_HUTS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
+import { CHARACTER_MASTERY_STAT_EFFECTS, characterRankTitle } from '@/game/data/characterMastery';
 import {
   advanceDailyContracts,
   contractDayKey,
@@ -294,6 +295,7 @@ export function createInitialMeta(): MetaState {
     endlessRecordDepth: 0,
     endlessDiscoveryIds: [],
     fatigueByCharacter: {},
+    characterLevelUps: {},
     recovery: defaultRecovery(),
     facilityTier: 'tub',
     discoveredHutIds: [],
@@ -798,6 +800,12 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       }
     }
   }
+  const characterLevelUps: Record<string, number> = {};
+  if (parsed.characterLevelUps && typeof parsed.characterLevelUps === 'object') {
+    for (const [key, value] of Object.entries(parsed.characterLevelUps)) {
+      if (characterIds.has(key)) characterLevelUps[key] = counter(value);
+    }
+  }
   const parsedRecovery = parsed.recovery;
   const recovery: RecoverySession = {
     characterId:
@@ -1009,6 +1017,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     endlessRecordDepth: counter(parsed.endlessRecordDepth),
     endlessDiscoveryIds,
     fatigueByCharacter,
+    characterLevelUps,
     recovery,
     facilityTier: tier,
     discoveredHutIds,
@@ -1243,6 +1252,16 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
       if (effect.cap !== undefined) stats[effect.stat] = Math.min(stats[effect.stat], effect.cap);
     }
   }
+  const masteryLevel = characterLevelProgress(meta, character.id).level;
+  const masteryStacks = Math.max(0, masteryLevel - 1);
+  if (masteryStacks > 0) {
+    for (const effect of CHARACTER_MASTERY_STAT_EFFECTS) {
+      if (effect.kind !== 'stat') continue;
+      if (effect.add) stats[effect.stat] += effect.add * masteryStacks;
+      if (effect.mult) stats[effect.stat] *= Math.pow(effect.mult, masteryStacks);
+      if (effect.cap !== undefined) stats[effect.stat] = Math.min(stats[effect.stat], effect.cap);
+    }
+  }
   const cards = activeCardEffects(meta);
   for (const [stat, multiplier] of Object.entries(cards.statMults) as Array<[keyof BaseStats, number]>) stats[stat] *= multiplier;
   stats.magnet *= cards.magnetMult;
@@ -1323,6 +1342,33 @@ export function playerLevelProgress(totalLevelUps: number): {
     remaining -= needed;
     level += 1;
     needed = levelUpsForPlayerLevel(level);
+  }
+  return { level, levelUpsIntoLevel: remaining, levelUpsToNext: needed };
+}
+
+/**
+ * Level-ups needed to advance past `level`, for a single character's own
+ * lifetime mastery level. Same growing-curve shape as `levelUpsForPlayerLevel`
+ * but gentler -- a single character accumulates level-ups slower than the
+ * account-wide total, so its own levels should still come at a reasonable pace.
+ */
+function levelUpsForCharacterLevel(level: number): number {
+  return Math.round(3 + level * 2 + Math.pow(level, 1.4) * 0.9);
+}
+
+/** Derives a character's persistent mastery level from `meta.characterLevelUps[characterId]`. */
+export function characterLevelProgress(meta: MetaState, characterId: string): {
+  level: number;
+  levelUpsIntoLevel: number;
+  levelUpsToNext: number;
+} {
+  let level = 1;
+  let remaining = Math.max(0, meta.characterLevelUps[characterId] ?? 0);
+  let needed = levelUpsForCharacterLevel(level);
+  while (remaining >= needed) {
+    remaining -= needed;
+    level += 1;
+    needed = levelUpsForCharacterLevel(level);
   }
   return { level, levelUpsIntoLevel: remaining, levelUpsToNext: needed };
 }
@@ -2412,6 +2458,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
             (prev.fatigueByCharacter[result.characterId] ?? 0) + FATIGUE_PER_RUN_PCT,
           ),
         },
+        characterLevelUps: {
+          ...prev.characterLevelUps,
+          [result.characterId]: (prev.characterLevelUps[result.characterId] ?? 0) + Math.max(0, result.level - 1),
+        },
         discoveredHutIds: RECOVERY_HUTS.filter(
           (hut) => clearedAreaIds.includes(hut.areaId),
         ).map((hut) => hut.id),
@@ -2484,6 +2534,22 @@ export function reducer(state: StoreState, action: Action): StoreState {
             id: `dvd-easter-egg-${Date.now()}`,
             title: '★ SPECIAL EASTER EGG UNLOCKED! ★',
             body: 'DVD Bouncing Logo & DVD Corner Strike unlocked! The legendary screensaver ricochets across the screen and detonates full-screen rainbow kinetic bursts on corner hits!',
+            createdAt: Date.now(),
+          },
+        ];
+      }
+
+      // Character mastery rank-up: only announce when the rank *title*
+      // actually changes (not every level), so the queue doesn't spam.
+      const rankBefore = characterRankTitle(characterLevelProgress(prev, result.characterId).level);
+      const rankAfter = characterRankTitle(characterLevelProgress(next, result.characterId).level);
+      if (rankAfter !== rankBefore) {
+        next.pendingNotifications = [
+          ...next.pendingNotifications,
+          {
+            id: `character-rank-${result.characterId}-${Date.now()}`,
+            title: `${runCharacter.name} reached ${rankAfter} rank`,
+            body: `Level ${characterLevelProgress(next, result.characterId).level} mastery for ${runCharacter.name} -- permanent combat bonus increased.`,
             createdAt: Date.now(),
           },
         ];

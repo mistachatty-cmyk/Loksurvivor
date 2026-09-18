@@ -21,12 +21,14 @@ import { WorkshopOverview } from './WorkshopPanel';
 import {
   BASE_CARD_CREDITS_PER_LOOT_BOX,
   LOKPET_CARD_PACK_COST,
+  characterLevelProgress,
   describeUnlock,
   episodeProgress,
   episodeStatus,
   playerLevelProgress,
   useMeta,
 } from '@/game/state/metaStore';
+import { characterRankTitle } from '@/game/data/characterMastery';
 import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
@@ -40,7 +42,7 @@ import {
   VISITING_CARD_SILHOUETTE,
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -249,6 +251,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
     { key: 'universe', label: 'Universe', icon: Globe, count: meta.visitingLokCards.length },
     { key: 'stats', label: 'Stats', icon: TrendingUp },
+    { key: 'mastery', label: 'Mastery', icon: Award },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
   ];
 
@@ -794,6 +797,55 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                 </div>
               );
             })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'mastery' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-mastery"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Award className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Mastery</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Every operative's own persistent level, from playing them specifically</p>
+            </div>
+          </div>
+
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {[...CHARACTERS]
+              .map((character) => ({ character, progress: characterLevelProgress(meta, character.id) }))
+              .sort((a, b) => b.progress.level - a.progress.level || b.progress.levelUpsIntoLevel - a.progress.levelUpsIntoLevel)
+              .map(({ character, progress }) => {
+                const rank = characterRankTitle(progress.level);
+                const pct = (progress.levelUpsIntoLevel / Math.max(1, progress.levelUpsToNext)) * 100;
+                return (
+                  <div
+                    key={character.id}
+                    className="flex items-center gap-3 border border-border bg-card p-3"
+                    data-testid={`card-character-level-${character.id}`}
+                  >
+                    <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={40} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-xs font-black uppercase text-white">{character.name}</p>
+                        <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider text-sky-300">
+                          Lv {progress.level} · {rank}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-black/50">
+                        <div
+                          className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </motion.section>
       )}

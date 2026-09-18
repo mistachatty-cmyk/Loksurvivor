@@ -1927,6 +1927,8 @@ export interface MetaState {
   endlessDiscoveryIds: string[];
   /** Character id -> current fatigue penalty percentage, capped at 5. */
   fatigueByCharacter: Record<string, number>;
+  /** Character id -> lifetime level-ups earned while playing that character specifically -- never resets. Feeds each character's own persistent mastery level. */
+  characterLevelUps: Record<string, number>;
   /** The active recovery session, if anyone is resting. */
   recovery: RecoverySession;
   /** Highest hideout facility purchased by the player. */
