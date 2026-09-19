@@ -259,6 +259,7 @@ export function createInitialMeta(): MetaState {
     hideoutAmbienceEnabled: false,
     hideoutWeatherEnabled: true,
     splashTextEnabled: true,
+    oneLineTitleEnabled: false,
     travelEncountersEnabled: true,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
@@ -992,6 +993,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
+    oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
     travelEncountersEnabled: parsed.travelEncountersEnabled !== false,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
@@ -1580,6 +1582,7 @@ type Action =
   | { type: 'setHideoutAmbience'; enabled: boolean }
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setSplashTextEnabled'; enabled: boolean }
+  | { type: 'setOneLineTitleEnabled'; enabled: boolean }
   | { type: 'setTravelEncountersEnabled'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
@@ -2319,6 +2322,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setSplashTextEnabled':
       return { ...state, meta: { ...state.meta, splashTextEnabled: action.enabled } };
 
+    case 'setOneLineTitleEnabled':
+      return { ...state, meta: { ...state.meta, oneLineTitleEnabled: action.enabled } };
+
     case 'setTravelEncountersEnabled':
       return { ...state, meta: { ...state.meta, travelEncountersEnabled: action.enabled } };
 
@@ -2848,6 +2854,7 @@ export interface MetaContextValue {
   setHideoutAmbience: (enabled: boolean) => void;
   setHideoutWeather: (enabled: boolean) => void;
   setSplashTextEnabled: (enabled: boolean) => void;
+  setOneLineTitleEnabled: (enabled: boolean) => void;
   setTravelEncountersEnabled: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
@@ -2996,6 +3003,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setSplashTextEnabled = useCallback(
     (enabled: boolean) => dispatch({ type: 'setSplashTextEnabled', enabled }),
+    [],
+  );
+  const setOneLineTitleEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setOneLineTitleEnabled', enabled }),
     [],
   );
   const setTravelEncountersEnabled = useCallback(
@@ -3176,6 +3187,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutAmbience,
       setHideoutWeather,
       setSplashTextEnabled,
+      setOneLineTitleEnabled,
       setTravelEncountersEnabled,
       setPaletteAnimations,
       setWorldPaletteBlend,
@@ -3278,6 +3290,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutAmbience,
     setHideoutWeather,
     setSplashTextEnabled,
+    setOneLineTitleEnabled,
     setTravelEncountersEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,

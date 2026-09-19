@@ -97,20 +97,37 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
           </motion.p>
         </AnimatePresence>
 
-        <div className="relative mb-10">
-          <h1 className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-            Survivor<br/>616
-          </h1>
-          {meta.splashTextEnabled ? (
-            <p
-              className="pointer-events-none absolute top-full right-1 mt-1 max-w-[70%] rotate-[-6deg] text-right font-mono text-[10px] font-black italic leading-tight sm:text-xs"
-              style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
-              data-testid="text-intro-splash"
-            >
-              {splashText}
-            </p>
-          ) : null}
-        </div>
+        {meta.oneLineTitleEnabled ? (
+          <div className="relative mb-10">
+            <h1 className="whitespace-nowrap text-4xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] sm:text-6xl md:text-7xl">
+              Survivor616
+            </h1>
+            {meta.splashTextEnabled ? (
+              <p
+                className="pointer-events-none mt-2 text-center font-mono text-[10px] font-black italic leading-tight sm:text-xs"
+                style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
+                data-testid="text-intro-splash"
+              >
+                {splashText}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="relative mb-10">
+            <h1 className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+              Survivor<br/>616
+            </h1>
+            {meta.splashTextEnabled ? (
+              <p
+                className="pointer-events-none absolute top-full right-1 mt-1 max-w-[70%] rotate-[-6deg] text-right font-mono text-[10px] font-black italic leading-tight sm:text-xs"
+                style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
+                data-testid="text-intro-splash"
+              >
+                {splashText}
+              </p>
+            ) : null}
+          </div>
+        )}
 
         <motion.button
           type="button"

@@ -68,6 +68,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setHideoutAmbience,
     setHideoutWeather,
     setSplashTextEnabled,
+    setOneLineTitleEnabled,
     setTravelEncountersEnabled,
     setGyroEnabled,
     setGyroSensitivity,
@@ -391,6 +392,30 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     data-testid="button-toggle-splash-text"
                   >
                     {meta.splashTextEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Survivor616 title</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Show the title screen name as a single "Survivor616" line, with the splash blurb sitting
+                      unrotated right below it -- instead of the classic stacked two-line title. Off by default.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOneLineTitleEnabled(!meta.oneLineTitleEnabled)}
+                    aria-pressed={meta.oneLineTitleEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.oneLineTitleEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-one-line-title"
+                  >
+                    {meta.oneLineTitleEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>
