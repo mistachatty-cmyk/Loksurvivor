@@ -106,7 +106,7 @@ interface PendingTravelEncounter {
  * Lets a screen be opened directly (e.g. `?screen=areas`) so any part of the
  * game can be reached without replaying progress. Only honoured in dev.
  */
-function initialScreen(onboarded: boolean): Screen {
+function initialScreen(): Screen {
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get('screen');
@@ -137,12 +137,12 @@ function initialScreen(onboarded: boolean): Screen {
     }
     if (requested === 'sector-command') return { name: 'sector-command' };
   }
-  return { name: onboarded ? 'hub' : 'intro' };
+  return { name: 'intro' };
 }
 
 function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas } = useMeta();
-  const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
+  const [screen, setScreen] = useState<Screen>(() => initialScreen());
   const [roomId, setRoomId] = useState('main-floor');
   const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
