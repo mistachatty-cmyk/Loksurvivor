@@ -2,8 +2,8 @@
  * Cold open. Sets the premise before the player ever sees the hideout.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { lazy, Suspense, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
@@ -15,6 +15,14 @@ import { pickSplashText } from '@/game/data/splashText';
 // bundle loads in the background and the canvas fades in once it's ready,
 // same pattern this codebase already uses for RunScreen/StudioScreen.
 const AttractMode = lazy(() => import('@/ui/AttractMode').then((m) => ({ default: m.AttractMode })));
+
+// The location tag mostly reads "Grand Rapids", but every so often fades to
+// a lore-flavored alternate -- 616 as "the center of the universe" -- and
+// back. Mostly-one, occasionally-the-other, not a 50/50 rotation.
+const LOCATION_TAG_MAIN = 'Grand Rapids · 616';
+const LOCATION_TAG_ALT = 'A grand display of digital rapids';
+const LOCATION_TAG_ALT_INTERVAL_MS = 26_000;
+const LOCATION_TAG_ALT_DURATION_MS = 4_000;
 
 export interface IntroScreenProps {
   onBegin: () => void;
@@ -32,6 +40,19 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   // Picked once per mount, not per render -- a fresh one shows up whenever
   // the title screen loads, Minecraft-main-menu-splash style.
   const splashText = useMemo(() => pickSplashText(), []);
+
+  const [showAltLocationTag, setShowAltLocationTag] = useState(false);
+  useEffect(() => {
+    let revertTimer: ReturnType<typeof setTimeout> | undefined;
+    const cycleTimer = setInterval(() => {
+      setShowAltLocationTag(true);
+      revertTimer = setTimeout(() => setShowAltLocationTag(false), LOCATION_TAG_ALT_DURATION_MS);
+    }, LOCATION_TAG_ALT_INTERVAL_MS);
+    return () => {
+      clearInterval(cycleTimer);
+      if (revertTimer) clearTimeout(revertTimer);
+    };
+  }, []);
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 text-center bg-black text-white relative overflow-hidden">
@@ -62,11 +83,23 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         transition={{ duration: 1.2, ease: "easeOut" }}
         className="relative z-10 flex flex-col items-center max-w-lg w-full"
       >
-        <p className="text-primary text-xs uppercase tracking-[0.4em] font-bold mb-6">Grand Rapids · 616</p>
-        
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={showAltLocationTag ? 'alt' : 'main'}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-primary text-xs uppercase tracking-[0.4em] font-bold mb-6"
+            data-testid="text-intro-location-tag"
+          >
+            {showAltLocationTag ? LOCATION_TAG_ALT : LOCATION_TAG_MAIN}
+          </motion.p>
+        </AnimatePresence>
+
         <div className="relative mb-10">
           <h1 className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-            616<br/>Survivor
+            Survivor<br/>616
           </h1>
           {meta.splashTextEnabled ? (
             <p
@@ -78,11 +111,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             </p>
           ) : null}
         </div>
-        
-        <p className="text-muted-foreground text-sm md:text-base leading-relaxed mb-12 max-w-sm">
-          The block turned after dark. You have a basement bar, a crew worth saving, and one night at a time.
-        </p>
-        
+
         <motion.button
           type="button"
           whileHover={{ scale: 1.02 }}
@@ -94,6 +123,16 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
           <div className="absolute inset-0 bg-white translate-y-[100%] group-hover:translate-y-[0%] transition-transform duration-300 ease-out" />
           <span className="relative z-10 group-hover:text-black transition-colors duration-300">Enter the hideout</span>
         </motion.button>
+
+        <a
+          href="https://gsix.online"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-8 text-[10px] uppercase tracking-widest text-white/35 transition-colors hover:text-white/65"
+          data-testid="link-intro-credit"
+        >
+          Powered by LokServices · Designed by GSixDesigns
+        </a>
       </motion.div>
     </div>
   );
