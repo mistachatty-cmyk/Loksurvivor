@@ -134,8 +134,8 @@ export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
   }, [seats, ended]);
 
   return (
-    <div className="relative w-full h-full">
-      <canvas ref={canvasRef} className="w-full h-full block" />
+    <div className="relative h-dvh w-full overflow-hidden bg-black">
+      <canvas ref={canvasRef} className="block h-full w-full" />
       <div className="absolute top-3 right-3 rounded-md bg-black/60 px-3 py-2 font-mono text-xs text-white min-w-[180px]">
         <div className="mb-1 flex items-center justify-between text-white/70">
           <span>LokSurvivorArena</span>

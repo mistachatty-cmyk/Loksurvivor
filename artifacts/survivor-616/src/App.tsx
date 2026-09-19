@@ -26,7 +26,8 @@ import {
   resolveTravelEncounterOpponent,
   type ResolvedTravelEncounterOpponent,
 } from '@/game/travelEncounter';
-import type { RunResult } from '@/game/types';
+import type { AreaDef, RunResult } from '@/game/types';
+import type { ArenaSeat } from '@/game/arena/arenaWorld';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
@@ -55,6 +56,8 @@ const CardShopPanel = lazy(() => import('@/ui/CardShopPanel').then(m => ({ defau
 const ThreatMatrixScreen = lazy(() => import('@/ui/ThreatMatrixScreen').then(m => ({ default: m.ThreatMatrixScreen })));
 const MapBuilder = lazy(() => import('@/ui/MapBuilder').then(m => ({ default: m.MapBuilder })));
 const SectorCommandScreen = lazy(() => import('@/ui/SectorCommandScreen').then(m => ({ default: m.SectorCommandScreen })));
+const ArenaSetupScreen = lazy(() => import('@/ui/ArenaSetupScreen').then(m => ({ default: m.ArenaSetupScreen })));
+const ArenaScreen = lazy(() => import('@/game/ArenaScreen').then(m => ({ default: m.ArenaScreen })));
 const TravelEncounterOverlay = lazy(() => import('@/ui/TravelEncounterOverlay').then(m => ({ default: m.TravelEncounterOverlay })));
 
 const queryClient = new QueryClient();
@@ -84,6 +87,8 @@ type Screen =
   | { name: 'threat-matrix' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
+  | { name: 'arena-setup' }
+  | { name: 'arena'; area: AreaDef; seats: ArenaSeat[] }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
 
@@ -280,6 +285,7 @@ function Game() {
           onOpen={openPanel}
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
+          onOpenArena={() => setScreen({ name: 'arena-setup' })}
           onBack={() => setScreen({ name: 'intro' })}
         />
       );
@@ -291,6 +297,23 @@ function Game() {
             onBack={goHub}
             onLaunch={(missionId) => setScreen({ name: 'run', areaId: missionId, missionId })}
           />
+        </Suspense>
+      );
+
+    case 'arena-setup':
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <ArenaSetupScreen
+            onBack={goHub}
+            onLaunch={(area, seats) => setScreen({ name: 'arena', area, seats })}
+          />
+        </Suspense>
+      );
+
+    case 'arena':
+      return (
+        <Suspense fallback={<ScreenFallback />}>
+          <ArenaScreen area={screen.area} seats={screen.seats} onExit={goHub} />
         </Suspense>
       );
 
