@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -19,7 +19,20 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import { advanceDailyContracts } from '@/game/data/contracts';
-import type { RunResult } from '@/game/types';
+import { createRng } from '@/game/engine/math';
+import {
+  TRAVEL_ENCOUNTER_COOLDOWN_MS,
+  TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS,
+  TRAVEL_ENCOUNTER_TRIGGERS,
+  type TravelEncounterSource,
+} from '@/game/data/travelEncounters';
+import {
+  pickTravelEncounterOpponent,
+  resolveTravelEncounterOpponent,
+  type ResolvedTravelEncounterOpponent,
+} from '@/game/travelEncounter';
+import type { AreaDef, RunResult } from '@/game/types';
+import type { ArenaSeat } from '@/game/arena/arenaWorld';
 import { ArchivePanel } from '@/ui/ArchivePanel';
 import { AreaSelect } from '@/ui/AreaSelect';
 import { BestiaryPanel } from '@/ui/BestiaryPanel';
@@ -40,11 +53,15 @@ import { CardShopPanel } from '@/ui/CardShopPanel';
 import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
+import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
+import { TravelEncounterOverlay } from '@/ui/TravelEncounterOverlay';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
 import { MapBuilder } from '@/ui/MapBuilder';
 import { SectorCommandScreen } from '@/ui/SectorCommandScreen';
+import { ArenaSetupScreen } from '@/ui/ArenaSetupScreen';
+import { ArenaScreen } from '@/game/ArenaScreen';
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
 
@@ -72,8 +89,18 @@ type Screen =
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
+  | { name: 'arena-setup' }
+  | { name: 'arena'; area: AreaDef; seats: ArenaSeat[] }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
+
+interface PendingTravelEncounter {
+  opponent: ResolvedTravelEncounterOpponent;
+  rng: () => number;
+  label: string;
+  /** The navigation that was intercepted; run once the popup resolves (win/lose/flee). */
+  onResolved: () => void;
+}
 
 /**
  * Lets a screen be opened directly (e.g. `?screen=areas`) so any part of the
@@ -117,6 +144,7 @@ function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
+  const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
 
   const goHub = useCallback(() => {
@@ -216,6 +244,37 @@ function Game() {
     [completeRun, completeSectorMission, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
+  const lastTravelEncounterAtRef = useRef(0);
+
+  const attemptTravelEncounter = useCallback(
+    (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void) => {
+      // Never ambush a brand-new player before they've finished a real run
+      // and learned the basics, and never fire back-to-back within a
+      // session -- both gaps in the original v1 rollout.
+      if (
+        !meta.travelEncountersEnabled ||
+        meta.totalRuns < TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS ||
+        Date.now() - lastTravelEncounterAtRef.current < TRAVEL_ENCOUNTER_COOLDOWN_MS
+      ) {
+        proceed();
+        return;
+      }
+      const trigger = TRAVEL_ENCOUNTER_TRIGGERS.find(
+        (candidate) => candidate.source === source && (source !== 'hub-room' || candidate.roomId === targetRoomId),
+      );
+      if (!trigger || Math.random() >= trigger.chance) {
+        proceed();
+        return;
+      }
+      lastTravelEncounterAtRef.current = Date.now();
+      const rng = createRng(Date.now());
+      const opponent = resolveTravelEncounterOpponent(pickTravelEncounterOpponent(rng), rng);
+      setTravelEncounter({ opponent, rng, label: trigger.label, onResolved: proceed });
+    },
+    [meta.travelEncountersEnabled, meta.totalRuns],
+  );
+
+  function renderScreen(): ReactNode {
   switch (screen.name) {
     case 'intro':
       return (
@@ -235,17 +294,29 @@ function Game() {
       return (
         <HubScreen
           roomId={roomId}
-          onChangeRoom={(nextRoomId) => { sfx.play('uiNav'); setRoomId(nextRoomId); }}
+          onChangeRoom={(nextRoomId) => attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); })}
           onOpen={openPanel}
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
           onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
+          onOpenArena={() => setScreen({ name: 'arena-setup' })}
           onBack={() => setScreen({ name: 'intro' })}
         />
       );
 
     case 'lokpet-battle':
       return <LokPetBattleScreen onReturnToHub={goHub} initialTab={screen.initialTab} />;
+
+    case 'arena-setup':
+      return (
+        <ArenaSetupScreen
+          onBack={goHub}
+          onLaunch={(area, seats) => setScreen({ name: 'arena', area, seats })}
+        />
+      );
+
+    case 'arena':
+      return <ArenaScreen area={screen.area} seats={screen.seats} onExit={goHub} />;
 
     case 'sector-command':
       return (
@@ -268,7 +339,14 @@ function Game() {
       );
 
     case 'areas':
-      return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
+      return (
+        <AreaSelect
+          onBack={goHub}
+          onLaunch={(areaId, challengeIds) =>
+            attemptTravelEncounter('run-launch', undefined, () => setScreen({ name: 'run', areaId, challengeIds }))
+          }
+        />
+      );
 
     case 'bestiary':
       return <BestiaryPanel onBack={goHub} />;
@@ -370,6 +448,25 @@ function Game() {
     default:
       return null;
   }
+  }
+
+  return (
+    <>
+      {renderScreen()}
+      {travelEncounter && (
+        <TravelEncounterOverlay
+          opponent={travelEncounter.opponent}
+          rng={travelEncounter.rng}
+          label={travelEncounter.label}
+          onClose={() => {
+            const proceed = travelEncounter.onResolved;
+            setTravelEncounter(null);
+            proceed();
+          }}
+        />
+      )}
+    </>
+  );
 }
 
 function Providers({ children }: { children: ReactNode }) {
@@ -381,6 +478,7 @@ function Providers({ children }: { children: ReactNode }) {
             <MusicProvider>
               {children}
               <MusicNowPlaying />
+              <FocusWidgetMount />
             </MusicProvider>
           </CloudSyncProvider>
         </MetaProvider>

@@ -37,6 +37,8 @@ export interface HubScreenProps {
   onOpenSectorCommand: () => void;
   /** Opens the LokPet battle arena & sparring sandbox in the Lit Corner. */
   onOpenLokPetBattle?: () => void;
+  /** Opens the LokSurvivorArena seat/area picker. */
+  onOpenArena: () => void;
   /** Returns to the cold-open title screen. */
   onBack?: () => void;
 }
@@ -95,7 +97,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onBack }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onBack }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
@@ -409,6 +411,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                       <span className="block text-[10px] text-pink-200/70">LokPet Battles · Sparring & League</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenArena}
+                    data-testid="button-hideout-arena"
+                    className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
+                  >
+                    <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
+                      <span className="block text-[10px] text-violet-100/60">2-4 players · most kills wins</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
                   </button>
                 )}
               </div>

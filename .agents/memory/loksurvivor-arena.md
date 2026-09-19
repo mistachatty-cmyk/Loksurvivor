@@ -70,10 +70,20 @@ for the skeleton.
   broadcast diffs). Host-authoritative input relay, not full server-side
   physics, for the first real pass; room codes via a `?room=` URL param, no
   accounts.
-- **Menu wiring.** `ArenaScreen` takes `area`/`seats`/`onExit` as props and
-  isn't wired into the game's mode-select UI yet — a caller has to construct
-  it directly today.
-- **Guest character choice UI**, ready-up flow, and a real "1-4" seat picker
-  — `ArenaScreen` currently takes a fixed `seats` array.
+- **Menu wiring — done.** `HubScreen`'s main-floor room has a third button
+  (`onOpenArena`, next to Sanctum computer / Sector Command, same
+  `activeRoom.id === 'main-floor'`-gated pattern) opening a new
+  `src/ui/ArenaSetupScreen.tsx`: an area dropdown, a 2-4 seat stepper, and a
+  per-seat character `<select>` (filtered to `meta.unlockedCharacterIds`) —
+  the "genuinely new component" flagged below, since no multi-character-
+  selection UI existed anywhere else to adapt. Its `onLaunch(area, seats)`
+  feeds two new `App.tsx` `Screen` variants (`'arena-setup'`/`'arena'`,
+  mirroring the `'sector-command'` case exactly) that mount `ArenaScreen`.
+  Seat ids are `'host'`/`'p2'`/`'p3'`/`'p4'`, matching what `killEnemy`'s
+  `killerId` and `arenaStandings` already expect.
+- **Ready-up flow** (confirm-before-launch beyond the picker's own launch
+  button) is still unbuilt — not needed for a local-only skeleton where the
+  host launches for everyone at the same keyboard.
 - **Per-host-weapon kill attribution** and true PvP (explicitly out of
   scope per the user's original ask — kill-count competition only).
+- **Networking** (see above) remains the only large piece left.
