@@ -19,7 +19,7 @@ import { blendSpritePalettes } from '@/game/data/characterSkins';
 
 import { drawRig, drawShadow } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
-import { clamp } from '@/game/engine/math';
+import { clamp, dist2 } from '@/game/engine/math';
 
 /** World units of sprite height per rig pixel. */
 const SPRITE_SCALE = 2.05;

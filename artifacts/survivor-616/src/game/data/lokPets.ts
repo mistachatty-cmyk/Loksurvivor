@@ -138,8 +138,13 @@ function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element
 }
 
 /** Generate one deterministic, chest-ready LokPet blueprint. */
-export function rollLokPet(rng: () => number): LokPetRoll {
-  const variant = pickWeightedVariant(rng);
+export function rollLokPet(
+  rng: () => number,
+  options?: { fixedVariantId?: string },
+): LokPetRoll {
+  const variant = options?.fixedVariantId
+    ? LOKPET_VARIANTS.find((v) => v.id === options.fixedVariantId) ?? pickWeightedVariant(rng)
+    : pickWeightedVariant(rng);
   const special = SPECIAL_LOKPET_LOADOUTS[variant.id];
   if (special) {
     return {
