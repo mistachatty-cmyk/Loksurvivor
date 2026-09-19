@@ -4,10 +4,12 @@ import { createRng } from '@/game/engine/math';
 import { createInitialMeta, reducer } from '@/game/state/metaStore';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { CARD_MANIFESTS } from '@/game/data/cards';
+import { HUB_ROOMS } from '@/game/data/progression';
 import {
   BASE_CARD_THROW_DAMAGE,
   TRAVEL_ENCOUNTER_OPPONENTS,
   TRAVEL_ENCOUNTER_REWARD,
+  TRAVEL_ENCOUNTER_TRIGGERS,
   UNARMED_PUNCH_DAMAGE,
   cardThrowDamage,
 } from './data/travelEncounters';
@@ -36,6 +38,13 @@ test('every curated enemy id resolves and every lokpet roll is populated', () =>
   const resolved = resolveTravelEncounterOpponent({ kind: 'lokpet' }, createRng(1));
   assert.ok(resolved.lokPetRoll);
   assert.ok(resolved.hp > 0);
+});
+
+test('every hub-room trigger points at a real HubRoomDef id', () => {
+  const hubRoomIds = new Set(HUB_ROOMS.map((room) => room.id));
+  for (const trigger of TRAVEL_ENCOUNTER_TRIGGERS) {
+    if (trigger.source === 'hub-room') assert.ok(trigger.roomId && hubRoomIds.has(trigger.roomId), `missing hub room id: ${trigger.roomId}`);
+  }
 });
 
 test('a scripted attack sequence drives status to won with exact hp/round', () => {
@@ -139,4 +148,13 @@ test('completeTravelEncounter is a no-op on loss or flee', () => {
   assert.equal(reducer(state, { type: 'completeTravelEncounter', result: lostResult }), state);
   const fledResult: TravelEncounterResult = { ...lostResult, outcome: 'fled' };
   assert.equal(reducer(state, { type: 'completeTravelEncounter', result: fledResult }), state);
+});
+
+test('a win against an enemy counts toward the same Bestiary tally a real run would', () => {
+  const state = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
+  const wonResult: TravelEncounterResult = { outcome: 'won', opponentKind: 'enemy', enemyId: 'nightcrawler', caughtLokPet: false, rewardCred: TRAVEL_ENCOUNTER_REWARD.cred, rewardCardCredits: TRAVEL_ENCOUNTER_REWARD.cardCredits };
+  const next = reducer(state, { type: 'completeTravelEncounter', result: wonResult });
+  assert.equal(next.meta.bestiary.nightcrawler, 1);
+  const again = reducer(next, { type: 'completeTravelEncounter', result: wonResult });
+  assert.equal(again.meta.bestiary.nightcrawler, 2);
 });

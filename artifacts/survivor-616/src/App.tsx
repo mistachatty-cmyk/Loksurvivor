@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -20,7 +20,12 @@ import {
 } from '@/game/state/metaStore';
 import { advanceDailyContracts } from '@/game/data/contracts';
 import { createRng } from '@/game/engine/math';
-import { TRAVEL_ENCOUNTER_TRIGGERS, type TravelEncounterSource } from '@/game/data/travelEncounters';
+import {
+  TRAVEL_ENCOUNTER_COOLDOWN_MS,
+  TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS,
+  TRAVEL_ENCOUNTER_TRIGGERS,
+  type TravelEncounterSource,
+} from '@/game/data/travelEncounters';
 import {
   pickTravelEncounterOpponent,
   resolveTravelEncounterOpponent,
@@ -236,9 +241,18 @@ function Game() {
     [completeRun, completeSectorMission, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
+  const lastTravelEncounterAtRef = useRef(0);
+
   const attemptTravelEncounter = useCallback(
     (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void) => {
-      if (!meta.travelEncountersEnabled) {
+      // Never ambush a brand-new player before they've finished a real run
+      // and learned the basics, and never fire back-to-back within a
+      // session -- both gaps in the original v1 rollout.
+      if (
+        !meta.travelEncountersEnabled ||
+        meta.totalRuns < TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS ||
+        Date.now() - lastTravelEncounterAtRef.current < TRAVEL_ENCOUNTER_COOLDOWN_MS
+      ) {
         proceed();
         return;
       }
@@ -249,11 +263,12 @@ function Game() {
         proceed();
         return;
       }
+      lastTravelEncounterAtRef.current = Date.now();
       const rng = createRng(Date.now());
       const opponent = resolveTravelEncounterOpponent(pickTravelEncounterOpponent(rng), rng);
       setTravelEncounter({ opponent, rng, label: trigger.label, onResolved: proceed });
     },
-    [meta.travelEncountersEnabled],
+    [meta.travelEncountersEnabled, meta.totalRuns],
   );
 
   function renderScreen(): ReactNode {

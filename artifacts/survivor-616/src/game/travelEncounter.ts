@@ -24,7 +24,8 @@ export interface TravelEncounterTurnLogEntry {
   round: number;
   actor: 'player' | 'opponent';
   damage: number;
-  cardId?: string;
+  /** Human-readable action description ("Threw Rubber District", "Sent Biscuit", "Threw a punch") for the on-screen log line. */
+  label?: string;
 }
 
 export interface TravelEncounterState {
@@ -96,11 +97,11 @@ export function createTravelEncounterState(player: TravelEncounterCombatant, opp
   return { status: 'active', round: 1, player: { ...player }, opponent: { ...opponent }, log: [] };
 }
 
-/** First half of a round: the player's throw/punch lands on the opponent. Round doesn't advance here -- see applyOpponentAttack. */
-export function applyPlayerAttack(state: TravelEncounterState, damage: number, cardId?: string): TravelEncounterState {
+/** First half of a round: the player's throw/punch/pet-send lands on the opponent. Round doesn't advance here -- see applyOpponentAttack. */
+export function applyPlayerAttack(state: TravelEncounterState, damage: number, label?: string): TravelEncounterState {
   if (state.status !== 'active') return state;
   const hp = Math.max(0, state.opponent.hp - damage);
-  const log = [...state.log, { round: state.round, actor: 'player' as const, damage, cardId }];
+  const log = [...state.log, { round: state.round, actor: 'player' as const, damage, label }];
   if (hp <= 0) return { ...state, opponent: { ...state.opponent, hp }, status: 'won', log };
   return { ...state, opponent: { ...state.opponent, hp }, log };
 }

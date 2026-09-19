@@ -56,7 +56,9 @@ export const TRAVEL_ENCOUNTER_OPPONENTS: TravelEncounterOpponentEntry[] = [
   { opponent: { kind: 'enemy', enemyId: 'sodium-lamp' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'corner-cutter' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'marquee-static' }, weight: 2 },
-  { opponent: { kind: 'lokpet' }, weight: 11 },
+  { opponent: { kind: 'enemy', enemyId: 'neon-leech' }, weight: 2 },
+  { opponent: { kind: 'enemy', enemyId: 'pallet-wraith' }, weight: 2 },
+  { opponent: { kind: 'lokpet' }, weight: 15 },
 ];
 
 export const TRAVEL_ENCOUNTER_REWARD = { cred: 6, cardCredits: 1, catchChance: 0.35 };
@@ -65,6 +67,21 @@ export const PLAYER_TRAVEL_HP = 50;
 export const UNARMED_PUNCH_DAMAGE = 5;
 export const BASE_CARD_THROW_DAMAGE = 8;
 export const BATTLE_DECK_SLOTS = 6;
+
+/**
+ * A once-per-fight bonus attack using the player's own selected LokPet
+ * companion (`meta.selectedLokPetIds[0]`) -- closes the gap between the
+ * original "fight using your lock pet" request and v1, which otherwise only
+ * offered card-throws/an unarmed punch. Visually it's still the player's
+ * own left-side sprite acting (no third actor rendered) -- a deliberate
+ * "classic version" simplification, not a bug. See travel-encounters.md.
+ */
+export const PET_ASSIST_DAMAGE_MULT = 1.4;
+
+/** Minimum real-world ms between two travel encounters firing in one session -- prevents rapid-fire spam from bouncing between the storefront and other rooms. */
+export const TRAVEL_ENCOUNTER_COOLDOWN_MS = 45_000;
+/** Don't ambush a brand-new player before they've finished a single real run and learned the basics. */
+export const TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS = 1;
 
 /**
  * Deliberately its own, much flatter curve than passiveCards.ts's

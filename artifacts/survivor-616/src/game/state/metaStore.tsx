@@ -1692,10 +1692,17 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const caughtPet = action.result.caughtLokPet && action.result.lokPetRoll
         ? [{ id: `pet-${Date.now().toString(36)}-0-${action.result.lokPetRoll.variantId}`, roll: action.result.lokPetRoll, stamina: PET_STAMINA_MAX }]
         : [];
+      // A travel-encounter win against an enemy counts toward the same
+      // Bestiary defeat tally a real run would -- otherwise this feature is
+      // invisible to existing progression UI.
+      const bestiary = action.result.opponentKind === 'enemy' && action.result.enemyId
+        ? { ...state.meta.bestiary, [action.result.enemyId]: (state.meta.bestiary[action.result.enemyId] ?? 0) + 1 }
+        : state.meta.bestiary;
       return {
         ...state,
         meta: {
           ...state.meta,
+          bestiary,
           cred: state.meta.cred + action.result.rewardCred,
           cardCredits: state.meta.cardCredits + action.result.rewardCardCredits,
           savedLokPets: [...caughtPet, ...state.meta.savedLokPets].slice(0, 48),
