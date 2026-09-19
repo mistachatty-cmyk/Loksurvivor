@@ -142,7 +142,9 @@ export function encodeWav(buffer: AudioBuffer): ArrayBuffer {
   // Interleave. Reading each channel once and striding the writes is markedly
   // faster than calling getChannelData per frame.
   let offset = 44;
-  const data = Array.from({ length: channels }, (_, channel) => buffer.getChannelData(channel));
+  const data = Array.from({ length: channels }, (_, channel) =>
+    channel < buffer.numberOfChannels ? buffer.getChannelData(channel) : new Float32Array(frames),
+  );
   for (let frame = 0; frame < frames; frame += 1) {
     for (let channel = 0; channel < channels; channel += 1) {
       const sample = Math.max(-1, Math.min(1, data[channel]![frame] ?? 0));

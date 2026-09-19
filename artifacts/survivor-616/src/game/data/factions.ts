@@ -127,6 +127,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#06b6d4',
     roster: ['soul-extractor', 'digitized-phantom', 'bit-rot', 'dust-mite', 'director-clapper', 'quantum-weaver'],
   },
+  {
+    id: 'arbor-collective',
+    name: 'Arbor Collective',
+    description: 'Bio-digital canopy flora and razor holo-bramble mimics infiltrating decommissioned data corridors.',
+    accent: '#34d399',
+    roster: ['cyber-root-trapper', 'digital-mimic-tree', 'spore-arbor-mortar'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

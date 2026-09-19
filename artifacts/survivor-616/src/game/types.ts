@@ -112,12 +112,16 @@ export interface OwnedCardRecord {
 export type LokPetFamily = 'animal' | 'ghoul' | 'bat' | 'mote' | 'blob' | 'mechanical';
 export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jelly' | 'clockwork'
   | 'prism-moth' | 'void-pup' | 'ember-koi' | 'clock-beetle'
-  | 'solar-owl' | 'shadow-mantis' | 'glitch-fox' | 'magnet-ursa';
+  | 'solar-owl' | 'shadow-mantis' | 'glitch-fox' | 'magnet-ursa'
+  | 'cyber-hydra' | 'plasma-kitsune' | 'nano-phoenix' | 'titan-colossus'
+  | 'chrono-hare' | 'byte-serpent' | 'cosmic-axolotl' | 'storm-griffin';
 export type LokPetAttackKind = 'shot' | 'rapid-shot' | 'heavy-shot' | 'pulse' | 'explosion';
 export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow';
 export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
 export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescue' | 'clock-pause'
-  | 'solar-flare' | 'mantis-slice' | 'phase-dash' | 'polar-pull';
+  | 'solar-flare' | 'mantis-slice' | 'phase-dash' | 'polar-pull'
+  | 'tri-laser' | 'plasma-orbit' | 'rebirth-burst' | 'seismic-slam'
+  | 'time-warp' | 'glitch-strike' | 'starlight-heal' | 'thunder-claw';
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
@@ -187,6 +191,18 @@ export interface SavedLokPet {
   roll: LokPetRoll;
   /** One charge is spent when the pet joins a run; elixirs restore it. */
   stamina: number;
+  /** Current battle level (1-50), earned via LokPet battles and treats. */
+  level?: number;
+  /** Current battle experience points. */
+  exp?: number;
+  /** Lifetime battle victories in sparring, league, and gauntlet. */
+  battlesWon?: number;
+  /** Total battles fought. */
+  battlesFought?: number;
+  /** Pinned favorite in kennel and battle party selector. */
+  favorite?: boolean;
+  /** Equipped battle trinket/tag. */
+  equippedTrinket?: string;
 }
 
 /**
@@ -552,6 +568,10 @@ export interface EvolutionDef {
   name: string;
   description: string;
   baseWeaponId: string;
+  /** Evolution partner weapon requirement: requires owning this weapon maxed (level 8). */
+  requiredWeaponId?: string;
+  requiredWeaponLevel?: number;
+  requiredBaseLevel?: number;
   /** Legacy passive gate retained for compatibility with the original three cards. */
   requiredPassiveId?: string;
   characterId?: string;
@@ -816,7 +836,13 @@ export type EnemyBehavior =
   /** Photonic prism that reflects player shots into splitting laser needles. */
   | 'prism'
   /** Quantum tether that links to nearby allies with a hazardous beam. */
-  | 'weaver';
+  | 'weaver'
+  /** Cybernetic tree that roots into the ground and erupts branching thorn fissures. */
+  | 'root-trapper'
+  /** Camouflaged tree mimic that ambushes the player at close quarters. */
+  | 'mimic-tree'
+  /** Floating spore node that mortars digital lingering mist clouds. */
+  | 'spore-mortar';
 
 export interface EnemyDef {
   id: string;
@@ -913,7 +939,11 @@ export interface ObstacleDef {
      /** A heavy, wonky sentry block: zaps the player with a short-range bolt on a cadence. See oddity-arenas.md. */
      | 'attack-block'
      /** Null Sector only: a tall breakable server cabinet that overloads into a small AoE burst when destroyed. */
-     | 'server-rack';
+     | 'server-rack'
+     /** Tree Null map: real cybernetic digital tree with dense foliage and data trunk. */
+     | 'tree-digital'
+     /** Tree Null map: holographic decoy tree that flickers and permits projectile/player pass-through. */
+     | 'tree-fake';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
@@ -1915,6 +1945,14 @@ export interface MetaState {
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */
   lokCollectorPetsFound: number;
+  /** Sanctum LokPet League tier reached (0: unranked, 1-5: champion tiers). */
+  lokPetLeagueTier: number;
+  /** Total LokPet arena battles won. */
+  lokPetBattleWins: number;
+  /** Badges and crests earned from defeating league syndicate masters. */
+  lokPetBattleBadges: string[];
+  /** Treats available to feed and level up companions in the Lit Corner. */
+  lokPetTreats: number;
   /** Rare currency found by breaking street props, weighted toward endless mode. Spendable in the hideout vendor's relic category. */
   skeletonKeys: number;
   /** Rentable/buildable passive cred generators the player owns. See `data/generators.ts`. */

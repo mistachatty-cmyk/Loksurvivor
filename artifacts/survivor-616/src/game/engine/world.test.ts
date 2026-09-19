@@ -59,14 +59,12 @@ import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
 import { generateChunk } from '@/game/engine/chunks';
 import { createRng } from '@/game/engine/math';
 import {
-  characterLevelProgress,
   createInitialMeta,
   effectiveStats,
   getCharacterFatigueSummary,
   getLokPetDiscoveries,
   loadMeta,
   normalizeMeta,
-  playerLevelProgress,
   rewardCredMultiplier,
   reducer,
   startingWeaponLevel,
@@ -3262,94 +3260,45 @@ test('fog is presentation only — it never changes the simulation', () => {
   assert.equal(Math.round(foggy.player.hp), Math.round(clear.player.hp), 'fog changed incoming damage');
 });
 
-test('playerLevelProgress climbs monotonically, starts at 1, and stays uncapped', () => {
-  assert.equal(playerLevelProgress(0).level, 1);
+test('crazy internet culture and canvas weapons are defined, fire properly, and generate projectiles/effects', () => {
+  const crazyIds = [
+    'nyan-stream',
+    'popup-ad-storm',
+    'dialup-handshake',
+    'dom-tree-slicer',
+    'rickroll-resonance',
+    'bsod-annihilator',
+  ] as const;
 
-  const totals = [0, 1, 10, 50, 200, 1000, 5000];
-  const levels = totals.map((total) => playerLevelProgress(total).level);
-  for (let i = 1; i < levels.length; i += 1) {
-    assert.ok(levels[i]! >= levels[i - 1]!, `level regressed going from ${totals[i - 1]} to ${totals[i]} level-ups`);
+  for (const id of crazyIds) {
+    const def = WEAPONS_BY_ID[id];
+    assert.ok(def, `weapon ${id} must exist in WEAPONS_BY_ID`);
+    assert.ok(def.name.length > 0, `weapon ${id} must have a name`);
+    assert.ok(def.description.length > 0, `weapon ${id} must have a description`);
+    assert.ok(def.damage > 0, `weapon ${id} must have positive damage`);
   }
-  assert.ok(levels[levels.length - 1]! > levels[0]!, 'enough level-ups must eventually raise the player level');
-  assert.ok(playerLevelProgress(5000).level > 20, 'the curve has no hardcoded cap');
 
-  const progress = playerLevelProgress(100);
-  assert.ok(progress.levelUpsToNext > 0);
-  assert.ok(
-    progress.levelUpsIntoLevel >= 0 && progress.levelUpsIntoLevel < progress.levelUpsToNext,
-    'progress into the current level must never reach or exceed what the level needs',
-  );
-});
+  const area = {
+    ...AREAS[0]!,
+    durationSec: 120,
+    waves: [],
+  };
 
-test('completeRun folds this run\'s level-ups into the lifetime total forever', () => {
-  let state = { meta: createInitialMeta(), lastRun: null };
+  for (const id of crazyIds) {
+    const world = createWorld(area, testCharacter(id), CHARACTERS[0]!.stats, 777);
+    assert.equal(world.weapons[0]?.def.id, id);
+    if (world.weapons[0]) world.weapons[0].readyAt = 0;
 
-  const firstRun = runResult([], true);
-  firstRun.level = 4; // 3 level-ups
-  state = reducer(state, { type: 'completeRun', result: firstRun });
-  assert.equal(state.meta.totalLevelUps, 3);
+    let fired = false;
+    // Step world to allow weapon to trigger
+    for (let s = 0; s < 30; s += 1) {
+      stepWorld(world, 1 / 30, neutralInput);
+      if (world.projectiles.length > 0 || world.effects.length > 0) {
+        fired = true;
+      }
+    }
 
-  const secondRun = runResult([], false);
-  secondRun.level = 1; // reached level 1, i.e. no level-ups this run
-  state = reducer(state, { type: 'completeRun', result: secondRun });
-  assert.equal(state.meta.totalLevelUps, 3, 'a run with no level-ups must not change the lifetime total');
-
-  const thirdRun = runResult([], true);
-  thirdRun.level = 7; // 6 more level-ups
-  state = reducer(state, { type: 'completeRun', result: thirdRun });
-  assert.equal(state.meta.totalLevelUps, 9);
-
-  assert.equal(playerLevelProgress(state.meta.totalLevelUps).level, playerLevelProgress(9).level);
-});
-
-test('characterLevelProgress climbs monotonically, starts at 1, and stays uncapped', () => {
-  const meta = (levelUps: number) => ({ ...createInitialMeta(), characterLevelUps: { [CHARACTERS[0]!.id]: levelUps } });
-  assert.equal(characterLevelProgress(meta(0), CHARACTERS[0]!.id).level, 1);
-
-  const totals = [0, 1, 10, 50, 200, 1000, 5000];
-  const levels = totals.map((total) => characterLevelProgress(meta(total), CHARACTERS[0]!.id).level);
-  for (let i = 1; i < levels.length; i += 1) {
-    assert.ok(levels[i]! >= levels[i - 1]!, `level regressed going from ${totals[i - 1]} to ${totals[i]} level-ups`);
+    assert.ok(fired, `weapon ${id} should spawn projectiles or effects upon firing`);
   }
-  assert.ok(levels[levels.length - 1]! > levels[0]!, 'enough level-ups must eventually raise the character level');
-  assert.ok(characterLevelProgress(meta(5000), CHARACTERS[0]!.id).level > 20, 'the curve has no hardcoded cap');
-
-  const progress = characterLevelProgress(meta(100), CHARACTERS[0]!.id);
-  assert.ok(progress.levelUpsToNext > 0);
-  assert.ok(
-    progress.levelUpsIntoLevel >= 0 && progress.levelUpsIntoLevel < progress.levelUpsToNext,
-    'progress into the current level must never reach or exceed what the level needs',
-  );
 });
 
-test('completeRun folds level-ups into each character\'s own lifetime total independently', () => {
-  let state = { meta: createInitialMeta(), lastRun: null };
-  const shadeId = CHARACTERS[0]!.id;
-  const otherId = CHARACTERS[1]!.id;
-
-  const firstRun = runResult([], true);
-  firstRun.characterId = shadeId;
-  firstRun.level = 4; // 3 level-ups for shadeId
-  state = reducer(state, { type: 'completeRun', result: firstRun });
-  assert.equal(state.meta.characterLevelUps[shadeId], 3);
-  assert.equal(state.meta.characterLevelUps[otherId] ?? 0, 0, 'a different character must not receive this run\'s level-ups');
-
-  const secondRun = runResult([], false);
-  secondRun.characterId = otherId;
-  secondRun.level = 6; // 5 level-ups for otherId
-  state = reducer(state, { type: 'completeRun', result: secondRun });
-  assert.equal(state.meta.characterLevelUps[shadeId], 3, 'the first character\'s total must be untouched by a run played as another character');
-  assert.equal(state.meta.characterLevelUps[otherId], 5);
-
-  const thirdRun = runResult([], true);
-  thirdRun.characterId = shadeId;
-  thirdRun.level = 7; // 6 more level-ups for shadeId
-  state = reducer(state, { type: 'completeRun', result: thirdRun });
-  assert.equal(state.meta.characterLevelUps[shadeId], 9);
-  assert.equal(state.meta.characterLevelUps[otherId], 5, 'the other character\'s total must be untouched by this run');
-
-  const expectedLevelFor9 = characterLevelProgress({ ...createInitialMeta(), characterLevelUps: { [shadeId]: 9 } }, shadeId).level;
-  const expectedLevelFor5 = characterLevelProgress({ ...createInitialMeta(), characterLevelUps: { [otherId]: 5 } }, otherId).level;
-  assert.equal(characterLevelProgress(state.meta, shadeId).level, expectedLevelFor9);
-  assert.equal(characterLevelProgress(state.meta, otherId).level, expectedLevelFor5);
-});

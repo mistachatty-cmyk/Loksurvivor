@@ -127,6 +127,7 @@ export function estimateBufferBpm(buffer: AudioBuffer): {
   bpm: number;
   confidence: number;
 } {
+  if (!buffer || buffer.numberOfChannels <= 0) return { bpm: DEFAULT_BPM, confidence: 0 };
   const samples = buffer.getChannelData(0);
   const sampleRate = buffer.sampleRate;
   const binSamples = Math.max(1, Math.round((BIN_MS / 1000) * sampleRate));

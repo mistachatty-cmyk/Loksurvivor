@@ -111,4 +111,99 @@ export const AREAS_NULL_SECTOR: AreaDef[] = [
       squadWave({ fromSec: 300, toSec: 301, factionId: 'null-sector', ratePerSec: 1, burst: 1, formation: 'ring' }),
     ],
   },
+  {
+    id: 'tree-null',
+    name: 'Tree Null',
+    district: 'The Silicon Arboretum',
+    description:
+      'A subterranean bio-digital forest organized around Yggdrasil Null. Holographic decoys flicker among real cybernetic trees while ancient arboreal constructs defend the grove.',
+    backdrop: 'art/cellar.jpeg',
+    bounds: { w: 2600, h: 2600 },
+    ground: { base: '#03140d', tile: '#06261b', seam: '#10b981', glow: '#06b6d4' },
+    sky: 'roofed',
+    landmark: {
+      name: 'Yggdrasil Null',
+      description: 'The monumental core cyber-tree channeling pulsing bio-electric data down deep through the city bedrock.',
+      kind: 'plaza',
+      accent: '#10b981',
+    },
+    obstacles: [
+      // The Big Digital Real Tree right in the middle
+      { x: 0, y: 0, w: 120, h: 120, kind: 'tree-digital' },
+
+      // Inner ring: alternating real and fake digital trees around the central monument
+      { x: 0, y: -260, w: 56, h: 56, kind: 'tree-fake' },
+      { x: 184, y: -184, w: 56, h: 56, kind: 'tree-digital' },
+      { x: 260, y: 0, w: 56, h: 56, kind: 'tree-fake' },
+      { x: 184, y: 184, w: 56, h: 56, kind: 'tree-digital' },
+      { x: 0, y: 260, w: 56, h: 56, kind: 'tree-fake' },
+      { x: -184, y: 184, w: 56, h: 56, kind: 'tree-digital' },
+      { x: -260, y: 0, w: 56, h: 56, kind: 'tree-fake' },
+      { x: -184, y: -184, w: 56, h: 56, kind: 'tree-digital' },
+
+      // North grove - mix of real cyber trees and shimmering holographic mimics
+      { x: -480, y: -640, w: 52, h: 52, kind: 'tree-digital' },
+      { x: -360, y: -720, w: 52, h: 52, kind: 'tree-fake' },
+      { x: -220, y: -600, w: 52, h: 52, kind: 'tree-digital' },
+      { x: 0, y: -760, w: 60, h: 60, kind: 'tree-fake' },
+      { x: 220, y: -600, w: 52, h: 52, kind: 'tree-digital' },
+      { x: 360, y: -720, w: 52, h: 52, kind: 'tree-fake' },
+      { x: 480, y: -640, w: 52, h: 52, kind: 'tree-digital' },
+
+      // South grove - dense mixed labyrinth
+      { x: -480, y: 640, w: 52, h: 52, kind: 'tree-fake' },
+      { x: -360, y: 720, w: 52, h: 52, kind: 'tree-digital' },
+      { x: -220, y: 600, w: 52, h: 52, kind: 'tree-fake' },
+      { x: 0, y: 760, w: 60, h: 60, kind: 'tree-digital' },
+      { x: 220, y: 600, w: 52, h: 52, kind: 'tree-fake' },
+      { x: 360, y: 720, w: 52, h: 52, kind: 'tree-digital' },
+      { x: 480, y: 640, w: 52, h: 52, kind: 'tree-fake' },
+
+      // East grove & data-cache alcove
+      { x: 680, y: -320, w: 54, h: 54, kind: 'tree-digital' },
+      { x: 780, y: -180, w: 54, h: 54, kind: 'tree-fake' },
+      { x: 860, y: 0, w: 60, h: 60, kind: 'tree-digital' },
+      { x: 780, y: 180, w: 54, h: 54, kind: 'tree-fake' },
+      { x: 680, y: 320, w: 54, h: 54, kind: 'tree-digital' },
+      { x: 1050, y: 0, w: 46, h: 46, kind: 'attack-block' },
+
+      // West grove & data-cache alcove
+      { x: -680, y: -320, w: 54, h: 54, kind: 'tree-fake' },
+      { x: -780, y: -180, w: 54, h: 54, kind: 'tree-digital' },
+      { x: -860, y: 0, w: 60, h: 60, kind: 'tree-fake' },
+      { x: -780, y: 180, w: 54, h: 54, kind: 'tree-digital' },
+      { x: -680, y: 320, w: 54, h: 54, kind: 'tree-fake' },
+      { x: -1050, y: 0, w: 46, h: 46, kind: 'attack-block' },
+
+      // Corner sanctuaries with reflective surfaces and bio-roots
+      { x: 960, y: -960, w: 52, h: 52, kind: 'tree-digital' },
+      { x: 1080, y: -1080, w: 48, h: 48, kind: 'reflective-surface' },
+      { x: -960, y: -960, w: 52, h: 52, kind: 'tree-fake' },
+      { x: -1080, y: -1080, w: 48, h: 48, kind: 'reflective-surface' },
+      { x: 960, y: 960, w: 52, h: 52, kind: 'tree-fake' },
+      { x: 1080, y: 1080, w: 48, h: 48, kind: 'reflective-surface' },
+      { x: -960, y: 960, w: 52, h: 52, kind: 'tree-digital' },
+      { x: -1080, y: 1080, w: 48, h: 48, kind: 'reflective-surface' },
+    ],
+    durationSec: 600,
+    threat: 'severe',
+    rescueAllyId: 'archivist',
+    discoveryId: 'tree-null-log',
+    unlock: { kind: 'default' },
+    waves: [
+      // Primary tree enemy ramp: Root Sentries anchor, Mimic Trees rush from concealment, and Spore Arbors bombard
+      { fromSec: 0, toSec: 600, enemyId: 'cyber-root-trapper', ratePerSec: 0.18, burst: 1 },
+      { fromSec: 30, toSec: 600, enemyId: 'digital-mimic-tree', ratePerSec: 0.32, burst: 2, formation: 'pincer' },
+      { fromSec: 60, toSec: 600, enemyId: 'spore-arbor-mortar', ratePerSec: 0.22, burst: 1 },
+      // Escalating grove waves
+      ...escalatingWaves({ enemyId: 'digital-mimic-tree', baseRatePerSec: 0.35, matchLengthSec: 600, faction: 'Arbor Collective' }),
+      // Sudden pincer ambush waves from the decoys
+      { fromSec: 90, toSec: 570, enemyId: 'digital-mimic-tree', ratePerSec: 0.4, burst: 3, formation: 'pincer' },
+      // Ring ambush of root sentries encircling player at minutes 3 and 7
+      { fromSec: 180, toSec: 182, enemyId: 'cyber-root-trapper', ratePerSec: 1.5, burst: 4, formation: 'ring' },
+      { fromSec: 420, toSec: 422, enemyId: 'cyber-root-trapper', ratePerSec: 2.0, burst: 6, formation: 'ring' },
+      // Spore arbor mortar battery barrage
+      { fromSec: 240, toSec: 600, enemyId: 'spore-arbor-mortar', ratePerSec: 0.35, burst: 2 },
+    ],
+  },
 ];

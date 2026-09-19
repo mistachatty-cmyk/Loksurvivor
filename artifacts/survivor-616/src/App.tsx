@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -19,54 +19,36 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import { advanceDailyContracts } from '@/game/data/contracts';
-import { createRng } from '@/game/engine/math';
-import {
-  TRAVEL_ENCOUNTER_COOLDOWN_MS,
-  TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS,
-  TRAVEL_ENCOUNTER_TRIGGERS,
-  type TravelEncounterSource,
-} from '@/game/data/travelEncounters';
-import {
-  pickTravelEncounterOpponent,
-  resolveTravelEncounterOpponent,
-  type ResolvedTravelEncounterOpponent,
-} from '@/game/travelEncounter';
 import type { RunResult } from '@/game/types';
+import { ArchivePanel } from '@/ui/ArchivePanel';
+import { AreaSelect } from '@/ui/AreaSelect';
+import { BestiaryPanel } from '@/ui/BestiaryPanel';
+import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
+import { MusicPanel } from '@/ui/MusicPanel';
+import { RunSummary } from '@/ui/RunSummary';
+import { RecoveryPanel } from '@/ui/RecoveryPanel';
+import { VendorPanel } from '@/ui/VendorPanel';
+import { WorkshopPanel } from '@/ui/WorkshopPanel';
+import { SettingsPanel } from '@/ui/SettingsPanel';
+import { PaletteGalleryPanel } from '@/ui/PaletteGalleryPanel';
+import { SoundBoothPanel } from '@/ui/SoundBoothPanel';
+import { AccountPanel } from '@/ui/AccountPanel';
+import { FeedbackPanel } from '@/ui/FeedbackPanel';
+import { CardShopPanel } from '@/ui/CardShopPanel';
+import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
+import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
-import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
-
+import { MapBuilder } from '@/ui/MapBuilder';
+import { SectorCommandScreen } from '@/ui/SectorCommandScreen';
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
-const ArchivePanel = lazy(() => import('@/ui/ArchivePanel').then(m => ({ default: m.ArchivePanel })));
-const AreaSelect = lazy(() => import('@/ui/AreaSelect').then(m => ({ default: m.AreaSelect })));
-const BestiaryPanel = lazy(() => import('@/ui/BestiaryPanel').then(m => ({ default: m.BestiaryPanel })));
-const CharacterSelect = lazy(() => import('@/ui/CharacterSelect').then(m => ({ default: m.CharacterSelect })));
-const MusicPanel = lazy(() => import('@/ui/MusicPanel').then(m => ({ default: m.MusicPanel })));
-const RunSummary = lazy(() => import('@/ui/RunSummary').then(m => ({ default: m.RunSummary })));
-const RecoveryPanel = lazy(() => import('@/ui/RecoveryPanel').then(m => ({ default: m.RecoveryPanel })));
-const VendorPanel = lazy(() => import('@/ui/VendorPanel').then(m => ({ default: m.VendorPanel })));
-const WorkshopPanel = lazy(() => import('@/ui/WorkshopPanel').then(m => ({ default: m.WorkshopPanel })));
-const SettingsPanel = lazy(() => import('@/ui/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
-const PaletteGalleryPanel = lazy(() => import('@/ui/PaletteGalleryPanel').then(m => ({ default: m.PaletteGalleryPanel })));
-const SoundBoothPanel = lazy(() => import('@/ui/SoundBoothPanel').then(m => ({ default: m.SoundBoothPanel })));
-const AccountPanel = lazy(() => import('@/ui/AccountPanel').then(m => ({ default: m.AccountPanel })));
-const FeedbackPanel = lazy(() => import('@/ui/FeedbackPanel').then(m => ({ default: m.FeedbackPanel })));
-const CardShopPanel = lazy(() => import('@/ui/CardShopPanel').then(m => ({ default: m.CardShopPanel })));
-const ThreatMatrixScreen = lazy(() => import('@/ui/ThreatMatrixScreen').then(m => ({ default: m.ThreatMatrixScreen })));
-const MapBuilder = lazy(() => import('@/ui/MapBuilder').then(m => ({ default: m.MapBuilder })));
-const SectorCommandScreen = lazy(() => import('@/ui/SectorCommandScreen').then(m => ({ default: m.SectorCommandScreen })));
-const TravelEncounterOverlay = lazy(() => import('@/ui/TravelEncounterOverlay').then(m => ({ default: m.TravelEncounterOverlay })));
 
 const queryClient = new QueryClient();
-
-function ScreenFallback() {
-  return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>;
-}
 
 type Screen =
   | { name: 'intro' }
@@ -89,16 +71,9 @@ type Screen =
   | { name: 'threat-matrix' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
+  | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
-
-interface PendingTravelEncounter {
-  opponent: ResolvedTravelEncounterOpponent;
-  rng: () => number;
-  label: string;
-  /** The navigation that was intercepted; run once the popup resolves (win/lose/flee). */
-  onResolved: () => void;
-}
 
 /**
  * Lets a screen be opened directly (e.g. `?screen=areas`) so any part of the
@@ -113,6 +88,7 @@ function initialScreen(onboarded: boolean): Screen {
     if (requested === 'summary' && params.get('fixture') === 'lokpet-archive') {
       return { name: 'summary', result: createLokPetArchiveFixtureResult() };
     }
+    if (requested === 'lokpet-battle') return { name: 'lokpet-battle' };
     if (
       requested === 'hub' ||
       requested === 'roster' ||
@@ -141,7 +117,6 @@ function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen(meta.onboarded));
   const [roomId, setRoomId] = useState('main-floor');
-  const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
 
   const goHub = useCallback(() => {
@@ -241,37 +216,6 @@ function Game() {
     [completeRun, completeSectorMission, meta.fatigueByCharacter, meta.knownRelicIds],
   );
 
-  const lastTravelEncounterAtRef = useRef(0);
-
-  const attemptTravelEncounter = useCallback(
-    (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void) => {
-      // Never ambush a brand-new player before they've finished a real run
-      // and learned the basics, and never fire back-to-back within a
-      // session -- both gaps in the original v1 rollout.
-      if (
-        !meta.travelEncountersEnabled ||
-        meta.totalRuns < TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS ||
-        Date.now() - lastTravelEncounterAtRef.current < TRAVEL_ENCOUNTER_COOLDOWN_MS
-      ) {
-        proceed();
-        return;
-      }
-      const trigger = TRAVEL_ENCOUNTER_TRIGGERS.find(
-        (candidate) => candidate.source === source && (source !== 'hub-room' || candidate.roomId === targetRoomId),
-      );
-      if (!trigger || Math.random() >= trigger.chance) {
-        proceed();
-        return;
-      }
-      lastTravelEncounterAtRef.current = Date.now();
-      const rng = createRng(Date.now());
-      const opponent = resolveTravelEncounterOpponent(pickTravelEncounterOpponent(rng), rng);
-      setTravelEncounter({ opponent, rng, label: trigger.label, onResolved: proceed });
-    },
-    [meta.travelEncountersEnabled, meta.totalRuns],
-  );
-
-  function renderScreen(): ReactNode {
   switch (screen.name) {
     case 'intro':
       return (
@@ -291,151 +235,86 @@ function Game() {
       return (
         <HubScreen
           roomId={roomId}
-          onChangeRoom={(nextRoomId) => attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); })}
+          onChangeRoom={(nextRoomId) => { sfx.play('uiNav'); setRoomId(nextRoomId); }}
           onOpen={openPanel}
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
+          onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
           onBack={() => setScreen({ name: 'intro' })}
         />
       );
 
+    case 'lokpet-battle':
+      return <LokPetBattleScreen onReturnToHub={goHub} initialTab={screen.initialTab} />;
+
     case 'sector-command':
       return (
-        <Suspense fallback={<ScreenFallback />}>
-          <SectorCommandScreen
-            onBack={goHub}
-            onLaunch={(missionId) => setScreen({ name: 'run', areaId: missionId, missionId })}
-          />
-        </Suspense>
+        <SectorCommandScreen
+          onBack={goHub}
+          onLaunch={(missionId) => setScreen({ name: 'run', areaId: missionId, missionId })}
+        />
       );
 
     case 'map-editor':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />
-        </Suspense>
-      );
+      return <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />;
 
     case 'roster':
       return (
-        <Suspense fallback={<ScreenFallback />}>
-          <CharacterSelect
-            onBack={goHub}
-            onConfirm={() => setScreen({ name: 'areas' })}
-            onLaunchEpisode={(episodeId, areaId) => setScreen({ name: 'run', areaId, episodeId })}
-          />
-        </Suspense>
+        <CharacterSelect
+          onBack={goHub}
+          onConfirm={() => setScreen({ name: 'areas' })}
+          onLaunchEpisode={(episodeId, areaId) => setScreen({ name: 'run', areaId, episodeId })}
+        />
       );
 
     case 'areas':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <AreaSelect
-            onBack={goHub}
-            onLaunch={(areaId, challengeIds) =>
-              attemptTravelEncounter('run-launch', undefined, () => setScreen({ name: 'run', areaId, challengeIds }))
-            }
-          />
-        </Suspense>
-      );
+      return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
 
     case 'bestiary':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <BestiaryPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <BestiaryPanel onBack={goHub} />;
 
     case 'archive':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} />
-        </Suspense>
-      );
+      return <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} />;
 
     case 'music':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <MusicPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <MusicPanel onBack={goHub} />;
 
     case 'studio':
       return (
-        <Suspense fallback={<ScreenFallback />}>
+        <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading studio...</div>}>
           <StudioScreen onBack={goHub} />
         </Suspense>
       );
 
     case 'recovery':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <RecoveryPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <RecoveryPanel onBack={goHub} />;
 
     case 'vendor':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <VendorPanel onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />
-        </Suspense>
-      );
+      return <VendorPanel onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />;
 
     case 'workshop':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <WorkshopPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <WorkshopPanel onBack={goHub} />;
 
     case 'card-shop':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <CardShopPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <CardShopPanel onBack={goHub} />;
 
     case 'settings':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <SettingsPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <SettingsPanel onBack={goHub} />;
 
     case 'palette-store':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <PaletteGalleryPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <PaletteGalleryPanel onBack={goHub} />;
 
     case 'sound-booth':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <SoundBoothPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <SoundBoothPanel onBack={goHub} />;
 
     case 'account':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <AccountPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <AccountPanel onBack={goHub} />;
 
     case 'feedback':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <FeedbackPanel onBack={goHub} />
-        </Suspense>
-      );
+      return <FeedbackPanel onBack={goHub} />;
 
     case 'threat-matrix':
-      return (
-        <Suspense fallback={<ScreenFallback />}>
-          <ThreatMatrixScreen onBack={goHub} />
-        </Suspense>
-      );
+      return <ThreatMatrixScreen onBack={goHub} />;
 
     case 'run':
       {
@@ -468,52 +347,29 @@ function Game() {
       const canRetry = unlockedAreas.some((a) => a.id === screen.result.areaId) ||
         meta.customMaps.some((map) => map.id === screen.result.areaId);
       return (
-        <Suspense fallback={<ScreenFallback />}>
-          <RunSummary
-            result={screen.result}
-            areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
-            onReturnToHub={goHub}
-            onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
-            onOpenAccount={() => setScreen({ name: 'account' })}
-            onRetry={() =>
-              canRetry
-                ? setScreen({
-                    name: 'run',
-                    areaId: screen.result.areaId,
-                    episodeId: screen.result.episode?.id,
-                    challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
-                  })
-                : goHub()
-            }
-          />
-        </Suspense>
+        <RunSummary
+          result={screen.result}
+          areaOverride={meta.customMaps.find((map) => map.id === screen.result.areaId) ? customMapToArea(meta.customMaps.find((map) => map.id === screen.result.areaId)!) : undefined}
+          onReturnToHub={goHub}
+          onOpenArchive={(variantId) => setScreen({ name: 'archive', variantId })}
+          onOpenAccount={() => setScreen({ name: 'account' })}
+          onRetry={() =>
+            canRetry
+              ? setScreen({
+                  name: 'run',
+                  areaId: screen.result.areaId,
+                  episodeId: screen.result.episode?.id,
+                  challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
+                })
+              : goHub()
+          }
+        />
       );
     }
 
     default:
       return null;
   }
-  }
-
-  return (
-    <>
-      {renderScreen()}
-      {travelEncounter && (
-        <Suspense fallback={null}>
-          <TravelEncounterOverlay
-            opponent={travelEncounter.opponent}
-            rng={travelEncounter.rng}
-            label={travelEncounter.label}
-            onClose={() => {
-              const proceed = travelEncounter.onResolved;
-              setTravelEncounter(null);
-              proceed();
-            }}
-          />
-        </Suspense>
-      )}
-    </>
-  );
 }
 
 function Providers({ children }: { children: ReactNode }) {
@@ -525,7 +381,6 @@ function Providers({ children }: { children: ReactNode }) {
             <MusicProvider>
               {children}
               <MusicNowPlaying />
-              <FocusWidgetMount />
             </MusicProvider>
           </CloudSyncProvider>
         </MetaProvider>

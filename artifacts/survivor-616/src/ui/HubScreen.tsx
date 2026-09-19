@@ -2,7 +2,7 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { isPrimeTakeoverActive, useMeta, describeUnlock, playerLevelProgress } from '@/game/state/metaStore';
+import { isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
@@ -13,12 +13,9 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
-import { UpdatePopup } from './UpdatePopup';
-import { CHANGELOG, CURRENT_VERSION } from '@/game/data/changelog';
-import { pickCreditName } from '@/game/data/creditRotation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Megaphone } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -27,7 +24,6 @@ import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes
 import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
-import { AnimatedNumber } from './AnimatedNumber';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
 
@@ -39,6 +35,8 @@ export interface HubScreenProps {
   onOpenMapEditor: () => void;
   /** Opens the playable tactical campaign from the Sanctum computer. */
   onOpenSectorCommand: () => void;
+  /** Opens the LokPet battle arena & sparring sandbox in the Lit Corner. */
+  onOpenLokPetBattle?: () => void;
   /** Returns to the cold-open title screen. */
   onBack?: () => void;
 }
@@ -97,12 +95,10 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onBack }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onBack }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
-  const playerLevel = playerLevelProgress(meta.totalLevelUps);
-  const playerLevelPct = (playerLevel.levelUpsIntoLevel / Math.max(1, playerLevel.levelUpsToNext)) * 100;
   const roomNavRef = useRef<HTMLElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
@@ -157,7 +153,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext]);
 
   const weatherIcon = WEATHER_ICONS[scene.weather];
-  const footerCredit = useMemo(() => pickCreditName(), []);
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
     [roomAllies.length, scene.flavorLines, selectedCharacter.id],
@@ -172,7 +167,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
-      <UpdatePopup />
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}
@@ -251,19 +245,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               <p className="text-sm font-bold">
                 <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated
               </p>
-              <div className="mt-2" data-testid="widget-player-level">
-                <p className="flex items-center justify-start sm:justify-end gap-1.5 text-xs font-bold uppercase tracking-widest text-sky-300">
-                  <Zap className="h-3.5 w-3.5" />
-                  Player Lv <AnimatedNumber value={playerLevel.level} className="text-sm text-white" data-testid="text-player-level" />
-                </p>
-                <div className="mr-auto mt-1 h-1 w-32 overflow-hidden rounded-full bg-black/50 sm:mr-0 sm:ml-auto sm:w-40">
-                  <div
-                    className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
-                    style={{ width: `${playerLevelPct}%` }}
-                    data-testid="bar-player-level"
-                  />
-                </div>
-              </div>
               {meta.lootTokens > 0 && (
                 <p className="text-xs font-mono text-amber-400 mt-1">
                   <Package className="inline w-3 h-3 mr-1" />{meta.lootTokens} loot tokens
@@ -413,6 +394,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                       <span className="block text-[10px] text-amber-100/60">Direct captured units · campaign</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && onOpenLokPetBattle && (
+                  <button
+                    type="button"
+                    onClick={onOpenLokPetBattle}
+                    data-testid="button-hideout-lokpet-battle"
+                    className="group flex items-center gap-3 border border-pink-400/40 bg-pink-950/40 px-3 py-2 text-left transition hover:border-pink-300 hover:bg-pink-950/70"
+                  >
+                    <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
+                      <span className="block text-[10px] text-pink-200/70">LokPet Battles · Sparring & League</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
                   </button>
                 )}
               </div>
@@ -658,18 +654,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </button>
         )}
-
-        <button
-          type="button"
-          onClick={() => onOpen('unlocks')}
-          className="mt-6 flex w-full items-center gap-3 border-t border-border/60 pt-4 text-left transition-colors hover:text-primary"
-          data-testid="footer-updates"
-        >
-          <Megaphone className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            v{CURRENT_VERSION} · {CHANGELOG.length} updates · brought to you by {footerCredit} — see what's new
-          </span>
-        </button>
       </div>
     </motion.div>
   );

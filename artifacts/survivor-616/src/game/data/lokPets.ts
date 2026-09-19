@@ -34,6 +34,14 @@ export const LOKPET_VARIANTS: LokPetVariantDef[] = [
   { id: 'shadow-mantis', name: 'Shadow Mantis', family: 'mechanical', silhouette: 'shadow-mantis', palette: { body: '#0f172a', bodyDark: '#020617', accent: '#38bdf8', glow: '#818cf8', eye: '#e0f2fe' }, description: 'A sleek insectoid unit wielding razor scythes that carve through armor.', sizeScale: 0.88, legendary: true, specialAbility: 'mantis-slice', weight: 1 },
   { id: 'glitch-fox', name: 'Glitch Fox', family: 'animal', silhouette: 'glitch-fox', palette: { body: '#1e1b4b', bodyDark: '#0f0e26', accent: '#ec4899', glow: '#06b6d4', eye: '#fdf2f8' }, description: 'A quick-stepping runner flickering between frames of reality.', sizeScale: 0.92, legendary: true, specialAbility: 'phase-dash', weight: 1 },
   { id: 'magnet-ursa', name: 'Magnet Ursa', family: 'animal', silhouette: 'magnet-ursa', palette: { body: '#334155', bodyDark: '#1e293b', accent: '#a855f7', glow: '#38bdf8', eye: '#f8fafc' }, description: 'A heavy celestial beast whose core generates crushing magnetic gravitational wells.', sizeScale: 1.18, legendary: true, specialAbility: 'polar-pull', weight: 1 },
+  { id: 'cyber-hydra', name: 'Cyber Hydra', family: 'mechanical', silhouette: 'cyber-hydra', palette: { body: '#0284c7', bodyDark: '#082f49', accent: '#38bdf8', glow: '#06b6d4', eye: '#e0f2fe' }, description: 'A three-headed neural network serpent that projects synchronised laser volleys.', sizeScale: 1.15, legendary: true, specialAbility: 'tri-laser', weight: 1 },
+  { id: 'plasma-kitsune', name: 'Plasma Kitsune', family: 'animal', silhouette: 'plasma-kitsune', palette: { body: '#ea580c', bodyDark: '#431407', accent: '#f59e0b', glow: '#fbbf24', eye: '#fffbeb' }, description: 'A mystic nine-tailed fox dancing with orbiting plasma beads.', sizeScale: 0.96, legendary: true, specialAbility: 'plasma-orbit', weight: 1 },
+  { id: 'nano-phoenix', name: 'Nano Phoenix', family: 'bat', silhouette: 'nano-phoenix', palette: { body: '#f43f5e', bodyDark: '#4c0519', accent: '#fb7185', glow: '#fda4af', eye: '#fff1f2' }, description: 'A miniature reborn avatar of nanite flames that triggers emergency bursts upon danger.', sizeScale: 0.94, legendary: true, specialAbility: 'rebirth-burst', weight: 1 },
+  { id: 'titan-colossus', name: 'Titan Colossus', family: 'mechanical', silhouette: 'titan-colossus', palette: { body: '#475569', bodyDark: '#0f172a', accent: '#94a3b8', glow: '#cbd5e1', eye: '#f8fafc' }, description: 'A miniature steel juggernaut that cracks asphalt with thunderous seismic shockwaves.', sizeScale: 1.35, legendary: true, specialAbility: 'seismic-slam', weight: 1 },
+  { id: 'chrono-hare', name: 'Chrono Hare', family: 'animal', silhouette: 'chrono-hare', palette: { body: '#8b5cf6', bodyDark: '#2e1065', accent: '#c084fc', glow: '#e9d5ff', eye: '#faf5ff' }, description: 'A temporal sprinter that bends local spacetime to dodge lethal fire.', sizeScale: 0.85, legendary: true, specialAbility: 'time-warp', weight: 1 },
+  { id: 'byte-serpent', name: 'Byte Serpent', family: 'blob', silhouette: 'byte-serpent', palette: { body: '#10b981', bodyDark: '#022c22', accent: '#34d399', glow: '#6ee7b7', eye: '#ecfdf5' }, description: 'A segmented cybernetic viper that infects targets with code corruption.', sizeScale: 1.20, legendary: true, specialAbility: 'glitch-strike', weight: 1 },
+  { id: 'cosmic-axolotl', name: 'Cosmic Axolotl', family: 'animal', silhouette: 'cosmic-axolotl', palette: { body: '#ec4899', bodyDark: '#500724', accent: '#a855f7', glow: '#f472b6', eye: '#fdf2f8' }, description: 'An ethereal deep-space axolotl radiating gentle starlight regenerative waves.', sizeScale: 0.90, legendary: true, specialAbility: 'starlight-heal', weight: 1 },
+  { id: 'storm-griffin', name: 'Storm Griffin', family: 'bat', silhouette: 'storm-griffin', palette: { body: '#0284c7', bodyDark: '#0c4a6e', accent: '#facc15', glow: '#38bdf8', eye: '#fef08a' }, description: 'An electrified raptor with crackling talons and thunderous wingbeats.', sizeScale: 1.10, legendary: true, specialAbility: 'thunder-claw', weight: 1 },
   { id: 'dusk-pouncer', name: 'Dusk Pouncer', family: 'animal', silhouette: 'pouncer', palette: { body: '#312e81', bodyDark: '#1e1b4b', accent: '#a855f7', glow: '#c084fc', eye: '#fae8ff' }, description: 'An agile alley stalker that thrives when city neon flickers low.' },
   { id: 'echo-skull', name: 'Echo Skull', family: 'ghoul', silhouette: 'skull', palette: { body: '#475569', bodyDark: '#1e293b', accent: '#34d399', glow: '#10b981', eye: '#ecfdf5' }, description: 'A curious specter that vibrates in resonance with distant sirens.' },
   { id: 'volt-wing', name: 'Volt Wing', family: 'bat', silhouette: 'winglet', palette: { body: '#1e3a5f', bodyDark: '#0b192c', accent: '#facc15', glow: '#38bdf8', eye: '#ffffff' }, description: 'A high-voltage bat that discharges static arcs upon contact.' },
@@ -108,6 +116,14 @@ const SPECIAL_LOKPET_LOADOUTS: Record<string, {
   'shadow-mantis': { attackKind: 'rapid-shot', element: 'freeze', elementLabel: 'chilled alloy', traitLabel: 'Scythe Dance · razor pierce', stats: { health: 105, moveSpeed: 185, damage: 18, cooldownMs: 540, range: 290, projectileSpeed: 440, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 110000 } },
   'glitch-fox': { attackKind: 'heavy-shot', element: 'slow', elementLabel: 'phase kinetic', traitLabel: 'Glitch Step · shockwave flicker', stats: { health: 115, moveSpeed: 172, damage: 26, cooldownMs: 820, range: 310, projectileSpeed: 410, explosionRadius: 58, pulseRadius: 0, lifetimeMs: 115000 } },
   'magnet-ursa': { attackKind: 'explosion', element: 'none', elementLabel: 'graviton crush', traitLabel: 'Polar Core · vacuum crush', stats: { health: 140, moveSpeed: 124, damage: 28, cooldownMs: 880, range: 310, projectileSpeed: 340, explosionRadius: 84, pulseRadius: 90, lifetimeMs: 120000 } },
+  'cyber-hydra': { attackKind: 'rapid-shot', element: 'none', elementLabel: 'tri-laser barrage', traitLabel: 'Tri-Core Beam · piercing grid', stats: { health: 120, moveSpeed: 160, damage: 24, cooldownMs: 500, range: 360, projectileSpeed: 480, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 115000 } },
+  'plasma-kitsune': { attackKind: 'pulse', element: 'fire', elementLabel: 'plasma orbit', traitLabel: 'Foxfire Halo · swirling burn', stats: { health: 110, moveSpeed: 175, damage: 22, cooldownMs: 650, range: 310, projectileSpeed: 390, explosionRadius: 0, pulseRadius: 130, lifetimeMs: 112000 } },
+  'nano-phoenix': { attackKind: 'explosion', element: 'fire', elementLabel: 'reborn flame', traitLabel: 'Nanite Surge · cleansing ashes', stats: { health: 100, moveSpeed: 180, damage: 26, cooldownMs: 780, range: 330, projectileSpeed: 400, explosionRadius: 80, pulseRadius: 0, lifetimeMs: 110000 } },
+  'titan-colossus': { attackKind: 'explosion', element: 'none', elementLabel: 'seismic crush', traitLabel: 'Tectonic Force · shock rupture', stats: { health: 165, moveSpeed: 115, damage: 32, cooldownMs: 920, range: 280, projectileSpeed: 300, explosionRadius: 95, pulseRadius: 100, lifetimeMs: 125000 } },
+  'chrono-hare': { attackKind: 'rapid-shot', element: 'slow', elementLabel: 'chrono dilation', traitLabel: 'Second Hand · time stutter', stats: { health: 90, moveSpeed: 210, damage: 18, cooldownMs: 440, range: 300, projectileSpeed: 500, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 105000 } },
+  'byte-serpent': { attackKind: 'heavy-shot', element: 'freeze', elementLabel: 'glitch cipher', traitLabel: 'Byte Byte · null pointer shock', stats: { health: 130, moveSpeed: 155, damage: 27, cooldownMs: 760, range: 320, projectileSpeed: 420, explosionRadius: 60, pulseRadius: 0, lifetimeMs: 118000 } },
+  'cosmic-axolotl': { attackKind: 'pulse', element: 'slow', elementLabel: 'starlight pulse', traitLabel: 'Astral Dew · serene lullaby', stats: { health: 115, moveSpeed: 145, damage: 20, cooldownMs: 680, range: 350, projectileSpeed: 360, explosionRadius: 0, pulseRadius: 125, lifetimeMs: 120000 } },
+  'storm-griffin': { attackKind: 'heavy-shot', element: 'none', elementLabel: 'volt storm', traitLabel: 'Tempest Arc · thunder talon', stats: { health: 125, moveSpeed: 185, damage: 29, cooldownMs: 700, range: 340, projectileSpeed: 460, explosionRadius: 65, pulseRadius: 0, lifetimeMs: 115000 } },
 };
 
 function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element: LokPetElement; label: string } {
@@ -214,6 +230,14 @@ export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
   'shadow-mantis': 'Shadow Mantis',
   'glitch-fox': 'Glitch Fox',
   'magnet-ursa': 'Magnet Ursa',
+  'cyber-hydra': 'Cyber Hydra',
+  'plasma-kitsune': 'Plasma Kitsune',
+  'nano-phoenix': 'Nano Phoenix',
+  'titan-colossus': 'Titan Colossus',
+  'chrono-hare': 'Chrono Hare',
+  'byte-serpent': 'Byte Serpent',
+  'cosmic-axolotl': 'Cosmic Axolotl',
+  'storm-griffin': 'Storm Griffin',
 };
 
 /**
@@ -311,6 +335,93 @@ function magnetUrsaRig(): SpriteRig {
   return rig;
 }
 
+function cyberHydraRig(): SpriteRig {
+  const rig = serpentRig({ segments: 4, thickness: 12 });
+  rig.parts.push(
+    { key: 'crest', x: -8, y: 12, w: 4, h: 6, color: 'accent', z: 9 },
+    { key: 'crest', x: 0, y: 15, w: 5, h: 7, color: 'accentBright', z: 9 },
+    { key: 'crest', x: 8, y: 12, w: 4, h: 6, color: 'accent', z: 9 },
+    { key: 'aura', x: -10, y: 3, w: 20, h: 5, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 22;
+  return rig;
+}
+
+function plasmaKitsuneRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 14, length: 18, ears: true });
+  rig.parts.push(
+    { key: 'aura', x: -16, y: 6, w: 10, h: 12, color: 'glow', z: 0 },
+    { key: 'aura', x: -12, y: 10, w: 8, h: 10, color: 'accentBright', z: 0 },
+    { key: 'crest', x: 5, y: 11, w: 4, h: 5, color: 'accent', z: 8 },
+  );
+  rig.pixelHeight = 19;
+  return rig;
+}
+
+function nanoPhoenixRig(): SpriteRig {
+  const rig = blobRig({ height: 14, width: 15, wings: true, spikes: true });
+  rig.parts.push(
+    { key: 'aura', x: -15, y: 2, w: 30, h: 8, color: 'glow', z: 0 },
+    { key: 'crest', x: -5, y: 14, w: 10, h: 6, color: 'accentBright', z: 8 },
+    { key: 'face', x: -4, y: 8, w: 8, h: 4, color: 'skin', z: 9 },
+  );
+  rig.pixelHeight = 20;
+  return rig;
+}
+
+function titanColossusRig(): SpriteRig {
+  const rig = blobRig({ height: 18, width: 18, spikes: true, tendrils: true });
+  rig.parts.push(
+    { key: 'torso', x: -9, y: 4, w: 18, h: 12, color: 'bodyDark', z: 5 },
+    { key: 'crest', x: -7, y: 15, w: 14, h: 6, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -12, y: 1, w: 24, h: 4, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 23;
+  return rig;
+}
+
+function chronoHareRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 15, length: 15, ears: true });
+  rig.parts.push(
+    { key: 'crest', x: 3, y: 15, w: 3, h: 8, color: 'accentBright', z: 9 },
+    { key: 'crest', x: 6, y: 15, w: 3, h: 8, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -8, y: 3, w: 18, h: 5, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 21;
+  return rig;
+}
+
+function byteSerpentRig(): SpriteRig {
+  const rig = serpentRig({ segments: 5, thickness: 11 });
+  rig.parts.push(
+    { key: 'crest', x: 4, y: 11, w: 5, h: 5, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -12, y: 3, w: 22, h: 5, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 18;
+  return rig;
+}
+
+function cosmicAxolotlRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 12, length: 17, ears: true });
+  rig.parts.push(
+    { key: 'crest', x: 5, y: 8, w: 6, h: 8, color: 'accentBright', z: 9 },
+    { key: 'crest', x: -3, y: 8, w: 4, h: 7, color: 'accent', z: 8 },
+    { key: 'aura', x: -14, y: 4, w: 26, h: 6, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 18;
+  return rig;
+}
+
+function stormGriffinRig(): SpriteRig {
+  const rig = blobRig({ height: 15, width: 16, wings: true, spikes: true });
+  rig.parts.push(
+    { key: 'crest', x: 4, y: 14, w: 6, h: 6, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -14, y: 3, w: 28, h: 6, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 21;
+  return rig;
+}
+
 const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   pouncer: blobRig({ height: 15, width: 12, tendrils: true }),
   skull: blobRig({ height: 14, width: 11, spikes: true }),
@@ -326,6 +437,14 @@ const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   'shadow-mantis': shadowMantisRig(),
   'glitch-fox': glitchFoxRig(),
   'magnet-ursa': magnetUrsaRig(),
+  'cyber-hydra': cyberHydraRig(),
+  'plasma-kitsune': plasmaKitsuneRig(),
+  'nano-phoenix': nanoPhoenixRig(),
+  'titan-colossus': titanColossusRig(),
+  'chrono-hare': chronoHareRig(),
+  'byte-serpent': byteSerpentRig(),
+  'cosmic-axolotl': cosmicAxolotlRig(),
+  'storm-griffin': stormGriffinRig(),
 };
 
 export function lokPetRig(silhouette: LokPetSilhouette): SpriteRig {

@@ -746,6 +746,8 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
       'parking-meter': [14, 20, 46, 58],
       'attack-block': [50, 70, 50, 70],
       'server-rack': [46, 60, 56, 84],
+      'tree-digital': [50, 80, 50, 80],
+      'tree-fake': [50, 80, 50, 80],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);

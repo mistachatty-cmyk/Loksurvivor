@@ -371,7 +371,8 @@ function paintSoftCloud(
   scale = 1,
   lobes = CLOUD_LOBES,
 ) {
-  if (alpha <= 0.002) return;
+  if (alpha <= 0.002 || !Number.isFinite(alpha)) return;
+  if (rx <= 0 || ry <= 0 || scale <= 0 || !Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(scale) || !Number.isFinite(x) || !Number.isFinite(y)) return;
   const blob = softBlob(color);
   if (!blob) return;
   ctx.save();
@@ -379,6 +380,7 @@ function paintSoftCloud(
   for (const lobe of lobes) {
     const lrx = Math.max(1, lobe.rx * rx * scale);
     const lry = Math.max(1, lobe.ry * ry * scale);
+    if (!Number.isFinite(lrx) || !Number.isFinite(lry) || lrx <= 0 || lry <= 0) continue;
     ctx.drawImage(
       blob,
       x + lobe.dx * rx * scale - lrx,
@@ -750,6 +752,7 @@ function drawFogBanks(ctx: CanvasRenderingContext2D, w: World, left: number, top
       const ry = 64 + n * 54;
       const blob = softBlob('#b0becd');
       if (!blob) continue;
+      if (rx <= 0 || ry <= 0 || !Number.isFinite(rx) || !Number.isFinite(ry) || !Number.isFinite(fx) || !Number.isFinite(fy)) continue;
       ctx.globalAlpha = (0.16 + n * 0.16) * intensity;
       ctx.drawImage(blob, fx - rx, fy - ry, rx * 2, ry * 2);
     }
@@ -1582,6 +1585,8 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'parking-meter': { top: '#4a4a52', side: '#28282e', trim: '#c9c9d2' },
   'attack-block': { top: '#3a1620', side: '#1e0b11', trim: '#ff5c5c' },
   'server-rack': { top: '#0e1b26', side: '#081119', trim: '#1fe6ff' },
+  'tree-digital': { top: '#064e3b', side: '#022c22', trim: '#10b981' },
+  'tree-fake': { top: '#083344', side: '#051b24', trim: '#06b6d4' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -1835,6 +1840,150 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.stroke();
       ctx.fillStyle = '#28282e';
       ctx.fillRect(obstacle.x - 1, y - height + obstacle.h * 0.16, 2, obstacle.h * 0.12);
+      ctx.restore();
+    } else if (obstacle.kind === 'tree-digital') {
+      ctx.save();
+      const isCentralTree = obstacle.w >= 100 || (Math.abs(obstacle.x) < 5 && Math.abs(obstacle.y) < 5);
+      if (isCentralTree) {
+        // Massive Central Living Digital Tree: Yggdrasil Null
+        const trunkW = obstacle.w * 0.44;
+        const trunkH = obstacle.h * 1.15;
+        const treeTopY = y - height - obstacle.h * 0.95;
+
+        // Glowing root network on ground radiating outwards
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 3.5;
+        ctx.globalAlpha = 0.85;
+        for (let r = 0; r < 8; r += 1) {
+          const rootAngle = (r * Math.PI) / 4 + Math.sin(w.now * 0.001) * 0.05;
+          const rDist = obstacle.w * 0.9;
+          ctx.beginPath();
+          ctx.moveTo(obstacle.x, y);
+          const midX = obstacle.x + Math.cos(rootAngle) * (rDist * 0.5);
+          const midY = y + Math.sin(rootAngle) * (rDist * 0.5) * 0.55;
+          const endX = obstacle.x + Math.cos(rootAngle) * rDist;
+          const endY = y + Math.sin(rootAngle) * rDist * 0.55;
+          ctx.quadraticCurveTo(midX + Math.sin(r) * 12, midY, endX, endY);
+          ctx.stroke();
+        }
+
+        // Carbon trunk
+        ctx.fillStyle = '#0f1f18';
+        ctx.globalAlpha = 0.98;
+        ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
+
+        // Vertical emerald circuit veins on trunk
+        ctx.fillStyle = '#34d399';
+        ctx.globalAlpha = 0.8 + Math.sin(w.now * 0.003) * 0.2;
+        for (let v = -2; v <= 2; v += 1) {
+          ctx.fillRect(obstacle.x + v * (trunkW * 0.18) - 1.5, y - trunkH + 4, 3, trunkH - 8);
+        }
+
+        // Sprawling digital foliage canopy
+        const canopyW = obstacle.w * 1.85;
+        const canopyH = obstacle.h * 1.55;
+        const pulse = 0.9 + Math.sin(w.now * 0.002) * 0.1;
+        ctx.globalAlpha = 0.95;
+
+        // Canopy shadow & dark underlayer
+        ctx.fillStyle = '#022c22';
+        ctx.beginPath();
+        ctx.ellipse(obstacle.x, treeTopY + 18, canopyW * 0.52, canopyH * 0.42, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Layered emerald pixel foliage clusters
+        ctx.fillStyle = '#047857';
+        for (let c = 0; c < 9; c += 1) {
+          const cx = obstacle.x + Math.cos(c * 0.72) * (canopyW * 0.3);
+          const cy = treeTopY + Math.sin(c * 0.72) * (canopyH * 0.25);
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, canopyW * 0.28, canopyH * 0.24, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Bright neon circuit foliage highlights
+        ctx.fillStyle = '#10b981';
+        ctx.globalAlpha = pulse;
+        for (let c = 0; c < 6; c += 1) {
+          const cx = obstacle.x + Math.sin(c * 1.2) * (canopyW * 0.2);
+          const cy = treeTopY - 10 + Math.cos(c * 1.2) * (canopyH * 0.18);
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, canopyW * 0.18, canopyH * 0.15, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Floating digital data leaves orbiting crown
+        ctx.fillStyle = '#6ee7b7';
+        for (let l = 0; l < 6; l += 1) {
+          const orbitAngle = (w.now * 0.0015 + l * 1.05) % (Math.PI * 2);
+          const lx = obstacle.x + Math.cos(orbitAngle) * (canopyW * 0.48);
+          const ly = treeTopY + Math.sin(orbitAngle) * (canopyH * 0.28);
+          ctx.fillRect(lx - 3, ly - 3, 6, 6);
+        }
+      } else {
+        // Standard Cybernetic Tree
+        const trunkW = obstacle.w * 0.32;
+        const trunkH = obstacle.h * 0.85;
+        const treeTopY = y - height - obstacle.h * 0.4;
+
+        ctx.fillStyle = '#0a1d15';
+        ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
+
+        // Circuit line
+        ctx.fillStyle = '#10b981';
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(obstacle.x - 1, y - trunkH + 2, 2, trunkH - 4);
+
+        // Foliage layers
+        ctx.fillStyle = '#064e3b';
+        ctx.beginPath();
+        ctx.ellipse(obstacle.x, treeTopY, obstacle.w * 0.65, obstacle.h * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#10b981';
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.ellipse(obstacle.x, treeTopY - 6, obstacle.w * 0.42, obstacle.h * 0.38, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    } else if (obstacle.kind === 'tree-fake') {
+      // Holographic Decoy Tree: translucent, cyan/teal flickering scanlines
+      ctx.save();
+      const flicker = 0.48 + Math.sin(w.now * 0.012 + obstacle.x) * 0.2;
+      ctx.globalAlpha = flicker;
+
+      // Base projector pedestal
+      ctx.fillStyle = '#083344';
+      ctx.fillRect(obstacle.x - 9, y - 4, 18, 6);
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(obstacle.x - 6, y - 3, 12, 2);
+
+      // Holographic trunk
+      const trunkW = obstacle.w * 0.26;
+      const trunkH = obstacle.h * 0.8;
+      const treeTopY = y - height - obstacle.h * 0.35;
+
+      ctx.fillStyle = '#0891b2';
+      ctx.fillRect(obstacle.x - trunkW / 2, y - trunkH, trunkW, trunkH);
+
+      // Hologram canopy outline & fill
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath();
+      ctx.ellipse(obstacle.x, treeTopY, obstacle.w * 0.6, obstacle.h * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // CRT horizontal holographic scanlines
+      ctx.fillStyle = '#a5f3fc';
+      for (let s = y - height - obstacle.h * 0.8; s < y; s += 5) {
+        ctx.fillRect(obstacle.x - obstacle.w * 0.55, s, obstacle.w * 1.1, 1.5);
+      }
+
+      // Glitch tear offset
+      if (Math.sin(w.now * 0.005 + obstacle.y) > 0.75) {
+        ctx.fillStyle = '#ec4899';
+        ctx.fillRect(obstacle.x - obstacle.w * 0.4, treeTopY, obstacle.w * 0.8, 3);
+      }
       ctx.restore();
     }
 
@@ -2605,6 +2754,42 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.moveTo(effect.x, effect.y);
         ctx.lineTo(endX, endY);
         ctx.stroke();
+
+        if (effect.weaponId === 'inspect-element') {
+          // DevTools CSS Box Model Inspection Reticle at target endpoint
+          ctx.save();
+          ctx.translate(endX, endY);
+          
+          // Orange Margin Box
+          ctx.fillStyle = 'rgba(249, 115, 22, 0.25)';
+          ctx.strokeStyle = '#ea580c';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(-28, -28, 56, 56);
+          ctx.fillRect(-28, -28, 56, 56);
+
+          // Green Padding Box
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+          ctx.strokeStyle = '#16a34a';
+          ctx.setLineDash([]);
+          ctx.strokeRect(-20, -20, 40, 40);
+          ctx.fillRect(-20, -20, 40, 40);
+
+          // Blue Content Box (<div.threat 24x24>)
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+          ctx.strokeStyle = '#0284c7';
+          ctx.strokeRect(-12, -12, 24, 24);
+          ctx.fillRect(-12, -12, 24, 24);
+
+          // Tag indicator
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 7px monospace';
+          ctx.textAlign = 'center';
+          ctx.shadowColor = '#38bdf8';
+          ctx.shadowBlur = 8;
+          ctx.fillText('div#target 48×48', 0, -32);
+          ctx.restore();
+        }
         break;
       }
       case 'hazard': {
@@ -2758,6 +2943,265 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
         ctx.restore();
         break;
       }
+
+      case 'dialup-carrier': {
+        const perpX = -Math.sin(effect.angle);
+        const perpY = Math.cos(effect.angle);
+        const segments = 36;
+        const stepLen = effect.radius / segments;
+
+        ctx.save();
+        // High-frequency Phosphor CRT Green Noise & Carrier Wave
+        ctx.strokeStyle = '#22c55e';
+        ctx.shadowColor = '#4ade80';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 3 * fade;
+
+        // Carrier FSK Sine Ribbon
+        ctx.beginPath();
+        for (let s = 0; s <= segments; s += 1) {
+          const dist = s * stepLen;
+          const progress = s / segments;
+          const envelope = Math.sin(progress * Math.PI);
+          const fskFreq = (s % 8 < 4) ? 2.4 : 1.1;
+          const wave = Math.sin(s * fskFreq + w.now / 30) * 18 * envelope;
+          const px = effect.x + Math.cos(effect.angle) * dist + perpX * wave;
+          const py = effect.y + Math.sin(effect.angle) * dist + perpY * wave;
+          if (s === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        // White-hot core beam
+        ctx.strokeStyle = '#f0fdf4';
+        ctx.lineWidth = 1.2 * fade;
+        ctx.beginPath();
+        for (let s = 0; s <= segments; s += 1) {
+          const dist = s * stepLen;
+          const progress = s / segments;
+          const envelope = Math.sin(progress * Math.PI);
+          const fskFreq = (s % 8 < 4) ? 2.4 : 1.1;
+          const wave = Math.sin(s * fskFreq + w.now / 30) * 18 * envelope;
+          const px = effect.x + Math.cos(effect.angle) * dist + perpX * wave;
+          const py = effect.y + Math.sin(effect.angle) * dist + perpY * wave;
+          if (s === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        // Terminal Modem Handshake Telemetry Text
+        const packetLabels = ['> ATDT 56K', 'CONNECT 56000', 'V.90 SYN', '0x7E ACK', '+++ATH0'];
+        ctx.fillStyle = '#86efac';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let pIdx = 0; pIdx < 3; pIdx += 1) {
+          const pDist = effect.radius * (0.3 + pIdx * 0.3);
+          const pAngle = effect.angle;
+          const tx = effect.x + Math.cos(pAngle) * pDist;
+          const ty = effect.y + Math.sin(pAngle) * pDist + (pIdx % 2 === 0 ? -12 : 12);
+          ctx.fillText(packetLabels[(Math.floor(w.now / 300) + pIdx) % packetLabels.length]!, tx, ty);
+        }
+        ctx.restore();
+        break;
+      }
+
+      case 'rickroll-disco': {
+        ctx.save();
+        const gridSize = 4;
+        const tileSize = (effect.radius * 2) / (gridSize + 1);
+        const discoColors = ['#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#06b6d4', '#f43f5e'];
+        const beatStep = Math.floor(w.now / 200);
+
+        // Animated neon disco dance floor tiles
+        for (let gx = -2; gx <= 2; gx += 1) {
+          for (let gy = -2; gy <= 2; gy += 1) {
+            const tileX = effect.x + gx * tileSize;
+            const tileY = effect.y + gy * tileSize;
+            if (dist2(tileX, tileY, effect.x, effect.y) > effect.radius * effect.radius) continue;
+
+            const colorIndex = Math.abs(gx * 3 + gy * 7 + beatStep) % discoColors.length;
+            ctx.fillStyle = discoColors[colorIndex]!;
+            ctx.globalAlpha = 0.42 * fade;
+            ctx.fillRect(tileX - tileSize * 0.45, tileY - tileSize * 0.45, tileSize * 0.9, tileSize * 0.9);
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.globalAlpha = 0.65 * fade;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(tileX - tileSize * 0.45, tileY - tileSize * 0.45, tileSize * 0.9, tileSize * 0.9);
+          }
+        }
+
+        // Floating retro music notes
+        const notes = ['♪', '♫', '♬', '♩'];
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let n = 0; n < 4; n += 1) {
+          const noteAngle = (Math.PI * 2 * n) / 4 + w.now / 600;
+          const noteDist = effect.radius * 0.65;
+          const nx = effect.x + Math.cos(noteAngle) * noteDist;
+          const ny = effect.y + Math.sin(noteAngle) * noteDist + Math.sin(w.now / 150 + n) * 8;
+          ctx.fillStyle = discoColors[(n + beatStep) % discoColors.length]!;
+          ctx.shadowColor = ctx.fillStyle;
+          ctx.shadowBlur = 10;
+          ctx.globalAlpha = 0.95 * fade;
+          ctx.fillText(notes[n % notes.length]!, nx, ny);
+        }
+
+        // Center silhouette dancer (Rick's iconic trench coat rhythm groove)
+        const danceHop = Math.abs(Math.sin(w.now / 110)) * 6;
+        const kickAngle = Math.sin(w.now / 110) * 0.4;
+        const dcX = effect.x;
+        const dcY = effect.y - danceHop;
+
+        ctx.shadowColor = '#ec4899';
+        ctx.shadowBlur = 14;
+        ctx.globalAlpha = 0.95 * fade;
+
+        // Head with pompadour
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath();
+        ctx.arc(dcX, dcY - 20, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#b45309';
+        ctx.beginPath();
+        ctx.arc(dcX + 1, dcY - 22, 4.5, Math.PI, Math.PI * 2);
+        ctx.fill();
+
+        // Trench Coat Torso
+        ctx.fillStyle = '#e2e8f0';
+        ctx.beginPath();
+        ctx.moveTo(dcX - 6, dcY - 14);
+        ctx.lineTo(dcX + 6, dcY - 14);
+        ctx.lineTo(dcX + 8, dcY - 1);
+        ctx.lineTo(dcX - 8, dcY - 1);
+        ctx.closePath();
+        ctx.fill();
+
+        // Coat lapels & tie
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(dcX - 1, dcY - 13, 2, 8);
+
+        // Kicking Legs
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(dcX - 3, dcY - 1);
+        ctx.lineTo(dcX - 6 + kickAngle * 10, dcY + 11);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(dcX + 3, dcY - 1);
+        ctx.lineTo(dcX + 6 - kickAngle * 10, dcY + 11);
+        ctx.stroke();
+
+        // Dancing Arms holding microphone
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(dcX - 6, dcY - 12);
+        ctx.lineTo(dcX - 11, dcY - 6 + Math.sin(w.now / 110) * 4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(dcX + 6, dcY - 12);
+        ctx.lineTo(dcX + 10, dcY - 16 - Math.sin(w.now / 110) * 4);
+        ctx.stroke();
+
+        // Mic
+        ctx.fillStyle = '#94a3b8';
+        ctx.beginPath();
+        ctx.arc(dcX + 11, dcY - 18 - Math.sin(w.now / 110) * 4, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+        break;
+      }
+
+      case 'bsod-crash': {
+        ctx.save();
+        const crashW = Math.min(effect.radius * 2.2, 420);
+        const crashH = Math.min(effect.radius * 1.5, 240);
+
+        // Solid Cobalt Blue Screen of Death
+        ctx.fillStyle = '#0000aa';
+        ctx.globalAlpha = 0.88 * fade;
+        ctx.shadowColor = '#1d4ed8';
+        ctx.shadowBlur = 24;
+        ctx.fillRect(effect.x - crashW / 2, effect.y - crashH / 2, crashW, crashH);
+
+        // White border
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(effect.x - crashW / 2, effect.y - crashH / 2, crashW, crashH);
+
+        // CRT Scanline Simulation
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
+        for (let sl = -crashH / 2; sl < crashH / 2; sl += 4) {
+          ctx.fillRect(effect.x - crashW / 2, effect.y + sl, crashW, 1.5);
+        }
+
+        // Monospace crash text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        const startX = effect.x - crashW / 2 + 12;
+        let startY = effect.y - crashH / 2 + 12;
+
+        ctx.fillText('A problem has been detected and Loksurvivor has been halted.', startX, startY);
+        startY += 15;
+        ctx.fillText('DRIVER_IRQL_NOT_LESS_OR_EQUAL', startX, startY);
+        startY += 15;
+        ctx.fillText('*** STOP: 0x000000D1 (0x0000000C, 0x00000002, 0xF86B5A89)', startX, startY);
+        startY += 18;
+        const memoryPct = Math.min(100, Math.floor(((w.now - effect.bornAt) / 650) * 100));
+        ctx.fillText(`Beginning dump of physical memory: ${memoryPct}%`, startX, startY);
+        startY += 15;
+        const cursorBlink = Math.floor(w.now / 250) % 2 === 0 ? '_' : ' ';
+        ctx.fillText(`Physical memory dump complete. Restarting ${cursorBlink}`, startX, startY);
+
+        ctx.restore();
+        break;
+      }
+
+      case 'matrix-rain': {
+        ctx.save();
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 12;
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+
+        const streamCount = 7;
+        const colSpacing = (effect.radius * 2) / (streamCount + 1);
+        const glyphs = ['1', '0', '1', '0', '0xFF', '404', '7B', 'NULL', 'λ', '0', '1'];
+
+        for (let col = -3; col <= 3; col += 1) {
+          const streamX = effect.x + col * colSpacing;
+          const colSeed = Math.abs(col * 739);
+          const streamOffset = ((w.now * 0.18 + colSeed * 50) % (effect.radius * 2)) - effect.radius;
+          
+          for (let row = 0; row < 6; row += 1) {
+            const charY = effect.y + streamOffset - row * 13;
+            if (dist2(streamX, charY, effect.x, effect.y) > effect.radius * effect.radius) continue;
+
+            const charIndex = (colSeed + row + Math.floor(w.now / 150)) % glyphs.length;
+            const char = glyphs[charIndex]!;
+
+            if (row === 0) {
+              // Leading glaring white head glyph
+              ctx.fillStyle = '#ffffff';
+              ctx.globalAlpha = 0.95 * fade;
+            } else {
+              // Fading green phosphor trail
+              ctx.fillStyle = '#22c55e';
+              ctx.globalAlpha = Math.max(0.12, (1 - row * 0.16)) * fade;
+            }
+            ctx.fillText(char, streamX, charY);
+          }
+        }
+        ctx.restore();
+        break;
+      }
     }
     ctx.restore();
   }
@@ -2805,6 +3249,47 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
       ctx.beginPath();
       ctx.arc(x, y, 4.5, 0, Math.PI * 2);
       ctx.stroke();
+    } else if (weapon?.def.id === 'spinning-loading-wheel') {
+      // Authentic retro OS spinning rainbow beachball / HTML5 buffer spinner
+      ctx.translate(Math.round(x), Math.round(y));
+      const spinAngle = orb.angle * 3.5 + w.now / 150;
+      ctx.rotate(spinAngle);
+      
+      const pinwheelColors = ['#ff2a2a', '#ff9900', '#ffff00', '#00dd00', '#00c0ff', '#0033ff', '#9900ff', '#ff00aa'];
+      const slices = pinwheelColors.length;
+      const wheelRadius = 13;
+      
+      for (let s = 0; s < slices; s += 1) {
+        const a1 = (s * Math.PI * 2) / slices;
+        const a2 = ((s + 1) * Math.PI * 2) / slices;
+        ctx.fillStyle = pinwheelColors[s]!;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, wheelRadius, a1, a2);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Outer glass rim & inner hub
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, wheelRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // HTML5 Buffering text indicator
+      ctx.rotate(-spinAngle);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'center';
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = '#06b6d4';
+      ctx.fillText('99%...', 0, -wheelRadius - 4);
     } else {
       // Default: a spinning vinyl-blade silhouette, angled along its orbit direction.
       const spinAngle = orb.angle + Math.PI / 2;
@@ -2893,6 +3378,461 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
       ctx.restore();
       continue;
     }
+
+    if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
+      const isElemental = proj.customKind === 'elemental-llama' || proj.isElementalLlama;
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      const facingLeft = proj.vx < 0;
+      if (facingLeft) {
+        ctx.scale(-1, 1);
+      }
+
+      // Floating trail symbol
+      const heartOffset = Math.sin(w.now / 100) * 3;
+      ctx.font = '10px sans-serif';
+      if (isElemental) {
+        ctx.fillStyle = '#c084fc';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 8;
+        ctx.fillText('⚡', -14, -6 + heartOffset);
+      } else {
+        ctx.fillStyle = '#f43f5e';
+        ctx.shadowColor = '#fb7185';
+        ctx.shadowBlur = 6;
+        ctx.fillText('❤', -14, -6 + heartOffset);
+      }
+
+      // Fluffy llama body
+      ctx.shadowColor = isElemental ? '#a855f7' : '#fda4af';
+      ctx.shadowBlur = isElemental ? 12 : 8;
+      ctx.fillStyle = isElemental ? '#faf5ff' : '#fff5f5';
+      ctx.beginPath();
+      ctx.roundRect(-10, -5, 16, 12, 5);
+      ctx.fill();
+
+      // Long neck & head
+      ctx.beginPath();
+      ctx.roundRect(4, -14, 7, 12, 3);
+      ctx.roundRect(4, -18, 10, 8, 3);
+      ctx.fill();
+
+      // Cute pointy ears / crown
+      ctx.fillStyle = isElemental ? '#c084fc' : '#fecdd3';
+      ctx.beginPath();
+      ctx.moveTo(5, -18);
+      ctx.lineTo(6, -23);
+      ctx.lineTo(9, -18);
+      ctx.fill();
+
+      // Saddle
+      ctx.fillStyle = isElemental ? '#7e22ce' : '#fb7185';
+      ctx.fillRect(-6, -5, 9, 7);
+      ctx.fillStyle = isElemental ? '#38bdf8' : '#fde047';
+      ctx.fillRect(-6, 0, 9, 2);
+
+      // Eye
+      ctx.fillStyle = isElemental ? '#0284c7' : '#1e1b4b';
+      ctx.beginPath();
+      ctx.arc(11, -15, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Animated trotting legs
+      const legCycle = Math.sin(w.now / 50);
+      ctx.strokeStyle = isElemental ? '#c084fc' : '#fbcfe8';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(6, 7);
+      ctx.lineTo(6 + legCycle * 4, 14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(9, 7);
+      ctx.lineTo(9 - legCycle * 4, 14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-6, 7);
+      ctx.lineTo(-6 - legCycle * 4, 14);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-3, 7);
+      ctx.lineTo(-3 + legCycle * 4, 14);
+      ctx.stroke();
+
+      ctx.restore();
+      continue;
+    }
+
+    if (proj.customKind === 'nyan-cat') {
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      const heading = Math.atan2(proj.vy, proj.vx);
+      ctx.rotate(heading);
+
+      // Undulating Rainbow Trail (6 stripes)
+      const rainbowColors = ['#ff0000', '#ff9900', '#ffff00', '#33ff00', '#0099ff', '#9933ff'];
+      const trailPoints = proj.trail;
+      if (trailPoints.length > 1) {
+        ctx.save();
+        ctx.rotate(-heading); // Draw trail in world space
+        ctx.translate(-proj.x, -proj.y);
+        for (let r = 0; r < 6; r += 1) {
+          ctx.strokeStyle = rainbowColors[r]!;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          const yOffset = (r - 2.5) * 2.4;
+          for (let t = 0; t < trailPoints.length; t += 1) {
+            const pt = trailPoints[t]!;
+            const waveOffset = Math.sin((w.now / 60) + t * 0.8) * 3;
+            if (t === 0) ctx.moveTo(pt.x, pt.y + yOffset + waveOffset);
+            else ctx.lineTo(pt.x, pt.y + yOffset + waveOffset);
+          }
+          ctx.lineTo(proj.x, proj.y + yOffset);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // Pop-Tart Body (Crisp golden pastry with strawberry frosting and sprinkles)
+      ctx.shadowColor = '#f472b6';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#fed7aa';
+      ctx.strokeStyle = '#c2410c';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(-12, -8, 20, 16, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      // Pink strawberry frosting
+      ctx.fillStyle = '#f472b6';
+      ctx.beginPath();
+      ctx.roundRect(-10, -6, 16, 12, 2);
+      ctx.fill();
+
+      // Sprinkles (dark pink dots)
+      ctx.fillStyle = '#be185d';
+      ctx.fillRect(-7, -4, 2, 2);
+      ctx.fillRect(-3, -2, 2, 2);
+      ctx.fillRect(1, -4, 2, 2);
+      ctx.fillRect(-6, 2, 2, 2);
+      ctx.fillRect(-1, 2, 2, 2);
+      ctx.fillRect(2, 0, 2, 2);
+
+      // Gray Cat Head & Ears
+      ctx.fillStyle = '#94a3b8';
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(8, -8);
+      ctx.lineTo(12, -14);
+      ctx.lineTo(14, -7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(11, 4);
+      ctx.lineTo(15, 10);
+      ctx.lineTo(16, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(7, -7, 12, 14, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Cheeks & Eyes
+      ctx.fillStyle = '#f43f5e';
+      ctx.fillRect(9, 3, 2, 2);
+      ctx.fillRect(9, -5, 2, 2);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(14, -3, 2, 2);
+      ctx.fillRect(14, 2, 2, 2);
+
+      // Tail (wagging)
+      const tailWag = Math.sin(w.now / 70) * 4;
+      ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.roundRect(-17, -2 + tailWag, 6, 4, 2);
+      ctx.fill();
+
+      // Sparkling star
+      const starPhase = (w.now / 120) % (Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '9px monospace';
+      ctx.fillText('✦', -16 + Math.cos(starPhase) * 6, -10 + Math.sin(starPhase) * 6);
+
+      ctx.restore();
+      continue;
+    }
+
+    if (proj.customKind === 'popup-window') {
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      const winW = 74;
+      const winH = 46;
+
+      ctx.shadowColor = '#0284c7';
+      ctx.shadowBlur = 12;
+
+      // Authentic Win95 Beveled Window Frame
+      ctx.fillStyle = '#c0c0c0';
+      ctx.fillRect(-winW / 2, -winH / 2, winW, winH);
+
+      // 3D Bevel highlight & shadow
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-winW / 2, winH / 2);
+      ctx.lineTo(-winW / 2, -winH / 2);
+      ctx.lineTo(winW / 2, -winH / 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#404040';
+      ctx.beginPath();
+      ctx.moveTo(-winW / 2, winH / 2);
+      ctx.lineTo(winW / 2, winH / 2);
+      ctx.lineTo(winW / 2, -winH / 2);
+      ctx.stroke();
+
+      // Titlebar (Dark Blue Gradient)
+      const grad = ctx.createLinearGradient(-winW / 2 + 2, 0, winW / 2 - 2, 0);
+      grad.addColorStop(0, '#000080');
+      grad.addColorStop(1, '#1084d0');
+      ctx.fillStyle = grad;
+      ctx.fillRect(-winW / 2 + 2, -winH / 2 + 2, winW - 4, 12);
+
+      // Title text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const title = (proj.popupTitle ?? 'Alert.exe').slice(0, 11);
+      ctx.fillText(title, -winW / 2 + 5, -winH / 2 + 8);
+
+      // Close Button [X]
+      ctx.fillStyle = '#c0c0c0';
+      ctx.fillRect(winW / 2 - 12, -winH / 2 + 3, 9, 10);
+      ctx.strokeStyle = '#808080';
+      ctx.strokeRect(winW / 2 - 12, -winH / 2 + 3, 9, 10);
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 7px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('×', winW / 2 - 7.5, -winH / 2 + 8);
+
+      // Window Body Icon & Text
+      const icon = proj.popupKind === 'warn' ? '⚠' : proj.popupKind === 'million' ? '★' : proj.popupKind === 'ipod' ? '♫' : '!';
+      const iconColor = proj.popupKind === 'warn' ? '#eab308' : proj.popupKind === 'million' ? '#ef4444' : '#2563eb';
+      ctx.fillStyle = iconColor;
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(icon, -winW / 2 + 12, 4);
+
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 6px monospace';
+      ctx.textAlign = 'left';
+      const bodyText = proj.popupText ?? '1,000,000th VISITOR!';
+      ctx.fillText(bodyText.slice(0, 13), -winW / 2 + 22, 1);
+      if (bodyText.length > 13) {
+        ctx.fillText(bodyText.slice(13, 26), -winW / 2 + 22, 10);
+      }
+
+      // OK Button
+      ctx.fillStyle = '#d4d4d4';
+      ctx.fillRect(-8, winH / 2 - 11, 16, 8);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-8, winH / 2 - 11, 16, 8);
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 5.5px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('OK', 0, winH / 2 - 6.5);
+
+      ctx.restore();
+      continue;
+    }
+
+    if (proj.customKind === 'dom-tag') {
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      const heading = Math.atan2(proj.vy, proj.vx);
+      ctx.rotate(heading);
+
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 12;
+
+      // Dark code pill container
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      const tagStr = proj.tagText ?? '<canvas>';
+      ctx.font = 'bold 9px monospace';
+      const textMetrics = ctx.measureText(tagStr);
+      const pillW = textMetrics.width + 14;
+      const pillH = 18;
+
+      ctx.beginPath();
+      ctx.roundRect(-pillW / 2, -pillH / 2, pillW, pillH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(tagStr, 0, 0);
+
+      // Glowing cutting pincer brackets
+      const scissorAngle = Math.sin(w.now / 60) * 0.35;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-pillW / 2 - 4, -8);
+      ctx.lineTo(pillW / 2 + 4, -8 - scissorAngle * 10);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-pillW / 2 - 4, 8);
+      ctx.lineTo(pillW / 2 + 4, 8 + scissorAngle * 10);
+      ctx.stroke();
+
+      ctx.restore();
+      continue;
+    }
+
+    if (proj.customKind === 'byte-block') {
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 14;
+
+      const size = 26;
+      // 3D Isometric Shaded Blue Byte Cube
+      // Top face
+      ctx.fillStyle = '#60a5fa';
+      ctx.beginPath();
+      ctx.moveTo(0, -size / 2);
+      ctx.lineTo(size / 2, -size / 4);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(-size / 2, -size / 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Left face
+      ctx.fillStyle = '#1d4ed8';
+      ctx.beginPath();
+      ctx.moveTo(-size / 2, -size / 4);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(0, size / 2);
+      ctx.lineTo(-size / 2, size / 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Right face
+      ctx.fillStyle = '#1e40af';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(size / 2, -size / 4);
+      ctx.lineTo(size / 2, size / 4);
+      ctx.lineTo(0, size / 2);
+      ctx.closePath();
+      ctx.fill();
+
+      // Hex code label
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(proj.tagText ?? '0xDEAD', 0, size / 6);
+
+      ctx.restore();
+      continue;
+    }
+
+    if (proj.customKind === 'golden-cookie') {
+      ctx.save();
+      ctx.translate(proj.x, proj.y);
+      const heading = Math.atan2(proj.vy, proj.vx);
+      ctx.rotate(heading + w.now / 150);
+
+      // Golden radiance aura
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 18;
+
+      // Golden Cookie Base
+      const r = 16;
+      ctx.fillStyle = '#d97706';
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.arc(-2, -2, r * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Chocolate chips
+      ctx.fillStyle = '#451a03';
+      const chipOffsets = [
+        { x: -6, y: -5 },
+        { x: 4, y: -7 },
+        { x: -3, y: 3 },
+        { x: 7, y: 2 },
+        { x: 0, y: -2 },
+        { x: -7, y: 7 },
+      ];
+      for (const chip of chipOffsets) {
+        ctx.beginPath();
+        ctx.arc(chip.x, chip.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Outer golden crispy edge
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Orbiting frantic auto-clicking mouse cursors
+      ctx.rotate(-heading - w.now / 150);
+      for (let c = 0; c < 3; c += 1) {
+        const cAngle = (Math.PI * 2 * c) / 3 + w.now / 120;
+        const cx = Math.cos(cAngle) * 26;
+        const cy = Math.sin(cAngle) * 26;
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(cAngle + Math.PI / 4);
+        
+        // Classic white pointer cursor with black outline
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(8, 8);
+        ctx.lineTo(4, 8);
+        ctx.lineTo(6, 12);
+        ctx.lineTo(4, 13);
+        ctx.lineTo(2, 9);
+        ctx.lineTo(-1, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Floating click feedback: "+777"
+      const clickPulse = Math.sin(w.now / 80);
+      if (clickPulse > 0.4) {
+        ctx.fillStyle = '#fef08a';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('+777', 0, -22);
+      }
+
+      ctx.restore();
+      continue;
+    }
+
     ctx.save();
     ctx.globalAlpha = 0.4;
     ctx.strokeStyle = proj.color;
@@ -3465,6 +4405,31 @@ function drawActors(
       }
       ctx.restore();
     }
+
+    if (w.character.id === 'llama-mama' || w.character.id === 'llama-overlord') {
+      ctx.save();
+      const overheadY = headY - 14;
+      const ego = w.llamaEgoScore ?? 0;
+      if (ego > 0) {
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        const isOverlord = w.character.id === 'llama-overlord';
+        ctx.fillStyle = isOverlord ? '#c084fc' : '#f43f5e';
+        ctx.shadowColor = isOverlord ? '#a855f7' : '#fb7185';
+        ctx.shadowBlur = 8;
+        ctx.fillText(isOverlord ? `👑 SUPREMACY +${ego}` : `👑 EGO +${ego}`, p.x, overheadY);
+      }
+      if (w.llamaMamaRageUntil && w.now < w.llamaMamaRageUntil) {
+        const rageY = ego > 0 ? overheadY - 14 : overheadY;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff4500';
+        ctx.shadowColor = '#ff6a00';
+        ctx.shadowBlur = 12;
+        ctx.fillText("WE'RE OVER IT! PERIOD!", p.x, rageY);
+      }
+      ctx.restore();
+    }
   };
 
   // Full-recolor setting: blend each enemy's own palette with the active
@@ -3676,6 +4641,32 @@ function drawActors(
       ctx.fillStyle = converted ? '#65f6d1' : enemyPalette.accent;
       ctx.fillRect(enemy.x - width / 2, top, width * (enemy.hp / enemy.maxHp), 4);
     }
+
+    if (enemy.cutifiedUntil && enemy.cutifiedUntil > w.now && !enemy.dying) {
+      ctx.save();
+      const heartPulse = Math.sin((w.now + enemy.uid * 130) / 180) * 3;
+      ctx.fillStyle = '#f43f5e';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#fb7185';
+      ctx.shadowBlur = 6;
+      ctx.fillText('❤', enemy.x - 7, enemy.y - enemy.radius - 10 + heartPulse);
+      ctx.fillText('❤', enemy.x + 7, enemy.y - enemy.radius - 14 - heartPulse);
+
+      const bubblePhase = (w.now / 350 + enemy.uid) % (Math.PI * 2);
+      ctx.strokeStyle = '#fbcfe8';
+      ctx.fillStyle = 'rgba(251, 207, 232, 0.4)';
+      ctx.lineWidth = 1.5;
+      for (let bi = 0; bi < 3; bi += 1) {
+        const bx = enemy.x + Math.sin(bubblePhase + bi * 2.1) * (enemy.radius + 8);
+        const by = enemy.y - enemy.radius - (bi * 9) - (bubblePhase * 5);
+        ctx.beginPath();
+        ctx.arc(bx, by, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
   drawPlayer();
   drawGuests(ctx, w);
@@ -3833,14 +4824,16 @@ function drawBubbleWash(ctx: CanvasRenderingContext2D, w: World) {
 
 export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewport) {
   const { width, height, dpr } = view;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+  const safeDpr = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
 
   // Show roughly the same slice of the world regardless of screen size,
   // unless a caller (the map editor's whole-map preview) asks for a
   // specific slice width.
-  const targetView = view.targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78));
-  const zoom = width / targetView;
+  const targetView = Math.max(1, view.targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78)));
+  const zoom = Math.max(0.001, width / targetView);
 
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
   ctx.fillStyle = '#06060a';
   ctx.fillRect(0, 0, width, height);
 

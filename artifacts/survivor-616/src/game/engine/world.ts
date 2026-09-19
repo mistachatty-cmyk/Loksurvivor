@@ -219,6 +219,9 @@ export interface EnemyActor extends Actor {
    * makes capture a decision instead of a reflex test.
    */
   capturableUntil: number;
+  /** Llamá Máma: mesmerized with heart eyes and bubbles, trailing baby llamas */
+  cutifiedUntil?: number;
+  cutifiedTargetUid?: number;
 }
 
 export interface Projectile {
@@ -255,10 +258,21 @@ export interface Projectile {
   pausedUntil?: number;
   /** Zero Day: when set, this projectile IS a thrown frozen enemy (that uid), resolved by resolveThrownEnemyImpact instead of the normal hit path. */
   carriedEnemyUid?: number;
-  /** Custom projectile kind, such as the retro DVD bouncing screensaver icon. */
-  customKind?: 'dvd-logo';
+  /** Custom projectile kind, such as the retro DVD bouncing screensaver icon, cascading solitaire windows, nyan cat, popup ad, dom tag, byte block, golden cookie. */
+  customKind?: 'dvd-logo' | 'solitaire' | 'baby-llama' | 'elemental-llama' | 'nyan-cat' | 'popup-window' | 'dom-tag' | 'byte-block' | 'golden-cookie';
   weaponId?: string;
   bounceCount?: number;
+  trampleNextAt?: number;
+  hasRefracted?: boolean;
+  isElementalLlama?: boolean;
+  popupTitle?: string;
+  popupText?: string;
+  popupKind?: 'warn' | 'ipod' | 'million' | 'hot' | 'error';
+  tagText?: string;
+  tagPair?: 'open' | 'close';
+  sinePhase?: number;
+  sineBaseX?: number;
+  sineBaseY?: number;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact'
@@ -267,12 +281,22 @@ export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' |
   /** Glitch / 4th-wall desktop marquee selection and CRT corruption box. */
   | 'glitch'
   /** Real-time stereo audio oscilloscope waveform ribbons. */
-  | 'waveform';
+  | 'waveform'
+  /** Hypnotic 8-bit retro dance floor with floating musical notes. */
+  | 'rickroll-disco'
+  /** Authentic full-screen cobalt blue BSOD CRT crash. */
+  | 'bsod-crash'
+  /** 56k dial-up baud audio carrier wave. */
+  | 'dialup-carrier'
+  /** Real-time digital terminal matrix green phosphor code rain. */
+  | 'matrix-rain';
 
 export interface Effect {
   uid: number;
   kind: EffectKind;
   weaponId?: string;
+  bsodErrorText?: string;
+  discoBeat?: number;
   x: number;
   y: number;
   radius: number;
@@ -708,9 +732,11 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'attack-block': { variant: 'heavy-metal', hp: 220 },
   /** Null Sector only: overloads into an AoE burst on break. See null-sector.md. */
   'server-rack': { variant: 'light-breakable', hp: 110 },
+  /** Tree Null map: tough cybernetic digital tree with dense foliage. */
+  'tree-digital': { variant: 'heavy-metal', hp: 800 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
-  'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
+  'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -884,6 +910,11 @@ export interface World {
   maxLokPets: number;
   /** All LokPets generated this run, including companions that have expired. */
   lokPetHistory: LokPetInstance[];
+  /** Llamá Máma passive & mechanics */
+  llamaMamaEnraged?: boolean;
+  llamaMamaRageUntil?: number;
+  llamaMamaLastBlastAt?: number;
+  llamaEgoScore?: number;
 
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
@@ -1725,16 +1756,22 @@ function ultActive(w: World): boolean {
 
 function damageMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.damageMult ?? 1) : 1;
-  return w.stats.power * ult;
+  const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
+  const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(2.5, w.llamaEgoScore * 0.05)) : 1;
+  return w.stats.power * ult * ego;
 }
 
 function areaMult(w: World): number {
-  return w.stats.area;
+  const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
+  const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(1.0, w.llamaEgoScore * 0.03)) : 1;
+  return w.stats.area * ego;
 }
 
 function speedMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
-  return ult * (w.modifiers.speedMode ? 1.35 : 1);
+  const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
+  const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(0.6, w.llamaEgoScore * 0.025)) : 1;
+  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego;
 }
 
 /**
@@ -3285,6 +3322,14 @@ function damagePlayer(
   if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
   p.hp -= reduced;
+  if (w.character.id === 'llama-mama' && p.hp > 0 && p.hp / p.maxHp <= 0.24 && !w.llamaMamaEnraged) {
+    w.llamaMamaEnraged = true;
+    w.llamaMamaRageUntil = w.now + 14000;
+    pushAlert(w, "WE'RE OVER IT! PERIOD!");
+    pushSfx(w, 'ultimate');
+    w.shake = Math.max(w.shake, 14);
+    spawnParticles(w, p.x, p.y, '#ff4500', 30, 220);
+  }
   pushSfx(w, 'playerHurt');
   p.invulnUntil = w.now + 420;
   p.hitFlashUntil = w.now + 160;
@@ -3643,6 +3688,17 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         evolutionBehavior: behavior,
       });
       novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
+      if (weapon.id === 'graviton-repulsor') {
+        forEachNearby(w, p.x, p.y, reach + 30, (enemy) => {
+          if (enemy.dying) return;
+          const dx = enemy.x - p.x;
+          const dy = enemy.y - p.y;
+          const d = Math.hypot(dx, dy) || 1;
+          enemy.kx += (dx / d) * 440;
+          enemy.ky += (dy / d) * 440;
+        });
+        w.shake = Math.max(w.shake, 6);
+      }
       if (behavior?.kind === 'field') {
         triggerEvolutionHit(w, behavior, p.x, p.y, damage, weapon.color ?? palette.accent, weaponImpact(weapon), weapon.statusEffectId);
       }
@@ -3655,8 +3711,24 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
 
     case 'aura': {
       // The aura is permanent; each activation is a damage tick.
-      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon));
+      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
       damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
+      w.effects.push({
+        uid: uid(w),
+        kind: 'ring',
+        x: p.x,
+        y: p.y,
+        radius: reach,
+        angle: 0,
+        spread: 0,
+        bornAt: w.now,
+        expiresAt: w.now + 220,
+        color: weapon.color ?? palette.accent,
+        damage: 0,
+        impactIntensity: 0,
+        hitUids: new Set(),
+        followPlayer: true,
+      });
       break;
     }
 
@@ -3665,12 +3737,14 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       const target = nearestEnemy(w, p.x, p.y, reach + 100);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
       const isWaveform = weapon.id.includes('oscilloscope');
+      const isDialup = weapon.id === 'dialup-handshake';
       for (let i = 0; i < count; i += 1) {
         w.effects.push({
-          uid: uid(w), kind: isWaveform ? 'waveform' : 'wave', weaponId: weapon.id, x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
-          angle, spread: isWaveform ? 0.48 : 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
+          uid: uid(w), kind: isDialup ? 'dialup-carrier' : isWaveform ? 'waveform' : 'wave', weaponId: weapon.id, x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
+          angle, spread: isDialup ? 0.58 : isWaveform ? 0.48 : 0.38, bornAt: w.now + i * 120, expiresAt: w.now + (isDialup ? 440 : 330) + i * 120,
           color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
           evolutionBehavior: behavior,
+          statusEffectId: weapon.statusEffectId,
         });
       }
       p.anim = 'attack'; p.animStartedAt = w.now;
@@ -3680,14 +3754,26 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
     case 'laser': {
       const target = nearestEnemy(w, p.x, p.y, reach);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      const isInspect = weapon.id === 'inspect-element';
       w.effects.push({
-        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: 0.055,
-        bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
-         damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: isInspect ? 0.08 : 0.055,
+        bornAt: w.now, expiresAt: w.now + (isInspect ? 340 : 260), color: weapon.color ?? palette.accent,
+        damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
         evolutionBehavior: behavior,
         bonusVsStatusId: weapon.bonusVsStatusId,
         bonusVsStatusMult: weapon.bonusVsStatusMult,
+        weaponId: weapon.id,
       });
+      if (isInspect && target) {
+        w.popups.push({
+          x: target.x,
+          y: target.y - 32,
+          text: 'display: none !important;',
+          color: '#38bdf8',
+          bornAt: w.now,
+          vy: 30,
+        });
+      }
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
@@ -3697,6 +3783,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       // as always. count > 1: spread that many fields into a ring around the
       // player instead of stacking them on top of each other, connected by
       // ambient 'web' strand effects. See run-presentation.md.
+      const isRickroll = weapon.id === 'rickroll-resonance';
+      const isMatrix = weapon.id === 'matrix-digital-rain';
       const nodeCount = Math.max(1, runWeapon.count);
       const ringRadius = nodeCount > 1 ? reach : 0;
       const nodeRadius = nodeCount > 1 ? reach * 0.4 : reach;
@@ -3707,12 +3795,14 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         const ny = p.y + Math.sin(nodeAngle) * ringRadius;
         nodePositions.push({ x: nx, y: ny });
         w.effects.push({
-          uid: uid(w), kind: 'hazard', x: nx, y: ny, radius: nodeRadius, angle: 0, spread: Math.PI * 2,
+          uid: uid(w), kind: isMatrix ? 'matrix-rain' : isRickroll ? 'rickroll-disco' : 'hazard', x: nx, y: ny, radius: nodeRadius, angle: 0, spread: Math.PI * 2,
           bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
           damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
-          hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
+          hurtsPlayer: isRickroll || isMatrix ? false : !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
           statusEffectId: weapon.statusEffectId,
+          pullStrength: weapon.id.includes('singularity') ? 160 : undefined,
           evolutionBehavior: behavior,
+          weaponId: weapon.id,
         });
       }
       if (nodeCount > 1) {
@@ -3729,7 +3819,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         }
         pushAlert(w, 'WEB ANCHORS SET');
       } else {
-        pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+        pushAlert(w, isMatrix ? 'MATRIX RAIN' : isRickroll ? 'RICKROLL' : weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
       }
       break;
     }
@@ -3796,36 +3886,95 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         w.shake = Math.max(w.shake, 4);
       }
       const used = new Set<number>();
-      const shots = Math.max(1, runWeapon.count);
+      const isLlama = weapon.id === 'baby-llama-stampede';
+      const isElementalLlama = weapon.id === 'elemental-llama-stampede';
+      const isLlamaFamily = isLlama || isElementalLlama;
+      const shots = isLlamaFamily
+        ? Math.max(3, runWeapon.count + Math.floor(runWeapon.level * 1.5))
+        : Math.max(1, runWeapon.count);
+      const isMoving = Math.hypot(p.vx, p.vy) > 8;
+      const baseDirection = isMoving
+        ? Math.atan2(p.vy, p.vx)
+        : (w.rng() * Math.PI * 2);
+
       for (let i = 0; i < shots; i += 1) {
-        const target = nearestEnemy(w, p.x, p.y, weapon.range, used);
-        if (target) used.add(target.uid);
-        const angle = target
-          ? Math.atan2(target.y - p.y, target.x - p.x)
-          : (p.facing > 0 ? 0 : Math.PI) + randRange(w.rng, -0.4, 0.4);
+        let angle: number;
+        let target: EnemyActor | null = null;
+        if (isLlamaFamily) {
+          const spread = (i - (shots - 1) / 2) * 0.22;
+          angle = baseDirection + spread;
+        } else {
+          target = nearestEnemy(w, p.x, p.y, weapon.range, used);
+          if (target) used.add(target.uid);
+          angle = target
+            ? Math.atan2(target.y - p.y, target.x - p.x)
+            : (p.facing > 0 ? 0 : Math.PI) + randRange(w.rng, -0.4, 0.4);
+        }
         const speed = weapon.speed ?? 200;
+        const isSolitaire = weapon.id === 'solitaire-cascade' || weapon.id === 'infinite-solitaire';
+        const isBranch = weapon.id === 'binary-branch' || weapon.id === 'yggdrasil-null';
+        const isNyan = weapon.id === 'nyan-stream';
+        const isPopup = weapon.id === 'popup-ad-storm';
+        const isDom = weapon.id === 'dom-tree-slicer';
+        const isCookie = weapon.id === 'cookie-clicker';
+        const projRadius = isLlamaFamily ? 14 : isSolitaire ? 14 : isNyan ? 16 : isPopup ? 20 : isDom ? 13 : isCookie ? 16 : isBranch ? 10 : weapon.id === 'magma-coil' || weapon.id === 'solar-supernova' ? 12 : 6;
+
+        let popupData: { title: string; text: string; kind: 'warn' | 'ipod' | 'million' | 'hot' | 'error' } | undefined;
+        if (isPopup) {
+          const popupPool = [
+            { title: 'WinPopup.exe', text: 'YOU WON A FREE IPOD NANO!', kind: 'ipod' as const },
+            { title: 'CRITICAL ALERT', text: '1,492 THREATS DETECTED!', kind: 'warn' as const },
+            { title: 'CONGRATULATIONS!', text: '1,000,000th VISITOR CLICK!', kind: 'million' as const },
+            { title: '404 NOT FOUND', text: 'STREET NOT FOUND: ABORT', kind: 'error' as const },
+            { title: 'SYSTEM OPTIMIZER', text: 'DOWNLOAD MORE RAM NOW!', kind: 'hot' as const },
+          ];
+          popupData = popupPool[Math.floor(w.rng() * popupPool.length)];
+        }
+
+        let domTagText: string | undefined;
+        if (isDom) {
+          const domTags = [
+            '<canvas width="616">', '</canvas>',
+            '<div id="obliterate">', '</div>',
+            '<script src="chaos.js">', '</script>',
+            '<section role="hazard">', '</section>',
+            '<!-- TODO: SURVIVE -->', '<!DOCTYPE carnage>',
+          ];
+          domTagText = domTags[Math.floor(w.rng() * domTags.length)];
+        }
+
         w.projectiles.push({
           uid: uid(w),
           x: p.x,
           y: p.y + 10,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          radius: 6,
+          radius: projRadius,
           damage,
           impactIntensity: weaponImpact(weapon),
           fromPlayer: true,
-          expiresAt: w.now + (weapon.lifetimeMs ?? 2000),
+          expiresAt: w.now + (isLlamaFamily ? Math.round(((weapon.range ?? 560) / (weapon.speed ?? 300)) * 1000) : (weapon.lifetimeMs ?? 2000)),
           targetUid: weapon.kind === 'homing' ? (target?.uid ?? null) : null,
           turnRate: weapon.kind === 'homing' ? 5.2 : 0,
-          color: palette.accent,
+          color: weapon.color ?? palette.accent,
           trail: [],
-          pierce: weapon.pierce ?? 0,
+          pierce: isLlamaFamily ? 99 : (weapon.pierce ?? 0),
           hitUids: new Set(),
           obstacleUids: new Set(),
           obstacleInteraction: weapon.obstacleInteraction ?? 'block',
           statusEffectId: weapon.statusEffectId,
           impactTrigger: weapon.impactTrigger,
           evolutionBehavior: behavior,
+          weaponId: weapon.id,
+          customKind: isElementalLlama ? 'elemental-llama' : isLlama ? 'baby-llama' : isSolitaire ? 'solitaire' : isNyan ? 'nyan-cat' : isPopup ? 'popup-window' : isDom ? 'dom-tag' : isCookie ? 'golden-cookie' : undefined,
+          isElementalLlama: isElementalLlama,
+          popupTitle: popupData?.title,
+          popupText: popupData?.text,
+          popupKind: popupData?.kind,
+          tagText: domTagText,
+          sinePhase: isNyan ? (i * Math.PI + w.rng() * 1.5) : undefined,
+          sineBaseX: isNyan ? p.x : undefined,
+          sineBaseY: isNyan ? p.y + 10 : undefined,
         });
       }
       p.anim = 'attack';
@@ -3888,6 +4037,66 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
     }
 
     case 'glitch': {
+      if (weapon.id === 'bsod-annihilator') {
+        w.effects.push({
+          uid: uid(w),
+          kind: 'bsod-crash',
+          weaponId: weapon.id,
+          x: p.x,
+          y: p.y,
+          radius: reach * 1.3,
+          angle: 0,
+          spread: 0,
+          bornAt: w.now,
+          expiresAt: w.now + 650,
+          color: '#1e40af',
+          damage,
+          impactIntensity: 5,
+          impactTrigger: 'stomp',
+          hitUids: new Set(),
+          followPlayer: true,
+          statusEffectId: 'freeze',
+          bsodErrorText: '*** STOP: 0x0000007B (0xF78D2524, 0xC0000034) INACCESSIBLE_BOOT_DEVICE',
+        });
+        novaDamage(w, p.x, p.y, reach * 1.3, damage, 5, 'freeze');
+        damageBreakable(w, p.x, p.y, reach * 1.3, damage, 5, p.x, p.y, 'stomp');
+
+        // Spawn falling byte blocks from above
+        for (let b = 0; b < 5; b += 1) {
+          const bx = p.x + randRange(w.rng, -reach * 0.75, reach * 0.75);
+          const by = p.y + randRange(w.rng, -reach * 0.75, reach * 0.75);
+          const bytePool = ['0xDEAD', '0xBEEF', '0xCAFE', '0x0000', '0xFFFF', '0xNULL', '0xBAAD'];
+          w.projectiles.push({
+            uid: uid(w),
+            weaponId: weapon.id,
+            customKind: 'byte-block',
+            tagText: bytePool[Math.floor(w.rng() * bytePool.length)],
+            x: bx,
+            y: by - 220,
+            vx: 0,
+            vy: 420,
+            radius: 18,
+            damage: damage * 0.8,
+            impactIntensity: 4,
+            fromPlayer: true,
+            expiresAt: w.now + 850,
+            targetUid: null,
+            turnRate: 0,
+            color: '#38bdf8',
+            trail: [],
+            pierce: 3,
+            hitUids: new Set(),
+            sineBaseY: by,
+          });
+        }
+        w.shake = Math.max(w.shake, 14);
+        pushAlert(w, 'KERNEL PANIC: BSOD');
+        pushSfx(w, 'bossWarning');
+        p.anim = 'attack';
+        p.animStartedAt = w.now;
+        break;
+      }
+
       const target = nearestEnemy(w, p.x, p.y, reach + 120);
       const cx = target ? target.x : p.x + (p.facing > 0 ? reach * 0.6 : -reach * 0.6);
       const cy = target ? target.y : p.y;
@@ -4051,6 +4260,70 @@ export function activateUltimate(w: World): boolean {
       followPlayer: false,
     });
   }
+  if (ult.id === 'llamaste-overload') {
+    const burstCount = 24;
+    const speed = 320;
+    for (let i = 0; i < burstCount; i += 1) {
+      const angle = (i / burstCount) * Math.PI * 2;
+      w.projectiles.push({
+        uid: uid(w),
+        x: w.player.x,
+        y: w.player.y + 10,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 15,
+        damage: 52 * damageMult(w),
+        impactIntensity: 3,
+        fromPlayer: true,
+        expiresAt: w.now + 3200,
+        targetUid: null,
+        turnRate: 0,
+        color: '#fb7185',
+        trail: [],
+        pierce: 99,
+        hitUids: new Set(),
+        obstacleUids: new Set(),
+        weaponId: 'baby-llama-stampede',
+        customKind: 'baby-llama',
+        isElementalLlama: true,
+      });
+    }
+    spawnParticles(w, w.player.x, w.player.y, '#fb7185', 25, 200);
+    spawnParticles(w, w.player.x, w.player.y, '#38bdf8', 16, 180);
+    spawnParticles(w, w.player.x, w.player.y, '#a855f7', 16, 180);
+  }
+  if (ult.id === 'apex-llamageddon') {
+    const burstCount = 28;
+    const speed = 360;
+    for (let i = 0; i < burstCount; i += 1) {
+      const angle = (i / burstCount) * Math.PI * 2;
+      w.projectiles.push({
+        uid: uid(w),
+        x: w.player.x,
+        y: w.player.y + 10,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 17,
+        damage: 64 * damageMult(w),
+        impactIntensity: 4,
+        fromPlayer: true,
+        expiresAt: w.now + 3500,
+        targetUid: null,
+        turnRate: 0,
+        color: '#c084fc',
+        trail: [],
+        pierce: 99,
+        hitUids: new Set(),
+        obstacleUids: new Set(),
+        weaponId: 'elemental-llama-stampede',
+        customKind: 'elemental-llama',
+        isElementalLlama: true,
+      });
+    }
+    spawnParticles(w, w.player.x, w.player.y, '#c084fc', 35, 240);
+    spawnParticles(w, w.player.x, w.player.y, '#f59e0b', 20, 200);
+    spawnParticles(w, w.player.x, w.player.y, '#38bdf8', 20, 200);
+  }
   w.shake = Math.max(w.shake, 12);
   pushAlert(w, ult.name);
   pushSfx(w, 'ultimate');
@@ -4118,10 +4391,26 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   for (const evolution of EVOLUTIONS) {
     if (w.disabledWeaponIds && w.disabledWeaponIds.includes(evolution.id)) continue;
     const weapon = w.weapons.find((entry) => entry.def.id === evolution.baseWeaponId);
-    const passive = w.passives.find((entry) => entry.def.id === evolution.requiredPassiveId);
-    if (weapon && passive && weapon.def.id !== evolution.id) {
-      pool.push({ id: `evolution-${evolution.id}`, name: evolution.name, description: evolution.description, weight: 14, maxStacks: 1, effects: [], cardKind: 'evolution', evolutionId: evolution.id });
+    if (!weapon || weapon.def.id === evolution.id) continue;
+
+    // Check base weapon level (if requiredBaseLevel specified, or if requiredWeaponId is set default to 8 maxed)
+    const reqBase = evolution.requiredBaseLevel ?? (evolution.requiredWeaponId ? 8 : 1);
+    if (weapon.level < reqBase) continue;
+
+    // Check partner weapon if specified (e.g. requires another weapon maxed)
+    if (evolution.requiredWeaponId) {
+      const partner = w.weapons.find((entry) => entry.def.id === evolution.requiredWeaponId);
+      const reqPartner = evolution.requiredWeaponLevel ?? 8;
+      if (!partner || partner.level < reqPartner) continue;
     }
+
+    // Check passive if specified
+    if (evolution.requiredPassiveId) {
+      const passive = w.passives.find((entry) => entry.def.id === evolution.requiredPassiveId);
+      if (!passive) continue;
+    }
+
+    pool.push({ id: `evolution-${evolution.id}`, name: evolution.name, description: evolution.description, weight: 16, maxStacks: 1, effects: [], cardKind: 'evolution', evolutionId: evolution.id });
   }
   for (const recipe of RELIC_RECIPES) {
     const eligibility = relicRecipeEligibility(w, recipe);
@@ -4198,6 +4487,17 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
       weapon.level = Math.min(8, weapon.level + 1);
       if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
       pushAlert(w, `${evolution.name} evolved`);
+      if (evolution.requiredWeaponId) {
+        w.popups.push({
+          x: w.player.x,
+          y: w.player.y + 32,
+          text: `★ FUSION · ${evolution.name} ★`,
+          color: evolution.color,
+          bornAt: w.now,
+          vy: 35,
+        });
+        w.shake = Math.max(w.shake, 4);
+      }
     }
   }
   if (upgrade.cardKind === 'relic-evolution' && upgrade.relicRecipeId) {
@@ -5119,14 +5419,16 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
     const hitX = horizontal > vertical;
     const nx = hitX ? (dx < 0 ? -1 : 1) : 0;
     const ny = hitX ? 0 : (dy < 0 ? -1 : 1);
-    if (b.kind === 'reflective-surface' && proj.fromPlayer && proj.obstacleInteraction === 'reflect') {
+    if (proj.fromPlayer && proj.obstacleInteraction === 'reflect') {
       (proj.obstacleUids ??= new Set()).add(b.uid);
       if (hitX) proj.vx *= -1;
       else proj.vy *= -1;
       // Move clear of the face so a reflected shot cannot immediately collide again.
-      proj.x = b.x + nx * (b.w / 2 + proj.radius + 1);
-      proj.y = b.y + ny * (b.h / 2 + proj.radius + 1);
-      spawnParticles(w, proj.x, proj.y, '#d8b4fe', 5, 70);
+      proj.x = b.x + nx * (b.w / 2 + proj.radius + 2);
+      proj.y = b.y + ny * (b.h / 2 + proj.radius + 2);
+      proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
+      spawnParticles(w, proj.x, proj.y, proj.color ?? '#d8b4fe', 5, 70);
       pushAlert(w, 'Ricochet');
       continue;
     }
@@ -5134,11 +5436,9 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
       spawnParticles(w, proj.x, proj.y, '#d8b4fe', 3, 45);
       return true;
     }
-    if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp' || b.kind === 'metal-box' || b.kind === 'bench') {
-      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
-      spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
-      return true;
-    }
+    damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
+    spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
+    return true;
   }
   return false;
 }
@@ -6067,6 +6367,78 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'root-trapper': {
+        // Roots down when within 340px, channels a pulsing digital root circle,
+        // then erupts a branching laser root spike towards the player.
+        if (distance < 340) {
+          if (w.now < enemy.chargeUntil) {
+            // Actively channeling roots: immobilized and resistant
+            speed = 0;
+            if (w.now >= enemy.fireReadyAt) {
+              enemy.fireReadyAt = w.now + 250;
+              spawnParticles(w, enemy.x, enemy.y, '#10b981', 4, 30);
+            }
+          } else if (w.now >= enemy.chargeReadyAt) {
+            enemy.chargeUntil = w.now + 1100;
+            enemy.chargeReadyAt = w.now + 3800;
+            enemy.fireReadyAt = w.now + 100;
+            const rootAngle = Math.atan2(dirY, dirX);
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 260, angle: rootAngle, spread: 0.22,
+                bornAt: w.now + 600, expiresAt: w.now + 1100, color: '#10b981', damage: 12, impactIntensity: 1,
+                hitUids: new Set(), followPlayer: false,
+              });
+              w.effects.push({
+                uid: uid(w), kind: 'ring', x: p.x, y: p.y, radius: 45, angle: 0, spread: Math.PI * 2,
+                bornAt: w.now, expiresAt: w.now + 600, color: '#059669', damage: 0, impactIntensity: 0,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          } else {
+            speed *= 0.55;
+          }
+        }
+        break;
+      }
+      case 'mimic-tree': {
+        // Dormant until approached or damaged; explodes into a high-speed sprint & spin slash
+        if (enemy.hp === enemy.maxHp && distance > 140 && !enemy.chargeUntil) {
+          speed = 0; // Perfectly still, masquerading as a tree
+        } else {
+          if (!enemy.chargeUntil) {
+            enemy.chargeUntil = w.now + 6000;
+            pushAlert(w, 'MIMIC AMBUSH!');
+            spawnParticles(w, enemy.x, enemy.y, '#06b6d4', 12, 110);
+            w.shake = Math.max(w.shake, 2.5);
+          }
+          speed = enemy.speed * 1.85;
+          enemy.weave += dt * 5;
+        }
+        break;
+      }
+      case 'spore-mortar': {
+        // Floats at medium-long range (280-420px), lobbing lingering hazard clouds
+        if (distance < 260) {
+          speed = -enemy.speed * 0.7; // Back up if player gets too close
+        } else if (distance > 380) {
+          speed = enemy.speed * 1.2;
+        } else {
+          speed *= 0.35;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 3200;
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'hazard', x: p.x + randRange(w.rng, -30, 30), y: p.y + randRange(w.rng, -30, 30),
+              radius: 54, angle: 0, spread: Math.PI * 2, bornAt: w.now, expiresAt: w.now + 2600, color: '#34d399', damage: 5, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+            spawnParticles(w, enemy.x, enemy.y, '#34d399', 6, 60);
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
@@ -6074,7 +6446,21 @@ function updateEnemies(w: World, dt: number) {
 
     let moveX = dirX;
     let moveY = dirY;
-    if (enemy.def.behavior === 'pincer' && w.now >= enemy.chargeUntil) {
+    if (enemy.cutifiedUntil && w.now < enemy.cutifiedUntil) {
+      speed *= 0.42;
+      const babyLlama = w.projectiles.find((pr) => pr.customKind === 'baby-llama' && pr.uid === enemy.cutifiedTargetUid)
+        ?? w.projectiles.find((pr) => pr.customKind === 'baby-llama');
+      if (babyLlama) {
+        const ldx = babyLlama.x - enemy.x;
+        const ldy = babyLlama.y - enemy.y;
+        const llen = Math.hypot(ldx, ldy) || 1;
+        moveX = ldx / llen;
+        moveY = ldy / llen;
+      } else {
+        moveX = -dirX * 0.75 + Math.sin(w.now / 240 + enemy.uid) * 0.6;
+        moveY = -dirY * 0.75 + Math.cos(w.now / 240 + enemy.uid) * 0.6;
+      }
+    } else if (enemy.def.behavior === 'pincer' && w.now >= enemy.chargeUntil) {
       const pincerSide = (enemy.uid % 2 === 0 ? 1 : -1);
       const wobble = pincerSide * 0.95;
       moveX = dirX * 0.3 + -dirY * wobble;
@@ -6121,7 +6507,8 @@ function updateEnemies(w: World, dt: number) {
 
     // Contact damage.
     const contact = enemy.radius + p.radius;
-    if (enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
+    const isCutified = enemy.cutifiedUntil && w.now < enemy.cutifiedUntil;
+    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
       damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
     }
@@ -6179,6 +6566,10 @@ function updateEnemies(w: World, dt: number) {
     if (enemy.dying && w.now - enemy.deathAt > 560) {
       w.enemies.splice(i, 1);
     }
+  }
+
+  if (w.character.id === 'llama-mama') {
+    w.llamaEgoScore = w.enemies.filter((e) => !e.dying && (e.cutifiedUntil ?? 0) > w.now).length;
   }
 }
 
@@ -6358,6 +6749,44 @@ function updateProjectiles(w: World, dt: number) {
           triggerDvdCornerStrike(w, proj);
         }
       }
+    } else if (proj.customKind === 'solitaire' || proj.weaponId === 'solitaire-cascade' || proj.weaponId === 'infinite-solitaire') {
+      const halfW = (w.area.endless ? 520 : w.bounds.w / 2) - 18;
+      const halfH = (w.area.endless ? 400 : w.bounds.h / 2) - 18;
+      const originX = w.area.endless ? p.x : 0;
+      const originY = w.area.endless ? p.y : 0;
+      const minX = originX - halfW;
+      const maxX = originX + halfW;
+      const minY = originY - halfH;
+      const maxY = originY + halfH;
+
+      let bounced = false;
+      if (proj.x <= minX && proj.vx < 0) {
+        proj.x = minX;
+        proj.vx = Math.abs(proj.vx);
+        bounced = true;
+      } else if (proj.x >= maxX && proj.vx > 0) {
+        proj.x = maxX;
+        proj.vx = -Math.abs(proj.vx);
+        bounced = true;
+      }
+
+      if (proj.y <= minY && proj.vy < 0) {
+        proj.y = minY;
+        proj.vy = Math.abs(proj.vy);
+        bounced = true;
+      } else if (proj.y >= maxY && proj.vy > 0) {
+        proj.y = maxY;
+        proj.vy = -Math.abs(proj.vy);
+        bounced = true;
+      }
+
+      if (bounced) {
+        proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+        proj.hitUids.clear(); // Re-arm collision after bounce
+        spawnParticles(w, proj.x, proj.y, proj.color ?? '#c084fc', 6, 75);
+        pushAlert(w, 'Cascade Bounce');
+      }
+      remove = false;
     } else if (!remove) {
       if (w.area.endless) {
         // In endless mode, cull by distance from player rather than fixed arena walls.
@@ -6393,8 +6822,58 @@ function updateProjectiles(w: World, dt: number) {
       continue;
     }
 
+    if (proj.customKind === 'nyan-cat') {
+      proj.sinePhase = (proj.sinePhase ?? 0) + dt * 14;
+      const fwdAngle = Math.atan2(proj.vy, proj.vx);
+      const perpX = -Math.sin(fwdAngle);
+      const perpY = Math.cos(fwdAngle);
+      const wobble = Math.sin(proj.sinePhase) * 110 * dt;
+      proj.x += perpX * wobble;
+      proj.y += perpY * wobble;
+      if (w.rng() < 0.35) {
+        const rainbowColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7'];
+        spawnParticles(w, proj.x - Math.cos(fwdAngle) * 16, proj.y - Math.sin(fwdAngle) * 16, rainbowColors[Math.floor(w.rng() * rainbowColors.length)]!, 2, 50);
+      }
+    }
+
+    if (proj.customKind === 'popup-window') {
+      const halfW = (w.area.endless ? 480 : w.bounds.w / 2) - 30;
+      const halfH = (w.area.endless ? 360 : w.bounds.h / 2) - 24;
+      const originX = w.area.endless ? p.x : 0;
+      const originY = w.area.endless ? p.y : 0;
+      let bounced = false;
+      if (proj.x <= originX - halfW && proj.vx < 0) { proj.x = originX - halfW; proj.vx = Math.abs(proj.vx); bounced = true; }
+      else if (proj.x >= originX + halfW && proj.vx > 0) { proj.x = originX + halfW; proj.vx = -Math.abs(proj.vx); bounced = true; }
+      if (proj.y <= originY - halfH && proj.vy < 0) { proj.y = originY - halfH; proj.vy = Math.abs(proj.vy); bounced = true; }
+      else if (proj.y >= originY + halfH && proj.vy > 0) { proj.y = originY + halfH; proj.vy = -Math.abs(proj.vy); bounced = true; }
+      if (bounced) {
+        proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+        proj.hitUids.clear();
+        spawnParticles(w, proj.x, proj.y, '#0284c7', 6, 80);
+      }
+    }
+
+    if (proj.customKind === 'byte-block' && proj.sineBaseY !== undefined) {
+      if (proj.y >= proj.sineBaseY) {
+        proj.y = proj.sineBaseY;
+        novaDamage(w, proj.x, proj.y, 65, proj.damage * 1.5, 4, 'freeze');
+        damageBreakable(w, proj.x, proj.y, 65, proj.damage * 1.5, 4, proj.x, proj.y, 'stomp');
+        spawnParticles(w, proj.x, proj.y, '#1e40af', 14, 140);
+        spawnParticles(w, proj.x, proj.y, '#38bdf8', 8, 90);
+        w.shake = Math.max(w.shake, 7);
+        remove = true;
+      }
+    }
+
+    if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
+      if (!proj.trampleNextAt || w.now >= proj.trampleNextAt) {
+        proj.hitUids.clear();
+        proj.trampleNextAt = w.now + 380;
+      }
+    }
+
     if (!remove && proj.fromPlayer) {
-      forEachNearby(w, proj.x, proj.y, 30, (enemy) => {
+      forEachNearby(w, proj.x, proj.y, Math.max(36, proj.radius + 18), (enemy) => {
         if (remove || enemy.dying || proj.hitUids.has(enemy.uid)) return;
         const reach = proj.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
@@ -6412,6 +6891,63 @@ function updateProjectiles(w: World, dt: number) {
             );
           } else {
             damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
+          }
+          if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
+            const pSpeed = Math.hypot(proj.vx, proj.vy) || 1;
+            const pushDirX = proj.vx / pSpeed;
+            const pushDirY = proj.vy / pSpeed;
+            enemy.kx += pushDirX * 380;
+            enemy.ky += pushDirY * 380;
+            enemy.cutifiedUntil = w.now + 5500;
+            enemy.cutifiedTargetUid = proj.uid;
+
+            // Maternal Ego & Sovereign Supremacy score boost
+            w.llamaEgoScore = (w.llamaEgoScore ?? 0) + 1;
+
+            if (proj.isElementalLlama || proj.customKind === 'elemental-llama') {
+              // Elemental benefits applied during Llamasté Overload or by Llamá Overlòrd
+              const statusPool = ['slow', 'burning', 'freeze', 'acid', 'chilled', 'corrupted'];
+              if (w.rng() < 0.75) {
+                const chosen = statusPool[Math.floor(w.rng() * statusPool.length)]!;
+                applyStatusEffect(w, enemy, chosen);
+              }
+              if (w.rng() < 0.45) applyStatusEffect(w, enemy, 'slow');
+              if (w.rng() < 0.35) applyStatusEffect(w, enemy, 'burning');
+              if (w.rng() < 0.28) applyStatusEffect(w, enemy, 'freeze');
+              if (w.rng() < 0.28) applyStatusEffect(w, enemy, 'acid');
+              if (w.rng() < 0.22) applyStatusEffect(w, enemy, 'chilled');
+
+              spawnParticles(w, enemy.x, enemy.y, '#c084fc', 8, 90);
+              spawnParticles(w, enemy.x, enemy.y, '#38bdf8', 6, 70);
+            } else {
+              // Base baby llama: heavy knockback, adoring cutify heart-eyes, and Ego boost!
+              spawnParticles(w, enemy.x, enemy.y, '#f43f5e', 8, 80);
+              spawnParticles(w, enemy.x, enemy.y, '#fb7185', 5, 60);
+            }
+          }
+          if (proj.weaponId === 'holofoil-cutter' && !proj.hasRefracted) {
+            proj.hasRefracted = true;
+            const baseAngle = Math.atan2(proj.vy, proj.vx);
+            for (const offset of [-0.48, 0.48]) {
+              const refAngle = baseAngle + offset;
+              w.effects.push({
+                uid: uid(w),
+                kind: 'laser',
+                x: proj.x,
+                y: proj.y,
+                radius: 130,
+                angle: refAngle,
+                spread: 0.045,
+                bornAt: w.now,
+                expiresAt: w.now + 190,
+                color: '#e879f9',
+                damage: proj.damage * 0.65,
+                impactIntensity: 2,
+                hitUids: new Set([enemy.uid]),
+                followPlayer: false,
+              });
+            }
+            spawnParticles(w, proj.x, proj.y, '#e879f9', 8, 90);
           }
           triggerEvolutionHit(
             w,
@@ -6455,10 +6991,15 @@ function updateProjectiles(w: World, dt: number) {
             proj.evolutionBehavior = undefined;
             pushAlert(w, 'SIGNATURE SPLIT');
           }
-            damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
+          damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
-          if (proj.pierce > 0) proj.pierce -= 1;
-          else remove = true;
+          if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
+            // Baby & elemental llamas keep stampeding without losing pierce per hit
+          } else if (proj.pierce > 0) {
+            proj.pierce -= 1;
+          } else {
+            remove = true;
+          }
         }
       });
     } else if (!remove) {
@@ -6469,7 +7010,18 @@ function updateProjectiles(w: World, dt: number) {
       }
     }
 
-    if (remove) w.projectiles.splice(i, 1);
+    if (remove) {
+      if (proj.customKind === 'popup-window') {
+        novaDamage(w, proj.x, proj.y, 90, proj.damage * 1.4, 3);
+        damageBreakable(w, proj.x, proj.y, 90, proj.damage * 1.4, 3, proj.x, proj.y);
+        const confetti = ['#ff0055', '#ffcc00', '#00ffcc', '#3b82f6', '#ec4899', '#ffffff'];
+        for (let c = 0; c < 14; c += 1) {
+          spawnParticles(w, proj.x, proj.y, confetti[c % confetti.length]!, 1, 130);
+        }
+        pushAlert(w, '[X] POPUP CLOSED');
+      }
+      w.projectiles.splice(i, 1);
+    }
   }
 }
 
@@ -7526,7 +8078,7 @@ function updateEffects(w: World) {
     }
 
     const active = w.now >= effect.bornAt;
-    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'waveform' || effect.kind === 'laser' || effect.kind === 'impact') && effect.damage > 0) {
+    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'waveform' || effect.kind === 'dialup-carrier' || effect.kind === 'laser' || effect.kind === 'impact') && effect.damage > 0) {
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
         if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
         const reach = effect.radius + enemy.radius;
@@ -7580,7 +8132,7 @@ function updateEffects(w: World) {
       damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
     }
 
-    if (active && effect.kind === 'hazard' && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
+    if (active && (effect.kind === 'hazard' || effect.kind === 'rickroll-disco') && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
       effect.nextTickAt = w.now + 520;
       effect.hitUids.clear();
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
@@ -7603,6 +8155,30 @@ function updateEffects(w: World) {
     }
 
     if (w.now > effect.expiresAt) {
+      if (effect.weaponId === 'singularity-core' || (effect.kind === 'hazard' && effect.pullStrength)) {
+        const collapseRadius = effect.radius * 1.5;
+        const collapseDamage = effect.damage * 2.4;
+        novaDamage(w, effect.x, effect.y, collapseRadius, collapseDamage, 4);
+        damageBreakable(w, effect.x, effect.y, collapseRadius, collapseDamage, 4, effect.x, effect.y);
+        w.effects.push({
+          uid: uid(w),
+          kind: 'ring',
+          x: effect.x,
+          y: effect.y,
+          radius: collapseRadius,
+          angle: 0,
+          spread: 0,
+          bornAt: w.now,
+          expiresAt: w.now + 260,
+          color: effect.color,
+          damage: 0,
+          impactIntensity: 0,
+          hitUids: new Set(),
+          followPlayer: false,
+        });
+        spawnParticles(w, effect.x, effect.y, effect.color, 16, 140);
+        pushSfx(w, 'obstacleBreak');
+      }
       if (effect.evolutionBehavior?.kind === 'delayed-burst') {
         const burstRadius = effect.radius * (effect.evolutionBehavior.radius ?? 0.82);
         const burstDamage = effect.damage * 0.55;
@@ -8748,6 +9324,50 @@ function updateThreatEvents(w: World, dt: number) {
   }
 }
 
+function updateLlamaMamaPassive(w: World) {
+  if (w.character.id !== 'llama-mama') return;
+  const p = w.player;
+  if (p.hp > 0 && p.hp / p.maxHp <= 0.24 && !w.llamaMamaEnraged) {
+    w.llamaMamaEnraged = true;
+    w.llamaMamaRageUntil = w.now + 14000;
+    pushAlert(w, "WE'RE OVER IT! PERIOD!");
+    pushSfx(w, 'ultimate');
+    w.shake = Math.max(w.shake, 14);
+    spawnParticles(w, p.x, p.y, '#ff4500', 30, 220);
+  }
+
+  if (w.llamaMamaRageUntil && w.now < w.llamaMamaRageUntil) {
+    if (!w.llamaMamaLastBlastAt || w.now - w.llamaMamaLastBlastAt >= 320) {
+      w.llamaMamaLastBlastAt = w.now;
+      const radius = 240 * areaMult(w);
+      const blastDamage = 28 * damageMult(w);
+      novaDamage(w, p.x, p.y, radius, blastDamage, 3, 'burn');
+      damageBreakable(w, p.x, p.y, radius, blastDamage, 3, p.x, p.y);
+      w.effects.push({
+        uid: uid(w),
+        kind: 'wave',
+        x: p.x,
+        y: p.y,
+        radius,
+        angle: 0,
+        spread: Math.PI * 2,
+        bornAt: w.now,
+        expiresAt: w.now + 320,
+        color: '#ff4500',
+        damage: 0,
+        impactIntensity: 0,
+        hitUids: new Set(),
+        followPlayer: true,
+      });
+      spawnParticles(w, p.x, p.y, '#ff7700', 8, 140);
+    }
+  } else if (w.llamaMamaRageUntil && w.now >= w.llamaMamaRageUntil) {
+    if (p.hp / p.maxHp > 0.24) {
+      w.llamaMamaEnraged = false;
+    }
+  }
+}
+
 export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (w.outcome !== 'running') return;
 
@@ -8790,6 +9410,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
     while (w.playerTrail.length > 0 && w.now - w.playerTrail[0]!.at > 2800) w.playerTrail.shift();
   }
   updateStealth(w);
+  updateLlamaMamaPassive(w);
   updateDistrictIncursion(w, dt);
 
   if (w.area.endless && w.endless) {
