@@ -27,7 +27,8 @@ import {
 import { useMeta } from '@/game/state/metaStore';
 import { RigPortrait } from '@/ui/RigPortrait';
 import {
-  LOKPET_RIGS,
+  lokPetRig,
+  lokPetSpritePalette,
   LOKPET_VARIANTS,
   LOKPET_VARIANTS_BY_ID,
 } from '@/game/data/lokPets';
@@ -141,6 +142,7 @@ export function LokPetBattleScreen({
       }, delay);
       return () => clearTimeout(timer);
     }
+    return;
   }, [battleState]);
 
   // Canvas VFX Rendering
@@ -265,7 +267,7 @@ export function LokPetBattleScreen({
     }
 
     const battle = createBattle({
-      gameMode: 'sparring',
+      gameMode: 'test-sparring',
       playerPets: meta.savedLokPets,
       dummyCustomVariant: dummyVariant,
       dummyLevel: dummyLvl,
@@ -317,11 +319,9 @@ export function LokPetBattleScreen({
     const activeEnemyPet = battleState.enemyTeam[battleState.activeEnemyIndex];
     const isPlayerTurn = battleState.currentTurnActor === 'player' && battleState.phase === 'select-action';
 
-    const playerRigFactory = LOKPET_RIGS[activePlayerPet.silhouette];
-    const playerRig = playerRigFactory ? playerRigFactory() : null;
+    const playerRig = lokPetRig(activePlayerPet.silhouette);
 
-    const enemyRigFactory = LOKPET_RIGS[activeEnemyPet.silhouette];
-    const enemyRig = enemyRigFactory ? enemyRigFactory() : null;
+    const enemyRig = lokPetRig(activeEnemyPet.silhouette);
 
     const isVictory = battleState.phase === 'victory';
     const isDefeat = battleState.phase === 'defeat';
@@ -473,7 +473,7 @@ export function LokPetBattleScreen({
                 {playerRig && (
                   <RigPortrait
                     rig={playerRig}
-                    palette={activePlayerPet.palette}
+                    palette={lokPetSpritePalette(activePlayerPet.palette)}
                     anim={activePlayerPet.isGuarding ? 'walk' : 'idle'}
                     size={110}
                     className="drop-shadow-lg filter transition-transform"
@@ -574,7 +574,7 @@ export function LokPetBattleScreen({
                 {enemyRig && (
                   <RigPortrait
                     rig={enemyRig}
-                    palette={activeEnemyPet.palette}
+                    palette={lokPetSpritePalette(activeEnemyPet.palette)}
                     anim={activeEnemyPet.isGuarding ? 'walk' : 'idle'}
                     size={110}
                     className="drop-shadow-lg filter transition-transform [transform:scaleX(-1)]"
@@ -1007,7 +1007,7 @@ export function LokPetBattleScreen({
                   >
                     {LOKPET_VARIANTS.map((variant) => (
                       <option key={variant.id} value={variant.id}>
-                        {variant.name} ({variant.element.toUpperCase()} · {variant.rarity.toUpperCase()})
+                        {variant.name}
                       </option>
                     ))}
                   </select>
@@ -1053,20 +1053,19 @@ export function LokPetBattleScreen({
             {meta.savedLokPets.length > 0 ? (
               (() => {
                 const leadPet = meta.savedLokPets[0];
-                const rigFactory = LOKPET_RIGS[leadPet.roll.silhouette];
-                const rig = rigFactory ? rigFactory() : null;
+                const rig = lokPetRig(leadPet.roll.silhouette);
 
                 return (
                   <div className="mt-4 flex flex-col items-center text-center">
                     <div className="h-32 w-32 grid place-items-center rounded-2xl border border-slate-800 bg-slate-950 p-2">
-                      {rig && <RigPortrait rig={rig} palette={leadPet.roll.palette} size={100} />}
+                      {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(leadPet.roll.palette)} size={100} />}
                     </div>
                     <h4 className="mt-3 font-bold text-lg text-white">{leadPet.roll.name}</h4>
                     <div className="mt-1 flex items-center gap-2">
                       <span className="font-mono text-xs text-cyan-400 font-bold">Lv.{leadPet.level || 1}</span>
                       {renderElementBadge(leadPet.roll.element)}
                     </div>
-                    <p className="mt-2 text-xs text-slate-400 italic">“{leadPet.roll.personality.label}”</p>
+                    <p className="mt-2 text-xs text-slate-400 italic">"{leadPet.roll.traitLabel}"</p>
 
                     <div className="mt-4 w-full border-t border-slate-800 pt-3 text-left font-mono text-xs space-y-1">
                       <div className="flex justify-between text-slate-400">
@@ -1144,7 +1143,7 @@ export function LokPetBattleScreen({
                     <p className="text-xs text-slate-400">{tier.trainerTitle}</p>
 
                     <p className="mt-3 text-xs italic text-slate-300 leading-relaxed">
-                      “{tier.flavorQuote}”
+                      "{tier.flavorQuote}"
                     </p>
 
                     {/* Opponent Team Lineup */}
@@ -1221,8 +1220,7 @@ export function LokPetBattleScreen({
             <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {meta.savedLokPets.map((pet) => {
                 const isSelected = selectedKennelPetId === pet.id;
-                const rigFactory = LOKPET_RIGS[pet.roll.silhouette];
-                const rig = rigFactory ? rigFactory() : null;
+                const rig = lokPetRig(pet.roll.silhouette);
 
                 return (
                   <div
@@ -1236,7 +1234,7 @@ export function LokPetBattleScreen({
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-16 w-16 shrink-0 grid place-items-center rounded-lg border border-slate-800 bg-slate-950">
-                        {rig && <RigPortrait rig={rig} palette={pet.roll.palette} size={50} />}
+                        {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(pet.roll.palette)} size={50} />}
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -1266,8 +1264,7 @@ export function LokPetBattleScreen({
                 return <div className="text-center text-slate-400">No companion selected.</div>;
               }
 
-              const rigFactory = LOKPET_RIGS[pet.roll.silhouette];
-              const rig = rigFactory ? rigFactory() : null;
+              const rig = lokPetRig(pet.roll.silhouette);
               const level = pet.level || 1;
               const exp = pet.exp || 0;
               const expNext = getExpForLevel(level);
@@ -1292,7 +1289,7 @@ export function LokPetBattleScreen({
 
                   <div className="mt-4 flex flex-col items-center text-center">
                     <div className="h-28 w-28 grid place-items-center rounded-xl border border-slate-800 bg-slate-950 p-2">
-                      {rig && <RigPortrait rig={rig} palette={pet.roll.palette} size={90} />}
+                      {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(pet.roll.palette)} size={90} />}
                     </div>
                     <h3 className="mt-3 font-bold text-lg text-white">{pet.roll.name}</h3>
                     <div className="mt-1 flex items-center gap-2">

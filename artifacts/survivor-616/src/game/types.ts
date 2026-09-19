@@ -125,9 +125,12 @@ export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescu
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
+  ink?: string;
   body: string;
   bodyDark: string;
   accent: string;
+  accentBright?: string;
+  skin?: string;
   glow: string;
   eye: string;
 }

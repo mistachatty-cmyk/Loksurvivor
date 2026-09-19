@@ -147,7 +147,7 @@ export interface BattleState {
   activeAnimation?: BattleAnimationState;
   cheerAvailable: boolean;
   autoBattle: boolean;
-  battleSpeed: 1 | 2;
+  battleSpeed: 1 | 2 | 3;
   rewards?: BattleRewards;
 }
 
