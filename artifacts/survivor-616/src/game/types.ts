@@ -1879,8 +1879,10 @@ export interface MetaState {
   hideoutWeatherEnabled: boolean;
   /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
   splashTextEnabled: boolean;
-  /** Shows the title screen name as a single "Survivor616" line with the splash blurb unrotated right below it, instead of the classic stacked two-line title. Off by default. */
+  /** Shows the cleaner signature title lockup instead of the classic stacked two-line title. Off by default. */
   oneLineTitleEnabled: boolean;
+  /** Lets the two title pieces be dragged with a gentle release momentum on the opening screen. On by default. */
+  introTitlePhysicsEnabled: boolean;
   /** Popup travel-encounter minigame on select hideout/run-launch triggers. On by default. See game/travelEncounter.ts. */
   travelEncountersEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */

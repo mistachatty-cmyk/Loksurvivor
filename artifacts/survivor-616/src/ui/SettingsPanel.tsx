@@ -69,6 +69,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setHideoutWeather,
     setSplashTextEnabled,
     setOneLineTitleEnabled,
+    setIntroTitlePhysicsEnabled,
     setTravelEncountersEnabled,
     setGyroEnabled,
     setGyroSensitivity,
@@ -398,10 +399,11 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Survivor616 title</h3>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Signature title layout</h3>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Show the title screen name as a single "Survivor616" line, with the splash blurb sitting
-                      unrotated right below it -- instead of the classic stacked two-line title. Off by default.
+                      Keeps the official Survivor616 name, while giving its “616” half a compact badge beside
+                      Survivor instead of rendering the whole word as one cramped line. Turn it off for the
+                      original stacked lockup.
                     </p>
                   </div>
                   <button
@@ -416,6 +418,30 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     data-testid="button-toggle-one-line-title"
                   >
                     {meta.oneLineTitleEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Movable intro title</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Touch or drag the two pieces of Survivor616 apart on the opening screen. Each carries gentle
+                      release momentum, and a low-key reset appears after you move it. On by default.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIntroTitlePhysicsEnabled(!meta.introTitlePhysicsEnabled)}
+                    aria-pressed={meta.introTitlePhysicsEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.introTitlePhysicsEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-intro-title-physics"
+                  >
+                    {meta.introTitlePhysicsEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>

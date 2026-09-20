@@ -5,13 +5,19 @@
 The cold-open title screen (`src/ui/IntroScreen.tsx`) previously read "616 /
 Survivor" (two lines, in that order) with a static "Grand Rapids · 616" tag
 above it, a body paragraph of flavor text, and no external credit. The user
-asked to rename the brand to **Survivor616** and use the location tag to
-hint at deeper lore, without redesigning the screen (attract-mode
-background, centered layout, framer-motion fade-ins all stay as-is).
+settled on **Survivor616** as the game’s official name. “616Survivor” and
+other 616/survivor permutations are playful alternate lockups, not a
+rebrand. The attract-mode background, centered layout, and framer-motion
+fade-ins stay as-is.
 
-- Title text is now literally `Survivor` / `616` stacked, reading
-  "Survivor616" top-to-bottom -- same two-line layout, order swapped, not a
-  new lockup.
+- The signature layout renders `Survivor` and `616` as two pieces of one
+  **Survivor616** lockup: “616” is a compact lower-right badge so the name
+  feels deliberate instead of cramped. The classic stacked layout remains
+  selectable as the alternate presentation.
+- The title pieces can be dragged on touch or pointer devices with gentle
+  release momentum. This is on by default, can be disabled in Settings, and
+  always has a subtle reset control after the title has moved. Positions are
+  session-only, so reloads never leave the title in an awkward place.
 - The body paragraph ("The block turned after dark...") was removed
   entirely, not replaced.
 - A small external credit link was added below the "Enter the hideout"
