@@ -16,10 +16,10 @@ test('finished rescue routes do not repeatedly offer an already rescued ally', (
   assert.equal(nextRescueAllyId('back-alley', ['deacon'], 'deacon'), undefined);
 });
 
-test('the LokPet Card Shop is a default hideout destination with a live shop entry point', () => {
+test('DigiScope is a default hideout destination with a live shop entry point', () => {
   const shop = HUB_ROOMS.find((room) => room.id === 'the-storefront');
   assert.ok(shop);
-  assert.equal(shop.name, 'LokPet Card Shop');
+  assert.equal(shop.name, 'DigiScope');
   assert.equal(shop.unlock.kind, 'default');
   assert.ok(shop.features.includes('card-shop'));
 });

@@ -468,7 +468,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <div>
                     <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      A short pop-up scrap can trigger when you enter the LokPet Card Shop or head out on a run --
+                      A short pop-up scrap can trigger when you enter DigiScope or head out on a run --
                       throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
                       off to skip it entirely.
                     </p>

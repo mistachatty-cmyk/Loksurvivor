@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Check, CreditCard, Layers3, LockKeyhole, PackageOpen, Sparkles, Swords } from 'lucide-react';
+import { Check, CreditCard, Layers3, LockKeyhole, PackageOpen, RotateCcw, Sparkles, Swords } from 'lucide-react';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { CARD_SHOP_PACKS, PASSIVE_CARDS, activeCardEffects, passiveDeckSlots } from '@/game/data/passiveCards';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
-import { BATTLE_DECK_SLOTS, cardThrowDamage, describeOwnedCard } from '@/game/data/travelEncounters';
+import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS, cardThrowOutcome, describeOwnedCard } from '@/game/data/travelEncounters';
 import { BASE_CARD_CREDITS_PER_LOOT_BOX, useMeta } from '@/game/state/metaStore';
 import { LockDeckCollection } from './LockDeckCollection';
 import { PackOpeningReveal } from './PackOpeningReveal';
@@ -20,7 +20,7 @@ const SHOP_TABS: { id: ShopTab; label: string; icon: typeof PackageOpen }[] = [
 ];
 
 export function CardShopPanel({ onBack }: { onBack: () => void }) {
-  const { meta, buyCardPack, togglePassiveCard, toggleBattleDeckCard, lastCardPackReveal, clearCardPackReveal } = useMeta();
+  const { meta, buyCardPack, togglePassiveCard, toggleBattleDeckCard, buyCardSalvageProtocol, lastCardPackReveal, clearCardPackReveal } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const [tab, setTab] = useState<ShopTab>('binder');
   const [showAll, setShowAll] = useState(false);
@@ -70,15 +70,45 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
       <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="flex items-center gap-2 font-display text-xl font-black uppercase text-white"><Swords className="h-5 w-5 text-fuchsia-200" />Battle Deck</p>
-          <p className="mt-1 text-[10px] uppercase tracking-widest text-white/45">Equip {BATTLE_DECK_SLOTS} cards to throw during travel encounters -- any owned card works, thrown for flat, rarity-scaled damage.</p>
+          <p className="mt-1 text-[10px] uppercase tracking-widest text-white/45">
+            Equip {BATTLE_DECK_SLOTS} cards to throw during travel encounters -- damage and effects vary by card
+            {meta.cardSalvageUnlocked ? ', and Salvage Protocol means a thrown card always comes back.' : ', but a thrown card is gone for good until you unlock Salvage Protocol below.'}
+          </p>
         </div>
         <div className="flex gap-1.5">{Array.from({ length: BATTLE_DECK_SLOTS }, (_, i) => <span key={i} className={`grid h-8 w-8 place-items-center border text-xs ${i < meta.battleDeckCardIds.length ? 'border-fuchsia-300/50 text-fuchsia-200' : 'border-white/10 text-white/20'}`}>{i + 1}</span>)}</div>
       </div>
+
+      <div className={`mt-4 flex flex-col gap-3 border p-3 sm:flex-row sm:items-center sm:justify-between ${meta.cardSalvageUnlocked ? 'border-emerald-300/40 bg-emerald-300/5' : 'border-amber-300/40 bg-amber-300/5'}`} data-testid="section-card-salvage">
+        <div className="flex items-start gap-2">
+          <RotateCcw className={`mt-0.5 h-4 w-4 shrink-0 ${meta.cardSalvageUnlocked ? 'text-emerald-200' : 'text-amber-200'}`} />
+          <div>
+            <p className="font-display text-sm font-black uppercase text-white">Salvage Protocol</p>
+            <p className="mt-1 max-w-xl text-[10px] leading-relaxed text-white/60">
+              {meta.cardSalvageUnlocked
+                ? 'Unlocked -- thrown cards digitally return to your binder instead of getting used up.'
+                : `You have to earn it first: finish ${CARD_SALVAGE_EARN_RUNS} runs (you're at ${Math.min(meta.totalRuns, CARD_SALVAGE_EARN_RUNS)}/${CARD_SALVAGE_EARN_RUNS}). Then buy in here and cards stop disappearing when you throw them.`}
+            </p>
+          </div>
+        </div>
+        {!meta.cardSalvageUnlocked && (
+          <button
+            type="button"
+            onClick={() => { buyCardSalvageProtocol(); sfx.play('purchase'); }}
+            disabled={meta.totalRuns < CARD_SALVAGE_EARN_RUNS || meta.cardCredits < CARD_SALVAGE_COST}
+            className="shrink-0 border border-emerald-300/50 bg-emerald-300/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-widest text-emerald-100 transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-35"
+            data-testid="button-buy-card-salvage"
+          >
+            {meta.totalRuns < CARD_SALVAGE_EARN_RUNS ? `Finish ${CARD_SALVAGE_EARN_RUNS} runs first` : `Unlock · ${CARD_SALVAGE_COST} CC`}
+          </button>
+        )}
+      </div>
+
       <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {meta.cardCollection.filter((record) => record.copies > 0).map((record) => {
           const info = describeOwnedCard(record.cardId);
           if (!info) return null;
           const active = meta.battleDeckCardIds.includes(record.cardId);
+          const outcome = cardThrowOutcome(record, 'enemy');
           return (
             <button
               key={record.cardId}
@@ -89,7 +119,10 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
             >
               <span className={`text-[9px] uppercase ${RARITY_COLOR[info.rarity] ?? 'text-slate-200'}`}>{info.rarity} · x{record.copies} · {record.bestVariant}</span>
               <span className="mt-1 flex justify-between font-display text-sm font-black uppercase text-white">{info.name}{active && <Check className="h-4 w-4" />}</span>
-              <span className="mt-1 block text-[10px] text-white/50">Throw · {cardThrowDamage(record)} dmg</span>
+              <span className="mt-1 block text-[10px] text-white/50">
+                Throw · {outcome.damage} dmg{outcome.heal > 0 ? ` · +${outcome.heal} hp` : ''}
+                {info.subjectType === 'lokpet' ? ' · +25% vs LokPets' : ''}
+              </span>
             </button>
           );
         })}
@@ -111,7 +144,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
   );
 
   return (
-    <ScreenLayout title="LokPet Card Shop" subtitle="The Neon Sleeve · Hideout location" onBack={onBack}>
+    <ScreenLayout title="DigiScope" subtitle="The Neon Sleeve · Hideout location" onBack={onBack}>
       <section className="relative mb-7 overflow-hidden border border-fuchsia-300/40 bg-[radial-gradient(circle_at_80%_15%,rgba(232,121,249,.22),transparent_38%),linear-gradient(135deg,rgba(8,47,73,.75),rgba(24,24,39,.94))] p-5 sm:p-7" data-testid="section-card-shop">
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>

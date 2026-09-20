@@ -85,7 +85,7 @@ export function ContractBoard({ onHeadOut }: ContractBoardProps) {
           </button>
         </div>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
         {dailyContracts.map((contract) => <ContractCard key={contract.id} contract={contract} />)}
       </div>
       <p className="mt-3 flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-cyan-100/50">

@@ -53,7 +53,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
-  'card-shop': { label: 'LokPet Card Shop', icon: CreditCard, testId: 'button-open-card-shop', description: 'Open packs & build your Lock Deck' },
+  'card-shop': { label: 'DigiScope', icon: CreditCard, testId: 'button-open-card-shop', description: 'Open packs & build your Lock Deck' },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
   'palette-store': { label: 'Customization Shop', icon: Palette, testId: 'button-open-palette-store', description: 'Palettes & run auras' },
   'sound-booth': { label: 'The Sound Booth', icon: Disc3, testId: 'button-open-sound-booth', description: 'Buy & preview SFX packs' },
@@ -188,7 +188,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             aria-hidden="true"
           />
            <div
-             className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)}`}
+             // Bounded to one viewport, not `inset-0` against this screen's
+             // full (much taller) scrollable height -- every child here uses
+             // percentage positioning tuned for a viewport-height box. See
+             // .agents/memory/hideout-ambiance.md for the bug this fixed.
+             className={`hideout-ambient absolute inset-x-0 top-0 h-[100dvh] z-20 ${weatherClass(scene.weather)}`}
              style={{
                '--scene-accent': primePalette?.accent ?? scene.homeAccent,
                '--scene-sky': primePalette?.bodyDark ?? scene.skyAccent,

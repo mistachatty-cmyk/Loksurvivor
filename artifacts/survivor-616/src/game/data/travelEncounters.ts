@@ -1,13 +1,18 @@
 /**
- * Data for the hub-side "travel encounter" minigame -- the "classic version"
- * described in .agents/memory/travel-encounters.md: flat, mildly
- * rarity/variant-scaled card-throw damage, no per-card unique effects yet.
+ * Data for the hub-side "travel encounter" minigame. Started as the "classic
+ * version" described in .agents/memory/travel-encounters.md (flat, mildly
+ * rarity/variant-scaled card-throw damage, no per-card effects); the 2026-09-20
+ * pass layered a first, deliberately small step of the "richer move system"
+ * that doc named as the future direction -- a subject-type damage multiplier
+ * plus two small on-throw effects (see CARD_SUBJECT_DAMAGE_MULT and
+ * cardThrowOutcome below). Still no cross-round status effects or elemental
+ * matchups -- see the memory doc for why that stays a bigger, separate pass.
  * Only ever read from `game/travelEncounter.ts` and the travel-encounter UI;
  * `engine/world.ts` never touches any of this.
  */
 import type { CardVariant, OwnedCardRecord } from '@/game/types';
 import type { LokAssetRarity } from '@/game/lok/types';
-import { CARD_MANIFESTS_BY_ID } from './cards';
+import { CARD_MANIFESTS_BY_ID, type LokDeckCardMetadata } from './cards';
 import { PASSIVE_CARDS_BY_ID, type PassiveCardRarity } from './passiveCards';
 
 export type TravelEncounterSource = 'hub-room' | 'run-launch';
@@ -30,7 +35,7 @@ export interface TravelEncounterTrigger {
  * hideout room.
  */
 export const TRAVEL_ENCOUNTER_TRIGGERS: TravelEncounterTrigger[] = [
-  { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.2, label: 'Someone by the LokPet Card Shop wants a piece of your sleeve.' },
+  { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.2, label: 'Someone by DigiScope wants a piece of your sleeve.' },
   { id: 'head-out', source: 'run-launch', chance: 0.2, label: 'Something crosses your path on the way out.' },
 ];
 
@@ -67,6 +72,19 @@ export const PLAYER_TRAVEL_HP = 50;
 export const UNARMED_PUNCH_DAMAGE = 5;
 export const BASE_CARD_THROW_DAMAGE = 8;
 export const BATTLE_DECK_SLOTS = 6;
+
+/**
+ * Salvage Protocol: until bought, a thrown Battle Deck card is consumed on
+ * throw (win, lose, or flee -- see `consumeThrownCard` in metaStore.tsx) the
+ * same way a real thrown object would be. `CARD_SALVAGE_EARN_RUNS` is the
+ * "you have to earn it" half of the gate (reusing the totalRuns counter
+ * every save already tracks, rather than adding a new one); the CC cost is
+ * the "buy in" half, spent at DigiScope like everything else in this shop.
+ * Cards are otherwise never decremented anywhere else in the game -- see
+ * .agents/memory/travel-encounters.md.
+ */
+export const CARD_SALVAGE_EARN_RUNS = 3;
+export const CARD_SALVAGE_COST = 40;
 
 /**
  * A once-per-fight bonus attack using the player's own selected LokPet
@@ -110,19 +128,61 @@ export interface OwnedCardDisplay {
   name: string;
   description?: string;
   rarity: LokAssetRarity | PassiveCardRarity;
+  /** Only set for cards.ts-backed cards (a LokAssetManifest) -- passiveCards.ts cards have no subject and use the 1x default below. */
+  subjectType?: LokDeckCardMetadata['subjectType'];
 }
 
 /** A `cardCollection` entry may be backed by either card catalog -- cards.ts's LokAssetManifest ids or passiveCards.ts's PassiveCardDef ids share one collection. */
 export function describeOwnedCard(cardId: string): OwnedCardDisplay | undefined {
   const manifest = CARD_MANIFESTS_BY_ID[cardId];
-  if (manifest) return { name: manifest.name, description: manifest.description, rarity: manifest.rarity };
+  if (manifest) {
+    const subjectType = (manifest.metadata as LokDeckCardMetadata | undefined)?.subjectType;
+    return { name: manifest.name, description: manifest.description, rarity: manifest.rarity, subjectType };
+  }
   const passive = PASSIVE_CARDS_BY_ID[cardId];
   if (passive) return { name: passive.name, description: passive.description, rarity: passive.rarity };
   return undefined;
 }
 
-/** Flat, mildly rarity/variant-scaled throw damage -- no per-card unique effects in the "classic version". */
+/**
+ * A card's subject decides a flat multiplier on top of rarity/variant --
+ * operatives (signature-weapon flavor) hit hardest, allies hold back on raw
+ * damage in favor of the heal in `cardThrowOutcome`, and a discovery/beacon
+ * card is a keepsake, not a fighter. `enemy`/`lokpet` stay at the rarity/
+ * variant baseline; a `lokpet` card's own edge is the type-match bonus below.
+ */
+export const CARD_SUBJECT_DAMAGE_MULT: Record<NonNullable<LokDeckCardMetadata['subjectType']>, number> = {
+  character: 1.15,
+  enemy: 1,
+  ally: 0.85,
+  lokpet: 1,
+  discovery: 0.9,
+};
+
+/** Flat heal applied to the player when an `ally` card is thrown -- calling in support, not just swinging harder. */
+export const ALLY_CARD_HEAL = 6;
+/** Bonus multiplier when a `lokpet` card is thrown at a `lokpet`-kind opponent -- the one type-match edge in the "classic version". */
+export const LOKPET_CARD_TYPE_BONUS_MULT = 1.25;
+
+/** Rarity/variant/subject-scaled throw damage. See the file header for how this differs from the original flat "classic version" formula. */
 export function cardThrowDamage(record: OwnedCardRecord): number {
-  const rarity = describeOwnedCard(record.cardId)?.rarity ?? 'common';
-  return Math.round(BASE_CARD_THROW_DAMAGE * CARD_RARITY_DAMAGE_MULT[rarity] * CARD_VARIANT_DAMAGE_MULT[record.bestVariant]);
+  const info = describeOwnedCard(record.cardId);
+  const rarity = info?.rarity ?? 'common';
+  const subjectMult = info?.subjectType ? CARD_SUBJECT_DAMAGE_MULT[info.subjectType] : 1;
+  return Math.round(BASE_CARD_THROW_DAMAGE * CARD_RARITY_DAMAGE_MULT[rarity] * CARD_VARIANT_DAMAGE_MULT[record.bestVariant] * subjectMult);
+}
+
+export interface CardThrowOutcome {
+  damage: number;
+  /** HP restored to the player the instant the card is thrown (currently only `ally` cards). */
+  heal: number;
+}
+
+/** `cardThrowDamage` plus the two small per-subject effects: a lokpet-vs-lokpet type bonus and an ally's support heal. */
+export function cardThrowOutcome(record: OwnedCardRecord, opponentKind: 'enemy' | 'lokpet'): CardThrowOutcome {
+  const info = describeOwnedCard(record.cardId);
+  let damage = cardThrowDamage(record);
+  if (info?.subjectType === 'lokpet' && opponentKind === 'lokpet') damage = Math.round(damage * LOKPET_CARD_TYPE_BONUS_MULT);
+  const heal = info?.subjectType === 'ally' ? ALLY_CARD_HEAL : 0;
+  return { damage, heal };
 }
