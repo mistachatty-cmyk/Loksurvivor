@@ -118,7 +118,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             <IntroPhysicsBody
               id="splash"
               order={3}
-              className={`intro-splash ${meta.oneLineTitleEnabled ? 'intro-splash--centered' : ''}`}
+              className="intro-splash intro-splash--centered"
               testId="text-intro-splash"
             >
               {splashText}

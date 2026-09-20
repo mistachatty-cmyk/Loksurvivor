@@ -667,14 +667,13 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .intro-title__word {
   position: relative;
   z-index: 2;
-  /* Keep the original blunt display face instead of inheriting the game's
-     monospaced UI font. This is deliberately system-only until the custom
-     Survivor616 wordmark is drawn. */
-  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  /* A broad, heavy grotesk keeps the original title's clean arcade-poster
+     feel, separate from the game's monospaced interface font. */
+  font-family: "Arial Black", "Arial Bold", "Helvetica Neue", Arial, sans-serif;
   font-weight: 900;
   text-transform: uppercase;
   text-shadow: var(--intro-title-shadow);
-  letter-spacing: -.07em;
+  letter-spacing: -.052em;
 }
 .intro-title__number { font-size: clamp(4.2rem, 18vw, 6.2rem); }
 .intro-title__word { margin-top: .42rem; font-size: clamp(4rem, 16.5vw, 6.7rem); }
@@ -687,21 +686,21 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .intro-title--one-line .intro-title__word { order: -1; margin-top: 0; font-size: clamp(3rem, 11vw, 5.5rem); }
 .intro-title--one-line .intro-title__number { font-size: clamp(2.8rem, 9vw, 4.5rem); color: var(--intro-accent); }
 .intro-splash {
-  --intro-resting-rotation: -4deg;
-  align-self: flex-end;
-  max-width: 74%;
-  margin: .3rem 3% 1.65rem 0;
+  --intro-resting-rotation: 0deg;
+  align-self: center;
+  max-width: 82%;
+  margin: .65rem auto 0;
   color: var(--intro-splash);
   font-family: var(--app-font-mono);
   font-size: clamp(.65rem, 2.4vw, .78rem);
   font-weight: 900;
   font-style: italic;
   line-height: 1.15;
-  text-align: right;
+  text-align: center;
   text-shadow: 0 0 .55rem color-mix(in srgb, var(--intro-splash) 80%, transparent);
   transform: rotate(var(--intro-resting-rotation));
 }
-.intro-splash--centered { align-self: center; margin-right: 0; text-align: center; }
+.intro-splash--centered { align-self: center; margin-right: auto; text-align: center; }
 .intro-enter { min-width: min(100%, 24rem); margin-top: 1.7rem; box-shadow: 0 .8rem 3rem hsl(var(--primary) / .1); }
 .intro-physics-body {
   cursor: grab;
