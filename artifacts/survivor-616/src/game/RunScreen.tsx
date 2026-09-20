@@ -384,7 +384,7 @@ export function RunScreen({
         hatStyle: getHatStyle(meta.activeHatId),
         paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
-        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
+        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => ({ ...pet.roll, level: pet.level ?? 1 })),
         modifiers: meta.runModifiers,
         graphicsQuality: meta.graphicsQuality,
         worldColorPalette: activeWorldPalette,

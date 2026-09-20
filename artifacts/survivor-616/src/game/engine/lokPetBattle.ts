@@ -149,6 +149,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
     fainted: false,
     battlesWon: savedPet.battlesWon || 0,
     equippedTrinket: savedPet.equippedTrinket,
+    starter: savedPet.starter,
   };
 }
 
@@ -707,7 +708,8 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
     const oldLevel = pet.level;
     pet.exp += baseExp;
     let newLevel = oldLevel;
-    while (pet.exp >= pet.expToNext && newLevel < 50) {
+    const maxLevel = pet.starter ? 99 : 50;
+    while (pet.exp >= pet.expToNext && newLevel < maxLevel) {
       pet.exp -= pet.expToNext;
       newLevel += 1;
       pet.expToNext = getExpForLevel(newLevel);

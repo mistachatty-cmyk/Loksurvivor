@@ -14,6 +14,9 @@ import { arachnidRig, blobRig, quadrupedRig, serpentRig } from '@/game/sprites/r
 
 /** Original silhouette and palette sheets for the temporary LokPet family. */
 export const LOKPET_VARIANTS: LokPetVariantDef[] = [
+  { id: 'lil-llama', name: 'Lil Llamà', family: 'animal', silhouette: 'pouncer', palette: { body: '#f4ead8', bodyDark: '#493d49', accent: '#ff7ab8', glow: '#67e8f9', eye: '#1f2937' }, description: 'A tiny, fearless llama whose charm can turn a rush of enemies into a heart-eyed escort.', sizeScale: 0.78, legendary: true, starter: true, specialAbility: 'cutify-getaway', weight: 0 },
+  { id: 'static-null', name: 'Static Null', family: 'mote', silhouette: 'spark', palette: { body: '#1a1630', bodyDark: '#05030b', accent: '#8b5cf6', glow: '#22d3ee', eye: '#f5f3ff' }, description: 'A friendly-looking data mote that grows by eating hostile code—and quietly takes a little from its partner.', sizeScale: 0.7, legendary: true, starter: true, specialAbility: 'null-consume', weight: 0 },
+  { id: 'lil-buzbee', name: 'Lil Buzbèè', family: 'bat', silhouette: 'winglet', palette: { body: '#facc15', bodyDark: '#3f2a05', accent: '#fff7a8', glow: '#f59e0b', eye: '#111827' }, description: 'The runt of the hive: a high-energy scout that gathers drops and leaves restorative speed pollen.', sizeScale: 0.64, legendary: true, starter: true, specialAbility: 'buzbee-pollen', weight: 0 },
   { id: 'moss-pouncer', name: 'Moss Pouncer', family: 'animal', silhouette: 'pouncer', palette: { body: '#54734c', bodyDark: '#26392c', accent: '#b8ff5c', glow: '#7dffb2', eye: '#fff1a8' }, description: 'A spring-loaded alley creature with leaf-bright eyes.' },
   { id: 'cinder-pouncer', name: 'Cinder Pouncer', family: 'animal', silhouette: 'pouncer', palette: { body: '#a94f45', bodyDark: '#42252c', accent: '#ffb86b', glow: '#ff6b35', eye: '#ffe08a' }, description: 'A warm little runner that smells faintly of rain and sparks.' },
   { id: 'chalk-grin', name: 'Chalk Grin', family: 'ghoul', silhouette: 'skull', palette: { body: '#b9c2b0', bodyDark: '#394348', accent: '#d6a8ff', glow: '#a78bfa', eye: '#fef3c7' }, description: 'A tiny graveyard grin with a soft spot for loud noises.' },
@@ -108,6 +111,9 @@ const SPECIAL_LOKPET_LOADOUTS: Record<string, {
   traitLabel: string;
   stats: LokPetRoll['stats'];
 }> = {
+  'lil-llama': { attackKind: 'pulse', element: 'slow', elementLabel: 'heartbound', traitLabel: 'Cutify · Getaway', stats: { health: 110, moveSpeed: 168, damage: 17, cooldownMs: 780, range: 300, projectileSpeed: 390, explosionRadius: 0, pulseRadius: 118, lifetimeMs: 120000 } },
+  'static-null': { attackKind: 'explosion', element: 'freeze', elementLabel: 'null code', traitLabel: 'Data Feast · Quiet Tithe', stats: { health: 104, moveSpeed: 154, damage: 23, cooldownMs: 820, range: 320, projectileSpeed: 420, explosionRadius: 72, pulseRadius: 0, lifetimeMs: 120000 } },
+  'lil-buzbee': { attackKind: 'rapid-shot', element: 'none', elementLabel: 'pollen kinetic', traitLabel: 'Item Scout · Boost Pollen', stats: { health: 86, moveSpeed: 205, damage: 14, cooldownMs: 520, range: 350, projectileSpeed: 500, explosionRadius: 0, pulseRadius: 94, lifetimeMs: 120000 } },
   'prism-moth': { attackKind: 'rapid-shot', element: 'none', elementLabel: 'prismatic', traitLabel: 'Spectrum Sweep · split collector', stats: { health: 76, moveSpeed: 178, damage: 13, cooldownMs: 620, range: 330, projectileSpeed: 430, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 108000 } },
   'void-pup': { attackKind: 'pulse', element: 'slow', elementLabel: 'void slow', traitLabel: 'Eventide Fetch · hollow howl', stats: { health: 98, moveSpeed: 150, damage: 17, cooldownMs: 980, range: 300, projectileSpeed: 360, explosionRadius: 0, pulseRadius: 112, lifetimeMs: 108000 } },
   'ember-koi': { attackKind: 'explosion', element: 'fire', elementLabel: 'restorative fire', traitLabel: 'Cinder Current · last catch', stats: { health: 126, moveSpeed: 136, damage: 21, cooldownMs: 820, range: 320, projectileSpeed: 360, explosionRadius: 72, pulseRadius: 0, lifetimeMs: 108000 } },
@@ -205,6 +211,18 @@ export function rollLokPet(
 
 export const LOKPET_VARIANTS_BY_ID: Record<string, LokPetVariantDef> =
   Object.fromEntries(LOKPET_VARIANTS.map((variant) => [variant.id, variant]));
+
+export const STARTER_LOKPET_IDS = ['lil-llama', 'static-null', 'lil-buzbee'] as const;
+export type StarterLokPetId = typeof STARTER_LOKPET_IDS[number];
+
+export function isStarterLokPetId(value: string): value is StarterLokPetId {
+  return (STARTER_LOKPET_IDS as readonly string[]).includes(value);
+}
+
+/** Three model phases shared by cards, kennel, and the live run renderer. */
+export function starterLokPetEvolutionStage(level = 1): 1 | 2 | 3 {
+  return level >= 66 ? 3 : level >= 33 ? 2 : 1;
+}
 
 export const LOKPET_RARITY_COLORS: Record<LokPetRarity, string> = {
   common: '#94a3b8',

@@ -64,6 +64,7 @@ export interface BattlePet {
   fainted: boolean;
   battlesWon: number;
   equippedTrinket?: string;
+  starter?: boolean;
 }
 
 export interface BattleLogEntry {
