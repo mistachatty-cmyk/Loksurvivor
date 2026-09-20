@@ -667,8 +667,11 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .intro-title__word {
   position: relative;
   z-index: 2;
-  font-family: var(--app-font-sans);
-  font-weight: 950;
+  /* Keep the original blunt display face instead of inheriting the game's
+     monospaced UI font. This is deliberately system-only until the custom
+     Survivor616 wordmark is drawn. */
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  font-weight: 900;
   text-transform: uppercase;
   text-shadow: var(--intro-title-shadow);
   letter-spacing: -.07em;
@@ -699,15 +702,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   transform: rotate(var(--intro-resting-rotation));
 }
 .intro-splash--centered { align-self: center; margin-right: 0; text-align: center; }
-.intro-premise {
-  max-width: 37rem;
-  margin: 0 auto 2rem;
-  color: rgba(255,255,255,.58);
-  font-size: clamp(1rem, 3.6vw, 1.15rem);
-  line-height: 1.65;
-  text-shadow: 0 1px .8rem #000;
-}
-.intro-enter { min-width: min(100%, 24rem); box-shadow: 0 .8rem 3rem hsl(var(--primary) / .1); }
+.intro-enter { min-width: min(100%, 24rem); margin-top: 1.7rem; box-shadow: 0 .8rem 3rem hsl(var(--primary) / .1); }
 .intro-physics-body {
   cursor: grab;
   touch-action: none;

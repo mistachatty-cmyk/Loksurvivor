@@ -125,10 +125,6 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             </IntroPhysicsBody>
           ) : null}
 
-          <IntroPhysicsBody id="premise" order={4} className="intro-premise" testId="text-intro-premise">
-            The block turned after dark. You have a basement bar, a crew worth saving, and one night at a time.
-          </IntroPhysicsBody>
-
           <motion.button
             type="button"
             whileHover={{ scale: 1.02 }}
