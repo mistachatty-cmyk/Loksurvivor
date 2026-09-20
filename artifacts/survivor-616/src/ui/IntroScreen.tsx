@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
 import { pickSplashText } from '@/game/data/splashText';
+import { IntroTitle } from '@/ui/IntroTitle';
 
 // Pulls in the full simulation engine (createWorld/stepWorld/renderWorld),
 // which is otherwise only paid for once a real run starts. Lazy-loading it
@@ -97,37 +98,21 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
           </motion.p>
         </AnimatePresence>
 
-        {meta.oneLineTitleEnabled ? (
-          <div className="relative mb-10">
-            <h1 className="whitespace-nowrap text-4xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] sm:text-6xl md:text-7xl">
-              Survivor616
-            </h1>
-            {meta.splashTextEnabled ? (
-              <p
-                className="pointer-events-none mt-2 text-center font-mono text-[10px] font-black italic leading-tight sm:text-xs"
-                style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
-                data-testid="text-intro-splash"
-              >
-                {splashText}
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          <div className="relative mb-10">
-            <h1 className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-              Survivor<br/>616
-            </h1>
-            {meta.splashTextEnabled ? (
-              <p
-                className="pointer-events-none absolute top-full right-1 mt-1 max-w-[70%] rotate-[-6deg] text-right font-mono text-[10px] font-black italic leading-tight sm:text-xs"
-                style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
-                data-testid="text-intro-splash"
-              >
-                {splashText}
-              </p>
-            ) : null}
-          </div>
-        )}
+        <IntroTitle
+          signatureLayout={meta.oneLineTitleEnabled}
+          physicsEnabled={meta.introTitlePhysicsEnabled}
+        />
+        {meta.splashTextEnabled ? (
+          <p
+            className={`pointer-events-none -mt-3 mb-8 max-w-[80%] font-mono text-[10px] font-black italic leading-tight sm:text-xs ${
+              meta.oneLineTitleEnabled ? 'text-center' : 'self-end text-right rotate-[-4deg]'
+            }`}
+            style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
+            data-testid="text-intro-splash"
+          >
+            {splashText}
+          </p>
+        ) : null}
 
         <motion.button
           type="button"
