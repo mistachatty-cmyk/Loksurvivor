@@ -148,6 +148,9 @@ export interface PlayerActor extends Actor {
   dashReadyAt: number;
   dashStartedAt: number;
   dashHitUids: Set<number>;
+  /** Lil Buzbèè pollen: movement/healing buff, including the 1.5s linger. */
+  pollenSpeedUntil?: number;
+  pollenHealingUntil?: number;
 }
 
 /**
@@ -2588,8 +2591,11 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
   }
   const index = w.lokPets.length;
   const orbitAngle = (Math.PI * 2 * index) / w.maxLokPets + w.rng() * 0.2;
+  const starterPartner = roll.specialAbility === 'cutify-getaway' || roll.specialAbility === 'null-consume' || roll.specialAbility === 'buzbee-pollen';
+  const evolutionStage = (roll.level ?? 1) >= 66 ? 3 : (roll.level ?? 1) >= 33 ? 2 : 1;
   const pet: LokPetInstance = {
     ...roll,
+    sizeScale: (roll.sizeScale ?? 1) * (1 + (evolutionStage - 1) * 0.18),
     origin,
     uid: uid(w),
     x: w.player.x + Math.cos(orbitAngle) * (40 + index * 6),
@@ -2599,8 +2605,8 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
     orbitAngle,
     orbitRadius: 40 + index * 6,
     bornAt: w.now,
-    ghostAt: w.now + LOKPET_GHOST_AFTER_MS,
-    expiresAt: w.now + roll.stats.lifetimeMs,
+    ghostAt: starterPartner && origin === 'loadout' ? Number.POSITIVE_INFINITY : w.now + LOKPET_GHOST_AFTER_MS,
+    expiresAt: starterPartner && origin === 'loadout' ? Number.POSITIVE_INFINITY : w.now + roll.stats.lifetimeMs,
     ghost: false,
     readyAt: w.now + 500,
     nextPulseAt: w.now + 500,
@@ -2727,6 +2733,55 @@ function triggerSpecialLokPetAbility(w: World, pet: LokPetInstance) {
     }
     showLokPetSpecial(w, pet, 'POLAR GRAVITON', 145);
     pet.specialReadyAt = w.now + 4500;
+  } else if (pet.specialAbility === 'cutify-getaway') {
+    const level = Math.max(1, Math.min(99, pet.level ?? 1));
+    const maxTargets = Math.min(6, 1 + Math.floor(level / 20));
+    const crowd = w.enemies
+      .filter((enemy) => !enemy.dying && dist2(enemy.x, enemy.y, pet.x, pet.y) <= 230 ** 2)
+      .sort((a, b) => dist2(a.x, a.y, pet.x, pet.y) - dist2(b.x, b.y, pet.x, pet.y));
+    for (const enemy of crowd.slice(0, maxTargets)) {
+      enemy.cutifiedUntil = w.now + 2800 + level * 22;
+      enemy.cutifiedTargetUid = pet.uid;
+      const dx = enemy.x - pet.x; const dy = enemy.y - pet.y; const len = Math.hypot(dx, dy) || 1;
+      enemy.kx += (dx / len) * (210 + level * 2.2);
+      enemy.ky += (dy / len) * (210 + level * 2.2);
+      spawnParticles(w, enemy.x, enemy.y, '#fb7185', 6, 65);
+    }
+    const getawayThreshold = Math.max(3, 7 - Math.floor(level / 22));
+    if (crowd.length >= getawayThreshold) {
+      showLokPetBurst(w, pet.x, pet.y, 128 + level * 0.7, lokPetDamage(w, pet) * 0.45, pet.palette.glow, 'slow');
+      showLokPetSpecial(w, pet, 'CUTIFY + GETAWAY', 128);
+    } else {
+      showLokPetSpecial(w, pet, 'CUTIFY', 96);
+    }
+    pet.specialReadyAt = w.now + Math.max(4300, 9000 - level * 45);
+  } else if (pet.specialAbility === 'null-consume') {
+    const level = Math.max(1, Math.min(99, pet.level ?? 1));
+    const radius = 112 + level * 0.75;
+    const tithe = w.player.hp > 1 ? 1 : 0;
+    w.player.hp = Math.max(1, w.player.hp - tithe);
+    showLokPetBurst(w, pet.x, pet.y, radius, lokPetDamage(w, pet) * (0.8 + level / 120), pet.palette.glow, 'freeze');
+    w.popups.push({ x: w.player.x, y: w.player.y + 28, text: tithe ? '-1 DATA TITHE' : 'TITHE REFUSED', color: pet.palette.accent, bornAt: w.now, vy: 26 });
+    showLokPetSpecial(w, pet, level >= 99 ? 'NOMAD-EATER ECHO' : 'DATA FEAST', radius);
+    pet.specialReadyAt = w.now + Math.max(3300, 5900 - level * 24);
+  } else if (pet.specialAbility === 'buzbee-pollen') {
+    const level = Math.max(1, Math.min(99, pet.level ?? 1));
+    const capacity = level >= 99 ? Number.POSITIVE_INFINITY : 2 + Math.floor(level / 12);
+    const pickups = w.pickups
+      .filter((pickup) => pickup.kind !== 'loot-box' && dist2(pickup.x, pickup.y, pet.x, pet.y) <= 520 ** 2)
+      .sort((a, b) => dist2(a.x, a.y, pet.x, pet.y) - dist2(b.x, b.y, pet.x, pet.y))
+      .slice(0, capacity);
+    for (const pickup of pickups) {
+      const dx = w.player.x - pickup.x; const dy = w.player.y - pickup.y; const len = Math.hypot(dx, dy) || 1;
+      pickup.vx += (dx / len) * 900;
+      pickup.vy += (dy / len) * 900;
+    }
+    // The pollen is dropped directly on the orbit path around the player;
+    // three seconds in-field plus a 1.5s linger keeps the touch interaction readable.
+    w.player.pollenSpeedUntil = w.now + 4500;
+    w.player.pollenHealingUntil = w.now + 4500;
+    showLokPetSpecial(w, pet, level >= 99 ? 'ROYAL POLLEN SWEEP' : 'BOOST POLLEN', 104);
+    pet.specialReadyAt = w.now + Math.max(3900, 6500 - level * 22);
   } else {
     const pauseUntil = w.now + 850;
     for (const projectile of w.projectiles) {
@@ -5715,7 +5770,8 @@ function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y);
+  const pollenSpeed = (p.pollenSpeedUntil ?? 0) > w.now ? 1.18 : 1;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * pollenSpeed;
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -8329,8 +8385,11 @@ function updatePickups(w: World, dt: number) {
           pushSfx(w, 'pickupXp');
           break;
         case 'health':
-          w.player.hp = clamp(w.player.hp + pickup.value, 0, w.player.maxHp);
-          w.popups.push({ x: p.x, y: p.y + 26, text: `+${pickup.value}`, color: '#7dffb2', bornAt: w.now, vy: 30 });
+          {
+            const healing = Math.round(pickup.value * ((w.player.pollenHealingUntil ?? 0) > w.now ? 1.5 : 1));
+            w.player.hp = clamp(w.player.hp + healing, 0, w.player.maxHp);
+            w.popups.push({ x: p.x, y: p.y + 26, text: `+${healing}`, color: '#7dffb2', bornAt: w.now, vy: 30 });
+          }
           pushSfx(w, 'pickupHealth');
           break;
         case 'cred':

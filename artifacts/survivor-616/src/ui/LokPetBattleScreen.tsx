@@ -15,7 +15,6 @@ import {
   CircleDot,
   FastForward,
   Award,
-  Plus,
   Play,
   CheckCircle2,
   RefreshCw,
@@ -73,7 +72,6 @@ export function LokPetBattleScreen({
     feedLokPetTreat,
     toggleFavoriteLokPet,
     equipLokPetTrinket,
-    draftStarterLokPets,
   } = useMeta();
 
   const [activeTab, setActiveTab] = useState<'league' | 'sparring' | 'kennel'>(initialTab);
@@ -94,13 +92,6 @@ export function LokPetBattleScreen({
 
   // Canvas VFX Overlay Ref
   const vfxCanvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Auto-draft starter companions if player has none yet
-  useEffect(() => {
-    if (meta.savedLokPets.length === 0) {
-      draftStarterLokPets();
-    }
-  }, [meta.savedLokPets.length, draftStarterLokPets]);
 
   // If initialTierId is passed, launch that battle immediately
   useEffect(() => {
@@ -1208,13 +1199,11 @@ export function LokPetBattleScreen({
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={draftStarterLokPets}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
-              >
-                <Plus className="h-3.5 w-3.5" /> Draft Starters
-              </button>
+              {meta.savedLokPets.length === 0 && (
+                <span className="rounded-lg border border-cyan-400/25 bg-cyan-400/5 px-3 py-1.5 text-xs font-semibold text-cyan-200">
+                  Find your first partner on the road to the hideout.
+                </span>
+              )}
             </div>
 
             <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">

@@ -121,7 +121,8 @@ export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
 export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescue' | 'clock-pause'
   | 'solar-flare' | 'mantis-slice' | 'phase-dash' | 'polar-pull'
   | 'tri-laser' | 'plasma-orbit' | 'rebirth-burst' | 'seismic-slam'
-  | 'time-warp' | 'glitch-strike' | 'starlight-heal' | 'thunder-claw';
+  | 'time-warp' | 'glitch-strike' | 'starlight-heal' | 'thunder-claw'
+  | 'cutify-getaway' | 'null-consume' | 'buzbee-pollen';
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
@@ -147,6 +148,8 @@ export interface LokPetVariantDef {
   sizeScale?: number;
   legendary?: boolean;
   specialAbility?: LokPetSpecialAbility;
+  /** First-arrival companion, chosen during the digital-bush encounter. */
+  starter?: boolean;
   /** Variant-roll weight. Legendary companions are deliberately scarce. */
   weight?: number;
 }
@@ -186,6 +189,8 @@ export interface LokPetRoll {
   sizeScale?: number;
   legendary?: boolean;
   specialAbility?: LokPetSpecialAbility;
+  /** Persistent companion level copied into a run for scaled starter behavior. */
+  level?: number;
 }
 
 /** A captured, repeatable LokPet blueprint stored in the player's kennel. */
@@ -194,7 +199,7 @@ export interface SavedLokPet {
   roll: LokPetRoll;
   /** One charge is spent when the pet joins a run; elixirs restore it. */
   stamina: number;
-  /** Current battle level (1-50), earned via LokPet battles and treats. */
+  /** Current battle level (starter partners cap at 99; other companions cap at 50). */
   level?: number;
   /** Current battle experience points. */
   exp?: number;
@@ -206,6 +211,10 @@ export interface SavedLokPet {
   favorite?: boolean;
   /** Equipped battle trinket/tag. */
   equippedTrinket?: string;
+  /** Marks the one partner chosen during the first trip to the hideout. */
+  starter?: boolean;
+  /** Last hourly free full-health/stamina refresh boundary. */
+  lastFreeRefreshAt?: number;
 }
 
 /**
@@ -1976,6 +1985,10 @@ export interface MetaState {
   runModifiers: RunModifiers;
   /** Whether the player has seen the intro briefing. */
   onboarded: boolean;
+  /** The one-time first-arrival LokPet rescue has been completed. */
+  starterLokPetOnboardingComplete: boolean;
+  /** Species chosen during the first-arrival encounter. */
+  starterLokPetVariantId: string | null;
   /** Farthest endless distance ever reached (world units). */
   endlessRecordDistancePx: number;
   /** Deepest dungeon depth ever reached in endless mode. */

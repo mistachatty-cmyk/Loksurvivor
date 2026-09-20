@@ -23,7 +23,7 @@ import { getCharacterSkins } from '@/game/data/characterSkins';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
-import { LOKPET_VARIANTS_BY_ID, rollLokPet } from '@/game/data/lokPets';
+import { isStarterLokPetId, LOKPET_VARIANTS_BY_ID, rollLokPet, type StarterLokPetId } from '@/game/data/lokPets';
 import { createRng } from '@/game/engine/math';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
 import {
@@ -68,7 +68,7 @@ import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
 import { getExpForLevel } from '@/game/engine/lokPetBattle';
 import { DIRECTORS } from '@/game/data/directors';
-import { CARD_MANIFESTS } from '@/game/data/cards';
+import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
@@ -314,6 +314,8 @@ export function createInitialMeta(): MetaState {
     generatorAccrualAt: Date.now(),
     runModifiers: {},
     onboarded: false,
+    starterLokPetOnboardingComplete: false,
+    starterLokPetVariantId: null,
     endlessRecordDistancePx: 0,
     endlessRecordDepth: 0,
     endlessDiscoveryIds: [],
@@ -770,6 +772,7 @@ function normalizeLokPetHistory(value: unknown): LokPetDiscoveryHistoryEntry[] {
 }
 
 const PET_STAMINA_MAX = 3;
+export const STARTER_LOKPET_FREE_REFRESH_MS = 60 * 60 * 1000;
 const ELIXIR_GRANT_MS = 20 * 60 * 1000;
 const ELIXIR_GRANT_AMOUNT = 3;
 const ELIXIR_CAP = 18;
@@ -785,14 +788,35 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
       id: candidate.id,
       roll: roll as SavedLokPet['roll'],
       stamina: Math.max(0, Math.min(PET_STAMINA_MAX, counter(candidate.stamina))),
-      level: typeof candidate.level === 'number' && candidate.level >= 1 ? Math.min(50, Math.floor(candidate.level)) : 1,
+      level: typeof candidate.level === 'number' && candidate.level >= 1 ? Math.min(candidate.starter === true ? 99 : 50, Math.floor(candidate.level)) : 1,
       exp: typeof candidate.exp === 'number' ? Math.max(0, Math.floor(candidate.exp)) : 0,
       battlesWon: counter(candidate.battlesWon),
       battlesFought: counter(candidate.battlesFought),
       favorite: candidate.favorite === true,
       equippedTrinket: typeof candidate.equippedTrinket === 'string' ? candidate.equippedTrinket : undefined,
+      starter: candidate.starter === true,
+      lastFreeRefreshAt: typeof candidate.lastFreeRefreshAt === 'number' && Number.isFinite(candidate.lastFreeRefreshAt)
+        ? Math.max(0, candidate.lastFreeRefreshAt)
+        : undefined,
     }];
   }).slice(0, 48);
+}
+
+function refreshStarterLokPets(pets: SavedLokPet[], now: number): SavedLokPet[] {
+  let changed = false;
+  const next = pets.map((pet) => {
+    if (!pet.starter) return pet;
+    const last = pet.lastFreeRefreshAt ?? now;
+    const grants = Math.floor(Math.max(0, now - last) / STARTER_LOKPET_FREE_REFRESH_MS);
+    if (grants < 1) return pet;
+    changed = true;
+    return {
+      ...pet,
+      stamina: PET_STAMINA_MAX,
+      lastFreeRefreshAt: last + grants * STARTER_LOKPET_FREE_REFRESH_MS,
+    };
+  });
+  return changed ? next : pets;
 }
 
 /**
@@ -980,7 +1004,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     .map((episodeId) => CHARACTER_EPISODES_BY_ID[episodeId]?.evolutionId)
     .filter((evolutionId): evolutionId is string => Boolean(evolutionId));
   const unlockedEvolutionIds = [...new Set([...explicitEvolutionIds, ...completedEvolutionIds])];
-  const savedLokPets = normalizeSavedLokPets(parsed.savedLokPets);
+  const savedLokPets = refreshStarterLokPets(normalizeSavedLokPets(parsed.savedLokPets), Date.now());
   const cardCollection = normalizeCardCollection(parsed.cardCollection);
   const ownedPassiveIds = new Set(cardCollection.filter((record) => PASSIVE_CARDS_BY_ID[record.cardId]).map((record) => record.cardId));
   const ownedCardIds = new Set(cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
@@ -1085,6 +1109,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedGeneratorIds,
     runModifiers: normalizeRunModifiers(parsed.runModifiers),
     onboarded: parsed.onboarded === true,
+    starterLokPetOnboardingComplete: parsed.starterLokPetOnboardingComplete === true,
+    starterLokPetVariantId: typeof parsed.starterLokPetVariantId === 'string' && isStarterLokPetId(parsed.starterLokPetVariantId)
+      ? parsed.starterLokPetVariantId
+      : null,
     endlessRecordDistancePx: counter(parsed.endlessRecordDistancePx),
     endlessRecordDepth: counter(parsed.endlessRecordDepth),
     endlessDiscoveryIds,
@@ -1590,6 +1618,7 @@ type Action =
   | { type: 'toggleFavoriteLokPet'; id: string }
   | { type: 'equipLokPetTrinket'; id: string; trinketId?: string }
   | { type: 'draftStarterLokPets' }
+  | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; now: number }
   | { type: 'clearLastRun' }
   | { type: 'clearCardPackReveal' }
   | { type: 'markOnboarded' }
@@ -1824,9 +1853,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'refreshPetElixirs': {
       const recovery = replenishPetElixirs(state.meta, action.now);
-      return recovery.petElixirs === state.meta.petElixirs
+      const savedLokPets = refreshStarterLokPets(state.meta.savedLokPets, action.now);
+      return recovery.petElixirs === state.meta.petElixirs && savedLokPets === state.meta.savedLokPets
         ? state
-        : { ...state, meta: { ...state.meta, ...recovery } };
+        : { ...state, meta: { ...state.meta, ...recovery, savedLokPets } };
     }
 
     case 'feedLokPetTreat': {
@@ -1837,7 +1867,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const curExp = (pet.exp || 0) + 75;
       let newLvl = curLvl;
       let remExp = curExp;
-      while (remExp >= getExpForLevel(newLvl) && newLvl < 50) {
+      const maxLevel = pet.starter ? 99 : 50;
+      while (remExp >= getExpForLevel(newLvl) && newLvl < maxLevel) {
         remExp -= getExpForLevel(newLvl);
         newLvl += 1;
       }
@@ -1939,7 +1970,55 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'completeStarterLokPetOnboarding': {
+      if (state.meta.starterLokPetOnboardingComplete || !isStarterLokPetId(action.variantId)) return state;
+      const roll = rollLokPet(() => 0.616, { fixedVariantId: action.variantId });
+      const starter: SavedLokPet = {
+        id: `starter-${action.variantId}-${action.now}`,
+        roll: { ...roll, level: 1 },
+        stamina: PET_STAMINA_MAX,
+        level: 1,
+        exp: 0,
+        battlesWon: 0,
+        battlesFought: 0,
+        favorite: true,
+        starter: true,
+        lastFreeRefreshAt: action.now,
+      };
+      const pack = CARD_SHOP_PACKS_BY_ID.lokpet;
+      const rng = createRng((action.now ^ 0x616) >>> 0);
+      const firstPack = rollCardPack(pack.id, rng, CARD_MANIFESTS.map((card) => card.id));
+      const secondPack = rollCardPack(pack.id, rng, CARD_MANIFESTS.map((card) => card.id));
+      const pulls = [...firstPack, ...secondPack];
+      const starterCard = LOKPET_CARDS.find((card) => card.metadata?.subjectId === action.variantId);
+      const starterCardPulls: CardPull[] = starterCard
+        ? [{ cardId: starterCard.id, variant: 'standard', value: 1 }]
+        : [];
+      const ownedBeforeIds = new Set(state.meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
+      const seen = new Set<string>();
+      const newFlags = pulls.map((pull) => {
+        const isNew = !ownedBeforeIds.has(pull.cardId) && !seen.has(pull.cardId);
+        seen.add(pull.cardId);
+        return isNew;
+      });
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          starterLokPetOnboardingComplete: true,
+          starterLokPetVariantId: action.variantId,
+          savedLokPets: [starter, ...state.meta.savedLokPets].slice(0, 48),
+          selectedLokPetIds: [starter.id],
+          lokPetCatalog: recordLokPetCatalog(state.meta.lokPetCatalog, [roll]),
+          cardCredits: state.meta.cardCredits + 40,
+          cardCollection: mergeCardPulls(state.meta.cardCollection, [...starterCardPulls, ...pulls]),
+        },
+        lastCardPackReveal: { packId: 'lokpet', pulls, newFlags },
+      };
+    }
+
     case 'enterHideout': {
+      const refreshedPets = refreshStarterLokPets(state.meta.savedLokPets, action.now);
       const crewActivitySeed = state.meta.crewActivitySeed + 1;
       const crewActivityByAlly = rollCrewActivities(state.meta.rescuedAllyIds, crewActivitySeed);
       const hideoutVisitCount = state.meta.hideoutVisitCount + 1;
@@ -1958,6 +2037,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ...state,
         meta: {
           ...state.meta,
+          savedLokPets: refreshedPets,
           crewActivitySeed,
           crewActivityByAlly,
           activeCrewRumor: state.meta.activeCrewRumor ?? rollCrewRumor(
@@ -2904,6 +2984,7 @@ export interface MetaContextValue {
   toggleFavoriteLokPet: (id: string) => void;
   equipLokPetTrinket: (id: string, trinketId?: string) => void;
   draftStarterLokPets: () => void;
+  completeStarterLokPetOnboarding: (variantId: StarterLokPetId) => void;
   clearLastRun: () => void;
   clearCardPackReveal: () => void;
   markOnboarded: () => void;
@@ -3038,6 +3119,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     [],
   );
   const draftStarterLokPets = useCallback(() => dispatch({ type: 'draftStarterLokPets' }), []);
+  const completeStarterLokPetOnboarding = useCallback(
+    (variantId: StarterLokPetId) => dispatch({ type: 'completeStarterLokPetOnboarding', variantId, now: Date.now() }),
+    [],
+  );
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
   const clearCardPackReveal = useCallback(() => dispatch({ type: 'clearCardPackReveal' }), []);
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
@@ -3256,6 +3341,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleFavoriteLokPet,
       equipLokPetTrinket,
       draftStarterLokPets,
+      completeStarterLokPetOnboarding,
       clearLastRun,
       clearCardPackReveal,
       markOnboarded,
@@ -3364,6 +3450,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleFavoriteLokPet,
     equipLokPetTrinket,
     draftStarterLokPets,
+    completeStarterLokPetOnboarding,
     clearLastRun,
     clearCardPackReveal,
     markOnboarded,

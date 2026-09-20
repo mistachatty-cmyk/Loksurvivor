@@ -55,6 +55,7 @@ import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { TravelEncounterOverlay } from '@/ui/TravelEncounterOverlay';
+import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
@@ -69,6 +70,7 @@ const queryClient = new QueryClient();
 
 type Screen =
   | { name: 'intro' }
+  | { name: 'starter-lokpet-encounter' }
   | { name: 'hub' }
   | { name: 'roster' }
   | { name: 'areas' }
@@ -116,6 +118,7 @@ function initialScreen(): Screen {
       return { name: 'summary', result: createLokPetArchiveFixtureResult() };
     }
     if (requested === 'lokpet-battle') return { name: 'lokpet-battle' };
+    if (requested === 'starter-lokpet-encounter') return { name: 'starter-lokpet-encounter' };
     if (
       requested === 'hub' ||
       requested === 'roster' ||
@@ -281,7 +284,11 @@ function Game() {
         <IntroScreen
           onBegin={() => {
             markOnboarded();
-            goHub();
+            if (!meta.starterLokPetOnboardingComplete && meta.totalRuns === 0 && meta.savedLokPets.length === 0) {
+              setScreen({ name: 'starter-lokpet-encounter' });
+            } else {
+              goHub();
+            }
           }}
           onSignIn={() => {
             markOnboarded();
@@ -290,11 +297,28 @@ function Game() {
         />
       );
 
+    case 'starter-lokpet-encounter':
+      return (
+        <StarterLokPetEncounter
+          onEnterHideout={() => {
+            enterHideout();
+            setScreen({ name: 'card-shop' });
+          }}
+        />
+      );
+
     case 'hub':
       return (
         <HubScreen
           roomId={roomId}
-          onChangeRoom={(nextRoomId) => attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); })}
+          onChangeRoom={(nextRoomId) => {
+            if (nextRoomId === 'the-storefront') {
+              sfx.play('uiNav');
+              setScreen({ name: 'card-shop' });
+              return;
+            }
+            attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); });
+          }}
           onOpen={openPanel}
           onOpenMapEditor={() => setScreen({ name: 'map-editor' })}
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
