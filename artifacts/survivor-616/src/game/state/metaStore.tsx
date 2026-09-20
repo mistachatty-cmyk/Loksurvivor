@@ -1618,7 +1618,7 @@ type Action =
   | { type: 'toggleFavoriteLokPet'; id: string }
   | { type: 'equipLokPetTrinket'; id: string; trinketId?: string }
   | { type: 'draftStarterLokPets' }
-  | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; now: number }
+  | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; characterId: string; now: number }
   | { type: 'clearLastRun' }
   | { type: 'clearCardPackReveal' }
   | { type: 'markOnboarded' }
@@ -1972,6 +1972,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'completeStarterLokPetOnboarding': {
       if (state.meta.starterLokPetOnboardingComplete || !isStarterLokPetId(action.variantId)) return state;
+      const starterCharacter = CHARACTERS.find((character) => character.id === action.characterId);
+      if (!starterCharacter || !state.meta.unlockedCharacterIds.includes(starterCharacter.id)) return state;
       const roll = rollLokPet(() => 0.616, { fixedVariantId: action.variantId });
       const starter: SavedLokPet = {
         id: `starter-${action.variantId}-${action.now}`,
@@ -2007,6 +2009,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
           ...state.meta,
           starterLokPetOnboardingComplete: true,
           starterLokPetVariantId: action.variantId,
+          selectedCharacterId: starterCharacter.id,
           savedLokPets: [starter, ...state.meta.savedLokPets].slice(0, 48),
           selectedLokPetIds: [starter.id],
           lokPetCatalog: recordLokPetCatalog(state.meta.lokPetCatalog, [roll]),
@@ -2984,7 +2987,7 @@ export interface MetaContextValue {
   toggleFavoriteLokPet: (id: string) => void;
   equipLokPetTrinket: (id: string, trinketId?: string) => void;
   draftStarterLokPets: () => void;
-  completeStarterLokPetOnboarding: (variantId: StarterLokPetId) => void;
+  completeStarterLokPetOnboarding: (variantId: StarterLokPetId, characterId: string) => void;
   clearLastRun: () => void;
   clearCardPackReveal: () => void;
   markOnboarded: () => void;
@@ -3120,7 +3123,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const draftStarterLokPets = useCallback(() => dispatch({ type: 'draftStarterLokPets' }), []);
   const completeStarterLokPetOnboarding = useCallback(
-    (variantId: StarterLokPetId) => dispatch({ type: 'completeStarterLokPetOnboarding', variantId, now: Date.now() }),
+    (variantId: StarterLokPetId, characterId: string) => dispatch({ type: 'completeStarterLokPetOnboarding', variantId, characterId, now: Date.now() }),
     [],
   );
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
