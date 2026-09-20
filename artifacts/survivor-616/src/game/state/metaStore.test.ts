@@ -22,6 +22,22 @@ test('intro title physics defaults on, migrates older saves, and can be disabled
   assert.equal(timed.meta.introTitleReturnDelaySec, 7);
 });
 
+test('Look Lab preferences migrate safely and persist through their reducers', () => {
+  const migrated = normalizeMeta({ version: 1, lokPetArtStyle: 'holo-card', uiBorderStyle: 'round' });
+  assert.equal(migrated.lokPetArtStyle, 'holo-card');
+  assert.equal(migrated.uiBorderStyle, 'round');
+  assert.equal(normalizeMeta({ version: 1, lokPetArtStyle: 'not-a-style', uiBorderStyle: 'sharp-ish' }).lokPetArtStyle, 'pixel-core');
+  assert.equal(normalizeMeta({ version: 1, lokPetArtStyle: 'not-a-style', uiBorderStyle: 'sharp-ish' }).uiBorderStyle, 'square');
+
+  const artUpdated = reducer(
+    { meta: createInitialMeta(), lastRun: null },
+    { type: 'setLokPetArtStyle', style: 'neon-signal' },
+  );
+  const borderUpdated = reducer(artUpdated, { type: 'setUiBorderStyle', style: 'soft' });
+  assert.equal(borderUpdated.meta.lokPetArtStyle, 'neon-signal');
+  assert.equal(borderUpdated.meta.uiBorderStyle, 'soft');
+});
+
 test('Llamasté is available from the hideout on new and returning saves', () => {
   assert.ok(createInitialMeta().unlockedCharacterIds.includes('llamaste'));
   assert.ok(normalizeMeta({ version: 1, unlockedCharacterIds: ['shade'] }).unlockedCharacterIds.includes('llamaste'));

@@ -1882,6 +1882,10 @@ export interface MetaState {
   mirrorModeEnabled: boolean;
   /** 'grid' shows list-heavy hub panels as multi-column card grids; 'list' is the original single-column layout. */
   uiDensity: 'grid' | 'list';
+  /** Cosmetic presentation for LokPet portraits and cards. Never changes a companion's stats. */
+  lokPetArtStyle: 'pixel-core' | 'neon-signal' | 'holo-card';
+  /** Shared chrome shape for menu cards and controls. */
+  uiBorderStyle: 'square' | 'soft' | 'round';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
   musicReactiveEnabled: boolean;
   /** Optional procedural room ambience in the hideout (rain, pipe hum, cellar drips). Off by default. */

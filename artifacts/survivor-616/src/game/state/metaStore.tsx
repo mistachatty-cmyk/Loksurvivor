@@ -261,6 +261,8 @@ export function createInitialMeta(): MetaState {
     paletteInvertEnabled: false,
     mirrorModeEnabled: false,
     uiDensity: 'grid',
+    lokPetArtStyle: 'pixel-core',
+    uiBorderStyle: 'square',
     musicReactiveEnabled: true,
     sfxEnabled: true,
     hideoutAmbienceEnabled: false,
@@ -1048,6 +1050,14 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     paletteInvertEnabled: parsed.paletteInvertEnabled === true,
     mirrorModeEnabled: parsed.mirrorModeEnabled === true,
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
+    lokPetArtStyle:
+      parsed.lokPetArtStyle === 'neon-signal' || parsed.lokPetArtStyle === 'holo-card'
+        ? parsed.lokPetArtStyle
+        : 'pixel-core',
+    uiBorderStyle:
+      parsed.uiBorderStyle === 'soft' || parsed.uiBorderStyle === 'round'
+        ? parsed.uiBorderStyle
+        : 'square',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
     sfxEnabled: parsed.sfxEnabled !== false,
     // Opt-in, unlike the other audio toggles: ambience should never start
@@ -1615,6 +1625,7 @@ type Action =
   | { type: 'buyHandheldDigiScope' }
   | { type: 'completeTravelEncounter'; result: TravelEncounterResult }
   | { type: 'toggleSavedLokPet'; id: string }
+  | { type: 'setLokPetLoadout'; ids: string[] }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
   | { type: 'refreshPetElixirs'; now: number }
   | { type: 'feedLokPetTreat'; id: string }
@@ -1684,6 +1695,8 @@ type Action =
   | { type: 'buyGenerator'; id: string; now: number }
   | { type: 'refreshGeneratorIncome'; now: number }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
+  | { type: 'setLokPetArtStyle'; style: MetaState['lokPetArtStyle'] }
+  | { type: 'setUiBorderStyle'; style: MetaState['uiBorderStyle'] }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
   | { type: 'tickRecovery'; now: number }
@@ -1753,6 +1766,13 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ? state.meta.selectedLokPetIds.filter((id) => id !== action.id)
         : state.meta.selectedLokPetIds.length < capacity ? [...state.meta.selectedLokPetIds, action.id] : state.meta.selectedLokPetIds;
       return { ...state, meta: { ...state.meta, selectedLokPetIds: selected } };
+    }
+
+    case 'setLokPetLoadout': {
+      const capacity = lokPetTeamCapacity(getCharacter(state.meta.selectedCharacterId));
+      const readyPetIds = new Set(state.meta.savedLokPets.filter((pet) => pet.stamina > 0).map((pet) => pet.id));
+      const selectedLokPetIds = [...new Set(action.ids)].filter((id) => readyPetIds.has(id)).slice(0, capacity);
+      return { ...state, meta: { ...state.meta, selectedLokPetIds } };
     }
 
     case 'buyCardPack': {
@@ -2559,6 +2579,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
         meta: { ...state.meta, uiDensity: action.density },
       };
 
+    case 'setLokPetArtStyle':
+      return { ...state, meta: { ...state.meta, lokPetArtStyle: action.style } };
+
+    case 'setUiBorderStyle':
+      return { ...state, meta: { ...state.meta, uiBorderStyle: action.style } };
+
     case 'setWorldInvertEnabled':
       if (action.enabled && vendorPurchaseCount(state.meta, 'invert-world') <= 0) return state;
       return { ...state, meta: { ...state.meta, worldInvertEnabled: action.enabled } };
@@ -2993,6 +3019,7 @@ export interface MetaContextValue {
   buyCardSalvageProtocol: () => void;
   buyHandheldDigiScope: () => void;
   toggleSavedLokPet: (id: string) => void;
+  setLokPetLoadout: (ids: string[]) => void;
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
   feedLokPetTreat: (id: string) => void;
@@ -3062,6 +3089,8 @@ export interface MetaContextValue {
   buyGenerator: (id: string) => void;
   refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
+  setLokPetArtStyle: (style: MetaState['lokPetArtStyle']) => void;
+  setUiBorderStyle: (style: MetaState['uiBorderStyle']) => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
   tickRecovery: () => void;
@@ -3122,6 +3151,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyHandheldDigiScope = useCallback(() => dispatch({ type: 'buyHandheldDigiScope' }), []);
   const resolveTravelEncounter = useCallback((result: TravelEncounterResult) => dispatch({ type: 'completeTravelEncounter', result }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
+  const setLokPetLoadout = useCallback((ids: string[]) => dispatch({ type: 'setLokPetLoadout', ids }), []);
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
   const refreshPetElixirs = useCallback(() => dispatch({ type: 'refreshPetElixirs', now: Date.now() }), []);
   const feedLokPetTreat = useCallback((id: string) => dispatch({ type: 'feedLokPetTreat', id }), []);
@@ -3277,6 +3307,14 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (density: 'grid' | 'list') => dispatch({ type: 'setUiDensity', density }),
     [],
   );
+  const setLokPetArtStyle = useCallback(
+    (style: MetaState['lokPetArtStyle']) => dispatch({ type: 'setLokPetArtStyle', style }),
+    [],
+  );
+  const setUiBorderStyle = useCallback(
+    (style: MetaState['uiBorderStyle']) => dispatch({ type: 'setUiBorderStyle', style }),
+    [],
+  );
   const startRecovery = useCallback((characterId: string, locationId?: string) => dispatch({ type: 'startRecovery', characterId, locationId }), []);
   const stopRecovery = useCallback(() => dispatch({ type: 'stopRecovery' }), []);
   const tickRecovery = useCallback(() => dispatch({ type: 'tickRecovery', now: Date.now() }), []);
@@ -3352,6 +3390,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyCardSalvageProtocol,
       buyHandheldDigiScope,
       toggleSavedLokPet,
+      setLokPetLoadout,
       restoreSavedLokPet,
       refreshPetElixirs,
       feedLokPetTreat,
@@ -3421,6 +3460,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyGenerator,
       refreshGeneratorIncome,
       setUiDensity,
+      setLokPetArtStyle,
+      setUiBorderStyle,
       resetProgress,
       startRecovery,
       stopRecovery,
@@ -3462,6 +3503,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyCardSalvageProtocol,
     buyHandheldDigiScope,
     toggleSavedLokPet,
+    setLokPetLoadout,
     restoreSavedLokPet,
     refreshPetElixirs,
     feedLokPetTreat,
@@ -3530,6 +3572,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyGenerator,
     refreshGeneratorIncome,
     setUiDensity,
+    setLokPetArtStyle,
+    setUiBorderStyle,
     resetProgress,
     startRecovery,
     stopRecovery,
