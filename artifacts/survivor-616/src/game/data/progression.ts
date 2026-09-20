@@ -367,7 +367,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-storefront',
-    name: 'DigiScope',
+    name: 'The Neon Sleeve',
     subtitle: 'The Neon Sleeve',
     description:
       'A bright little storefront where Lock Packs, passive decks, duplicate cards, and rare variants change hands under a humming sign.',

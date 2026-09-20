@@ -130,7 +130,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onBegin}
-            className="intro-enter group relative w-full overflow-hidden bg-primary px-10 py-5 text-sm font-black uppercase tracking-widest text-primary-foreground sm:w-auto"
+            className="intro-enter group relative w-full overflow-hidden bg-primary px-10 py-5 font-display text-base font-black uppercase tracking-[.14em] text-primary-foreground sm:w-auto"
             data-testid="button-begin"
           >
             <div className="absolute inset-0 translate-y-[100%] bg-white transition-transform duration-300 ease-out group-hover:translate-y-[0%]" />
@@ -141,7 +141,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             href="https://gsix.online"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-9 self-center text-center text-[9px] uppercase tracking-[0.12em] text-white/24 transition-colors hover:text-white/50"
+            className="mt-3 self-center text-center font-mono text-[8px] uppercase tracking-[0.1em] text-white/20 transition-colors hover:text-white/50"
             data-testid="link-intro-credit"
           >
             Powered by LokServices · Designed by GSixDesigns

@@ -105,6 +105,7 @@ export function PackOpeningReveal({
   const pack = CARD_SHOP_PACKS_BY_ID[reveal.packId];
   const [focusIndex, setFocusIndex] = useState(0);
   const [focalFlipped, setFocalFlipped] = useState(false);
+  const [flippingAll, setFlippingAll] = useState(false);
   const advancedRef = useRef(false);
   const done = focusIndex >= reveal.pulls.length;
   const canReopen = cardCredits >= pack.cost;
@@ -116,19 +117,21 @@ export function PackOpeningReveal({
 
   useEffect(() => {
     setFocusIndex(0);
+    setFlippingAll(false);
   }, [reveal]);
 
   useEffect(() => {
     if (done) return;
     setFocalFlipped(false);
     advancedRef.current = false;
+    if (!flippingAll) return;
     const flipTimer = setTimeout(flipUp, FLIP_DELAY_MS);
     return () => clearTimeout(flipTimer);
     // flipUp is a stable per-render closure over refs/setState/sfx only; re-running
     // this effect on every render would be harmless but pointless, so it's scoped to
     // the two values that actually change the outcome.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusIndex, done]);
+  }, [focusIndex, done, flippingAll]);
 
   const advance = () => {
     if (advancedRef.current) return;
@@ -138,14 +141,14 @@ export function PackOpeningReveal({
   };
 
   useEffect(() => {
-    if (done || !focalFlipped) return;
+    if (done || !focalFlipped || !flippingAll) return;
     const advanceTimer = setTimeout(advance, HOLD_MS);
     return () => clearTimeout(advanceTimer);
     // advance is a stable per-render closure over refs/setState only; re-running this
     // effect on every render would be harmless but pointless, so it's scoped to the
     // two values that actually change the outcome.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focalFlipped, done]);
+  }, [focalFlipped, done, flippingAll]);
 
   const handleFocalTap = () => (focalFlipped ? advance() : flipUp());
 
@@ -172,7 +175,7 @@ export function PackOpeningReveal({
             <p className="mt-1 text-xs uppercase tracking-widest text-white/45">{reveal.newFlags.filter(Boolean).length} new · {reveal.pulls.length} total</p>
           </motion.div>
         ) : (
-          <p className="mt-4 text-[10px] uppercase tracking-widest text-white/35">Tap the card to reveal it</p>
+          <p className="mt-4 text-[10px] uppercase tracking-widest text-white/35">Flip each card yourself, or run the full reveal</p>
         )}
 
         <div className="mt-6 flex min-h-44 w-full flex-wrap items-center justify-center gap-2 sm:min-h-56 sm:gap-3">
@@ -203,9 +206,19 @@ export function PackOpeningReveal({
               type="button"
               onClick={handleFocalTap}
               className="border border-white/20 px-4 py-2.5 font-mono text-[10px] font-black uppercase tracking-widest text-white/60 transition-all active:scale-[0.97] hover:border-white/40"
-              data-testid="button-skip-card-reveal"
+              data-testid="button-flip-card-reveal"
             >
-              Skip
+              {focalFlipped ? 'Next card' : 'Flip card'}
+            </button>
+          )}
+          {!done && !flippingAll && (
+            <button
+              type="button"
+              onClick={() => setFlippingAll(true)}
+              className="border border-fuchsia-200/45 bg-fuchsia-300/10 px-4 py-2.5 font-mono text-[10px] font-black uppercase tracking-widest text-fuchsia-100 transition-all active:scale-[0.97]"
+              data-testid="button-flip-all-cards"
+            >
+              Flip all in order
             </button>
           )}
           {done && (
