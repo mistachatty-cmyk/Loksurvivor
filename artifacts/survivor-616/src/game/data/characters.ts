@@ -519,7 +519,8 @@ export const CHARACTERS: CharacterDef[] = [
       durationMs: 3000,
       effect: { novaDamage: 90, novaRadius: 260, damageMult: 1.4, invulnerable: true },
     },
-    unlock: { kind: 'clearArea', areaId: 'crystal-cellar' },
+    // Llamasté is already meditating in the hideout when the player arrives.
+    unlock: { kind: 'default' },
   },
   {
     id: 'llama-mama',
@@ -563,7 +564,7 @@ export const CHARACTERS: CharacterDef[] = [
       durationMs: 4000,
       effect: { novaDamage: 110, novaRadius: 320, damageMult: 1.5, invulnerable: true },
     },
-    unlock: { kind: 'default' },
+    unlock: { kind: 'clearArea', areaId: 'crystal-cellar' },
   },
   {
     id: 'llama-overlord',
