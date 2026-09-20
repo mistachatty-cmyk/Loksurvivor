@@ -368,6 +368,97 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     maxStacks: 1,
     effects: [{ kind: 'utility', utility: 'starting-weapon-level', amount: 1 }],
   },
+
+  // -- Street kit / Run leverage / Hard contracts expansion. --
+  {
+    id: 'wide-guard',
+    name: 'Wide Guard',
+    description: '+5% weapon area per stack. Whatever you swing reaches a little further into the crowd.',
+    category: 'stat',
+    cost: 130,
+    maxStacks: 4,
+    effects: [{ kind: 'stat', stat: 'area', mult: 1.05, cap: 1.35 }],
+  },
+  {
+    id: 'fence-connections',
+    name: 'Fence Connections',
+    description: '+12% final cred per stack. Otis knows a guy who knows a guy.',
+    category: 'utility',
+    cost: 300,
+    maxStacks: 2,
+    effects: [{ kind: 'utility', utility: 'reward-cred-mult', amount: 0.12 }],
+  },
+  {
+    id: 'contract-glass-city',
+    name: 'Contract: Glass City',
+    description: 'Fragile hostiles, brutal comeback: enemies shatter easy but hit like trucks. Contract rewards are better.',
+    category: 'challenge',
+    cost: 250,
+    maxStacks: 1,
+    challengeId: 'glass-city',
+  },
+
+  // -- Field ops expansion. --
+  {
+    id: 'mirror-mode',
+    name: 'Wrong Side of the Street',
+    description: 'Unlocks a Settings toggle that mirrors the whole run left-to-right. Purely for chaos — flip it back off any time.',
+    category: 'ability',
+    cost: 90,
+    maxStacks: 1,
+  },
+  {
+    id: 'overclock-rig',
+    name: 'Overclocked Rig',
+    description: "+4% global damage and a shorter cooldown clock per stack. Runs hot -- the vendor won't warranty burns.",
+    category: 'ability',
+    cost: 280,
+    maxStacks: 2,
+    effects: [
+      { kind: 'stat', stat: 'power', add: 0.04, cap: 2.1 },
+      { kind: 'stat', stat: 'haste', mult: 0.95, cap: 0.7 },
+    ],
+  },
+  {
+    id: 'night-vision',
+    name: 'Low-Light Optics',
+    description: "Cuts the night-time screen tint by three-quarters. The city stops hiding things from you once the sun's down.",
+    category: 'ability',
+    cost: 200,
+    maxStacks: 1,
+  },
+
+  // -- Locksmith's corner expansion. --
+  {
+    id: 'relic-tumbler-pick',
+    name: 'Tumbler Pick',
+    description: '+3% crit chance per stack. Every lock has a sweet spot. So does every skull.',
+    category: 'relic',
+    currency: 'skeletonKeys',
+    cost: 7,
+    maxStacks: 2,
+    effects: [{ kind: 'stat', stat: 'crit', add: 0.03, cap: 0.46 }],
+  },
+  {
+    id: 'relic-trigger-spring',
+    name: 'Loosened Trigger Spring',
+    description: "-6% weapon cooldown per stack. Whatever it used to slow down, it isn't slowing down anymore.",
+    category: 'relic',
+    currency: 'skeletonKeys',
+    cost: 6,
+    maxStacks: 2,
+    effects: [{ kind: 'stat', stat: 'haste', mult: 0.94, cap: 0.75 }],
+  },
+  {
+    id: 'relic-blast-lens',
+    name: 'Cracked Blast Lens',
+    description: '+8% weapon area per stack. Fractured glass, somehow focuses worse and reaches further.',
+    category: 'relic',
+    currency: 'skeletonKeys',
+    cost: 7,
+    maxStacks: 2,
+    effects: [{ kind: 'stat', stat: 'area', mult: 1.08, cap: 1.5 }],
+  },
 ];
 
 export const VENDOR_CATALOG_BY_ID: Record<string, VendorItemDef> = Object.fromEntries(
@@ -401,6 +492,15 @@ export const CHALLENGE_CONTRACTS: ChallengeContractDef[] = [
     enemySpawnMultiplier: 1,
     enemyHealthMultiplier: 1,
     enemyDamageMultiplier: 1.4,
+  },
+  {
+    id: 'glass-city',
+    name: 'Glass City',
+    description: 'Enemy health -30%. Enemy contact damage +55%.',
+    rewardMultiplier: 1.45,
+    enemySpawnMultiplier: 1,
+    enemyHealthMultiplier: 0.7,
+    enemyDamageMultiplier: 1.55,
   },
 ];
 

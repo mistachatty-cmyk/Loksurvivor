@@ -406,7 +406,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           <section className="mb-6 border border-sky-300/35 bg-sky-300/5 p-4" aria-labelledby="lokpet-card-shop-heading" data-testid="section-lokpet-card-shop">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 id="lokpet-card-shop-heading" className="font-black uppercase text-sky-100">LokPet Card Shop</h3>
+                <h3 id="lokpet-card-shop-heading" className="font-black uppercase text-sky-100">DigiScope</h3>
                 <p className="text-xs text-muted-foreground">LokPack shortcut · two stackable passive LokPet cards. Visit the hideout shop for every pack type and your deck.</p>
                 <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-sky-200">Earn {BASE_CARD_CREDITS_PER_LOOT_BOX} Card Credits per blue box. Collector ranks earn more.</p>
               </div>

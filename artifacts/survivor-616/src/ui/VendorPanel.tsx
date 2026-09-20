@@ -8,8 +8,11 @@ import {
   Check,
   Cpu,
   Crosshair,
+  Expand,
   EyeOff,
+  FlipHorizontal2,
   FlipVertical2,
+  Flame,
   Footprints,
   Gauge,
   Gem,
@@ -22,6 +25,7 @@ import {
   LockKeyhole,
   Magnet,
   Maximize2,
+  Moon,
   PackageCheck,
   Palette,
   Radar,
@@ -121,6 +125,7 @@ const STAT_LABELS: Record<string, string> = {
   power: 'global damage',
   armor: 'contact resistance',
   magnet: 'pickup range',
+  crit: 'crit chance',
 };
 
 const ITEM_ICONS: Record<string, LucideIcon> = {
@@ -154,9 +159,18 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'corner-magnet': Magnet,
   'tidal-anchor': Anchor,
   'static-inverter': Zap,
+  'wide-guard': Expand,
+  'fence-connections': BadgeDollarSign,
+  'contract-glass-city': Flame,
+  'mirror-mode': FlipHorizontal2,
+  'overclock-rig': Flame,
+  'night-vision': Moon,
+  'relic-tumbler-pick': KeyRound,
+  'relic-trigger-spring': Gauge,
+  'relic-blast-lens': Expand,
 };
 
-/** Short, hand-written labels for "ability" items whose real effect can't be summarized by a single stat/utility delta. */
+/** Short, hand-written labels for vendor items whose real effect can't be summarized by a single stat/utility delta -- mostly "ability" items, but also any relic/stat item using a `mult` effect the generic summary below doesn't read. */
 const ABILITY_EFFECT_LABELS: Record<string, string> = {
   'minimap-street-ears': 'Minimap tier 1 — enemy blips',
   'minimap-loot-sense': 'Minimap tier 2 — loot blips',
@@ -174,6 +188,12 @@ const ABILITY_EFFECT_LABELS: Record<string, string> = {
   'corner-magnet': '3x corner critical window',
   'tidal-anchor': '-75% bubble surge displacement',
   'static-inverter': 'Dust mite lightning recharges shields',
+  'wide-guard': '+5% weapon area / stack',
+  'mirror-mode': 'Unlocks a Settings toggle',
+  'overclock-rig': '+4% damage · -5% cooldown / stack',
+  'night-vision': 'Night tint cut by 75%',
+  'relic-trigger-spring': '-6% weapon cooldown / stack',
+  'relic-blast-lens': '+8% weapon area / stack',
 };
 
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
@@ -199,7 +219,7 @@ function effectLabel(item: VendorItemDef): string {
   }
   if (effect.kind === 'stat') {
     const amount = effect.add ?? 0;
-    const isPercent = effect.stat === 'power' || effect.stat === 'armor';
+    const isPercent = effect.stat === 'power' || effect.stat === 'armor' || effect.stat === 'crit';
     const displayAmount = isPercent ? `${Math.round(amount * 100)}%` : `${amount}`;
     return `+${displayAmount} ${STAT_LABELS[effect.stat] ?? effect.stat} / stack`;
   }

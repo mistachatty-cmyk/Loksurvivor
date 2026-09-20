@@ -68,6 +68,7 @@ import {
   hasExtraLife,
   hazardImmunityUnlocked,
   minimapUnlockTiers,
+  nightVisionUnlocked,
   physicsObjectClickRadiusBonus,
   rewardCredMultiplier,
   startingWeaponLevel,
@@ -374,6 +375,7 @@ export function RunScreen({
         sizeMult: giantSizeMult(meta),
         stealth: stealthConfig(meta),
         hazardImmune: hazardImmunityUnlocked(meta),
+        nightVisionEnabled: nightVisionUnlocked(meta),
         extraLifeAvailable: hasExtraLife(meta),
         minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
@@ -1063,11 +1065,16 @@ export function RunScreen({
     }
   })();
 
+  const chaosTransform = [
+    meta.worldInvertEnabled ? 'rotate(180deg)' : '',
+    meta.mirrorModeEnabled ? 'scaleX(-1)' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div
       className="relative h-dvh w-full overflow-hidden bg-black select-none"
       style={{
-        transform: meta.worldInvertEnabled ? 'rotate(180deg)' : undefined,
+        transform: chaosTransform || undefined,
         filter: meta.paletteInvertEnabled ? 'invert(1)' : undefined,
         animation: hud?.wheelSpin?.colorFluctuation ? 'hordespin-hue 2.2s linear infinite' : undefined,
       }}

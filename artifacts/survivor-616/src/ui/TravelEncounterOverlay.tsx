@@ -2,7 +2,9 @@
  * The "classic version" travel encounter popup: player on the left, an
  * enemy or wild LokPet on the right, simple turn-based combat. See
  * .agents/memory/travel-encounters.md for why the combat here is
- * deliberately flat/uniform and isolated from engine/world.ts.
+ * deliberately simple and isolated from engine/world.ts, and for the
+ * subject-type damage/effect variation layered on top of the original flat
+ * formula (cardThrowOutcome in data/travelEncounters.ts).
  */
 import { useEffect, useRef, useState } from 'react';
 import { LogOut, PawPrint, Swords } from 'lucide-react';
@@ -15,7 +17,7 @@ import {
   PET_ASSIST_DAMAGE_MULT,
   PLAYER_TRAVEL_HP,
   UNARMED_PUNCH_DAMAGE,
-  cardThrowDamage,
+  cardThrowOutcome,
   describeOwnedCard,
 } from '@/game/data/travelEncounters';
 import {
@@ -45,7 +47,7 @@ interface Gesture {
 const BEAT_MS = 450;
 
 export function TravelEncounterOverlay({ opponent, rng, label, onClose }: TravelEncounterOverlayProps) {
-  const { meta, selectedCharacter, resolveTravelEncounter } = useMeta();
+  const { meta, selectedCharacter, resolveTravelEncounter, consumeThrownCard } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(
     selectedCharacter,
@@ -90,10 +92,17 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
     .map((cardId) => meta.cardCollection.find((record) => record.cardId === cardId && record.copies > 0))
     .filter((record): record is NonNullable<typeof record> => Boolean(record));
 
-  const handleAttack = (damage: number, actionLabel?: string) => {
+  const handleAttack = (damage: number, actionLabel?: string, heal = 0) => {
     if (busy || combat.status !== 'active') return;
     setBusy(true);
-    const afterPlayer = applyPlayerAttack(combat, damage, actionLabel);
+    // Ally cards call in support instead of hitting harder -- apply the heal
+    // to a shallow-cloned state before the pure applyPlayerAttack, so that
+    // function stays a plain damage-in/damage-out transform. See
+    // cardThrowOutcome in data/travelEncounters.ts.
+    const healedState = heal > 0
+      ? { ...combat, player: { ...combat.player, hp: Math.min(combat.player.maxHp, combat.player.hp + heal) } }
+      : combat;
+    const afterPlayer = applyPlayerAttack(healedState, damage, actionLabel);
     const afterOpponent = afterPlayer.status === 'active' ? applyOpponentAttack(afterPlayer, opponent.damage) : afterPlayer;
 
     playGesture('left', 'attack');
@@ -172,18 +181,30 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
               <div className="grid grid-cols-2 gap-2">
                 {battleDeck.map((record) => {
                   const info = describeOwnedCard(record.cardId);
-                  const damage = Math.round(cardThrowDamage(record) * powerMult);
+                  const outcome = cardThrowOutcome(record, opponent.kind);
+                  const damage = Math.round(outcome.damage * powerMult);
+                  const lastCopy = !meta.cardSalvageUnlocked && record.copies <= 1;
                   return (
                     <button
                       key={record.cardId}
                       type="button"
                       disabled={busy}
-                      onClick={() => handleAttack(damage, info?.name ?? 'Threw a card')}
+                      onClick={() => {
+                        consumeThrownCard(record.cardId);
+                        handleAttack(damage, info?.name ?? 'Threw a card', outcome.heal);
+                      }}
                       className="border border-white/15 bg-white/[.03] p-2 text-left transition-all active:scale-[0.97] disabled:opacity-40"
                       data-testid={`button-throw-card-${record.cardId}`}
                     >
                       <span className="block font-display text-xs font-black uppercase text-white">{info?.name ?? 'Unknown card'}</span>
-                      <span className="mt-0.5 block text-[9px] text-white/50">Throw · {damage} dmg</span>
+                      <span className="mt-0.5 block text-[9px] text-white/50">
+                        Throw · {damage} dmg{outcome.heal > 0 ? ` · +${outcome.heal} hp` : ''}
+                      </span>
+                      {!meta.cardSalvageUnlocked && (
+                        <span className={`mt-0.5 block text-[8px] uppercase tracking-wide ${lastCopy ? 'text-rose-300' : 'text-white/30'}`}>
+                          {lastCopy ? 'Last one -- gone after this' : `${record.copies} left before it's gone`}
+                        </span>
+                      )}
                     </button>
                   );
                 })}

@@ -1001,6 +1001,8 @@ export interface World {
   stealthConfig: StealthAbilityConfig | null;
   /** "Let Me Hold This" owned: hazard weapons never hurt whoever's holding them, native character or not. */
   hazardImmune: boolean;
+  /** "Low-Light Optics" owned: draw.ts cuts the night-time screen tint down instead of applying it in full. */
+  nightVisionEnabled: boolean;
   /** Timestamp (w.now) the current cloak activation ends; 0 or in the past when not cloaked. */
   stealthUntil: number;
   /** Timestamp (w.now) the cloak is next allowed to activate. */
@@ -1199,6 +1201,7 @@ export function createWorld(
     sizeMult?: number;
     stealth?: StealthAbilityConfig | null;
     hazardImmune?: boolean;
+    nightVisionEnabled?: boolean;
     minimapEnemyRadar?: boolean;
     minimapLootSense?: boolean;
     minimapHazardSense?: boolean;
@@ -1438,6 +1441,7 @@ export function createWorld(
     playerSizeMult: sizeMult,
     stealthConfig: setup.stealth ?? null,
     hazardImmune: setup.hazardImmune ?? false,
+    nightVisionEnabled: setup.nightVisionEnabled ?? false,
     stealthUntil: 0,
     stealthReadyAt: setup.stealth ? 4000 : Number.POSITIVE_INFINITY,
     stealthAnchorX: 0,

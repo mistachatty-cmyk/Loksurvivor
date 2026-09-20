@@ -3,16 +3,31 @@ import test from 'node:test';
 import { createRng } from '@/game/engine/math';
 import { createInitialMeta, reducer } from '@/game/state/metaStore';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
-import { CARD_MANIFESTS } from '@/game/data/cards';
+import { CARD_MANIFESTS, type LokDeckCardMetadata } from '@/game/data/cards';
 import { HUB_ROOMS } from '@/game/data/progression';
+import type { LokAssetManifest } from '@/game/lok/types';
 import {
+  ALLY_CARD_HEAL,
   BASE_CARD_THROW_DAMAGE,
+  CARD_RARITY_DAMAGE_MULT,
+  CARD_SALVAGE_COST,
+  CARD_SALVAGE_EARN_RUNS,
+  CARD_SUBJECT_DAMAGE_MULT,
+  CARD_VARIANT_DAMAGE_MULT,
+  LOKPET_CARD_TYPE_BONUS_MULT,
   TRAVEL_ENCOUNTER_OPPONENTS,
   TRAVEL_ENCOUNTER_REWARD,
   TRAVEL_ENCOUNTER_TRIGGERS,
   UNARMED_PUNCH_DAMAGE,
   cardThrowDamage,
+  cardThrowOutcome,
 } from './data/travelEncounters';
+
+function findCardBySubject(subjectType: LokDeckCardMetadata['subjectType']): LokAssetManifest<LokDeckCardMetadata> {
+  const card = CARD_MANIFESTS.find((candidate) => (candidate.metadata as LokDeckCardMetadata | undefined)?.subjectType === subjectType);
+  if (!card) throw new Error(`no card found with subjectType ${subjectType}`);
+  return card as LokAssetManifest<LokDeckCardMetadata>;
+}
 import {
   applyFlee,
   applyOpponentAttack,
@@ -157,4 +172,70 @@ test('a win against an enemy counts toward the same Bestiary tally a real run wo
   assert.equal(next.meta.bestiary.nightcrawler, 1);
   const again = reducer(next, { type: 'completeTravelEncounter', result: wonResult });
   assert.equal(again.meta.bestiary.nightcrawler, 2);
+});
+
+test('cardThrowDamage applies the subject-type multiplier on top of rarity/variant', () => {
+  const characterCard = findCardBySubject('character');
+  const record = { cardId: characterCard.id, copies: 1, variants: { standard: 1 } as const, bestVariant: 'standard' as const, totalValue: 1 };
+  const expected = Math.round(BASE_CARD_THROW_DAMAGE * CARD_RARITY_DAMAGE_MULT[characterCard.rarity] * CARD_VARIANT_DAMAGE_MULT.standard * CARD_SUBJECT_DAMAGE_MULT.character);
+  assert.equal(cardThrowDamage(record), expected);
+  // A passiveCards.ts-backed id has no subjectType, so its multiplier stays 1 -- unaffected by this pass.
+  const passiveRecord = { cardId: 'lok.survivor-616.card.scenario-rubber-district', copies: 1, variants: { standard: 1 } as const, bestVariant: 'standard' as const, totalValue: 1 };
+  assert.equal(cardThrowDamage(passiveRecord), Math.round(BASE_CARD_THROW_DAMAGE * CARD_RARITY_DAMAGE_MULT.common * CARD_VARIANT_DAMAGE_MULT.standard));
+});
+
+test('cardThrowOutcome heals on an ally card and adds no bonus against a non-lokpet opponent', () => {
+  const allyCard = findCardBySubject('ally');
+  const record = { cardId: allyCard.id, copies: 1, variants: { standard: 1 } as const, bestVariant: 'standard' as const, totalValue: 1 };
+  const outcome = cardThrowOutcome(record, 'enemy');
+  assert.equal(outcome.heal, ALLY_CARD_HEAL);
+  assert.equal(outcome.damage, cardThrowDamage(record));
+});
+
+test('cardThrowOutcome adds the type-match bonus only when a lokpet card is thrown at a lokpet opponent', () => {
+  const lokpetCard = findCardBySubject('lokpet');
+  const record = { cardId: lokpetCard.id, copies: 1, variants: { standard: 1 } as const, bestVariant: 'standard' as const, totalValue: 1 };
+  const vsEnemy = cardThrowOutcome(record, 'enemy');
+  const vsLokpet = cardThrowOutcome(record, 'lokpet');
+  assert.equal(vsEnemy.damage, cardThrowDamage(record));
+  assert.equal(vsLokpet.damage, Math.round(cardThrowDamage(record) * LOKPET_CARD_TYPE_BONUS_MULT));
+  assert.ok(vsLokpet.damage > vsEnemy.damage);
+});
+
+test('consumeThrownCard removes one copy and drops the record/battle-deck slot at zero, but is a no-op once Salvage Protocol is unlocked', () => {
+  const characterCard = findCardBySubject('character');
+  const base = createInitialMeta();
+  const meta = {
+    ...base,
+    cardCollection: [{ cardId: characterCard.id, copies: 2, variants: { standard: 2 }, bestVariant: 'standard' as const, totalValue: 2 }],
+    battleDeckCardIds: [characterCard.id],
+  };
+  const state = { meta, lastRun: null, lastCardPackReveal: null };
+
+  const afterFirstThrow = reducer(state, { type: 'consumeThrownCard', cardId: characterCard.id });
+  assert.equal(afterFirstThrow.meta.cardCollection[0]!.copies, 1);
+  assert.deepEqual(afterFirstThrow.meta.battleDeckCardIds, [characterCard.id]);
+
+  const afterSecondThrow = reducer(afterFirstThrow, { type: 'consumeThrownCard', cardId: characterCard.id });
+  assert.equal(afterSecondThrow.meta.cardCollection.length, 0);
+  assert.deepEqual(afterSecondThrow.meta.battleDeckCardIds, []);
+
+  const unlockedState = { meta: { ...meta, cardSalvageUnlocked: true }, lastRun: null, lastCardPackReveal: null };
+  assert.equal(reducer(unlockedState, { type: 'consumeThrownCard', cardId: characterCard.id }), unlockedState);
+});
+
+test('buyCardSalvageProtocol requires both the earned run count and the CC cost, and only unlocks once', () => {
+  const base = createInitialMeta();
+  const tooFewRuns = { meta: { ...base, totalRuns: CARD_SALVAGE_EARN_RUNS - 1, cardCredits: CARD_SALVAGE_COST }, lastRun: null, lastCardPackReveal: null };
+  assert.equal(reducer(tooFewRuns, { type: 'buyCardSalvageProtocol' }), tooFewRuns);
+
+  const tooPoor = { meta: { ...base, totalRuns: CARD_SALVAGE_EARN_RUNS, cardCredits: CARD_SALVAGE_COST - 1 }, lastRun: null, lastCardPackReveal: null };
+  assert.equal(reducer(tooPoor, { type: 'buyCardSalvageProtocol' }), tooPoor);
+
+  const ready = { meta: { ...base, totalRuns: CARD_SALVAGE_EARN_RUNS, cardCredits: CARD_SALVAGE_COST }, lastRun: null, lastCardPackReveal: null };
+  const unlocked = reducer(ready, { type: 'buyCardSalvageProtocol' });
+  assert.equal(unlocked.meta.cardSalvageUnlocked, true);
+  assert.equal(unlocked.meta.cardCredits, 0);
+
+  assert.equal(reducer(unlocked, { type: 'buyCardSalvageProtocol' }), unlocked);
 });

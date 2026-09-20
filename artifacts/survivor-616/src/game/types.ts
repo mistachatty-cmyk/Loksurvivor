@@ -1869,6 +1869,8 @@ export interface MetaState {
   worldInvertEnabled: boolean;
   /** Cheat-code toggle from the Quartermaster's "Negative Exposure" unlock: inverts the run's color palette. Requires owning that vendor item. */
   paletteInvertEnabled: boolean;
+  /** Cheat-code toggle from the Quartermaster's "Wrong Side of the Street" unlock: mirrors the run left-to-right. Requires owning that vendor item. */
+  mirrorModeEnabled: boolean;
   /** 'grid' shows list-heavy hub panels as multi-column card grids; 'list' is the original single-column layout. */
   uiDensity: 'grid' | 'list';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
@@ -1950,6 +1952,8 @@ export interface MetaState {
   activePassiveCardIds: string[];
   /** Up to BATTLE_DECK_SLOTS owned card ids equipped for the travel-encounter minigame's Attack action. Empty deck falls back to an unarmed punch -- never blocks the player. See data/travelEncounters.ts. */
   battleDeckCardIds: string[];
+  /** Salvage Protocol bought at DigiScope: once true, a thrown Battle Deck card is never consumed. False by default -- a thrown card is gone for good until this is earned and bought. See data/travelEncounters.ts. */
+  cardSalvageUnlocked: boolean;
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */

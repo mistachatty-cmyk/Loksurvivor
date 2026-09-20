@@ -69,8 +69,8 @@ import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
 import { getExpForLevel } from '@/game/engine/lokPetBattle';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS } from '@/game/data/cards';
-import { CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
-import { BATTLE_DECK_SLOTS } from '@/game/data/travelEncounters';
+import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
+import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
@@ -90,6 +90,7 @@ import type {
   LokPetDiscoveryHistoryEntry,
   LokPetElement,
   LokPetRarity,
+  OwnedCardRecord,
   LokPetRunDiscovery,
   LokPetRoll,
   SavedLokPet,
@@ -258,6 +259,7 @@ export function createInitialMeta(): MetaState {
     minimapPosition: { x: 0.82, y: 0.18 },
     worldInvertEnabled: false,
     paletteInvertEnabled: false,
+    mirrorModeEnabled: false,
     uiDensity: 'grid',
     musicReactiveEnabled: true,
     sfxEnabled: true,
@@ -300,6 +302,7 @@ export function createInitialMeta(): MetaState {
     cardCollection: [],
     activePassiveCardIds: [],
     battleDeckCardIds: [],
+    cardSalvageUnlocked: false,
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     lokPetLeagueTier: 0,
@@ -406,6 +409,24 @@ function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
     const bestVariant = typeof entry.bestVariant === 'string' && validVariants.has(entry.bestVariant as CardVariant) ? entry.bestVariant as CardVariant : 'standard';
     return [{ cardId: entry.cardId, copies, variants, bestVariant, totalValue: Math.max(copies, counter(entry.totalValue, copies)) }];
   }).slice(0, 500);
+}
+
+/** Removes one copy of a record's own `bestVariant` (the one a throw would have used) and recomputes `bestVariant`/`totalValue`. Returns null once copies reach 0, so the caller drops the record entirely -- mirrors normalizeCardCollection's own "a 0-copy record doesn't exist" rule. */
+function removeThrownCardCopy(record: OwnedCardRecord): OwnedCardRecord | null {
+  const copies = record.copies - 1;
+  if (copies <= 0) return null;
+  const spentVariant = record.bestVariant;
+  const variants = { ...record.variants };
+  const remainingOfSpent = Math.max(0, (variants[spentVariant] ?? 1) - 1);
+  if (remainingOfSpent > 0) variants[spentVariant] = remainingOfSpent;
+  else delete variants[spentVariant];
+  const totalValue = Math.max(0, record.totalValue - CARD_VARIANT_VALUE[spentVariant]);
+  let bestVariant: CardVariant = 'standard';
+  let bestValue = -1;
+  for (const [variant, count] of Object.entries(variants) as [CardVariant, number][]) {
+    if (count > 0 && CARD_VARIANT_VALUE[variant] > bestValue) { bestValue = CARD_VARIANT_VALUE[variant]; bestVariant = variant; }
+  }
+  return { ...record, copies, variants, bestVariant, totalValue };
 }
 
 function normalizedPosition(value: unknown, fallback: { x: number; y: number }): { x: number; y: number } {
@@ -999,6 +1020,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
     worldInvertEnabled: parsed.worldInvertEnabled === true,
     paletteInvertEnabled: parsed.paletteInvertEnabled === true,
+    mirrorModeEnabled: parsed.mirrorModeEnabled === true,
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
     sfxEnabled: parsed.sfxEnabled !== false,
@@ -1052,6 +1074,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     cardCollection,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
     battleDeckCardIds: Array.isArray(parsed.battleDeckCardIds) ? [...new Set(parsed.battleDeckCardIds.filter((id): id is string => typeof id === 'string' && ownedCardIds.has(id)))].slice(0, BATTLE_DECK_SLOTS) : [],
+    cardSalvageUnlocked: parsed.cardSalvageUnlocked === true,
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     lokPetLeagueTier: counter(parsed.lokPetLeagueTier),
@@ -1489,6 +1512,11 @@ export function hazardImmunityUnlocked(meta: MetaState): boolean {
   return vendorPurchaseCount(meta, 'hazard-handler') > 0;
 }
 
+/** Whether "Low-Light Optics" is owned: the night-time screen tint is cut down in draw.ts. */
+export function nightVisionUnlocked(meta: MetaState): boolean {
+  return vendorPurchaseCount(meta, 'night-vision') > 0;
+}
+
 /** True while Artisan Valor Prime is fronting the Paint Gallery and re-theming the hideout (every 14th hideout visit, for a few visits or occasionally a real 24h window). */
 export function isPrimeTakeoverActive(meta: MetaState, now: number): boolean {
   return meta.primeTakeoverVisitsRemaining > 0 || now < meta.primeTakeoverUntil;
@@ -1551,6 +1579,8 @@ type Action =
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
   | { type: 'togglePassiveCard'; cardId: string }
   | { type: 'toggleBattleDeckCard'; cardId: string }
+  | { type: 'consumeThrownCard'; cardId: string }
+  | { type: 'buyCardSalvageProtocol' }
   | { type: 'completeTravelEncounter'; result: TravelEncounterResult }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
@@ -1614,6 +1644,7 @@ type Action =
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
   | { type: 'setWorldInvertEnabled'; enabled: boolean }
   | { type: 'setPaletteInvertEnabled'; enabled: boolean }
+  | { type: 'setMirrorModeEnabled'; enabled: boolean }
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
   | { type: 'dismissNotifications'; ids: string[] }
   | { type: 'acknowledgeChangelog' }
@@ -1729,6 +1760,33 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const active = state.meta.battleDeckCardIds;
       const next = active.includes(action.cardId) ? active.filter((id) => id !== action.cardId) : active.length < BATTLE_DECK_SLOTS ? [...active, action.cardId] : active;
       return { ...state, meta: { ...state.meta, battleDeckCardIds: next } };
+    }
+
+    // Thrown, not spent from a shop -- until Salvage Protocol is bought, a
+    // Battle Deck card loses one copy the instant it's thrown, win or lose.
+    // A no-op once the protocol is owned, so callers can dispatch this
+    // unconditionally on every throw. See CARD_SALVAGE_* in travelEncounters.ts.
+    case 'consumeThrownCard': {
+      if (state.meta.cardSalvageUnlocked) return state;
+      const record = state.meta.cardCollection.find((candidate) => candidate.cardId === action.cardId);
+      if (!record) return state;
+      const remaining = removeThrownCardCopy(record);
+      const cardCollection = remaining
+        ? state.meta.cardCollection.map((candidate) => (candidate.cardId === action.cardId ? remaining : candidate))
+        : state.meta.cardCollection.filter((candidate) => candidate.cardId !== action.cardId);
+      const battleDeckCardIds = remaining
+        ? state.meta.battleDeckCardIds
+        : state.meta.battleDeckCardIds.filter((id) => id !== action.cardId);
+      return { ...state, meta: { ...state.meta, cardCollection, battleDeckCardIds } };
+    }
+
+    case 'buyCardSalvageProtocol': {
+      if (state.meta.cardSalvageUnlocked) return state;
+      if (state.meta.totalRuns < CARD_SALVAGE_EARN_RUNS || state.meta.cardCredits < CARD_SALVAGE_COST) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, cardSalvageUnlocked: true, cardCredits: state.meta.cardCredits - CARD_SALVAGE_COST },
+      };
     }
 
     // No penalty on loss/flee beyond no reward -- enforced here at the state
@@ -2414,6 +2472,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (action.enabled && vendorPurchaseCount(state.meta, 'invert-palette') <= 0) return state;
       return { ...state, meta: { ...state.meta, paletteInvertEnabled: action.enabled } };
 
+    case 'setMirrorModeEnabled':
+      if (action.enabled && vendorPurchaseCount(state.meta, 'mirror-mode') <= 0) return state;
+      return { ...state, meta: { ...state.meta, mirrorModeEnabled: action.enabled } };
+
     case 'toggleRunModifier': {
       const current = state.meta.runModifiers[action.key] === true;
       return {
@@ -2832,6 +2894,8 @@ export interface MetaContextValue {
   buyLokPetCardPack: () => void;
   togglePassiveCard: (cardId: string) => void;
   toggleBattleDeckCard: (cardId: string) => void;
+  consumeThrownCard: (cardId: string) => void;
+  buyCardSalvageProtocol: () => void;
   toggleSavedLokPet: (id: string) => void;
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
@@ -2894,6 +2958,7 @@ export interface MetaContextValue {
   setMinimapPosition: (position: { x: number; y: number }) => void;
   setWorldInvertEnabled: (enabled: boolean) => void;
   setPaletteInvertEnabled: (enabled: boolean) => void;
+  setMirrorModeEnabled: (enabled: boolean) => void;
   toggleRunModifier: (key: keyof RunModifiers) => void;
   dismissNotifications: (ids: string[]) => void;
   acknowledgeChangelog: () => void;
@@ -2955,6 +3020,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyCardPack', packId: 'lokpet', now: Date.now() }), []);
   const togglePassiveCard = useCallback((cardId: string) => dispatch({ type: 'togglePassiveCard', cardId }), []);
   const toggleBattleDeckCard = useCallback((cardId: string) => dispatch({ type: 'toggleBattleDeckCard', cardId }), []);
+  const consumeThrownCard = useCallback((cardId: string) => dispatch({ type: 'consumeThrownCard', cardId }), []);
+  const buyCardSalvageProtocol = useCallback(() => dispatch({ type: 'buyCardSalvageProtocol' }), []);
   const resolveTravelEncounter = useCallback((result: TravelEncounterResult) => dispatch({ type: 'completeTravelEncounter', result }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
@@ -3095,6 +3162,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setPaletteInvertEnabled', enabled }),
     [],
   );
+  const setMirrorModeEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setMirrorModeEnabled', enabled }),
+    [],
+  );
   const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
   const dismissNotifications = useCallback((ids: string[]) => dispatch({ type: 'dismissNotifications', ids }), []);
   const acknowledgeChangelog = useCallback(() => dispatch({ type: 'acknowledgeChangelog' }), []);
@@ -3175,6 +3246,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyLokPetCardPack,
       togglePassiveCard,
       toggleBattleDeckCard,
+      consumeThrownCard,
+      buyCardSalvageProtocol,
       toggleSavedLokPet,
       restoreSavedLokPet,
       refreshPetElixirs,
@@ -3237,6 +3310,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMinimapPosition,
       setWorldInvertEnabled,
       setPaletteInvertEnabled,
+      setMirrorModeEnabled,
       toggleRunModifier,
       dismissNotifications,
       acknowledgeChangelog,
@@ -3280,6 +3354,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyLokPetCardPack,
     togglePassiveCard,
     toggleBattleDeckCard,
+    consumeThrownCard,
+    buyCardSalvageProtocol,
     toggleSavedLokPet,
     restoreSavedLokPet,
     refreshPetElixirs,
@@ -3341,6 +3417,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMinimapPosition,
     setWorldInvertEnabled,
     setPaletteInvertEnabled,
+    setMirrorModeEnabled,
     toggleRunModifier,
     dismissNotifications,
     acknowledgeChangelog,

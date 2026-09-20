@@ -78,6 +78,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setStudioPlugins,
     setWorldInvertEnabled,
     setPaletteInvertEnabled,
+    setMirrorModeEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,
     importMeta,
@@ -467,7 +468,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <div>
                     <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      A short pop-up scrap can trigger when you enter the LokPet Card Shop or head out on a run --
+                      A short pop-up scrap can trigger when you enter DigiScope or head out on a run --
                       throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
                       off to skip it entirely.
                     </p>
@@ -686,7 +687,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
           </div>
         </section>
 
-        {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
+        {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 || vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
           <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
@@ -697,7 +698,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-300">Quartermaster cheats</p>
                   <h2 className="mt-1 text-xl font-black uppercase text-white">Chaos toggles</h2>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Unlocked in the Field ops shop. Purely cosmetic, purely for chaos — flip either back off any time.
+                    Unlocked in the Field ops shop. Purely cosmetic, purely for chaos — flip any of these back off any time.
                   </p>
                 </div>
                 {vendorPurchaseCount(meta, 'invert-world') > 0 ? (
@@ -739,6 +740,27 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                       data-testid="button-toggle-palette-invert"
                     >
                       {meta.paletteInvertEnabled ? 'Inverted' : 'Off'}
+                    </button>
+                  </div>
+                ) : null}
+                {vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-white">Wrong Side of the Street</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Mirror the whole run left-to-right.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMirrorModeEnabled(!meta.mirrorModeEnabled)}
+                      aria-pressed={meta.mirrorModeEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.mirrorModeEnabled
+                          ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
+                          : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-mirror-mode"
+                    >
+                      {meta.mirrorModeEnabled ? 'Mirrored' : 'Off'}
                     </button>
                   </div>
                 ) : null}
