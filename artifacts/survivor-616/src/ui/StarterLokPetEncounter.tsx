@@ -1,56 +1,91 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, PackageOpen, Sparkles, Swords, Zap } from 'lucide-react';
+import { Heart, PackageOpen, Shield, Sparkles, Swords, Zap } from 'lucide-react';
 
+import { getEnemy } from '@/game/data/enemies';
 import { LOKPET_VARIANTS_BY_ID, STARTER_LOKPET_IDS, type StarterLokPetId } from '@/game/data/lokPets';
 import { useMeta } from '@/game/state/metaStore';
+import type { CharacterDef, EnemyDef } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
+import { RigPortrait } from '@/ui/RigPortrait';
 
 type Phase = 'fists' | 'rustle' | 'choose' | 'partner' | 'victory';
 
 const STARTER_DETAILS: Record<StarterLokPetId, { role: string; active: string; passive: string; evolution: string }> = {
   'lil-llama': {
     role: 'Crowd-control guardian',
-    active: 'Cutify charms nearby enemies. They trail your partner with hearts overhead and body-block their old crew.',
-    passive: 'Getaway blasts a crowded ring backward. More targets and stronger knockback unlock as Lil Llamà levels.',
+    active: 'Cutify charms nearby enemies into a heart-eyed escort that blocks its old crew.',
+    passive: 'Getaway blasts a crowded ring backward, scaling its reach and force as Lil Llamà grows.',
     evolution: 'Cria → Street Llama → Heartguard Llama',
   },
   'static-null': {
     role: 'Growing data predator',
-    active: 'Data Feast consumes hostile code in a damaging null burst. Its reach and appetite grow every level.',
-    passive: 'Quiet Tithe boosts the burst by borrowing a sliver of your energy—never enough to finish you.',
+    active: 'Data Feast consumes hostile code in a damaging null burst that expands every level.',
+    passive: 'Quiet Tithe strengthens the burst by borrowing a sliver of your energy, but can never finish you.',
     evolution: 'Data Mote → Null Familiar → Nomad-Eater Echo',
   },
   'lil-buzbee': {
     role: 'Loot scout and field medic',
-    active: 'Item Scout zips out to gather more nearby drops as it levels, then sweeps the whole local field at level 99.',
-    passive: 'Boost Pollen grants speed and 1.5× healing while inside; the effect lingers for 1.5 seconds after leaving.',
+    active: 'Item Scout gathers more nearby drops as it grows, then sweeps the local field at level 99.',
+    passive: 'Boost Pollen grants speed and 1.5× healing, lingering for 1.5 seconds after you leave it.',
     evolution: 'Runt Bee → Courier Bee → Royal Buzbèè',
   },
 };
 
+function FighterModel({ character, hits }: { character: CharacterDef; hits: number }) {
+  return (
+    <motion.div
+      key={hits}
+      initial={hits > 0 ? { x: 0 } : false}
+      animate={hits > 0 ? { x: [0, 18, 0], rotate: [0, 2, 0] } : { x: 0 }}
+      transition={{ duration: .28 }}
+      className="relative mx-auto grid h-28 w-28 place-items-end overflow-hidden border border-cyan-200/30 bg-[radial-gradient(circle_at_50%_64%,rgba(34,211,238,.2),transparent_58%)] shadow-[0_0_30px_rgba(34,211,238,.08)]"
+    >
+      <div className="absolute inset-x-4 bottom-2 h-px bg-cyan-100/30 shadow-[0_0_12px_rgba(103,232,249,.5)]" />
+      <RigPortrait rig={character.rig} palette={character.palette} anim="walk" size={104} />
+    </motion.div>
+  );
+}
+
+function EnemyModel({ enemy, hp }: { enemy: EnemyDef; hp: number }) {
+  return (
+    <motion.div
+      key={hp}
+      initial={hp < 100 ? { x: 0, filter: 'brightness(2)' } : false}
+      animate={hp < 100 ? { x: [0, 8, -5, 0], filter: ['brightness(2)', 'brightness(1)', 'brightness(1)'] } : { x: 0 }}
+      transition={{ duration: .34 }}
+      className={`relative mx-auto grid h-28 w-28 place-items-end overflow-hidden border bg-[radial-gradient(circle_at_50%_64%,rgba(248,113,113,.2),transparent_58%)] ${hp === 0 ? 'border-white/10 grayscale opacity-35' : 'border-red-300/35'}`}
+    >
+      <div className="absolute inset-x-4 bottom-2 h-px bg-red-200/30 shadow-[0_0_12px_rgba(248,113,113,.45)]" />
+      <RigPortrait rig={enemy.rig} palette={enemy.palette} anim={hp === 0 ? 'hurt' : 'walk'} size={104} animated={hp > 0} />
+    </motion.div>
+  );
+}
+
 export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () => void }) {
-  const { completeStarterLokPetOnboarding } = useMeta();
+  const { completeStarterLokPetOnboarding, selectedCharacter, unlockedCharacters } = useMeta();
+  const [starterCharacter] = useState<CharacterDef>(() => (
+    unlockedCharacters[Math.floor(Math.random() * unlockedCharacters.length)] ?? selectedCharacter
+  ));
+  const enemy = useMemo(() => getEnemy('nightcrawler'), []);
   const [phase, setPhase] = useState<Phase>('fists');
   const [enemyHp, setEnemyHp] = useState(100);
   const [inspected, setInspected] = useState<StarterLokPetId | null>(null);
   const [chosen, setChosen] = useState<StarterLokPetId | null>(null);
   const [hits, setHits] = useState(0);
-  const selected = inspected ? LOKPET_VARIANTS_BY_ID[inspected] : null;
   const chosenVariant = chosen ? LOKPET_VARIANTS_BY_ID[chosen] : null;
   const phaseCopy = useMemo(() => {
-    if (phase === 'fists') return 'No deck. No weapon. Just get through the block.';
+    if (phase === 'fists') return `${starterCharacter.name} drew the short route. No deck. No weapon. Get through the block.`;
     if (phase === 'rustle') return 'Something digital is moving in the brush.';
-    if (phase === 'choose') return inspected ? 'Signal identified. Choose carefully—this partner stays with you.' : 'Three unknown signals answer. Touch one to reveal it.';
-    if (phase === 'partner') return `${chosenVariant?.name ?? 'Your partner'} is with you. Finish the fight.`;
-    return 'First night survived. Your partner is coming home.';
-  }, [chosenVariant?.name, inspected, phase]);
+    if (phase === 'choose') return inspected ? 'Signal identified. This partner stays with you.' : 'Three unknown signals answer. Touch one to reveal it.';
+    if (phase === 'partner') return `${chosenVariant?.name ?? 'Your partner'} is with ${starterCharacter.name}. Finish the fight.`;
+    return `First night survived. ${starterCharacter.name} and your new partner are coming home.`;
+  }, [chosenVariant?.name, inspected, phase, starterCharacter.name]);
 
   const punch = () => {
     const nextHits = hits + 1;
-    const nextHp = Math.max(42, enemyHp - 19);
     setHits(nextHits);
-    setEnemyHp(nextHp);
+    setEnemyHp(Math.max(42, enemyHp - 19));
     if (nextHits >= 3) setPhase('rustle');
   };
 
@@ -58,128 +93,160 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
     const next = Math.max(0, enemyHp - 24);
     setEnemyHp(next);
     if (next === 0 && chosen) {
-      completeStarterLokPetOnboarding(chosen);
+      completeStarterLokPetOnboarding(chosen, starterCharacter.id);
       setPhase('victory');
     }
   };
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-black text-white" data-testid="starter-lokpet-encounter">
-      <div className="absolute inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: "url('/art/alley.jpeg')" }} aria-hidden="true" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_68%_52%,rgba(34,211,238,.16),transparent_22%),linear-gradient(to_bottom,rgba(0,0,0,.32),rgba(0,0,0,.92))]" aria-hidden="true" />
+      <div className="absolute inset-0 bg-cover bg-center opacity-40" style={{ backgroundImage: "url('/art/alley.jpeg')" }} aria-hidden="true" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(34,211,238,.12),transparent_34%),linear-gradient(to_bottom,rgba(0,0,0,.28),rgba(0,0,0,.94))]" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-0 opacity-[.07] [background-image:repeating-linear-gradient(0deg,transparent_0,transparent_3px,#fff_4px)]" aria-hidden="true" />
 
-      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-5xl flex-col px-4 py-5 sm:px-8 sm:py-8">
+      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-4xl flex-col px-4 py-5 sm:px-8 sm:py-8">
         <header className="flex items-start justify-between gap-4 border-b border-white/15 pb-4">
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[.32em] text-orange-300">First arrival · en route to the hideout</p>
             <h1 className="mt-2 text-2xl font-black uppercase tracking-tight sm:text-4xl">The Block Has Teeth</h1>
-            <p className="mt-2 max-w-xl text-sm text-white/60">{phaseCopy}</p>
+            <p className="mt-2 max-w-xl text-base leading-relaxed text-white/65">{phaseCopy}</p>
           </div>
-          <span className="border border-white/15 bg-black/50 px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-white/55">Unarmed</span>
+          <span className="max-w-28 border border-cyan-100/20 bg-black/60 px-3 py-2 text-right font-mono text-[10px] uppercase tracking-widest text-cyan-100/70">
+            Random starter<br /><strong className="text-white">{starterCharacter.name}</strong>
+          </span>
         </header>
 
-        <section className="relative my-5 min-h-[250px] flex-1 overflow-hidden border border-white/15 bg-black/45 p-4 sm:min-h-[330px] sm:p-7">
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(transparent,rgba(249,115,22,.08))]" />
-          <div className="relative flex h-full min-h-[220px] items-end justify-between gap-4">
-            <motion.div animate={{ x: phase === 'partner' ? [0, 7, 0] : 0 }} className="w-28 sm:w-40">
-              <div className="mx-auto grid h-20 w-16 place-items-center border-2 border-white/50 bg-zinc-900 text-3xl">✊</div>
-              <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-widest text-white/60">You · fists</p>
-            </motion.div>
+        <section className="relative my-5 min-h-[320px] overflow-hidden border border-white/15 bg-black/45 p-4 shadow-[inset_0_0_60px_rgba(0,0,0,.65)] sm:min-h-[390px] sm:p-7">
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(transparent,rgba(249,115,22,.09))]" />
+          <div className="absolute inset-x-8 bottom-16 h-px bg-gradient-to-r from-transparent via-orange-200/20 to-transparent" />
 
-            <AnimatePresence>
-              {(phase === 'rustle' || phase === 'choose') && (
-                <motion.button
-                  type="button"
-                  initial={{ opacity: 0, scale: .8 }}
-                  animate={{ opacity: 1, x: '-50%', scale: [1, 1.04, 1], rotate: [-1, 1, -1] }}
-                  exit={{ opacity: 0, scale: .8 }}
-                  transition={{ scale: { repeat: Infinity, duration: 1.4 }, rotate: { repeat: Infinity, duration: .35 } }}
-                  onClick={() => setPhase('choose')}
-                  className="absolute bottom-8 left-1/2 -translate-x-1/2 border border-cyan-300/60 bg-cyan-950/70 px-5 py-4 text-center shadow-[0_0_28px_rgba(34,211,238,.25)]"
-                  data-testid="button-investigate-bush"
-                >
-                  <Sparkles className="mx-auto h-6 w-6 text-cyan-200" />
-                  <span className="mt-2 block font-mono text-[9px] font-black uppercase tracking-[.22em] text-cyan-100">Digital rustle</span>
-                </motion.button>
-              )}
-            </AnimatePresence>
+          <div className="relative grid min-h-[285px] grid-cols-[1fr_.72fr_1fr] items-end gap-2 sm:min-h-[335px] sm:gap-6">
+            <div className="min-w-0 pb-2 text-center">
+              <FighterModel character={starterCharacter} hits={hits} />
+              <p className="mt-3 truncate text-sm font-black uppercase tracking-wide text-white">{starterCharacter.name}</p>
+              <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[.18em] text-cyan-100/65">Starter · fists</p>
+            </div>
 
-            {chosenVariant && phase !== 'victory' && (
-              <motion.div initial={{ opacity: 0, y: 28, scale: .7 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="absolute bottom-6 left-[34%]">
-                <LokPetIcon silhouette={chosenVariant.silhouette} palette={chosenVariant.palette} size={72} className="bg-black/65" />
-                <p className="mt-2 text-center font-mono text-[9px] font-black uppercase text-cyan-200">Partner</p>
-              </motion.div>
-            )}
+            <div className="relative flex min-h-40 items-end justify-center pb-8">
+              <AnimatePresence mode="wait">
+                {(phase === 'rustle' || phase === 'choose') && !chosenVariant ? (
+                  <motion.button
+                    key="rustle"
+                    type="button"
+                    initial={{ opacity: 0, scale: .75 }}
+                    animate={{ opacity: 1, scale: [1, 1.05, 1], rotate: [-1, 1, -1] }}
+                    exit={{ opacity: 0, scale: .75 }}
+                    transition={{ scale: { repeat: Infinity, duration: 1.4 }, rotate: { repeat: Infinity, duration: .35 } }}
+                    onClick={() => setPhase('choose')}
+                    className="absolute bottom-10 left-1/2 w-24 -translate-x-1/2 border border-cyan-300/60 bg-cyan-950/80 px-2 py-4 text-center shadow-[0_0_32px_rgba(34,211,238,.32)]"
+                    data-testid="button-investigate-bush"
+                  >
+                    <Sparkles className="mx-auto h-6 w-6 text-cyan-100" />
+                    <span className="mt-2 block font-mono text-[9px] font-black uppercase tracking-[.18em] text-cyan-50">Digital rustle</span>
+                  </motion.button>
+                ) : chosenVariant ? (
+                  <motion.div key="partner" initial={{ opacity: 0, y: 24, scale: .7 }} animate={{ opacity: 1, y: [0, -5, 0], scale: 1 }} transition={{ y: { repeat: Infinity, duration: 1.8 } }} className="text-center">
+                    <div className="rounded-full bg-cyan-300/5 p-1 shadow-[0_0_35px_rgba(34,211,238,.22)]">
+                      <LokPetIcon silhouette={chosenVariant.silhouette} palette={chosenVariant.palette} size={76} className="bg-black/55" />
+                    </div>
+                    <p className="mt-2 font-mono text-[9px] font-black uppercase tracking-wider text-cyan-100">Partner</p>
+                  </motion.div>
+                ) : (
+                  <motion.div key="empty" className="mb-10 h-px w-12 bg-white/10" />
+                )}
+              </AnimatePresence>
+            </div>
 
-            <motion.div animate={phase === 'partner' ? { x: [0, 12, -7, 0] } : { x: 0 }} className="w-32 sm:w-44">
-              <div className="mx-auto grid h-24 w-20 place-items-center border-2 border-red-400/60 bg-red-950/70 text-4xl">☠</div>
-              <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-widest text-red-200">Block scavenger</p>
-              <div className="mt-2 h-2 overflow-hidden bg-white/10"><motion.div className="h-full bg-red-400" animate={{ width: `${enemyHp}%` }} /></div>
-            </motion.div>
+            <div className="min-w-0 pb-2 text-center">
+              <EnemyModel enemy={enemy} hp={enemyHp} />
+              <p className="mt-3 truncate text-sm font-black uppercase tracking-wide text-red-100">Block Scavenger</p>
+              <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[.18em] text-red-200/60">{enemy.name} · street threat</p>
+              <div className="mx-auto mt-2 h-2 max-w-36 overflow-hidden border border-white/5 bg-white/10"><motion.div className="h-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,.55)]" animate={{ width: `${enemyHp}%` }} /></div>
+            </div>
           </div>
         </section>
 
         {phase === 'fists' && (
-          <button type="button" onClick={punch} className="mx-auto flex min-h-14 w-full max-w-sm items-center justify-center gap-3 bg-orange-400 px-6 py-4 text-sm font-black uppercase tracking-[.18em] text-black active:scale-[.98]" data-testid="button-starter-punch">
-            <Swords className="h-5 w-5" /> Throw a punch
+          <button type="button" onClick={punch} className="mx-auto flex min-h-16 w-full max-w-md items-center justify-center gap-3 bg-orange-400 px-6 py-4 text-sm font-black uppercase tracking-[.18em] text-black shadow-[0_12px_45px_rgba(249,115,22,.16)] active:scale-[.98]" data-testid="button-starter-punch">
+            <Swords className="h-5 w-5" /> {starterCharacter.name}: throw a punch
           </button>
         )}
 
-        {phase === 'rustle' && <p className="text-center font-mono text-xs uppercase tracking-[.25em] text-cyan-200">Tap the signal in the brush</p>}
+        {phase === 'rustle' && <p className="text-center font-mono text-xs uppercase tracking-[.25em] text-cyan-100">Tap the movement in the brush</p>}
 
         {phase === 'choose' && (
-          <div className="fixed inset-0 z-30 overflow-y-auto bg-black/90 p-4 backdrop-blur-md sm:p-8">
-            <div className="mx-auto max-w-5xl">
-              <p className="text-center font-mono text-[10px] font-black uppercase tracking-[.32em] text-cyan-200">Choose your first LokPet</p>
+          <div className="fixed inset-0 z-30 overflow-y-auto bg-black/94 p-4 backdrop-blur-md sm:p-8">
+            <div className="mx-auto max-w-4xl pb-8">
+              <p className="text-center font-mono text-[11px] font-black uppercase tracking-[.32em] text-cyan-100">Choose your first LokPet</p>
               <h2 className="mt-2 text-center text-3xl font-black uppercase">Three signals. One partner.</h2>
-              <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <p className="mx-auto mt-2 max-w-xl text-center text-sm text-white/55">Reveal each silhouette. Its field role, abilities, and growth path stay beside it while you decide.</p>
+
+              <div className="mt-6 grid gap-3">
                 {STARTER_LOKPET_IDS.map((id, index) => {
                   const variant = LOKPET_VARIANTS_BY_ID[id];
                   const open = inspected === id;
+                  const details = STARTER_DETAILS[id];
                   return (
-                    <motion.button key={id} type="button" onClick={() => setInspected(id)} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: [0, -4, 0] }} transition={{ delay: index * .1, y: { repeat: Infinity, duration: 2 + index * .25 } }} className={`min-h-72 border p-5 text-left transition ${open ? 'border-cyan-200 bg-cyan-400/10' : 'border-white/15 bg-white/[.035]'}`} data-testid={`button-starter-${id}`}>
-                      <div className={`mx-auto w-fit transition duration-500 ${open ? '' : 'brightness-0 opacity-55'}`}>
-                        <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} size={88} className="bg-black/60" />
-                      </div>
-                      <p className="mt-5 font-mono text-[9px] uppercase tracking-[.25em] text-white/45">Signal 0{index + 1}</p>
-                      <h3 className="mt-1 text-xl font-black uppercase">{open ? variant.name : 'Unknown LokPet'}</h3>
-                      <p className="mt-2 text-xs leading-relaxed text-white/55">{open ? STARTER_DETAILS[id].role : 'Animated silhouette · identity encrypted'}</p>
-                    </motion.button>
+                    <motion.article key={id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .08 }} className={`relative overflow-hidden border transition ${open ? 'border-cyan-200/70 bg-cyan-950/35 shadow-[0_0_38px_rgba(34,211,238,.1)]' : 'border-white/15 bg-white/[.035]'}`}>
+                      <button type="button" onClick={() => setInspected(id)} className="grid w-full grid-cols-[6.5rem_1fr] items-center gap-4 p-4 text-left sm:grid-cols-[8rem_1fr] sm:p-5" aria-pressed={open} data-testid={`button-starter-${id}`}>
+                        <div className={`relative mx-auto w-fit transition duration-500 ${open ? '' : 'brightness-0 opacity-50'}`}>
+                          <div className={`absolute inset-1 rounded-full blur-xl ${open ? 'bg-cyan-300/20' : 'bg-white/5'}`} />
+                          <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} size={open ? 104 : 88} className="relative bg-black/50" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-mono text-[10px] uppercase tracking-[.25em] text-white/45">Signal 0{index + 1} · {open ? variant.family : 'encrypted'}</p>
+                          <h3 className="mt-1 text-xl font-black uppercase sm:text-2xl">{open ? variant.name : 'Unknown LokPet'}</h3>
+                          <p className="mt-2 text-sm font-bold uppercase tracking-wide text-cyan-100/75">{open ? details.role : 'Moving silhouette · touch to identify'}</p>
+                          {open ? <p className="mt-2 text-sm leading-relaxed text-white/60">{variant.description}</p> : null}
+                        </div>
+                      </button>
+
+                      <AnimatePresence initial={false}>
+                        {open ? (
+                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                            <div className="grid gap-3 border-t border-cyan-100/15 p-4 sm:grid-cols-2 sm:p-5">
+                              <div className="border border-pink-300/15 bg-black/35 p-3">
+                                <p className="font-mono text-[10px] font-black uppercase tracking-widest text-pink-200"><Heart className="mr-2 inline h-4 w-4" />Active</p>
+                                <p className="mt-2 text-sm leading-relaxed text-white/72">{details.active}</p>
+                              </div>
+                              <div className="border border-amber-300/15 bg-black/35 p-3">
+                                <p className="font-mono text-[10px] font-black uppercase tracking-widest text-amber-200"><Zap className="mr-2 inline h-4 w-4" />Passive</p>
+                                <p className="mt-2 text-sm leading-relaxed text-white/72">{details.passive}</p>
+                              </div>
+                              <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-black/35 p-3">
+                                <p className="font-mono text-[10px] uppercase tracking-wider text-cyan-100"><Shield className="mr-2 inline h-4 w-4" />3 forms · level 99 max · {details.evolution}</p>
+                                <button type="button" onClick={() => { setChosen(id); setPhase('partner'); }} className="min-h-12 bg-cyan-100 px-5 py-3 text-xs font-black uppercase tracking-[.18em] text-slate-950 active:scale-[.98]" data-testid="button-confirm-starter">Choose {variant.name}</button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                    </motion.article>
                   );
                 })}
               </div>
-
-              {selected && inspected && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 border border-cyan-300/30 bg-cyan-950/25 p-5">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <p className="text-sm leading-relaxed text-white/75"><Heart className="mr-2 inline h-4 w-4 text-pink-300" />{STARTER_DETAILS[inspected].active}</p>
-                    <p className="text-sm leading-relaxed text-white/75"><Zap className="mr-2 inline h-4 w-4 text-amber-300" />{STARTER_DETAILS[inspected].passive}</p>
-                  </div>
-                  <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-cyan-200">3 forms · level 99 max · {STARTER_DETAILS[inspected].evolution}</p>
-                  <button type="button" onClick={() => { setChosen(inspected); setPhase('partner'); }} className="mt-5 w-full bg-cyan-200 px-5 py-4 text-xs font-black uppercase tracking-[.2em] text-slate-950 active:scale-[.99]" data-testid="button-confirm-starter">Choose {selected.name}</button>
-                </motion.div>
-              )}
             </div>
           </div>
         )}
 
         {phase === 'partner' && (
-          <button type="button" onClick={partnerStrike} className="mx-auto flex min-h-14 w-full max-w-sm items-center justify-center gap-3 bg-cyan-200 px-6 py-4 text-sm font-black uppercase tracking-[.16em] text-slate-950 active:scale-[.98]" data-testid="button-partner-strike">
+          <button type="button" onClick={partnerStrike} className="mx-auto flex min-h-16 w-full max-w-md items-center justify-center gap-3 bg-cyan-100 px-6 py-4 text-sm font-black uppercase tracking-[.16em] text-slate-950 shadow-[0_12px_45px_rgba(34,211,238,.14)] active:scale-[.98]" data-testid="button-partner-strike">
             <Zap className="h-5 w-5" /> Fight together
           </button>
         )}
 
         {phase === 'victory' && (
-          <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="border border-emerald-300/40 bg-emerald-950/30 p-5 text-center" data-testid="starter-rewards">
+          <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="border border-emerald-300/40 bg-emerald-950/30 p-5 text-center shadow-[0_0_50px_rgba(16,185,129,.08)]" data-testid="starter-rewards">
             <p className="font-mono text-[10px] font-black uppercase tracking-[.28em] text-emerald-200">Partner bonded · rewards secured</p>
-            <h2 className="mt-2 text-2xl font-black uppercase">Welcome to the hideout, {chosenVariant?.name}</h2>
-            <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs font-bold uppercase tracking-wide">
+            <h2 className="mt-2 text-2xl font-black uppercase">{starterCharacter.name} + {chosenVariant?.name}</h2>
+            <p className="mt-1 text-sm text-white/55">Your first field team is ready for the hideout.</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold uppercase tracking-wide sm:flex sm:flex-wrap sm:justify-center">
               <span className="border border-white/15 px-3 py-2">First companion card</span>
               <span className="border border-white/15 px-3 py-2">2 free LokPacks</span>
               <span className="border border-white/15 px-3 py-2">40 Card Credits</span>
               <span className="border border-white/15 px-3 py-2">Hourly full refresh</span>
             </div>
-            <button type="button" onClick={onEnterHideout} className="mt-5 inline-flex items-center gap-2 bg-orange-400 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-enter-hideout-after-starter"><PackageOpen className="h-5 w-5" /> Enter hideout & open packs</button>
+            <button type="button" onClick={onEnterHideout} className="mt-5 inline-flex min-h-14 items-center gap-2 bg-orange-400 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-enter-hideout-after-starter"><PackageOpen className="h-5 w-5" /> Enter hideout & open packs</button>
           </motion.section>
         )}
       </div>

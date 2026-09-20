@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Oxanium:wght@700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -667,13 +667,16 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .intro-title__word {
   position: relative;
   z-index: 2;
-  /* Keep the newer build's bulky digital face inside the classic stacked
-     lockup. Space Mono is bundled above, so this stays consistent on iOS. */
-  font-family: var(--app-font-sans);
-  font-weight: 950;
+  /* Oxanium keeps the remembered broad digital build without falling back to
+     Arial on iOS. The brief phase-slip below is intentionally restrained. */
+  font-family: 'Oxanium', 'Space Mono', monospace;
+  font-weight: 800;
+  font-style: normal;
   text-transform: uppercase;
-  text-shadow: var(--intro-title-shadow);
-  letter-spacing: -.052em;
+  text-shadow: var(--intro-title-shadow), .018em 0 rgba(54, 244, 255, .28), -.012em 0 rgba(255, 61, 175, .18);
+  filter: contrast(1.08) blur(.12px);
+  letter-spacing: -.045em;
+  animation: intro-title-phase 7.4s steps(1, end) infinite;
 }
 .intro-title__number { font-size: clamp(4.2rem, 18vw, 6.2rem); }
 .intro-title__word { margin-top: .42rem; font-size: clamp(4rem, 16.5vw, 6.7rem); }
@@ -734,8 +737,14 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 @keyframes intro-blackout { 0%, 91%, 94%, 100% { opacity: 1; } 92%, 93% { opacity: .25; } }
 @keyframes intro-chromatic { 0%,100% { text-shadow: var(--intro-title-shadow); } 50% { text-shadow: .22rem 0 #ff3daf, -.22rem 0 #36f4ff; } }
 @keyframes intro-static { 0%,100% { opacity: 1; filter: none; } 52% { opacity: .82; filter: contrast(1.25); } }
+@keyframes intro-title-phase {
+  0%, 92%, 95%, 100% { text-shadow: var(--intro-title-shadow), .018em 0 rgba(54, 244, 255, .28), -.012em 0 rgba(255, 61, 175, .18); filter: contrast(1.08) blur(.12px); }
+  93% { text-shadow: var(--intro-title-shadow), .07em 0 rgba(54, 244, 255, .55), -.045em 0 rgba(255, 61, 175, .38); filter: contrast(1.14) blur(.28px); }
+  94% { text-shadow: var(--intro-title-shadow), -.035em 0 rgba(54, 244, 255, .42), .055em 0 rgba(255, 61, 175, .3); filter: contrast(1.1) blur(.16px); }
+}
 
 @media (prefers-reduced-motion: reduce) {
+  .intro-title__number, .intro-title__word { animation: none !important; }
   .hideout-ambient *, .hideout-ambient { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
   .music-reactive-root::before { opacity: 0 !important; }
   .intro-screen *, .intro-screen { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
