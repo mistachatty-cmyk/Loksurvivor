@@ -9,6 +9,8 @@ import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
 import { pickSplashText } from '@/game/data/splashText';
 import { IntroTitle } from '@/ui/IntroTitle';
+import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset } from '@/ui/introPhysics';
+import { introPhysicsForTheme, resolveIntroEvent } from '@/ui/introPresentation';
 
 // Pulls in the full simulation engine (createWorld/stepWorld/renderWorld),
 // which is otherwise only paid for once a real run starts. Lazy-loading it
@@ -41,6 +43,8 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   // Picked once per mount, not per render -- a fresh one shows up whenever
   // the title screen loads, Minecraft-main-menu-splash style.
   const splashText = useMemo(() => pickSplashText(), []);
+  const introEvent = useMemo(() => resolveIntroEvent(), []);
+  const physicsProfile = useMemo(() => introPhysicsForTheme(meta.uiTheme, introEvent), [introEvent, meta.uiTheme]);
 
   const [showAltLocationTag, setShowAltLocationTag] = useState(false);
   useEffect(() => {
@@ -56,13 +60,16 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   }, []);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center p-8 text-center bg-black text-white relative overflow-hidden">
+    <div
+      className="intro-screen min-h-[100dvh] flex flex-col items-center justify-center p-6 sm:p-8 text-center bg-black text-white relative overflow-hidden"
+      data-intro-event={introEvent}
+    >
       {/* A bot-piloted run of the real game plays behind the copy below --
           random character, random area, rotating scenes. See AttractMode.tsx. */}
       <Suspense fallback={null}>
         <AttractMode />
       </Suspense>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_0%,transparent_70%)] pointer-events-none" />
+      <div className="intro-screen__atmosphere absolute inset-0 pointer-events-none" />
 
       {showSignIn ? (
         <motion.button
@@ -78,64 +85,74 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         </motion.button>
       ) : null}
       
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.2, ease: "easeOut" }}
-        className="relative z-10 flex flex-col items-center max-w-lg w-full"
+      <IntroPhysicsProvider
+        enabled={meta.introTitlePhysicsEnabled}
+        returnDelaySec={meta.introTitleReturnDelaySec}
+        profile={physicsProfile}
       >
-        <AnimatePresence mode="wait">
-          <motion.p
-            key={showAltLocationTag ? 'alt' : 'main'}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-primary text-xs uppercase tracking-[0.4em] font-bold mb-6"
-            data-testid="text-intro-location-tag"
-          >
-            {showAltLocationTag ? LOCATION_TAG_ALT : LOCATION_TAG_MAIN}
-          </motion.p>
-        </AnimatePresence>
-
-        <IntroTitle
-          signatureLayout={meta.oneLineTitleEnabled}
-          physicsEnabled={meta.introTitlePhysicsEnabled}
-        />
-        {meta.splashTextEnabled ? (
-          <p
-            className={`pointer-events-none -mt-3 mb-8 max-w-[80%] font-mono text-[10px] font-black italic leading-tight sm:text-xs ${
-              meta.oneLineTitleEnabled ? 'text-center' : 'self-end text-right rotate-[-4deg]'
-            }`}
-            style={{ color: '#67e8f9', textShadow: '0 0 8px rgba(103,232,249,0.8)' }}
-            data-testid="text-intro-splash"
-          >
-            {splashText}
-          </p>
-        ) : null}
-
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={onBegin}
-          className="group relative w-full sm:w-auto px-10 py-5 bg-primary text-primary-foreground uppercase tracking-widest font-black text-sm overflow-hidden"
-          data-testid="button-begin"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.2, ease: 'easeOut' }}
+          className="intro-screen__content relative z-10 flex w-full max-w-xl flex-col items-center"
         >
-          <div className="absolute inset-0 bg-white translate-y-[100%] group-hover:translate-y-[0%] transition-transform duration-300 ease-out" />
-          <span className="relative z-10 group-hover:text-black transition-colors duration-300">Enter the hideout</span>
-        </motion.button>
+          <IntroPhysicsBody id="location" order={0} className="mb-6">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={showAltLocationTag ? 'alt' : 'main'}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.8 }}
+                className="intro-location text-primary text-xs uppercase tracking-[0.4em] font-bold"
+                data-testid="text-intro-location-tag"
+              >
+                {showAltLocationTag ? LOCATION_TAG_ALT : LOCATION_TAG_MAIN}
+              </motion.p>
+            </AnimatePresence>
+          </IntroPhysicsBody>
 
-        <a
-          href="https://gsix.online"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-8 text-[10px] uppercase tracking-widest text-white/35 transition-colors hover:text-white/65"
-          data-testid="link-intro-credit"
-        >
-          Powered by LokServices · Designed by GSixDesigns
-        </a>
-      </motion.div>
+          <IntroTitle oneLine={meta.oneLineTitleEnabled} />
+
+          {meta.splashTextEnabled ? (
+            <IntroPhysicsBody
+              id="splash"
+              order={3}
+              className={`intro-splash ${meta.oneLineTitleEnabled ? 'intro-splash--centered' : ''}`}
+              testId="text-intro-splash"
+            >
+              {splashText}
+            </IntroPhysicsBody>
+          ) : null}
+
+          <IntroPhysicsBody id="premise" order={4} className="intro-premise" testId="text-intro-premise">
+            The block turned after dark. You have a basement bar, a crew worth saving, and one night at a time.
+          </IntroPhysicsBody>
+
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onBegin}
+            className="intro-enter group relative w-full overflow-hidden bg-primary px-10 py-5 text-sm font-black uppercase tracking-widest text-primary-foreground sm:w-auto"
+            data-testid="button-begin"
+          >
+            <div className="absolute inset-0 translate-y-[100%] bg-white transition-transform duration-300 ease-out group-hover:translate-y-[0%]" />
+            <span className="relative z-10 transition-colors duration-300 group-hover:text-black">Enter the hideout</span>
+          </motion.button>
+
+          <a
+            href="https://gsix.online"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-8 text-[10px] uppercase tracking-widest text-white/35 transition-colors hover:text-white/65"
+            data-testid="link-intro-credit"
+          >
+            Powered by LokServices · Designed by GSixDesigns
+          </a>
+        </motion.div>
+        <IntroPhysicsReset />
+      </IntroPhysicsProvider>
     </div>
   );
 }

@@ -235,6 +235,11 @@ function clampGyroSensitivity(value: unknown): number {
   return Math.max(0.5, Math.min(2, numeric));
 }
 
+function clampIntroReturnDelay(value: unknown): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 4;
+  return Math.max(1, Math.min(12, Math.round(numeric)));
+}
+
 export function createInitialMeta(): MetaState {
   return {
     version: META_VERSION,
@@ -261,6 +266,7 @@ export function createInitialMeta(): MetaState {
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
     introTitlePhysicsEnabled: true,
+    introTitleReturnDelaySec: 4,
     travelEncountersEnabled: true,
     paletteAnimationsEnabled: true,
     worldPaletteBlendEnabled: true,
@@ -996,6 +1002,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
     introTitlePhysicsEnabled: parsed.introTitlePhysicsEnabled !== false,
+    introTitleReturnDelaySec: clampIntroReturnDelay(parsed.introTitleReturnDelaySec),
     travelEncountersEnabled: parsed.travelEncountersEnabled !== false,
     paletteAnimationsEnabled: parsed.paletteAnimationsEnabled !== false,
     worldPaletteBlendEnabled: parsed.worldPaletteBlendEnabled !== false,
@@ -1586,6 +1593,7 @@ type Action =
   | { type: 'setSplashTextEnabled'; enabled: boolean }
   | { type: 'setOneLineTitleEnabled'; enabled: boolean }
   | { type: 'setIntroTitlePhysicsEnabled'; enabled: boolean }
+  | { type: 'setIntroTitleReturnDelay'; seconds: number }
   | { type: 'setTravelEncountersEnabled'; enabled: boolean }
   | { type: 'setPaletteAnimations'; enabled: boolean }
   | { type: 'setWorldPaletteBlend'; enabled: boolean }
@@ -2331,6 +2339,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setIntroTitlePhysicsEnabled':
       return { ...state, meta: { ...state.meta, introTitlePhysicsEnabled: action.enabled } };
 
+    case 'setIntroTitleReturnDelay':
+      return { ...state, meta: { ...state.meta, introTitleReturnDelaySec: clampIntroReturnDelay(action.seconds) } };
+
     case 'setTravelEncountersEnabled':
       return { ...state, meta: { ...state.meta, travelEncountersEnabled: action.enabled } };
 
@@ -2862,6 +2873,7 @@ export interface MetaContextValue {
   setSplashTextEnabled: (enabled: boolean) => void;
   setOneLineTitleEnabled: (enabled: boolean) => void;
   setIntroTitlePhysicsEnabled: (enabled: boolean) => void;
+  setIntroTitleReturnDelay: (seconds: number) => void;
   setTravelEncountersEnabled: (enabled: boolean) => void;
   setPaletteAnimations: (enabled: boolean) => void;
   setWorldPaletteBlend: (enabled: boolean) => void;
@@ -3018,6 +3030,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setIntroTitlePhysicsEnabled = useCallback(
     (enabled: boolean) => dispatch({ type: 'setIntroTitlePhysicsEnabled', enabled }),
+    [],
+  );
+  const setIntroTitleReturnDelay = useCallback(
+    (seconds: number) => dispatch({ type: 'setIntroTitleReturnDelay', seconds }),
     [],
   );
   const setTravelEncountersEnabled = useCallback(
@@ -3200,6 +3216,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setSplashTextEnabled,
       setOneLineTitleEnabled,
       setIntroTitlePhysicsEnabled,
+      setIntroTitleReturnDelay,
       setTravelEncountersEnabled,
       setPaletteAnimations,
       setWorldPaletteBlend,
@@ -3304,6 +3321,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setSplashTextEnabled,
     setOneLineTitleEnabled,
     setIntroTitlePhysicsEnabled,
+    setIntroTitleReturnDelay,
     setTravelEncountersEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,

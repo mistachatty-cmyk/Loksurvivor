@@ -70,6 +70,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setSplashTextEnabled,
     setOneLineTitleEnabled,
     setIntroTitlePhysicsEnabled,
+    setIntroTitleReturnDelay,
     setTravelEncountersEnabled,
     setGyroEnabled,
     setGyroSensitivity,
@@ -399,11 +400,9 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Signature title layout</h3>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Alternate title layout</h3>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Keeps the official Survivor616 name, while giving its “616” half a compact badge beside
-                      Survivor instead of rendering the whole word as one cramped line. Turn it off for the
-                      original stacked lockup.
+                      Keeps the official Survivor616 name on one line. Leave this off for the original 616-over-Survivor lockup.
                     </p>
                   </div>
                   <button
@@ -424,10 +423,9 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Movable intro title</h3>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Intro physics</h3>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Touch or drag the two pieces of Survivor616 apart on the opening screen. Each carries gentle
-                      release momentum, and a low-key reset appears after you move it. On by default.
+                      Touch, grow, pull, and throw the nonessential intro copy. Pieces bounce off the screen and each other before returning home.
                     </p>
                   </div>
                   <button
@@ -444,6 +442,25 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     {meta.introTitlePhysicsEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
+                {meta.introTitlePhysicsEnabled ? (
+                  <label className="mt-4 block border-t border-border/60 pt-4" htmlFor="intro-return-delay">
+                    <span className="flex items-center justify-between gap-4 font-mono text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Magnetic return delay
+                      <output className="text-primary">{meta.introTitleReturnDelaySec}s</output>
+                    </span>
+                    <input
+                      id="intro-return-delay"
+                      type="range"
+                      min="1"
+                      max="12"
+                      step="1"
+                      value={meta.introTitleReturnDelaySec}
+                      onChange={(event) => setIntroTitleReturnDelay(Number(event.currentTarget.value))}
+                      className="mt-3 w-full accent-primary"
+                      data-testid="input-intro-return-delay"
+                    />
+                  </label>
+                ) : null}
               </div>
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

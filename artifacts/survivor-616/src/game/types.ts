@@ -1883,6 +1883,8 @@ export interface MetaState {
   oneLineTitleEnabled: boolean;
   /** Lets the two title pieces be dragged with a gentle release momentum on the opening screen. On by default. */
   introTitlePhysicsEnabled: boolean;
+  /** Seconds of inactivity before the intro pieces magnetically return home. */
+  introTitleReturnDelaySec: number;
   /** Popup travel-encounter minigame on select hideout/run-launch triggers. On by default. See game/travelEncounter.ts. */
   travelEncountersEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
