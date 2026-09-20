@@ -15,7 +15,8 @@ export function LokPetIcon({
 }) {
   return (
     <div
-      className={`shrink-0 border ${className}`}
+      className={`relative shrink-0 overflow-hidden border ${className}`}
+      data-lokpet-icon
       style={{
         width: size,
         height: size,

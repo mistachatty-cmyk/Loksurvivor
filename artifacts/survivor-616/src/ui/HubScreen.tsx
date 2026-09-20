@@ -39,6 +39,8 @@ export interface HubScreenProps {
   onOpenLokPetBattle?: () => void;
   /** Opens the LokSurvivorArena seat/area picker. */
   onOpenArena: () => void;
+  /** Reopens the companion and visual setup screen without starting a run. */
+  onOpenRunSetup: () => void;
   /** Returns to the cold-open title screen. */
   onBack?: () => void;
 }
@@ -97,7 +99,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onBack }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
@@ -169,6 +171,16 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
+      <button
+        type="button"
+        onClick={onOpenRunSetup}
+        className="fixed right-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
+        data-testid="button-open-run-setup"
+        title="Change LokPets and looks anytime"
+      >
+        <Sparkles className="h-4 w-4 text-cyan-200" />
+        <span>Looks &amp; LokPets</span>
+      </button>
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}

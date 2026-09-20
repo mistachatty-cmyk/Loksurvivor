@@ -45,6 +45,34 @@
   --radius-xl: 0px;
 }
 
+/* Player-selected chrome. The default stays sharply pixel-like; the other
+   two shapes only restyle existing UI edges and never alter layout or input. */
+[data-ui-border-style='soft'] :where(.border) { border-radius: .55rem; }
+[data-ui-border-style='round'] :where(.border) { border-radius: 999px; }
+[data-ui-border-style='round'] :where(textarea.border) { border-radius: 1rem; }
+
+/* LokPet presentation is deliberately UI-only. The combat sprite rig remains
+   mechanically stable while the collection, setup, and card portraits can be
+   given a different collectible finish. */
+[data-lokpet-art-style='neon-signal'] [data-lokpet-icon] {
+  border-color: #67e8f9 !important;
+  box-shadow: 0 0 0 1px rgba(34,211,238,.32), 0 0 18px rgba(34,211,238,.72), inset 0 0 18px rgba(167,139,250,.2) !important;
+  filter: saturate(1.32) contrast(1.12);
+}
+[data-lokpet-art-style='neon-signal'] [data-lokpet-icon]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(103,232,249,.12) 3px 4px);
+}
+[data-lokpet-art-style='holo-card'] [data-lokpet-icon] {
+  clip-path: polygon(10% 0, 90% 0, 100% 12%, 100% 88%, 90% 100%, 10% 100%, 0 88%, 0 12%);
+  border-color: #f0abfc !important;
+  box-shadow: 0 0 0 1px rgba(240,171,252,.48), 0 0 18px rgba(192,132,252,.45) !important;
+  filter: saturate(1.18) brightness(1.08);
+}
+
 /* During combat the persistent soundtrack becomes a tiny edge transport so it
    cannot reserve a second top row or overlap the run timer. */
 body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] {

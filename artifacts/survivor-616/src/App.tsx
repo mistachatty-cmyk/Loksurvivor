@@ -56,6 +56,7 @@ import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { TravelEncounterOverlay } from '@/ui/TravelEncounterOverlay';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
+import { RunSetupScreen } from '@/ui/RunSetupScreen';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
 import { RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { customMapToArea } from '@/game/data/customMaps';
@@ -93,6 +94,7 @@ type Screen =
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
   | { name: 'arena-setup' }
   | { name: 'arena'; area: AreaDef; seats: ArenaSeat[] }
+  | { name: 'run-setup'; areaId?: string; challengeIds?: string[]; episodeId?: string; missionId?: string; destination: 'run' | 'hub' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
 
@@ -155,6 +157,10 @@ function Game() {
     enterHideout();
     setScreen({ name: 'hub' });
   }, [enterHideout, sfx]);
+
+  const prepareRun = useCallback((run: Omit<Extract<Screen, { name: 'run' }>, 'name'>) => {
+    setScreen({ name: 'run-setup', ...run, destination: 'run' });
+  }, []);
 
   const openPanel = useCallback((panel: HubPanel) => {
     sfx.play('uiNav');
@@ -324,6 +330,7 @@ function Game() {
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
           onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
           onOpenArena={() => setScreen({ name: 'arena-setup' })}
+          onOpenRunSetup={() => setScreen({ name: 'run-setup', destination: 'hub' })}
           onBack={() => setScreen({ name: 'intro' })}
         />
       );
@@ -346,19 +353,19 @@ function Game() {
       return (
         <SectorCommandScreen
           onBack={goHub}
-          onLaunch={(missionId) => setScreen({ name: 'run', areaId: missionId, missionId })}
+          onLaunch={(missionId) => prepareRun({ areaId: missionId, missionId })}
         />
       );
 
     case 'map-editor':
-      return <MapBuilder onBack={goHub} onLaunch={(mapId) => setScreen({ name: 'run', areaId: mapId })} />;
+      return <MapBuilder onBack={goHub} onLaunch={(mapId) => prepareRun({ areaId: mapId })} />;
 
     case 'roster':
       return (
         <CharacterSelect
           onBack={goHub}
           onConfirm={() => setScreen({ name: 'areas' })}
-          onLaunchEpisode={(episodeId, areaId) => setScreen({ name: 'run', areaId, episodeId })}
+          onLaunchEpisode={(episodeId, areaId) => prepareRun({ areaId, episodeId })}
         />
       );
 
@@ -367,8 +374,23 @@ function Game() {
         <AreaSelect
           onBack={goHub}
           onLaunch={(areaId, challengeIds) =>
-            attemptTravelEncounter('run-launch', undefined, () => setScreen({ name: 'run', areaId, challengeIds }))
+            attemptTravelEncounter('run-launch', undefined, () => prepareRun({ areaId, challengeIds }))
           }
+        />
+      );
+
+    case 'run-setup':
+      return (
+        <RunSetupScreen
+          intent={screen.destination === 'run' ? 'launch' : 'manage'}
+          onBack={goHub}
+          onComplete={() => {
+            if (screen.destination === 'hub' || !screen.areaId) {
+              goHub();
+              return;
+            }
+            setScreen({ name: 'run', areaId: screen.areaId, challengeIds: screen.challengeIds, episodeId: screen.episodeId, missionId: screen.missionId });
+          }}
         />
       );
 
@@ -422,7 +444,7 @@ function Game() {
       {
         const customMap = meta.customMaps.find((map) => map.id === screen.areaId);
         if (screen.areaId.startsWith('custom-') && !customMap) {
-          return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => setScreen({ name: 'run', areaId, challengeIds })} />;
+          return <AreaSelect onBack={goHub} onLaunch={(areaId, challengeIds) => prepareRun({ areaId, challengeIds })} />;
         }
         return (
           <Suspense fallback={<div className="grid min-h-dvh place-items-center bg-black font-mono text-xs uppercase tracking-[0.25em] text-blue-200">Loading block…</div>}>
@@ -457,8 +479,7 @@ function Game() {
           onOpenAccount={() => setScreen({ name: 'account' })}
           onRetry={() =>
             canRetry
-              ? setScreen({
-                  name: 'run',
+              ? prepareRun({
                   areaId: screen.result.areaId,
                   episodeId: screen.result.episode?.id,
                   challengeIds: screen.result.challenges?.map((challenge) => challenge.id),
@@ -516,7 +537,13 @@ function Providers({ children }: { children: ReactNode }) {
 function ThemedGame() {
   const { meta } = useMeta();
   return (
-    <div data-ui-theme={meta.uiTheme} data-ui-swatch={activeUiThemeSwatchId(meta)} className="min-h-[100dvh]">
+    <div
+      data-ui-theme={meta.uiTheme}
+      data-ui-swatch={activeUiThemeSwatchId(meta)}
+      data-lokpet-art-style={meta.lokPetArtStyle}
+      data-ui-border-style={meta.uiBorderStyle}
+      className="min-h-[100dvh]"
+    >
       <Game />
     </div>
   );
