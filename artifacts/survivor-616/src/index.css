@@ -638,7 +638,111 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   mix-blend-mode: screen;
 }
 
+/* Survivor616 cold open: preserve the original composition while themes tint its atmosphere. */
+.intro-screen {
+  --intro-accent: hsl(var(--primary));
+  --intro-splash: #67e8f9;
+  --intro-title-shadow: 0 0 1.15rem rgba(255, 255, 255, .16);
+  isolation: isolate;
+}
+.intro-screen__atmosphere {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 46%, hsl(var(--primary) / .07), transparent 42%),
+    linear-gradient(to bottom, rgba(0,0,0,.18), transparent 25%, transparent 72%, rgba(0,0,0,.42));
+  box-shadow: inset 0 0 8rem rgba(0,0,0,.54);
+}
+.intro-screen__content { animation: intro-flow-in 900ms cubic-bezier(.2,.8,.2,1) both; }
+.intro-location { color: var(--intro-accent); text-shadow: 0 0 .8rem hsl(var(--primary) / .3); }
+.intro-title {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: .2rem;
+  line-height: .78;
+  color: #fff;
+}
+.intro-title__number,
+.intro-title__word {
+  position: relative;
+  z-index: 2;
+  font-family: var(--app-font-sans);
+  font-weight: 950;
+  text-transform: uppercase;
+  text-shadow: var(--intro-title-shadow);
+  letter-spacing: -.07em;
+}
+.intro-title__number { font-size: clamp(4.2rem, 18vw, 6.2rem); }
+.intro-title__word { margin-top: .42rem; font-size: clamp(4rem, 16.5vw, 6.7rem); }
+.intro-title--one-line {
+  flex-direction: row;
+  justify-content: center;
+  gap: clamp(.5rem, 2vw, 1rem);
+  margin: 1.15rem 0 1.6rem;
+}
+.intro-title--one-line .intro-title__word { order: -1; margin-top: 0; font-size: clamp(3rem, 11vw, 5.5rem); }
+.intro-title--one-line .intro-title__number { font-size: clamp(2.8rem, 9vw, 4.5rem); color: var(--intro-accent); }
+.intro-splash {
+  --intro-resting-rotation: -4deg;
+  align-self: flex-end;
+  max-width: 74%;
+  margin: .3rem 3% 1.65rem 0;
+  color: var(--intro-splash);
+  font-family: var(--app-font-mono);
+  font-size: clamp(.65rem, 2.4vw, .78rem);
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1.15;
+  text-align: right;
+  text-shadow: 0 0 .55rem color-mix(in srgb, var(--intro-splash) 80%, transparent);
+  transform: rotate(var(--intro-resting-rotation));
+}
+.intro-splash--centered { align-self: center; margin-right: 0; text-align: center; }
+.intro-premise {
+  max-width: 37rem;
+  margin: 0 auto 2rem;
+  color: rgba(255,255,255,.58);
+  font-size: clamp(1rem, 3.6vw, 1.15rem);
+  line-height: 1.65;
+  text-shadow: 0 1px .8rem #000;
+}
+.intro-enter { min-width: min(100%, 24rem); box-shadow: 0 .8rem 3rem hsl(var(--primary) / .1); }
+.intro-physics-body {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+  transform-origin: center;
+}
+.intro-physics-body:active { cursor: grabbing; }
+
+/* Selected UI themes influence the scene without replacing the core lockup. */
+[data-ui-theme='arcade'] .intro-screen { --intro-title-shadow: .2rem 0 #ff3daf, -.2rem 0 #36f4ff; }
+[data-ui-theme='night-drive'] .intro-screen { --intro-splash: #ff71ce; }
+[data-ui-theme='pothole-oracle'] .intro-screen__atmosphere { background-image: repeating-linear-gradient(102deg, transparent 0 2.2rem, hsl(var(--primary) / .035) 2.25rem 2.3rem), radial-gradient(circle at center, hsl(var(--primary) / .08), transparent 48%); }
+[data-ui-theme='mall-ghost'] .intro-screen { --intro-title-shadow: 0 0 1.4rem hsl(var(--primary) / .34); }
+[data-ui-theme='weather-radio'] .intro-screen__atmosphere { background-image: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.018) 3px 4px), radial-gradient(circle at center, hsl(var(--primary) / .08), transparent 48%); }
+[data-ui-theme='salvage-terminal'] .intro-title__word { letter-spacing: -.045em; }
+[data-ui-theme='river-dawn'] .intro-screen__atmosphere { background-image: linear-gradient(to top, hsl(var(--primary) / .1), transparent 42%); }
+[data-ui-theme='block-party'] .intro-title__number { color: var(--intro-accent); }
+[data-ui-theme='signal-garden'] .intro-screen__atmosphere { box-shadow: inset 0 0 10rem hsl(var(--primary) / .09); }
+[data-ui-theme='night-bus'] .intro-screen__atmosphere { background-image: linear-gradient(105deg, transparent 15%, hsl(var(--primary) / .08) 48%, transparent 72%); }
+[data-ui-theme='impossible-manual'] .intro-title__number { -webkit-text-stroke: 1px var(--intro-accent); }
+
+/* Rare session-scoped anomalies. Center Collision stays reserved for a future event. */
+.intro-screen[data-intro-event='blackout'] .intro-screen__atmosphere { animation: intro-blackout 7s steps(1,end) infinite; }
+.intro-screen[data-intro-event='chromatic-drift'] .intro-title__word { animation: intro-chromatic 5.5s ease-in-out infinite; }
+.intro-screen[data-intro-event='low-gravity'] .intro-screen__atmosphere { box-shadow: inset 0 0 9rem hsl(var(--primary) / .16); }
+.intro-screen[data-intro-event='static-bloom'] .intro-screen__atmosphere { animation: intro-static 3.8s steps(8,end) infinite; }
+
+@keyframes intro-flow-in { from { opacity: 0; filter: blur(.5rem); } to { opacity: 1; filter: blur(0); } }
+@keyframes intro-blackout { 0%, 91%, 94%, 100% { opacity: 1; } 92%, 93% { opacity: .25; } }
+@keyframes intro-chromatic { 0%,100% { text-shadow: var(--intro-title-shadow); } 50% { text-shadow: .22rem 0 #ff3daf, -.22rem 0 #36f4ff; } }
+@keyframes intro-static { 0%,100% { opacity: 1; filter: none; } 52% { opacity: .82; filter: contrast(1.25); } }
+
 @media (prefers-reduced-motion: reduce) {
   .hideout-ambient *, .hideout-ambient { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
   .music-reactive-root::before { opacity: 0 !important; }
+  .intro-screen *, .intro-screen { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }
