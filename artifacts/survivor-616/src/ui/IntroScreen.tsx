@@ -141,7 +141,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             href="https://gsix.online"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-8 text-[10px] uppercase tracking-widest text-white/35 transition-colors hover:text-white/65"
+            className="mt-9 self-center text-center text-[9px] uppercase tracking-[0.12em] text-white/24 transition-colors hover:text-white/50"
             data-testid="link-intro-credit"
           >
             Powered by LokServices · Designed by GSixDesigns
