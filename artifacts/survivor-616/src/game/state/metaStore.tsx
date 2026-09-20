@@ -874,11 +874,18 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     }
   }
 
-  const unlockedCharacterIds = idList(
+  const savedUnlockedCharacterIds = idList(
     parsed.unlockedCharacterIds,
     characterIds,
     defaults.unlockedCharacterIds,
   );
+  // Starting characters are part of the game's arrival story, not a one-time
+  // save creation detail. Add them during hydration so a returning player
+  // receives any starter character introduced after their save was made.
+  const unlockedCharacterIds = [...new Set([
+    ...savedUnlockedCharacterIds,
+    ...CHARACTERS.filter((character) => character.unlock.kind === 'default').map((character) => character.id),
+  ])];
   const selectedCharacterId =
     typeof parsed.selectedCharacterId === 'string' &&
     unlockedCharacterIds.includes(parsed.selectedCharacterId)
