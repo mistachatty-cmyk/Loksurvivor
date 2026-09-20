@@ -4872,7 +4872,11 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const tint = timeOfDayTint(w.cycle.phase);
   if (tint !== 'rgba(0, 0, 0, 0.000)') {
     ctx.fillStyle = tint;
+    // Low-Light Optics: keep a hint of the time-of-day mood without the city
+    // actually hiding anything from a player who paid not to be surprised.
+    ctx.globalAlpha = w.nightVisionEnabled ? 0.25 : 1;
     ctx.fillRect(left, top, right - left, bottom - top);
+    ctx.globalAlpha = 1;
   }
   drawCloudShadows(ctx, cloudPuffs, profile);
   drawWetSheen(ctx, w, left, top, right, bottom, profile.rain);

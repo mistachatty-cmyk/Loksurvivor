@@ -258,6 +258,7 @@ export function createInitialMeta(): MetaState {
     minimapPosition: { x: 0.82, y: 0.18 },
     worldInvertEnabled: false,
     paletteInvertEnabled: false,
+    mirrorModeEnabled: false,
     uiDensity: 'grid',
     musicReactiveEnabled: true,
     sfxEnabled: true,
@@ -999,6 +1000,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     minimapPosition: normalizedPosition(parsed.minimapPosition, defaults.minimapPosition),
     worldInvertEnabled: parsed.worldInvertEnabled === true,
     paletteInvertEnabled: parsed.paletteInvertEnabled === true,
+    mirrorModeEnabled: parsed.mirrorModeEnabled === true,
     uiDensity: parsed.uiDensity === 'list' ? 'list' : 'grid',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
     sfxEnabled: parsed.sfxEnabled !== false,
@@ -1489,6 +1491,11 @@ export function hazardImmunityUnlocked(meta: MetaState): boolean {
   return vendorPurchaseCount(meta, 'hazard-handler') > 0;
 }
 
+/** Whether "Low-Light Optics" is owned: the night-time screen tint is cut down in draw.ts. */
+export function nightVisionUnlocked(meta: MetaState): boolean {
+  return vendorPurchaseCount(meta, 'night-vision') > 0;
+}
+
 /** True while Artisan Valor Prime is fronting the Paint Gallery and re-theming the hideout (every 14th hideout visit, for a few visits or occasionally a real 24h window). */
 export function isPrimeTakeoverActive(meta: MetaState, now: number): boolean {
   return meta.primeTakeoverVisitsRemaining > 0 || now < meta.primeTakeoverUntil;
@@ -1614,6 +1621,7 @@ type Action =
   | { type: 'setMinimapPosition'; position: { x: number; y: number } }
   | { type: 'setWorldInvertEnabled'; enabled: boolean }
   | { type: 'setPaletteInvertEnabled'; enabled: boolean }
+  | { type: 'setMirrorModeEnabled'; enabled: boolean }
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
   | { type: 'dismissNotifications'; ids: string[] }
   | { type: 'acknowledgeChangelog' }
@@ -2414,6 +2422,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (action.enabled && vendorPurchaseCount(state.meta, 'invert-palette') <= 0) return state;
       return { ...state, meta: { ...state.meta, paletteInvertEnabled: action.enabled } };
 
+    case 'setMirrorModeEnabled':
+      if (action.enabled && vendorPurchaseCount(state.meta, 'mirror-mode') <= 0) return state;
+      return { ...state, meta: { ...state.meta, mirrorModeEnabled: action.enabled } };
+
     case 'toggleRunModifier': {
       const current = state.meta.runModifiers[action.key] === true;
       return {
@@ -2894,6 +2906,7 @@ export interface MetaContextValue {
   setMinimapPosition: (position: { x: number; y: number }) => void;
   setWorldInvertEnabled: (enabled: boolean) => void;
   setPaletteInvertEnabled: (enabled: boolean) => void;
+  setMirrorModeEnabled: (enabled: boolean) => void;
   toggleRunModifier: (key: keyof RunModifiers) => void;
   dismissNotifications: (ids: string[]) => void;
   acknowledgeChangelog: () => void;
@@ -3095,6 +3108,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setPaletteInvertEnabled', enabled }),
     [],
   );
+  const setMirrorModeEnabled = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setMirrorModeEnabled', enabled }),
+    [],
+  );
   const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
   const dismissNotifications = useCallback((ids: string[]) => dispatch({ type: 'dismissNotifications', ids }), []);
   const acknowledgeChangelog = useCallback(() => dispatch({ type: 'acknowledgeChangelog' }), []);
@@ -3237,6 +3254,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMinimapPosition,
       setWorldInvertEnabled,
       setPaletteInvertEnabled,
+      setMirrorModeEnabled,
       toggleRunModifier,
       dismissNotifications,
       acknowledgeChangelog,
@@ -3341,6 +3359,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMinimapPosition,
     setWorldInvertEnabled,
     setPaletteInvertEnabled,
+    setMirrorModeEnabled,
     toggleRunModifier,
     dismissNotifications,
     acknowledgeChangelog,

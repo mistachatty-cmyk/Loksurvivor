@@ -1869,6 +1869,8 @@ export interface MetaState {
   worldInvertEnabled: boolean;
   /** Cheat-code toggle from the Quartermaster's "Negative Exposure" unlock: inverts the run's color palette. Requires owning that vendor item. */
   paletteInvertEnabled: boolean;
+  /** Cheat-code toggle from the Quartermaster's "Wrong Side of the Street" unlock: mirrors the run left-to-right. Requires owning that vendor item. */
+  mirrorModeEnabled: boolean;
   /** 'grid' shows list-heavy hub panels as multi-column card grids; 'list' is the original single-column layout. */
   uiDensity: 'grid' | 'list';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
