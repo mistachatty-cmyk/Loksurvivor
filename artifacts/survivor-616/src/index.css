@@ -667,10 +667,10 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .intro-title__word {
   position: relative;
   z-index: 2;
-  /* A broad, heavy grotesk keeps the original title's clean arcade-poster
-     feel, separate from the game's monospaced interface font. */
-  font-family: "Arial Black", "Arial Bold", "Helvetica Neue", Arial, sans-serif;
-  font-weight: 900;
+  /* Keep the newer build's bulky digital face inside the classic stacked
+     lockup. Space Mono is bundled above, so this stays consistent on iOS. */
+  font-family: var(--app-font-sans);
+  font-weight: 950;
   text-transform: uppercase;
   text-shadow: var(--intro-title-shadow);
   letter-spacing: -.052em;
