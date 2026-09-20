@@ -1961,8 +1961,10 @@ export interface MetaState {
   activePassiveCardIds: string[];
   /** Up to BATTLE_DECK_SLOTS owned card ids equipped for the travel-encounter minigame's Attack action. Empty deck falls back to an unarmed punch -- never blocks the player. See data/travelEncounters.ts. */
   battleDeckCardIds: string[];
-  /** Salvage Protocol bought at DigiScope: once true, a thrown Battle Deck card is never consumed. False by default -- a thrown card is gone for good until this is earned and bought. See data/travelEncounters.ts. */
+  /** Legacy compatibility flag for players who previously owned Salvage Protocol. */
   cardSalvageUnlocked: boolean;
+  /** Permanent companion-shop device. It keeps thrown cards in the binder and records companion details in Archives. */
+  handheldDigiScopeOwned: boolean;
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */

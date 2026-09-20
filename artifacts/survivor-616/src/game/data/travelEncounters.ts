@@ -35,7 +35,7 @@ export interface TravelEncounterTrigger {
  * hideout room.
  */
 export const TRAVEL_ENCOUNTER_TRIGGERS: TravelEncounterTrigger[] = [
-  { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.2, label: 'Someone by DigiScope wants a piece of your sleeve.' },
+  { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.2, label: 'Someone by the Neon Sleeve wants a piece of your deck.' },
   { id: 'head-out', source: 'run-launch', chance: 0.2, label: 'Something crosses your path on the way out.' },
 ];
 
@@ -74,12 +74,12 @@ export const BASE_CARD_THROW_DAMAGE = 8;
 export const BATTLE_DECK_SLOTS = 6;
 
 /**
- * Salvage Protocol: until bought, a thrown Battle Deck card is consumed on
+ * Handheld DigiScope: until bought, a thrown Battle Deck card is consumed on
  * throw (win, lose, or flee -- see `consumeThrownCard` in metaStore.tsx) the
  * same way a real thrown object would be. `CARD_SALVAGE_EARN_RUNS` is the
  * "you have to earn it" half of the gate (reusing the totalRuns counter
  * every save already tracks, rather than adding a new one); the CC cost is
- * the "buy in" half, spent at DigiScope like everything else in this shop.
+ * the permanent device purchase, made in the LokPet Shop.
  * Cards are otherwise never decremented anywhere else in the game -- see
  * .agents/memory/travel-encounters.md.
  */

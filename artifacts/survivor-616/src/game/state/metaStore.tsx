@@ -303,6 +303,7 @@ export function createInitialMeta(): MetaState {
     activePassiveCardIds: [],
     battleDeckCardIds: [],
     cardSalvageUnlocked: false,
+    handheldDigiScopeOwned: false,
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     lokPetLeagueTier: 0,
@@ -773,6 +774,7 @@ function normalizeLokPetHistory(value: unknown): LokPetDiscoveryHistoryEntry[] {
 
 const PET_STAMINA_MAX = 3;
 export const STARTER_LOKPET_FREE_REFRESH_MS = 60 * 60 * 1000;
+export const HANDHELD_DIGISCOPE_COST = 240;
 const ELIXIR_GRANT_MS = 20 * 60 * 1000;
 const ELIXIR_GRANT_AMOUNT = 3;
 const ELIXIR_CAP = 18;
@@ -1099,6 +1101,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
     battleDeckCardIds: Array.isArray(parsed.battleDeckCardIds) ? [...new Set(parsed.battleDeckCardIds.filter((id): id is string => typeof id === 'string' && ownedCardIds.has(id)))].slice(0, BATTLE_DECK_SLOTS) : [],
     cardSalvageUnlocked: parsed.cardSalvageUnlocked === true,
+    handheldDigiScopeOwned: parsed.handheldDigiScopeOwned === true || parsed.cardSalvageUnlocked === true,
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     lokPetLeagueTier: counter(parsed.lokPetLeagueTier),
@@ -1609,6 +1612,7 @@ type Action =
   | { type: 'toggleBattleDeckCard'; cardId: string }
   | { type: 'consumeThrownCard'; cardId: string }
   | { type: 'buyCardSalvageProtocol' }
+  | { type: 'buyHandheldDigiScope' }
   | { type: 'completeTravelEncounter'; result: TravelEncounterResult }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
@@ -1791,12 +1795,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, battleDeckCardIds: next } };
     }
 
-    // Thrown, not spent from a shop -- until Salvage Protocol is bought, a
+    // Thrown, not spent from a shop -- until a Handheld DigiScope is bought, a
     // Battle Deck card loses one copy the instant it's thrown, win or lose.
     // A no-op once the protocol is owned, so callers can dispatch this
     // unconditionally on every throw. See CARD_SALVAGE_* in travelEncounters.ts.
     case 'consumeThrownCard': {
-      if (state.meta.cardSalvageUnlocked) return state;
+      if (state.meta.handheldDigiScopeOwned || state.meta.cardSalvageUnlocked) return state;
       const record = state.meta.cardCollection.find((candidate) => candidate.cardId === action.cardId);
       if (!record) return state;
       const remaining = removeThrownCardCopy(record);
@@ -1815,6 +1819,14 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, cardSalvageUnlocked: true, cardCredits: state.meta.cardCredits - CARD_SALVAGE_COST },
+      };
+    }
+
+    case 'buyHandheldDigiScope': {
+      if (state.meta.handheldDigiScopeOwned || state.meta.cred < HANDHELD_DIGISCOPE_COST) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, handheldDigiScopeOwned: true, cred: state.meta.cred - HANDHELD_DIGISCOPE_COST },
       };
     }
 
@@ -2979,6 +2991,7 @@ export interface MetaContextValue {
   toggleBattleDeckCard: (cardId: string) => void;
   consumeThrownCard: (cardId: string) => void;
   buyCardSalvageProtocol: () => void;
+  buyHandheldDigiScope: () => void;
   toggleSavedLokPet: (id: string) => void;
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
@@ -3106,6 +3119,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const toggleBattleDeckCard = useCallback((cardId: string) => dispatch({ type: 'toggleBattleDeckCard', cardId }), []);
   const consumeThrownCard = useCallback((cardId: string) => dispatch({ type: 'consumeThrownCard', cardId }), []);
   const buyCardSalvageProtocol = useCallback(() => dispatch({ type: 'buyCardSalvageProtocol' }), []);
+  const buyHandheldDigiScope = useCallback(() => dispatch({ type: 'buyHandheldDigiScope' }), []);
   const resolveTravelEncounter = useCallback((result: TravelEncounterResult) => dispatch({ type: 'completeTravelEncounter', result }), []);
   const toggleSavedLokPet = useCallback((id: string) => dispatch({ type: 'toggleSavedLokPet', id }), []);
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
@@ -3336,6 +3350,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleBattleDeckCard,
       consumeThrownCard,
       buyCardSalvageProtocol,
+      buyHandheldDigiScope,
       toggleSavedLokPet,
       restoreSavedLokPet,
       refreshPetElixirs,
@@ -3445,6 +3460,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleBattleDeckCard,
     consumeThrownCard,
     buyCardSalvageProtocol,
+    buyHandheldDigiScope,
     toggleSavedLokPet,
     restoreSavedLokPet,
     refreshPetElixirs,

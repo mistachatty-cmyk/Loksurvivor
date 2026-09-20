@@ -183,7 +183,7 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
                   const info = describeOwnedCard(record.cardId);
                   const outcome = cardThrowOutcome(record, opponent.kind);
                   const damage = Math.round(outcome.damage * powerMult);
-                  const lastCopy = !meta.cardSalvageUnlocked && record.copies <= 1;
+                  const lastCopy = !meta.handheldDigiScopeOwned && record.copies <= 1;
                   return (
                     <button
                       key={record.cardId}
@@ -200,7 +200,7 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
                       <span className="mt-0.5 block text-[9px] text-white/50">
                         Throw · {damage} dmg{outcome.heal > 0 ? ` · +${outcome.heal} hp` : ''}
                       </span>
-                      {!meta.cardSalvageUnlocked && (
+                      {!meta.handheldDigiScopeOwned && (
                         <span className={`mt-0.5 block text-[8px] uppercase tracking-wide ${lastCopy ? 'text-rose-300' : 'text-white/30'}`}>
                           {lastCopy ? 'Last one -- gone after this' : `${record.copies} left before it's gone`}
                         </span>

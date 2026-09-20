@@ -23,7 +23,7 @@ import {
   Bot,
 } from 'lucide-react';
 
-import { useMeta } from '@/game/state/metaStore';
+import { HANDHELD_DIGISCOPE_COST, useMeta } from '@/game/state/metaStore';
 import { RigPortrait } from '@/ui/RigPortrait';
 import {
   lokPetRig,
@@ -70,6 +70,7 @@ export function LokPetBattleScreen({
     meta,
     recordLokPetBattleResult,
     feedLokPetTreat,
+    buyHandheldDigiScope,
     toggleFavoriteLokPet,
     equipLokPetTrinket,
   } = useMeta();
@@ -1205,6 +1206,33 @@ export function LokPetBattleScreen({
                 </span>
               )}
             </div>
+
+            <section className={`mt-5 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${meta.handheldDigiScopeOwned ? 'border-cyan-300/40 bg-cyan-300/5' : 'border-cyan-400/25 bg-slate-950/70'}`} data-testid="section-handheld-digiscope">
+              <div className="flex items-start gap-3">
+                <Bot className={`mt-0.5 h-5 w-5 shrink-0 ${meta.handheldDigiScopeOwned ? 'text-cyan-200' : 'text-cyan-400'}`} />
+                <div>
+                  <p className="font-display text-sm font-black uppercase text-white">Handheld DigiScope</p>
+                  <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-slate-400">
+                    {meta.handheldDigiScopeOwned
+                      ? 'Linked permanently. Thrown cards stay in your binder, and your companion records stay available in Archives.'
+                      : 'A permanent LokPet Shop device. It records companion details to Archives and keeps Battle Deck cards when you throw them.'}
+                  </p>
+                </div>
+              </div>
+              {meta.handheldDigiScopeOwned ? (
+                <span className="font-mono text-[10px] font-black uppercase tracking-widest text-cyan-200">Linked</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={buyHandheldDigiScope}
+                  disabled={meta.cred < HANDHELD_DIGISCOPE_COST}
+                  className="shrink-0 rounded-lg border border-cyan-300/50 bg-cyan-300/10 px-3 py-2 font-mono text-[10px] font-black uppercase tracking-widest text-cyan-100 transition hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-35"
+                  data-testid="button-buy-handheld-digiscope"
+                >
+                  Buy · {HANDHELD_DIGISCOPE_COST} cred
+                </button>
+              )}
+            </section>
 
             <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {meta.savedLokPets.map((pet) => {
