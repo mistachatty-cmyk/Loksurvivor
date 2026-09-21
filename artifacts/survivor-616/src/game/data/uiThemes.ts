@@ -12,6 +12,41 @@ export interface UiLook {
  */
 export const UI_THEMES: UIThemeDef[] = [
   {
+    id: 'starter-beacon', name: 'Starter Beacon', tier: 'starter', starter: true,
+    description: 'The welcoming 616 terminal: warm amber, clean cyan and a gentle broadcast glow.', cost: 0,
+    swatches: [{ id: 'amber-boot', name: 'Amber Boot', primaryHsl: '32 95% 55%' }, { id: 'cyan-ping', name: 'Cyan Ping', primaryHsl: '188 96% 65%' }, { id: 'rose-key', name: 'Rose Key', primaryHsl: '344 90% 68%' }],
+  },
+  {
+    id: 'tape-garden', name: 'Tape Garden', tier: 'standard', starter: true,
+    description: 'Cassette-green foliage, hand-drawn lines, and a slow living glow around the hideout.', cost: 0,
+    swatches: [{ id: 'fern-tape', name: 'Fern Tape', primaryHsl: '145 76% 58%' }, { id: 'orchid-loop', name: 'Orchid Loop', primaryHsl: '292 82% 70%' }, { id: 'pollen-gold', name: 'Pollen Gold', primaryHsl: '46 96% 62%' }],
+  },
+  {
+    id: 'streetwave', name: 'Streetwave', tier: 'uncommon', starter: true,
+    description: 'Wet pavement, radio blue and hot route lights with a subtle moving city-frequency sheen.', cost: 0,
+    swatches: [{ id: 'route-amber', name: 'Route Amber', primaryHsl: '35 100% 60%' }, { id: 'rain-blue', name: 'Rain Blue', primaryHsl: '207 92% 68%' }, { id: 'seat-plum', name: 'Seat Plum', primaryHsl: '313 63% 68%' }],
+  },
+  {
+    id: 'prism-block', name: 'Prism Block', tier: 'rare', starter: true,
+    description: 'A rare-spectrum party set: sticker colors, prism flashes, and bold hand-painted panel edges.', cost: 0,
+    swatches: [{ id: 'flyer-yellow', name: 'Flyer Yellow', primaryHsl: '50 100% 62%' }, { id: 'speaker-magenta', name: 'Speaker Magenta', primaryHsl: '326 100% 68%' }, { id: 'porch-teal', name: 'Porch Teal', primaryHsl: '166 88% 58%' }],
+  },
+  {
+    id: 'crown-static', name: 'Crown Static', tier: 'legendary', starter: true,
+    description: 'A legendary broadcast anomaly: deep violet, crown gold and controlled chromatic static.', cost: 0,
+    swatches: [{ id: 'crown-gold', name: 'Crown Gold', primaryHsl: '47 100% 64%' }, { id: 'royal-violet', name: 'Royal Violet', primaryHsl: '274 100% 72%' }, { id: 'ice-static', name: 'Ice Static', primaryHsl: '192 100% 72%' }],
+  },
+  {
+    id: 'midnight-reliquary', name: 'Midnight Reliquary', tier: 'legendary', hidden: true,
+    description: 'A secret midnight archive where blue fire drifts across the panels and the interface breathes in slow light.', cost: 0,
+    swatches: [{ id: 'blue-ember', name: 'Blue Ember', primaryHsl: '196 100% 70%' }, { id: 'moon-violet', name: 'Moon Violet', primaryHsl: '267 100% 76%' }, { id: 'relic-gold', name: 'Relic Gold', primaryHsl: '45 100% 68%' }],
+  },
+  {
+    id: 'mirror-carnival', name: 'Mirror Carnival', tier: 'legendary', hidden: true,
+    description: 'A secret reflective midway: color keeps folding through the chrome while every card catches a different glow.', cost: 0,
+    swatches: [{ id: 'mirror-rose', name: 'Mirror Rose', primaryHsl: '337 100% 72%' }, { id: 'electric-mint', name: 'Electric Mint', primaryHsl: '167 100% 67%' }, { id: 'ultraviolet', name: 'Ultraviolet', primaryHsl: '278 100% 74%' }],
+  },
+  {
     id: 'house',
     name: 'House Style',
     description:
@@ -131,6 +166,9 @@ export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(
 
 export const DEFAULT_UI_THEME_ID = 'house';
 
+export const STARTER_UI_THEME_IDS = UI_THEMES.filter((theme) => theme.starter).map((theme) => theme.id);
+export const HIDDEN_UI_THEME_IDS = UI_THEMES.filter((theme) => theme.hidden).map((theme) => theme.id);
+
 export function defaultSwatchId(themeId: string): string | undefined {
   return UI_THEMES_BY_ID[themeId]?.swatches?.[0]?.id;
 }
@@ -142,4 +180,8 @@ export function uiLooksForOwnedThemeIds(ownedThemeIds: string[]): UiLook[] {
     if (!theme.swatches?.length) return [{ themeId: theme.id }];
     return theme.swatches.map((swatch) => ({ themeId: theme.id, swatchId: swatch.id }));
   });
+}
+
+export function uiLooksForThemeIds(themeIds: string[]): UiLook[] {
+  return uiLooksForOwnedThemeIds(themeIds);
 }
