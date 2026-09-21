@@ -14,7 +14,7 @@ import {
   transactionDone,
 } from './localMediaDatabase';
 import { loadMediaAssets } from './localMediaStore';
-import { loadLocalTracks, saveLocalTrack } from './localTrackLibrary';
+import { clearLocalTracks, loadLocalTracks, saveLocalTrack } from './localTrackLibrary';
 import { addClip, createProject } from './studio/project';
 import {
   loadStudioAudioAssets,
@@ -114,6 +114,36 @@ test('equal media bytes are stored once and shared by Studio references', async 
   assert.equal(restored.project.name, 'Deduplicated');
   assert.deepEqual(restored.assetIds, [studioAsset.id]);
   assert.equal((await loadStudioAudioAssets(restored.assetIds)).length, 1);
+});
+
+test('clearing the local soundtrack frees soundtrack-only assets but retains Studio sources', async () => {
+  await saveLocalTrack({
+    id: 'soundtrack-only',
+    title: 'Disposable mix',
+    file: new File(['only soundtrack'], 'disposable.wav', { type: 'audio/wav' }),
+    isVideoContainer: false,
+    addedAt: 616,
+  });
+  const sharedFile = new File(['shared studio source'], 'shared.wav', { type: 'audio/wav' });
+  await saveLocalTrack({
+    id: 'studio-shared-track',
+    title: 'Studio shared',
+    file: sharedFile,
+    isVideoContainer: false,
+    addedAt: 616,
+  });
+  const studioAsset = await saveStudioAudioFile(sharedFile);
+  await saveStudioWorkspace(createProject('Keep the source'), [studioAsset.id]);
+
+  await clearLocalTracks();
+  assert.equal((await loadLocalTracks()).length, 0);
+
+  const database = await openLocalMediaDatabase();
+  const transaction = database.transaction(MEDIA_ASSET_STORE, 'readonly');
+  assert.equal(await requestResult(transaction.objectStore(MEDIA_ASSET_STORE).count()), 1);
+  await transactionDone(transaction);
+  database.close();
+  assert.equal((await loadMediaAssets([studioAsset.id])).length, 1);
 });
 
 test('a saved Studio audio file and project reopen from the shared database', async () => {

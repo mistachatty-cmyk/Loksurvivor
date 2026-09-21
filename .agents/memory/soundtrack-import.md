@@ -73,3 +73,22 @@ Local track records originally carried their `File` inline in database version
 Persisted separately from meta progression, at `survivor616.playlists.v1`
 -- this is playback organization, not save-file state, and didn't belong in
 `metaStore`'s versioned migration path.
+
+## Main game album — Lokifed Take 1
+
+`Lokifed — Take 1` is the one built-in game album. Its 12 M4A releases live
+in `src/assets/lokifed-take-1/`; do not reintroduce the superseded demo
+mixtape imports. The album is a protected built-in playlist: users can create
+and manage their own playlists beside it, but cannot rename, delete, reorder,
+or edit the album.
+
+Tracks are revealed in authored track-number order. Track 0 is available
+immediately; every later track needs that many lifetime completed run
+objectives. The count is persisted as `MetaState.soundtrackObjectiveCompletions`
+and advances only through `completeRun`. Locked tracks remain visible with
+their exact objective requirement, but are excluded from autoplay/shuffle.
+
+`clearLocalTracks` must clear both local-track references and their orphaned
+media assets. It must preserve media that is still referenced by the Studio
+workspace, since the local soundtrack and Studio intentionally deduplicate
+the same source bytes.

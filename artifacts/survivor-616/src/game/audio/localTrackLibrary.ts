@@ -11,6 +11,7 @@ import {
   MEDIA_ASSET_STORE,
   openLocalMediaDatabase,
   requestResult,
+  STUDIO_PROJECT_STORE,
   transactionDone,
 } from './localMediaDatabase';
 import { hashBlob, loadMediaAsset, mediaAssetId, saveMediaAsset, type MediaAssetRecord } from './localMediaStore';
@@ -175,11 +176,56 @@ export async function loadLocalTracks(): Promise<StoredLocalTrack[]> {
 }
 
 export async function removeLocalTrack(id: string): Promise<void> {
-  await withStore('readwrite', (store) => store.delete(id));
+  const database = await openLocalMediaDatabase();
+  try {
+    const transaction = database.transaction([LOCAL_TRACK_STORE, MEDIA_ASSET_STORE, STUDIO_PROJECT_STORE], 'readwrite');
+    const tracks = transaction.objectStore(LOCAL_TRACK_STORE);
+    const current = (await requestResult(tracks.get(id))) as StoredLocalTrackReference | undefined;
+    tracks.delete(id);
+    if (current?.assetId) {
+      const [remaining, studioProjects] = await Promise.all([
+        requestResult(tracks.getAll()) as Promise<StoredLocalTrackReference[]>,
+        requestResult(transaction.objectStore(STUDIO_PROJECT_STORE).getAll()) as Promise<Array<{ assetIds?: unknown }>>,
+      ]);
+      const stillUsedByTrack = remaining.some((track) => track.id !== id && track.assetId === current.assetId);
+      const stillUsedByStudio = studioProjects.some(
+        (project) => Array.isArray(project.assetIds) && project.assetIds.includes(current.assetId),
+      );
+      if (!stillUsedByTrack && !stillUsedByStudio) transaction.objectStore(MEDIA_ASSET_STORE).delete(current.assetId);
+    }
+    await transactionDone(transaction);
+  } finally {
+    database.close();
+  }
 }
 
 export async function clearLocalTracks(): Promise<void> {
-  await withStore('readwrite', (store) => store.clear());
+  // Clearing only the track-reference store made the UI look empty but left
+  // every audio Blob behind in IndexedDB, so it did not actually free local
+  // storage. Delete soundtrack-only assets too, while retaining any shared
+  // source still used by a Studio project.
+  const database = await openLocalMediaDatabase();
+  try {
+    const transaction = database.transaction([LOCAL_TRACK_STORE, MEDIA_ASSET_STORE, STUDIO_PROJECT_STORE], 'readwrite');
+    const tracks = transaction.objectStore(LOCAL_TRACK_STORE);
+    const [references, studioProjects] = await Promise.all([
+      requestResult(tracks.getAll()) as Promise<StoredLocalTrackReference[]>,
+      requestResult(transaction.objectStore(STUDIO_PROJECT_STORE).getAll()) as Promise<Array<{ assetIds?: unknown }>>,
+    ]);
+    const studioAssetIds = new Set(
+      studioProjects.flatMap((project) => Array.isArray(project.assetIds)
+        ? project.assetIds.filter((assetId): assetId is string => typeof assetId === 'string')
+        : []),
+    );
+    const assets = transaction.objectStore(MEDIA_ASSET_STORE);
+    for (const reference of references) {
+      if (typeof reference.assetId === 'string' && !studioAssetIds.has(reference.assetId)) assets.delete(reference.assetId);
+    }
+    tracks.clear();
+    await transactionDone(transaction);
+  } finally {
+    database.close();
+  }
 }
 
 export async function getLocalLibrarySummary(): Promise<LocalLibrarySummary> {

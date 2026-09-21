@@ -253,6 +253,8 @@ export function createInitialMeta(): MetaState {
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
     graphicsQuality: 'high',
+    frameRateMode: 60,
+    soundtrackObjectiveCompletions: 0,
     wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
@@ -1042,6 +1044,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
         ? parsed.graphicsQuality
         : 'high',
+    frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
+    soundtrackObjectiveCompletions: counter(parsed.soundtrackObjectiveCompletions),
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
@@ -1666,6 +1670,7 @@ type Action =
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
+  | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
@@ -2495,6 +2500,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
 
+    case 'setFrameRateMode':
+      return { ...state, meta: { ...state.meta, frameRateMode: action.mode } };
+
     case 'setWildlifeSheltersInRain':
       return {
         ...state,
@@ -2850,6 +2858,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         totalLevelUps: prev.totalLevelUps + Math.max(0, result.level - 1),
+        soundtrackObjectiveCompletions: prev.soundtrackObjectiveCompletions + result.completedObjectives.filter((objective) => objective.completed).length,
         cred: prev.cred + result.cred + dailyContracts.rewardCred,
         lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
         cardCredits: prev.cardCredits + cardCreditsForRun(runCharacter, result.lootBoxesOpened),
@@ -3060,6 +3069,7 @@ export interface MetaContextValue {
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
+  setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
@@ -3214,6 +3224,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
+  const setFrameRateMode = useCallback((mode: MetaState['frameRateMode']) => dispatch({ type: 'setFrameRateMode', mode }), []);
   const setWildlifeSheltersInRain = useCallback(
     (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
     [],
@@ -3431,6 +3442,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPresentation,
       setPauseMapVisible,
       setGraphicsQuality,
+      setFrameRateMode,
       setWildlifeSheltersInRain,
       setMinimapVisible,
       setMusicReactive,
@@ -3544,6 +3556,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setFrameRateMode,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMusicReactive,

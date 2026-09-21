@@ -30,6 +30,8 @@ import {
   Loader2,
   ExternalLink,
   Heart,
+  LockKeyhole,
+  Disc3,
 } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
 
@@ -87,7 +89,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
   return (
     <ScreenLayout
       title="Soundtrack"
-      subtitle="Mixtape"
+      subtitle="Albums & playlists"
       onBack={onBack}
     >
       <div
@@ -247,6 +249,23 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
             </p>
           </section>
 
+          <section className="mb-5 border border-primary/35 bg-primary/5 p-4" aria-labelledby="main-soundtrack-title">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p id="main-soundtrack-title" className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary">
+                  <Disc3 className="h-4 w-4" /> Main game soundtrack
+                </p>
+                <p className="mt-1 text-sm font-semibold text-white">Lokifed — Take 1</p>
+                <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+                  Tracks release in album order as you finish run objectives. Your own local files and playlists stay separate.
+                </p>
+              </div>
+              <span className="shrink-0 border border-primary/30 bg-black/30 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                {Math.min(player.soundtrackObjectiveCompletions + 1, player.albums[0]?.trackIds.length ?? 0)}/{player.albums[0]?.trackIds.length ?? 0} unlocked
+              </span>
+            </div>
+          </section>
+
           {player.streamingEmbeds.length > 0 && (
             <section className="mb-6 border border-primary/35 bg-card/70 p-4" aria-labelledby="streaming-shelf-title">
               <div className="mb-3 flex items-start justify-between gap-4">
@@ -346,19 +365,20 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                     type="button"
                     onClick={() => player.setActivePlaylist(playlist.id)}
                     onDoubleClick={() => {
+                      if (playlist.builtIn) return;
                       setRenamingId(playlist.id);
                       setRenameDraft(playlist.name);
                     }}
                     className={`px-3 py-1.5 text-xs font-bold uppercase tracking-widest ${
                       player.activePlaylistId === playlist.id ? 'text-primary' : 'text-muted-foreground hover:text-white'
                     }`}
-                    title="Double-click to rename"
+                    title={playlist.builtIn ? 'Built-in album' : 'Double-click to rename'}
                     data-testid={`button-playlist-${playlist.id}`}
                   >
-                    {playlist.name} <span className="opacity-60">({playlist.trackIds.length})</span>
+                    {playlist.builtIn ? 'Album: ' : ''}{playlist.name} <span className="opacity-60">({playlist.trackIds.length})</span>
                   </button>
                 )}
-                <button
+                {!playlist.builtIn && <button
                   type="button"
                   onClick={() => {
                     if (window.confirm(`Delete playlist "${playlist.name}"? Tracks themselves are not deleted.`)) {
@@ -370,7 +390,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                   data-testid={`button-delete-playlist-${playlist.id}`}
                 >
                   <Trash2 className="w-3 h-3" />
-                </button>
+                </button>}
               </div>
             ))}
             {newPlaylistDraft !== null ? (
@@ -441,7 +461,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
               axis="y"
               values={viewedTracks}
               onReorder={(next) => {
-                if (player.activePlaylist) {
+                if (player.activePlaylist && !player.activePlaylist.builtIn) {
                   player.reorderPlaylistTracks(player.activePlaylist.id, next.map((t) => t.id));
                 }
               }}
@@ -454,12 +474,12 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                   <Reorder.Item
                     key={track.id}
                     value={track}
-                    drag={player.activePlaylist && !favoritesOnly ? 'y' : false}
+                    drag={player.activePlaylist && !player.activePlaylist.builtIn && !favoritesOnly ? 'y' : false}
                     className={`group flex min-w-0 items-center justify-between border p-1 pr-3 transition-colors ${
                       isCurrent ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
                     }`}
                   >
-                    {player.activePlaylist && (
+                    {player.activePlaylist && !player.activePlaylist.builtIn && (
                       <span className="cursor-grab px-1 text-muted-foreground/50 active:cursor-grabbing" aria-hidden>
                         <GripVertical className="w-4 h-4" />
                       </span>
@@ -470,8 +490,8 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                       className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left"
                       data-testid={`button-track-${track.id}`}
                     >
-                      <div className={`w-8 h-8 flex items-center justify-center shrink-0 ${isCurrent ? 'bg-primary text-primary-foreground' : 'bg-black text-muted-foreground group-hover:text-white'}`}>
-                        {isCurrent && player.isPlaying ? <Music className="w-4 h-4 animate-pulse" /> : <Play className="w-4 h-4 ml-0.5" />}
+                      <div className={`w-8 h-8 flex items-center justify-center shrink-0 ${isCurrent ? 'bg-primary text-primary-foreground' : track.locked ? 'bg-black text-amber-300' : 'bg-black text-muted-foreground group-hover:text-white'}`}>
+                        {track.locked ? <LockKeyhole className="w-4 h-4" /> : isCurrent && player.isPlaying ? <Music className="w-4 h-4 animate-pulse" /> : <Play className="w-4 h-4 ml-0.5" />}
                       </div>
                       <div className="min-w-0 flex-1 truncate">
                         <span className={`block font-bold text-sm truncate ${isCurrent ? 'text-primary' : 'text-white'}`}>
@@ -480,6 +500,11 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                         {track.isVideoContainer && (
                           <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
                             video file — audio only
+                          </span>
+                        )}
+                        {track.locked && (
+                          <span className="block text-[9px] font-mono uppercase tracking-widest text-amber-300/80">
+                            Finish {track.unlockObjectiveCount} objectives · {player.soundtrackObjectiveCompletions}/{track.unlockObjectiveCount}
                           </span>
                         )}
                       </div>
@@ -515,7 +540,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                         )
                       )}
 
-                      {player.playlists.length > 0 && !player.activePlaylist && (
+                      {player.playlists.some((playlist) => !playlist.builtIn) && !player.activePlaylist && !track.locked && (
                         <select
                           defaultValue=""
                           onChange={(event) => {
@@ -530,7 +555,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                           <option value="" disabled>
                             + Add to playlist
                           </option>
-                          {player.playlists.map((playlist) => (
+                          {player.playlists.filter((playlist) => !playlist.builtIn).map((playlist) => (
                             <option key={playlist.id} value={playlist.id}>
                               {playlist.name}
                             </option>
@@ -538,7 +563,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                         </select>
                       )}
 
-                      {player.activePlaylist ? (
+                      {player.activePlaylist && !player.activePlaylist.builtIn ? (
                         <button
                           type="button"
                           onClick={() => player.removeFromPlaylist(player.activePlaylist!.id, track.id)}
@@ -559,7 +584,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       ) : (
-                        <span className="px-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">616 Mixtape</span>
+                        <span className="px-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">{track.album ?? 'Built in'}</span>
                       )}
                     </div>
                   </Reorder.Item>

@@ -1866,6 +1866,15 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: 'high' | 'balanced' | 'performance';
+  /**
+   * Render pacing preference. The simulation remains fixed at 60 Hz, while
+   * 120 Hz redraws input and presentation between simulation updates on
+   * capable displays. The renderer automatically reduces its backing scale
+   * when a device cannot keep the requested cadence.
+   */
+  frameRateMode: 60 | 120;
+  /** Lifetime objective completions, used to reveal the ordered game soundtrack. */
+  soundtrackObjectiveCompletions: number;
   /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
   wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */

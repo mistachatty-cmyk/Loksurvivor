@@ -22,6 +22,26 @@ test('intro title physics defaults on, migrates older saves, and can be disabled
   assert.equal(timed.meta.introTitleReturnDelaySec, 7);
 });
 
+test('frame pacing defaults safely and only accepts the supported 60/120 modes', () => {
+  assert.equal(createInitialMeta().frameRateMode, 60);
+  assert.equal(normalizeMeta({ version: 1 }).frameRateMode, 60);
+  assert.equal(normalizeMeta({ version: 1, frameRateMode: 120 }).frameRateMode, 120);
+  assert.equal(normalizeMeta({ version: 1, frameRateMode: 144 }).frameRateMode, 60);
+
+  const updated = reducer(
+    { meta: createInitialMeta(), lastRun: null },
+    { type: 'setFrameRateMode', mode: 120 },
+  );
+  assert.equal(updated.meta.frameRateMode, 120);
+});
+
+test('soundtrack objective progress safely defaults for older saves', () => {
+  assert.equal(createInitialMeta().soundtrackObjectiveCompletions, 0);
+  assert.equal(normalizeMeta({ version: 1 }).soundtrackObjectiveCompletions, 0);
+  assert.equal(normalizeMeta({ version: 1, soundtrackObjectiveCompletions: 4 }).soundtrackObjectiveCompletions, 4);
+  assert.equal(normalizeMeta({ version: 1, soundtrackObjectiveCompletions: -2 }).soundtrackObjectiveCompletions, 0);
+});
+
 test('Look Lab preferences migrate safely and persist through their reducers', () => {
   const migrated = normalizeMeta({ version: 1, lokPetArtStyle: 'holo-card', uiBorderStyle: 'round' });
   assert.equal(migrated.lokPetArtStyle, 'holo-card');

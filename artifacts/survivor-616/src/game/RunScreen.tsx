@@ -175,6 +175,7 @@ const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: s
 const FIXED_STEP = 1 / 60;
 /** Most catch-up steps allowed in one frame before time is dropped. */
 const MAX_SUBSTEPS = 6;
+const FRAME_INTERVAL_MS: Record<60 | 120, number> = { 60: 1000 / 60, 120: 1000 / 120 };
 
 function formatClock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -286,6 +287,10 @@ export function RunScreen({
   presentationRef.current = meta;
   const musicReactiveRef = useRef(meta.musicReactiveEnabled);
   musicReactiveRef.current = meta.musicReactiveEnabled;
+  // Kept in a ref so changing pacing in Settings applies to the next drawn
+  // frame without rebuilding the world or restarting a run.
+  const frameRateModeRef = useRef<60 | 120>(meta.frameRateMode);
+  frameRateModeRef.current = meta.frameRateMode;
 
   // Tilt steering. The hook is inert unless the setting is on, and the ref is
   // read straight from the loop so orientation events never re-render.
@@ -724,9 +729,21 @@ export function RunScreen({
     let countdownLeft = 1500;
     let sizeCheckedAt = 0;
     let accumulator = 0;
+    let lastRenderAt = -Infinity;
+    let nextRenderAt = 0;
+    let scheduledRate: 60 | 120 = frameRateModeRef.current;
+    let backingScale = 1;
+    let performanceWindowAt = last;
+    let renderSamples = 0;
+    let missedCadenceSamples = 0;
+    let totalRenderCost = 0;
 
     const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      // Preserve crispness whenever the device has headroom. Under sustained
+      // load this backs the canvas down in a few small, reversible steps;
+      // that is substantially cheaper than allowing a heavy frame to block
+      // input or trigger a long fixed-step catch-up burst.
+      const ratio = Math.max(0.5, Math.min(window.devicePixelRatio || 1, 2) * backingScale);
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
       const height = Math.max(1, rect.height);
@@ -863,7 +880,66 @@ export function RunScreen({
         ? (view.width < 620 ? 900 : Math.min(1700, view.width * 1.4))
         : undefined;
       renderTargetViewRef.current = commanderTargetView;
-      renderWorld(ctx, world, commanderTargetView ? { ...view, targetViewOverride: commanderTargetView } : view);
+
+      const requestedRate = frameRateModeRef.current;
+      const targetFrameMs = FRAME_INTERVAL_MS[requestedRate];
+      const sinceLastRender = time - lastRenderAt;
+      if (requestedRate !== scheduledRate) {
+        scheduledRate = requestedRate;
+        nextRenderAt = time;
+      }
+      // RAF itself chooses the display cadence. In 60 mode, deliberately
+      // skip only redundant high-refresh redraws; simulation is still fixed
+      // 60 Hz. A deadline (instead of "every N RAFs") also paces correctly
+      // on 90 Hz and 144 Hz panels.
+      const shouldRender = time + 0.75 >= nextRenderAt;
+      if (shouldRender) {
+        const renderStartedAt = performance.now();
+        const visualPressure = world.effects.length + world.particles.length + world.popups.length;
+        const visualBudget = backingScale <= 0.72 || visualPressure > 430
+          ? 'minimal'
+          : backingScale < 1 || visualPressure > 230
+            ? 'reduced'
+            : undefined;
+        renderWorld(
+          ctx,
+          world,
+          commanderTargetView
+            ? { ...view, targetViewOverride: commanderTargetView, visualBudget }
+            : { ...view, visualBudget },
+        );
+        const renderCost = performance.now() - renderStartedAt;
+        totalRenderCost += renderCost;
+        renderSamples += 1;
+        if (lastRenderAt > 0 && sinceLastRender > targetFrameMs * 1.35) missedCadenceSamples += 1;
+        lastRenderAt = time;
+        nextRenderAt += targetFrameMs;
+        // If a tab resumed after a long pause, restart the pacing clock
+        // rather than attempting to pay back a backlog of visual frames.
+        if (nextRenderAt < time - targetFrameMs) nextRenderAt = time + targetFrameMs;
+
+        // Do not bounce resolution every frame. A half-second window makes
+        // this respond to a true swarm/effects spike while restoring detail
+        // gradually once the pressure is gone.
+        if (time - performanceWindowAt >= 500) {
+          const averageCost = totalRenderCost / Math.max(1, renderSamples);
+          const overloaded = missedCadenceSamples >= 3 || averageCost > targetFrameMs * 0.8;
+          const comfortablyFast = missedCadenceSamples === 0 && averageCost < targetFrameMs * 0.42;
+          const nextScale = overloaded
+            ? Math.max(0.6, backingScale - 0.15)
+            : comfortablyFast
+              ? Math.min(1, backingScale + 0.1)
+              : backingScale;
+          if (nextScale !== backingScale) {
+            backingScale = nextScale;
+            view = resize();
+          }
+          performanceWindowAt = time;
+          renderSamples = 0;
+          missedCadenceSamples = 0;
+          totalRenderCost = 0;
+        }
+      }
 
       highlightRecorderRef.current.observe(world);
       clipRecorderRef.current.tick(world.now);

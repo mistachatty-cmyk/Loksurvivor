@@ -48,11 +48,24 @@ export interface Viewport {
   height: number;
   dpr: number;
   /**
+   * A renderer-only pressure signal from the run loop. It never removes an
+   * entity from the simulation or changes damage: it only limits cosmetic
+   * work that is off-camera or too dense to read.
+   */
+  visualBudget?: 'full' | 'reduced' | 'minimal';
+  /**
    * How many world units wide the view should show. Normally derived from
    * `width` so every screen sees roughly the same slice of the world; the
    * map editor overrides it to fit a whole authored map in one frame.
    */
   targetViewOverride?: number;
+}
+
+type ViewBounds = { left: number; top: number; right: number; bottom: number };
+
+function isNearView(x: number, y: number, bounds: ViewBounds, padding = 0): boolean {
+  return x >= bounds.left - padding && x <= bounds.right + padding
+    && y >= bounds.top - padding && y <= bounds.bottom + padding;
 }
 
 function hashCell(x: number, y: number): number {
@@ -2608,8 +2621,20 @@ function drawPendingMeteors(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawEffects(ctx: CanvasRenderingContext2D, w: World) {
+function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds, visualBudget: NonNullable<Viewport['visualBudget']>) {
+  const cosmeticLimit = visualBudget === 'minimal' ? 60 : visualBudget === 'reduced' ? 130 : Number.POSITIVE_INFINITY;
+  const cosmeticStride = visualBudget === 'minimal' ? 3 : visualBudget === 'reduced' ? 2 : 1;
+  let cosmeticDrawn = 0;
   for (const effect of w.effects) {
+    // Effects often outlive the projectile that created them. Rendering all
+    // of them even when they are well beyond the camera was a quiet cost in
+    // dense/endless runs; gameplay still updates every instance in world.ts.
+    if (!isNearView(effect.x, effect.y, bounds, effect.radius + 48)) continue;
+    const gameplayReadable = effect.kind === 'laser' || effect.kind === 'hazard' || effect.kind === 'nova' || effect.kind === 'ring' || effect.kind === 'wave';
+    if (!gameplayReadable) {
+      if (cosmeticDrawn >= cosmeticLimit || effect.uid % cosmeticStride !== 0) continue;
+      cosmeticDrawn += 1;
+    }
     const life = (w.now - effect.bornAt) / Math.max(1, effect.expiresAt - effect.bornAt);
     const fade = 1 - life;
     ctx.save();
@@ -3308,8 +3333,9 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawProjectiles(ctx: CanvasRenderingContext2D, w: World) {
+function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds) {
   for (const proj of w.projectiles) {
+    if (!isNearView(proj.x, proj.y, bounds, Math.max(36, proj.radius + 28))) continue;
     // Zero Day: a thrown frozen enemy renders as its own rig in flight
     // instead of a normal weapon-projectile sprite.
     if (proj.carriedEnemyUid !== undefined) {
@@ -4705,8 +4731,14 @@ function drawGuests(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawParticles(ctx: CanvasRenderingContext2D, w: World) {
-  for (const particle of w.particles) {
+function drawParticles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds, visualBudget: NonNullable<Viewport['visualBudget']>) {
+  const limit = visualBudget === 'minimal' ? 56 : visualBudget === 'reduced' ? 112 : Number.POSITIVE_INFINITY;
+  const stride = visualBudget === 'minimal' ? 3 : visualBudget === 'reduced' ? 2 : 1;
+  let drawn = 0;
+  for (let index = 0; index < w.particles.length; index += 1) {
+    const particle = w.particles[index]!;
+    if (!isNearView(particle.x, particle.y, bounds, 12) || index % stride !== 0 || drawn >= limit) continue;
+    drawn += 1;
     const life = (w.now - particle.bornAt) / particle.lifeMs;
     ctx.globalAlpha = Math.max(0, 1 - life);
     ctx.fillStyle = particle.color;
@@ -4715,10 +4747,14 @@ function drawParticles(ctx: CanvasRenderingContext2D, w: World) {
   ctx.globalAlpha = 1;
 }
 
-function drawPopups(ctx: CanvasRenderingContext2D, w: World) {
+function drawPopups(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds, visualBudget: NonNullable<Viewport['visualBudget']>) {
   ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
   ctx.textAlign = 'center';
+  const limit = visualBudget === 'minimal' ? 18 : visualBudget === 'reduced' ? 28 : Number.POSITIVE_INFINITY;
+  let drawn = 0;
   for (const popup of w.popups) {
+    if (!isNearView(popup.x, popup.y, bounds, 32) || drawn >= limit) continue;
+    drawn += 1;
     const life = (w.now - popup.bornAt) / 700;
     ctx.globalAlpha = Math.max(0, 1 - life);
     ctx.fillStyle = '#000000';
@@ -4851,6 +4887,17 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const right = w.camera.x + halfViewW + 40;
   const top = w.camera.y - halfViewH - 40;
   const bottom = w.camera.y + halfViewH + 40;
+  const viewBounds = { left, top, right, bottom };
+  // At the standard cap, let high quality stay visually complete. Once the
+  // screen is genuinely busy, keep player-facing combat cues while reducing
+  // only nonessential VFX. A smaller backing scale supplied by RunScreen is
+  // a separate, last-resort safeguard for a slower device.
+  const visualBudget = view.visualBudget
+    ?? (w.graphicsQuality === 'performance' && w.enemies.length >= 80
+      ? 'minimal'
+      : w.graphicsQuality !== 'high' && w.enemies.length >= 150
+        ? 'reduced'
+        : 'full');
 
   // Use the era's ground palette when inside a dungeon room.
   const ground = effectiveGround(w);
@@ -4912,13 +4959,13 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawActors(ctx, w, { left, top, right, bottom });
   drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
-  drawEffects(ctx, w);
+  drawEffects(ctx, w, viewBounds, visualBudget);
   drawBubbleWash(ctx, w);
   drawElectricChains(ctx, w);
-  drawProjectiles(ctx, w);
+  drawProjectiles(ctx, w, viewBounds);
   drawPendingMeteors(ctx, w);
-  drawParticles(ctx, w);
-  drawPopups(ctx, w);
+  drawParticles(ctx, w, viewBounds, visualBudget);
+  drawPopups(ctx, w, viewBounds, visualBudget);
   if (sky !== 'roofed') {
     if (showBirds) drawBirds(ctx, w, left, top, right, bottom);
     drawClouds(ctx, w, cloudPuffs, profile);
