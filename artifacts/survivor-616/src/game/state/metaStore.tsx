@@ -51,6 +51,8 @@ import {
 } from '@/game/data/contracts';
 import {
   DEFAULT_UI_THEME_ID,
+  HIDDEN_UI_THEME_IDS,
+  STARTER_UI_THEME_IDS,
   UI_THEMES_BY_ID,
   defaultSwatchId,
   uiLooksForOwnedThemeIds,
@@ -142,7 +144,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 17;
+const META_VERSION = 18;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -345,9 +347,11 @@ export function createInitialMeta(): MetaState {
     knownRelicIds: [],
     customMaps: [],
     uiPanelLayout: 'rail',
-    ownedUiThemeIds: [DEFAULT_UI_THEME_ID],
+    ownedUiThemeIds: [DEFAULT_UI_THEME_ID, ...STARTER_UI_THEME_IDS],
     uiTheme: DEFAULT_UI_THEME_ID,
     uiThemeSwatchByTheme: {},
+    themeCycleMastered: false,
+    themeCycleCollection: 'starter',
     ownedPaletteIds: [DEFAULT_PALETTE_ID],
     activePaletteId: DEFAULT_PALETTE_ID,
     ownedSoundPackIds: [DEFAULT_SOUND_PACK_ID],
@@ -461,7 +465,7 @@ function normalizeVendorPurchases(value: unknown): Record<string, number> {
 }
 
 function normalizeOwnedUiThemeIds(value: unknown): string[] {
-  const owned = new Set<string>([DEFAULT_UI_THEME_ID]);
+  const owned = new Set<string>([DEFAULT_UI_THEME_ID, ...STARTER_UI_THEME_IDS]);
   if (Array.isArray(value)) {
     for (const entry of value) {
       if (typeof entry === 'string' && UI_THEMES_BY_ID[entry]) owned.add(entry);
@@ -1170,6 +1174,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedUiThemeIds,
     uiTheme: normalizeUiTheme(parsed.uiTheme, ownedUiThemeIds),
     uiThemeSwatchByTheme: normalizeUiThemeSwatchByTheme(parsed.uiThemeSwatchByTheme),
+    themeCycleMastered: parsed.themeCycleMastered === true,
+    themeCycleCollection: parsed.themeCycleMastered === true && parsed.themeCycleCollection === 'owned' ? 'owned' : 'starter',
     ownedPaletteIds: normalizeOwnedPaletteIds(parsed.ownedPaletteIds),
     activePaletteId: normalizePaletteId(parsed.activePaletteId, normalizeOwnedPaletteIds(parsed.ownedPaletteIds)),
     ownedSoundPackIds: normalizeOwnedSoundPackIds(parsed.ownedSoundPackIds),
@@ -1671,6 +1677,10 @@ type Action =
   | { type: 'buyCelebration'; id: string }
   | { type: 'equipCelebration'; id: string }
   | { type: 'cycleUiLook' }
+  | { type: 'cycleStarterUiLook' }
+  | { type: 'unlockThemeCycleMastery' }
+  | { type: 'setThemeCycleCollection'; collection: 'starter' | 'owned' }
+  | { type: 'checkHiddenThemeReload' }
   | { type: 'unlockDevModeAccess' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
@@ -2437,7 +2447,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, activeCelebrationId: action.id } };
 
     case 'cycleUiLook': {
-      const looks = uiLooksForOwnedThemeIds(effectiveCatalogIds(state.meta, 'uiThemes', state.meta.ownedUiThemeIds));
+      const themeIds = state.meta.themeCycleMastered && state.meta.themeCycleCollection === 'owned'
+        ? effectiveCatalogIds(state.meta, 'uiThemes', state.meta.ownedUiThemeIds)
+        : STARTER_UI_THEME_IDS;
+      const looks = uiLooksForOwnedThemeIds(themeIds);
       if (looks.length <= 1) return state;
       const currentSwatchId = activeUiThemeSwatchId(state.meta);
       const currentIndex = looks.findIndex(
@@ -2461,6 +2474,46 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'cycleStarterUiLook': {
+      const looks = uiLooksForOwnedThemeIds(STARTER_UI_THEME_IDS);
+      const currentSwatchId = activeUiThemeSwatchId(state.meta);
+      const currentIndex = looks.findIndex((look) => look.themeId === state.meta.uiTheme && look.swatchId === currentSwatchId);
+      const next = looks[(currentIndex + 1 + looks.length) % looks.length] ?? looks[0];
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          uiTheme: next.themeId,
+          ...(next.swatchId ? { uiThemeSwatchByTheme: { ...state.meta.uiThemeSwatchByTheme, [next.themeId]: next.swatchId } } : {}),
+        },
+      };
+    }
+
+    case 'unlockThemeCycleMastery':
+      if (state.meta.themeCycleMastered || state.meta.cred < 2400) return state;
+      return { ...state, meta: { ...state.meta, cred: state.meta.cred - 2400, themeCycleMastered: true } };
+
+    case 'setThemeCycleCollection':
+      if (!state.meta.themeCycleMastered) return state;
+      return { ...state, meta: { ...state.meta, themeCycleCollection: action.collection } };
+
+    case 'checkHiddenThemeReload': {
+      // Rare cold-open takeovers are the discovery mechanic. This action only
+      // runs when IntroScreen mounts, never during normal render work.
+      const undiscovered = HIDDEN_UI_THEME_IDS.filter((id) => !state.meta.ownedUiThemeIds.includes(id));
+      const available = state.meta.devModeAllUnlocks ? HIDDEN_UI_THEME_IDS : undiscovered.length > 0 ? undiscovered : HIDDEN_UI_THEME_IDS.filter((id) => state.meta.ownedUiThemeIds.includes(id));
+      if (available.length === 0 || Math.random() >= 0.08) return state;
+      const id = available[Math.floor(Math.random() * available.length)]!;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          uiTheme: id,
+          ownedUiThemeIds: state.meta.ownedUiThemeIds.includes(id) ? state.meta.ownedUiThemeIds : [...state.meta.ownedUiThemeIds, id],
+        },
+      };
+    }
+
     case 'unlockDevModeAccess':
       return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
 
@@ -2471,6 +2524,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         meta: {
           ...state.meta,
           devModeAllUnlocks: action.enabled,
+          ...(action.enabled ? { ownedUiThemeIds: [...new Set([...state.meta.ownedUiThemeIds, ...HIDDEN_UI_THEME_IDS])] } : {}),
           ...(!action.enabled
             ? {
                 uiTheme: state.meta.ownedUiThemeIds.includes(state.meta.uiTheme) ? state.meta.uiTheme : DEFAULT_UI_THEME_ID,
@@ -3076,6 +3130,10 @@ export interface MetaContextValue {
   buyCelebration: (id: string) => void;
   equipCelebration: (id: string) => void;
   cycleUiLook: () => void;
+  cycleStarterUiLook: () => void;
+  unlockThemeCycleMastery: () => void;
+  setThemeCycleCollection: (collection: 'starter' | 'owned') => void;
+  checkHiddenThemeReload: () => void;
   unlockDevModeAccess: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
@@ -3224,6 +3282,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const buyCelebration = useCallback((id: string) => dispatch({ type: 'buyCelebration', id }), []);
   const equipCelebration = useCallback((id: string) => dispatch({ type: 'equipCelebration', id }), []);
   const cycleUiLook = useCallback(() => dispatch({ type: 'cycleUiLook' }), []);
+  const cycleStarterUiLook = useCallback(() => dispatch({ type: 'cycleStarterUiLook' }), []);
+  const unlockThemeCycleMastery = useCallback(() => dispatch({ type: 'unlockThemeCycleMastery' }), []);
+  const setThemeCycleCollection = useCallback((collection: 'starter' | 'owned') => dispatch({ type: 'setThemeCycleCollection', collection }), []);
+  const checkHiddenThemeReload = useCallback(() => dispatch({ type: 'checkHiddenThemeReload' }), []);
   const unlockDevModeAccess = useCallback(() => dispatch({ type: 'unlockDevModeAccess' }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
@@ -3459,6 +3521,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyCelebration,
       equipCelebration,
       cycleUiLook,
+      cycleStarterUiLook,
+      unlockThemeCycleMastery,
+      setThemeCycleCollection,
+      checkHiddenThemeReload,
       unlockDevModeAccess,
       setDevModeAllUnlocks,
       setPhysicsObjectClicks,
@@ -3575,6 +3641,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyCelebration,
     equipCelebration,
     cycleUiLook,
+    cycleStarterUiLook,
+    unlockThemeCycleMastery,
+    setThemeCycleCollection,
+    checkHiddenThemeReload,
     unlockDevModeAccess,
     setDevModeAllUnlocks,
     setPhysicsObjectClicks,
