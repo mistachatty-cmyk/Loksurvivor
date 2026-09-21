@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
@@ -16,6 +16,10 @@ interface Props {
 
 export function ScreenLayout({ title, subtitle, onBack, children, action, backdrop, className = '' }: Props) {
   const { meta } = useMeta();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [title]);
 
   return (
     <motion.div
@@ -39,6 +43,12 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
             aria-hidden="true"
           />
         </div>
+      )}
+
+      {onBack && (
+        <button type="button" onClick={onBack} className="fixed bottom-4 left-4 z-50 flex min-h-11 items-center gap-2 border border-white/25 bg-black/85 px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white shadow-xl backdrop-blur hover:border-primary hover:text-primary sm:hidden" data-testid="button-back-floating">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </button>
       )}
 
       <header className="relative z-20 px-6 pt-10 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">

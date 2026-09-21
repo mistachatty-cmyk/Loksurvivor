@@ -98,15 +98,15 @@ function FatigueIndicator({ summary }: { summary: CharacterFatigueSummary }) {
       }`}
       data-testid="character-fatigue-indicator"
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2">
           <HeartPulse
             className={`h-4 w-4 shrink-0 ${
               isFatigued ? 'text-amber-400 animate-pulse' : 'text-emerald-400'
             }`}
           />
           <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
                 Readiness &amp; Fatigue
               </span>
@@ -127,7 +127,7 @@ function FatigueIndicator({ summary }: { summary: CharacterFatigueSummary }) {
             </h4>
           </div>
         </div>
-        <div className="text-right shrink-0">
+        <div className="self-start text-left sm:self-auto sm:text-right shrink-0">
           <span
             className={`inline-block border px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
               isFatigued

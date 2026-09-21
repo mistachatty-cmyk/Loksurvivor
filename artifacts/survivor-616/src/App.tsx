@@ -159,7 +159,9 @@ function Game() {
   }, [enterHideout, sfx]);
 
   const prepareRun = useCallback((run: Omit<Extract<Screen, { name: 'run' }>, 'name'>) => {
-    setScreen({ name: 'run-setup', ...run, destination: 'run' });
+    // Looks & LokPets is a persistent preference surface, not a mandatory
+    // pre-match interruption. The floating hideout control can reopen it.
+    setScreen({ name: 'run', ...run });
   }, []);
 
   const openPanel = useCallback((panel: HubPanel) => {

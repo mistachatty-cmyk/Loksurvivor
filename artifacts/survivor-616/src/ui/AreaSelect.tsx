@@ -39,7 +39,15 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const customMaps = meta.customMaps;
   const challenges = availableChallengeContracts(meta);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
-  const [filter, setFilter] = useState<'all' | 'endless' | 'standard'>('all');
+  type MapFilter = 'standard' | 'bonus' | '2x' | 'endless';
+  const [filter, setFilter] = useState<MapFilter>('standard');
+
+  const inFilter = (area: (typeof unlockedAreas)[number], nextFilter: MapFilter) => {
+    if (nextFilter === 'endless') return Boolean(area.endless);
+    if (nextFilter === '2x') return area.id.endsWith('-2x');
+    if (nextFilter === 'bonus') return false;
+    return !area.endless && !area.id.endsWith('-2x');
+  };
 
   const toggleChallenge = (id: string) => {
     setSelectedChallengeIds((current) => {
@@ -49,19 +57,17 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   };
 
   const filteredUnlocked = unlockedAreas.filter((a) => {
-    if (filter === 'endless') return Boolean(a.endless);
-    if (filter === 'standard') return !a.endless;
-    return true;
+    return inFilter(a, filter);
   });
 
   const filteredLocked = lockedAreas.filter((a) => {
-    if (filter === 'endless') return Boolean(a.endless);
-    if (filter === 'standard') return !a.endless;
-    return true;
+    return inFilter(a, filter);
   });
 
   const endlessCount = unlockedAreas.filter((a) => a.endless).length + lockedAreas.filter((a) => a.endless).length;
   const standardCount = unlockedAreas.filter((a) => !a.endless).length + lockedAreas.filter((a) => !a.endless).length;
+  const twoXCount = [...unlockedAreas, ...lockedAreas].filter((a) => a.id.endsWith('-2x')).length;
+  const bonusCount = customMaps.length;
 
   return (
     <ScreenLayout 
@@ -122,18 +128,6 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setFilter('all')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border ${
-              filter === 'all'
-                ? 'border-primary bg-primary text-black'
-                : 'border-border bg-card text-muted-foreground hover:border-primary/60 hover:text-white'
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5" />
-            All Districts ({unlockedAreas.length + lockedAreas.length})
-          </button>
-          <button
-            type="button"
             onClick={() => setFilter('endless')}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border ${
               filter === 'endless'
@@ -154,7 +148,13 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
             }`}
           >
             <Clock className="h-3.5 w-3.5" />
-            Standard ({standardCount})
+            Standard ({Math.max(0, standardCount - twoXCount)})
+          </button>
+          <button type="button" onClick={() => setFilter('bonus')} className={`flex items-center gap-1.5 border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === 'bonus' ? 'border-violet-300 bg-violet-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-violet-300/60 hover:text-violet-200'}`}>
+            <Layers className="h-3.5 w-3.5" /> Bonus Maps ({bonusCount})
+          </button>
+          <button type="button" onClick={() => setFilter('2x')} className={`flex items-center gap-1.5 border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === '2x' ? 'border-orange-300 bg-orange-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-orange-300/60 hover:text-orange-200'}`}>
+            <Maximize2 className="h-3.5 w-3.5" /> 2× Maps ({twoXCount})
           </button>
         </div>
 
@@ -167,7 +167,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filter !== 'endless' && customMaps.map((map, i) => {
+        {filter === 'bonus' && customMaps.map((map, i) => {
           const area = customMapToArea(map);
           const mapIssues = customMapValidationIssues(map);
           const launchable = mapIssues.length === 0;

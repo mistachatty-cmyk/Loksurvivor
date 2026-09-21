@@ -82,6 +82,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       `-- ${STUDIO_NAME}`,
     ],
   },
+  {
+    version: '0.6.0',
+    date: '2026-09-21',
+    kind: 'update',
+    title: 'Looks, LokPets, and a Hideout That Makes Sense',
+    body: [
+      'Looks & LokPets now stays saved and launches from the hideout instead of interrupting every match.',
+      'Your selected companion stays at your side, or rests in the Handheld DigiScope when its charge is empty.',
+      'Standard, Bonus, 2x, and Infinite maps now have their own tabs. Infinite Worlds remain truly endless.',
+      'The Sound Booth now owns Studio and Soundtrack; the Alley Annex owns the Quartermaster and Relic Workshop; Archives and Bestiary live in the Back Room.',
+      'First Night starts minimized, mobile readiness is easier to read, and every menu page returns to the top with a persistent mobile Back button.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
