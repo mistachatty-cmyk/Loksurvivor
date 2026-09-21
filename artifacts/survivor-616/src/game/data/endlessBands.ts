@@ -15,7 +15,7 @@ export const ENDLESS_BANDS: EndlessBandDef[] = [
     riskLabel: 'familiar streets',
     hazardLabel: 'clear lanes',
     enemyPool: ['nightcrawler', 'neon-leech'],
-    eventTitle: 'No signal beyond the core',
+    eventTitle: 'No route beyond the core',
     eventDescription: 'Keep moving until the city changes its shape.',
   },
   {
@@ -41,8 +41,8 @@ export const ENDLESS_BANDS: EndlessBandDef[] = [
     riskLabel: 'freight lanes',
     hazardLabel: 'railfall',
     enemyPool: ['ash-wisp', 'bloodhound', 'belfry-bat', 'bridge-lookout', 'corner-cutter'],
-    eventTitle: 'Signal box 616',
-    eventDescription: 'Cross the live rail shadow for a chance at a locked signal cache.',
+    eventTitle: 'Switch box 616',
+    eventDescription: 'Cross the live rail shadow for a chance at a locked rail cache.',
   },
   {
     id: 'industrial-fringe',
@@ -306,7 +306,7 @@ export const NULL_SECTOR_ENDLESS_BANDS: EndlessBandDef[] = [
     thresholdPx: 900,
     accent: '#22d3ee',
     ground: { base: '#06151c', tile: '#0c222c', seam: '#030a0e', glow: '#06b6d4' },
-    riskLabel: 'signal overload',
+    riskLabel: 'grid overload',
     hazardLabel: 'data surge',
     enemyPool: ['packet-wraith', 'pallet-wraith', 'neon-leech'],
     eventTitle: 'Bus router beacon',
@@ -404,7 +404,7 @@ export const DOCKS_ENDLESS_BANDS: EndlessBandDef[] = [
     hazardLabel: 'riptide vortex',
     enemyPool: ['river-wraith', 'current-stag', 'bass-bruiser', 'lightless-prowler'],
     eventTitle: 'Derelict tugboat buoy',
-    eventDescription: 'A rusted river tug’s emergency radio is looping a salvage signal.',
+    eventDescription: 'A rusted river tug’s emergency radio is looping a salvage call.',
   },
   {
     id: 'docks-horizon',

@@ -94,7 +94,7 @@ export const WEIRD_AREAS: AreaDef[] = [
   {
     id: 'null-orchard',
     name: 'Null Orchard',
-    district: 'Municipal garden, signal not found',
+    district: 'Municipal garden, route not found',
     description: 'Rows of trees grow fuse boxes instead of fruit. Some hum, some spark, and the fog keeps moving even when the wind stops.',
     backdrop: 'art/cellar.jpeg',
     bounds: { w: 2200, h: 1400 },

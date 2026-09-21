@@ -22,7 +22,7 @@ export const SECTOR_STRUCTURES: SectorStructureDef[] = [
   {
     id: 'relay-beacon',
     name: 'Choir Relay',
-    description: 'A tapped street relay. Turns a stray Choir signal into a body every twelve seconds.',
+    description: 'A tapped street relay. Turns a stray Choir pulse into a body every twelve seconds.',
     spawnIntervalSec: 12,
     unitEnemyId: 'nightcrawler',
     hp: 260,

@@ -1,7 +1,7 @@
 import type { HatDef, HatStyle } from '@/game/types';
 
 export const HATS: HatDef[] = [
-  { id: 'no-hat', name: 'No Hat', description: 'Keep the signal clean.', cost: 0, tier: 'standard', style: 'none' },
+  { id: 'no-hat', name: 'No Hat', description: 'Keep the look clean.', cost: 0, tier: 'standard', style: 'none' },
   { id: 'midnight-topper', name: 'Midnight Topper', description: 'A crooked top hat hovering just above the static.', cost: 2, tier: 'uncommon', style: 'top-hat' },
   { id: 'sunwire-halo', name: 'Sunwire Halo', description: 'A bright ring that refuses to touch the head.', cost: 2, tier: 'uncommon', style: 'halo' },
   { id: 'block-crown', name: 'Block Crown', description: 'Three brass points for a very small kingdom.', cost: 3, tier: 'rare', style: 'crown' },

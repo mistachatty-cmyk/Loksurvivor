@@ -273,7 +273,7 @@ export const CARD_PACKS: LokDeckSet[] = [
   },
   {
     id: 'lokpets',
-    name: 'Signal Beasts',
+    name: 'Spirit Beasts',
     kicker: 'LokPet discovery pack',
     description: 'Survivor 616 LokPet families, ready to bridge into Lock Decks later.',
     cardIds: cardsForSet('lokpets'),

@@ -56,7 +56,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
               className={`border p-3 text-left transition-all active:scale-[0.97] ${active ? 'border-fuchsia-300 bg-fuchsia-300/10' : record ? 'border-white/15' : 'border-white/[.07] opacity-45'}`}
             >
               <span className={`text-[9px] uppercase ${RARITY_COLOR[card.rarity]}`}>{card.type} · {card.rarity}{record ? ` · x${record.copies} · ${record.bestVariant}` : ''}</span>
-              <span className="mt-1 flex justify-between font-display text-sm font-black uppercase text-white">{record ? card.name : 'Unknown Signal'}{active && <Check className="h-4 w-4" />}</span>
+              <span className="mt-1 flex justify-between font-display text-sm font-black uppercase text-white">{record ? card.name : 'Unknown Card'}{active && <Check className="h-4 w-4" />}</span>
               <span className="mt-1 block text-[10px] text-white/50">{record ? card.description : 'Open matching packs to break the seal.'}</span>
             </button>
           );

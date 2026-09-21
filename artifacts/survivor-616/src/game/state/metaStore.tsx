@@ -2858,7 +2858,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         totalLevelUps: prev.totalLevelUps + Math.max(0, result.level - 1),
-        soundtrackObjectiveCompletions: prev.soundtrackObjectiveCompletions + result.completedObjectives.filter((objective) => objective.completed).length,
+        soundtrackObjectiveCompletions: prev.soundtrackObjectiveCompletions + result.completedObjectives.length,
         cred: prev.cred + result.cred + dailyContracts.rewardCred,
         lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
         cardCredits: prev.cardCredits + cardCreditsForRun(runCharacter, result.lootBoxesOpened),

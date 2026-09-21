@@ -1,9 +1,10 @@
 import { ArrowLeft, Check, Circle, Cpu, Grid3X3, Monitor, PawPrint, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
+import { THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 
 type SetupStep = 'companion' | 'look';
 
@@ -20,7 +21,7 @@ const ART_STYLES: Array<{
   description: string;
 }> = [
   { id: 'pixel-core', label: 'Pixel Core', description: 'The classic pixel rig.' },
-  { id: 'neon-signal', label: 'Neon Signal', description: 'Glow-forward signal scan.' },
+  { id: 'neon-signal', label: 'Neon Flight', description: 'Glow-forward companion scan.' },
   { id: 'holo-card', label: 'Holo Card', description: 'A collectible-card finish.' },
 ];
 
@@ -52,6 +53,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     setGraphicsQuality,
     setUiPanelLayout,
     setMinimapVisible,
+    equipPalette,
   } = useMeta();
   const [step, setStep] = useState<SetupStep>('companion');
   const [selectedPetId, setSelectedPetId] = useState<string | null>(meta.selectedLokPetIds[0] ?? null);
@@ -61,8 +63,12 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const [panelLayout, setPanelLayout] = useState(meta.uiPanelLayout);
   const [minimapVisible, setMinimapVisibleChoice] = useState(meta.minimapVisible);
   const readyPets = meta.savedLokPets.filter((pet) => pet.stamina > 0);
+  const regularReadyPets = readyPets.filter((pet) => !pet.roll.legendary);
+  const legendaryReadyPets = readyPets.filter((pet) => pet.roll.legendary);
   const capacity = lokPetTeamCapacity(selectedCharacter);
   const isLaunch = intent === 'launch';
+  const ownedPalettes = meta.ownedPaletteIds.map((id) => THEMED_PALETTES_BY_ID[id]).filter(Boolean);
+  const paletteIndex = Math.max(0, ownedPalettes.findIndex((palette) => palette.id === meta.activePaletteId));
 
   const continueWithCompanion = () => {
     setLokPetLoadout(selectedPetId ? [selectedPetId] : []);
@@ -124,11 +130,12 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                 <p className="mt-3 text-sm font-black uppercase">Go solo</p>
                 <p className="mt-1 text-xs leading-relaxed text-white/50">No companion this run.</p>
               </button>
-              {readyPets.map((pet) => {
+              {[...regularReadyPets, ...legendaryReadyPets].map((pet) => {
                 const selected = pet.id === selectedPetId;
                 return (
+                  <Fragment key={pet.id}>
+                  {pet.roll.legendary && pet.id === legendaryReadyPets[0]?.id ? <div className="col-span-full mt-2 border-t border-amber-300/30 pt-3 font-mono text-[10px] font-black uppercase tracking-[.24em] text-amber-200">Legendary companions</div> : null}
                   <button
-                    key={pet.id}
                     type="button"
                     onClick={() => setSelectedPetId(pet.id)}
                     className={`relative min-h-36 border p-4 text-left transition ${selected ? selectClass(true) : selectClass(false)}`}
@@ -144,6 +151,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                       </div>
                     </div>
                   </button>
+                  </Fragment>
                 );
               })}
             </div>
@@ -176,6 +184,13 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
+              <section className="border border-white/15 bg-white/[.03] p-4 lg:col-span-2" data-testid="looks-palette-slider">
+                <div className="flex items-center justify-between gap-3">
+                  <div><h3 className="text-sm font-black uppercase">Theme palette slider</h3><p className="mt-1 text-xs text-white/55">Slide through every palette you own. The interface updates immediately.</p></div>
+                  <span className="font-mono text-[10px] font-bold uppercase text-cyan-100">{ownedPalettes[paletteIndex]?.name ?? 'Default'}</span>
+                </div>
+                <input type="range" min={0} max={Math.max(0, ownedPalettes.length - 1)} value={paletteIndex} onChange={(event) => { const palette = ownedPalettes[Number(event.target.value)]; if (palette) equipPalette(palette.id); }} className="mt-4 w-full accent-cyan-300" aria-label="Theme palette" />
+              </section>
               <section className="border border-white/15 bg-white/[.03] p-4">
                 <h3 className="flex items-center gap-2 text-sm font-black uppercase"><PawPrint className="h-4 w-4 text-pink-200" /> LokPet art style</h3>
                 <p className="mt-1 text-xs text-white/55">A visual-only finish for portraits and cards.</p>

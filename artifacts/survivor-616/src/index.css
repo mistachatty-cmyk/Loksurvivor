@@ -777,3 +777,6 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   .music-reactive-root::before { opacity: 0 !important; }
   .intro-screen *, .intro-screen { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }
+[data-testid^='run-hud'], [data-testid='run-intel-drawer'], [data-testid='button-loot-tray'], [data-testid='button-loot-tray-options'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-hud, 1)); }
+[data-testid^='overlay-'], [role='dialog'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-popups, 1)); }
+header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-menus, 1)); }

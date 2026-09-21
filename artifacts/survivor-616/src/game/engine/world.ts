@@ -3293,7 +3293,7 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   const packChance = 0.0015 + (collector?.floorPackChance ?? 0) + w.cardEffects.packDropBonus;
   if (enemy.def.family !== 'Boss' && w.rng() < packChance) {
     w.pickups.push({ uid: uid(w), kind: 'card-pack', x: enemy.x, y: enemy.y, vx: randRange(w.rng, -24, 24), vy: randRange(w.rng, -24, 24), value: 1, bornAt: w.now });
-    pushAlert(w, collector ? `${collector.rank} found a floor Lock Pack` : 'Lock Pack signal dropped');
+    pushAlert(w, collector ? `${collector.rank} found a floor Lock Pack` : 'Lock Pack dropped');
   }
 
   if (enemy.def.family === 'Boss') {

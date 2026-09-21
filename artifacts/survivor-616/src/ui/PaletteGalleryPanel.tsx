@@ -202,7 +202,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">{category === 'palettes' ? 'World & character colors' : category === 'auras' ? 'Procedural run effects' : category === 'hats' ? 'Floating headwear' : 'Reward reveal effects'}</p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Signal auras' : category === 'hats' ? 'Hover hats' : 'Celebrations'}</h2>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Run auras' : category === 'hats' ? 'Hover hats' : 'Celebrations'}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                 {category === 'palettes'
                   ? 'Recolor your fighter, weapon effects, and world accents. Premium palettes cost more, but nothing here changes combat power.'

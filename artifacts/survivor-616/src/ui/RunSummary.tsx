@@ -215,7 +215,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
               <Radio className="h-5 w-5 text-cyan-200" />
               <div>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">Broadcast Board</p>
-                <h2 className="mt-1 text-xl font-black uppercase text-white">Signal answered</h2>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">Call answered</h2>
               </div>
             </div>
             <div className="mt-4 space-y-2">

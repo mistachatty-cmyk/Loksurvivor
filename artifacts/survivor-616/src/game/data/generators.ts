@@ -31,7 +31,7 @@ export const RENTABLE_GENERATORS: GeneratorDef[] = [
   {
     id: 'rooftop-antenna',
     name: 'Rooftop Antenna Lease',
-    description: 'Someone always needs signal. Unglamorous, reliable, always on.',
+    description: 'Someone always needs a connection. Unglamorous, reliable, always on.',
     cost: 1200,
     credPerMinute: 14,
   },

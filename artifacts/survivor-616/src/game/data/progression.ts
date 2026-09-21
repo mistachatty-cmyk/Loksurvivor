@@ -212,7 +212,7 @@ export const ALLIES: AllyDef[] = [
   {
     id: 'frankie',
     name: 'Frankie Reyes',
-    role: 'Rail yard signalman',
+    role: 'Rail yard switch operator',
     blurb: 'Worked the switch by lantern long after the yard stopped running trains on schedule. Still logs every arrival, real or otherwise.',
     room: 'the-cellar',
     boost: { haste: -0.04 },
@@ -330,7 +330,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'studio', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['runs', 'roster', 'allies', 'settings', 'account', 'feedback'],
   },
   {
     id: 'rooftop-perch',
@@ -348,11 +348,11 @@ export const HUB_ROOMS: HubRoomDef[] = [
     name: 'The Cellar',
     subtitle: 'Hidden room',
     description:
-      'Behind the walk-in cooler, down a hatch nobody mentions. Lantern light, glass growths, and a record wall.',
+      'Behind the walk-in cooler: your playable cabinets and the crypto-mining rigs. Nothing else competes for the cellar floor.',
     backdrop: 'art/cellar.jpeg',
     biome: 'cellar',
     unlock: { kind: 'discovery', discoveryId: 'lantern-shard' },
-    features: ['music', 'bestiary', 'allies', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['allies', 'settings', 'account', 'feedback'],
   },
   {
     id: 'the-alley',
@@ -363,7 +363,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/alley.jpeg',
     biome: 'alley',
     unlock: { kind: 'discovery', discoveryId: 'floodwall-mark' },
-    features: ['vendor', 'workshop', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['vendor', 'workshop', 'allies', 'settings', 'account', 'feedback'],
   },
   {
     id: 'the-storefront',
@@ -373,11 +373,10 @@ export const HUB_ROOMS: HubRoomDef[] = [
       'A bright little storefront where Lock Packs, passive decks, duplicate cards, and rare variants change hands under a humming sign.',
     backdrop: 'art/street.jpeg',
     biome: 'archive',
-    // The shop is a Hideout destination for now, so a fresh player can always
-    // see where Card Credits and Lock Deck packs live. It can later become a
-    // city-travel destination without changing its UI or saved card data.
+    // A travel destination outside the hideout. Selecting it launches the
+    // Neon Sleeve shop immediately through App's room routing.
     unlock: { kind: 'default' },
-    features: ['card-shop', 'bestiary', 'unlocks', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['card-shop'],
   },
   {
     id: 'the-back-room',
@@ -388,7 +387,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/street.jpeg',
     biome: 'archive',
     unlock: { kind: 'discovery', discoveryId: 'arcade-high-score' },
-    features: ['allies', 'vendor', 'studio', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['allies', 'bestiary', 'unlocks', 'settings', 'account', 'feedback'],
   },
   {
     id: 'the-sound-booth',
@@ -401,7 +400,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     // Same reasoning as the-storefront: a Hideout destination from the start
     // so a fresh player can always find where their loot-token SFX packs live.
     unlock: { kind: 'default' },
-    features: ['sound-booth', 'unlocks', 'settings', 'account', 'feedback'],
+    features: ['music', 'studio', 'sound-booth', 'settings', 'account', 'feedback'],
   },
 ];
 

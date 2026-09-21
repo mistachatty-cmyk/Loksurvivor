@@ -1,13 +1,15 @@
 import { FIRST_NIGHT_CHAPTERS, recommendedFirstNightChapter } from '@/game/data/firstNight';
 import { getArea } from '@/game/data/areas';
 import { useMeta } from '@/game/state/metaStore';
-import { CheckCircle2, ChevronRight, Compass, Lock, Radio, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, Compass, Lock, Radio, ShieldAlert } from 'lucide-react';
+import { useState } from 'react';
 
 export interface FirstNightBoardProps {
   compact?: boolean;
 }
 
 export function FirstNightBoard({ compact = false }: FirstNightBoardProps) {
+  const [expanded, setExpanded] = useState(false);
   const { meta, unlockedAreas } = useMeta();
   const unlockedIds = unlockedAreas.map((area) => area.id);
   const recommended = recommendedFirstNightChapter(meta.clearedAreaIds, unlockedIds);
@@ -19,7 +21,7 @@ export function FirstNightBoard({ compact = false }: FirstNightBoardProps) {
       className={`border border-cyan-300/25 bg-cyan-950/10 ${compact ? 'p-4' : 'p-5 sm:p-6'}`}
       data-testid="section-first-night-board"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} className="flex w-full flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between" data-testid="button-toggle-first-night-board">
         <div>
           <div className="flex items-center gap-2 text-cyan-200">
             <Compass className="h-4 w-4" aria-hidden="true" />
@@ -30,12 +32,13 @@ export function FirstNightBoard({ compact = false }: FirstNightBoardProps) {
             Rescues and landmarks are connected. Clear any district you like, but the highlighted lead keeps the opening story moving.
           </p>
         </div>
-        <span className="shrink-0 font-mono text-xs uppercase tracking-widest text-cyan-100/70">
+        <span className="flex shrink-0 items-center gap-2 font-mono text-xs uppercase tracking-widest text-cyan-100/70">
           {completedCount}/{FIRST_NIGHT_CHAPTERS.length} leads pinned
+          <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </span>
-      </div>
+      </button>
 
-      <div className={`mt-4 grid gap-3 ${compact ? '' : 'lg:grid-cols-[1.1fr_1fr]'}`}>
+      {expanded && <><div className={`mt-4 grid gap-3 ${compact ? '' : 'lg:grid-cols-[1.1fr_1fr]'}`}>
         <div className="border border-cyan-300/20 bg-black/25 p-3" data-testid="first-night-thread">
           <div className="flex items-center gap-2">
             {sireConfirmed ? (
@@ -44,7 +47,7 @@ export function FirstNightBoard({ compact = false }: FirstNightBoardProps) {
               <Radio className="h-4 w-4 text-cyan-200" aria-hidden="true" />
             )}
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100/80">
-              {sireConfirmed ? 'Influence confirmed' : 'Signal still forming'}
+              {sireConfirmed ? 'Influence confirmed' : 'Trail still forming'}
             </p>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-white">
@@ -112,7 +115,7 @@ export function FirstNightBoard({ compact = false }: FirstNightBoardProps) {
             );
           })}
         </div>
-      )}
+      )}</>}
     </section>
   );
 }

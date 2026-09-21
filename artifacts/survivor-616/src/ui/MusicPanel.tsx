@@ -655,9 +655,14 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                 </button>
               </div>
 
-              {/* Toggles & Volume */}
-              <div className="flex items-center justify-between gap-4 pt-6 border-t border-border/50">
-                <div className="flex gap-2">
+              {/* Optional advanced playback controls */}
+              <details className="group border-t border-border/50 pt-4" data-testid="music-advanced-controls">
+                <summary className="cursor-pointer list-none text-center font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary">
+                  <span className="group-open:hidden">Show advanced controls</span>
+                  <span className="hidden group-open:inline">Hide advanced controls</span>
+                </summary>
+                <div className="mt-4 flex items-center justify-between gap-4 border-t border-border/30 pt-4">
+                  <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={player.toggleShuffle}
@@ -676,30 +681,31 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                   >
                     {player.repeat === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
                   </button>
-                </div>
+                  </div>
 
-                <div className="flex items-center gap-2 flex-1 max-w-[120px]">
-                  <button
-                    type="button"
-                    onClick={player.toggleMute}
-                    className="text-muted-foreground hover:text-white transition-colors"
-                    data-testid="button-mute"
-                  >
-                    {player.muted || player.volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={player.muted ? 0 : player.volume}
-                    onChange={(e) => player.setVolume(Number(e.target.value))}
-                    className="w-full h-1 bg-black appearance-none cursor-pointer accent-primary focus:outline-none"
-                    aria-label="Volume"
-                    data-testid="input-volume"
-                  />
+                  <div className="flex items-center gap-2 flex-1 max-w-[120px]">
+                    <button
+                      type="button"
+                      onClick={player.toggleMute}
+                      className="text-muted-foreground hover:text-white transition-colors"
+                      data-testid="button-mute"
+                    >
+                      {player.muted || player.volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={player.muted ? 0 : player.volume}
+                      onChange={(e) => player.setVolume(Number(e.target.value))}
+                      className="w-full h-1 bg-black appearance-none cursor-pointer accent-primary focus:outline-none"
+                      aria-label="Volume"
+                      data-testid="input-volume"
+                    />
+                  </div>
                 </div>
-              </div>
+              </details>
             </div>
           </div>
         </div>

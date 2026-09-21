@@ -39,11 +39,13 @@ import {
 import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
+import { UiTransparencyControls } from './UiTransparencyControls';
 
 export interface SettingsPanelProps {
   onBack: () => void;
+  onOpenLooksAndLokPets?: () => void;
 }
-export function SettingsPanel({ onBack }: SettingsPanelProps) {
+export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
   const {
     meta,
     setPhysicsObjectClicks,
@@ -154,8 +156,9 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
   );
 
   return (
-    <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
+    <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">Looks &amp; LokPets</button> : undefined}>
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
+        <UiTransparencyControls />
         <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
@@ -933,7 +936,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
                   Set the hideout&rsquo;s mood without changing the action. Themes change the menu chrome; palettes
-                  change its signal color and are remembered independently for every theme.
+                  change its accent color and are remembered independently for every theme.
                 </p>
                 <button
                   type="button"

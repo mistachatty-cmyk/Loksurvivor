@@ -24,6 +24,7 @@ import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes
 import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
+import { LokPetIcon } from './LokPetVariantSheet';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
 
@@ -125,6 +126,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const primeTakeoverActive = isPrimeTakeoverActive(meta, Date.now());
   const primePalette = primeTakeoverActive ? getCharacter('artisanvalor').palette : null;
   const [isPageVisible, setIsPageVisible] = useState(true);
+  const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
 
   useEffect(() => {
     const updateVisibility = () => setIsPageVisible(document.visibilityState === 'visible');
@@ -181,6 +183,17 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <Sparkles className="h-4 w-4 text-cyan-200" />
         <span>Looks &amp; LokPets</span>
       </button>
+      {companion && (
+        <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
+          <LokPetIcon silhouette={companion.roll.silhouette} palette={companion.roll.palette} size={42} />
+          <div className="min-w-0">
+            <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.roll.name}</p>
+            <p className="font-mono text-[8px] uppercase tracking-wider text-white/55">
+              {companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}
+            </p>
+          </div>
+        </div>
+      )}
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}
@@ -424,7 +437,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
                     <span>
                       <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
-                      <span className="block text-[10px] text-pink-200/70">LokPet Battles · Sparring & League</span>
+                      <span className="block text-[10px] text-pink-200/70">Experimental · LokPet Battles · Sparring & League</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
                   </button>
@@ -439,7 +452,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
                     <span>
                       <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
-                      <span className="block text-[10px] text-violet-100/60">2-4 players · most kills wins</span>
+                      <span className="block text-[10px] text-violet-100/60">Experimental · 2-4 players · most kills wins</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
                   </button>
