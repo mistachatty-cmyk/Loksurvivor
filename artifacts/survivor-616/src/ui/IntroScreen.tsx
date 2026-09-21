@@ -39,7 +39,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   // actually configured, and never shown to someone already signed in.
   const { available, session } = useAuth();
   const showSignIn = Boolean(onSignIn) && available && !session;
-  const { meta } = useMeta();
+  const { meta, cycleStarterUiLook, checkHiddenThemeReload } = useMeta();
   // Picked once per mount, not per render -- a fresh one shows up whenever
   // the title screen loads, Minecraft-main-menu-splash style.
   const splashText = useMemo(() => pickSplashText(), []);
@@ -58,6 +58,10 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
       if (revertTimer) clearTimeout(revertTimer);
     };
   }, []);
+
+  useEffect(() => {
+    checkHiddenThemeReload();
+  }, [checkHiddenThemeReload]);
 
   return (
     <div
@@ -124,6 +128,15 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
               {splashText}
             </IntroPhysicsBody>
           ) : null}
+
+          <button
+            type="button"
+            onClick={cycleStarterUiLook}
+            className="mb-3 border border-white/20 bg-black/35 px-4 py-2 font-mono text-[9px] font-bold uppercase tracking-[.2em] text-white/80 transition-colors hover:border-primary hover:text-primary"
+            data-testid="button-intro-cycle-theme"
+          >
+            Theme: {meta.uiTheme.replace(/-/g, ' ')} · switch starter look
+          </button>
 
           <motion.button
             type="button"
