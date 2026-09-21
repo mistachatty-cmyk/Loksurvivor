@@ -815,6 +815,62 @@ export const AREAS: AreaDef[] = [
     ],
   },
 
+  {
+    id: 'lev-syndicate-spire',
+    name: 'Lev Syndicate Spire',
+    district: 'Lev Highline Concourse',
+    description:
+      'An elevated mega-plaza suspended hundreds of meters above the city between Lev Syndicate corporate towers. Features high-voltage transformer stations, suspension skyways, security laser gates, and violent cyber-storms.',
+    backdrop: 'art/rooftops.jpeg',
+    bounds: { w: 2200, h: 1000 },
+    ground: {
+      base: '#041017',
+      tile: '#0c2233',
+      seam: '#22d3ee',
+      glow: '#f59e0b',
+    },
+    sky: 'cyber-storm',
+    authoredGroundTiles: [
+      { x: 0, y: 0, w: 2000, h: 40, base: '#041017', tile: '#0c2233', seam: '#22d3ee', glow: '#22d3ee' },
+      { x: -500, y: -200, w: 300, h: 200, base: '#041017', tile: '#13354f', seam: '#38bdf8', glow: '#38bdf8' },
+      { x: 500, y: 200, w: 300, h: 200, base: '#041017', tile: '#13354f', seam: '#38bdf8', glow: '#38bdf8' },
+      { x: 0, y: -350, w: 800, h: 16, base: '#041017', tile: '#0c2233', seam: '#f59e0b', glow: '#f59e0b' },
+      { x: 0, y: 350, w: 800, h: 16, base: '#041017', tile: '#0c2233', seam: '#f59e0b', glow: '#f59e0b' },
+    ],
+    obstacles: [
+      { x: -750, y: -300, w: 160, h: 140, kind: 'skyscraper' },
+      { x: 750, y: 300, w: 160, h: 140, kind: 'skyscraper' },
+      { x: -380, y: 240, w: 80, h: 60, kind: 'transformer-station' },
+      { x: 380, y: -240, w: 80, h: 60, kind: 'transformer-station' },
+      { x: 0, y: -180, w: 140, h: 36, kind: 'skyline-bridge' },
+      { x: 0, y: 180, w: 140, h: 36, kind: 'skyline-bridge' },
+      { x: -520, y: 0, w: 50, h: 50, kind: 'beacon-tower' },
+      { x: 520, y: 0, w: 50, h: 50, kind: 'beacon-tower' },
+      { x: -160, y: 0, w: 90, h: 28, kind: 'security-gate' },
+      { x: 160, y: 0, w: 90, h: 28, kind: 'security-gate' },
+      { x: -300, y: -120, w: 56, h: 56, kind: 'bunker-hatch' },
+      { x: 300, y: 120, w: 56, h: 56, kind: 'bunker-hatch' },
+    ],
+    landmark: {
+      name: 'Lev Singularity Generator',
+      description: 'The central gravitational stabilization core of the Lev Syndicate Highline Concourse.',
+      kind: 'plaza',
+      accent: '#22d3ee',
+    },
+    durationSec: 200,
+    threat: 'severe',
+    discoveryId: 'lev-core-archive',
+    unlock: { kind: 'default' },
+    waves: [
+      { fromSec: 0, toSec: 40, enemyId: 'lev-drone-interceptor', ratePerSec: 1.2, burst: 3, faction: 'Lev Syndicate' },
+      { fromSec: 25, toSec: 80, enemyId: 'lev-nanite-phantom', ratePerSec: 0.8, burst: 2, formation: 'pincer', faction: 'Lev Syndicate' },
+      { fromSec: 50, toSec: 110, enemyId: 'lev-substation-brute', ratePerSec: 0.5, burst: 1, hpMult: 1.1, faction: 'Lev Syndicate' },
+      { fromSec: 75, toSec: 150, enemyId: 'lev-arc-conductor', ratePerSec: 0.6, burst: 2, faction: 'Lev Syndicate' },
+      { fromSec: 100, toSec: 170, enemyId: 'lev-singularity-colossus', ratePerSec: 0.35, burst: 1, hpMult: 1.25, faction: 'Lev Syndicate' },
+      { fromSec: 140, toSec: 200, enemyId: 'lev-drone-interceptor', ratePerSec: 2.2, burst: 4, formation: 'ring', faction: 'Lev Syndicate' },
+    ],
+  },
+
   ...WEIRD_AREAS,
 
   // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.

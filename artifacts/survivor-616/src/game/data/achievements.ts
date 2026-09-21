@@ -358,6 +358,14 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     progress: (meta) => ratio(meta.endlessRecordDistancePx, 15000),
     reward: { kind: 'cred', amount: 450 },
   },
+  {
+    id: 'lev-spire-conqueror',
+    name: 'Spire Conqueror',
+    description: 'Survive and clear the Lev Syndicate Spire highline plaza.',
+    tier: 'gold',
+    isComplete: (meta) => meta.clearedAreaIds.includes('lev-syndicate-spire'),
+    reward: { kind: 'cred', amount: 350 },
+  },
 ];
 
 export const ACHIEVEMENTS_BY_ID: Record<string, AchievementDef> = Object.fromEntries(

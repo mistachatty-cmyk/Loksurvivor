@@ -427,6 +427,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'arcade-high-score', name: 'The High Score', blurb: 'A cabinet screen still glowing under the dust, top of the board initials burned into the phosphor.' },
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
   { id: 'null-sector-log', name: 'The Null Sector Log', blurb: 'A maintenance log with no author field. Every entry ends the same way: "still running."' },
+  { id: 'lev-core-archive', name: 'The Lev Core Archive', blurb: 'A cracked data slate salvaged from the singularity generator, still cycling schematics for a spire that was never finished.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

@@ -134,6 +134,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#34d399',
     roster: ['cyber-root-trapper', 'digital-mimic-tree', 'spore-arbor-mortar'],
   },
+  {
+    id: 'lev-syndicate',
+    name: 'Lev Syndicate',
+    description: 'A high-altitude cybernetic and industrial cartel commanding the skyway concourses -- gravitational war machines, phase-shifting nanite operatives, and high-voltage field engineers.',
+    accent: '#38bdf8',
+    roster: ['lev-singularity-colossus', 'lev-nanite-phantom', 'lev-arc-conductor', 'lev-substation-brute', 'lev-drone-interceptor'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

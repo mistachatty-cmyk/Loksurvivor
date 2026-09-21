@@ -6499,6 +6499,83 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'vortex-crusher': {
+        // Heavy anchor that pulls survivors with gravitational singularity pulses, then detonates
+        if (distance > 180) {
+          speed = enemy.speed * 1.1;
+        } else {
+          speed = enemy.speed * 0.45;
+        }
+        // Singularity vacuum pull when in proximity
+        if (distance < 280) {
+          const pullStrength = (1 - distance / 280) * 12;
+          p.x -= dirX * pullStrength * dt;
+          p.y -= dirY * pullStrength * dt;
+          if (Math.random() < 0.25) {
+            spawnParticles(w, enemy.x + randRange(w.rng, -35, 35), enemy.y + randRange(w.rng, -35, 35), '#38bdf8', 2, 25);
+          }
+        }
+        // Explosive radial kinetic pulse discharge
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 3600;
+          w.shake = Math.max(w.shake, 4);
+          spawnParticles(w, enemy.x, enemy.y, '#0284c7', 18, 140);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: 130, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now, expiresAt: w.now + 700, color: '#38bdf8', damage: 16, impactIntensity: 2,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'nanite-swarm': {
+        // Agile flanker that dissolves into magnetic nanites and phases behind survivor
+        enemy.weave += dt * 5;
+        speed = enemy.speed;
+
+        // Phase shift blink when close or timed
+        if (w.now >= enemy.chargeReadyAt && distance < 180) {
+          enemy.chargeReadyAt = w.now + 3200;
+          spawnParticles(w, enemy.x, enemy.y, '#c084fc', 14, 100);
+          // Teleport to flanking offset
+          const blinkAngle = Math.atan2(dirY, dirX) + (Math.random() > 0.5 ? 1.8 : -1.8);
+          enemy.x = p.x + Math.cos(blinkAngle) * 95;
+          enemy.y = p.y + Math.sin(blinkAngle) * 95;
+          spawnParticles(w, enemy.x, enemy.y, '#7c3aed', 10, 80);
+          speed = enemy.speed * 1.6;
+        }
+        break;
+      }
+      case 'arc-conductor': {
+        // High-voltage mobile station that bridges lethal electric arcs
+        if (distance < 160) {
+          speed = -enemy.speed * 0.6;
+        } else if (distance > 260) {
+          speed = enemy.speed;
+        } else {
+          speed = enemy.speed * 0.3;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 2600;
+          const arcAngle = Math.atan2(dirY, dirX);
+          spawnParticles(w, enemy.x, enemy.y, '#fbbf24', 8, 70);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 240, angle: arcAngle, spread: 0.15,
+              bornAt: w.now + 300, expiresAt: w.now + 750, color: '#f59e0b', damage: 14, impactIntensity: 1,
+              hitUids: new Set(), followPlayer: false,
+            });
+            w.effects.push({
+              uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: 30, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now, expiresAt: w.now + 300, color: '#fef08a', damage: 0, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
@@ -6538,7 +6615,7 @@ function updateEnemies(w: World, dt: number) {
       moveX /= l;
       moveY /= l;
     }
-    if (enemy.def.behavior === 'flanker' || enemy.def.behavior === 'prowler' || enemy.def.behavior === 'lookout') {
+    if (enemy.def.behavior === 'flanker' || enemy.def.behavior === 'prowler' || enemy.def.behavior === 'lookout' || enemy.def.behavior === 'nanite-swarm') {
       const wobble = Math.sin(enemy.weave) * (enemy.def.behavior === 'lookout' ? 0.85 : 1.15);
       moveX = dirX + -dirY * wobble;
       moveY = dirY + dirX * wobble;
