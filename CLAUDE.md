@@ -17,6 +17,18 @@ Do not confuse `/home/user/Loksurvivor` (capital L) with `/home/user/loksurvivor
 developed clone with commit history; the capitalized one is a stale duplicate
 stuck on the initial import commit.
 
+## Naming rule — never use “signal”
+
+**“Signal” is prohibited.** Do not introduce it in player-facing copy, theme
+or palette names, character/enemy/ability names, ids, CSS classes, test ids,
+comments, documentation, or new code. This is a permanent creative constraint.
+
+Choose a specific alternative that fits the context instead: `beacon` for a
+broadcast/navigation idea, `pulse` for rhythm or energy, `relay` for routing,
+`static` for interference, `frequency` for radio texture, or an original
+contextual name. Do not perform broad historical renames unless a task asks for
+them; this rule governs all new and edited work.
+
 ## Commands
 
 Run from the repo root unless noted:
