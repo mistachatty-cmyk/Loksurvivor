@@ -41,6 +41,9 @@ export type BuildingPrefabId =
   | 'server-cluster'
   | 'harbor-office'
   | 'toll-plaza'
+  | 'lev-substation'
+  | 'skyline-spire'
+  | 'nanite-foundry'
   | (string & {});
 
 export interface BuildingPrefab {
@@ -308,6 +311,49 @@ export const BUILDING_PREFABS: BuildingPrefab[] = [
       { x: -110, y: -60, w: 80, h: 24, kind: 'barrier', propVariant: 'fixed-bench' },
       { x: 100, y: 60, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
       { x: 0, y: 70, w: 48, h: 48, kind: 'fuse-box', propVariant: 'light-breakable' },
+    ],
+  },
+  {
+    id: 'lev-substation',
+    name: 'Lev Power Grid Substation',
+    sign: 'LEV 500kV // GRID',
+    accent: '#38bdf8',
+    footprint: { w: 220, h: 160 },
+    interiorBounds: { w: 460, h: 320 },
+    interiorProps: [
+      { x: -110, y: -60, w: 64, h: 54, kind: 'transformer-station', propVariant: 'heavy-metal' },
+      { x: 110, y: -60, w: 64, h: 54, kind: 'transformer-station', propVariant: 'heavy-metal' },
+      { x: 0, y: -80, w: 80, h: 24, kind: 'security-gate', propVariant: 'heavy-metal' },
+      { x: -50, y: 60, w: 48, h: 48, kind: 'fuse-box', propVariant: 'light-breakable' },
+      { x: 50, y: 60, w: 48, h: 48, kind: 'fuse-box', propVariant: 'light-breakable' },
+    ],
+  },
+  {
+    id: 'skyline-spire',
+    name: 'Lev Skyline Spire',
+    sign: 'SKYWAY TOWER 616',
+    accent: '#f59e0b',
+    footprint: { w: 240, h: 170 },
+    interiorBounds: { w: 480, h: 340 },
+    interiorProps: [
+      { x: 0, y: -90, w: 100, h: 60, kind: 'skyscraper', propVariant: 'heavy-metal' },
+      { x: -120, y: 0, w: 90, h: 32, kind: 'skyline-bridge', propVariant: 'heavy-metal' },
+      { x: 120, y: 0, w: 90, h: 32, kind: 'skyline-bridge', propVariant: 'heavy-metal' },
+      { x: 0, y: 80, w: 120, h: 20, kind: 'barrier', propVariant: 'fixed-bench' },
+    ],
+  },
+  {
+    id: 'nanite-foundry',
+    name: 'Lev Nanite Foundry',
+    sign: 'SYNTHESIS // LAB 04',
+    accent: '#c084fc',
+    footprint: { w: 210, h: 155 },
+    interiorBounds: { w: 440, h: 310 },
+    interiorProps: [
+      { x: 0, y: -70, w: 50, h: 50, kind: 'beacon-tower', propVariant: 'heavy-metal' },
+      { x: -110, y: 30, w: 56, h: 56, kind: 'bunker-hatch', propVariant: 'heavy-metal' },
+      { x: 110, y: 30, w: 56, h: 56, kind: 'bunker-hatch', propVariant: 'heavy-metal' },
+      { x: 0, y: 70, w: 54, h: 54, kind: 'metal-box', propVariant: 'heavy-metal' },
     ],
   },
 ];
@@ -748,6 +794,12 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
       'server-rack': [46, 60, 56, 84],
       'tree-digital': [50, 80, 50, 80],
       'tree-fake': [50, 80, 50, 80],
+      skyscraper: [140, 220, 120, 180],
+      'transformer-station': [64, 96, 50, 70],
+      'skyline-bridge': [120, 180, 32, 48],
+      'beacon-tower': [44, 60, 44, 60],
+      'security-gate': [70, 110, 24, 32],
+      'bunker-hatch': [50, 68, 50, 68],
     };
     const [minW, maxW, minH, maxH] = sizes[kind];
     const w = minW + rng() * (maxW - minW);

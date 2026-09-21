@@ -854,7 +854,13 @@ export type EnemyBehavior =
   /** Camouflaged tree mimic that ambushes the player at close quarters. */
   | 'mimic-tree'
   /** Floating spore node that mortars digital lingering mist clouds. */
-  | 'spore-mortar';
+  | 'spore-mortar'
+  /** Lev Syndicate: heavy anchor that gravitationally pulls the player in close, then detonates a radial kinetic ring. */
+  | 'vortex-crusher'
+  /** Lev Syndicate: agile flanker that periodically phase-blinks to a flanking angle behind the player. */
+  | 'nanite-swarm'
+  /** Lev Syndicate: mobile high-voltage station that bridges a directional electric arc at range. */
+  | 'arc-conductor';
 
 export interface EnemyDef {
   id: string;
@@ -955,7 +961,19 @@ export interface ObstacleDef {
      /** Tree Null map: real cybernetic digital tree with dense foliage and data trunk. */
      | 'tree-digital'
      /** Tree Null map: holographic decoy tree that flickers and permits projectile/player pass-through. */
-     | 'tree-fake';
+     | 'tree-fake'
+     /** Lev Syndicate Spire only: multi-story monolith with lit cyber-window matrices and a rooftop hazard beacon. */
+     | 'skyscraper'
+     /** Lev Syndicate Spire only: industrial electrical transformer with caution striping and crackling micro-sparks. */
+     | 'transformer-station'
+     /** Lev Syndicate Spire only: illuminated suspension skyway deck. */
+     | 'skyline-bridge'
+     /** Lev Syndicate Spire only: communication lattice mast emitting broadcast wave pulses. */
+     | 'beacon-tower'
+     /** Lev Syndicate Spire only: reinforced blast barrier with a pulsing security laser tripwire. */
+     | 'security-gate'
+     /** Lev Syndicate Spire only: street-embedded blast shelter hatch. */
+     | 'bunker-hatch';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
@@ -974,7 +992,13 @@ export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' |
  * `roofed` means there is no sky at all (cellars, interiors) -- every sky
  * effect is suppressed rather than dimmed.
  */
-export type AreaSky = 'clear' | 'overcast' | 'rain' | 'fog' | 'roofed';
+export type AreaSky = 'clear' | 'overcast' | 'rain' | 'fog' | 'roofed'
+  /** Lev Syndicate Spire: electric storm — ion sparks, ground discharges, violet distant lightning. */
+  | 'cyber-storm'
+  /** Reserved for a future Lev-themed area: dense industrial smog with bioluminescent spore motes. */
+  | 'toxic-haze'
+  /** Reserved for a future Lev-themed area: scorching radiation front with rising heat motes. */
+  | 'solar-flare';
 
 export interface AreaDef {
   id: string;
@@ -1720,6 +1744,12 @@ export interface UIThemeDef {
   description: string;
   /** Cred cost to unlock. 0 = always owned. */
   cost: number;
+  /** Visual progression label. Starter themes are always available. */
+  tier?: 'starter' | CosmeticTier;
+  /** Included in the always-available intro theme carousel. */
+  starter?: boolean;
+  /** Secret until earned through a rare reload takeover or Dev Mode. */
+  hidden?: boolean;
   /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
   swatches?: UIThemeSwatchDef[];
 }
@@ -2056,6 +2086,10 @@ export interface MetaState {
   uiTheme: string;
   /** Selected accent swatch id per theme, for themes that offer swatches. */
   uiThemeSwatchByTheme: Record<string, string>;
+  /** Core Master upgrade: expands cycling beyond the starter theme set. */
+  themeCycleMastered: boolean;
+  /** Which collection the Core Master cycles through after it is unlocked. */
+  themeCycleCollection: 'starter' | 'owned';
   /** Purchased themed palette ids. The 'default' palette is always included. */
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */

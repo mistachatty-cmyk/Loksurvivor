@@ -296,6 +296,31 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   --ring: 348 92% 66%;
 }
 
+/* Five free starter looks: each is a complete token set, not just an accent swap. */
+[data-ui-theme='starter-beacon'] { --background: 232 30% 6%; --foreground: 210 30% 95%; --card: 230 28% 10%; --card-foreground: 210 30% 95%; --primary: 32 95% 55%; --primary-foreground: 232 30% 6%; --secondary: 228 25% 15%; --secondary-foreground: 210 30% 95%; --muted: 228 20% 13%; --muted-foreground: 215 18% 62%; --accent: 188 70% 14%; --accent-foreground: 188 96% 65%; --border: 203 42% 29%; --input: 203 42% 29%; --ring: 32 95% 55%; }
+[data-ui-theme='tape-garden'] { --background: 155 31% 6%; --foreground: 138 28% 94%; --card: 156 28% 10%; --card-foreground: 138 28% 94%; --primary: 145 76% 58%; --primary-foreground: 155 31% 6%; --secondary: 153 25% 15%; --secondary-foreground: 138 28% 94%; --muted: 152 20% 13%; --muted-foreground: 146 18% 62%; --accent: 145 48% 14%; --accent-foreground: 145 76% 58%; --border: 145 38% 29%; --input: 145 38% 29%; --ring: 145 76% 58%; }
+[data-ui-theme='streetwave'] { --background: 218 37% 7%; --foreground: 212 42% 95%; --card: 219 31% 11%; --card-foreground: 212 42% 95%; --primary: 207 92% 68%; --primary-foreground: 218 37% 7%; --secondary: 220 26% 16%; --secondary-foreground: 212 42% 95%; --muted: 220 20% 13%; --muted-foreground: 212 16% 63%; --accent: 207 56% 15%; --accent-foreground: 207 92% 68%; --border: 208 44% 31%; --input: 208 44% 31%; --ring: 207 92% 68%; }
+[data-ui-theme='prism-block'] { --background: 280 28% 7%; --foreground: 48 55% 96%; --card: 282 26% 12%; --card-foreground: 48 55% 96%; --primary: 326 100% 68%; --primary-foreground: 280 28% 7%; --secondary: 276 25% 17%; --secondary-foreground: 48 55% 96%; --muted: 277 19% 14%; --muted-foreground: 275 20% 67%; --accent: 326 65% 16%; --accent-foreground: 326 100% 68%; --border: 292 46% 34%; --input: 292 46% 34%; --ring: 326 100% 68%; background-image: linear-gradient(135deg, hsl(326 100% 55% / .05), transparent 42%, hsl(166 88% 50% / .05)); }
+[data-ui-theme='crown-static'] { --background: 260 35% 5%; --foreground: 46 58% 96%; --card: 262 31% 10%; --card-foreground: 46 58% 96%; --primary: 47 100% 64%; --primary-foreground: 260 35% 5%; --secondary: 262 28% 15%; --secondary-foreground: 46 58% 96%; --muted: 262 21% 12%; --muted-foreground: 260 20% 68%; --accent: 274 62% 17%; --accent-foreground: 47 100% 64%; --border: 274 52% 35%; --input: 274 52% 35%; --ring: 47 100% 64%; background-image: radial-gradient(circle at 15% 0%, hsl(47 100% 60% / .12), transparent 29%), linear-gradient(145deg, transparent 65%, hsl(192 100% 65% / .06)); }
+[data-ui-theme='starter-beacon'][data-ui-swatch='cyan-ping'] { --primary: 188 96% 65%; --accent-foreground: 188 96% 65%; --ring: 188 96% 65%; }
+[data-ui-theme='starter-beacon'][data-ui-swatch='rose-key'] { --primary: 344 90% 68%; --accent-foreground: 344 90% 68%; --ring: 344 90% 68%; }
+[data-ui-theme='tape-garden'][data-ui-swatch='orchid-loop'] { --primary: 292 82% 70%; --accent-foreground: 292 82% 70%; --ring: 292 82% 70%; }
+[data-ui-theme='tape-garden'][data-ui-swatch='pollen-gold'], [data-ui-theme='crown-static'][data-ui-swatch='crown-gold'] { --primary: 46 96% 62%; --accent-foreground: 46 96% 62%; --ring: 46 96% 62%; }
+[data-ui-theme='streetwave'][data-ui-swatch='route-amber'] { --primary: 35 100% 60%; --accent-foreground: 35 100% 60%; --ring: 35 100% 60%; }
+[data-ui-theme='streetwave'][data-ui-swatch='seat-plum'] { --primary: 313 63% 68%; --accent-foreground: 313 63% 68%; --ring: 313 63% 68%; }
+[data-ui-theme='prism-block'][data-ui-swatch='flyer-yellow'] { --primary: 50 100% 62%; --accent-foreground: 50 100% 62%; --ring: 50 100% 62%; }
+[data-ui-theme='prism-block'][data-ui-swatch='porch-teal'] { --primary: 166 88% 58%; --accent-foreground: 166 88% 58%; --ring: 166 88% 58%; }
+[data-ui-theme='crown-static'][data-ui-swatch='royal-violet'] { --primary: 274 100% 72%; --accent-foreground: 274 100% 72%; --ring: 274 100% 72%; }
+[data-ui-theme='crown-static'][data-ui-swatch='ice-static'] { --primary: 192 100% 72%; --accent-foreground: 192 100% 72%; --ring: 192 100% 72%; }
+[data-ui-theme='midnight-reliquary'] { --background: 224 48% 5%; --foreground: 213 48% 96%; --card: 225 42% 9%; --card-foreground: 213 48% 96%; --primary: 196 100% 70%; --primary-foreground: 224 48% 5%; --secondary: 226 34% 14%; --secondary-foreground: 213 48% 96%; --muted: 226 28% 12%; --muted-foreground: 215 22% 66%; --accent: 196 65% 15%; --accent-foreground: 196 100% 70%; --border: 207 58% 35%; --input: 207 58% 35%; --ring: 196 100% 70%; background-image: radial-gradient(circle at 50% 100%, hsl(196 100% 68% / .16), transparent 48%); animation: reliquary-breathe 5.5s ease-in-out infinite; }
+[data-ui-theme='mirror-carnival'] { --background: 294 37% 6%; --foreground: 330 58% 97%; --card: 295 32% 11%; --card-foreground: 330 58% 97%; --primary: 337 100% 72%; --primary-foreground: 294 37% 6%; --secondary: 292 28% 16%; --secondary-foreground: 330 58% 97%; --muted: 292 22% 13%; --muted-foreground: 293 22% 68%; --accent: 337 65% 16%; --accent-foreground: 337 100% 72%; --border: 306 58% 36%; --input: 306 58% 36%; --ring: 337 100% 72%; background-image: conic-gradient(from 180deg at 50% 50%, hsl(337 100% 65% / .08), hsl(167 100% 60% / .08), hsl(278 100% 68% / .08), hsl(337 100% 65% / .08)); animation: carnival-shift 9s linear infinite; }
+[data-ui-theme='midnight-reliquary'][data-ui-swatch='moon-violet'] { --primary: 267 100% 76%; --accent-foreground: 267 100% 76%; --ring: 267 100% 76%; }
+[data-ui-theme='midnight-reliquary'][data-ui-swatch='relic-gold'] { --primary: 45 100% 68%; --accent-foreground: 45 100% 68%; --ring: 45 100% 68%; }
+[data-ui-theme='mirror-carnival'][data-ui-swatch='electric-mint'] { --primary: 167 100% 67%; --accent-foreground: 167 100% 67%; --ring: 167 100% 67%; }
+[data-ui-theme='mirror-carnival'][data-ui-swatch='ultraviolet'] { --primary: 278 100% 74%; --accent-foreground: 278 100% 74%; --ring: 278 100% 74%; }
+@keyframes reliquary-breathe { 50% { filter: brightness(1.14) saturate(1.13); } }
+@keyframes carnival-shift { to { filter: hue-rotate(28deg) saturate(1.18); } }
+
 /* Night Drive: a cool, cinematic chrome that still uses the same UI tokens. */
 [data-ui-theme='night-drive'] {
   --background: 226 42% 7%;
@@ -759,6 +784,12 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='salvage-terminal'] .intro-title__word { letter-spacing: -.045em; }
 [data-ui-theme='river-dawn'] .intro-screen__atmosphere { background-image: linear-gradient(to top, hsl(var(--primary) / .1), transparent 42%); }
 [data-ui-theme='block-party'] .intro-title__number { color: var(--intro-accent); }
+[data-ui-theme='tape-garden'] .intro-screen__atmosphere { background-image: radial-gradient(circle at 50% 100%, hsl(var(--primary) / .12), transparent 45%); }
+[data-ui-theme='streetwave'] .intro-screen__atmosphere { background-image: linear-gradient(105deg, transparent 20%, hsl(var(--primary) / .10) 50%, transparent 78%); }
+[data-ui-theme='prism-block'] .intro-title { text-shadow: .12rem 0 hsl(326 100% 68% / .45), -.12rem 0 hsl(166 88% 58% / .34); }
+[data-ui-theme='crown-static'] .intro-screen__atmosphere { background-image: repeating-linear-gradient(0deg, transparent 0 3px, hsl(47 100% 64% / .025) 3px 4px), radial-gradient(circle at 50% 0%, hsl(47 100% 64% / .13), transparent 47%); }
+[data-ui-theme='midnight-reliquary'] .intro-screen__atmosphere { background-image: radial-gradient(circle at 50% 100%, hsl(196 100% 68% / .22), transparent 48%); }
+[data-ui-theme='mirror-carnival'] .intro-title { animation: intro-chromatic 3.2s ease-in-out infinite; }
 [data-ui-theme='signal-garden'] .intro-screen__atmosphere { box-shadow: inset 0 0 10rem hsl(var(--primary) / .09); }
 [data-ui-theme='night-bus'] .intro-screen__atmosphere { background-image: linear-gradient(105deg, transparent 15%, hsl(var(--primary) / .08) 48%, transparent 72%); }
 [data-ui-theme='impossible-manual'] .intro-title__number { -webkit-text-stroke: 1px var(--intro-accent); }

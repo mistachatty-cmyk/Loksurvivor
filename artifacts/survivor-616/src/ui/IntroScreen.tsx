@@ -4,9 +4,11 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Palette } from 'lucide-react';
 
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { pickSplashText } from '@/game/data/splashText';
 import { IntroTitle } from '@/ui/IntroTitle';
 import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset } from '@/ui/introPhysics';
@@ -39,7 +41,8 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   // actually configured, and never shown to someone already signed in.
   const { available, session } = useAuth();
   const showSignIn = Boolean(onSignIn) && available && !session;
-  const { meta } = useMeta();
+  const { meta, cycleStarterUiLook, checkHiddenThemeReload } = useMeta();
+  const player = useMusicPlayer();
   // Picked once per mount, not per render -- a fresh one shows up whenever
   // the title screen loads, Minecraft-main-menu-splash style.
   const splashText = useMemo(() => pickSplashText(), []);
@@ -57,6 +60,36 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
       clearInterval(cycleTimer);
       if (revertTimer) clearTimeout(revertTimer);
     };
+  }, []);
+
+  useEffect(() => {
+    checkHiddenThemeReload();
+  }, [checkHiddenThemeReload]);
+
+  // Try to start the title soundtrack the moment the intro loads. Most
+  // browsers block audio before any user gesture, so this attempt is
+  // allowed to fail quietly -- no banner, no prompt. The first pointer or
+  // key interaction anywhere on the intro (theme cycle, "Enter the
+  // hideout", or just a stray tap) retries once, which is enough of a
+  // gesture to satisfy the autoplay policy without the player ever
+  // noticing a step happened.
+  useEffect(() => {
+    if (player.isPlaying) return;
+    let unlocked = false;
+    const start = () => {
+      if (unlocked || player.isPlaying) return;
+      unlocked = true;
+      player.ensureAudioContext();
+      player.togglePlay();
+    };
+    start();
+    window.addEventListener('pointerdown', start, { once: true, capture: true });
+    window.addEventListener('keydown', start, { once: true, capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', start, { capture: true });
+      window.removeEventListener('keydown', start, { capture: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -124,6 +157,17 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
               {splashText}
             </IntroPhysicsBody>
           ) : null}
+
+          <button
+            type="button"
+            onClick={cycleStarterUiLook}
+            title={`Theme: ${meta.uiTheme.replace(/-/g, ' ')} · tap to switch`}
+            aria-label={`Switch starter look (current theme: ${meta.uiTheme.replace(/-/g, ' ')})`}
+            className="absolute left-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-colors hover:border-primary hover:text-primary"
+            data-testid="button-intro-cycle-theme"
+          >
+            <Palette className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
 
           <motion.button
             type="button"

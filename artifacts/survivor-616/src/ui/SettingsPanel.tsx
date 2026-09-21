@@ -64,6 +64,8 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     equipUiTheme,
     selectUiThemeSwatch,
     cycleUiLook,
+    unlockThemeCycleMastery,
+    setThemeCycleCollection,
     unlockDevModeAccess,
     setDevModeAllUnlocks,
     setMusicReactive,
@@ -949,6 +951,32 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   Roll the look
                 </button>
               </div>
+              <div className="mt-4 border border-primary/30 bg-primary/5 p-3" data-testid="section-core-master-theme-cycle">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Core Master · theme cycle</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {meta.themeCycleMastered
+                        ? 'Choose whether Roll the Look rotates the five starter looks or every theme you have unlocked.'
+                        : 'Upgrade to add your unlocked theme collection to the quick cycle. The starter carousel stays free.'}
+                    </p>
+                  </div>
+                  {!meta.themeCycleMastered ? (
+                    <button type="button" onClick={unlockThemeCycleMastery} disabled={meta.cred < 2400} className="shrink-0 border border-primary px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-primary disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground" data-testid="button-unlock-core-master-theme-cycle">
+                      Unlock · 2400 cred
+                    </button>
+                  ) : null}
+                </div>
+                {meta.themeCycleMastered ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {(['starter', 'owned'] as const).map((collection) => (
+                      <button key={collection} type="button" onClick={() => setThemeCycleCollection(collection)} aria-pressed={meta.themeCycleCollection === collection} className={`border px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-widest ${meta.themeCycleCollection === collection ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-theme-cycle-${collection}`}>
+                        {collection === 'starter' ? 'Starter themes' : 'Unlocked themes'}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 Theme combinations: {ownedLookCount} owned
               </p>
@@ -983,7 +1011,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                 </button>
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {UI_THEMES.map((theme) => {
+                {UI_THEMES.filter((theme) => !theme.hidden || hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds)).map((theme) => {
                   const owned = hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds);
                   const equipped = meta.uiTheme === theme.id;
                   const affordable = meta.cred >= theme.cost;
@@ -993,6 +1021,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                         <h3 className="text-sm font-black uppercase tracking-wide text-white">{theme.name}</h3>
                         {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
                       </div>
+                      {theme.tier ? <span className="mt-2 inline-block border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest text-primary">{theme.tier}</span> : null}
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{theme.description}</p>
                       {theme.swatches ? (
                         <div

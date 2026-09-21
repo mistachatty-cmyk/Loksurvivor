@@ -261,6 +261,21 @@ const SKY_PROFILES: Record<AreaSky, SkyProfile> = {
     birds: false, fireflies: false, litter: false,
     rain: 0, fog: 0, lightningPeriodMs: 0,
   },
+  'cyber-storm': {
+    cloudChance: 0.85, cloudAlpha: 0.95, shadowAlpha: 1.9,
+    birds: false, fireflies: true, litter: true,
+    rain: 0.95, fog: 0.25, lightningPeriodMs: 4800,
+  },
+  'toxic-haze': {
+    cloudChance: 0.55, cloudAlpha: 0.8, shadowAlpha: 0.85,
+    birds: false, fireflies: true, litter: true,
+    rain: 0, fog: 0.85, lightningPeriodMs: 0,
+  },
+  'solar-flare': {
+    cloudChance: 0.35, cloudAlpha: 0.6, shadowAlpha: 1.35,
+    birds: true, fireflies: false, litter: true,
+    rain: 0, fog: 0.15, lightningPeriodMs: 0,
+  },
 };
 
 /**
@@ -692,6 +707,92 @@ function drawRain(ctx: CanvasRenderingContext2D, w: World, left: number, top: nu
     }
   }
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Dynamic atmospheric particle layers for The Lev Expansion skies:
+ * - cyber-storm: high-speed electric ion sparks and ground electrostatic arc discharges
+ * - toxic-haze: buoyant phosphorescent chemical spore motes undulated by atmospheric currents
+ * - solar-flare: scorching convection heat distortion motes rising vertically into the sky
+ */
+function drawAtmosphericParticles(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+  sky: AreaSky,
+) {
+  if (sky === 'roofed' || sky === 'clear' || sky === 'overcast' || sky === 'fog') return;
+  const clip = clipToArena(w, left, top, right, bottom);
+  const width = clip.right - clip.left;
+  const height = clip.bottom - clip.top;
+  if (width <= 0 || height <= 0) return;
+
+  const CELL = 180;
+  const startX = Math.floor(clip.left / CELL) * CELL;
+  const startY = Math.floor(clip.top / CELL) * CELL;
+
+  ctx.save();
+  if (sky === 'cyber-storm') {
+    // Electric ion sparks & micro-lightning arcs
+    for (let x = startX; x < clip.right; x += CELL) {
+      for (let y = startY; y < clip.bottom; y += CELL) {
+        const n = hashCell(x / CELL + 83, y / CELL - 83);
+        const sparkT = (w.now * 0.0018 * (0.8 + n) + n * 10) % 1;
+        const px = x + n * CELL + Math.sin(w.now * 0.008 + n * 20) * 16;
+        const py = y + sparkT * CELL;
+        const color = n > 0.5 ? '#38bdf8' : '#c084fc';
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.55 + Math.sin(w.now * 0.02 + n * 50) * 0.4;
+        ctx.fillRect(px, py, 2.5, 2.5);
+
+        // Ground-level electrostatic discharge
+        if (n > 0.88 && Math.sin(w.now * 0.004 + n * 100) > 0.85) {
+          ctx.strokeStyle = '#67e8f9';
+          ctx.lineWidth = 1.2;
+          ctx.globalAlpha = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + 12 * (n - 0.5), py + 8);
+          ctx.lineTo(px + 24 * (n - 0.5), py + 14);
+          ctx.stroke();
+        }
+      }
+    }
+  } else if (sky === 'toxic-haze') {
+    // Bioluminescent chemical spore motes floating gently
+    for (let x = startX; x < clip.right; x += CELL) {
+      for (let y = startY; y < clip.bottom; y += CELL) {
+        const n = hashCell(x / CELL - 31, y / CELL + 31);
+        const t = (w.now * 0.0004 * (0.6 + n * 0.4) + n * 7) % 1;
+        const px = x + n * CELL + Math.sin(w.now * 0.0015 + n * 12) * 28;
+        const py = y + (1 - t) * CELL;
+        const r = 2 + n * 2;
+        ctx.fillStyle = n > 0.4 ? '#84cc16' : '#a3e635';
+        ctx.globalAlpha = (0.35 + Math.sin(w.now * 0.003 + n * 30) * 0.25) * 0.85;
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else if (sky === 'solar-flare') {
+    // Incandescent solar ember particles rising against gravity
+    for (let x = startX; x < clip.right; x += CELL) {
+      for (let y = startY; y < clip.bottom; y += CELL) {
+        const n = hashCell(x / CELL + 59, y / CELL + 101);
+        const t = (w.now * 0.0009 * (0.9 + n * 0.3) + n * 9) % 1;
+        const px = x + n * CELL + Math.sin(w.now * 0.002 + n * 15) * 14;
+        const py = y + (1 - t) * CELL;
+        const color = n > 0.6 ? '#f59e0b' : '#fb923c';
+        ctx.fillStyle = color;
+        ctx.globalAlpha = (0.45 + Math.sin(w.now * 0.005 + n * 40) * 0.3) * 0.9;
+        ctx.fillRect(px - 1, py - 1, 3, 3);
+      }
+    }
+  }
   ctx.restore();
 }
 
@@ -1600,6 +1701,12 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'server-rack': { top: '#0e1b26', side: '#081119', trim: '#1fe6ff' },
   'tree-digital': { top: '#064e3b', side: '#022c22', trim: '#10b981' },
   'tree-fake': { top: '#083344', side: '#051b24', trim: '#06b6d4' },
+  skyscraper: { top: '#1e293b', side: '#0f172a', trim: '#38bdf8' },
+  'transformer-station': { top: '#334155', side: '#1e293b', trim: '#eab308' },
+  'skyline-bridge': { top: '#1e293b', side: '#0f172a', trim: '#06b6d4' },
+  'beacon-tower': { top: '#3b0764', side: '#2e1065', trim: '#ec4899' },
+  'security-gate': { top: '#451a03', side: '#291003', trim: '#f97316' },
+  'bunker-hatch': { top: '#1c1917', side: '#0c0a09', trim: '#a8a29e' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -1997,6 +2104,176 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
         ctx.fillStyle = '#ec4899';
         ctx.fillRect(obstacle.x - obstacle.w * 0.4, treeTopY, obstacle.w * 0.8, 3);
       }
+      ctx.restore();
+    } else if (obstacle.kind === 'skyscraper') {
+      ctx.save();
+      // Multi-story corporate skyscraper facade with glowing window matrix & rooftop spire
+      const roofY = y - height;
+      // Window matrix on side facade
+      const rows = Math.max(2, Math.floor(height / 14));
+      const cols = Math.max(3, Math.floor(obstacle.w / 16));
+      const cellW = (obstacle.w - 12) / cols;
+      const cellH = (height - 10) / rows;
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const winX = x + 6 + c * cellW;
+          const winY = roofY + 6 + r * cellH;
+          const litSeed = Math.sin((obstacle.x + c * 17) * 12.9898 + (obstacle.y + r * 13) * 78.233);
+          if (litSeed > -0.1) {
+            ctx.fillStyle = litSeed > 0.5 ? '#38bdf8' : litSeed > 0.2 ? '#fef08a' : '#0284c7';
+            ctx.globalAlpha = 0.75 + Math.sin(w.now * 0.002 + litSeed * 10) * 0.2;
+            ctx.fillRect(winX, winY, cellW - 4, cellH - 4);
+          }
+        }
+      }
+      // Rooftop parapet trim & elevator penthouse
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(x + obstacle.w * 0.35, roofY - 14, obstacle.w * 0.3, 14);
+      ctx.fillStyle = '#0ea5e9';
+      ctx.fillRect(x + obstacle.w * 0.35 + 3, roofY - 10, obstacle.w * 0.3 - 6, 2);
+      // Warning antenna spire
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(obstacle.x, roofY - 14);
+      ctx.lineTo(obstacle.x, roofY - 32);
+      ctx.stroke();
+      // Blinking red aircraft collision beacon
+      const beaconLit = Math.sin(w.now * 0.006 + obstacle.x) > 0;
+      ctx.fillStyle = beaconLit ? '#ef4444' : '#450a0a';
+      ctx.beginPath();
+      ctx.arc(obstacle.x, roofY - 33, beaconLit ? 3.5 : 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (obstacle.kind === 'transformer-station') {
+      ctx.save();
+      const roofY = y - height;
+      // High-voltage warning hazard stripes on face
+      ctx.fillStyle = '#eab308';
+      ctx.fillRect(x + 4, roofY + 4, obstacle.w - 8, 5);
+      ctx.fillStyle = '#000000';
+      for (let s = x + 4; s < x + obstacle.w - 8; s += 10) {
+        ctx.beginPath();
+        ctx.moveTo(s, roofY + 4);
+        ctx.lineTo(s + 5, roofY + 9);
+        ctx.lineTo(s + 3, roofY + 9);
+        ctx.lineTo(s - 2, roofY + 4);
+        ctx.fill();
+      }
+      // Twin porcelain insulator coils atop unit
+      const coilCount = Math.max(2, Math.floor(obstacle.w / 28));
+      for (let i = 0; i < coilCount; i += 1) {
+        const cx = x + (i + 0.5) * (obstacle.w / coilCount);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(cx - 4, roofY - 12, 8, 12);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(cx - 6, roofY - 8, 12, 2);
+        ctx.fillRect(cx - 6, roofY - 4, 12, 2);
+        // Intermittent electric spark discharge
+        if (Math.sin(w.now * 0.015 + i * 3 + obstacle.x) > 0.85) {
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(cx, roofY - 12);
+          ctx.lineTo(cx + (Math.random() - 0.5) * 14, roofY - 20 - Math.random() * 8);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    } else if (obstacle.kind === 'skyline-bridge') {
+      ctx.save();
+      const roofY = y - height;
+      // Illuminated turquoise walkway floor strip
+      ctx.fillStyle = '#06b6d4';
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(x + 2, roofY + obstacle.h * 0.4, obstacle.w - 4, 3);
+      // Steel suspension trusses & glass canopy balustrade
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      for (let tx = x; tx <= x + obstacle.w; tx += 20) {
+        ctx.moveTo(tx, roofY + obstacle.h * 0.4);
+        ctx.lineTo(tx + 10, roofY);
+        ctx.lineTo(tx + 20, roofY + obstacle.h * 0.4);
+      }
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'beacon-tower') {
+      ctx.save();
+      const roofY = y - height;
+      // Communication lattice mast
+      ctx.strokeStyle = '#a855f7';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(obstacle.x - 6, roofY - 26, 12, 26);
+      ctx.beginPath();
+      ctx.moveTo(obstacle.x - 6, roofY);
+      ctx.lineTo(obstacle.x + 6, roofY - 26);
+      ctx.moveTo(obstacle.x + 6, roofY);
+      ctx.lineTo(obstacle.x - 6, roofY - 26);
+      ctx.stroke();
+      // Concentric radio signal pulses expanding outward
+      const pulsePhase = (w.now * 0.003 + obstacle.y) % 1;
+      ctx.strokeStyle = '#ec4899';
+      ctx.globalAlpha = (1 - pulsePhase) * 0.8;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(obstacle.x, roofY - 28, 6 + pulsePhase * 24, -Math.PI * 0.8, -Math.PI * 0.2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (obstacle.kind === 'security-gate') {
+      ctx.save();
+      const roofY = y - height;
+      // Twin armored biometric stanchions
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(x, roofY, 8, obstacle.h);
+      ctx.fillRect(x + obstacle.w - 8, roofY, 8, obstacle.h);
+      // Laser security tripwire beam
+      const laserGlow = 0.6 + Math.sin(w.now * 0.008) * 0.3;
+      ctx.globalAlpha = laserGlow;
+      ctx.fillStyle = '#ea580c';
+      ctx.fillRect(x + 8, roofY + obstacle.h * 0.45, obstacle.w - 16, 2.5);
+      // Biometric status LED
+      ctx.fillStyle = Math.sin(w.now * 0.004) > 0 ? '#22c55e' : '#ef4444';
+      ctx.beginPath();
+      ctx.arc(x + 4, roofY + 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (obstacle.kind === 'bunker-hatch') {
+      ctx.save();
+      // Subterranean blast door flush with asphalt
+      const cx = obstacle.x;
+      const cy = y - height * 0.5;
+      const r = Math.min(obstacle.w, obstacle.h) * 0.44;
+      // Bolted steel perimeter ring
+      ctx.fillStyle = '#292524';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#78716c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Inner hatch plate
+      ctx.fillStyle = '#44403c';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+      // Hydraulic locking spokes
+      ctx.strokeStyle = '#a8a29e';
+      ctx.lineWidth = 2.5;
+      for (let a = 0; a < 4; a += 1) {
+        const ang = (a * Math.PI) / 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(ang) * (r * 0.7), cy + Math.sin(ang) * (r * 0.7));
+        ctx.stroke();
+      }
+      // Status indicator light
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
 
@@ -4971,6 +5248,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     drawClouds(ctx, w, cloudPuffs, profile);
     drawFogBanks(ctx, w, left, top, right, bottom, profile.fog);
     drawRain(ctx, w, left, top, right, bottom, profile.rain);
+    drawAtmosphericParticles(ctx, w, left, top, right, bottom, sky);
   }
 
   ctx.restore();
@@ -4992,8 +5270,8 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   // Distant lightning, under the damage flash so a hit still reads as red.
   const bolt = lightningIntensity(w.now, profile.lightningPeriodMs);
   if (bolt > 0) {
-    ctx.globalAlpha = bolt * 0.16;
-    ctx.fillStyle = '#cfe0ff';
+    ctx.globalAlpha = bolt * (sky === 'cyber-storm' ? 0.22 : 0.16);
+    ctx.fillStyle = sky === 'cyber-storm' ? '#d8b4fe' : '#cfe0ff';
     ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1;
   }
