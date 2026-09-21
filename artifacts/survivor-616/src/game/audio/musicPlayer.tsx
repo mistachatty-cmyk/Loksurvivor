@@ -409,7 +409,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const analysisRef = useRef<MusicAnalyser | null>(null);
 
   const [tracks, setTracks] = useState<Track[]>(() => withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions));
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  // Data Spark is the title-screen default. Browsers still require an explicit
+  // gesture before sound begins, so this selects it without forcing autoplay.
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.7);
   const [muted, setMuted] = useState(false);
