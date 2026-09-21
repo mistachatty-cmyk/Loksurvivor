@@ -1167,6 +1167,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       playIndex(firstIndex);
       return;
     }
+    // The title-screen default is selected before any user gesture. Its source
+    // is intentionally not loaded until that first gesture, so start it here.
+    if (!audio.src) {
+      playIndex(currentIndex);
+      return;
+    }
     if (audio.paused) {
       void audio.play().catch(() => {
         setIsPlaying(false);
