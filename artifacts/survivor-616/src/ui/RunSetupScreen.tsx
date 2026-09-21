@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
+import { RigPortrait } from '@/ui/RigPortrait';
 import { THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 
 type SetupStep = 'companion' | 'look';
@@ -50,6 +51,8 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     setLokPetLoadout,
     setLokPetArtStyle,
     setUiBorderStyle,
+    setLokPetBorderStyle,
+    setCharacterBorderStyle,
     setGraphicsQuality,
     setUiPanelLayout,
     setMinimapVisible,
@@ -60,6 +63,8 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const [artStyle, setArtStyle] = useState(meta.lokPetArtStyle);
   const [graphicsQuality, setGraphicsQualityChoice] = useState(meta.graphicsQuality);
   const [borderStyle, setBorderStyle] = useState(meta.uiBorderStyle);
+  const [lokPetBorderStyle, setLokPetBorderStyleChoice] = useState(meta.lokPetBorderStyle);
+  const [characterBorderStyle, setCharacterBorderStyleChoice] = useState(meta.characterBorderStyle);
   const [panelLayout, setPanelLayout] = useState(meta.uiPanelLayout);
   const [minimapVisible, setMinimapVisibleChoice] = useState(meta.minimapVisible);
   const readyPets = meta.savedLokPets.filter((pet) => pet.stamina > 0);
@@ -79,6 +84,8 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     setLokPetArtStyle(artStyle);
     setGraphicsQuality(graphicsQuality);
     setUiBorderStyle(borderStyle);
+    setLokPetBorderStyle(lokPetBorderStyle);
+    setCharacterBorderStyle(characterBorderStyle);
     setUiPanelLayout(panelLayout);
     setMinimapVisible(minimapVisible);
     onComplete();
@@ -172,7 +179,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
             </button>
           </section>
         ) : (
-          <section className="mt-5" data-lokpet-art-style={artStyle} data-ui-border-style={borderStyle}>
+          <section className="mt-5" data-lokpet-art-style={artStyle} data-ui-border-style={borderStyle} data-lokpet-border-style={lokPetBorderStyle} data-character-border-style={characterBorderStyle}>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] font-black uppercase tracking-[.22em] text-cyan-200">2 · Optional · Look Lab</p>
@@ -219,12 +226,51 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
               </section>
 
               <section className="border border-white/15 bg-white/[.03] p-4">
-                <h3 className="flex items-center gap-2 text-sm font-black uppercase"><Grid3X3 className="h-4 w-4 text-violet-200" /> Border shape</h3>
+                <h3 className="flex items-center gap-2 text-sm font-black uppercase"><Grid3X3 className="h-4 w-4 text-violet-200" /> Interface border</h3>
+                <p className="mt-1 text-xs text-white/55">Menu cards and controls only.</p>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   {BORDERS.map((option) => {
                     const Icon = option.icon;
                     return <button key={option.id} type="button" onClick={() => setBorderStyle(option.id)} className={`border p-3 text-center transition ${borderStyle === option.id ? selectClass(true) : selectClass(false)}`} aria-pressed={borderStyle === option.id} data-testid={`button-ui-border-${option.id}`}><Icon className="mx-auto h-5 w-5" /><p className="mt-2 text-[11px] font-black uppercase">{option.label}</p></button>;
                   })}
+                </div>
+              </section>
+
+              <section className="border border-white/15 bg-white/[.03] p-4 lg:col-span-2" data-testid="portrait-border-controls">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="flex items-center gap-2 text-sm font-black uppercase"><Sparkles className="h-4 w-4 text-pink-200" /> Portrait borders</h3>
+                    <p className="mt-1 text-xs text-white/55">LokPets and characters each keep their own frame choice. More frames can be added without changing this setup.</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/50">
+                    <span>Independent</span><span className="h-1 w-1 rounded-full bg-pink-200" /><span>Visual only</span>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <LokPetIcon silhouette="jelly" palette={{ body: '#87529a', bodyDark: '#33214c', accent: '#f0abfc', glow: '#c084fc', eye: '#fef3c7' }} size={54} className="bg-black/60" />
+                      <div><p className="text-xs font-black uppercase">LokPet frame</p><p className="text-[11px] text-white/50">For companion portraits and cards.</p></div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {BORDERS.map((option) => {
+                        const Icon = option.icon;
+                        return <button key={option.id} type="button" onClick={() => setLokPetBorderStyleChoice(option.id)} className={`border p-2 text-center transition ${lokPetBorderStyle === option.id ? selectClass(true) : selectClass(false)}`} aria-pressed={lokPetBorderStyle === option.id} data-testid={`button-lokpet-border-${option.id}`}><Icon className="mx-auto h-4 w-4" /><p className="mt-1 text-[10px] font-black uppercase">{option.label}</p></button>;
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-[54px] w-[54px] place-items-center overflow-hidden border border-white/25 bg-black/60"><RigPortrait rig={selectedCharacter.rig} palette={selectedCharacter.palette} anim="idle" size={48} /></span>
+                      <div><p className="text-xs font-black uppercase">Character frame</p><p className="text-[11px] text-white/50">For playable character portraits and cards.</p></div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {BORDERS.map((option) => {
+                        const Icon = option.icon;
+                        return <button key={option.id} type="button" onClick={() => setCharacterBorderStyleChoice(option.id)} className={`border p-2 text-center transition ${characterBorderStyle === option.id ? selectClass(true) : selectClass(false)}`} aria-pressed={characterBorderStyle === option.id} data-testid={`button-character-border-${option.id}`}><Icon className="mx-auto h-4 w-4" /><p className="mt-1 text-[10px] font-black uppercase">{option.label}</p></button>;
+                      })}
+                    </div>
+                  </div>
                 </div>
               </section>
 

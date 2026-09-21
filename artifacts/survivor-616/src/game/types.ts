@@ -1895,6 +1895,10 @@ export interface MetaState {
   lokPetArtStyle: 'pixel-core' | 'neon-signal' | 'holo-card';
   /** Shared chrome shape for menu cards and controls. */
   uiBorderStyle: 'square' | 'soft' | 'round';
+  /** Independent frame shape for collectible LokPet portraits. */
+  lokPetBorderStyle: 'square' | 'soft' | 'round';
+  /** Independent frame shape for playable-character portraits. */
+  characterBorderStyle: 'square' | 'soft' | 'round';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
   musicReactiveEnabled: boolean;
   /** Optional procedural room ambience in the hideout (rain, pipe hum, cellar drips). Off by default. */

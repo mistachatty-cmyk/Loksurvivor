@@ -51,6 +51,14 @@
 [data-ui-border-style='round'] :where(.border) { border-radius: 999px; }
 [data-ui-border-style='round'] :where(textarea.border) { border-radius: 1rem; }
 
+/* Portrait frames are deliberately independent from interface chrome: players
+   can keep sharp menus while giving characters and LokPets their own frame. */
+[data-lokpet-border-style='soft'] [data-lokpet-icon] { border-radius: .55rem; }
+[data-lokpet-border-style='round'] [data-lokpet-icon] { border-radius: 999px; }
+[data-character-border-style='square'] [data-character-portrait] { background: rgba(0,0,0,.32); box-shadow: 0 0 0 1px rgba(255,255,255,.28); }
+[data-character-border-style='soft'] [data-character-portrait] { border-radius: .55rem; background: rgba(0,0,0,.32); box-shadow: 0 0 0 1px rgba(255,255,255,.28); }
+[data-character-border-style='round'] [data-character-portrait] { border-radius: 999px; background: rgba(0,0,0,.32); box-shadow: 0 0 0 1px rgba(255,255,255,.28); }
+
 /* LokPet presentation is deliberately UI-only. The combat sprite rig remains
    mechanically stable while the collection, setup, and card portraits can be
    given a different collectible finish. */

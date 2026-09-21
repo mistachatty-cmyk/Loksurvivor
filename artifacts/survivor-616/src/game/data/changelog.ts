@@ -98,6 +98,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Sound Booth player keeps previous, play, and next up front, with shuffle, repeat, and volume tucked into optional advanced controls.',
     ],
   },
+  {
+    version: '0.7.0',
+    date: '2026-09-21',
+    kind: 'update',
+    title: 'Your Frame, Your Soundtrack',
+    body: [
+      'LokPets and playable characters now each have their own saved portrait frame: Square, Soft, or Round. Interface borders remain a separate choice.',
+      'A persistent Soundtrack button now starts a random unlocked song from anywhere in the game, and skips the current track when another unlocked option exists.',
+      'All frame choices live in Looks & LokPets and are ready for future collectible frames, animation effects, and rarity styles.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

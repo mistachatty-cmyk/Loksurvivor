@@ -43,19 +43,25 @@ test('soundtrack objective progress safely defaults for older saves', () => {
 });
 
 test('Look Lab preferences migrate safely and persist through their reducers', () => {
-  const migrated = normalizeMeta({ version: 1, lokPetArtStyle: 'holo-card', uiBorderStyle: 'round' });
+  const migrated = normalizeMeta({ version: 1, lokPetArtStyle: 'holo-card', uiBorderStyle: 'round', lokPetBorderStyle: 'soft', characterBorderStyle: 'round' });
   assert.equal(migrated.lokPetArtStyle, 'holo-card');
   assert.equal(migrated.uiBorderStyle, 'round');
+  assert.equal(migrated.lokPetBorderStyle, 'soft');
+  assert.equal(migrated.characterBorderStyle, 'round');
   assert.equal(normalizeMeta({ version: 1, lokPetArtStyle: 'not-a-style', uiBorderStyle: 'sharp-ish' }).lokPetArtStyle, 'pixel-core');
   assert.equal(normalizeMeta({ version: 1, lokPetArtStyle: 'not-a-style', uiBorderStyle: 'sharp-ish' }).uiBorderStyle, 'square');
+  assert.equal(normalizeMeta({ version: 1, lokPetBorderStyle: 'sharp-ish', characterBorderStyle: 'sharp-ish' }).lokPetBorderStyle, 'square');
+  assert.equal(normalizeMeta({ version: 1, lokPetBorderStyle: 'sharp-ish', characterBorderStyle: 'sharp-ish' }).characterBorderStyle, 'square');
 
   const artUpdated = reducer(
     { meta: createInitialMeta(), lastRun: null },
     { type: 'setLokPetArtStyle', style: 'neon-signal' },
   );
-  const borderUpdated = reducer(artUpdated, { type: 'setUiBorderStyle', style: 'soft' });
+  const borderUpdated = reducer(reducer(reducer(artUpdated, { type: 'setUiBorderStyle', style: 'soft' }), { type: 'setLokPetBorderStyle', style: 'round' }), { type: 'setCharacterBorderStyle', style: 'soft' });
   assert.equal(borderUpdated.meta.lokPetArtStyle, 'neon-signal');
   assert.equal(borderUpdated.meta.uiBorderStyle, 'soft');
+  assert.equal(borderUpdated.meta.lokPetBorderStyle, 'round');
+  assert.equal(borderUpdated.meta.characterBorderStyle, 'soft');
 });
 
 test('Llamasté is available from the hideout on new and returning saves', () => {
