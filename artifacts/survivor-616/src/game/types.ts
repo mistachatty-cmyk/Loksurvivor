@@ -1720,6 +1720,12 @@ export interface UIThemeDef {
   description: string;
   /** Cred cost to unlock. 0 = always owned. */
   cost: number;
+  /** Visual progression label. Starter themes are always available. */
+  tier?: 'starter' | CosmeticTier;
+  /** Included in the always-available intro theme carousel. */
+  starter?: boolean;
+  /** Secret until earned through a rare reload takeover or Dev Mode. */
+  hidden?: boolean;
   /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
   swatches?: UIThemeSwatchDef[];
 }
@@ -2056,6 +2062,10 @@ export interface MetaState {
   uiTheme: string;
   /** Selected accent swatch id per theme, for themes that offer swatches. */
   uiThemeSwatchByTheme: Record<string, string>;
+  /** Core Master upgrade: expands cycling beyond the starter theme set. */
+  themeCycleMastered: boolean;
+  /** Which collection the Core Master cycles through after it is unlocked. */
+  themeCycleCollection: 'starter' | 'owned';
   /** Purchased themed palette ids. The 'default' palette is always included. */
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */
