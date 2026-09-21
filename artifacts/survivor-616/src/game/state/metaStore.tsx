@@ -265,6 +265,8 @@ export function createInitialMeta(): MetaState {
     uiDensity: 'grid',
     lokPetArtStyle: 'pixel-core',
     uiBorderStyle: 'square',
+    lokPetBorderStyle: 'square',
+    characterBorderStyle: 'square',
     musicReactiveEnabled: true,
     sfxEnabled: true,
     hideoutAmbienceEnabled: false,
@@ -1062,6 +1064,14 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.uiBorderStyle === 'soft' || parsed.uiBorderStyle === 'round'
         ? parsed.uiBorderStyle
         : 'square',
+    lokPetBorderStyle:
+      parsed.lokPetBorderStyle === 'soft' || parsed.lokPetBorderStyle === 'round'
+        ? parsed.lokPetBorderStyle
+        : 'square',
+    characterBorderStyle:
+      parsed.characterBorderStyle === 'soft' || parsed.characterBorderStyle === 'round'
+        ? parsed.characterBorderStyle
+        : 'square',
     musicReactiveEnabled: parsed.musicReactiveEnabled !== false,
     sfxEnabled: parsed.sfxEnabled !== false,
     // Opt-in, unlike the other audio toggles: ambience should never start
@@ -1702,6 +1712,8 @@ type Action =
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
   | { type: 'setLokPetArtStyle'; style: MetaState['lokPetArtStyle'] }
   | { type: 'setUiBorderStyle'; style: MetaState['uiBorderStyle'] }
+  | { type: 'setLokPetBorderStyle'; style: MetaState['lokPetBorderStyle'] }
+  | { type: 'setCharacterBorderStyle'; style: MetaState['characterBorderStyle'] }
   | { type: 'startRecovery'; characterId: string; locationId?: string }
   | { type: 'stopRecovery' }
   | { type: 'tickRecovery'; now: number }
@@ -2592,6 +2604,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setUiBorderStyle':
       return { ...state, meta: { ...state.meta, uiBorderStyle: action.style } };
+    case 'setLokPetBorderStyle':
+      return { ...state, meta: { ...state.meta, lokPetBorderStyle: action.style } };
+    case 'setCharacterBorderStyle':
+      return { ...state, meta: { ...state.meta, characterBorderStyle: action.style } };
 
     case 'setWorldInvertEnabled':
       if (action.enabled && vendorPurchaseCount(state.meta, 'invert-world') <= 0) return state;
@@ -3101,6 +3117,8 @@ export interface MetaContextValue {
   setUiDensity: (density: 'grid' | 'list') => void;
   setLokPetArtStyle: (style: MetaState['lokPetArtStyle']) => void;
   setUiBorderStyle: (style: MetaState['uiBorderStyle']) => void;
+  setLokPetBorderStyle: (style: MetaState['lokPetBorderStyle']) => void;
+  setCharacterBorderStyle: (style: MetaState['characterBorderStyle']) => void;
   startRecovery: (characterId: string, locationId?: string) => void;
   stopRecovery: () => void;
   tickRecovery: () => void;
@@ -3326,6 +3344,14 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (style: MetaState['uiBorderStyle']) => dispatch({ type: 'setUiBorderStyle', style }),
     [],
   );
+  const setLokPetBorderStyle = useCallback(
+    (style: MetaState['lokPetBorderStyle']) => dispatch({ type: 'setLokPetBorderStyle', style }),
+    [],
+  );
+  const setCharacterBorderStyle = useCallback(
+    (style: MetaState['characterBorderStyle']) => dispatch({ type: 'setCharacterBorderStyle', style }),
+    [],
+  );
   const startRecovery = useCallback((characterId: string, locationId?: string) => dispatch({ type: 'startRecovery', characterId, locationId }), []);
   const stopRecovery = useCallback(() => dispatch({ type: 'stopRecovery' }), []);
   const tickRecovery = useCallback(() => dispatch({ type: 'tickRecovery', now: Date.now() }), []);
@@ -3474,6 +3500,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setUiDensity,
       setLokPetArtStyle,
       setUiBorderStyle,
+      setLokPetBorderStyle,
+      setCharacterBorderStyle,
       resetProgress,
       startRecovery,
       stopRecovery,
@@ -3587,6 +3615,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setUiDensity,
     setLokPetArtStyle,
     setUiBorderStyle,
+    setLokPetBorderStyle,
+    setCharacterBorderStyle,
     resetProgress,
     startRecovery,
     stopRecovery,

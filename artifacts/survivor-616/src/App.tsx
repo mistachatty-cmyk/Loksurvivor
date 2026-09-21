@@ -544,6 +544,8 @@ function ThemedGame() {
       data-ui-swatch={activeUiThemeSwatchId(meta)}
       data-lokpet-art-style={meta.lokPetArtStyle}
       data-ui-border-style={meta.uiBorderStyle}
+      data-lokpet-border-style={meta.lokPetBorderStyle}
+      data-character-border-style={meta.characterBorderStyle}
       className="min-h-[100dvh]"
     >
       <Game />
