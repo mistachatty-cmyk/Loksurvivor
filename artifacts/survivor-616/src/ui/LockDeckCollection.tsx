@@ -110,7 +110,7 @@ function CollectionCard({ card, owned, copies, variant, onOpen }: { card: LokAss
       <div className="absolute inset-[5px] rounded-[10px] border border-white/15 bg-[#09090d]" />
       <div className="absolute inset-x-3 top-3 z-10 flex items-start justify-between gap-2">
         <div>
-          <p className="font-display text-[13px] font-black uppercase leading-none tracking-tight text-white">{owned ? card.name : 'Unknown Signal'}</p>
+          <p className="font-display text-[13px] font-black uppercase leading-none tracking-tight text-white">{owned ? card.name : 'Unknown Card'}</p>
           <p className="mt-1 font-mono text-[7px] uppercase tracking-[.18em] text-white/45">{info?.cardNumber ?? card.slug}</p>
         </div>
         <span className={`font-mono text-[7px] font-black uppercase tracking-wider ${rarity.ink}`}>{card.rarity}</span>
@@ -151,7 +151,7 @@ function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; owned: b
         </div>
         <div className="flex flex-col p-6">
           <span className={`font-mono text-[10px] font-black uppercase tracking-[.24em] ${rarity.ink}`}>{card.rarity} · {cardPackFor(card).name}</span>
-          <h3 className="mt-3 font-display text-3xl font-black uppercase leading-none text-white">{owned ? card.name : 'Unknown Signal'}</h3>
+          <h3 className="mt-3 font-display text-3xl font-black uppercase leading-none text-white">{owned ? card.name : 'Unknown Card'}</h3>
           <p className="mt-2 font-mono text-[9px] uppercase tracking-widest text-white/40">{info?.cardNumber} · definition v{card.version}</p>
           <p className="mt-6 text-sm leading-relaxed text-white/65">{owned ? card.description : 'This slot is sealed. Find or buy a Lock Pack to reveal a copy.'}</p>
           <div className="mt-auto grid grid-cols-2 gap-3 pt-8 text-[9px] uppercase tracking-widest">

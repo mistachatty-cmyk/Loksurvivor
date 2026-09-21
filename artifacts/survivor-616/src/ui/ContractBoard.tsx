@@ -64,9 +64,9 @@ export function ContractBoard({ onHeadOut }: ContractBoardProps) {
           </div>
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">The Broadcast Board</p>
-            <h2 className="mt-1 text-2xl font-black uppercase text-white">Three signals for today</h2>
+            <h2 className="mt-1 text-2xl font-black uppercase text-white">Three jobs for today</h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              The city is making requests. Complete runs to turn the signal into Cred.
+              The city is making requests. Complete runs to turn the work into Cred.
             </p>
           </div>
         </div>

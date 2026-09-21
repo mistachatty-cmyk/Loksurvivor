@@ -437,7 +437,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
                     <span>
                       <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
-                      <span className="block text-[10px] text-pink-200/70">LokPet Battles · Sparring & League</span>
+                      <span className="block text-[10px] text-pink-200/70">Experimental · LokPet Battles · Sparring & League</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
                   </button>
@@ -452,7 +452,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
                     <span>
                       <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
-                      <span className="block text-[10px] text-violet-100/60">2-4 players · most kills wins</span>
+                      <span className="block text-[10px] text-violet-100/60">Experimental · 2-4 players · most kills wins</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
                   </button>

@@ -36,9 +36,9 @@ export function LokPetVariantSheet() {
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="flex items-center gap-2">
           <span className="text-lg text-pink-300">✦</span>
-          <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet signal sheet</h2>
+          <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet field guide</h2>
         </div>
-        <span className="text-[10px] uppercase tracking-widest text-pink-300">original companions + legendary signals</span>
+        <span className="text-[10px] uppercase tracking-widest text-pink-300">original companions + legendary partners</span>
         <span className="ml-auto text-[10px] uppercase tracking-widest text-muted-foreground">{LOKPET_VARIANTS.length} variants · {new Set(LOKPET_VARIANTS.map((v) => v.silhouette)).size} silhouettes</span>
       </div>
       <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-muted-foreground">

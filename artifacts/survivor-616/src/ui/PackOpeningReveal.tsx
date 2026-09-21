@@ -25,7 +25,7 @@ function pulledCardInfo(pull: CardPull) {
   if (manifest) return { name: manifest.name, rarity: manifest.rarity, manifest };
   const passive = PASSIVE_CARDS_BY_ID[pull.cardId];
   if (passive) return { name: passive.name, rarity: passive.rarity, manifest: undefined };
-  return { name: 'Unknown Signal', rarity: 'common', manifest: undefined };
+  return { name: 'Unknown Card', rarity: 'common', manifest: undefined };
 }
 
 function PulledCardFace({ pull, size }: { pull: CardPull; size: 'focal' | 'tray' }) {

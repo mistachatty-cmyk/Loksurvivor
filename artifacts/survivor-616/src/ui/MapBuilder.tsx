@@ -623,7 +623,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
               <section className="border border-cyan-100/15 bg-[#0c1a20]/90 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-mono text-[9px] font-bold uppercase tracking-[.25em] text-cyan-200/60">Selected signal</p>
+                    <p className="font-mono text-[9px] font-bold uppercase tracking-[.25em] text-cyan-200/60">Selected route</p>
                     <p className="mt-1 text-sm font-black uppercase text-slate-100">{selectedPlacement ? assetFromId(selectedPlacement.assetId)?.name : 'Nothing selected'}</p>
                   </div>
                   {selectedPlacement && <span className="h-2 w-2 rounded-full bg-orange-300 shadow-[0_0_12px_rgba(253,186,116,.8)]" />}
@@ -660,7 +660,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
 
               <section className="border border-orange-200/20 bg-orange-200/[.04] p-4">
                 <div className="flex items-center gap-2 text-orange-200"><AlertTriangle className="h-4 w-4" /><p className="font-mono text-[9px] font-bold uppercase tracking-[.2em]">Preflight</p></div>
-                {validation.length > 0 ? <ul className="mt-3 space-y-2">{validation.map((warning) => <li key={warning} className="flex gap-2 text-[10px] leading-relaxed text-orange-100/75"><Minus className="mt-0.5 h-3 w-3 shrink-0" />{warning}</li>)}</ul> : <p className="mt-3 flex items-center gap-2 text-[10px] text-emerald-200"><Check className="h-3.5 w-3.5" /> Route has the minimum signals for launch.</p>}
+                {validation.length > 0 ? <ul className="mt-3 space-y-2">{validation.map((warning) => <li key={warning} className="flex gap-2 text-[10px] leading-relaxed text-orange-100/75"><Minus className="mt-0.5 h-3 w-3 shrink-0" />{warning}</li>)}</ul> : <p className="mt-3 flex items-center gap-2 text-[10px] text-emerald-200"><Check className="h-3.5 w-3.5" /> Route has the minimum checkpoints for launch.</p>}
                  <button type="button" onClick={handleLaunch} disabled={validation.some((warning) => warning.startsWith('No enemy pressure'))} data-testid="button-launch-custom-map" className="mt-4 flex w-full items-center justify-center gap-2 bg-orange-300 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-[#091216] transition hover:bg-orange-200 disabled:cursor-not-allowed disabled:opacity-40"><Upload className="h-3.5 w-3.5" /> Launch route</button>
               </section>
             </>

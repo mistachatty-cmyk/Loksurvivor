@@ -814,7 +814,7 @@ export const ENEMIES: EnemyDef[] = [
     faction: 'Cabinet Rot',
     role: 'swarm',
     traits: { swayRadius: 110 },
-    lore: 'Loose signal noise that never found a screen to live on. Circles anything warm enough to be one.',
+    lore: 'Loose broadcast noise that never found a screen to live on. Circles anything warm enough to be one.',
   },
   {
     id: 'claw-machine-menace',

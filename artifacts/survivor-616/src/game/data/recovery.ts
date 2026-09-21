@@ -88,7 +88,7 @@ export const RECOVERY_HUTS: RecoveryHutDef[] = [
     id: 'northline-cabin',
     name: 'Northline Cabin',
     areaId: 'northline-yard',
-    description: 'A rail signal cabin with a cot, a hot plate, and a window full of empty tracks.',
+    description: 'A rail switch cabin with a cot, a hot plate, and a window full of empty tracks.',
     facility: 'hot-tub',
     unlock: { kind: 'clearArea', areaId: 'northline-yard' },
   },

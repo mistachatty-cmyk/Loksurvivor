@@ -68,7 +68,7 @@ export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
   const seed = [...character.id].reduce((total, letter) => total + letter.charCodeAt(0), 0);
   const variants: Array<Pick<CharacterSkinDef, 'style' | 'name' | 'description' | 'episodeRequired'>> = [
     { style: 'original', name: 'Original', description: 'The character’s authored street colors.', episodeRequired: false },
-    { style: 'nocturne', name: 'Nocturne', description: 'A cool late-night version of the original signal.', episodeRequired: false },
+    { style: 'nocturne', name: 'Nocturne', description: 'A cool late-night version of the original look.', episodeRequired: false },
     { style: 'countertone', name: 'Countertone', description: 'A loud complementary remix unique to this fighter.', episodeRequired: false },
     { style: 'episode', name: 'Afterstory', description: 'The personal colorway earned by completing this character’s episode.', episodeRequired: true },
   ];

@@ -1739,7 +1739,7 @@ export function RunScreen({
       {chestFlight > 0 ? (
         <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
       ) : null}
-      <div className="absolute bottom-[5.25rem] right-2 z-40 flex items-stretch sm:bottom-[6.5rem] sm:right-5">
+      <div className="absolute right-2 top-[max(4.25rem,calc(env(safe-area-inset-top)+4rem))] z-40 flex items-stretch sm:right-5">
         <button
           type="button"
           onClick={openQueuedPrize}
@@ -1941,7 +1941,7 @@ export function RunScreen({
       {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen && !pauseSoundtrackOpen ? (
         <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
           <div className="pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
-            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div>
+            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><div className="flex gap-2">{liveDashboardOpen ? <button type="button" onClick={() => { setLiveDashboardOpen(false); setPhaseBoth('paused'); }} className="border border-amber-300/40 px-3 py-2 font-mono text-[10px] uppercase text-amber-100">Pause</button> : null}<button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div></div>
             {!liveDashboardOpen ? (
               <div className="mb-3 flex items-center gap-2 border border-cyan-200/20 bg-[#08111a] px-3 py-2" data-testid="pause-music-bar">
                 <button
@@ -2037,14 +2037,14 @@ export function RunScreen({
                 Head home
               </button>
             )}
-            {!liveDashboardOpen ? <button
+            <button
               type="button"
               onClick={onAbort}
               className="w-full rounded-sm border border-white/15 px-4 py-3 font-mono text-xs uppercase tracking-widest text-white/70"
               data-testid="button-abandon"
             >
-              Abandon run
-            </button> : null}
+              Leave run
+            </button>
             </div>
           </div>
         </div>

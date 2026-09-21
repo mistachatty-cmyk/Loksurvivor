@@ -88,7 +88,7 @@ export const SECTOR_MISSIONS: SectorMissionDef[] = [
     durationSec: 300,
     squadCap: 8,
     briefing:
-      'Sable traced the hum. Three racks under the substation are still feeding the signal, and none of them are plugged into anything. Break all three. You will not be able to cover them all at once, so take a squad that can.',
+      'Sable traced the hum. Three racks under the substation are still feeding the broadcast, and none of them are plugged into anything. Break all three. You will not be able to cover them all at once, so take a squad that can.',
     debrief:
       'The hum stops. Sable does not look relieved about it, which is its own kind of report.',
     objectives: [
@@ -98,7 +98,7 @@ export const SECTOR_MISSIONS: SectorMissionDef[] = [
     ],
     beats: [
       { id: 'substation-open', trigger: { kind: 'at-sec', sec: 5 }, line: 'Sable: "Three racks, three directions. Split or lose."', speakerAllyId: 'sable' },
-      { id: 'substation-push', trigger: { kind: 'objective-complete', objectiveId: 'substation-racks' }, line: 'Sable: "Signal is dropping. Whatever is left down here knows it was you."', speakerAllyId: 'sable' },
+      { id: 'substation-push', trigger: { kind: 'objective-complete', objectiveId: 'substation-racks' }, line: 'Sable: "Broadcast is dropping. Whatever is left down here knows it was you."', speakerAllyId: 'sable' },
     ],
     unlock: { kind: 'clearArea', areaId: 'null-sector' },
     requiresMissionIds: ['sector-hold-the-dock'],

@@ -425,7 +425,7 @@ function Game() {
       return <CardShopPanel onBack={goHub} />;
 
     case 'settings':
-      return <SettingsPanel onBack={goHub} />;
+      return <SettingsPanel onBack={goHub} onOpenLooksAndLokPets={() => setScreen({ name: 'run-setup', destination: 'hub' })} />;
 
     case 'palette-store':
       return <PaletteGalleryPanel onBack={goHub} />;

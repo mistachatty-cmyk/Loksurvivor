@@ -212,7 +212,7 @@ export const ALLIES: AllyDef[] = [
   {
     id: 'frankie',
     name: 'Frankie Reyes',
-    role: 'Rail yard signalman',
+    role: 'Rail yard switch operator',
     blurb: 'Worked the switch by lantern long after the yard stopped running trains on schedule. Still logs every arrival, real or otherwise.',
     room: 'the-cellar',
     boost: { haste: -0.04 },

@@ -41,7 +41,7 @@ export function dailyContractDefs(dayKey = contractDayKey()): DailyContractDef[]
     {
       id: `${dayKey}:street-sweep`,
       name: 'Street Sweep',
-      description: 'Clear any district. The signal wants one block quieter.',
+      description: 'Clear any district. The city wants one block quieter.',
       kind: 'clear-area',
       targetCount: 1,
       rewardCred: 55 + (roll % 2) * 15,
@@ -58,7 +58,7 @@ export function dailyContractDefs(dayKey = contractDayKey()): DailyContractDef[]
     },
     {
       id: `${dayKey}:hold-the-signal`,
-      name: 'Hold the Signal',
+      name: 'Hold the Line',
       description: `Survive ${surviveTarget} seconds in a single run.`,
       kind: 'survive-sec',
       targetCount: surviveTarget,

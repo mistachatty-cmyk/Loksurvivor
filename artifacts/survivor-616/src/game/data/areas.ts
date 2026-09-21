@@ -384,7 +384,7 @@ export const AREAS: AreaDef[] = [
     name: 'Northline Rail Yard',
     district: 'North cut',
     description:
-      'Dead rails divide a field of signal lights and freight cars. The city’s secret deliveries pass through here after midnight.',
+      'Dead rails divide a field of switch lights and freight cars. The city’s secret deliveries pass through here after midnight.',
     backdrop: 'art/alley.jpeg',
     bounds: { w: 1080, h: 620 },
     ground: { base: '#101820', tile: '#172632', seam: '#080d12', glow: '#f26b5e' },
@@ -410,7 +410,7 @@ export const AREAS: AreaDef[] = [
     discoveryId: 'northline-switch',
     landmark: {
       name: 'Northline Switch',
-      description: 'A signal tower blinks in a pattern only the crew recognizes.',
+      description: 'A switch tower blinks in a pattern only the crew recognizes.',
       kind: 'rail-yard',
       accent: '#f26b5e',
     },

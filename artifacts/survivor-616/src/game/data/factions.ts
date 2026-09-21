@@ -102,7 +102,7 @@ export const FACTIONS: FactionDef[] = [
   {
     id: 'null-sector',
     name: 'Null Sector',
-    description: 'A decommissioned data-center basement, corrupted by a rogue signal. Nothing down here is plugged in, and everything is still running.',
+    description: 'A decommissioned data-center basement, corrupted by a rogue broadcast. Nothing down here is plugged in, and everything is still running.',
     accent: '#22d3ee',
     roster: ['packet-wraith', 'firewall-brute', 'null-spitter', 'corrupted-lookout', 'drift-shard', 'prism-sentinel'],
   },

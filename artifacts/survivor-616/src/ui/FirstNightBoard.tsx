@@ -47,7 +47,7 @@ export function FirstNightBoard({ compact = false }: FirstNightBoardProps) {
               <Radio className="h-4 w-4 text-cyan-200" aria-hidden="true" />
             )}
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100/80">
-              {sireConfirmed ? 'Influence confirmed' : 'Signal still forming'}
+              {sireConfirmed ? 'Influence confirmed' : 'Trail still forming'}
             </p>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-white">

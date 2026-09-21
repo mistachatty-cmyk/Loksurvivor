@@ -17,7 +17,7 @@ export const CITY_RELICS: CityRelicDef[] = [
   },
   {
     id: 'cellar-signal-crystal',
-    name: 'Cellar Signal Crystal',
+    name: 'Cellar Pulse Crystal',
     description: 'A warm shard that holds a note after the hand leaves it. Sustained damage can keep singing in place.',
     sourceAreaId: 'crystal-cellar',
     sourceDiscoveryId: 'lantern-shard',

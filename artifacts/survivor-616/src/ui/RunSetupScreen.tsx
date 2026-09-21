@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, Circle, Cpu, Grid3X3, Monitor, PawPrint, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
@@ -21,7 +21,7 @@ const ART_STYLES: Array<{
   description: string;
 }> = [
   { id: 'pixel-core', label: 'Pixel Core', description: 'The classic pixel rig.' },
-  { id: 'neon-signal', label: 'Neon Signal', description: 'Glow-forward signal scan.' },
+  { id: 'neon-signal', label: 'Neon Flight', description: 'Glow-forward companion scan.' },
   { id: 'holo-card', label: 'Holo Card', description: 'A collectible-card finish.' },
 ];
 
@@ -63,6 +63,8 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const [panelLayout, setPanelLayout] = useState(meta.uiPanelLayout);
   const [minimapVisible, setMinimapVisibleChoice] = useState(meta.minimapVisible);
   const readyPets = meta.savedLokPets.filter((pet) => pet.stamina > 0);
+  const regularReadyPets = readyPets.filter((pet) => !pet.roll.legendary);
+  const legendaryReadyPets = readyPets.filter((pet) => pet.roll.legendary);
   const capacity = lokPetTeamCapacity(selectedCharacter);
   const isLaunch = intent === 'launch';
   const ownedPalettes = meta.ownedPaletteIds.map((id) => THEMED_PALETTES_BY_ID[id]).filter(Boolean);
@@ -128,11 +130,12 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                 <p className="mt-3 text-sm font-black uppercase">Go solo</p>
                 <p className="mt-1 text-xs leading-relaxed text-white/50">No companion this run.</p>
               </button>
-              {readyPets.map((pet) => {
+              {[...regularReadyPets, ...legendaryReadyPets].map((pet) => {
                 const selected = pet.id === selectedPetId;
                 return (
+                  <Fragment key={pet.id}>
+                  {pet.roll.legendary && pet.id === legendaryReadyPets[0]?.id ? <div className="col-span-full mt-2 border-t border-amber-300/30 pt-3 font-mono text-[10px] font-black uppercase tracking-[.24em] text-amber-200">Legendary companions</div> : null}
                   <button
-                    key={pet.id}
                     type="button"
                     onClick={() => setSelectedPetId(pet.id)}
                     className={`relative min-h-36 border p-4 text-left transition ${selected ? selectClass(true) : selectClass(false)}`}
@@ -148,6 +151,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                       </div>
                     </div>
                   </button>
+                  </Fragment>
                 );
               })}
             </div>
