@@ -11,7 +11,7 @@ import { useMeta } from '@/game/state/metaStore';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { pickSplashText } from '@/game/data/splashText';
 import { IntroTitle } from '@/ui/IntroTitle';
-import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset } from '@/ui/introPhysics';
+import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset, useIntroPhysicsResetVisible } from '@/ui/introPhysics';
 import { introPhysicsForTheme, resolveIntroEvent } from '@/ui/introPresentation';
 
 // Pulls in the full simulation engine (createWorld/stepWorld/renderWorld),
@@ -158,16 +158,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             </IntroPhysicsBody>
           ) : null}
 
-          <button
-            type="button"
-            onClick={cycleStarterUiLook}
-            title={`Theme: ${meta.uiTheme.replace(/-/g, ' ')} · tap to switch`}
-            aria-label={`Switch starter look (current theme: ${meta.uiTheme.replace(/-/g, ' ')})`}
-            className="absolute left-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-colors hover:border-primary hover:text-primary"
-            data-testid="button-intro-cycle-theme"
-          >
-            <Palette className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
+          <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
 
           <motion.button
             type="button"
@@ -194,6 +185,30 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
     </div>
+  );
+}
+
+/**
+ * Docked bottom-right, mirroring the music chip's move to the opposite
+ * corner. Nudges further right while the Reset button (bottom-left) is up,
+ * then eases back the moment Reset disappears -- a small tell that ties the
+ * two corners together while the title is off its resting spot.
+ */
+function ThemeCycleButton({ theme, onCycle }: { theme: string; onCycle: () => void }) {
+  const resetVisible = useIntroPhysicsResetVisible();
+  return (
+    <motion.button
+      type="button"
+      onClick={onCycle}
+      title={`Theme: ${theme.replace(/-/g, ' ')} · tap to switch`}
+      aria-label={`Switch starter look (current theme: ${theme.replace(/-/g, ' ')})`}
+      animate={{ x: resetVisible ? 56 : 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+      className="fixed bottom-3 right-3 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-colors hover:border-primary hover:text-primary"
+      data-testid="button-intro-cycle-theme"
+    >
+      <Palette className="h-3.5 w-3.5" aria-hidden="true" />
+    </motion.button>
   );
 }
 
