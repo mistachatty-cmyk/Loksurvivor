@@ -173,24 +173,27 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             <div className="absolute inset-0 translate-y-[100%] bg-white transition-transform duration-300 ease-out group-hover:translate-y-[0%]" />
             <span className="relative z-10 transition-colors duration-300 group-hover:text-black">Enter the hideout</span>
           </motion.button>
-
-          <a
-            href="https://gsix.online"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 self-center text-center font-mono text-[8px] uppercase tracking-[0.1em] text-white/20 transition-colors hover:text-white/50"
-            data-testid="link-intro-credit"
-          >
-            Powered by LokServices · Designed by GSixDesigns
-          </a>
         </motion.div>
-        {/* Both of these use `position: fixed`, which must escape to the
-            viewport -- kept as siblings of motion.div, not nested inside it,
-            because motion.div carries a Framer Motion filter: blur(0px) that
-            (despite doing nothing visually) creates a CSS containing block
-            for fixed descendants, same as a transform would. Nesting either
-            button inside it anchors it to that div's box instead of the
-            screen corner. */}
+        {/* All three of these use `position: fixed`, which must escape to
+            the viewport -- kept as siblings of motion.div, not nested inside
+            it, because motion.div carries a Framer Motion filter:
+            blur(0px) that (despite doing nothing visually) creates a CSS
+            containing block for fixed descendants, same as a transform
+            would. Nesting any of them inside motion.div anchors it to that
+            div's box instead of the screen edge -- which is also why the
+            credit link lives here now instead of in the flow below the
+            Enter button: the physics title can push that flow's layout
+            around, but the credit line should stay put at the bottom of the
+            screen regardless. */}
+        <a
+          href="https://gsix.online"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-3 left-1/2 z-20 -translate-x-1/2 text-center font-mono text-[8px] uppercase tracking-[0.1em] text-white/20 transition-colors hover:text-white/50"
+          data-testid="link-intro-credit"
+        >
+          Powered by LokServices · Designed by GSixDesigns
+        </a>
         <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
