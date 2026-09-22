@@ -66,28 +66,32 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
     checkHiddenThemeReload();
   }, [checkHiddenThemeReload]);
 
-  // Try to start the title soundtrack the moment the intro loads. Most
-  // browsers block audio before any user gesture, so this attempt is
-  // allowed to fail quietly -- no banner, no prompt. The first pointer or
-  // key interaction anywhere on the intro (theme cycle, "Enter the
-  // hideout", or just a stray tap) retries once, which is enough of a
-  // gesture to satisfy the autoplay policy without the player ever
-  // noticing a step happened.
+  // Try to start Data Spark, the title-screen default track, the moment the
+  // intro loads. Most browsers block audio before any user gesture, so this
+  // attempt is allowed to fail quietly -- no banner, no prompt. The first
+  // pointer or key interaction anywhere on the intro (theme cycle, "Enter
+  // the hideout", or just a stray tap) retries once -- a separate flag from
+  // the initial attempt, so the retry actually runs even though that first
+  // attempt is expected to fail -- which is enough of a gesture to satisfy
+  // the autoplay policy without the player ever noticing a step happened.
   useEffect(() => {
     if (player.isPlaying) return;
-    let unlocked = false;
-    const start = () => {
-      if (unlocked || player.isPlaying) return;
-      unlocked = true;
+    const attemptStart = () => {
       player.ensureAudioContext();
       player.togglePlay();
     };
-    start();
-    window.addEventListener('pointerdown', start, { once: true, capture: true });
-    window.addEventListener('keydown', start, { once: true, capture: true });
+    attemptStart();
+    let retried = false;
+    const retryOnGesture = () => {
+      if (retried) return;
+      retried = true;
+      attemptStart();
+    };
+    window.addEventListener('pointerdown', retryOnGesture, { once: true, capture: true });
+    window.addEventListener('keydown', retryOnGesture, { once: true, capture: true });
     return () => {
-      window.removeEventListener('pointerdown', start, { capture: true });
-      window.removeEventListener('keydown', start, { capture: true });
+      window.removeEventListener('pointerdown', retryOnGesture, { capture: true });
+      window.removeEventListener('keydown', retryOnGesture, { capture: true });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
