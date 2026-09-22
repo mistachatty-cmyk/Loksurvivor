@@ -173,27 +173,24 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             <div className="absolute inset-0 translate-y-[100%] bg-white transition-transform duration-300 ease-out group-hover:translate-y-[0%]" />
             <span className="relative z-10 transition-colors duration-300 group-hover:text-black">Enter the hideout</span>
           </motion.button>
+
+          <a
+            href="https://gsix.online"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 self-center text-center font-mono text-[8px] uppercase tracking-[0.1em] text-white/20 transition-colors hover:text-white/50"
+            data-testid="link-intro-credit"
+          >
+            Powered by LokServices · Designed by GSixDesigns
+          </a>
         </motion.div>
-        {/* All three of these use `position: fixed`, which must escape to
-            the viewport -- kept as siblings of motion.div, not nested inside
-            it, because motion.div carries a Framer Motion filter:
-            blur(0px) that (despite doing nothing visually) creates a CSS
-            containing block for fixed descendants, same as a transform
-            would. Nesting any of them inside motion.div anchors it to that
-            div's box instead of the screen edge -- which is also why the
-            credit link lives here now instead of in the flow below the
-            Enter button: the physics title can push that flow's layout
-            around, but the credit line should stay put at the bottom of the
-            screen regardless. */}
-        <a
-          href="https://gsix.online"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed bottom-3 left-1/2 z-20 -translate-x-1/2 text-center font-mono text-[8px] uppercase tracking-[0.1em] text-white/20 transition-colors hover:text-white/50"
-          data-testid="link-intro-credit"
-        >
-          Powered by LokServices · Designed by GSixDesigns
-        </a>
+        {/* Both of these use `position: fixed`, which must escape to the
+            viewport -- kept as siblings of motion.div, not nested inside it,
+            because motion.div carries a Framer Motion filter: blur(0px) that
+            (despite doing nothing visually) creates a CSS containing block
+            for fixed descendants, same as a transform would. Nesting either
+            one inside motion.div anchors it to that div's box instead of the
+            screen corner. */}
         <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
@@ -202,10 +199,11 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
 }
 
 /**
- * Docked bottom-right, mirroring the music chip's move to the opposite
- * corner. Nudges further right while the Reset button (bottom-left) is up,
- * then eases back the moment Reset disappears -- a small tell that ties the
- * two corners together while the title is off its resting spot.
+ * Shares IntroPhysicsReset's exact bottom-left slot (same
+ * bottom-4/left-4 sm:bottom-6/sm:left-6 anchor) rather than sitting
+ * somewhere else on screen. Normally parked right there; when Reset needs
+ * that spot -- the title is off its resting spot -- this slides out of the
+ * way to the right, then slides back the moment Reset disappears.
  */
 function ThemeCycleButton({ theme, onCycle }: { theme: string; onCycle: () => void }) {
   const resetVisible = useIntroPhysicsResetVisible();
@@ -215,9 +213,9 @@ function ThemeCycleButton({ theme, onCycle }: { theme: string; onCycle: () => vo
       onClick={onCycle}
       title={`Theme: ${theme.replace(/-/g, ' ')} · tap to switch`}
       aria-label={`Switch starter look (current theme: ${theme.replace(/-/g, ' ')})`}
-      animate={{ x: resetVisible ? 56 : 0 }}
+      animate={{ x: resetVisible ? 88 : 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-      className="fixed bottom-3 right-3 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-colors hover:border-primary hover:text-primary"
+      className="fixed bottom-4 left-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-colors hover:border-primary hover:text-primary sm:bottom-6 sm:left-6"
       data-testid="button-intro-cycle-theme"
     >
       <Palette className="h-3.5 w-3.5" aria-hidden="true" />
