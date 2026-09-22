@@ -323,6 +323,16 @@ export function IntroPhysicsBody({ id, order, children, className = '', style, t
   );
 }
 
+/**
+ * True exactly when the Reset button below is visible -- other intro UI
+ * (the theme switcher) reads this to slide out of the way while the title
+ * is off its resting spot, and slide back once it settles.
+ */
+export function useIntroPhysicsResetVisible(): boolean {
+  const context = useContext(IntroPhysicsContext);
+  return Boolean(context?.enabled && context.hasMoved);
+}
+
 export function IntroPhysicsReset() {
   const context = useContext(IntroPhysicsContext);
   if (!context?.enabled || !context.hasMoved) return null;
