@@ -162,8 +162,6 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             </IntroPhysicsBody>
           ) : null}
 
-          <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
-
           <motion.button
             type="button"
             whileHover={{ scale: 1.02 }}
@@ -186,6 +184,14 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             Powered by LokServices · Designed by GSixDesigns
           </a>
         </motion.div>
+        {/* Both of these use `position: fixed`, which must escape to the
+            viewport -- kept as siblings of motion.div, not nested inside it,
+            because motion.div carries a Framer Motion filter: blur(0px) that
+            (despite doing nothing visually) creates a CSS containing block
+            for fixed descendants, same as a transform would. Nesting either
+            button inside it anchors it to that div's box instead of the
+            screen corner. */}
+        <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
     </div>
