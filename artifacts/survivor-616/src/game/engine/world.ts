@@ -989,6 +989,17 @@ export interface World {
   grid: Map<number, EnemyActor[]>;
   /** Rebuilt every frame from `obstacles` so per-actor collision only tests nearby boxes. */
   obstacleGrid: Map<number, Aabb[]>;
+  /** True once `obstacleGrid` needs rebuilding (obstacles are static, so this only flips on add/break). */
+  obstacleGridDirty: boolean;
+  /**
+   * uid -> enemy, rebuilt alongside `grid` every frame (and kept in sync by
+   * the mid-frame spawn/removal sites) so uid-based lookups (homing-target
+   * refresh, thrown/carried enemy resolution, commanded-unit selection)
+   * don't have to linear-scan `w.enemies` -- that scan was O(enemies) per
+   * lookup, called per projectile/unit per frame, and dominated frame time
+   * once enemy counts got into the hundreds.
+   */
+  enemiesByUid: Map<number, EnemyActor>;
 
   /** Seed used to create rng; also forwarded to endless chunk generation. */
   rngSeed: number;
@@ -1437,6 +1448,8 @@ export function createWorld(
     ambientRng: createRng(seed + 0x5eed),
     grid: new Map(),
     obstacleGrid: new Map(),
+    obstacleGridDirty: true,
+    enemiesByUid: new Map(),
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
@@ -1863,7 +1876,9 @@ function cellKey(x: number, y: number): number {
 
 function rebuildGrid(w: World) {
   w.grid.clear();
+  w.enemiesByUid.clear();
   for (const enemy of w.enemies) {
+    w.enemiesByUid.set(enemy.uid, enemy);
     if (enemy.dying) continue;
     const key = cellKey(enemy.x, enemy.y);
     const bucket = w.grid.get(key);
@@ -1878,6 +1893,8 @@ function rebuildGrid(w: World) {
  * point-sample enemy grid above, which only ever needs one cell per actor.
  */
 function rebuildObstacleGrid(w: World) {
+  if (!w.obstacleGridDirty) return;
+  w.obstacleGridDirty = false;
   w.obstacleGrid.clear();
   for (const box of w.obstacles) {
     const minCx = Math.floor((box.x - box.w / 2) / CELL);
@@ -2047,6 +2064,7 @@ function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: 
     capturableUntil: 0,
   };
   w.enemies.push(enemy);
+  w.enemiesByUid.set(enemy.uid, enemy);
 
   if (
     w.activeCrewRumor?.rumorId === 'basement-broadcast' &&
@@ -3457,21 +3475,46 @@ function rebuildOrbiters(w: World, runWeapon = w.weapons.find((entry) => entry.d
   }
 }
 
-function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?: Set<number>) {
+/**
+ * Grid-bucketed instead of a full `w.enemies` scan -- this is called from
+ * ~20 per-frame sites (once per weapon per frame, plus once per
+ * commanded/converted unit per frame), so at hundreds-to-a-thousand enemies
+ * a linear scan here was the dominant per-frame cost. Walks the same
+ * fixed cell box `forEachNearby` does, just tracking the closest hit
+ * instead of visiting every one.
+ */
+function nearestEnemy(
+  w: World,
+  x: number,
+  y: number,
+  maxRange: number,
+  exclude?: Set<number>,
+  excludeUid?: number,
+) {
   let best: EnemyActor | null = null;
   let bestDist = maxRange * maxRange;
-  for (const enemy of w.enemies) {
-    if (enemy.dying) continue;
-    if (exclude?.has(enemy.uid)) continue;
-    if (w.now < enemy.invisibleUntil) continue;
-    // Sector Command: your own captured units are never a target -- not for
-    // your weapons, and not for each other. (Legacy `convertedUntil` allies
-    // from the allymaker weapon keep their original behavior.)
-    if (enemy.commanded) continue;
-    const d = dist2(enemy.x, enemy.y, x, y);
-    if (d < bestDist) {
-      bestDist = d;
-      best = enemy;
+  const cells = Math.ceil(maxRange / CELL);
+  const baseX = Math.floor(x / CELL);
+  const baseY = Math.floor(y / CELL);
+  for (let ix = -cells; ix <= cells; ix += 1) {
+    for (let iy = -cells; iy <= cells; iy += 1) {
+      const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+      if (!bucket) continue;
+      for (const enemy of bucket) {
+        if (enemy.dying) continue;
+        if (enemy.uid === excludeUid) continue;
+        if (exclude?.has(enemy.uid)) continue;
+        if (w.now < enemy.invisibleUntil) continue;
+        // Sector Command: your own captured units are never a target -- not for
+        // your weapons, and not for each other. (Legacy `convertedUntil` allies
+        // from the allymaker weapon keep their original behavior.)
+        if (enemy.commanded) continue;
+        const d = dist2(enemy.x, enemy.y, x, y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = enemy;
+        }
+      }
     }
   }
   return best;
@@ -3491,7 +3534,7 @@ function triggerEvolutionHit(
   if (!behavior) return;
   const radius = behavior.radius ?? 64;
   if (behavior.kind === 'chain') {
-    const target = nearestEnemy(w, x, y, radius + 90, excludeUid ? new Set([excludeUid]) : undefined);
+    const target = nearestEnemy(w, x, y, radius + 90, undefined, excludeUid);
     if (target) {
       damageEnemy(w, target, damage * 0.55, 0, x, y, statusEffectId);
       spawnParticles(w, target.x, target.y, color, 4, 55);
@@ -4948,6 +4991,7 @@ function syncObstacleAabbs(w: World) {
   w.obstacles = w.breakables
     .filter((b) => !b.broken)
     .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+  w.obstacleGridDirty = true;
 }
 
 function damageBreakable(
@@ -6029,7 +6073,8 @@ function updateDashSkill(w: World) {
     for (let i = dashSkill.pendingLandings.length - 1; i >= 0; i -= 1) {
       const landing = dashSkill.pendingLandings[i]!;
       if (w.now < landing.readyAt) continue;
-      const stillAlive = w.enemies.find((e) => e.uid === landing.uid && !e.dying);
+      const uidMatch = w.enemiesByUid.get(landing.uid);
+      const stillAlive = uidMatch && !uidMatch.dying ? uidMatch : undefined;
       const x = stillAlive?.x ?? landing.x;
       const y = stillAlive?.y ?? landing.y;
       novaDamage(w, x, y, landing.radius, landing.damage, 3);
@@ -6074,6 +6119,15 @@ function updateEnemies(w: World, dt: number) {
   const trackX = stealthed ? w.stealthAnchorX : p.x;
   const trackY = stealthed ? w.stealthAnchorY : p.y;
 
+  // Grid-backed lookups (nearestEnemy, enemiesByUid) run throughout this
+  // function -- including the converted-ally/commanded-unit targeting below,
+  // well before the separation pass's own rebuild -- so it has to be current
+  // before any of that runs, not just before separation. The later call is
+  // still worth keeping: it re-syncs against this frame's movement before
+  // the separation pass, exactly as before this function grew a top-of-frame
+  // rebuild too.
+  rebuildGrid(w);
+
   const enemyMoveBreakables = w.breakables.filter((b) => !b.broken && b.movable);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
@@ -6087,7 +6141,7 @@ function updateEnemies(w: World, dt: number) {
     }
 
     if (enemy.convertedUntil > w.now) {
-      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, new Set([enemy.uid]));
+      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, undefined, enemy.uid);
       if (allyTarget && w.now >= enemy.convertedAttackReadyAt) {
         enemy.convertedAttackReadyAt = w.now + 650;
         damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8 * statusDamageMultiplier(enemy))), 2, enemy.x, enemy.y);
@@ -6702,6 +6756,7 @@ function updateEnemies(w: World, dt: number) {
     const enemy = w.enemies[i]!;
     if (enemy.dying && w.now - enemy.deathAt > 560) {
       w.enemies.splice(i, 1);
+      w.enemiesByUid.delete(enemy.uid);
     }
   }
 
@@ -6783,7 +6838,8 @@ function updateProjectiles(w: World, dt: number) {
     }
 
     if (proj.targetUid !== null) {
-      const target = w.enemies.find((e) => e.uid === proj.targetUid && !e.dying);
+      const uidMatch = w.enemiesByUid.get(proj.targetUid);
+      const target = uidMatch && !uidMatch.dying ? uidMatch : undefined;
       if (target) {
         const desired = Math.atan2(target.y - proj.y, target.x - proj.x);
         const current = Math.atan2(proj.vy, proj.vx);
@@ -7174,7 +7230,7 @@ function updateProjectiles(w: World, dt: number) {
  * enemies into empty space can't be farmed for free kills.
  */
 function resolveThrownEnemyImpact(w: World, carriedUid: number, granted: boolean, atX: number, atY: number) {
-  const carried = w.enemies.find((e) => e.uid === carriedUid);
+  const carried = w.enemiesByUid.get(carriedUid);
   if (!carried) return;
   if (granted) {
     // Move it to the impact point first so the death animation, particles,
@@ -7185,6 +7241,7 @@ function resolveThrownEnemyImpact(w: World, carriedUid: number, granted: boolean
   } else {
     const index = w.enemies.indexOf(carried);
     if (index !== -1) w.enemies.splice(index, 1);
+    w.enemiesByUid.delete(carriedUid);
   }
 }
 
@@ -7736,7 +7793,7 @@ function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
   // captured unit could be ordered around and killed but contributed nothing
   // to a fight, which made the whole economy decorative.
   if (w.now >= enemy.contactReadyAt) {
-    const foe = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + UNIT_REACH, new Set([enemy.uid]));
+    const foe = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + UNIT_REACH, undefined, enemy.uid);
     if (foe) {
       enemy.contactReadyAt = w.now + UNIT_ATTACK_MS;
       // Routed through `damageEnemy` on purpose: it is the single choke point,
@@ -7763,7 +7820,7 @@ function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
   // you want for taking ground; plain 'move' is the one you want for
   // disengaging, so both exist.
   if (enemy.orderKind === 'attack-move') {
-    const target = nearestEnemy(w, enemy.x, enemy.y, UNIT_AGGRO_RANGE, new Set([enemy.uid]));
+    const target = nearestEnemy(w, enemy.x, enemy.y, UNIT_AGGRO_RANGE, undefined, enemy.uid);
     if (target) {
       const tdx = target.x - enemy.x;
       const tdy = target.y - enemy.y;
@@ -8961,6 +9018,7 @@ function updateEndlessChunks(w: World) {
         }
       }
     }
+    w.obstacleGridDirty = true;
   }
 }
 
@@ -9015,6 +9073,7 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
      y: p.y + obs.y,
    }));
   w.fluids = [];
+  w.obstacleGridDirty = true;
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -9094,6 +9153,7 @@ function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]
   }));
   w.obstacles = [...interiorShell, ...interiorProps];
   w.breakables = [...interiorShell, ...interiorProps].map((obs) => createBreakable(w, { ...obs, kind: obs.kind }));
+  w.obstacleGridDirty = true;
   w.potholes = [];
   w.fluids = [];
   w.enemies = w.enemies.filter((en) => en.dying);
@@ -9166,6 +9226,7 @@ function restoreStreetObstacles(w: World) {
       }
     }
   }
+  w.obstacleGridDirty = true;
 }
 
 function updateEndlessDungeon(w: World) {

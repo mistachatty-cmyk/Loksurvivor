@@ -1826,14 +1826,24 @@ function drawPotholes(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
+function drawObstacles(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  viewBounds: { left: number; top: number; right: number; bottom: number },
+) {
   const height = 16;
+  const margin = 80;
   // Draw the live prop records so streamed chunks and moving props share the
-  // same authored silhouette and profile.
-  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> =
-    w.area.endless
-      ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
-      : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
+  // same authored silhouette and profile. Culled to the camera viewport --
+  // endless mode can have a full 5x5 chunk window's worth of breakables
+  // loaded at once, and this ran unfiltered every frame before.
+  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> = [];
+  for (const o of w.breakables) {
+    if (o.broken) continue;
+    if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
+      || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
+    obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind });
+  }
 
   const worldTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
   for (const obstacle of obstacleList) {
@@ -5231,7 +5241,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawFluids(ctx, w);
   drawPotholes(ctx, w);
   drawAmbient(ctx, w);
-  drawObstacles(ctx, w);
+  drawObstacles(ctx, w, viewBounds);
   drawAwarenessArrow(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
   drawStormCloud(ctx, w);
