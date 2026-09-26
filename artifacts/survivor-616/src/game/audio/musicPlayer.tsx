@@ -820,6 +820,25 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
   }, [streamingEmbeds]);
 
+  // Mobile browsers suspend the shared AudioContext when the tab is
+  // backgrounded (locking the screen, switching apps, a notification banner)
+  // to save power, and nothing else resumes it automatically. Left alone,
+  // that reads to the player as "my soundtrack got messed up mid-run" --
+  // silence, or a stuck/garbled few seconds -- until they happen to open a
+  // panel that calls `ensureAudioContext()` for an unrelated reason. This
+  // only ever resumes the existing context; it never touches volume, pitch,
+  // or any other property of the music itself.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const context = audioContextRef.current;
+      if (context && context.state === 'suspended') void context.resume().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
   // Release every object URL when the app unmounts.
   useEffect(() => {
     return () => {

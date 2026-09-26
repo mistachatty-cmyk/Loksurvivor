@@ -55,3 +55,41 @@ and both are bounded multipliers.
 Audio is the dev's own bundled tracks or files the player picks off their own
 device. Analysis is entirely in-browser; nothing is uploaded, and no external
 catalog is streamed or claimed as licensed.
+
+## Mid-run audio must never be altered -- fixed 2026-09, still true
+
+The soundtrack `AudioContext` is shared app-wide (`musicPlayer.tsx`) and gets
+suspended by mobile browsers whenever the tab is backgrounded (locking the
+screen, an incoming call, switching apps) to save power. Nothing resumed it
+automatically, so returning to an in-progress run read to the player as "my
+music got messed up mid-game" -- silence or a stuck moment until some
+unrelated UI interaction happened to call `ensureAudioContext()`. Fixed with
+a `visibilitychange` listener in `MusicProvider` that calls `context.resume()`
+only when the existing context is `'suspended'` -- it never recreates the
+context, never touches `volume`/`playbackRate`/any filter, and does nothing
+if the context is already running. If this class of bug resurfaces (garbled
+pitch rather than silence after backgrounding), the next step is almost
+certainly WebKit's known sample-rate-after-route-change issue, which needs
+tearing down and rebuilding the `MediaElementAudioSourceNode`/analyser graph,
+not just a `resume()` call.
+
+## Future idea (not built): let the music drive spawns/waves, never audio
+
+The user has floated reusing `beatBus`'s energy/frequency-band data (already
+published every frame by `analysis.ts`) to trigger *gameplay* events when the
+music crosses a loudness/frequency threshold -- a tactical wave shape, a
+named faction arriving, a burst of more enemies or more ranged enemies, a
+palette/color shift, or a one-off special event. This is explicitly a later
+feature, not requested to be built now, and explicitly must **never** alter
+the audio itself (no volume/pitch/EQ changes tied to gameplay) -- the fix
+above exists specifically to keep mid-run audio untouched, and any such
+future work must preserve that boundary.
+
+If it does get built, it slots into the existing "reactions are content, not
+code" shape above: a new consumer of `beatBus` (bands/energy, not raw FFT
+data) feeding into `stepWorld`'s wave-selection logic the same way
+`musicMultiplier` already feeds speed/damage, with named presets in data
+rather than one-off checks in the loop. `WaveDef`'s existing `burst`/`group`/
+`formation` fields and `squadWave()` (see `content-authoring-system.md`) are
+probably the right vocabulary for "a certain faction" or "more enemies in
+general" once someone actually designs the trigger thresholds.
