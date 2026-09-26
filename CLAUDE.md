@@ -238,6 +238,22 @@ the kind isn't added to `KINDS`/the per-variant weight tables).
    pacing — `durationSec` and `ratePerSec` values aren't checked for being
    survivable by anything automated.
 
+### Every player-visible change appends a changelog entry
+
+`artifacts/survivor-616/src/game/data/changelog.ts`'s `CHANGELOG` array
+drives `CURRENT_VERSION`, the Hub's "see what's new" footer, the
+`UpdatePopup` shown to returning players, and the Archive's Updates chapter
+— all four derive from this one array, so appending an entry is the whole
+job (its own header comment has the exact convention: bump MINOR for a real
+update, PATCH for a hotfix-only change). Treat this the same as running
+`pnpm typecheck` — part of shipping a player-visible change, not an
+optional chore, and that applies to every AI agent or contributor touching
+this repo, not just whoever is reading this right now. See
+`.agents/memory/update-popup-footer-2026-09-26.md` for what happens when
+this slips (the popup/footer were silently deleted as collateral damage by
+an unrelated commit and stayed broken for over a week before anyone
+noticed) — don't let an unrelated `HubScreen.tsx` edit repeat that.
+
 ### Durable decisions in `.agents/memory/`
 
 Read these before touching the areas they cover — they record *why*, not

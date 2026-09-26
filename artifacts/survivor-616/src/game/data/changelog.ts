@@ -109,6 +109,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'All frame choices live in Looks & LokPets and are ready for future collectible frames, animation effects, and rarity styles.',
     ],
   },
+  {
+    version: '0.7.1',
+    date: '2026-09-26',
+    kind: 'hotfix',
+    title: "The Update Board Is Back",
+    body: [
+      "Restored the Hub's \"see what's new\" footer and this very update popup -- an unrelated commit had silently deleted both a while back, so new updates stopped announcing themselves.",
+      'Fixed the run camera creeping more zoomed-in the wider your browser window is; common desktop widths now hold a steady zoom level.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

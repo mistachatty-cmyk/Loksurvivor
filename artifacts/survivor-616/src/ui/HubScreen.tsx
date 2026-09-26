@@ -13,9 +13,12 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
+import { UpdatePopup } from './UpdatePopup';
+import { CHANGELOG, CURRENT_VERSION } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, Megaphone } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -159,6 +162,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext]);
 
   const weatherIcon = WEATHER_ICONS[scene.weather];
+  const footerCredit = useMemo(() => pickCreditName(), []);
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
     [roomAllies.length, scene.flavorLines, selectedCharacter.id],
@@ -173,6 +177,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
+      <UpdatePopup />
       <button
         type="button"
         onClick={onOpenRunSetup}
@@ -700,6 +705,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => onOpen('unlocks')}
+          className="mt-6 flex w-full items-center gap-3 border-t border-border/60 pt-4 text-left transition-colors hover:text-primary"
+          data-testid="footer-updates"
+        >
+          <Megaphone className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            v{CURRENT_VERSION} · {CHANGELOG.length} updates · brought to you by {footerCredit} — see what's new
+          </span>
+        </button>
       </div>
     </motion.div>
   );
