@@ -142,7 +142,14 @@ export function IntroPhysicsProvider({ children, enabled, returnDelaySec, profil
     body.lastPointerX = event.clientX;
     body.lastPointerY = event.clientY;
     body.lastPointerAt = performance.now();
-    setHasMoved(true);
+    // hasMoved (which gates Reset/theme-button visibility) is deliberately
+    // NOT set here. A plain tap -- pointerdown then pointerup with no real
+    // displacement -- would otherwise flip it true, then have the physics
+    // tick immediately flip it back false one frame later (nothing ended up
+    // needing a returnAt), producing a one-frame flash of Reset and a
+    // jarring slide-then-snap-back on the theme button. Setting it in
+    // pointerMove instead, gated on actual displacement, means a real tap
+    // never triggers either animation at all.
   }, [enabled]);
 
   const pointerMove = useCallback((id: string, event: ReactPointerEvent<HTMLDivElement>) => {
@@ -160,6 +167,7 @@ export function IntroPhysicsProvider({ children, enabled, returnDelaySec, profil
     body.lastPointerX = event.clientX;
     body.lastPointerY = event.clientY;
     body.lastPointerAt = now;
+    if (Math.hypot(body.x, body.y) > 3) setHasMoved(true);
     renderBody(body);
   }, [enabled]);
 
