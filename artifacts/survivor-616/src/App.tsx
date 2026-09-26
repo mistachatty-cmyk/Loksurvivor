@@ -18,6 +18,7 @@ import {
   startingWeaponLevel,
   useMeta,
 } from '@/game/state/metaStore';
+import { useVisitTheme, visitThemeStyle } from '@/lib/gsixVisitTheme';
 import { advanceDailyContracts } from '@/game/data/contracts';
 import { createRng } from '@/game/engine/math';
 import {
@@ -538,8 +539,10 @@ function Providers({ children }: { children: ReactNode }) {
 /** Theme attributes live above every screen, including the canvas run. */
 function ThemedGame() {
   const { meta } = useMeta();
+  const visitTheme = useVisitTheme();
   return (
     <div
+      style={visitTheme ? visitThemeStyle(visitTheme) : undefined}
       data-ui-theme={meta.uiTheme}
       data-ui-swatch={activeUiThemeSwatchId(meta)}
       data-lokpet-art-style={meta.lokPetArtStyle}
