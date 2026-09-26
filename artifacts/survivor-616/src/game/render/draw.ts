@@ -5145,6 +5145,21 @@ function drawBubbleWash(ctx: CanvasRenderingContext2D, w: World) {
 /* Entry point                                                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * How many world units are shown across the screen's width, before the
+ * `zoom = width / targetView` division that turns it into a scale factor.
+ * Keeping the width:targetView ratio constant (~0.78) is what keeps the
+ * camera showing "roughly the same slice of the world" as screen width
+ * changes -- the cap below exists only to bound the view distance on truly
+ * huge (ultra-wide/4K) monitors, and must stay well above the width of
+ * ordinary desktop/laptop screens (1280-1920) or those screens creep past
+ * the intended ratio and the camera reads as progressively more zoomed in
+ * the wider the window gets.
+ */
+export function targetViewForWidth(width: number, override?: number): number {
+  return Math.max(1, override ?? (width < 620 ? 470 : Math.min(1500, width * 0.78)));
+}
+
 export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewport) {
   const { width, height, dpr } = view;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
@@ -5153,7 +5168,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   // Show roughly the same slice of the world regardless of screen size,
   // unless a caller (the map editor's whole-map preview) asks for a
   // specific slice width.
-  const targetView = Math.max(1, view.targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78)));
+  const targetView = targetViewForWidth(width, view.targetViewOverride);
   const zoom = Math.max(0.001, width / targetView);
 
   ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
