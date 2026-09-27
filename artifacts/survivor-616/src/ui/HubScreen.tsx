@@ -25,6 +25,8 @@ import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
 import { LokPetIcon } from './LokPetVariantSheet';
+import { useAuth } from '@/state/authStore';
+import { useLokEconomy } from '@/state/lokEconomyStore';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
 
@@ -103,6 +105,8 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
+  const { session } = useAuth();
+  const { balance: lokBalance } = useLokEconomy();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
   const roomNavRef = useRef<HTMLElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
@@ -285,6 +289,16 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                 <p className="text-xs font-mono text-sky-400 mt-1">
                   <KeyRound className="inline w-3 h-3 mr-1" />{meta.skeletonKeys} skeleton keys
                 </p>
+              )}
+              {session && lokBalance !== null && (
+                <button
+                  type="button"
+                  onClick={() => onOpen('account')}
+                  className="mt-1 flex items-center gap-1 text-xs font-mono text-violet-300 hover:text-violet-200 justify-start sm:justify-end w-full"
+                  data-testid="button-lok-token-balance"
+                >
+                  <Sparkles className="inline w-3 h-3" />{lokBalance} LokTokens
+                </button>
               )}
             </div>
           </div>

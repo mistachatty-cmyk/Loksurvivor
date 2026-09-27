@@ -21,6 +21,7 @@ import { renderWorld, type Viewport } from '@/game/render/draw';
 import { type ArenaSeat, createArenaWorld } from '@/game/arena/arenaWorld';
 import { readArenaInputs } from '@/game/arena/arenaInput';
 import { arenaStandings, type ArenaStanding } from '@/game/arena/scoreboard';
+import { useLokEconomy } from '@/state/lokEconomyStore';
 import type { AreaDef } from '@/game/types';
 
 const FIXED_STEP = 1 / 60;
@@ -40,10 +41,22 @@ export function ArenaScreen({ area, seats, onExit }: ArenaScreenProps) {
   const [standings, setStandings] = useState<ArenaStanding[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(MATCH_DURATION_SEC);
   const [ended, setEnded] = useState(false);
+  const { earn: earnLokTokens } = useLokEconomy();
 
   useEffect(() => {
     worldRef.current = createArenaWorld(area, seats);
   }, [area, seats]);
+
+  useEffect(() => {
+    // Only the signed-in host (seat 'host') can earn -- guests are local-only
+    // actors sharing this device, not separate Supabase-authenticated users.
+    if (ended && standings[0]?.id === 'host') {
+      earnLokTokens('arena_match_win', { refType: 'arena-match', refId: `${area.id}-${Date.now()}` });
+    }
+    // Deliberately keyed only to `ended`'s false->true transition, not
+    // `standings` (which updates every ~100ms while the match is running).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ended]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => keysRef.current.add(e.key.toLowerCase());

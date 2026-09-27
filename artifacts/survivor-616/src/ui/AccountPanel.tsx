@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { Mail, MessageSquareText, Phone, ShieldCheck } from 'lucide-react';
+import { Mail, MessageSquareText, Phone, ShieldCheck, Sparkles } from 'lucide-react';
 
 import { useAuth, type NotificationPreference } from '@/state/authStore';
 import { useCloudSyncStatus } from '@/state/cloudSyncStore';
+import { useLokEconomy } from '@/state/lokEconomyStore';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,6 +114,26 @@ const SYNC_STATUS_LABEL: Record<ReturnType<typeof useCloudSyncStatus>, string> =
   error: "Couldn't reach the cloud save -- your local progress is still safe.",
 };
 
+function LokBalanceSection() {
+  const { balance, lifetimeEarned, rank } = useLokEconomy();
+  if (balance === null) return null;
+  return (
+    <div className="border border-violet-400/30 bg-violet-950/20 p-4" data-testid="section-lok-balance">
+      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-violet-300">
+        <Sparkles className="h-4 w-4" />
+        LokTokens
+      </p>
+      <p className="mt-1 text-2xl font-black text-white" data-testid="text-lok-token-balance">
+        {balance}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {lifetimeEarned ?? 0} earned lifetime
+        {rank?.label ? ` · ${rank.label} rank` : ''}
+      </p>
+    </div>
+  );
+}
+
 function LoginForm() {
   const { available, signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithApple, user, signOut } = useAuth();
   const syncStatus = useCloudSyncStatus();
@@ -130,6 +151,7 @@ function LoginForm() {
         <p className="text-xs text-muted-foreground" data-testid="text-cloud-sync-status">
           {SYNC_STATUS_LABEL[syncStatus]}
         </p>
+        <LokBalanceSection />
         <Button variant="outline" onClick={() => void signOut()} data-testid="button-sign-out">
           Sign out
         </Button>
