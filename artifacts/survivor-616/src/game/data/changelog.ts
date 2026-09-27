@@ -109,6 +109,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'All frame choices live in Looks & LokPets and are ready for future collectible frames, animation effects, and rarity styles.',
     ],
   },
+  {
+    version: '0.8.0',
+    date: '2026-09-27',
+    kind: 'update',
+    title: 'The Defector Reaches the Spire',
+    body: [
+      'Vector Lev joins the playable roster with the Lev Expansion nova and Singularity Collapse ultimate.',
+      'Lev Overlord Prime now closes the Lev Syndicate Spire as its giant gravity-frame commander.',
+      'Level Vector Lev once to earn the Singularity Defector achievement.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -1865,6 +1865,24 @@ export const ENEMIES: EnemyDef[] = [
     rig: triangleRig(14),
     lore: 'Sleek autonomous levitation drones that streak across the skyway in delta-wings, harrying survivors with high-frequency kinetic needle bursts.',
   },
+  {
+    id: 'lev-overlord-prime',
+    name: 'Lev Overlord Prime',
+    family: 'Boss',
+    behavior: 'vortex-crusher',
+    hp: 1250,
+    speed: 38,
+    damage: 32,
+    radius: 25,
+    xp: 140,
+    mass: 7,
+    sizeClass: 'giant',
+    faction: 'Lev Syndicate',
+    role: 'anchor',
+    palette: palette({ ink: '#020617', body: '#312e81', bodyDark: '#172554', accent: '#f59e0b', glow: '#67e8f9' }),
+    rig: giantRig(30),
+    lore: 'Executive commander of the Lev Syndicate, sealed inside an industrial singularity frame that turns the skyline itself into a weapon.',
+  },
 ];
 
 export const ENEMIES_BY_ID: Record<string, EnemyDef> = Object.fromEntries(
