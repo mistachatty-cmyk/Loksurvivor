@@ -78,18 +78,31 @@ persisted only to `localStorage`. It has no ledger, no idempotency, no
 cross-app account tie-in, and no server-side source of truth. Do not
 conflate it with LokTokens or try to merge/convert between them.
 
-## Known gap, not fixed by this pass
+## Fully verified end-to-end (2026-09-27 follow-up)
 
-This project's Supabase Auth email delivery is broken (`signup` returns a
-500, `"Error sending confirmation email"`) — a pre-existing infra issue,
-unrelated to this integration, that blocked a full live sign-in-based
-end-to-end test (real sign-up → earn → balance updates in the UI). What
-*was* verified: the deployed edge function's auth-guard logic (missing
-auth → platform 401; anon key with no real session → the function's own
-401) via direct `curl`, the RPC logic itself by reading `lok_grant`'s/
-`lok_bootstrap_account`'s actual `pg_get_functiondef` source (pre-existing,
-not new), the new earn_rules rows via `SELECT`, and that the app still
-boots and the badge correctly stays hidden when signed out (via headless
-browser). Fixing email delivery is a separate, pre-existing infra task —
-worth doing before this is verified fully live, and before any other app
-in the ecosystem hits the same wall reusing `lok-earn`.
+An earlier pass here concluded Supabase Auth email delivery was broken.
+That was wrong — it was a self-inflicted test mistake: the throwaway test
+account used `@example.com`, a reserved, non-routable documentation-only
+domain (RFC 2606) that no real mail server exists for, so any real
+provider correctly bounces mail to it. Real signups work fine — the
+project's `auth_logs` show real users signing in via Google OAuth from
+`gsix.online`/`survivor.gsix.online` throughout, and a retry with a real
+(disposable-inbox) test domain returned a clean `200` with
+`confirmation_sent_at` populated.
+
+With that corrected, the full live path was verified for real: signed up
+a test account, confirmed it server-side (simulating the email-link
+click), signed in for a real JWT, then called `lok-earn` three ways —
+a real grant (`{"ok":true,"amount":15,"balance":15,"lifetime":15}`), a
+replay of the same `idemKey` (`{"ok":true,"replay":true,"balance":15}`,
+correctly not double-crediting), and an unknown `eventKey`
+(`{"ok":false,"error":"unknown_event"}`, clean rejection) — then confirmed
+`lok_profile` returns matching balance/rank data. All test data (ledger
+row, account row, auth user) was deleted afterward.
+
+**Separate, real, pre-existing issue found while investigating:** the
+`send-welcome-email` edge function (not part of this integration, created
+long before it) returns `500` on every signup, including real ones
+unrelated to this change (confirmed in `function_edge_logs`, e.g. a real
+2026-09-26 signup). Worth a follow-up look by whoever owns that flow —
+it isn't something `lok-earn`/this integration touches or caused.
