@@ -52,6 +52,15 @@ backing code in that export.
   Discovery `lev-core-archive` added to `data/progression.ts`.
 - **Achievement**: `lev-spire-conqueror` (clear `lev-syndicate-spire`) added
   to `data/achievements.ts`.
+- **Phase 2 character**: `vector-lev` is now a complete `CharacterDef` with
+  the registered `lev-expansion` nova, `singularity-collapse` ultimate, a
+  Spire-clear unlock, and four generated personal skins through the shared
+  character-skin system.
+- **Phase 2 boss**: `lev-overlord-prime` is a giant Lev Syndicate anchor
+  using the already-implemented `vortex-crusher` combat behavior. It is in
+  the faction roster and closes the last ten seconds of the Spire.
+- **Phase 2 achievement**: `singularity-defector` is live now that Vector
+  Lev can actually be selected and leveled.
 
 ## What was NOT ported, and why
 
@@ -61,26 +70,6 @@ queries per id, including alternate phrasings) before concluding each of
 these is unimplemented — this is a porting task, not a design task, so none
 of it was authored fresh:
 
-- **`vector-lev`** (playable character "Vector Lev — The Singularity
-  Defector") — no `CharacterDef` anywhere in the source export. Only
-  appears as a `featuredCharacterId` string on the district (a field that
-  doesn't even exist on this repo's `AreaDef` — dropped when porting the
-  district) and in one achievement's `isComplete` check (see below).
-  **Needs**: a full `CharacterDef` authored in `data/characters.ts` —
-  base stats, a `lev-expansion` weapon (in `data/weapons.ts`), and a
-  `singularity-collapse` ultimate — before anything that names `vector-lev`
-  can be real.
-- **`lev-overlord-prime`** (boss, "Lev Overlord Prime") — no `EnemyDef`
-  anywhere in the source export, only referenced in the memo prose and in
-  `lev-syndicate-spire`'s wave list (`ratePerSec: 0.1, burst: 1, hpMult:
-  1.4`). That wave entry was dropped when porting the district (its
-  `toSec: 200` window was folded into extending the preceding drone wave
-  instead, so the district's last 10 seconds aren't dead time). **Needs**:
-  an `EnemyDef` (giant sizeClass, gravity/anti-gravity shockwave kit —
-  likely wants its own new `EnemyBehavior` case, not `vortex-crusher` reused,
-  since the memo describes a distinct "radial anti-gravity shockwave" from
-  the colossus's "kinetic shockwave ring") authored, then re-added to the
-  wave list.
 - **`lev-grav-catalyst`** (permanent relic) / **`lev-singularity-vortex`**
   (its evolution) — no `RelicRecipeDef`/`EvolutionDef` anywhere. **Needs**:
   entries in `data/relics.ts` and `data/evolutions.ts`, plus whatever base
@@ -98,13 +87,6 @@ of it was authored fresh:
 - **`lev-conduit`** (Scenario passive card) / **`lev-grav-link`** (LokPet
   passive card) — no `PassiveCardDef`/`CardDef` entries. **Needs**:
   authoring in `data/passiveCards.ts` and `data/cards.ts`.
-- **`singularity-defector`** achievement ("Level up Vector Lev at least once
-  during any run") — the *definition* exists in the source export's
-  `achievements.ts` (`isComplete: (meta) =>
-  (meta.characterLevelUps['vector-lev'] ?? 0) >= 1`), but it is permanently
-  unachievable without `vector-lev` existing as a real, level-up-able
-  character. Deliberately not ported — an achievement that can never fire is
-  worse than no achievement. Add it once `vector-lev` ships.
 
 ## Also NOT ported: the other 5 "districts" file content
 

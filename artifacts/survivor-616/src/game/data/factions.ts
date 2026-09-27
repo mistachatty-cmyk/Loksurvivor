@@ -160,7 +160,7 @@ export const FACTIONS: FactionDef[] = [
     name: 'Lev Syndicate',
     description: 'A high-altitude cybernetic and industrial cartel commanding the skyway concourses -- gravitational war machines, phase-shifting nanite operatives, and high-voltage field engineers.',
     accent: '#38bdf8',
-    roster: ['lev-singularity-colossus', 'lev-nanite-phantom', 'lev-arc-conductor', 'lev-substation-brute', 'lev-drone-interceptor'],
+    roster: ['lev-singularity-colossus', 'lev-nanite-phantom', 'lev-arc-conductor', 'lev-substation-brute', 'lev-drone-interceptor', 'lev-overlord-prime'],
   },
 ];
 

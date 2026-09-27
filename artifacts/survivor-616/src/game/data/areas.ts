@@ -872,6 +872,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 75, toSec: 150, enemyId: 'lev-arc-conductor', ratePerSec: 0.6, burst: 2, faction: 'Lev Syndicate' },
       { fromSec: 100, toSec: 170, enemyId: 'lev-singularity-colossus', ratePerSec: 0.35, burst: 1, hpMult: 1.25, faction: 'Lev Syndicate' },
       { fromSec: 140, toSec: 200, enemyId: 'lev-drone-interceptor', ratePerSec: 2.2, burst: 4, formation: 'ring', faction: 'Lev Syndicate' },
+      { fromSec: 190, toSec: 200, enemyId: 'lev-overlord-prime', ratePerSec: 0.1, burst: 1, hpMult: 1.4, faction: 'Lev Syndicate' },
     ],
   },
 

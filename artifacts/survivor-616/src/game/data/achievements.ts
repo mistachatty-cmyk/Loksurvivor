@@ -366,6 +366,15 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     isComplete: (meta) => meta.clearedAreaIds.includes('lev-syndicate-spire'),
     reward: { kind: 'cred', amount: 350 },
   },
+  {
+    id: 'singularity-defector',
+    name: 'Singularity Defector',
+    description: 'Level up Vector Lev at least once during any run.',
+    tier: 'silver',
+    isComplete: (meta) => (meta.characterLevelUps['vector-lev'] ?? 0) >= 1,
+    progress: (meta) => ratio(meta.characterLevelUps['vector-lev'] ?? 0, 1),
+    reward: { kind: 'cred', amount: 150 },
+  },
 ];
 
 export const ACHIEVEMENTS_BY_ID: Record<string, AchievementDef> = Object.fromEntries(
