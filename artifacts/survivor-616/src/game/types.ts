@@ -839,6 +839,24 @@ export type EnemyBehavior =
    *  player's *true* position inside it -- even through stealth -- ends the
    *  player's active stealth for every enemy, not just this one. */
   | 'sentry'
+  /** Locks its cone onto the player's *true* position (`traits.lockCone`) and
+   *  holds it there while in range; the cone narrows the whole time it stays
+   *  locked and detonates for a chunk of the player's max HP the moment it
+   *  closes to a line. Breaking the lock (leaving range) lets it reopen. */
+  | 'tracker'
+  /** Sweeps a color-coded cone (`traits.colorCone`); standing in it applies
+   *  whichever effect that color carries -- pull, slow, or an elemental
+   *  damage-over-time -- for as long as you stay inside. `kinds.length > 1`
+   *  flickers through every color/effect on `flickerMs`, for the "uses all
+   *  versions" prism and boss tiers. */
+  | 'beacon'
+  /** Doesn't hunt directly: on spawn it releases `traits.commander.droneCount`
+   *  free-roaming detector circles (`World.roamingDetectors`) that wander the
+   *  arena on their own paths. Any one that touches the player's real
+   *  position marks them with the drone's effect for `stickyMs` -- it
+   *  "sticks" regardless of range afterward -- and pings every drone's
+   *  cooldown independently. Drones despawn when the commander dies. */
+  | 'commander'
   /** Coordinated flank attack from opposing angles. */
   | 'pincer'
   /** Gravitational singularity that draws player, projectiles, and pickups. */
@@ -910,6 +928,66 @@ export interface EnemyDef {
      *  (bypassing stealth's frozen-anchor tracking) and, on a hit, ends
      *  the player's active stealth for every enemy in the run. */
     coneDetect?: { range: number; halfAngleDeg: number; sweepSpeed?: number };
+    /** tracker: a cone that locks onto the player's real position and narrows
+     *  from `startHalfAngleDeg` to `minHalfAngleDeg` over `closeMs` while
+     *  locked; closing to a line deals `explodeDamagePct` of the player's
+     *  max HP and reopens after `resetMs` (default 1800). */
+    lockCone?: {
+      range: number;
+      startHalfAngleDeg: number;
+      minHalfAngleDeg: number;
+      closeMs: number;
+      explodeDamagePct: number;
+      resetMs?: number;
+    };
+    /** beacon: a color-coded cone. `kinds` lists which effect(s) it cycles
+     *  through -- one entry for a single-color enemy, several for a "prism"
+     *  tier that flickers between them every `flickerMs`. 'pull' drags the
+     *  player toward the enemy at `pullForce`; 'slow'/'chill' cut move speed
+     *  by `slowPct` (`chill` hits harder) while standing in the beam;
+     *  'burn'/'shock' tick `tickDamagePerSec` while standing in the beam.
+     *  Setting `stickyMs` changes slow/chill/burn/shock from "while standing
+     *  in the beam" to "marked for a flat duration on first contact, then on
+     *  cooldown" -- the mark rides the player and keeps applying even after
+     *  they leave the cone. */
+    colorCone?: {
+      range: number;
+      halfAngleDeg: number;
+      sweepSpeed?: number;
+      kinds: Array<'pull' | 'slow' | 'chill' | 'burn' | 'shock'>;
+      flickerMs?: number;
+      pullForce?: number;
+      slowPct?: number;
+      tickDamagePerSec?: number;
+      stickyMs?: number;
+    };
+    /** commander: spawns roaming detector circles instead of hunting itself. */
+    commander?: {
+      droneCount: number;
+      droneRadius: number;
+      droneSpeed: number;
+      effectKind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock';
+      /** How long a drone's mark rides the player once it makes contact. */
+      stickyMs: number;
+      slowPct?: number;
+      tickDamagePerSec?: number;
+      /**
+       * The commander's own lock/shield cycle (separate from its drones):
+       * starts shielded and "searching," undamageable, for `shieldMs`
+       * (default 30000). Getting within `relockRange` (default 260) of the
+       * player's *true* position ends the shield early and locks on; while
+       * locked (`lockDurationMs`, default 14000) it applies the `irradiated`
+       * buff (speed + damage) to every ally within `allyBuffRadius` (default
+       * 220) each frame they stay close. When the locked window elapses it
+       * deliberately drops lock and re-shields, repeating forever. If the
+       * shield window runs out without relocking, it just re-arms and keeps
+       * searching.
+       */
+      shieldMs?: number;
+      relockRange?: number;
+      lockDurationMs?: number;
+      allyBuffRadius?: number;
+    };
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];

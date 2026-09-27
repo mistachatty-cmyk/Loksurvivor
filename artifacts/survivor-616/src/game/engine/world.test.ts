@@ -157,6 +157,8 @@ function addEnemy(
     ghostUntil: 0,
     invisibleUntil: 0,
     phaseUntil: 0,
+    shieldedUntil: 0,
+    commanderLocked: false,
     burstUntil: 0,
     baseRadius: def.radius,
     frozenUntil: 0,
