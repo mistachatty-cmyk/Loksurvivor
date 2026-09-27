@@ -142,4 +142,15 @@ export const REACTION_PRESETS = {
     { source: 'energy', target: 'lightRadius', amount: 0.3 },
     { source: 'downbeat', target: 'lightRadius', amount: 0.25, decayMs: 300 },
   ],
+  /** A detection/effect cone that visibly breathes with the bass and
+   *  brightens on every beat -- see drawScanCone in render/draw.ts. */
+  conePulse: [
+    { source: 'band', band: 'sub', target: 'scale', amount: 0.28 },
+    { source: 'beat', target: 'glow', amount: 0.45, decayMs: 160 },
+  ],
+  /** A sharper, faster pulse for small/twitchy cone enemies. */
+  coneFlicker: [
+    { source: 'onset', target: 'scale', amount: 0.2, decayMs: 90 },
+    { source: 'beat', target: 'glow', amount: 0.55, decayMs: 110 },
+  ],
 } satisfies Record<string, BeatReaction[]>;

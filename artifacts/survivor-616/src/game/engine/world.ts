@@ -153,8 +153,18 @@ export interface EnemyActor extends Actor {
   activeEffects: StatusEffectInstance[];
   /** wraith: undamageable and unrendered while `w.now < invisibleUntil`. */
   invisibleUntil: number;
-  /** wraith: w.now this circling phase ends and the next teleport fires. */
+  /** wraith: w.now this circling phase ends and the next teleport fires.
+   *  tracker: one-time init flag for the narrowing half-angle (weave spawns
+   *  randomized, so it can't double as its own "not yet set up" sentinel).
+   *  commander: w.now the current phase (shielded-and-searching, or locked)
+   *  ends. */
   phaseUntil: number;
+  /** commander: undamageable (still rendered, still able to contact-damage
+   *  the player) while `w.now < shieldedUntil` -- its "heavy shield". */
+  shieldedUntil: number;
+  /** commander: true while it currently has the player found and is
+   *  buffing nearby allies; false while shielded and searching to relock. */
+  commanderLocked: boolean;
 }
 
 /** A free-roaming detection circle released by a 'commander' enemy. See `updateRoamingDetectors`. */
@@ -1403,6 +1413,8 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     fallStartedAt: 0,
     invisibleUntil: def.traits?.revealMs ? w.now + def.traits.revealMs : 0,
     phaseUntil: 0,
+    shieldedUntil: 0,
+    commanderLocked: false,
   };
   w.enemies.push(enemy);
 
@@ -2227,6 +2239,9 @@ function damageEnemy(
   if (enemy.dying) return;
   // Wraiths can't be hurt while lurking invisible -- see oddity-arenas.md.
   if (w.now < enemy.invisibleUntil) return;
+  // Commanders: a heavy shield while searching/re-locking -- still fully
+  // visible and still able to contact-damage the player, just undamageable.
+  if (w.now < enemy.shieldedUntil) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
   const isCrit = burstDepth === 0 && w.rng() < w.stats.crit;
   // Landing a hit on the beat is its own bonus, stacking with a rolled crit.
@@ -4752,7 +4767,49 @@ function updateEnemies(w: World, dt: number) {
         // Doesn't hunt directly -- releases its roaming detector circles once
         // (see spawnEnemy/updateRoamingDetectors) and just ambles toward the
         // player at a fraction of its stated speed while they do the work.
+        // Separately, it cycles its own shield/lock state: shielded and
+        // searching for the player's *true* position, then locked-on and
+        // buffing nearby allies, then back to searching. See traits.commander.
         speed *= 0.5;
+        const cmd = traits?.commander;
+        if (cmd) {
+          const shieldMs = cmd.shieldMs ?? 30000;
+          const lockMs = cmd.lockDurationMs ?? 14000;
+          const relockRange = cmd.relockRange ?? 260;
+          if (enemy.phaseUntil === 0) {
+            enemy.shieldedUntil = w.now + shieldMs;
+            enemy.phaseUntil = w.now + shieldMs;
+          }
+          if (!enemy.commanderLocked) {
+            const realDist = Math.hypot(p.x - enemy.x, p.y - enemy.y);
+            if (realDist < relockRange) {
+              enemy.commanderLocked = true;
+              enemy.shieldedUntil = w.now;
+              enemy.phaseUntil = w.now + lockMs;
+              pushAlert(w, 'COMMANDER LOCKED ON');
+              spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 16, 120);
+              w.shake = Math.max(w.shake, 6);
+              if (w.now < w.stealthUntil) {
+                w.stealthUntil = w.now;
+                w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+              }
+            } else if (w.now >= enemy.phaseUntil) {
+              // Shield window ran out before it could relock -- re-arm and keep searching.
+              enemy.shieldedUntil = w.now + shieldMs;
+              enemy.phaseUntil = w.now + shieldMs;
+            }
+          } else if (w.now >= enemy.phaseUntil) {
+            // Deliberately loses the thread after its locked window, and re-shields.
+            enemy.commanderLocked = false;
+            enemy.shieldedUntil = w.now + shieldMs;
+            enemy.phaseUntil = w.now + shieldMs;
+          }
+          if (enemy.commanderLocked) {
+            forEachNearby(w, enemy.x, enemy.y, cmd.allyBuffRadius ?? 220, (ally) => {
+              if (ally.uid !== enemy.uid && !ally.dying) applyStatusEffect(w, ally, 'irradiated');
+            });
+          }
+        }
         break;
       }
       case 'chase':

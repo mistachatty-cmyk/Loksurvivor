@@ -790,6 +790,22 @@ export interface EnemyDef {
       stickyMs: number;
       slowPct?: number;
       tickDamagePerSec?: number;
+      /**
+       * The commander's own lock/shield cycle (separate from its drones):
+       * starts shielded and "searching," undamageable, for `shieldMs`
+       * (default 30000). Getting within `relockRange` (default 260) of the
+       * player's *true* position ends the shield early and locks on; while
+       * locked (`lockDurationMs`, default 14000) it applies the `irradiated`
+       * buff (speed + damage) to every ally within `allyBuffRadius` (default
+       * 220) each frame they stay close. When the locked window elapses it
+       * deliberately drops lock and re-shields, repeating forever. If the
+       * shield window runs out without relocking, it just re-arms and keeps
+       * searching.
+       */
+      shieldMs?: number;
+      relockRange?: number;
+      lockDurationMs?: number;
+      allyBuffRadius?: number;
     };
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */

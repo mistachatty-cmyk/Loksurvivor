@@ -2653,6 +2653,7 @@ function coneColorForKind(kind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock'): s
  */
 function drawScanCone(
   ctx: CanvasRenderingContext2D,
+  w: World,
   x: number,
   y: number,
   range: number,
@@ -2661,24 +2662,30 @@ function drawScanCone(
   color: string,
   alpha: number,
   now: number,
+  react?: Parameters<typeof reactionMultiplier>[0],
 ) {
+  // Music-reactive cones: 'scale' breathes the cone's reach with the track,
+  // 'glow' brightens its fill on the beat -- both no-ops without a `react`
+  // array on the enemy (musicVisual returns 1), so most cones stay static.
+  const drawRange = range * musicVisual(w, react, 'scale');
+  const drawAlpha = alpha * musicVisual(w, react, 'glow');
   ctx.save();
-  ctx.globalAlpha = alpha;
+  ctx.globalAlpha = drawAlpha;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(x, y);
-  ctx.arc(x, y, range, centerAngle - halfAngle, centerAngle + halfAngle);
+  ctx.arc(x, y, drawRange, centerAngle - halfAngle, centerAngle + halfAngle);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 
   const sweepT = (now / 900) % 1;
   ctx.save();
-  ctx.globalAlpha = alpha * 1.6 * (1 - sweepT);
+  ctx.globalAlpha = drawAlpha * 1.6 * (1 - sweepT);
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(x, y, range * sweepT, centerAngle - halfAngle, centerAngle + halfAngle);
+  ctx.arc(x, y, drawRange * sweepT, centerAngle - halfAngle, centerAngle + halfAngle);
   ctx.stroke();
   ctx.restore();
 }
@@ -3072,7 +3079,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     if (!enemy.dying && enemy.def.behavior === 'sentry' && enemy.def.traits?.coneDetect) {
       const detect = enemy.def.traits.coneDetect;
       const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
-      drawScanCone(ctx, enemy.x, enemy.y, detect.range, enemy.weave, halfAngle, '#f59e0b', 0.22, w.now);
+      drawScanCone(ctx, w, enemy.x, enemy.y, detect.range, enemy.weave, halfAngle, '#f59e0b', 0.22, w.now, enemy.def.react);
     }
     if (!enemy.dying && enemy.def.behavior === 'tracker' && enemy.def.traits?.lockCone) {
       const lock = enemy.def.traits.lockCone;
@@ -3081,13 +3088,35 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       const closeness = 1 - clamp((enemy.weave - minHalf) / Math.max(0.001, startHalf - minHalf), 0, 1);
       const faceAngle = Math.atan2(w.player.y - enemy.y, w.player.x - enemy.x);
       const color = closeness > 0.7 ? '#ff2d55' : '#ef4444';
-      drawScanCone(ctx, enemy.x, enemy.y, lock.range, faceAngle, enemy.weave, color, 0.2 + closeness * 0.35, w.now);
+      drawScanCone(ctx, w, enemy.x, enemy.y, lock.range, faceAngle, enemy.weave, color, 0.2 + closeness * 0.35, w.now, enemy.def.react);
     }
     if (!enemy.dying && enemy.def.behavior === 'beacon' && enemy.def.traits?.colorCone) {
       const cone = enemy.def.traits.colorCone;
       const halfAngle = (cone.halfAngleDeg * Math.PI) / 180;
       const activeKind = cone.kinds[Math.floor(w.now / (cone.flickerMs ?? 1400)) % cone.kinds.length] ?? cone.kinds[0];
-      drawScanCone(ctx, enemy.x, enemy.y, cone.range, enemy.weave, halfAngle, coneColorForKind(activeKind), 0.26, w.now);
+      drawScanCone(ctx, w, enemy.x, enemy.y, cone.range, enemy.weave, halfAngle, coneColorForKind(activeKind), 0.26, w.now, enemy.def.react);
+    }
+    if (!enemy.dying && enemy.def.behavior === 'commander') {
+      const shielded = w.now < enemy.shieldedUntil;
+      ctx.save();
+      if (shielded) {
+        // Heavy shield: a solid, slowly rotating hex-ish ring -- undamageable.
+        const pulse = 0.6 + 0.4 * Math.sin(w.now / 220);
+        ctx.globalAlpha = 0.35 + pulse * 0.25;
+        ctx.strokeStyle = '#67e8f9';
+        ctx.lineWidth = 4;
+      } else {
+        // Locked on: a thin dashed ring around whoever it's currently buffing.
+        ctx.globalAlpha = 0.55;
+        ctx.strokeStyle = '#f472b6';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 5]);
+        ctx.lineDashOffset = -w.now / 15;
+      }
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;

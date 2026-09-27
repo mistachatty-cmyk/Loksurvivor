@@ -55,7 +55,7 @@ export const FACTIONS: FactionDef[] = [
     name: 'Prism Choir',
     description: 'Color-coded beacons -- pull, slow, or elemental damage depending on the beam color, with a version that flickers through all of them.',
     accent: '#c4b5fd',
-    roster: ['lure-lamp', 'drag-net', 'cinder-eye', 'frost-eye', 'volt-eye', 'prism-warden'],
+    roster: ['lure-lamp', 'drag-net', 'cinder-eye', 'frost-eye', 'volt-eye', 'flare-duo', 'undertow', 'prism-warden'],
   },
   {
     id: 'afterimage-choir',

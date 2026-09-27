@@ -176,6 +176,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'prism-warden',
+    react: REACTION_PRESETS.conePulse,
     name: 'Prism Warden',
     family: 'Signal',
     behavior: 'beacon',
@@ -209,7 +210,49 @@ export const ENEMIES: EnemyDef[] = [
     lore: 'Every dead sign on the block reflected in one face at once.',
   },
   {
+    id: 'flare-duo',
+    react: REACTION_PRESETS.conePulse,
+    name: 'Flare Duo',
+    family: 'Signal',
+    behavior: 'beacon',
+    hp: 30,
+    speed: 24,
+    damage: 4,
+    radius: 9,
+    xp: 8,
+    mass: 1,
+    faction: 'Prism Choir',
+    // A "duo" tier between single-color and full prism: flickers between just
+    // its two elemental damage-over-time kinds, and its cone visibly swells
+    // with the bass (traits.colorCone + react, see drawScanCone).
+    traits: { colorCone: { range: 240, halfAngleDeg: 18, sweepSpeed: 0.55, kinds: ['burn', 'shock'], flickerMs: 700, tickDamagePerSec: 8 } },
+    palette: palette({ ink: '#160a08', body: '#7c2d12', bodyDark: '#431407', accent: '#fb7185', glow: '#fed7aa' }),
+    rig: blobRig({ height: 12, width: 10, spikes: true }),
+    lore: 'Two burnt-out relay lights that never learned to run on just one color.',
+  },
+  {
+    id: 'undertow',
+    react: REACTION_PRESETS.coneFlicker,
+    name: 'Undertow',
+    family: 'Signal',
+    behavior: 'beacon',
+    hp: 28,
+    speed: 22,
+    damage: 3,
+    radius: 9,
+    xp: 8,
+    mass: 1,
+    faction: 'Prism Choir',
+    // The other duo: pull and chill, flickering fast and twitching sharply
+    // to every onset instead of breathing with the bass like Flare Duo.
+    traits: { colorCone: { range: 250, halfAngleDeg: 18, sweepSpeed: 0.55, kinds: ['pull', 'chill'], flickerMs: 700, pullForce: 55, slowPct: 0.35 } },
+    palette: palette({ ink: '#07111b', body: '#1e3a5f', bodyDark: '#0c1f33', accent: '#60a5fa', glow: '#dbeafe' }),
+    rig: blobRig({ height: 12, width: 10, tendrils: true }),
+    lore: 'Drags you in, then goes cold. It never decided which one it likes better.',
+  },
+  {
     id: 'kaleidoscope',
+    react: REACTION_PRESETS.bassBulge,
     name: 'Kaleidoscope',
     family: 'Boss',
     behavior: 'beacon',
@@ -241,6 +284,7 @@ export const ENEMIES: EnemyDef[] = [
   },
   {
     id: 'signal-marshal',
+    react: REACTION_PRESETS.beatTwitch,
     name: 'Signal Marshal',
     family: 'Signal',
     behavior: 'commander',
@@ -256,7 +300,18 @@ export const ENEMIES: EnemyDef[] = [
     // touching the player marks them with a chill sticky effect that keeps
     // slowing them for 1.8s after contact, then goes on its own cooldown.
     // The circles despawn the moment this enemy dies.
-    traits: { commander: { droneCount: 3, droneRadius: 75, droneSpeed: 65, effectKind: 'chill', stickyMs: 1800, slowPct: 0.45 } },
+    //
+    // Separately, the Marshal itself is undamageable behind a heavy shield
+    // for 30s while searching; getting within 260 units of the player's real
+    // position drops the shield early and locks it on for 14s, buffing every
+    // ally within 220 units with 'irradiated' (speed + damage) the whole
+    // time. It then deliberately loses the thread and re-shields, repeating.
+    traits: {
+      commander: {
+        droneCount: 3, droneRadius: 75, droneSpeed: 65, effectKind: 'chill', stickyMs: 1800, slowPct: 0.45,
+        shieldMs: 30000, relockRange: 260, lockDurationMs: 14000, allyBuffRadius: 220,
+      },
+    },
     palette: palette({ ink: '#07111b', body: '#1e3a5f', bodyDark: '#0c1f33', accent: '#67e8f9', glow: '#cffafe' }),
     rig: humanoidRig({ height: 20, width: 11, hood: true }),
     lore: 'Never gets close itself. It just keeps the signal lights moving until one of them finds you.',
