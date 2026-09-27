@@ -2638,6 +2638,92 @@ function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
+function coneColorForKind(kind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock'): string {
+  return kind === 'pull' ? '#f472b6'
+    : kind === 'slow' ? '#38bdf8'
+    : kind === 'chill' ? '#93c5fd'
+    : kind === 'burn' ? '#fb923c'
+    : '#a78bfa';
+}
+
+/**
+ * Fills a cone and animates a thin "scan" arc sweeping from its origin to
+ * its edge every ~900ms, so every cone in the game (sentry/tracker/beacon/
+ * commander drones) reads as a live beam instead of a static wedge.
+ */
+function drawScanCone(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  range: number,
+  centerAngle: number,
+  halfAngle: number,
+  color: string,
+  alpha: number,
+  now: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, range, centerAngle - halfAngle, centerAngle + halfAngle);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  const sweepT = (now / 900) % 1;
+  ctx.save();
+  ctx.globalAlpha = alpha * 1.6 * (1 - sweepT);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x, y, range * sweepT, centerAngle - halfAngle, centerAngle + halfAngle);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A wandering detection circle spawned by a 'commander' enemy -- pulses like a radar contact. */
+function drawRoamingDetector(ctx: CanvasRenderingContext2D, w: World, detector: World['roamingDetectors'][number]) {
+  const color = coneColorForKind(detector.effectKind);
+  const pulse = 0.5 + 0.5 * Math.sin(w.now / 260);
+  ctx.save();
+  ctx.globalAlpha = 0.16 + pulse * 0.08;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(detector.x, detector.y, detector.radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.lineDashOffset = -w.now / 20;
+  ctx.beginPath();
+  ctx.arc(detector.x, detector.y, detector.radius * (0.75 + pulse * 0.2), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** The "stuck" marker floating over the player while a beacon/commander effect is riding them. */
+function drawPlayerConeMark(ctx: CanvasRenderingContext2D, w: World) {
+  if (w.now >= w.playerConeUntil || !w.playerConeKind) return;
+  const color = coneColorForKind(w.playerConeKind);
+  const bob = Math.sin(w.now / 180) * 3;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(w.player.x, w.player.y - 34 + bob, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawRoamingDetectors(ctx: CanvasRenderingContext2D, w: World) {
+  for (const detector of w.roamingDetectors) {
+    drawRoamingDetector(ctx, w, detector);
+  }
+}
+
 function drawActors(ctx: CanvasRenderingContext2D, w: World) {
   const outlineEnemies = w.enemies.length < 70;
 
@@ -2986,15 +3072,7 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
     if (!enemy.dying && enemy.def.behavior === 'sentry' && enemy.def.traits?.coneDetect) {
       const detect = enemy.def.traits.coneDetect;
       const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
-      ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = '#f59e0b';
-      ctx.beginPath();
-      ctx.moveTo(enemy.x, enemy.y);
-      ctx.arc(enemy.x, enemy.y, detect.range, enemy.weave - halfAngle, enemy.weave + halfAngle);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      drawScanCone(ctx, enemy.x, enemy.y, detect.range, enemy.weave, halfAngle, '#f59e0b', 0.22, w.now);
     }
     if (!enemy.dying && enemy.def.behavior === 'tracker' && enemy.def.traits?.lockCone) {
       const lock = enemy.def.traits.lockCone;
@@ -3002,34 +3080,14 @@ function drawActors(ctx: CanvasRenderingContext2D, w: World) {
       const minHalf = (lock.minHalfAngleDeg * Math.PI) / 180;
       const closeness = 1 - clamp((enemy.weave - minHalf) / Math.max(0.001, startHalf - minHalf), 0, 1);
       const faceAngle = Math.atan2(w.player.y - enemy.y, w.player.x - enemy.x);
-      ctx.save();
-      ctx.globalAlpha = 0.2 + closeness * 0.35;
-      ctx.fillStyle = closeness > 0.7 ? '#ff2d55' : '#ef4444';
-      ctx.beginPath();
-      ctx.moveTo(enemy.x, enemy.y);
-      ctx.arc(enemy.x, enemy.y, lock.range, faceAngle - enemy.weave, faceAngle + enemy.weave);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      const color = closeness > 0.7 ? '#ff2d55' : '#ef4444';
+      drawScanCone(ctx, enemy.x, enemy.y, lock.range, faceAngle, enemy.weave, color, 0.2 + closeness * 0.35, w.now);
     }
     if (!enemy.dying && enemy.def.behavior === 'beacon' && enemy.def.traits?.colorCone) {
       const cone = enemy.def.traits.colorCone;
       const halfAngle = (cone.halfAngleDeg * Math.PI) / 180;
       const activeKind = cone.kinds[Math.floor(w.now / (cone.flickerMs ?? 1400)) % cone.kinds.length] ?? cone.kinds[0];
-      const coneColor = activeKind === 'pull' ? '#f472b6'
-        : activeKind === 'slow' ? '#38bdf8'
-        : activeKind === 'chill' ? '#93c5fd'
-        : activeKind === 'burn' ? '#fb923c'
-        : '#a78bfa';
-      ctx.save();
-      ctx.globalAlpha = 0.26;
-      ctx.fillStyle = coneColor;
-      ctx.beginPath();
-      ctx.moveTo(enemy.x, enemy.y);
-      ctx.arc(enemy.x, enemy.y, cone.range, enemy.weave - halfAngle, enemy.weave + halfAngle);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      drawScanCone(ctx, enemy.x, enemy.y, cone.range, enemy.weave, halfAngle, coneColorForKind(activeKind), 0.26, w.now);
     }
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
       const telegraph = enemy.telegraphUntil > w.now;
@@ -3242,7 +3300,9 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawAmbient(ctx, w);
   drawObstacles(ctx, w);
   drawAwarenessArrow(ctx, w);
+  drawRoamingDetectors(ctx, w);
   drawActors(ctx, w);
+  drawPlayerConeMark(ctx, w);
   drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
   drawEffects(ctx, w);

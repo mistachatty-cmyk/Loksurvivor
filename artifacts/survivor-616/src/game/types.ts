@@ -690,7 +690,14 @@ export type EnemyBehavior =
    *  damage-over-time -- for as long as you stay inside. `kinds.length > 1`
    *  flickers through every color/effect on `flickerMs`, for the "uses all
    *  versions" prism and boss tiers. */
-  | 'beacon';
+  | 'beacon'
+  /** Doesn't hunt directly: on spawn it releases `traits.commander.droneCount`
+   *  free-roaming detector circles (`World.roamingDetectors`) that wander the
+   *  arena on their own paths. Any one that touches the player's real
+   *  position marks them with the drone's effect for `stickyMs` -- it
+   *  "sticks" regardless of range afterward -- and pings every drone's
+   *  cooldown independently. Drones despawn when the commander dies. */
+  | 'commander';
 
 export interface EnemyDef {
   id: string;
@@ -757,7 +764,11 @@ export interface EnemyDef {
      *  tier that flickers between them every `flickerMs`. 'pull' drags the
      *  player toward the enemy at `pullForce`; 'slow'/'chill' cut move speed
      *  by `slowPct` (`chill` hits harder) while standing in the beam;
-     *  'burn'/'shock' tick `tickDamagePerSec` while standing in the beam. */
+     *  'burn'/'shock' tick `tickDamagePerSec` while standing in the beam.
+     *  Setting `stickyMs` changes slow/chill/burn/shock from "while standing
+     *  in the beam" to "marked for a flat duration on first contact, then on
+     *  cooldown" -- the mark rides the player and keeps applying even after
+     *  they leave the cone. */
     colorCone?: {
       range: number;
       halfAngleDeg: number;
@@ -765,6 +776,18 @@ export interface EnemyDef {
       kinds: Array<'pull' | 'slow' | 'chill' | 'burn' | 'shock'>;
       flickerMs?: number;
       pullForce?: number;
+      slowPct?: number;
+      tickDamagePerSec?: number;
+      stickyMs?: number;
+    };
+    /** commander: spawns roaming detector circles instead of hunting itself. */
+    commander?: {
+      droneCount: number;
+      droneRadius: number;
+      droneSpeed: number;
+      effectKind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock';
+      /** How long a drone's mark rides the player once it makes contact. */
+      stickyMs: number;
       slowPct?: number;
       tickDamagePerSec?: number;
     };

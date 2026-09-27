@@ -157,6 +157,25 @@ export interface EnemyActor extends Actor {
   phaseUntil: number;
 }
 
+/** A free-roaming detection circle released by a 'commander' enemy. See `updateRoamingDetectors`. */
+export interface RoamingDetector {
+  uid: number;
+  /** EnemyActor.uid of the commander that spawned it; removed when that enemy dies. */
+  ownerUid: number;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  speed: number;
+  radius: number;
+  effectKind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock';
+  stickyMs: number;
+  slowPct: number;
+  tickDamagePerSec: number;
+  /** w.now before this drone can mark the player again after a hit. */
+  cooldownUntil: number;
+}
+
 export interface Projectile {
   uid: number;
   x: number;
@@ -762,12 +781,20 @@ export interface World {
   rumorSpeedUntil: number;
   rumorPantryAvailable: boolean;
   rumorBroadcastAvailable: boolean;
-  /** Beacon cones: timestamp (w.now) the current slow/chill debuff ends -- refreshed
-   *  every frame the player stays inside the beam, decays on its own once they leave. */
+  /** Beacon/commander cone effects: timestamp (w.now) the current debuff ends. A
+   *  non-sticky beam refreshes this every frame the player stays inside it; a
+   *  sticky one (traits.colorCone.stickyMs / traits.commander.stickyMs) sets a
+   *  flat duration on first contact that keeps ticking after they leave. */
   playerConeUntil: number;
-  playerConeKind: 'slow' | 'chill' | null;
-  /** Fraction of move speed removed while `playerConeUntil` is active. */
+  playerConeKind: 'slow' | 'chill' | 'burn' | 'shock' | null;
+  /** slow/chill: fraction of move speed removed. burn/shock: damage per tick. */
   playerConeMag: number;
+  /** burn/shock only: w.now the next damage tick fires. */
+  playerConeNextTickAt: number;
+  /** Free-roaming detector circles released by 'commander' enemies -- wander the
+   *  arena independent of their owner, marking the player with a sticky cone
+   *  effect on contact. Cleared when the owning commander dies. */
+  roamingDetectors: RoamingDetector[];
   rumorMagnetNextAt: number;
   /** Authored opening-campaign cue for this area, when one exists. */
   firstNightChapter?: ReturnType<typeof getFirstNightChapter>;
@@ -1033,6 +1060,8 @@ export function createWorld(
     playerConeUntil: 0,
     playerConeKind: null,
     playerConeMag: 0,
+    playerConeNextTickAt: 0,
+    roamingDetectors: [],
     rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
     firstNightChapter: getFirstNightChapter(area.id),
     firstNightBeatTriggered: false,
@@ -1376,6 +1405,27 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     phaseUntil: 0,
   };
   w.enemies.push(enemy);
+
+  if (def.behavior === 'commander' && def.traits?.commander) {
+    const cmd = def.traits.commander;
+    for (let i = 0; i < cmd.droneCount; i += 1) {
+      w.roamingDetectors.push({
+        uid: uid(w),
+        ownerUid: enemy.uid,
+        x: enemy.x + randRange(w.rng, -80, 80),
+        y: enemy.y + randRange(w.rng, -80, 80),
+        targetX: enemy.x,
+        targetY: enemy.y,
+        speed: cmd.droneSpeed,
+        radius: cmd.droneRadius,
+        effectKind: cmd.effectKind,
+        stickyMs: cmd.stickyMs,
+        slowPct: cmd.slowPct ?? 0.35,
+        tickDamagePerSec: cmd.tickDamagePerSec ?? 6,
+        cooldownUntil: 0,
+      });
+    }
+  }
 
   if (
     w.activeCrewRumor?.rumorId === 'basement-broadcast' &&
@@ -2244,6 +2294,97 @@ function updateStatusEffects(w: World) {
     }
     enemy.activeEffects = enemy.activeEffects.filter((effect) => effect.expiresAt > w.now);
   }
+}
+
+/** Ticks the player's active beacon/commander cone mark. Slow/chill are read
+ *  directly off `playerConeMag` by updatePlayer's speed calc; burn/shock tick
+ *  damage here on a 500ms cadence for as long as `playerConeUntil` holds,
+ *  independent of whether the source cone is still touching the player. */
+function updatePlayerConeEffects(w: World) {
+  if (w.now >= w.playerConeUntil) {
+    w.playerConeKind = null;
+    return;
+  }
+  if ((w.playerConeKind === 'burn' || w.playerConeKind === 'shock') && w.now >= w.playerConeNextTickAt) {
+    w.playerConeNextTickAt = w.now + 500;
+    damagePlayer(w, w.playerConeMag, w.player.x, w.player.y);
+    spawnParticles(w, w.player.x, w.player.y, coneEffectColor(w.playerConeKind), 3, 30);
+  }
+}
+
+/** Free-roaming detector circles released by 'commander' enemies (see
+ *  spawnEnemy). They wander toward a random point in the arena, forever
+ *  re-targeting once close, and mark the player with their sticky cone
+ *  effect on contact. Removed once their owning commander dies. */
+function updateRoamingDetectors(w: World, dt: number) {
+  if (w.roamingDetectors.length === 0) return;
+  const ownerAlive = new Set(w.enemies.filter((e) => !e.dying).map((e) => e.uid));
+  w.roamingDetectors = w.roamingDetectors.filter((d) => ownerAlive.has(d.ownerUid));
+  const halfW = w.bounds.w / 2 - 40;
+  const halfH = w.bounds.h / 2 - 40;
+  for (const d of w.roamingDetectors) {
+    const dx = d.targetX - d.x;
+    const dy = d.targetY - d.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 24) {
+      d.targetX = randRange(w.rng, -halfW, halfW);
+      d.targetY = randRange(w.rng, -halfH, halfH);
+    } else {
+      d.x += (dx / dist) * d.speed * dt;
+      d.y += (dy / dist) * d.speed * dt;
+    }
+    if (w.now < d.cooldownUntil) continue;
+    const rdist = Math.hypot(w.player.x - d.x, w.player.y - d.y);
+    if (rdist >= d.radius) continue;
+    d.cooldownUntil = w.now + d.stickyMs + 800;
+    if (d.effectKind === 'pull') {
+      const pdx = w.player.x - d.x;
+      const pdy = w.player.y - d.y;
+      const plen = Math.hypot(pdx, pdy) || 1;
+      // A single strong yank, not a continuous force -- the drone's contact is
+      // one instant, unlike a beacon's cone which the player can stand inside.
+      w.player.kx += (-pdx / plen) * 240;
+      w.player.ky += (-pdy / plen) * 240;
+      pushAlert(w, 'MARKED');
+    } else {
+      const mag = coneEffectMagnitude(d.effectKind, d.slowPct, d.tickDamagePerSec);
+      applyConeMark(w, d.effectKind, mag, d.stickyMs);
+    }
+    if (w.now < w.stealthUntil) {
+      w.stealthUntil = w.now;
+      w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+    }
+  }
+}
+
+/** Shared by 'beacon' cones and commander drones so both read the same
+ *  slow/chill/burn/shock magnitude out of a colorCone/commander trait. */
+function coneEffectMagnitude(kind: 'slow' | 'chill' | 'burn' | 'shock', slowPct: number, tickDamagePerSec: number): number {
+  if (kind === 'chill') return slowPct * 1.4;
+  if (kind === 'slow') return slowPct;
+  return tickDamagePerSec * 0.5;
+}
+
+/** Marks the player with a beacon/commander cone effect. Sticky effects hold
+ *  for a flat duration regardless of range afterward; non-sticky ones just
+ *  refresh a short rolling window while contact continues. */
+function applyConeMark(w: World, kind: 'slow' | 'chill' | 'burn' | 'shock', mag: number, stickyMs: number | undefined) {
+  w.playerConeUntil = w.now + (stickyMs ?? 260);
+  if (w.playerConeKind !== kind) w.playerConeNextTickAt = w.now + 500;
+  w.playerConeKind = kind;
+  w.playerConeMag = mag;
+  if (stickyMs) {
+    pushAlert(w, 'MARKED');
+    spawnParticles(w, w.player.x, w.player.y, coneEffectColor(kind), 14, 100);
+  }
+}
+
+function coneEffectColor(kind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock'): string {
+  return kind === 'pull' ? '#f472b6'
+    : kind === 'slow' ? '#38bdf8'
+    : kind === 'chill' ? '#93c5fd'
+    : kind === 'burn' ? '#fb923c'
+    : '#a78bfa';
 }
 
 function statusSpeedMultiplier(enemy: EnemyActor): number {
@@ -4537,7 +4678,12 @@ function updateEnemies(w: World, dt: number) {
         if (lock) {
           const startHalf = (lock.startHalfAngleDeg * Math.PI) / 180;
           const minHalf = (lock.minHalfAngleDeg * Math.PI) / 180;
-          if (enemy.weave <= 0) enemy.weave = startHalf;
+          // enemy.weave spawns at a random angle (staggers sweep-cone enemies);
+          // reclaim it as "current half-angle" via phaseUntil as a one-time init flag.
+          if (enemy.phaseUntil === 0) {
+            enemy.weave = startHalf;
+            enemy.phaseUntil = 1;
+          }
           const rdx = p.x - enemy.x;
           const rdy = p.y - enemy.y;
           const rdist = Math.hypot(rdx, rdy);
@@ -4586,18 +4732,27 @@ function updateEnemies(w: World, dt: number) {
                 const pull = cone.pullForce ?? 55;
                 p.kx += (-rdx / rdist) * pull * dt;
                 p.ky += (-rdy / rdist) * pull * dt;
-              } else if (activeKind === 'slow' || activeKind === 'chill') {
-                w.playerConeUntil = w.now + 260;
-                w.playerConeKind = activeKind;
-                w.playerConeMag = activeKind === 'chill' ? (cone.slowPct ?? 0.35) * 1.4 : (cone.slowPct ?? 0.35);
-              } else if (w.now >= enemy.fireReadyAt) {
-                enemy.fireReadyAt = w.now + 500;
-                damagePlayer(w, (cone.tickDamagePerSec ?? 6) * 0.5, enemy.x, enemy.y);
-                spawnParticles(w, p.x, p.y, activeKind === 'burn' ? '#fb923c' : '#a78bfa', 4, 40);
+              } else {
+                const mag = coneEffectMagnitude(activeKind, cone.slowPct ?? 0.35, cone.tickDamagePerSec ?? 6);
+                if (cone.stickyMs) {
+                  if (w.now >= enemy.fireReadyAt) {
+                    enemy.fireReadyAt = w.now + cone.stickyMs + 500;
+                    applyConeMark(w, activeKind, mag, cone.stickyMs);
+                  }
+                } else {
+                  applyConeMark(w, activeKind, mag, undefined);
+                }
               }
             }
           }
         }
+        break;
+      }
+      case 'commander': {
+        // Doesn't hunt directly -- releases its roaming detector circles once
+        // (see spawnEnemy/updateRoamingDetectors) and just ambles toward the
+        // player at a fraction of its stated speed while they do the work.
+        speed *= 0.5;
         break;
       }
       case 'chase':
@@ -6022,11 +6177,13 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   }
 
   updateStatusEffects(w);
+  updatePlayerConeEffects(w);
   updateAmbient(w, dt);
   updateLokPets(w, dt);
   updateFollowers(w, dt);
   updateStormCloud(w, dt);
   updateEnemies(w, dt);
+  updateRoamingDetectors(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
 

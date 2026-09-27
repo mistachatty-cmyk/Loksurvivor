@@ -199,6 +199,9 @@ export const ENEMIES: EnemyDef[] = [
         pullForce: 60,
         slowPct: 0.4,
         tickDamagePerSec: 7,
+        // A contact "sticks" the mark for 1.4s -- it keeps applying even if
+        // you step out of the beam, instead of only while you're inside it.
+        stickyMs: 1400,
       },
     },
     palette: palette({ ink: '#0a0a12', body: '#312e81', bodyDark: '#1e1b4b', accent: '#c4b5fd', glow: '#ede9fe' }),
@@ -229,11 +232,34 @@ export const ENEMIES: EnemyDef[] = [
         pullForce: 95,
         slowPct: 0.5,
         tickDamagePerSec: 11,
+        stickyMs: 2400,
       },
     },
     palette: palette({ ink: '#05030a', body: '#4c1d95', bodyDark: '#1e1b4b', accent: '#f472b6', accentBright: '#ffffff', glow: '#c4b5fd' }),
     rig: giantRig(34),
     lore: 'Every sign in 616 that ever went dark, still trying to tell you something.',
+  },
+  {
+    id: 'signal-marshal',
+    name: 'Signal Marshal',
+    family: 'Signal',
+    behavior: 'commander',
+    hp: 70,
+    speed: 22,
+    damage: 6,
+    radius: 12,
+    xp: 14,
+    mass: 1.6,
+    sizeClass: 'elite',
+    // Doesn't hunt itself -- releases three wandering detector circles on
+    // spawn (see traits.commander / World.roamingDetectors). Any one of them
+    // touching the player marks them with a chill sticky effect that keeps
+    // slowing them for 1.8s after contact, then goes on its own cooldown.
+    // The circles despawn the moment this enemy dies.
+    traits: { commander: { droneCount: 3, droneRadius: 75, droneSpeed: 65, effectKind: 'chill', stickyMs: 1800, slowPct: 0.45 } },
+    palette: palette({ ink: '#07111b', body: '#1e3a5f', bodyDark: '#0c1f33', accent: '#67e8f9', glow: '#cffafe' }),
+    rig: humanoidRig({ height: 20, width: 11, hood: true }),
+    lore: 'Never gets close itself. It just keeps the signal lights moving until one of them finds you.',
   },
   {
     id: 'nightcrawler',

@@ -44,6 +44,13 @@ export const FACTIONS: FactionDef[] = [
     roster: ['clampjaw', 'deadlock'],
   },
   {
+    id: 'signal-corps',
+    name: 'Signal Corps',
+    description: "Commanders that never close the distance themselves -- they just keep detector circles wandering the block until one sticks to you.",
+    accent: '#67e8f9',
+    roster: ['signal-marshal'],
+  },
+  {
     id: 'prism-choir',
     name: 'Prism Choir',
     description: 'Color-coded beacons -- pull, slow, or elemental damage depending on the beam color, with a version that flickers through all of them.',
