@@ -46,6 +46,16 @@ export const RECOVERY_FACILITIES: RecoveryFacilityDef[] = [
     cost: 550,
     unlockText: 'Upgrade from the Sauna Room',
   },
+  {
+    id: 'swat-sauna',
+    name: 'SWAT Sauna',
+    description:
+      'Confiscated department cedar, reassembled in the GRPD basement. The best recovery in the city -- reachable only by clearing the station, never bought.',
+    recoveryPctPerMinute: 3.1,
+    socialCapacity: 5,
+    cost: 0,
+    unlockText: 'Clear GRPD Station -- Division St.',
+  },
 ];
 
 export const RECOVERY_FACILITIES_BY_ID: Record<string, RecoveryFacilityDef> =
@@ -92,4 +102,27 @@ export const RECOVERY_HUTS: RecoveryHutDef[] = [
     facility: 'hot-tub',
     unlock: { kind: 'clearArea', areaId: 'northline-yard' },
   },
+  {
+    id: 'grpd-swat-sauna',
+    name: 'SWAT Sauna',
+    areaId: 'grpd-station-division',
+    description: 'The department left the sauna running. Nobody who works here now is going to be the one to shut it off.',
+    facility: 'swat-sauna',
+    unlock: { kind: 'clearArea', areaId: 'grpd-station-division' },
+  },
+];
+
+/**
+ * Rewards for the SWAT Sauna's "reach through the hole" hub action
+ * (`claimSaunaHoleReward` in `state/metaStore.tsx`). Grants the weapon for
+ * exactly the player's next run, cleared once that run ends -- see
+ * `MetaState.pendingSaunaReward`. Deliberately a small, extensible table:
+ * one entry today, more to come later per the user's own framing.
+ */
+export interface SaunaHoleRewardDef {
+  weaponId: string;
+}
+
+export const SAUNA_HOLE_REWARDS: SaunaHoleRewardDef[] = [
+  { weaponId: 'baton' },
 ];

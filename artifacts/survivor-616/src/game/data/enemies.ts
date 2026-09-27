@@ -1594,6 +1594,24 @@ export const ENEMIES: EnemyDef[] = [
     rig: triangleRig(14),
     lore: 'Sleek autonomous levitation drones that streak across the skyway in delta-wings, harrying survivors with high-frequency kinetic needle bursts.',
   },
+  {
+    id: 'digi-wolf',
+    name: 'Digi-Wolf',
+    family: 'Boss',
+    behavior: 'flanker',
+    traits: { teleportMs: 5000, ghostMs: 400 },
+    hp: 520,
+    speed: 46,
+    damage: 24,
+    radius: 19,
+    xp: 70,
+    mass: 4,
+    sizeClass: 'elite',
+    role: 'anchor',
+    palette: palette({ ink: '#03181c', body: '#0e7490', bodyDark: '#083344', accent: '#22d3ee', glow: '#67e8f9' }),
+    rig: quadrupedRig({ height: 17, length: 20, ears: true }),
+    lore: 'A wolf assembled from stolen packets, glimpsed only near GRPD Station. Winning against it does not feel like winning against a program.',
+  },
 ];
 
 export const ENEMIES_BY_ID: Record<string, EnemyDef> = Object.fromEntries(

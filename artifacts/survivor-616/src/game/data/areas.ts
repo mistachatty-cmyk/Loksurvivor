@@ -883,6 +883,51 @@ export const AREAS: AreaDef[] = [
     ],
   },
 
+  {
+    id: 'grpd-station-division',
+    name: 'GRPD Station — Division St.',
+    district: 'Off Division',
+    description:
+      'A precinct nobody formally decommissioned. The bullpen lights still trip on motion, and something in the evidence wing has been running the breaker for years.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 860, h: 660 },
+    ground: { base: '#12161c', tile: '#1a212b', seam: '#0a0e12', glow: '#60a5fa' },
+    sky: 'overcast',
+    obstacles: [
+      { x: -300, y: -200, w: 130, h: 70, kind: 'car' },
+      { x: 300, y: 200, w: 130, h: 70, kind: 'car' },
+      { x: -80, y: -240, w: 100, h: 30, kind: 'security-gate' },
+      { x: 80, y: 240, w: 100, h: 30, kind: 'security-gate' },
+      { x: -250, y: 60, w: 60, h: 60, kind: 'bunker-hatch' },
+      { x: 250, y: -60, w: 60, h: 60, kind: 'bunker-hatch' },
+      { x: 0, y: 0, w: 70, h: 70, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -160, y: -100, w: 56, h: 56, kind: 'crate' },
+      { x: 160, y: 100, w: 56, h: 56, kind: 'crate' },
+      { x: -180, y: 180, w: 54, h: 54, kind: 'crate-breakable' },
+      { x: 180, y: -180, w: 54, h: 54, kind: 'crate-breakable' },
+      { x: -350, y: -60, w: 46, h: 48, kind: 'fuse-box' },
+      { x: 350, y: 60, w: 46, h: 48, kind: 'fuse-box' },
+      { x: 0, y: -260, w: 96, h: 24, kind: 'cover' },
+      { x: 0, y: 260, w: 96, h: 24, kind: 'cover' },
+      { x: -60, y: 300, w: 58, h: 58, kind: 'barrel' },
+      { x: 60, y: -300, w: 58, h: 58, kind: 'barrel' },
+    ],
+    durationSec: 160,
+    threat: 'high',
+    rescueAllyId: 'sarge',
+    discoveryId: 'grpd-station-found',
+    unlock: { kind: 'clearArea', areaId: 'lev-syndicate-spire' },
+    waves: [
+      { fromSec: 0, toSec: 50, enemyId: 'nightcrawler', ratePerSec: 1.3, burst: 2 },
+      { fromSec: 15, toSec: 90, enemyId: 'bloodhound', ratePerSec: 0.6, burst: 1, hpMult: 1.15 },
+      { fromSec: 40, toSec: 120, enemyId: 'corner-cutter', ratePerSec: 0.5, burst: 1, formation: 'pincer' },
+      { fromSec: 65, toSec: 140, enemyId: 'crypt-spitter', ratePerSec: 0.42, burst: 1 },
+      { fromSec: 90, toSec: 160, enemyId: 'crypt-bouncer', ratePerSec: 0.35, burst: 1, hpMult: 1.2, formation: 'ring' },
+      // Digi-Wolf: super rare -- a low-probability late window, not a guaranteed encounter.
+      { fromSec: 130, toSec: 160, enemyId: 'digi-wolf', ratePerSec: 0.02, burst: 1 },
+    ],
+  },
+
   ...WEIRD_AREAS,
 
   // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.

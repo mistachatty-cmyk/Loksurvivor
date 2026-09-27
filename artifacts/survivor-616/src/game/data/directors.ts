@@ -30,6 +30,8 @@ export const DIRECTORS: DirectorDef[] = [
     unlockId: 'take-two',
     toggleLabel: 'Director Mode',
     toggleDescription: 'Raises the odds the Director crashes a run with its crew, once eligible.',
+    codexLore: "Filed under a personality, not a role. Whatever runs the Directors keeps a seat open for however many more of these it decides to grow.",
+    effect: { kind: 'none' },
   },
 ];
 

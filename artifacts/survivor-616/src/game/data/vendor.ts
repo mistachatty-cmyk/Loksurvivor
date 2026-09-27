@@ -459,6 +459,37 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     maxStacks: 2,
     effects: [{ kind: 'stat', stat: 'area', mult: 1.08, cap: 1.5 }],
   },
+  // Rapid Guard's K9 counter -- GRPD Station, 'grpd-station' hub room. Each
+  // purchase grants a SavedLokPet rolled from that variant (full common/
+  // charged/rare/mythic spread), not a stat effect -- see `grantsLokPetVariantId`
+  // and the 'lokpet' branch of `buyVendorItem` in state/metaStore.tsx.
+  {
+    id: 'rapid-guard-greyhound',
+    name: 'K9 Greyhound',
+    description: 'Rapid Guard says this one outran three separate task forces before anyone thought to just ask it nicely.',
+    category: 'lokpet',
+    cost: 140,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'k9-greyhound',
+  },
+  {
+    id: 'rapid-guard-shepherd',
+    name: 'K9 Shepherd',
+    description: "Retired from the department, not from the job. Rapid Guard swears it still salutes.",
+    category: 'lokpet',
+    cost: 140,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'k9-shepherd',
+  },
+  {
+    id: 'rapid-guard-wolf',
+    name: 'Alley Wolf',
+    description: "Rapid Guard won't say how he got this one. Says the paperwork is 'in progress.'",
+    category: 'lokpet',
+    cost: 260,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'wolf',
+  },
 ];
 
 export const VENDOR_CATALOG_BY_ID: Record<string, VendorItemDef> = Object.fromEntries(

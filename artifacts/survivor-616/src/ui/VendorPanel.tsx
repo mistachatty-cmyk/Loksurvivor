@@ -15,6 +15,7 @@ import {
   Flame,
   Footprints,
   Gauge,
+  Dog,
   Gem,
   Ghost,
   Globe,
@@ -117,6 +118,13 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
     description: 'Gear that changes how a run plays, not just its numbers. Some of it chains — buy the first rung to unlock the next.',
     icon: Radar,
   },
+  {
+    key: 'lokpet',
+    eyebrow: 'Rapid Guard / 06',
+    title: 'K9 counter',
+    description: "GRPD Station's own kennel. The only place in the city to buy a police dog, or something that only wishes it were one.",
+    icon: Dog,
+  },
 ];
 
 const STAT_LABELS: Record<string, string> = {
@@ -194,6 +202,9 @@ const ABILITY_EFFECT_LABELS: Record<string, string> = {
   'night-vision': 'Night tint cut by 75%',
   'relic-trigger-spring': '-6% weapon cooldown / stack',
   'relic-blast-lens': '+8% weapon area / stack',
+  'rapid-guard-greyhound': 'Joins your kennel',
+  'rapid-guard-shepherd': 'Joins your kennel',
+  'rapid-guard-wolf': 'Joins your kennel',
 };
 
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
@@ -440,7 +451,7 @@ export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
   return (
     <ScreenLayout
       title="Quartermaster"
-      subtitle="The back room / Grand Rapids"
+      subtitle="Otis & Rapid Guard / Grand Rapids"
       onBack={onBack}
       action={
         <div className="flex items-center gap-2">

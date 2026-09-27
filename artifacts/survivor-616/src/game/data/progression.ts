@@ -283,6 +283,21 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#bbf7d0', skin: '#0f3d24', glow: '#4ade80',
     },
   },
+  {
+    id: 'sarge',
+    name: 'Sarge Holloway',
+    role: 'Last officer standing',
+    blurb: 'Never got the call to stand down, so she never did. Still runs the station like the shift never ended.',
+    room: 'grpd-station',
+    boost: { armor: 0.03 },
+    boostLabel: '+3% armor',
+    preferredActivityIds: ['run-the-drills'],
+    rigHint: 'cap',
+    palette: {
+      ink: '#0a0f1a', body: '#1e3a5f', bodyDark: '#0b192c', accent: '#facc15',
+      accentBright: '#fef08a', skin: '#334155', glow: '#93c5fd',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
@@ -402,6 +417,32 @@ export const HUB_ROOMS: HubRoomDef[] = [
     unlock: { kind: 'default' },
     features: ['music', 'studio', 'sound-booth', 'settings', 'account', 'feedback'],
   },
+  {
+    id: 'grpd-station',
+    name: 'GRPD Station',
+    subtitle: 'Division St.',
+    description:
+      'A rundown precinct off Division nobody ever formally closed. The Digital Archive terminal hums in back, and Rapid Guard runs the K9 counter by the old holding cells.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    unlock: { kind: 'discovery', discoveryId: 'grpd-station-found' },
+    features: ['director-terminal', 'vendor', 'allies', 'settings', 'account', 'feedback'],
+  },
+  {
+    id: 'grpd-vault',
+    name: 'The Vault',
+    subtitle: 'Sealed evidence room',
+    description:
+      'A super-safe door nobody in the department ever shared the combination for. Whatever is behind it stays behind it, for now.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    // Deliberately unreachable: 'grpd-vault-code' has no DISCOVERIES entry
+    // and is never granted anywhere. See .agents/memory/grpd-station.md --
+    // this is an intentional, precedented "not built yet" content hook, not
+    // a bug to fix.
+    unlock: { kind: 'discovery', discoveryId: 'grpd-vault-code' },
+    features: [],
+  },
 ];
 
 export const HUB_ROOMS_BY_ID: Record<string, HubRoomDef> = Object.fromEntries(
@@ -428,6 +469,10 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
   { id: 'null-sector-log', name: 'The Null Sector Log', blurb: 'A maintenance log with no author field. Every entry ends the same way: "still running."' },
   { id: 'lev-core-archive', name: 'The Lev Core Archive', blurb: 'A cracked data slate salvaged from the singularity generator, still cycling schematics for a spire that was never finished.' },
+  { id: 'grpd-station-found', name: 'GRPD Station — Division St.', blurb: 'A precinct nobody decommissioned on paper. The lights are still department-metered.' },
+  // 'grpd-vault-code' is deliberately absent -- the vault room references it
+  // and is intentionally never unlockable yet. See grpd-vault in HUB_ROOMS
+  // below and .agents/memory/grpd-station.md.
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

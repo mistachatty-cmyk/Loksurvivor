@@ -115,7 +115,8 @@ export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jell
   | 'prism-moth' | 'void-pup' | 'ember-koi' | 'clock-beetle'
   | 'solar-owl' | 'shadow-mantis' | 'glitch-fox' | 'magnet-ursa'
   | 'cyber-hydra' | 'plasma-kitsune' | 'nano-phoenix' | 'titan-colossus'
-  | 'chrono-hare' | 'byte-serpent' | 'cosmic-axolotl' | 'storm-griffin';
+  | 'chrono-hare' | 'byte-serpent' | 'cosmic-axolotl' | 'storm-griffin'
+  | 'k9-hound' | 'wolf' | 'digi-wolf';
 export type LokPetAttackKind = 'shot' | 'rapid-shot' | 'heavy-shot' | 'pulse' | 'explosion';
 export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow';
 export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
@@ -123,7 +124,7 @@ export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescu
   | 'solar-flare' | 'mantis-slice' | 'phase-dash' | 'polar-pull'
   | 'tri-laser' | 'plasma-orbit' | 'rebirth-burst' | 'seismic-slam'
   | 'time-warp' | 'glitch-strike' | 'starlight-heal' | 'thunder-claw'
-  | 'cutify-getaway' | 'null-consume' | 'buzbee-pollen';
+  | 'cutify-getaway' | 'null-consume' | 'buzbee-pollen' | 'digi-fang';
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
@@ -1251,7 +1252,29 @@ export interface DirectorDef {
   /** Label shown on the Roster screen's Director Mode toggle once unlocked. */
   toggleLabel: string;
   toggleDescription: string;
+  /**
+   * Shown in the Digital Archive terminal once this personality is
+   * unlocked (`MetaState.defeatedDirectorIds`) -- distinct from the in-run
+   * `warningText`/`victoryText` banners. Locked cards show only a mystery
+   * placeholder, never this text.
+   */
+  codexLore: string;
+  /**
+   * How selecting this personality (`MetaState.activeDirectorPersonalityId`)
+   * changes the rest of a run, beyond which faction/boss spawns. A small,
+   * bounded set of knobs, composed the same way every other automatic/
+   * environmental multiplier in this codebase already composes -- never
+   * stacked outside existing difficulty caps. Stage 1 ships only the type
+   * shape plus `'none'` for the one existing Director; real tuning for
+   * additional personalities is future content.
+   */
+  effect: DirectorPersonalityEffect;
 }
+
+export type DirectorPersonalityEffect =
+  | { kind: 'none' }
+  | { kind: 'spawnBias'; spawnRateMult: number; hpMult: number }
+  | { kind: 'factionFavor'; favoredFactionId: string; spawnRateMult: number };
 
 /** Live per-run state for the (at most one, currently) active Director encounter. */
 export interface DirectorRunState {
@@ -1517,7 +1540,9 @@ export type CrewActivityId =
   | 'mind-the-register'
   // The back room
   | 'rewire-the-cabinets'
-  | 'run-the-high-score-board';
+  | 'run-the-high-score-board'
+  // GRPD Station
+  | 'run-the-drills';
 
 export type CrewActivityIcon =
   | 'utensils'
@@ -1632,7 +1657,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1652,7 +1677,7 @@ export interface HideoutSceneDef {
   flavorLines: string[];
 }
 
-export type FacilityTier = 'tub' | 'shower' | 'hot-tub' | 'sauna' | 'rooftop-hot-tub';
+export type FacilityTier = 'tub' | 'shower' | 'hot-tub' | 'sauna' | 'rooftop-hot-tub' | 'swat-sauna';
 
 export interface RecoveryFacilityDef {
   id: FacilityTier;
@@ -1686,7 +1711,7 @@ export interface DiscoveryDef {
   blurb: string;
 }
 
-export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'ability';
+export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'ability' | 'lokpet';
 
 export type VendorEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
@@ -1709,6 +1734,13 @@ export interface VendorItemDef {
    * the ghost cloak line) without a generic prerequisite-graph system.
    */
   requires?: string;
+  /**
+   * `category: 'lokpet'` items grant a `SavedLokPet` rolled from this
+   * variant straight into the kennel on purchase, instead of a permanent
+   * stat effect -- see `buyVendorItem` in `state/metaStore.tsx`. Rapid
+   * Guard's police-dog counter (`data/vendor.ts`) is the first user.
+   */
+  grantsLokPetVariantId?: string;
 }
 
 /** Derived from Ghost Cloak + its upgrade-tree stacks; null when the base unlock isn't owned. */
@@ -2125,6 +2157,20 @@ export interface MetaState {
   defeatedDirectorIds: string[];
   /** True once any Director has been defeated, unlocking the Director Mode run toggle. */
   directorModeUnlocked: boolean;
+  /**
+   * Which Director personality's squad/boss actually spawns for the Director
+   * encounter (see `updateDirector` in `engine/world.ts`). Only selectable
+   * from the Digital Archive terminal among ids already in
+   * `defeatedDirectorIds`; null/unset falls back to `DIRECTORS[0]`.
+   */
+  activeDirectorPersonalityId: string | null;
+  /**
+   * Set by the SWAT Sauna's "reach through the hole" hub action
+   * (`data/recovery.ts`'s `SAUNA_HOLE_REWARDS`); the referenced weapon is
+   * added to the very next run's loadout and this is cleared once that run
+   * ends, win or lose. Null when nothing is queued.
+   */
+  pendingSaunaReward: { weaponId: string } | null;
   /** Whether the Threat Matrix quarantine terminal is unlocked with lootkeys. */
   threatMatrixUnlocked: boolean;
   /** Bestiary enemy IDs contained/disabled from spawning in runs. */

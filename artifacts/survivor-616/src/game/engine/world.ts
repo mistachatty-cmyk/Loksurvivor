@@ -1069,6 +1069,12 @@ export interface World {
   wheelSpin: WheelSpinState | null;
   /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
   director: DirectorRunState;
+  /**
+   * Which `DirectorDef` actually fires, chosen at the Digital Archive
+   * terminal (`MetaState.activeDirectorPersonalityId`). Null/unknown id
+   * falls back to `DIRECTORS[0]` in `updateDirector`.
+   */
+  activeDirectorPersonalityId: string | null;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -1229,6 +1235,10 @@ export function createWorld(
     graphicsQuality?: 'high' | 'balanced' | 'performance';
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
+    /** Which Director personality to spawn for the Director encounter -- see `MetaState.activeDirectorPersonalityId`. */
+    activeDirectorPersonalityId?: string | null;
+    /** Grants this weapon at run start, once, from the SWAT Sauna's reward hole -- see `MetaState.pendingSaunaReward`. */
+    bonusWeaponId?: string;
     extraLifeAvailable?: boolean;
     /** Sector Command: squad cap for this mission. Presence of this enables the mode. */
     sectorSquadCap?: number;
@@ -1382,6 +1392,7 @@ export function createWorld(
       : null,
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
+    activeDirectorPersonalityId: setup.activeDirectorPersonalityId ?? null,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -1634,6 +1645,14 @@ export function createWorld(
   }
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
   for (const pet of setup.startingLokPets ?? []) spawnLokPet(world, pet, 'loadout');
+  if (setup.bonusWeaponId) {
+    const bonusDef = WEAPONS_BY_ID[setup.bonusWeaponId];
+    if (bonusDef && !world.weapons.some((entry) => entry.def.id === bonusDef.id)) {
+      const bonusWeapon = { def: bonusDef, level: 1, count: bonusDef.count ?? 1, readyAt: 400 };
+      world.weapons.push(bonusWeapon);
+      if (bonusDef.kind === 'orbit') rebuildOrbiters(world, bonusWeapon);
+    }
+  }
   return world;
 }
 
@@ -3328,6 +3347,15 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
       pushAlert(w, director.victoryText);
       w.shake = Math.max(w.shake, 14);
     }
+  }
+
+  // Digi-Wolf: "defeat-then-recruit" -- a real chance at the fixed Digi-Wolf
+  // LokPet variant, not a guarantee. No live capture mechanic (see
+  // .agents/memory/grpd-station.md).
+  if (enemy.defId === 'digi-wolf' && w.rng() < 0.7) {
+    const pet = rollLokPet(w.rng, { fixedVariantId: 'digi-wolf' });
+    spawnLokPet(w, pet);
+    pushAlert(w, `${pet.name} follows you home`);
   }
 
   // Loot.
@@ -8235,7 +8263,7 @@ function updateDirector(w: World) {
   if (state.phase !== 'pending') return;
   if (w.now < state.nextRollAt) return;
 
-  const director = DIRECTORS[0];
+  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId) ?? DIRECTORS[0];
   if (!director) return;
 
   if (w.time < director.triggerAfterSec) {

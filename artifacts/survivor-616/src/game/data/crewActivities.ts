@@ -245,6 +245,15 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
     icon: 'calculator',
     effects: [{ stat: 'crit', add: 0.03 }],
   },
+  {
+    id: 'run-the-drills',
+    roomId: 'grpd-station',
+    name: 'Run the drills',
+    description: 'Sarge keeps the muster board full even with a roster of one. Everyone leaves standing straighter.',
+    benefitLabel: '+4% armor',
+    icon: 'shield',
+    effects: [{ stat: 'armor', add: 0.04 }],
+  },
 ];
 
 export const CREW_ACTIVITIES_BY_ID: Record<CrewActivityId, CrewActivityDef> =

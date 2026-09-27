@@ -394,6 +394,8 @@ export function RunScreen({
         graphicsQuality: meta.graphicsQuality,
         worldColorPalette: activeWorldPalette,
         worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
+        activeDirectorPersonalityId: meta.activeDirectorPersonalityId,
+        bonusWeaponId: meta.pendingSaunaReward?.weaponId,
         sectorSquadCap: mission?.squadCap,
         playerStart: missionPlayerStart,
         mission,

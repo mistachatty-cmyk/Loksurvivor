@@ -39,6 +39,7 @@ import {
   RECOVERY_FACILITIES,
   RECOVERY_FACILITIES_BY_ID,
   RECOVERY_HUTS,
+  SAUNA_HOLE_REWARDS,
 } from '@/game/data/recovery';
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import { CHARACTER_MASTERY_STAT_EFFECTS, characterRankTitle } from '@/game/data/characterMastery';
@@ -368,6 +369,8 @@ export function createInitialMeta(): MetaState {
     claimedAchievementIds: [],
     defeatedDirectorIds: [],
     directorModeUnlocked: false,
+    activeDirectorPersonalityId: null,
+    pendingSaunaReward: null,
     threatMatrixUnlocked: false,
     disabledEnemyIds: [],
     disabledWeaponIds: [],
@@ -1200,6 +1203,17 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       [],
     ),
     directorModeUnlocked: parsed.directorModeUnlocked === true,
+    activeDirectorPersonalityId:
+      typeof parsed.activeDirectorPersonalityId === 'string' &&
+      DIRECTORS.some((director) => director.id === parsed.activeDirectorPersonalityId)
+        ? parsed.activeDirectorPersonalityId
+        : null,
+    pendingSaunaReward:
+      parsed.pendingSaunaReward &&
+      typeof parsed.pendingSaunaReward === 'object' &&
+      typeof (parsed.pendingSaunaReward as { weaponId?: unknown }).weaponId === 'string'
+        ? { weaponId: (parsed.pendingSaunaReward as { weaponId: string }).weaponId }
+        : null,
     threatMatrixUnlocked: parsed.threatMatrixUnlocked === true,
     disabledEnemyIds: Array.isArray(parsed.disabledEnemyIds)
       ? parsed.disabledEnemyIds.filter((id): id is string => typeof id === 'string')
@@ -1667,6 +1681,8 @@ type Action =
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'buyPalette'; id: string }
   | { type: 'equipPalette'; id: string }
+  | { type: 'equipDirectorPersonality'; id: string | null }
+  | { type: 'claimSaunaHoleReward' }
   | { type: 'buySoundPack'; id: string }
   | { type: 'equipSoundPack'; id: string }
   | { type: 'setSfxEnabled'; enabled: boolean }
@@ -2149,6 +2165,13 @@ export function reducer(state: StoreState, action: Action): StoreState {
         [currency]: balance - item.cost,
         vendorPurchases: nextPurchases,
       };
+      if (item.category === 'lokpet' && item.grantsLokPetVariantId) {
+        const roll = rollLokPet(Math.random, { fixedVariantId: item.grantsLokPetVariantId });
+        nextMeta.savedLokPets = [
+          { id: `pet-${Date.now().toString(36)}-0-${roll.variantId}`, roll, stamina: PET_STAMINA_MAX },
+          ...state.meta.savedLokPets,
+        ].slice(0, 48);
+      }
       if (item.id === 'threat-matrix-console') {
         nextMeta.threatMatrixUnlocked = true;
       }
@@ -2391,6 +2414,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'equipPalette':
       if (!hasCatalogItem(state.meta, 'palettes', action.id, state.meta.ownedPaletteIds)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
+
+    case 'equipDirectorPersonality': {
+      if (action.id !== null && !state.meta.defeatedDirectorIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, activeDirectorPersonalityId: action.id } };
+    }
+
+    case 'claimSaunaHoleReward': {
+      if (state.meta.pendingSaunaReward) return state;
+      const reward = SAUNA_HOLE_REWARDS[0];
+      if (!reward) return state;
+      return { ...state, meta: { ...state.meta, pendingSaunaReward: { weaponId: reward.weaponId } } };
+    }
 
     case 'buySoundPack': {
       const pack = SOUND_PACKS_BY_ID[action.id];
@@ -2779,7 +2814,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'upgradeFacility': {
       const currentIndex = facilityIndex(state.meta.facilityTier);
       const nextFacility = RECOVERY_FACILITIES[currentIndex + 1];
-      if (!nextFacility || state.meta.cred < nextFacility.cost) return state;
+      // The SWAT Sauna (cost 0) is a hut-only reward reached by clearing GRPD
+      // Station, never a purchasable rung on this ladder -- see its unlockText.
+      if (!nextFacility || nextFacility.cost <= 0 || state.meta.cred < nextFacility.cost) return state;
       return {
         ...state,
         meta: { ...state.meta, cred: state.meta.cred - nextFacility.cost, facilityTier: nextFacility.id },
@@ -2958,6 +2995,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
         discoveredHutIds: RECOVERY_HUTS.filter(
           (hut) => clearedAreaIds.includes(hut.areaId),
         ).map((hut) => hut.id),
+        // The SWAT Sauna's hole reward is scoped to exactly one run, win or lose.
+        pendingSaunaReward: null,
         activeCrewRumor: result.crewRumor ? null : prev.activeCrewRumor,
         completedEpisodeIds: [...prev.completedEpisodeIds],
         unlockedEvolutionIds: [...prev.unlockedEvolutionIds],
@@ -3120,6 +3159,10 @@ export interface MetaContextValue {
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   buyPalette: (id: string) => void;
   equipPalette: (id: string) => void;
+  /** Digital Archive terminal: select which Director personality spawns for the encounter. Pass null to clear. */
+  equipDirectorPersonality: (id: string | null) => void;
+  /** SWAT Sauna's "reach through the hole" hub action -- queues a bonus weapon for the next run. */
+  claimSaunaHoleReward: () => void;
   buySoundPack: (id: string) => void;
   equipSoundPack: (id: string) => void;
   setSfxEnabled: (enabled: boolean) => void;
@@ -3272,6 +3315,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
+  const equipDirectorPersonality = useCallback((id: string | null) => dispatch({ type: 'equipDirectorPersonality', id }), []);
+  const claimSaunaHoleReward = useCallback(() => dispatch({ type: 'claimSaunaHoleReward' }), []);
   const buySoundPack = useCallback((id: string) => dispatch({ type: 'buySoundPack', id }), []);
   const equipSoundPack = useCallback((id: string) => dispatch({ type: 'equipSoundPack', id }), []);
   const setSfxEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setSfxEnabled', enabled }), []);
@@ -3511,6 +3556,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       selectUiThemeSwatch,
       buyPalette,
       equipPalette,
+      equipDirectorPersonality,
+      claimSaunaHoleReward,
       buySoundPack,
       equipSoundPack,
       setSfxEnabled,
@@ -3631,6 +3678,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     selectUiThemeSwatch,
     buyPalette,
     equipPalette,
+    equipDirectorPersonality,
+    claimSaunaHoleReward,
     buySoundPack,
     equipSoundPack,
     setSfxEnabled,
