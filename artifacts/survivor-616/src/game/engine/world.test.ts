@@ -34,6 +34,21 @@ import {
   resolveImpactTravel,
   relicRecipeEligibility,
   setStormCloudMode,
+  captureEnemy,
+  commandedUnits,
+  missionSnapshot,
+  orderSelectedUnits,
+  selectAllCommandedUnits,
+  squadCostUsed,
+  assignControlGroup,
+  fogAt,
+  selectCommandedUnitAt,
+  selectCommandedUnitByUid,
+  selectControlGroup,
+  updateCommandSelection,
+  castFreezeCone,
+  updateFreezeSelection,
+  throwSelectedFrozenEnemies,
   type EnemyActor,
   type Projectile,
   stepWorld,
@@ -46,6 +61,7 @@ import { createRng } from '@/game/engine/math';
 import {
   createInitialMeta,
   effectiveStats,
+  getCharacterFatigueSummary,
   getLokPetDiscoveries,
   loadMeta,
   normalizeMeta,
@@ -53,7 +69,7 @@ import {
   reducer,
   startingWeaponLevel,
 } from '@/game/state/metaStore';
-import type { AreaDef, CharacterDef, LokPetRoll, RunResult } from '@/game/types';
+import type { AreaDef, CharacterDef, LokPetRoll, RunResult, SectorMissionDef } from '@/game/types';
 
 const neutralInput = { moveX: 0, moveY: 0, ultimate: false };
 
@@ -71,6 +87,21 @@ function testArea(obstacle: AreaDef['obstacles'][number]): AreaDef {
 function testCharacter(weaponId: string): CharacterDef {
   const weapon = WEAPONS_BY_ID[weaponId]!;
   return { ...CHARACTERS[0], weapon };
+}
+
+function freezeThrowTestCharacter(): CharacterDef {
+  return {
+    ...CHARACTERS[0]!,
+    freezeThrow: {
+      coneRangeUnits: 260,
+      coneAngleDeg: 90,
+      maxFreezeTargets: 7,
+      freezeDurationMs: 5000,
+      castCooldownMs: 8000,
+      throwDamage: 40,
+      throwSpeed: 500,
+    },
+  };
 }
 
 function addEnemy(
@@ -130,6 +161,14 @@ function addEnemy(
     commanderLocked: false,
     burstUntil: 0,
     baseRadius: def.radius,
+    frozenUntil: 0,
+    selectedForThrow: false,
+    commanded: false,
+    orderKind: 'none',
+    orderX: 0,
+    orderY: 0,
+    selectedForCommand: false,
+    capturableUntil: 0,
   };
   world.enemies.push(enemy);
   return enemy;
@@ -282,6 +321,44 @@ test('a grouped wave releases its mixed formation together', () => {
   assert.equal(world.enemies.length, 4);
   assert.equal(world.enemies.filter((enemy) => enemy.defId === 'nightcrawler').length, 2);
   assert.equal(world.enemies.filter((enemy) => enemy.defId === 'spiral-moth').length, 2);
+});
+
+test('the Director escalation triggers on schedule and spawns its registered squad', () => {
+  const area: AreaDef = { ...AREAS[0]!, id: 'director-trigger-test', durationSec: 999, waves: [], obstacles: [], rescueAllyId: undefined };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 1);
+  // Deterministic: any chance roll passes, so the Director fires on its
+  // first eligible reroll rather than depending on the seed.
+  world.rng = () => 0;
+
+  for (let i = 0; i < 8000 && world.director.phase === 'pending'; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.equal(world.director.phase, 'active');
+  assert.equal(world.director.activeDirectorId, 'take-two');
+  assert.ok(world.director.bossUid !== null);
+  assert.ok(world.enemies.some((enemy) => enemy.defId === 'the-director'));
+  assert.ok(world.enemies.some((enemy) => enemy.defId === 'boom-mic-runner'));
+  assert.ok(world.enemies.some((enemy) => enemy.defId === 'gaffer-brute'));
+});
+
+test('killing the Director boss resolves the encounter and marks the run result defeated', () => {
+  const area: AreaDef = { ...AREAS[0]!, id: 'director-defeat-test', durationSec: 999, waves: [], obstacles: [], rescueAllyId: undefined };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 1);
+  const boss = addEnemy(world, 'the-director', 30, 0);
+  boss.hp = 1;
+  world.director.phase = 'active';
+  world.director.activeDirectorId = 'take-two';
+  world.director.bossUid = boss.uid;
+  world.weapons[0]!.readyAt = 0;
+
+  for (let i = 0; i < 20; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.director.phase, 'resolved');
+  assert.equal(world.director.victorious, true);
+  const result = buildResult(world);
+  assert.equal(result.directorEncounterId, 'take-two');
+  assert.equal(result.directorDefeated, true);
 });
 
 test('a reflective surface redirects a compatible projectile', () => {
@@ -1262,7 +1339,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 15);
+    assert.equal(loaded.version, 17);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -1706,6 +1783,51 @@ test('vendor stat caps and utilities affect runs without developer unlock grants
   assert.equal(noPurchases.maxHp, CHARACTERS[0]!.stats.maxHp);
 });
 
+test('character fatigue summary accurately reflects current fatigue penalties on stats before starting a run', () => {
+  const base = createInitialMeta();
+  const character = CHARACTERS[0]!;
+
+  // 1. Fresh character
+  const freshSummary = getCharacterFatigueSummary(character, base);
+  assert.equal(freshSummary.isFatigued, false);
+  assert.equal(freshSummary.fatiguePct, 0);
+  assert.equal(freshSummary.effectiveStats.maxHp, character.stats.maxHp);
+  assert.equal(freshSummary.diffs.maxHp, 0);
+
+  // 2. Fatigued character (e.g. 4% fatigue)
+  const fatiguedMeta = {
+    ...base,
+    fatigueByCharacter: {
+      [character.id]: 4,
+    },
+  };
+  const fatiguedSummary = getCharacterFatigueSummary(character, fatiguedMeta);
+  assert.equal(fatiguedSummary.isFatigued, true);
+  assert.equal(fatiguedSummary.fatiguePct, 4);
+  assert.equal(fatiguedSummary.maxFatiguePct, 5);
+
+  // HP should be reduced by exactly 4%
+  const expectedHp = character.stats.maxHp * (1 - 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.maxHp, expectedHp);
+  assert.ok(Math.abs(fatiguedSummary.diffs.maxHp - (-0.04 * character.stats.maxHp)) < 1e-6);
+
+  // Speed should be reduced by 4%
+  const expectedSpeed = character.stats.speed * (1 - 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.speed, expectedSpeed);
+
+  // Power should be reduced by 4%
+  const expectedPower = character.stats.power * (1 - 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.power, expectedPower);
+
+  // Cooldown delay should increase haste by 4%
+  const expectedHaste = character.stats.haste * (1 + 0.04);
+  assert.equal(fatiguedSummary.effectiveStats.haste, expectedHaste);
+
+  // Unaffected stats like crit and lifesteal should remain unchanged
+  assert.equal(fatiguedSummary.effectiveStats.crit, character.stats.crit);
+  assert.equal(fatiguedSummary.effectiveStats.lifesteal, character.stats.lifesteal);
+});
+
 test('owned challenge contracts scale enemy pressure and payout', () => {
   const area: AreaDef = {
     ...AREAS[0]!,
@@ -1813,18 +1935,12 @@ test('a LokPet chest prize spawns a generated companion and exposes it to the HU
     616,
   );
   world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
-  // The LokPet entry is the final weighted entry in the prize table.
-  world.rng = () => 0.99;
-  world.pickups.push({ uid: 800, kind: 'loot-box', x: 0, y: 0, vx: 0, vy: 0, value: 0, bornAt: 0 });
-
-  stepWorld(world, 1 / 60, neutralInput);
-
   assert.equal(world.lokPets.length, 0);
-  assert.equal(world.pendingReel[0]?.kind, 'lokpet');
-  claimLootPrize(world, world.pendingReel[0]!);
+  const prize = { kind: 'lokpet' as const, label: 'LokPet hatch', lokPet: rollLokPet(createRng(616)) };
+  claimLootPrize(world, prize);
   assert.equal(world.lokPets.length, 1);
-  assert.equal(world.pendingReel[0]?.lokPet?.variantId, world.lokPets[0]?.variantId);
-  claimLootPrize(world, world.pendingReel[0]!);
+  assert.equal(prize.lokPet.variantId, world.lokPets[0]?.variantId);
+  claimLootPrize(world, prize);
   assert.equal(world.lokPets.length, 1, 'a replayed reel landing cannot duplicate the companion');
   const snapshot = hudSnapshot(world);
   assert.equal(snapshot.lokPets.length, 1);
@@ -1904,6 +2020,97 @@ test('LokPets follow, apply elemental attacks, explode, and become transparent g
   for (let i = 0; i < 3; i += 1) stepWorld(world, 1 / 60, neutralInput);
   assert.equal(world.lokPets.length, 0);
   assert.equal(world.lokPetHistory.length, 1);
+});
+
+test('legendary LokPet specials affect pickups, recovery, and combat time', () => {
+  const makeWorld = () => createWorld(
+    testArea({ x: 400, y: 400, w: 20, h: 20, kind: 'barrier' }),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    616,
+  );
+  const base = rollLokPet(createRng(44));
+
+  const prismWorld = makeWorld();
+  prismWorld.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  prismWorld.pickups.push({ uid: 801, kind: 'xp', x: 200, y: 0, vx: 0, vy: 0, value: 1, bornAt: 0 });
+  const prism = spawnLokPet(prismWorld, { ...base, variantId: 'prism-moth', specialAbility: 'prism-collect', legendary: true });
+  prism.specialReadyAt = 0;
+  stepWorld(prismWorld, 1 / 60, neutralInput);
+  assert.ok(prismWorld.pickups[0]!.vx < 0, 'Prism Moth must pull pickups toward the player');
+
+  const voidWorld = makeWorld();
+  voidWorld.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  voidWorld.pickups.push({ uid: 802, kind: 'xp', x: 220, y: 0, vx: 0, vy: 0, value: 1, bornAt: 0 });
+  const voidPup = spawnLokPet(voidWorld, { ...base, variantId: 'void-pup', specialAbility: 'void-fetch', legendary: true });
+  voidPup.specialReadyAt = 0;
+  stepWorld(voidWorld, 1 / 60, neutralInput);
+  assert.ok(voidWorld.pickups.length === 0 || Math.abs(voidWorld.pickups[0]!.x - voidWorld.player.x) < 30, 'Void Pup must fetch a reward');
+
+  const emberWorld = makeWorld();
+  emberWorld.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  emberWorld.player.hp = emberWorld.player.maxHp - 10;
+  const ember = spawnLokPet(emberWorld, { ...base, variantId: 'ember-koi', specialAbility: 'ember-rescue', legendary: true });
+  ember.specialReadyAt = 0;
+  stepWorld(emberWorld, 1 / 60, neutralInput);
+  assert.equal(emberWorld.player.hp, emberWorld.player.maxHp - 6, 'Ember Koi must restore four HP');
+
+  const clockWorld = makeWorld();
+  clockWorld.weapons[0]!.readyAt = 5000;
+  clockWorld.projectiles.push({
+    uid: 803, x: 90, y: 0, vx: -50, vy: 0, radius: 4, damage: 5, impactIntensity: 0,
+    fromPlayer: false, expiresAt: 5000, targetUid: null, turnRate: 0, color: '#fff', trail: [],
+    pierce: 0, hitUids: new Set(), obstacleUids: new Set(),
+  });
+  const clock = spawnLokPet(clockWorld, { ...base, variantId: 'clockwork-beetle', specialAbility: 'clock-pause', legendary: true });
+  clock.specialReadyAt = 0;
+  stepWorld(clockWorld, 1 / 60, neutralInput);
+  assert.ok(clock.specialActiveUntil > clockWorld.now, 'Clockwork Beetle must enter its accelerated-face state');
+  assert.ok(clockWorld.projectiles[0]!.pausedUntil! > clockWorld.now, 'Clockwork Beetle must pause hostile projectiles');
+  assert.ok(clockWorld.weapons[0]!.readyAt < 5000, 'Clockwork Beetle must borrow weapon cooldown time');
+});
+
+test('every legendary signature enters its distinct combat path in a real world', () => {
+  const ids = [
+    'bellwright',
+    'mawheel',
+    'lantern-widow',
+    'brassback',
+    'paper-saint',
+    'eclipse-pilgrim',
+    'bloomheart',
+    'marionette-king',
+    'cryo-mantis',
+    'neon-leviathan',
+  ] as const;
+
+  const worlds = Object.fromEntries(ids.map((id) => {
+    const character = getCharacter(id);
+    const world = createWorld(
+      testArea({ x: 400, y: 400, w: 20, h: 20, kind: 'barrier' }),
+      character,
+      character.stats,
+      616,
+    );
+    addEnemy(world, 'nightcrawler', 72, 0);
+    addEnemy(world, 'nightcrawler', 92, 18).uid += 1;
+    addEnemy(world, 'nightcrawler', 108, -18).uid += 2;
+    world.weapons[0]!.readyAt = 0;
+    stepWorld(world, 1 / 60, neutralInput);
+    assert.ok(world.weapons[0]!.readyAt > world.now, `${id} must fire through normal weapon cadence`);
+    return [id, world];
+  })) as Record<(typeof ids)[number], ReturnType<typeof createWorld>>;
+
+  assert.ok(worlds.bellwright.projectiles.some((projectile) => projectile.reverseAt));
+  assert.ok(worlds.mawheel.player.dashUntil > worlds.mawheel.now);
+  assert.ok(worlds['lantern-widow'].effects.some((effect) => effect.kind === 'web'));
+  assert.ok(worlds.brassback.enemies[0]!.kx < 0, 'Steam Harpoon must pull toward the player');
+  assert.ok(worlds['paper-saint'].projectiles.length >= 3 && worlds['paper-saint'].followers.length >= 2);
+  assert.ok(worlds['eclipse-pilgrim'].effects.some((effect) => effect.kind === 'hazard' && effect.pullStrength));
+  assert.ok(worlds.bloomheart.effects.some((effect) => effect.kind === 'hazard') && worlds.bloomheart.effects.some((effect) => effect.kind === 'web'));
+  assert.ok(worlds['marionette-king'].enemies.filter((enemy) => enemy.convertedUntil > worlds['marionette-king'].now).length >= 2);
+  assert.equal(worlds['cryo-mantis'].effects.filter((effect) => effect.kind === 'laser').length, 2);
+  assert.ok(worlds['neon-leviathan'].effects.some((effect) => effect.kind === 'ring'), 'Tidal Memory must replay the sampled route');
 });
 
 test('formation-tagged waves release deterministic positions', () => {
@@ -2425,3 +2632,675 @@ test('switching Storm Chaser to rain washes an existing fire/acid/frost ground s
   assert.ok(!world.fluids.some((tile) => tile.kind === 'acid-storm'), 'rain should wash the acid-storm stain off the ground');
   assert.ok(!enemy.activeEffects.some((effect) => effect.id === 'acid'), 'rain should also wash the acid status off the enemy standing in it');
 });
+
+function sectorWorld(squadCap = 6) {
+  return createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    21,
+    [],
+    1,
+    true,
+    null,
+    { sectorSquadCap: squadCap },
+  );
+}
+
+test('capture refuses healthy enemies, takes weakened ones, and forfeits the kill', () => {
+  const world = sectorWorld();
+  const enemy = addEnemy(world, 'nightcrawler', 60, 0);
+  const killsBefore = world.kills;
+
+  assert.equal(captureEnemy(world, enemy), false, 'a healthy enemy cannot be captured');
+
+  enemy.hp = enemy.maxHp * 0.2;
+  assert.equal(captureEnemy(world, enemy), true);
+  assert.equal(enemy.commanded, true);
+  assert.equal(commandedUnits(world).length, 1);
+  assert.equal(world.kills, killsBefore, 'capturing must not count as a kill');
+  assert.equal(world.sectorCommand?.captures, 1);
+});
+
+test('capture refuses bosses, unlisted enemies, and anything over the squad cap', () => {
+  const world = sectorWorld(2);
+  const boss = addEnemy(world, 'the-sire', 60, 0);
+  boss.hp = 1;
+  assert.equal(captureEnemy(world, boss), false, 'bosses are never capturable');
+
+  const unlisted = addEnemy(world, 'belfry-bat', 60, 20);
+  unlisted.uid = 901;
+  unlisted.hp = 1;
+  assert.equal(captureEnemy(world, unlisted), false, 'enemies without a capture profile are refused');
+
+  // Two 1-cost units fit a cap of 2; a third does not.
+  const first = addEnemy(world, 'nightcrawler', 40, 0);
+  first.uid = 902;
+  first.hp = 1;
+  const second = addEnemy(world, 'corner-cutter', 40, 20);
+  second.uid = 903;
+  second.hp = 1;
+  const third = addEnemy(world, 'nightcrawler', 40, 40);
+  third.uid = 904;
+  third.hp = 1;
+
+  assert.equal(captureEnemy(world, first), true);
+  assert.equal(captureEnemy(world, second), true);
+  assert.equal(squadCostUsed(world), 2);
+  assert.equal(captureEnemy(world, third), false, 'the squad cap is enforced');
+});
+
+test('captured units are excluded from player targeting, then take orders and walk to them', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 60, 0);
+  unit.hp = 1;
+  assert.equal(captureEnemy(world, unit), true);
+
+  // Selection: a box around the unit picks it up; a box elsewhere does not.
+  updateCommandSelection(world, 0, -60, 120, 60);
+  assert.deepEqual(world.sectorCommand?.selectedUids, [unit.uid]);
+  updateCommandSelection(world, 400, 400, 500, 500);
+  assert.deepEqual(world.sectorCommand?.selectedUids, []);
+
+  assert.equal(selectAllCommandedUnits(world), 1);
+  assert.equal(orderSelectedUnits(world, 260, 0), 1);
+  assert.equal(unit.orderKind, 'move');
+
+  const startX = unit.x;
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(unit.x > startX, 'a commanded unit should walk toward its order');
+});
+
+test('Fragmented Backup restores 25% HP once instead of ending the run, then a second lethal hit ends it normally', () => {
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    11,
+    [],
+    1,
+    true,
+    null,
+    { extraLifeAvailable: true },
+  );
+  const enemy = addEnemy(world, 'nightcrawler', 10, 0);
+  enemy.damage = 999;
+  world.player.hp = 1;
+
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.outcome, 'running', 'the extra life should have absorbed the lethal hit');
+  assert.ok(world.player.hp > 0, 'HP should be restored, not left at 0');
+  assert.equal(world.extraLifeUsed, true);
+
+  world.player.invulnUntil = 0;
+  world.player.hp = 1;
+  enemy.contactReadyAt = 0;
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.outcome, 'dead', 'a second lethal hit should end the run -- the extra life is spent');
+});
+
+test('the Corrupted status periodically relocates the enemy it is applied to', () => {
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), CHARACTERS[0]!, CHARACTERS[0]!.stats, 12);
+  const enemy = addEnemy(world, 'nightcrawler', 400, 400);
+  enemy.activeEffects.push({ id: 'corrupted', stacks: 1, appliedAt: 0, expiresAt: 5000 });
+  const startX = enemy.x;
+  const startY = enemy.y;
+
+  for (let i = 0; i < 40 && enemy.x === startX && enemy.y === startY; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.ok(enemy.x !== startX || enemy.y !== startY, 'Corrupted should have relocated the enemy within a second');
+});
+
+test('castFreezeCone freezes enemies ahead of a facing-right player, skips ones behind and bosses', () => {
+  const character = freezeThrowTestCharacter();
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 3);
+  const ahead = addEnemy(world, 'nightcrawler', 120, 0);
+  const behind = addEnemy(world, 'nightcrawler', -120, 0);
+  behind.uid = 901;
+  const boss = addEnemy(world, 'the-sire', 100, 10);
+  boss.uid = 902;
+  world.player.facing = 1;
+
+  const frozenCount = castFreezeCone(world);
+
+  assert.equal(frozenCount, 1);
+  assert.ok(ahead.frozenUntil > world.now, 'the enemy ahead of the player should be frozen');
+  assert.equal(behind.frozenUntil, 0, 'an enemy behind the player is outside the cone');
+  assert.equal(boss.frozenUntil, 0, 'bosses are exempt from freezing');
+});
+
+test('castFreezeCone respects its cooldown and caps at maxFreezeTargets', () => {
+  const character = freezeThrowTestCharacter();
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 4);
+  for (let i = 0; i < 9; i += 1) {
+    const enemy = addEnemy(world, 'nightcrawler', 60 + i * 5, i * 4 - 16);
+    enemy.uid = 900 + i;
+  }
+  world.player.facing = 1;
+
+  const firstCast = castFreezeCone(world);
+  assert.equal(firstCast, 7, 'capped at maxFreezeTargets even though 9 enemies are in range');
+
+  const secondCast = castFreezeCone(world);
+  assert.equal(secondCast, 0, 'still on cooldown immediately after the first cast');
+});
+
+test('updateFreezeSelection marks only frozen enemies inside the drag box', () => {
+  const character = freezeThrowTestCharacter();
+  const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 5);
+  const frozenInBox = addEnemy(world, 'nightcrawler', 100, 0);
+  const frozenOutsideBox = addEnemy(world, 'nightcrawler', 400, 400);
+  frozenOutsideBox.uid = 901;
+  const unfrozenInBox = addEnemy(world, 'nightcrawler', 110, 5);
+  unfrozenInBox.uid = 902;
+  frozenInBox.frozenUntil = world.now + 5000;
+  frozenOutsideBox.frozenUntil = world.now + 5000;
+  // unfrozenInBox stays unfrozen -- selection should skip it even though it's inside the box.
+
+  updateFreezeSelection(world, 50, -50, 150, 50);
+
+  assert.equal(frozenInBox.selectedForThrow, true);
+  assert.equal(frozenOutsideBox.selectedForThrow, false);
+  assert.equal(unfrozenInBox.selectedForThrow, false);
+  assert.deepEqual(world.freezeThrow?.selectedUids, [frozenInBox.uid]);
+});
+
+test('throwSelectedFrozenEnemies damages what it hits and grants a kill; a whiff grants no credit', () => {
+  const character = freezeThrowTestCharacter();
+
+  // Hit case: a target enemy sits directly in the thrown enemy's flight path.
+  const hitWorld = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 6);
+  const projectile = addEnemy(hitWorld, 'nightcrawler', 50, 0);
+  const target = addEnemy(hitWorld, 'nightcrawler', 150, 0);
+  target.uid = 901;
+  projectile.frozenUntil = hitWorld.now + 5000;
+  projectile.selectedForThrow = true;
+  hitWorld.freezeThrow!.selectedUids = [projectile.uid];
+  const targetHpBefore = target.hp;
+  const killsBefore = hitWorld.kills;
+
+  const thrownCount = throwSelectedFrozenEnemies(hitWorld, 300, 0);
+  assert.equal(thrownCount, 1);
+  for (let i = 0; i < 60 && hitWorld.enemies.some((e) => e.uid === projectile.uid); i += 1) {
+    stepWorld(hitWorld, 1 / 30, neutralInput);
+  }
+  assert.ok(target.hp < targetHpBefore, 'the struck enemy should take damage');
+  assert.equal(hitWorld.kills, killsBefore + 1, 'a successful throw grants the normal kill reward for the carried enemy');
+  assert.ok(!hitWorld.enemies.some((e) => e.uid === projectile.uid), 'the thrown enemy is resolved, not left lingering');
+
+  // Whiff case: nothing else on the arena for the thrown enemy to hit.
+  const missWorld = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 7);
+  const missProjectile = addEnemy(missWorld, 'nightcrawler', 50, 0);
+  missProjectile.frozenUntil = missWorld.now + 5000;
+  missWorld.freezeThrow!.selectedUids = [missProjectile.uid];
+  const killsBeforeMiss = missWorld.kills;
+
+  throwSelectedFrozenEnemies(missWorld, 900, 900);
+  for (let i = 0; i < 90 && missWorld.enemies.some((e) => e.uid === missProjectile.uid); i += 1) {
+    stepWorld(missWorld, 1 / 30, neutralInput);
+  }
+  assert.equal(missWorld.kills, killsBeforeMiss, 'a whiff grants no kill credit');
+  assert.ok(!missWorld.enemies.some((e) => e.uid === missProjectile.uid), 'the thrown enemy is still removed once it expires');
+});
+
+test('captured units are immune to every player damage path, not just targeting', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 40, 0);
+  unit.hp = unit.maxHp * 0.2;
+  assert.equal(captureEnemy(world, unit), true);
+  unit.hp = unit.maxHp;
+
+  // Nothing hostile is on the arena, so any hp loss over a long stretch of
+  // simulation could only have come from the player's own weapons.
+  const hpBefore = unit.hp;
+  for (let i = 0; i < 240; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(unit.hp, hpBefore, 'a captured unit must not be shot by its own side');
+  assert.equal(unit.dying, false);
+});
+
+test('a mission tracks its objectives and clears the run when the required ones are done', () => {
+  const missionDef: SectorMissionDef = {
+    id: 'test-mission',
+    name: 'Test Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    durationSec: 120,
+    squadCap: 4,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [
+      { id: 'turn', kind: 'capture-units', label: 'Turn 1', targetCount: 1 },
+      { id: 'bonus', kind: 'kill-any', label: 'Down 99', targetCount: 99, optional: true },
+    ],
+    beats: [{ id: 'open', trigger: { kind: 'at-sec', sec: 0 }, line: 'Vee: go.' }],
+    unlock: { kind: 'default' },
+  };
+  const world = createWorld(
+    testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    41,
+    [],
+    1,
+    true,
+    null,
+    { sectorSquadCap: 4, mission: missionDef },
+  );
+
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(missionSnapshot(world)?.lastBeatLine, 'Vee: go.', 'an at-0s beat fires on the first frame');
+  assert.equal(world.outcome, 'running');
+
+  const unit = addEnemy(world, 'nightcrawler', 40, 0);
+  unit.hp = unit.maxHp * 0.2;
+  assert.equal(captureEnemy(world, unit), true);
+  stepWorld(world, 1 / 30, neutralInput);
+
+  const snapshot = missionSnapshot(world)!;
+  assert.equal(snapshot.objectives.find((objective) => objective.id === 'turn')?.done, true);
+  assert.equal(snapshot.objectives.find((objective) => objective.id === 'bonus')?.done, false);
+  assert.equal(world.outcome, 'cleared', 'an unfinished optional objective must not hold the mission open');
+});
+
+test('select-all then order sends every unit walking to the ordered point', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 40, 0);
+  unit.hp = unit.maxHp * 0.2;
+  captureEnemy(world, unit);
+
+  assert.equal(selectAllCommandedUnits(world), 1);
+  assert.equal(orderSelectedUnits(world, -120, -60), 1);
+  assert.equal(unit.orderKind, 'move');
+
+  const distanceBefore = Math.hypot(unit.x - -120, unit.y - -60);
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(Math.hypot(unit.x - -120, unit.y - -60) < distanceBefore, 'the unit should close on its order');
+});
+
+test('a primed enemy survives player damage so the capture window is winnable', () => {
+  const world = sectorWorld();
+  const enemy = addEnemy(world, 'nightcrawler', 30, 0);
+  enemy.hp = enemy.maxHp * 0.2;
+
+  // Standing next to a weakened enemy primes it.
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(enemy.capturableUntil > world.now, 'a weakened enemy in reach should prime');
+
+  // Now let the player's own auto-fire pound it for two full seconds. This
+  // goes through the real weapon path on purpose -- the floor lives in
+  // `damageEnemy`, so anything that reaches it must respect the window.
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(enemy.dying, false, 'a primed enemy must not be killed by player damage');
+  assert.equal(enemy.hp, 1, 'it is floored at 1 hp instead');
+  assert.equal(captureEnemy(world, enemy), true, 'and it is still capturable afterwards');
+});
+
+test('capture priming only applies inside reach, and only in a mission', () => {
+  const world = sectorWorld();
+  const farAway = addEnemy(world, 'nightcrawler', 900, 900);
+  farAway.hp = farAway.maxHp * 0.2;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(farAway.capturableUntil, 0, 'an enemy out of reach is never primed');
+
+  // No sectorCommand -> no priming at all, so ordinary runs are untouched.
+  const plain = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), CHARACTERS[0]!, CHARACTERS[0]!.stats, 71);
+  const ordinary = addEnemy(plain, 'nightcrawler', 30, 0);
+  ordinary.hp = 1;
+  stepWorld(plain, 1 / 30, neutralInput);
+  assert.equal(ordinary.capturableUntil, 0, 'priming must not leak outside Sector Command');
+});
+
+test('the marquee catches units it crosses, not only ones it fully contains', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 100, 0);
+  unit.hp = 1;
+  captureEnemy(world, unit);
+
+  // A box that stops short of the unit's centre but visibly crosses it.
+  updateCommandSelection(world, 40, -30, unit.x - unit.radius - 4, 30);
+  assert.equal(world.sectorCommand?.selectedUids.length, 1, 'an overlapping box should select the unit');
+
+  // A box nowhere near it still selects nothing.
+  updateCommandSelection(world, -400, -400, -300, -300);
+  assert.equal(world.sectorCommand?.selectedUids.length, 0);
+});
+
+test('tapping a unit selects just that unit', () => {
+  const world = sectorWorld();
+  const a = addEnemy(world, 'nightcrawler', 100, 0);
+  a.hp = 1;
+  captureEnemy(world, a);
+  const b = addEnemy(world, 'corner-cutter', -100, 0);
+  b.uid = 950;
+  b.hp = 1;
+  captureEnemy(world, b);
+  selectAllCommandedUnits(world);
+  assert.equal(world.sectorCommand?.selectedUids.length, 2);
+
+  // A tap that misses slightly still lands on the nearer unit.
+  assert.equal(selectCommandedUnitAt(world, a.x + 20, a.y + 10), 1);
+  assert.deepEqual(world.sectorCommand?.selectedUids, [a.uid]);
+  assert.equal(b.selectedForCommand, false, 'tap-select replaces the selection, it does not add');
+
+  // A tap in open ground selects nothing and leaves the selection alone.
+  assert.equal(selectCommandedUnitAt(world, 600, 600), 0);
+  assert.deepEqual(world.sectorCommand?.selectedUids, [a.uid]);
+});
+
+test('running out the clock with objectives outstanding fails the mission and banks nothing', () => {
+  const missionDef: SectorMissionDef = {
+    id: 'test-timeout-mission',
+    name: 'Timeout Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    durationSec: 5,
+    squadCap: 4,
+    briefing: 'b',
+    debrief: 'd',
+    // Never satisfied by standing still, which is exactly the exploit.
+    objectives: [{ id: 'turn', kind: 'capture-units', label: 'Turn 1', targetCount: 1 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  const area = { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 5 };
+  const world = createWorld(
+    area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 43, [], 1, true, null,
+    { sectorSquadCap: 4, mission: missionDef },
+  );
+
+  // Idle until the clock expires.
+  for (let i = 0; i < 200 && world.outcome === 'running'; i += 1) {
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+
+  assert.equal(world.outcome, 'cleared', 'the run still ends through the ordinary timed path');
+  assert.equal(world.mission?.complete, false, 'but the mission is not complete');
+  assert.equal(world.mission?.failed, true, 'it is explicitly failed');
+
+  const result = buildResult(world);
+  assert.equal(result.cleared, true, 'the run result keeps its generic cleared flag');
+  assert.equal(result.missionComplete, false, 'and campaign credit is withheld');
+  assert.equal(result.missionId, 'test-timeout-mission');
+});
+
+/** A world with one beacon, which requires a 'beacon'-tier mission to activate. */
+function beaconWorld(squadCap = 6) {
+  const missionDef: SectorMissionDef = {
+    id: 'test-beacon-mission',
+    name: 'Beacon Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'beacon',
+    durationSec: 600,
+    squadCap,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  const area = { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 };
+  return createWorld(
+    area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 61, [], 1, true, null,
+    {
+      sectorSquadCap: squadCap,
+      mission: missionDef,
+      missionBeacons: [{ beaconId: 'relay-beacon', x: 240, y: 0 }],
+    },
+  );
+}
+
+test('a beacon trickles commanded reinforcements on its own timer', () => {
+  const world = beaconWorld();
+  assert.equal(world.beacons.length, 1);
+  assert.equal(commandedUnits(world).length, 0);
+
+  // Long enough for the staggered first spawn plus one interval.
+  for (let i = 0; i < 60 * 20; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  const units = commandedUnits(world);
+  assert.ok(units.length > 0, 'the beacon should have produced at least one unit');
+  assert.ok(units.every((unit) => unit.commanded), 'beacon output is an ordinary commanded unit');
+});
+
+test('a beacon refills a squad but never inflates it past the cap', () => {
+  const world = beaconWorld(2);
+  for (let i = 0; i < 60 * 90; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(squadCostUsed(world) <= 2, 'the squad cap is absolute, beacons included');
+});
+
+test('a beacon is mortal, and stops reinforcing once broken', () => {
+  const world = beaconWorld();
+  const beacon = world.beacons[0]!;
+  // Park a hostile on top of it.
+  const attacker = addEnemy(world, 'nightcrawler', beacon.x, beacon.y);
+  attacker.damage = 500;
+  for (let i = 0; i < 120 && !beacon.broken; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(beacon.broken, true, 'hostiles standing on a beacon should break it');
+
+  const unitsAfterBreak = commandedUnits(world).length;
+  for (let i = 0; i < 60 * 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(commandedUnits(world).length, unitsAfterBreak, 'a broken beacon produces nothing');
+});
+
+test('beacons stay inert for a stolen-economy mission even if the map places them', () => {
+  const missionDef: SectorMissionDef = {
+    id: 'test-stolen-mission',
+    name: 'Stolen Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    durationSec: 600,
+    squadCap: 6,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  const world = createWorld(
+    { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 },
+    CHARACTERS[0]!, CHARACTERS[0]!.stats, 62, [], 1, true, null,
+    { sectorSquadCap: 6, mission: missionDef, missionBeacons: [{ beaconId: 'relay-beacon', x: 240, y: 0 }] },
+  );
+  assert.equal(world.beacons.length, 0, 'economyTier gates whether beacons exist at all');
+});
+
+test('a commanded unit fights back, and its kills count like the player’s', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', 200, 0);
+  unit.hp = 1;
+  captureEnemy(world, unit);
+  unit.damage = 40;
+
+  const foe = addEnemy(world, 'nightcrawler', 210, 0);
+  foe.uid = 960;
+  const foeHpBefore = foe.hp;
+  const killsBefore = world.kills;
+
+  for (let i = 0; i < 30; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(foe.hp < foeHpBefore || foe.dying, 'a unit in contact should damage the hostile');
+
+  for (let i = 0; i < 60 * 12 && !foe.dying; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(foe.dying, true, 'and eventually kill it');
+  assert.ok(world.kills > killsBefore, 'a unit kill counts toward the run, like the player’s');
+});
+
+test('attack-move breaks off to engage, plain move does not', () => {
+  const world = sectorWorld();
+  const unit = addEnemy(world, 'nightcrawler', -200, 0);
+  unit.hp = 1;
+  captureEnemy(world, unit);
+  unit.damage = 1;
+
+  // A hostile sitting just off the unit's path.
+  const bystander = addEnemy(world, 'nightcrawler', -140, 0);
+  bystander.uid = 961;
+  bystander.hp = bystander.maxHp * 20;
+  bystander.speed = 0;
+
+  selectAllCommandedUnits(world);
+  orderSelectedUnits(world, 300, 0, 'attack-move');
+  assert.equal(unit.orderKind, 'attack-move');
+
+  for (let i = 0; i < 90; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  // It should have stopped at the bystander rather than run past to x=300.
+  assert.ok(unit.x < 0, `attack-move should hold at the contact, got x=${unit.x}`);
+});
+
+test('control groups store and recall a selection, pruning the dead', () => {
+  const world = sectorWorld();
+  const a = addEnemy(world, 'nightcrawler', 100, 0);
+  a.hp = 1;
+  captureEnemy(world, a);
+  const b = addEnemy(world, 'corner-cutter', -100, 0);
+  b.uid = 962;
+  b.hp = 1;
+  captureEnemy(world, b);
+
+  selectAllCommandedUnits(world);
+  assert.equal(assignControlGroup(world, 0), 2);
+
+  selectCommandedUnitByUid(world, a.uid);
+  assert.equal(world.sectorCommand?.selectedUids.length, 1);
+
+  assert.equal(selectControlGroup(world, 0), 2, 'recalling the group restores both');
+
+  // Lose one, and the group forgets it.
+  b.dying = true;
+  assert.equal(selectControlGroup(world, 0), 1, 'a dead unit is pruned from its group');
+  assert.deepEqual(world.sectorCommand?.groups[0], [a.uid]);
+});
+
+/** A fog-enabled mission world. */
+function fogWorld() {
+  const missionDef: SectorMissionDef = {
+    id: 'test-fog-mission',
+    name: 'Fog Mission',
+    factionId: 'afterimage-choir',
+    commanderAllyId: 'vee',
+    mapId: 'sector-map-loading-dock',
+    economyTier: 'stolen',
+    fogOfWar: true,
+    durationSec: 600,
+    squadCap: 6,
+    briefing: 'b',
+    debrief: 'd',
+    objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+    beats: [],
+    unlock: { kind: 'default' },
+  };
+  return createWorld(
+    { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 },
+    CHARACTERS[0]!, CHARACTERS[0]!.stats, 63, [], 1, true, null,
+    { sectorSquadCap: 6, mission: missionDef },
+  );
+}
+
+test('fog starts dark, lights around the player, and remembers where you have been', () => {
+  const world = fogWorld();
+  assert.ok(world.fog, 'the mission asked for fog');
+  assert.equal(fogAt(world, 900, 900), 0, 'far ground starts unseen');
+
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(fogAt(world, world.player.x, world.player.y), 2, 'the player lights their own cell');
+
+  // Walk right, then check the ground behind is remembered but no longer lit.
+  for (let i = 0; i < 200; i += 1) stepWorld(world, 1 / 30, { moveX: 1, moveY: 0, ultimate: false });
+  assert.equal(fogAt(world, 0, 0), 1, 'ground you have left is explored, not visible');
+  assert.equal(fogAt(world, world.player.x, world.player.y), 2);
+});
+
+test('fog is presentation only — it never changes the simulation', () => {
+  const seed = 64;
+  const build = (fogOn: boolean) => {
+    const missionDef: SectorMissionDef = {
+      id: 'test-fog-parity',
+      name: 'Fog Parity',
+      factionId: 'afterimage-choir',
+      commanderAllyId: 'vee',
+      mapId: 'sector-map-loading-dock',
+      economyTier: 'stolen',
+      fogOfWar: fogOn,
+      durationSec: 600,
+      squadCap: 6,
+      briefing: 'b',
+      debrief: 'd',
+      objectives: [{ id: 'survive', kind: 'survive-sec', label: 'Survive', targetCount: 599 }],
+      beats: [],
+      unlock: { kind: 'default' },
+    };
+    return createWorld(
+      { ...testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), durationSec: 600 },
+      CHARACTERS[0]!, CHARACTERS[0]!.stats, seed, [], 1, true, null,
+      { sectorSquadCap: 6, mission: missionDef },
+    );
+  };
+  const foggy = build(true);
+  const clear = build(false);
+  assert.ok(foggy.fog);
+  assert.equal(clear.fog, null);
+
+  for (let i = 0; i < 600; i += 1) {
+    stepWorld(foggy, 1 / 30, { moveX: 1, moveY: 0, ultimate: false });
+    stepWorld(clear, 1 / 30, { moveX: 1, moveY: 0, ultimate: false });
+  }
+
+  // Same seed, same inputs: fog must not have perturbed anything the sim does.
+  assert.equal(foggy.kills, clear.kills, 'fog changed the kill count');
+  assert.equal(foggy.enemies.length, clear.enemies.length, 'fog changed enemy spawning');
+  assert.equal(Math.round(foggy.player.x), Math.round(clear.player.x), 'fog changed player movement');
+  assert.equal(Math.round(foggy.player.hp), Math.round(clear.player.hp), 'fog changed incoming damage');
+});
+
+test('crazy internet culture and canvas weapons are defined, fire properly, and generate projectiles/effects', () => {
+  const crazyIds = [
+    'nyan-stream',
+    'popup-ad-storm',
+    'dialup-handshake',
+    'dom-tree-slicer',
+    'rickroll-resonance',
+    'bsod-annihilator',
+  ] as const;
+
+  for (const id of crazyIds) {
+    const def = WEAPONS_BY_ID[id];
+    assert.ok(def, `weapon ${id} must exist in WEAPONS_BY_ID`);
+    assert.ok(def.name.length > 0, `weapon ${id} must have a name`);
+    assert.ok(def.description.length > 0, `weapon ${id} must have a description`);
+    assert.ok(def.damage > 0, `weapon ${id} must have positive damage`);
+  }
+
+  const area = {
+    ...AREAS[0]!,
+    durationSec: 120,
+    waves: [],
+  };
+
+  for (const id of crazyIds) {
+    const world = createWorld(area, testCharacter(id), CHARACTERS[0]!.stats, 777);
+    assert.equal(world.weapons[0]?.def.id, id);
+    if (world.weapons[0]) world.weapons[0].readyAt = 0;
+
+    let fired = false;
+    // Step world to allow weapon to trigger
+    for (let s = 0; s < 30; s += 1) {
+      stepWorld(world, 1 / 30, neutralInput);
+      if (world.projectiles.length > 0 || world.effects.length > 0) {
+        fired = true;
+      }
+    }
+
+    assert.ok(fired, `weapon ${id} should spawn projectiles or effects upon firing`);
+  }
+});
+

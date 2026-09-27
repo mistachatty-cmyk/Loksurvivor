@@ -2,6 +2,8 @@
  * Archive: rescued crew, discovered locations, and everything still locked.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { ACHIEVEMENTS } from '@/game/data/achievements';
+import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { CHARACTER_EPISODES } from '@/game/data/episodes';
@@ -16,24 +18,95 @@ import {
 import { ALLIES, DISCOVERIES, allyRig } from '@/game/data/progression';
 import { STATUS_EFFECTS } from '@/game/data/statusEffects';
 import { WorkshopOverview } from './WorkshopPanel';
-import { describeUnlock, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
+import {
+  BASE_CARD_CREDITS_PER_LOOT_BOX,
+  LOKPET_CARD_PACK_COST,
+  characterLevelProgress,
+  describeUnlock,
+  episodeProgress,
+  episodeStatus,
+  playerLevelProgress,
+  useMeta,
+} from '@/game/state/metaStore';
+import { characterRankTitle } from '@/game/data/characterMastery';
+import { CHANGELOG, updateNumber } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
+import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
+import { LockDeckCollection } from './LockDeckCollection';
 import { ScreenLayout } from './ScreenLayout';
+import {
+  exportLokPetAsPortableCard,
+  importLokCardExport,
+  serializeLokCardExport,
+  VISITING_CARD_PALETTE,
+  VISITING_CARD_SILHOUETTE,
+} from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, type LucideIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Wrench, type LucideIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface ArchivePanelProps {
   onBack: () => void;
   focusVariantId?: string;
 }
 
+const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }> = {
+  bronze: { border: 'border-l-amber-700', label: 'text-amber-500' },
+  silver: { border: 'border-l-slate-300', label: 'text-slate-300' },
+  gold: { border: 'border-l-yellow-400', label: 'text-yellow-300' },
+  legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
+};
+
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
-  const { meta, resetProgress } = useMeta();
+  const { meta, resetProgress, claimAchievement, importVisitingLokCard, buyLokPetCardPack } = useMeta();
   const isListView = meta.uiDensity === 'list';
   const [showHistory, setShowHistory] = useState(false);
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
+  const [exchangePetId, setExchangePetId] = useState('');
+  const [exchangeOutput, setExchangeOutput] = useState('');
+  const [importInput, setImportInput] = useState('');
+  const [exchangeMessage, setExchangeMessage] = useState('');
+
+  const generateCardExport = () => {
+    const pet = meta.savedLokPets.find((candidate) => candidate.id === exchangePetId);
+    if (!pet) {
+      setExchangeMessage('Pick a kennel companion to export first.');
+      return;
+    }
+    const payload = exportLokPetAsPortableCard({
+      id: pet.id,
+      name: pet.roll.name,
+      variantId: pet.roll.variantId,
+      family: pet.roll.family,
+      rarity: pet.roll.rarity,
+      description: pet.roll.description,
+    });
+    setExchangeOutput(serializeLokCardExport(payload));
+    setExchangeMessage(`${pet.roll.name} is ready to hand to another LOK game.`);
+  };
+
+  const copyCardExport = async () => {
+    if (!exchangeOutput) return;
+    try {
+      await navigator.clipboard.writeText(exchangeOutput);
+      setExchangeMessage('Copied -- paste it into the receiving game.');
+    } catch {
+      setExchangeMessage('Copy failed; select the text and copy it manually.');
+    }
+  };
+
+  const importCard = () => {
+    const result = importLokCardExport(importInput);
+    if (!result.success) {
+      setExchangeMessage(result.error);
+      return;
+    }
+    importVisitingLokCard(result.card);
+    setImportInput('');
+    setExchangeMessage(`${result.card.name} arrived from ${result.card.sourceGame}.`);
+  };
   const formatHistoryDate = (timestamp: number) => {
     if (!Number.isFinite(timestamp) || timestamp <= 0 || timestamp > 8640000000000000) return 'Earlier run';
     return new Date(timestamp).toLocaleDateString();
@@ -167,10 +240,23 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
     }
   ];
 
+  const completedAchievementCount = ACHIEVEMENTS.filter((achievement) => achievement.isComplete(meta)).length;
+  const ownedCardCount = CARD_MANIFESTS.filter((card) => isCardOwned(card, meta)).length;
+  const playerLevel = playerLevelProgress(meta.totalLevelUps);
+  const playerLevelPct = (playerLevel.levelUpsIntoLevel / Math.max(1, playerLevel.levelUpsToNext)) * 100;
+  // Picked once per mount, not per render -- see data/creditRotation.ts.
+  const updatesCredit = useMemo(() => pickCreditName(), []);
+
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
+    { key: 'achievements', label: 'Achievements', icon: Trophy, count: completedAchievementCount, total: ACHIEVEMENTS.length },
+    { key: 'cards', label: 'Cards', icon: CreditCard, count: ownedCardCount, total: CARD_MANIFESTS.length },
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
     { key: 'history', label: 'History', icon: History, count: meta.lokPetHistory.length },
+    { key: 'universe', label: 'Universe', icon: Globe, count: meta.visitingLokCards.length },
+    { key: 'stats', label: 'Stats', icon: TrendingUp },
+    { key: 'mastery', label: 'Mastery', icon: Award },
+    { key: 'updates', label: 'Updates', icon: Megaphone, count: CHANGELOG.length },
     ...sections.map((section) => ({ key: section.title, label: section.title, icon: section.icon, count: section.count, total: section.total })),
   ];
 
@@ -227,6 +313,121 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
         </motion.section>
       )}
 
+      {activeChapter === 'achievements' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-achievements"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Trophy className="h-5 w-5 text-yellow-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Achievements</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Lifetime milestones, tallied automatically</p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">
+              {completedAchievementCount} / {ACHIEVEMENTS.length}
+            </span>
+          </div>
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {ACHIEVEMENTS.map((achievement) => {
+              const complete = achievement.isComplete(meta);
+              const progress = complete ? 1 : Math.max(0, Math.min(1, achievement.progress?.(meta) ?? 0));
+              const claimed = meta.claimedAchievementIds.includes(achievement.id);
+              const claimable = complete && Boolean(achievement.reward) && !claimed;
+              const tierStyle = ACHIEVEMENT_TIER_STYLES[achievement.tier];
+              return (
+                <article
+                  key={achievement.id}
+                  className={`flex flex-col gap-2 border border-l-4 p-4 ${
+                    complete ? `border-border ${tierStyle.border} bg-card text-white` : 'border-border/50 border-l-border/50 bg-card/30 text-muted-foreground'
+                  }`}
+                  data-testid={`card-achievement-${achievement.id}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold uppercase tracking-wide text-sm">{achievement.name}</p>
+                    <span className={`shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest ${tierStyle.label}`}>
+                      {achievement.tier}
+                    </span>
+                  </div>
+                  <p className={`text-xs ${complete ? 'text-muted-foreground' : 'opacity-70'}`}>{achievement.description}</p>
+                  {!complete && (
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-primary/70"
+                        style={{ width: `${Math.round(progress * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                  {achievement.reward && (
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                        Reward: {achievement.reward.amount} {achievement.reward.kind === 'cred' ? 'Cred' : achievement.reward.kind === 'lootTokens' ? 'Loot Tokens' : 'Card Credits'}
+                        {claimed ? ' · claimed' : ''}
+                      </span>
+                      {claimable && (
+                        <button
+                          type="button"
+                          onClick={() => claimAchievement(achievement.id)}
+                          className="inline-flex shrink-0 items-center gap-1 border border-yellow-300/50 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-yellow-200 transition-colors hover:border-yellow-200 hover:bg-yellow-300/10"
+                          data-testid={`button-claim-achievement-${achievement.id}`}
+                        >
+                          <Gift className="h-3 w-3" />
+                          Claim
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'cards' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-cards"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <CreditCard className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Card Binder</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Every operative, bestiary entry, crew member and LokPet as a portable Lok Ecosystem card
+              </p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">
+              {ownedCardCount} / {CARD_MANIFESTS.length}
+            </span>
+          </div>
+          <section className="mb-6 border border-sky-300/35 bg-sky-300/5 p-4" aria-labelledby="lokpet-card-shop-heading" data-testid="section-lokpet-card-shop">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 id="lokpet-card-shop-heading" className="font-black uppercase text-sky-100">Lock Pack Counter</h3>
+                <p className="text-xs text-muted-foreground">LokPack shortcut · two stackable passive LokPet cards. Visit the hideout counter for every pack type and your deck; companion DigiScope records live in the LokPet Shop.</p>
+                <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-sky-200">Earn {BASE_CARD_CREDITS_PER_LOOT_BOX} Card Credits per blue box. Collector ranks earn more.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-sm font-bold text-sky-200">{meta.cardCredits} CC</span>
+                <button
+                  type="button"
+                  onClick={buyLokPetCardPack}
+                  disabled={meta.cardCredits < LOKPET_CARD_PACK_COST}
+                  className="inline-flex items-center gap-2 border border-sky-300/50 bg-sky-300/10 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100 transition-colors hover:bg-sky-300/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  data-testid="button-buy-lokpet-card-pack"
+                >
+                  <Gift className="h-3.5 w-3.5" /> Open · {LOKPET_CARD_PACK_COST} CC
+                </button>
+              </div>
+            </div>
+          </section>
+          <LockDeckCollection meta={meta} listView={isListView} />
+        </motion.section>
+      )}
+
       {activeChapter === 'lokpets' && (
         <motion.section
           initial={{ opacity: 0, y: 20 }}
@@ -262,7 +463,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className={`truncate text-sm font-black uppercase tracking-wide ${found ? 'text-white' : 'text-muted-foreground'}`}>
-                            {found ? variant.name : 'Unknown signal'}
+                            {found ? variant.name : 'Unknown creature'}
                           </h3>
                           <p className={`mt-1 text-[10px] font-bold uppercase tracking-widest ${found ? 'text-pink-300' : 'text-muted-foreground/60'}`}>
                             {found ? `${variant.family} · ${LOKPET_SILHOUETTE_LABELS[variant.silhouette]}` : 'Undiscovered LokPet'}
@@ -314,7 +515,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                     </div>
                   ) : (
                     <p className="mt-4 border-t border-white/10 pt-3 text-xs italic text-muted-foreground/60">
-                      Open a blue loot box during a run to catalogue this signal.
+                      Open a blue loot box during a run to catalogue this trail.
                     </p>
                   )}
                 </article>
@@ -358,7 +559,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
             <div className="mt-3 space-y-3" data-testid="lokpet-history-list">
               {meta.lokPetHistory.length === 0 ? (
                 <div className="border border-dashed border-white/15 bg-black/20 p-5 text-center">
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">No signals logged yet</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">No echoes logged yet</p>
                   <p className="mt-1 text-xs text-muted-foreground/70">Generated LokPets will appear here after the run ends.</p>
                 </div>
               ) : (
@@ -423,6 +624,282 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               )}
             </div>
           )}
+        </motion.section>
+      )}
+
+      {activeChapter === 'universe' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-universe-exchange"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Globe className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">LOK Universe Exchange</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Cosmetic collection identity, shared with the rest of G-Six</p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">{meta.visitingLokCards.length} visiting</span>
+          </div>
+
+          <p className="mb-4 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            A kennel companion can leave this game as a portable <code className="text-white/80">lok.card-exchange</code> file
+            another G-Six game can read, and a card from another LOK game can arrive here the same way. Only flavor crosses
+            over -- name, family, and rarity label. An imported card never joins the kennel and never fights in a run.
+          </p>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="border border-border bg-card p-4">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Send a companion out</p>
+              {meta.savedLokPets.length === 0 ? (
+                <p className="text-xs italic text-muted-foreground/70">Capture a companion from a blue loot box first.</p>
+              ) : (
+                <>
+                  <select
+                    value={exchangePetId}
+                    onChange={(event) => { setExchangePetId(event.target.value); setExchangeOutput(''); }}
+                    className="w-full border border-border bg-black/30 px-2 py-2 text-xs text-white"
+                  >
+                    <option value="">Choose a kennel companion…</option>
+                    {meta.savedLokPets.map((pet) => (
+                      <option key={pet.id} value={pet.id}>{pet.roll.name} · {pet.roll.rarityLabel}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={generateCardExport}
+                    disabled={!exchangePetId}
+                    className="mt-3 border border-sky-300/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-200 hover:bg-sky-300/10 disabled:opacity-40"
+                  >
+                    Generate export
+                  </button>
+                  {exchangeOutput && (
+                    <>
+                      <textarea
+                        readOnly
+                        value={exchangeOutput}
+                        onFocus={(event) => event.currentTarget.select()}
+                        className="mt-3 h-32 w-full border border-border bg-black/40 p-2 font-mono text-[10px] text-white/80"
+                      />
+                      <button
+                        type="button"
+                        onClick={copyCardExport}
+                        className="mt-2 border border-border px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary/50"
+                      >
+                        Copy to clipboard
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="border border-border bg-card p-4">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Bring one in</p>
+              <textarea
+                value={importInput}
+                onChange={(event) => setImportInput(event.target.value)}
+                placeholder="Paste a LOK card export here…"
+                className="h-32 w-full border border-border bg-black/40 p-2 font-mono text-[10px] text-white/80"
+              />
+              <button
+                type="button"
+                onClick={importCard}
+                disabled={!importInput.trim()}
+                className="mt-3 border border-sky-300/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sky-200 transition-colors hover:border-sky-200 hover:bg-sky-300/10 disabled:opacity-40"
+              >
+                Import card
+              </button>
+            </div>
+          </div>
+
+          {exchangeMessage && (
+            <p className="mt-4 border border-border bg-black/20 px-3 py-2 text-[10px] uppercase tracking-widest text-sky-200" aria-live="polite">
+              {exchangeMessage}
+            </p>
+          )}
+
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Visiting cards</p>
+            {meta.visitingLokCards.length === 0 ? (
+              <p className="text-xs italic text-muted-foreground/70">No visiting cards yet. Import one from another LOK game above.</p>
+            ) : (
+              <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-3'}`}>
+                {meta.visitingLokCards.map((card) => (
+                  <article key={card.instanceId} className="flex items-center gap-3 border border-l-4 border-border border-l-sky-300 bg-card p-3" data-testid={`card-visiting-${card.instanceId}`}>
+                    <LokPetIcon silhouette={VISITING_CARD_SILHOUETTE} palette={VISITING_CARD_PALETTE} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-black uppercase tracking-wide text-white">{card.name}</p>
+                      <p className="truncate text-[9px] font-bold uppercase tracking-widest text-sky-300">from {card.sourceGame} · {card.rarity}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'stats' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-stats"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <TrendingUp className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">All-Time Stats</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Everything you've done, across every run, forever</p>
+            </div>
+          </div>
+
+          <div className="mb-6 border border-l-4 border-border border-l-sky-300 bg-card p-5" data-testid="card-player-level">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-sky-300">Player Level</p>
+                <p className="text-3xl font-black text-white">
+                  <AnimatedNumber value={playerLevel.level} data-testid="text-archive-player-level" />
+                </p>
+              </div>
+              <Zap className="h-8 w-8 text-sky-300" />
+            </div>
+            <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-black/50">
+              <div
+                className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                style={{ width: `${playerLevelPct}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+              {playerLevel.levelUpsIntoLevel} / {playerLevel.levelUpsToNext} level-ups to next
+            </p>
+          </div>
+
+          <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {([
+              { label: 'Total Level-Ups', value: meta.totalLevelUps, icon: Zap },
+              { label: 'Enemies Defeated', value: meta.totalKills, icon: Skull },
+              { label: 'Runs Played', value: meta.totalRuns, icon: Swords },
+              { label: 'Best Survival', value: Math.round(meta.bestSurvivalSec), suffix: 's', icon: Clock },
+              { label: 'Hideout Visits', value: meta.hideoutVisitCount, icon: DoorOpen },
+              { label: 'Endless Depth Record', value: meta.endlessRecordDepth, icon: Layers },
+              { label: 'Endless Distance Record', value: Math.round(meta.endlessRecordDistancePx), suffix: 'px', icon: Milestone },
+            ] as { label: string; value: number; suffix?: string; icon: LucideIcon }[]).map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="flex items-center gap-3 border border-border bg-card p-4"
+                  data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <Icon className="h-5 w-5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{stat.label}</p>
+                    <p className="text-lg font-black text-white">
+                      <AnimatedNumber value={stat.value} suffix={stat.suffix} />
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'mastery' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-mastery"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Award className="h-5 w-5 text-sky-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Mastery</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Every operative's own persistent level, from playing them specifically</p>
+            </div>
+          </div>
+
+          <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+            {[...CHARACTERS]
+              .map((character) => ({ character, progress: characterLevelProgress(meta, character.id) }))
+              .sort((a, b) => b.progress.level - a.progress.level || b.progress.levelUpsIntoLevel - a.progress.levelUpsIntoLevel)
+              .map(({ character, progress }) => {
+                const rank = characterRankTitle(progress.level);
+                const pct = (progress.levelUpsIntoLevel / Math.max(1, progress.levelUpsToNext)) * 100;
+                return (
+                  <div
+                    key={character.id}
+                    className="flex items-center gap-3 border border-border bg-card p-3"
+                    data-testid={`card-character-level-${character.id}`}
+                  >
+                    <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={40} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-xs font-black uppercase text-white">{character.name}</p>
+                        <span className="shrink-0 font-mono text-[9px] font-bold uppercase tracking-wider text-sky-300">
+                          Lv {progress.level} · {rank}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-black/50">
+                        <div
+                          className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </motion.section>
+      )}
+
+      {activeChapter === 'updates' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-updates"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Megaphone className="h-5 w-5 text-cyan-300" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Updates</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                {CHANGELOG.length} updates and counting, straight from {updatesCredit}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {[...CHANGELOG].reverse().map((entry) => (
+              <div
+                key={entry.version}
+                className={`border p-4 ${entry.kind === 'hotfix' ? 'border-amber-400/40 bg-amber-400/5' : 'border-border bg-card'}`}
+                data-testid={`archive-update-${entry.version}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest ${
+                      entry.kind === 'hotfix'
+                        ? 'border-amber-400/60 bg-amber-400/15 text-amber-300'
+                        : 'border-cyan-300/60 bg-cyan-300/15 text-cyan-200'
+                    }`}
+                  >
+                    {entry.kind === 'hotfix' ? <Wrench className="h-2.5 w-2.5" /> : <Megaphone className="h-2.5 w-2.5" />}
+                    {entry.kind === 'hotfix' ? 'Hotfix' : 'Update'} #{updateNumber(entry)}
+                  </span>
+                  <span className="font-mono text-[9px] text-muted-foreground">v{entry.version} · {entry.date}</span>
+                </div>
+                <h3 className="mt-1.5 text-sm font-black uppercase text-white">{entry.title}</h3>
+                <ul className="mt-1.5 space-y-1">
+                  {entry.body.map((line) => (
+                    <li key={line} className="text-xs leading-snug text-muted-foreground">{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         </motion.section>
       )}
 

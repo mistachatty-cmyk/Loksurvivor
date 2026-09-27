@@ -74,6 +74,7 @@ export function RigPortrait({
   return (
     <canvas
       ref={canvasRef}
+      data-character-portrait
       style={{ width: size, height: size }}
       className={className}
       aria-hidden="true"

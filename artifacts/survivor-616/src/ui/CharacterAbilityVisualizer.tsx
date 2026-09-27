@@ -185,6 +185,19 @@ function WeaponPatternDemo({ kind, color, count }: { kind: WeaponKind; color: st
           />
         </div>
       );
+    case 'glitch':
+      return (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <motion.div
+            className="h-12 w-14 border-2 border-dashed"
+            style={{ borderColor: color, backgroundColor: `${color}22` }}
+            animate={{ scale: [0.85, 1.1, 0.95], opacity: [0.6, 1, 0.6] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <div className="h-2 w-2 bg-white -mt-1 -ml-1" />
+          </motion.div>
+        </div>
+      );
     default:
       return (
         <motion.div

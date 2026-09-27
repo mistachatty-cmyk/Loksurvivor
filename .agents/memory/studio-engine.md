@@ -13,7 +13,7 @@ Two contexts fight over the output device, and mobile Safari suspends one of
 them without warning — the symptom is "audio works on desktop, one of the two
 sources is silent on iPhone", which is miserable to diagnose after the fact.
 If the player has not unlocked a context yet, Tone creates one and the player
-adopts *that*. Either way there is exactly one.
+adopts _that_. Either way there is exactly one.
 
 The same rule is why `importAudioFile` takes a context instead of constructing
 one: a context per dropped file leaks one per import.
@@ -31,7 +31,7 @@ for the rest of the session.
 
 ## `Tone.Draw`, and why beat position comes from ticks
 
-Transport callbacks fire *ahead* of real time; that lookahead is what makes
+Transport callbacks fire _ahead_ of real time; that lookahead is what makes
 scheduling sample-accurate. Publishing a visual frame straight from one runs
 the game's beat reactions ~100ms early, which reads as mushy rather than as
 "early" — you feel it without being able to name it. `Tone.getDraw().schedule`
@@ -52,15 +52,35 @@ serialises, exports as `.616song`, and unit-tests under `node --test` with no
 browser. `tracks.ts` owns every node and reconciles against the model.
 
 Consequences worth remembering:
+
 - `TrackGraph.sync()` reuses nodes rather than rebuilding. Rebuilding on every
   fader frame clicks audibly.
-- Effects are keyed by effect *instance* id, so two of the same effect stay
+- Effects are keyed by effect _instance_ id, so two of the same effect stay
   distinct and a parameter move does not rewire the graph.
 - Gain and pan changes ramp (20ms). Setting them instantly clicks.
 - Decoded buffers are **not** serialised — a project references the player's
-  files, it does not carry them. A project reloaded in a fresh session has
-  clips whose buffers are gone; the graph skips them so the rest still plays.
-  If that ever needs to change, the fix is re-import, not persisting audio.
+  files, it does not carry Web Audio objects or inline media bytes. The owned
+  source file is now retained in the shared content-addressed IndexedDB media
+  store and decoded back into the runtime map when Studio opens. If a source is
+  missing or no longer decodes, the graph skips it while the rest of the
+  project remains editable.
+
+## Studio persistence is local and content-addressed
+
+`audio/localMediaDatabase.ts` owns the historical `survivor616-soundtrack`
+database. Version 2 adds shared media-assets and Studio-project stores without
+renaming the database, so existing version-1 soundtrack files migrate in place.
+
+`audio/localMediaStore.ts` hashes owned media with SHA-256. Soundtrack records
+and Studio workspace records reference the same asset id, so moving the same
+bytes between those systems does not require another stored Blob. The active
+Studio workspace autosaves after edits and restores both its plain project
+model and its imported clip library on refresh.
+
+The old `survivor616.studio.v1` localStorage document remains a small synchronous
+recovery/migration fallback. It is not the authoritative media store and cannot
+carry audio. A quota or IndexedDB failure must leave the current session usable,
+show a visible session-only warning, and recommend exporting a backup.
 
 ## Never hard-wire a connection
 
@@ -76,11 +96,12 @@ to playback code.
 ## Instrument tracks are ordinary tracks
 
 A track plays a synth instead of audio clips when `instrumentId` is set, and
-that is the *only* difference. One mixer, one insert chain, one solo rule and
+that is the _only_ difference. One mixer, one insert chain, one solo rule and
 one export path cover both, and the piano roll simply appears for tracks that
 have an instrument.
 
 Two details that bite:
+
 - `syncVoice()` rebuilds the voice only when the instrument actually changes.
   Disposing and recreating a PolySynth cuts every note currently sounding.
 - The sanitiser must not write `instrumentId: undefined`. `JSON.stringify`
@@ -144,7 +165,7 @@ that shape: it fetches and executes code from another origin.
 So it is off by default (`meta.studioPluginsEnabled`), the SDK is fetched on
 demand rather than added to `package.json`, no plugin URL ships as a default,
 the URL must be `https:`, and the UI says plainly what loading one means. That
-setting defaults to false on every load *including upgrades* — remote code is
+setting defaults to false on every load _including upgrades_ — remote code is
 never enabled by shipping a new version.
 
 `wam/host.ts` is deliberately the entire blast radius. If plugin support is

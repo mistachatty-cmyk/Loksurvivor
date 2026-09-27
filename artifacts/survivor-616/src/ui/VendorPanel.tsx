@@ -1,23 +1,31 @@
 import { Fragment, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Anchor,
   ArrowUpRight,
   BadgeDollarSign,
   Box,
   Check,
+  Cpu,
   Crosshair,
+  Expand,
   EyeOff,
+  FlipHorizontal2,
   FlipVertical2,
+  Flame,
   Footprints,
   Gauge,
   Gem,
   Ghost,
+  Globe,
   HardHat,
   Hand,
   KeyRound,
   Lock,
   LockKeyhole,
+  Magnet,
   Maximize2,
+  Moon,
   PackageCheck,
   Palette,
   Radar,
@@ -28,6 +36,7 @@ import {
   Target,
   Timer,
   TrendingUp,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -61,6 +70,7 @@ const QUARTERMASTER_QUIPS = [
 
 export interface VendorPanelProps {
   onBack: () => void;
+  onOpenThreatMatrix?: () => void;
 }
 
 type CategoryConfig = {
@@ -115,6 +125,7 @@ const STAT_LABELS: Record<string, string> = {
   power: 'global damage',
   armor: 'contact resistance',
   magnet: 'pickup range',
+  crit: 'crit chance',
 };
 
 const ITEM_ICONS: Record<string, LucideIcon> = {
@@ -143,9 +154,23 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'ghost-cloak-full': EyeOff,
   'invert-world': FlipVertical2,
   'invert-palette': Palette,
+  'threat-matrix-console': Cpu,
+  'universal-incursion': Globe,
+  'corner-magnet': Magnet,
+  'tidal-anchor': Anchor,
+  'static-inverter': Zap,
+  'wide-guard': Expand,
+  'fence-connections': BadgeDollarSign,
+  'contract-glass-city': Flame,
+  'mirror-mode': FlipHorizontal2,
+  'overclock-rig': Flame,
+  'night-vision': Moon,
+  'relic-tumbler-pick': KeyRound,
+  'relic-trigger-spring': Gauge,
+  'relic-blast-lens': Expand,
 };
 
-/** Short, hand-written labels for "ability" items whose real effect can't be summarized by a single stat/utility delta. */
+/** Short, hand-written labels for vendor items whose real effect can't be summarized by a single stat/utility delta -- mostly "ability" items, but also any relic/stat item using a `mult` effect the generic summary below doesn't read. */
 const ABILITY_EFFECT_LABELS: Record<string, string> = {
   'minimap-street-ears': 'Minimap tier 1 — enemy blips',
   'minimap-loot-sense': 'Minimap tier 2 — loot blips',
@@ -158,6 +183,17 @@ const ABILITY_EFFECT_LABELS: Record<string, string> = {
   'ghost-cloak-full': 'Full invisibility · +5% stealth dmg',
   'invert-world': 'Unlocks a Settings toggle',
   'invert-palette': 'Unlocks a Settings toggle',
+  'threat-matrix-console': 'Unlocks Threat Matrix screen',
+  'universal-incursion': 'Enemies invade all maps',
+  'corner-magnet': '3x corner critical window',
+  'tidal-anchor': '-75% bubble surge displacement',
+  'static-inverter': 'Dust mite lightning recharges shields',
+  'wide-guard': '+5% weapon area / stack',
+  'mirror-mode': 'Unlocks a Settings toggle',
+  'overclock-rig': '+4% damage · -5% cooldown / stack',
+  'night-vision': 'Night tint cut by 75%',
+  'relic-trigger-spring': '-6% weapon cooldown / stack',
+  'relic-blast-lens': '+8% weapon area / stack',
 };
 
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
@@ -183,7 +219,7 @@ function effectLabel(item: VendorItemDef): string {
   }
   if (effect.kind === 'stat') {
     const amount = effect.add ?? 0;
-    const isPercent = effect.stat === 'power' || effect.stat === 'armor';
+    const isPercent = effect.stat === 'power' || effect.stat === 'armor' || effect.stat === 'crit';
     const displayAmount = isPercent ? `${Math.round(amount * 100)}%` : `${amount}`;
     return `+${displayAmount} ${STAT_LABELS[effect.stat] ?? effect.stat} / stack`;
   }
@@ -266,6 +302,7 @@ function ItemDetail({
   purchases,
   onBuy,
   onRefund,
+  onOpenThreatMatrix,
   inline = false,
 }: {
   item: VendorItemDef;
@@ -273,6 +310,7 @@ function ItemDetail({
   purchases: Record<string, number>;
   onBuy: (id: string) => void;
   onRefund: (id: string) => void;
+  onOpenThreatMatrix?: () => void;
   inline?: boolean;
 }) {
   const owned = ownedStacks(item, purchases);
@@ -350,12 +388,22 @@ function ItemDetail({
           <span>Refund</span>
           <kbd className="border border-current px-1 text-[9px]">R</kbd>
         </button>
+        {item.id === 'threat-matrix-console' && owned > 0 && onOpenThreatMatrix && (
+          <button
+            type="button"
+            onClick={onOpenThreatMatrix}
+            className="flex items-center justify-center gap-2 whitespace-nowrap border border-cyan-400 bg-cyan-950/60 px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-cyan-300 transition-colors hover:bg-cyan-900/80 shadow-md"
+          >
+            <Cpu className="h-4 w-4 shrink-0" />
+            <span>Open Threat Matrix</span>
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-export function VendorPanel({ onBack }: VendorPanelProps) {
+export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
   const { meta, buyVendorItem, refundVendorItem, refundAllVendorItems } = useMeta();
   const [activeCategory, setActiveCategory] = useState<VendorItemCategory>('stat');
   const [selectedId, setSelectedId] = useState<string>(
@@ -507,7 +555,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
           {selectedItem &&
             (layout === 'rail' ? (
               <div className="grid gap-4 lg:grid-cols-[16rem_1fr]" data-testid="section-vendor-grid">
-                <ItemDetail item={selectedItem} meta={meta} purchases={meta.vendorPurchases} onBuy={handleBuy} onRefund={refundVendorItem} />
+                <ItemDetail item={selectedItem} meta={meta} purchases={meta.vendorPurchases} onBuy={handleBuy} onRefund={refundVendorItem} onOpenThreatMatrix={onOpenThreatMatrix} />
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {itemsInCategory.map((item) => (
                     <ItemTile
@@ -540,6 +588,7 @@ export function VendorPanel({ onBack }: VendorPanelProps) {
                           purchases={meta.vendorPurchases}
                           onBuy={handleBuy}
                           onRefund={refundVendorItem}
+                          onOpenThreatMatrix={onOpenThreatMatrix}
                           inline
                         />
                       </div>

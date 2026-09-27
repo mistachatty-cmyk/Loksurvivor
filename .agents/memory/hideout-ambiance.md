@@ -35,6 +35,46 @@ established, working pattern here, and rain's `100%` width was the one-off
 mistake. Any new `.hideout-weather-*` variant should copy snow's fixed-size
 approach, not rain's original one.
 
+## The ambient decoration layer must be bounded to one viewport, not `inset-0` against the page
+
+**Bug (fixed, 2026-09-20):** `HubScreen.tsx`'s `.hideout-ambient` wrapper (the
+div holding `.hideout-sky-glow`, the clouds, the fliers, the weather
+particles, and `.hideout-home-art`) was `absolute inset-0` inside the
+screen's outermost `motion.div`, which is `min-h-[100dvh]` -- a *minimum*,
+not a fixed height, so its real rendered height grows to fit all of
+`HubScreen`'s content (session stats, generators, room nav, the scene panel,
+rumor board, First Night board, Contract Board, the feature grid, crew
+list...), easily 2500-4700px depending on viewport width and unlocked
+content. `inset-0` sized the ambient layer to match, and every child inside
+it is positioned with **percentages tuned for a viewport-height box**
+(`.hideout-home-art { bottom: 13% }`, `.hideout-cloud-one { top: 16% }`,
+`.hideout-sky-glow { inset: 0 0 35% }`, etc.) -- against a page several
+times taller than one screen, those percentages placed the decorations
+scattered down the middle of the page instead of anchored near the header,
+most visibly `.hideout-home-art`'s bordered window-grid icon floating over
+totally unrelated content (the Archive/Settings/Customization Shop row) a
+full screen or more below the header it's meant to sit behind. Same root
+cause as the rain-tile bug above (a size meant to track one specific box
+instead tracking a much larger container) but on the container's height
+this time, not a background-image's tile size.
+
+**Fix:** the ambient wrapper is `absolute inset-x-0 top-0 h-[100dvh]`
+instead of `inset-0` -- anchored to the top of the page, exactly one
+viewport tall, same as `.hideout-ambient`'s own percentage math already
+assumed. It scrolls away with the page past the first screen (it's
+`absolute`, not `fixed`) rather than following the user down, which is
+correct here: this is header-area atmosphere, not a persistent background.
+The grayscale photo backdrop and its two solid/gradient fade overlays
+(siblings of `.hideout-ambient`, still `absolute inset-0`) were left alone
+-- they're a uniform, low-opacity wash across the whole page and don't use
+any percentage-of-container math, so they were never part of this bug.
+
+**Any future addition to `.hideout-ambient` must keep this in mind:** a new
+percentage-positioned decoration only reads correctly if this wrapper stays
+bounded to a fixed, viewport-scale height. Don't revert it to `inset-0` to
+"cover more of the page" without re-tuning every child's percentages for
+whatever the new height actually is.
+
 ## Roadmap notes -- not yet built, recorded so the vision survives to when it is
 
 The rest of this doc is **design intent only**. Nothing described past this
@@ -90,13 +130,33 @@ Three constraints worth keeping:
 This is the "toggleable ambiance" the roadmap note below asked for, on the
 audio side; the CSS weather variety part of that note is still open.
 
-### Hideout room ambiance: more variety, toggleable
+### Hideout room ambiance: more variety, toggleable -- built 2026-09-12
 
-Beyond the rain bug fix above, there's a stated intent for more per-room
-background ambiance variety (`main-floor` currently has rain; other rooms
-have their own static `weather` in `HIDEOUT_SCENES`), and for ambiance to be
-**toggleable** by the player (a settings switch, presumably similar in
-spirit to existing toggles like `meta.wildlifeSheltersInRain` /
-`meta.minimapVisible`). No specific new weather kinds or toggle UI were
-specified -- flagged here so a future pass doesn't have to rediscover that
-this was asked for, but the concrete design is still open.
+Both parts of this roadmap note are now implemented, closing the gap it
+described:
+
+- **Variety.** Of the five `HIDEOUT_SCENES`, two had no real particle motion:
+  `the-cellar`'s `heat` was a static blurred glow (its own flavor text says
+  the warmth "wavers", which the CSS didn't) and `the-alley`'s `clear` had no
+  `.hideout-weather-clear` rule at all -- the one room with zero atmospheric
+  effect. `heat` now runs a slow breathing scale/opacity pulse
+  (`hideout-heat-waver`, 6s ease-in-out). `clear` now drifts warm
+  ember-colored dots, reusing the existing `hideout-rain` keyframe at a much
+  slower 16s duration rather than adding a new one -- same fixed-`rem`
+  `background-size` rule as rain/snow above (never a percentage, see the bug
+  fix at the top of this doc).
+- **Toggleable.** `meta.hideoutWeatherEnabled` (Settings > "Hideout
+  weather"), following the `pauseMapVisible`/`wildlifeSheltersInRain` boolean
+  pattern -- defaults to **`true`** (unlike the audio ambience toggle above,
+  which defaults to `false`: this is silent CSS decoration, not new sound, so
+  the "a returning player must never be surprised" rule that justifies
+  audio's opt-in default doesn't apply here). Gates the clouds, the
+  birds/drones/motes fliers, and the weather-particles layer as one unit in
+  `HubScreen.tsx`; `.hideout-sky-glow` (the static per-room accent tint)
+  intentionally stays regardless -- it's a plain radial-gradient, not
+  animated, so there's no motion or cost to opt out of.
+
+Verified by reading the live computed `animation-name`/`transform`/
+`background-position` at two points in time (not just screenshotting), and
+by confirming the toggle actually removes the elements from the DOM rather
+than only changing a class.

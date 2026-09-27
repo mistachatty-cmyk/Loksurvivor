@@ -28,7 +28,7 @@ test('every faction roster id names a real enemy, with no duplicates', () => {
 test('squadWave spawns the whole roster as one lead + group', () => {
   const wave = squadWave({ fromSec: 0, toSec: 10, factionId: 'bubbleteer-parade', ratePerSec: 1 });
   assert.equal(wave.enemyId, 'bubbleteer-cadet');
-  assert.deepEqual(wave.group, ['bubbleteer-shocker', 'captain-frothbite']);
+  assert.deepEqual(wave.group, ['bubbleteer-shocker', 'captain-frothbite', 'bubble-hopper', 'froth-behemoth']);
   assert.equal(wave.burst, 1);
   assert.equal(wave.faction, 'Bubbleteer Parade');
 });

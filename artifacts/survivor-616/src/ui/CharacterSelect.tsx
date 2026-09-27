@@ -3,12 +3,24 @@
  * name and props stable.
  */
 import { Fragment, useEffect } from 'react';
-import { BookOpen, LockKeyhole, Zap } from 'lucide-react';
+import { BookOpen, HeartPulse, LockKeyhole, Zap } from 'lucide-react';
 
-import { describeUnlock, effectiveStats, episodeProgress, episodeStatus, useMeta } from '@/game/state/metaStore';
+import {
+  characterLevelProgress,
+  currentFatiguePct,
+  describeUnlock,
+  effectiveStats,
+  episodeProgress,
+  episodeStatus,
+  getCharacterFatigueSummary,
+  lokPetTeamCapacity,
+  useMeta,
+  type CharacterFatigueSummary,
+} from '@/game/state/metaStore';
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
 import { getCharacterSkins, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
+import { characterMasteryStatBonus, characterRankTitle } from '@/game/data/characterMastery';
 import type { CharacterDef, MetaState } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
@@ -16,9 +28,11 @@ import { CharacterAbilityVisualizer } from './CharacterAbilityVisualizer';
 import { LokPetIcon, LokPetVariantSheet } from './LokPetVariantSheet';
 import { WeaponIcon } from './WeaponIcon';
 import { CosmeticPreview } from './CosmeticPreview';
+import { AnimatedNumber } from './AnimatedNumber';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getHatStyle } from '@/game/data/hats';
 import { getCelebrationStyle } from '@/game/data/celebrations';
+import type { RunModifiers } from '@/game/types';
 
 export interface CharacterSelectProps {
   onBack: () => void;
@@ -28,11 +42,227 @@ export interface CharacterSelectProps {
   onLaunchEpisode?: (episodeId: string, areaId: string) => void;
 }
 
-function StatRow({ label, value }: { label: string; value: string }) {
+function StatRow({
+  label,
+  value,
+  restedValue,
+  penalty,
+  testId,
+}: {
+  label: string;
+  value: string;
+  restedValue?: string;
+  penalty?: string;
+  testId?: string;
+}) {
   return (
-    <div className="flex items-center justify-between border-b border-border/60 py-1.5 text-xs">
-      <span className="uppercase tracking-wider text-muted-foreground">{label}</span>
-      <span className="font-bold text-white">{value}</span>
+    <div
+      className="flex items-center justify-between border-b border-border/60 py-1.5 text-xs"
+      data-testid={testId}
+    >
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="uppercase tracking-wider text-muted-foreground">{label}</span>
+        {penalty ? (
+          <span
+            className="font-mono text-[8px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1 py-0.5 shrink-0"
+            data-testid="stat-penalty-tag"
+          >
+            {penalty}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex items-baseline gap-1.5 font-bold shrink-0">
+        {restedValue && penalty ? (
+          <span
+            className="font-mono text-[10px] text-muted-foreground line-through opacity-60"
+            data-testid="stat-rested-value"
+          >
+            {restedValue}
+          </span>
+        ) : null}
+        <span className={penalty ? 'text-amber-300' : 'text-white'}>{value}</span>
+      </div>
+    </div>
+  );
+}
+
+function FatigueIndicator({ summary }: { summary: CharacterFatigueSummary }) {
+  const { isFatigued, fatiguePct, maxFatiguePct, effectiveStats, diffs } = summary;
+
+  return (
+    <div
+      className={`mt-3 border p-3 transition-colors ${
+        isFatigued
+          ? 'border-amber-500/50 bg-amber-500/10'
+          : 'border-emerald-500/30 bg-emerald-500/5'
+      }`}
+      data-testid="character-fatigue-indicator"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2">
+          <HeartPulse
+            className={`h-4 w-4 shrink-0 ${
+              isFatigued ? 'text-amber-400 animate-pulse' : 'text-emerald-400'
+            }`}
+          />
+          <div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+                Readiness &amp; Fatigue
+              </span>
+              <span
+                className={`font-mono text-[8px] font-black uppercase tracking-wider px-1 py-0.2 border ${
+                  isFatigued
+                    ? 'border-amber-400/50 bg-amber-400/20 text-amber-300'
+                    : 'border-emerald-400/40 bg-emerald-400/20 text-emerald-300'
+                }`}
+              >
+                {isFatigued ? 'Fatigued' : 'Peak readiness'}
+              </span>
+            </div>
+            <h4 className="text-xs font-black uppercase text-white mt-0.5">
+              {isFatigued
+                ? `${fatiguePct.toFixed(1)}% Combat Stat Penalty Active`
+                : 'Fully Rested (0.0% Penalty)'}
+            </h4>
+          </div>
+        </div>
+        <div className="self-start text-left sm:self-auto sm:text-right shrink-0">
+          <span
+            className={`inline-block border px-2 py-0.5 font-mono text-[10px] font-bold uppercase ${
+              isFatigued
+                ? 'border-amber-400/50 bg-amber-400/15 text-amber-300'
+                : 'border-emerald-400/50 bg-emerald-400/15 text-emerald-300'
+            }`}
+            data-testid="fatigue-penalty-badge"
+          >
+            {fatiguePct.toFixed(1)}% / {maxFatiguePct}% cap
+          </span>
+        </div>
+      </div>
+
+      {/* Visual meter bar relative to 5% max cap */}
+      <div className="mt-2.5">
+        <div className="flex justify-between font-mono text-[8px] uppercase text-muted-foreground mb-1">
+          <span>0% (Fresh)</span>
+          <span>{isFatigued ? `-${fatiguePct.toFixed(1)}% stat impact` : 'No debuff'}</span>
+          <span>5% (Max Fatigue)</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden border border-white/10 bg-black/40">
+          <div
+            className={`h-full transition-all duration-300 ${
+              isFatigued ? 'bg-amber-400' : 'bg-emerald-400'
+            }`}
+            style={{
+              width: `${Math.min(100, Math.max(isFatigued ? 6 : 0, (fatiguePct / maxFatiguePct) * 100))}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Impact breakdown */}
+      {isFatigued ? (
+        <div className="mt-2.5 border-t border-amber-500/20 pt-2" data-testid="fatigue-impact-details">
+          <p className="text-[10px] leading-snug text-amber-200/90">
+            Consecutive deployment strains this operative before starting the run:
+          </p>
+          <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-1.5 font-mono text-[9px]">
+            <div className="flex items-center justify-between border border-amber-400/25 bg-black/40 px-2 py-1">
+              <span className="text-muted-foreground uppercase">Health</span>
+              <span className="font-bold text-amber-300">
+                {Math.round(effectiveStats.maxHp)} HP{' '}
+                <span className="text-amber-400/80">({Math.round(diffs.maxHp)})</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between border border-amber-400/25 bg-black/40 px-2 py-1">
+              <span className="text-muted-foreground uppercase">Speed</span>
+              <span className="font-bold text-amber-300">
+                {Math.round(effectiveStats.speed)}{' '}
+                <span className="text-amber-400/80">({Math.round(diffs.speed)})</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between border border-amber-400/25 bg-black/40 px-2 py-1">
+              <span className="text-muted-foreground uppercase">Damage</span>
+              <span className="font-bold text-amber-300">
+                x{effectiveStats.power.toFixed(2)}{' '}
+                <span className="text-amber-400/80">(-{fatiguePct.toFixed(1)}%)</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between border border-amber-400/25 bg-black/40 px-2 py-1">
+              <span className="text-muted-foreground uppercase">Armor</span>
+              <span className="font-bold text-amber-300">
+                {Math.round(effectiveStats.armor * 100)}%{' '}
+                <span className="text-amber-400/80">(-{fatiguePct.toFixed(1)}%)</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between border border-amber-400/25 bg-black/40 px-2 py-1">
+              <span className="text-muted-foreground uppercase">Cooldowns</span>
+              <span className="font-bold text-amber-300">
+                +{fatiguePct.toFixed(1)}% delay
+              </span>
+            </div>
+            <div className="flex items-center justify-between border border-amber-400/25 bg-black/40 px-2 py-1">
+              <span className="text-muted-foreground uppercase">Area / Magnet</span>
+              <span className="font-bold text-amber-300">
+                -{fatiguePct.toFixed(1)}% reach
+              </span>
+            </div>
+          </div>
+          <p className="mt-2 text-[9px] text-muted-foreground">
+            Operative can rest at the Hideout Rooftop Recovery Deck to restore stats over time.
+          </p>
+        </div>
+      ) : (
+        <p className="mt-2 font-mono text-[9px] text-emerald-400/90">
+          Operative is at 100% combat capacity. Deploying into this run with zero penalties.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CharacterLevelIndicator({ character, meta }: { character: CharacterDef; meta: MetaState }) {
+  const progress = characterLevelProgress(meta, character.id);
+  const rank = characterRankTitle(progress.level);
+  const pct = (progress.levelUpsIntoLevel / Math.max(1, progress.levelUpsToNext)) * 100;
+  const powerBonusPct = Math.round(characterMasteryStatBonus(progress.level, 'power') * 100);
+  const hpBonus = Math.round(characterMasteryStatBonus(progress.level, 'maxHp'));
+
+  return (
+    <div
+      className="mt-3 border border-sky-500/30 bg-sky-500/5 p-3"
+      data-testid={`character-mastery-indicator-${character.id}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 shrink-0 text-sky-300" />
+          <div>
+            <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+              Mastery
+            </span>
+            <h4 className="text-xs font-black uppercase text-white mt-0.5">
+              Lv <AnimatedNumber value={progress.level} data-testid={`text-character-level-${character.id}`} /> · {rank}
+            </h4>
+          </div>
+        </div>
+        {progress.level > 1 ? (
+          <span
+            className="inline-block border border-sky-400/50 bg-sky-400/15 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300"
+            data-testid={`character-mastery-bonus-${character.id}`}
+          >
+            +{powerBonusPct}% power, +{hpBonus} HP
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-2.5 h-1.5 w-full overflow-hidden border border-white/10 bg-black/40">
+        <div
+          className="h-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1.5 font-mono text-[9px] text-muted-foreground">
+        {progress.levelUpsIntoLevel} / {progress.levelUpsToNext} level-ups to next
+      </p>
     </div>
   );
 }
@@ -50,7 +280,12 @@ function CharacterDetail({
   inline?: boolean;
   onSelectSkin: (characterId: string, skinId: string) => void;
 }) {
-  const stats = effectiveStats(character, meta);
+  const fatigueSummary = getCharacterFatigueSummary(character, meta);
+  const stats = fatigueSummary.effectiveStats;
+  const isFatigued = fatigueSummary.isFatigued;
+  const fatiguePct = fatigueSummary.fatiguePct;
+  const penaltyTag = isFatigued ? `-${fatiguePct.toFixed(1)}%` : undefined;
+
   const episode = CHARACTER_EPISODE_BY_CHARACTER_ID[character.id];
   const status = episode ? episodeStatus(episode.id, meta) : 'locked';
   const progress = episode ? episodeProgress(episode.id, meta) : 0;
@@ -68,8 +303,10 @@ function CharacterDetail({
       <div className="flex shrink-0 items-center gap-3">
         <CosmeticPreview rig={character.rig} palette={displayPalette} aura={getRunAuraStyle(meta.activeRunAuraId)} hat={getHatStyle(meta.activeHatId)} celebration={getCelebrationStyle(meta.activeCelebrationId)} paletteEffect={paletteEffect} compact />
         <div className="min-w-0">
+          {character.rarity === 'legendary' ? <span className="font-mono text-[8px] font-black uppercase tracking-[0.22em] text-amber-300">Legendary</span> : null}
           <h3 className="terminal-glow truncate text-lg font-black uppercase leading-tight text-white">{character.name}</h3>
           <p className="truncate text-[11px] font-bold uppercase tracking-wider text-primary">{character.handle}</p>
+          {character.crew ? <p className="truncate font-mono text-[8px] uppercase tracking-widest text-sky-300">{character.crew.name} · {character.crew.role}</p> : null}
         </div>
       </div>
 
@@ -110,13 +347,63 @@ function CharacterDetail({
 
       <div className={inline ? 'min-w-[14rem] flex-1' : ''}>
         <p className="text-xs italic text-muted-foreground">&ldquo;{character.tagline}&rdquo;</p>
+        {character.lokPetCollector ? (
+          <div className="mt-2 border border-pink-300/35 bg-pink-300/10 p-2 font-mono text-[9px] uppercase tracking-wider text-pink-100" data-testid={`collector-rank-${character.id}`}>
+            {character.lokPetCollector.rank} · +{character.lokPetCollector.extraTeamSlots} team slots · {character.lokPetCollector.lokPetPrizeWeightMultiplier.toFixed(2)}× LokPet pulls
+          </div>
+        ) : null}
+        {character.signatureTraits ? (
+          <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`character-traits-${character.id}`}>
+            {character.signatureTraits.map((trait) => (
+              <span key={trait} className="border border-primary/30 bg-primary/10 px-2 py-1 font-mono text-[8px] font-bold uppercase tracking-wider text-primary">{trait}</span>
+            ))}
+          </div>
+        ) : null}
+
+        <CharacterLevelIndicator character={character} meta={meta} />
+
+        {/* Visual indicator showing how current fatigue levels affect character stats before starting a run */}
+        <FatigueIndicator summary={fatigueSummary} />
+
         <div className={`mt-3 grid gap-x-4 ${inline ? 'grid-cols-3' : 'grid-cols-2'}`}>
-          <StatRow label="Health" value={Math.round(stats.maxHp).toString()} />
-          <StatRow label="Speed" value={Math.round(stats.speed).toString()} />
-          <StatRow label="Power" value={`x${stats.power.toFixed(2)}`} />
-          <StatRow label="Armor" value={`${Math.round(stats.armor * 100)}%`} />
-          <StatRow label="Crit" value={`${Math.round(stats.crit * 100)}%`} />
-          <StatRow label="Lifesteal" value={`${Math.round(stats.lifesteal * 100)}%`} />
+          <StatRow
+            label="Health"
+            value={Math.round(stats.maxHp).toString()}
+            restedValue={isFatigued ? Math.round(fatigueSummary.restedStats.maxHp).toString() : undefined}
+            penalty={penaltyTag}
+            testId="stat-row-health"
+          />
+          <StatRow
+            label="Speed"
+            value={Math.round(stats.speed).toString()}
+            restedValue={isFatigued ? Math.round(fatigueSummary.restedStats.speed).toString() : undefined}
+            penalty={penaltyTag}
+            testId="stat-row-speed"
+          />
+          <StatRow
+            label="Power"
+            value={`x${stats.power.toFixed(2)}`}
+            restedValue={isFatigued ? `x${fatigueSummary.restedStats.power.toFixed(2)}` : undefined}
+            penalty={penaltyTag}
+            testId="stat-row-power"
+          />
+          <StatRow
+            label="Armor"
+            value={`${Math.round(stats.armor * 100)}%`}
+            restedValue={isFatigued ? `${Math.round(fatigueSummary.restedStats.armor * 100)}%` : undefined}
+            penalty={penaltyTag}
+            testId="stat-row-armor"
+          />
+          <StatRow
+            label="Crit"
+            value={`${Math.round(stats.crit * 100)}%`}
+            testId="stat-row-crit"
+          />
+          <StatRow
+            label="Lifesteal"
+            value={`${Math.round(stats.lifesteal * 100)}%`}
+            testId="stat-row-lifesteal"
+          />
         </div>
       </div>
 
@@ -171,26 +458,54 @@ function CharacterTile({
   selected,
   onSelect,
   palette,
+  fatiguePct,
+  characterLevel,
 }: {
   character: CharacterDef;
   selected: boolean;
   onSelect: () => void;
   palette: CharacterDef['palette'];
+  fatiguePct?: number;
+  characterLevel?: number;
 }) {
+  const hasFatigue = typeof fatiguePct === 'number' && fatiguePct > 0;
+  const hasLevel = typeof characterLevel === 'number' && characterLevel > 1;
+
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`terminal-frame flex flex-col items-center gap-2 border p-3 text-center transition-colors ${
+      className={`terminal-frame relative flex flex-col items-center gap-2 border p-3 text-center transition-colors ${
         selected ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
       }`}
       data-testid={`button-character-${character.id}`}
+      style={character.rarity === 'legendary' ? { boxShadow: `0 0 18px ${palette.glow}33` } : undefined}
     >
-      <div className="grid h-14 w-14 place-items-center border border-border bg-black/40">
+      <div className="relative grid h-14 w-14 place-items-center border border-border bg-black/40">
         <RigPortrait rig={character.rig} palette={palette} anim="idle" size={48} />
+        {hasFatigue ? (
+          <span
+            className="absolute -top-1.5 -right-1.5 flex items-center gap-0.5 border border-amber-400/80 bg-black/90 px-1 py-0.5 font-mono text-[7px] font-bold text-amber-300 shadow"
+            title={`${fatiguePct.toFixed(1)}% fatigue stat penalty`}
+            data-testid={`tile-fatigue-${character.id}`}
+          >
+            <HeartPulse className="h-2 w-2 text-amber-400" />
+            -{fatiguePct.toFixed(1)}%
+          </span>
+        ) : null}
+        {hasLevel ? (
+          <span
+            className="absolute -top-1.5 -left-1.5 flex items-center gap-0.5 border border-sky-400/80 bg-black/90 px-1 py-0.5 font-mono text-[7px] font-bold text-sky-300 shadow"
+            title={`Mastery level ${characterLevel}`}
+            data-testid={`tile-level-${character.id}`}
+          >
+            Lv{characterLevel}
+          </span>
+        ) : null}
       </div>
       <span className="w-full truncate text-[10px] font-black uppercase tracking-wide text-white">{character.name}</span>
+      {character.rarity === 'legendary' ? <span className="font-mono text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">Legendary</span> : null}
     </button>
   );
 }
@@ -210,8 +525,61 @@ function LockedCharacterTile({ character }: { character: CharacterDef }) {
   );
 }
 
+const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; description: string }> = [
+  { key: 'doubleMode', name: '2x Mode', description: 'Doubled spawn rate and a flat hp bump on any run. Stacks with everything else here.' },
+  { key: 'quadSpawnMode', name: '4x Spawns', description: 'Optional fourfold wave pressure. If 2x Mode is also on, 4x wins for spawns while its hp bump remains.' },
+  { key: 'unleashedMode', name: 'Unleashed 1000', description: 'Up to 1,000 live enemies with optimized 8x pressure. Overrides other spawn-rate toggles, but keeps their hp effects.' },
+  { key: 'invertedMap', name: 'Invert', description: 'Mirrors the area layout left-to-right.' },
+  { key: 'speedMode', name: 'Speed Mode', description: 'Raises player and enemy movement speed.' },
+  { key: 'scalerMode', name: 'Scaler', description: "Enemy hp scales up with your level as the run goes." },
+  { key: 'infiniteMode', name: 'Infinite Mode', description: 'The clock never runs out -- the final wave repeats and escalates instead.' },
+  { key: 'hordeSpinEnabled', name: 'HordeSpin', description: 'Every 45s, spin a wheel for a scaled horde event and a reward. 5x5 and 666 are rare.' },
+  // Only shown once meta.directorModeUnlocked -- see RunModifiersChecklist below.
+  { key: 'directorModeEnabled', name: 'Director Mode', description: 'Raises the odds the Director crashes the run with its crew, once eligible.' },
+];
+
+function RunModifiersChecklist({ modifiers, directorModeUnlocked, onToggle }: { modifiers: RunModifiers; directorModeUnlocked: boolean; onToggle: (key: keyof RunModifiers) => void }) {
+  const options = RUN_MODIFIER_OPTIONS.filter((option) => option.key !== 'directorModeEnabled' || directorModeUnlocked);
+  return (
+    <section className="border border-primary/30 bg-card p-4" data-testid="section-run-modifiers">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-primary">Run modifiers</p>
+          <h2 className="mt-1 text-lg font-black uppercase text-white">Check off before you go out</h2>
+        </div>
+        <span className="font-mono text-[10px] uppercase text-muted-foreground">Applies to every run</span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {options.map((option) => {
+          const checked = modifiers[option.key] === true;
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onToggle(option.key)}
+              aria-pressed={checked}
+              className={`flex items-start gap-2 border p-2.5 text-left transition-colors ${checked ? 'border-primary bg-primary/10' : 'border-border bg-black/20 hover:border-primary/50'}`}
+              data-testid={`button-toggle-modifier-${option.key}`}
+            >
+              <span
+                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border font-mono text-[9px] ${checked ? 'border-primary bg-primary text-primary-foreground' : 'border-white/30 text-transparent'}`}
+              >
+                &#10003;
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-bold uppercase tracking-wide text-white">{option.name}</span>
+                <span className="block text-[10px] leading-snug text-muted-foreground">{option.description}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: CharacterSelectProps) {
-  const { unlockedCharacters, lockedCharacters, selectedCharacter, selectCharacter, selectCharacterSkin, setUiPanelLayout, meta, toggleSavedLokPet, restoreSavedLokPet, refreshPetElixirs } = useMeta();
+  const { unlockedCharacters, lockedCharacters, selectedCharacter, selectCharacter, selectCharacterSkin, setUiPanelLayout, meta, toggleSavedLokPet, restoreSavedLokPet, refreshPetElixirs, toggleRunModifier } = useMeta();
 
   useEffect(() => {
     refreshPetElixirs();
@@ -219,6 +587,11 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
     return () => window.clearInterval(timer);
   }, [refreshPetElixirs]);
   const layout = meta.uiPanelLayout;
+  const unlockedCollectors = unlockedCharacters.filter((character) => character.lokPetCollector);
+  const lockedCollectors = lockedCharacters.filter((character) => character.lokPetCollector);
+  const unlockedOperatives = unlockedCharacters.filter((character) => !character.lokPetCollector);
+  const lockedOperatives = lockedCharacters.filter((character) => !character.lokPetCollector);
+  const petTeamCapacity = lokPetTeamCapacity(selectedCharacter);
 
   return (
     <ScreenLayout
@@ -244,6 +617,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
             <button type="button" onClick={() => setUiPanelLayout('rail')} aria-pressed={layout === 'rail'} className={`border px-3 py-2 font-mono text-[9px] uppercase ${layout === 'rail' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>Original</button>
           </div>
         </div>
+        <RunModifiersChecklist modifiers={meta.runModifiers} directorModeUnlocked={meta.directorModeUnlocked} onToggle={toggleRunModifier} />
         <details className="border border-border bg-card/40 p-3" data-testid="character-combat-preview">
           <summary className="cursor-pointer font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Weapon &amp; ability preview</summary>
           <div className="mt-3"><CharacterAbilityVisualizer character={{ ...selectedCharacter, palette: resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled) }} /></div>
@@ -253,7 +627,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-black uppercase text-white">LokPet loadout</h2>
-                <p className="text-xs text-muted-foreground">Select up to three saved companions. Elixirs regenerate 3 every 20 minutes.</p>
+                <p className="text-xs text-muted-foreground">Select up to {petTeamCapacity} saved companions. Elixirs regenerate 3 every 20 minutes.</p>
               </div>
               <span className="font-mono text-sm text-pink-200">{meta.petElixirs} elixir</span>
             </div>
@@ -287,30 +661,53 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
         {layout === 'rail' ? (
           <div className="grid gap-4 lg:grid-cols-[20rem_1fr]" data-testid="section-roster-grid">
             <CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} onSelectSkin={selectCharacterSkin} />
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {unlockedCharacters.map((character) => (
-                <CharacterTile
-                  key={character.id}
-                  character={character}
-                  selected={character.id === selectedCharacter.id}
-                  onSelect={() => selectCharacter(character.id)}
-                  palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
-                />
-              ))}
-              {lockedCharacters.map((character) => (
-                <LockedCharacterTile key={character.id} character={character} />
-              ))}
+            <div className="space-y-5">
+              <section aria-labelledby="standard-roster-heading">
+                <h2 id="standard-roster-heading" className="mb-2 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Operatives</h2>
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                  {unlockedOperatives.map((character) => (
+                    <CharacterTile
+                      key={character.id}
+                      character={character}
+                      selected={character.id === selectedCharacter.id}
+                      onSelect={() => selectCharacter(character.id)}
+                      palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
+                      fatiguePct={currentFatiguePct(meta, character.id)}
+                      characterLevel={characterLevelProgress(meta, character.id).level}
+                    />
+                  ))}
+                  {lockedOperatives.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                </div>
+              </section>
+              <section aria-labelledby="collector-roster-heading" className="border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
+                <div className="mb-2 flex items-end justify-between gap-3"><div><h2 id="collector-roster-heading" className="font-black uppercase text-pink-100">LokPet Collectors</h2><p className="text-[9px] text-muted-foreground">Complete collector runs and catch LokPets to climb ranks.</p></div><span className="font-mono text-[9px] text-pink-200">{meta.lokCollectorRuns} runs · {meta.lokCollectorPetsFound} caught</span></div>
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                  {unlockedCollectors.map((character) => (
+                    <CharacterTile
+                      key={character.id}
+                      character={character}
+                      selected={character.id === selectedCharacter.id}
+                      onSelect={() => selectCharacter(character.id)}
+                      palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
+                      fatiguePct={currentFatiguePct(meta, character.id)}
+                      characterLevel={characterLevelProgress(meta, character.id).level}
+                    />
+                  ))}
+                  {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                </div>
+              </section>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 [grid-auto-flow:dense]" data-testid="section-roster-grid">
-            {unlockedCharacters.map((character) => (
+            {unlockedOperatives.map((character) => (
               <Fragment key={character.id}>
                 <CharacterTile
                   character={character}
                   selected={character.id === selectedCharacter.id}
                   onSelect={() => selectCharacter(character.id)}
                   palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
+                  fatiguePct={currentFatiguePct(meta, character.id)}
                 />
                 {character.id === selectedCharacter.id ? (
                   <div className="col-span-full">
@@ -319,9 +716,28 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                 ) : null}
               </Fragment>
             ))}
-            {lockedCharacters.map((character) => (
+            {lockedOperatives.map((character) => (
               <LockedCharacterTile key={character.id} character={character} />
             ))}
+            <div className="col-span-full mt-3 border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
+              <div className="mb-2 flex items-end justify-between gap-3"><div><h2 className="font-black uppercase text-pink-100">LokPet Collectors</h2><p className="text-[9px] text-muted-foreground">Complete collector runs and catch LokPets to climb ranks.</p></div><span className="font-mono text-[9px] text-pink-200">{meta.lokCollectorRuns} runs · {meta.lokCollectorPetsFound} caught</span></div>
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 [grid-auto-flow:dense]">
+                {unlockedCollectors.map((character) => (
+                  <Fragment key={character.id}>
+                    <CharacterTile
+                      character={character}
+                      selected={character.id === selectedCharacter.id}
+                      onSelect={() => selectCharacter(character.id)}
+                      palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
+                      fatiguePct={currentFatiguePct(meta, character.id)}
+                      characterLevel={characterLevelProgress(meta, character.id).level}
+                    />
+                    {character.id === selectedCharacter.id ? <div className="col-span-full"><CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} onSelectSkin={selectCharacterSkin} inline /></div> : null}
+                  </Fragment>
+                ))}
+                {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+              </div>
+            </div>
           </div>
         )}
       </div>

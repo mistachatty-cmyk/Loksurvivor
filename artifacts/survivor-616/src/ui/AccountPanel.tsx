@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Mail, MessageSquareText, Phone, ShieldCheck } from 'lucide-react';
 
 import { useAuth, type NotificationPreference } from '@/state/authStore';
+import { useCloudSyncStatus } from '@/state/cloudSyncStore';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -105,8 +106,16 @@ function WaitlistForm() {
   );
 }
 
+const SYNC_STATUS_LABEL: Record<ReturnType<typeof useCloudSyncStatus>, string> = {
+  off: 'Not syncing.',
+  syncing: 'Syncing progress...',
+  synced: 'Progress synced to this account.',
+  error: "Couldn't reach the cloud save -- your local progress is still safe.",
+};
+
 function LoginForm() {
   const { available, signInWithEmail, signUpWithEmail, signInWithGoogle, signInWithApple, user, signOut } = useAuth();
+  const syncStatus = useCloudSyncStatus();
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -117,6 +126,9 @@ function LoginForm() {
       <div className="space-y-4 border border-border bg-card p-6">
         <p className="text-sm text-muted-foreground">
           Signed in as <span className="text-white">{user.email}</span>.
+        </p>
+        <p className="text-xs text-muted-foreground" data-testid="text-cloud-sync-status">
+          {SYNC_STATUS_LABEL[syncStatus]}
         </p>
         <Button variant="outline" onClick={() => void signOut()} data-testid="button-sign-out">
           Sign out

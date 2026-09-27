@@ -8,21 +8,34 @@ import { ENEMIES_BY_ID } from '@/game/data/enemies';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
+import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import type { AreaDef, LokPetRunDiscovery, RunResult } from '@/game/types';
+import type { RunHighlightKind } from '@/game/data/runHighlights';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
+import { AccountNudge } from './AccountNudge';
+import { AnimatedNumber } from './AnimatedNumber';
+import { ShareRecapButton } from './ShareRecapButton';
+import type { GameRunSummaryLike } from '@lok/recap';
+import { loadMediaAssets } from '@/game/audio/localMediaStore';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
 import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound } from 'lucide-react';
-import { useMeta } from '@/game/state/metaStore';
+import { characterLevelProgress, playerLevelProgress, useMeta } from '@/game/state/metaStore';
+import { characterRankTitle } from '@/game/data/characterMastery';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+
+const RunRecapPlayer = lazy(() => import('@lok/recap/player').then((module) => ({ default: module.RunRecapPlayer })));
 
 export interface RunSummaryProps {
   result: RunResult;
   onReturnToHub: () => void;
   onRetry: () => void;
   onOpenArchive?: (variantId: string) => void;
+  onOpenAccount?: () => void;
   areaOverride?: AreaDef;
 }
 
@@ -40,8 +53,70 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, areaOverride }: RunSummaryProps) {
+const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
+  'level-up': Zap,
+  'boss-defeated': Skull,
+  'close-call': Heart,
+  ultimate: Sparkles,
+  'ally-rescued': Unlock,
+  'run-cleared': Trophy,
+  'run-ended': BatteryLow,
+};
+
+export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOpenAccount, areaOverride }: RunSummaryProps) {
   const { meta } = useMeta();
+  // meta.totalLevelUps already includes this run's contribution (completeRun
+  // folds it in before RunSummary mounts) -- subtract it back out to find the
+  // player level going into this run, so we can tell whether it ticked up.
+  const levelUpsThisRun = Math.max(0, result.level - 1);
+  const playerLevelBefore = playerLevelProgress(Math.max(0, meta.totalLevelUps - levelUpsThisRun)).level;
+  const playerLevelAfter = playerLevelProgress(meta.totalLevelUps).level;
+  // Same before/after trick, scoped to this run's character -- its own
+  // characterLevelUps entry already includes this run's contribution.
+  const characterLevelUpsAfter = meta.characterLevelUps[result.characterId] ?? 0;
+  const characterLevelBefore = characterLevelProgress(
+    { ...meta, characterLevelUps: { ...meta.characterLevelUps, [result.characterId]: Math.max(0, characterLevelUpsAfter - levelUpsThisRun) } },
+    result.characterId,
+  ).level;
+  const characterLevelAfter = characterLevelProgress(meta, result.characterId).level;
+  const characterRankBefore = characterRankTitle(characterLevelBefore);
+  const characterRankAfter = characterRankTitle(characterLevelAfter);
+  const { session, user } = useAuth();
+  const [showAfterAction, setShowAfterAction] = useState(false);
+  const [clipUrlsByAssetId, setClipUrlsByAssetId] = useState<Record<string, string>>({});
+
+  // Resolve captured-clip ids to local blob URLs for the after-action report's
+  // highlight reel. `saveMediaAsset`/`loadMediaAssets` live in the game's own
+  // IndexedDB (`localMediaStore`) -- `@lok/recap` never reaches into it
+  // itself, so the resolved `src` is handed to it as a plain prop.
+  useEffect(() => {
+    const assetIds = [...new Set((result.highlights ?? [])
+      .map((highlight) => highlight.clipAssetId)
+      .filter((id): id is string => Boolean(id)))];
+    if (assetIds.length === 0) return;
+    let cancelled = false;
+    const createdUrls: string[] = [];
+    loadMediaAssets(assetIds)
+      .then((records) => {
+        if (cancelled) return;
+        const next: Record<string, string> = {};
+        for (const record of records) {
+          const url = URL.createObjectURL(record.blob);
+          createdUrls.push(url);
+          next[record.id] = url;
+        }
+        setClipUrlsByAssetId(next);
+      })
+      .catch(() => {
+        // Local media unavailable -- the report falls back to a text beat list.
+      });
+    return () => {
+      cancelled = true;
+      for (const url of createdUrls) URL.revokeObjectURL(url);
+    };
+  }, [result.highlights]);
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const characterPalette = resolveCharacterCosmeticPalette(
@@ -50,6 +125,33 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
     meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
     meta.worldPaletteBlendEnabled,
   );
+  // Reuses the highlight recorder's already-tested detections rather than a
+  // second, separate event log -- only the kinds the recap timeline knows
+  // about (see `MILESTONE_KINDS` in @lok/recap) have a mapping.
+  const recapSummary: GameRunSummaryLike = {
+    playerName: user?.email?.split('@')[0],
+    signedIn: Boolean(session),
+    characterId: character.id,
+    characterName: character.name,
+    stageName: area.name,
+    endless: Boolean(result.endless),
+    outcome: result.cleared ? 'cleared' : 'died',
+    elapsedSeconds: result.survivedSec,
+    kills: result.kills,
+    level: result.level,
+    cred: result.cred,
+    events: (result.highlights ?? []).flatMap((highlight) => {
+      const type = highlight.kind === 'level-up' ? 'level'
+        : highlight.kind === 'boss-defeated' ? 'boss'
+        : highlight.kind === 'close-call' ? 'close-call'
+        : null;
+      return type ? [{ atSeconds: highlight.atMs / 1000, type, label: highlight.label }] : [];
+    }),
+    highlightClips: (result.highlights ?? []).flatMap((highlight) => {
+      const src = highlight.clipAssetId ? clipUrlsByAssetId[highlight.clipAssetId] : undefined;
+      return src ? [{ atMs: highlight.atMs, kind: highlight.kind, label: highlight.label, src }] : [];
+    }),
+  };
   const ally = result.rescuedAllyId ? ALLIES_BY_ID[result.rescuedAllyId] : undefined;
   const discovery = result.cleared && result.discoveryId ? DISCOVERIES_BY_ID[result.discoveryId] : undefined;
   const lokPets = result.lokPets ?? [];
@@ -58,15 +160,54 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
   const rumorAlly = result.crewRumor ? ALLIES_BY_ID[result.crewRumor.allyId] : undefined;
   const RumorIcon = result.crewRumor ? (RUMOR_ICONS[result.crewRumor.icon] ?? Sparkles) : Sparkles;
   const firstNight = result.firstNight;
+  // Sector Command: a mission run is judged on its objectives, so it gets its
+  // own headline and its authored debrief instead of the block-cleared copy.
+  const mission = result.missionId ? SECTOR_MISSIONS_BY_ID[result.missionId] : undefined;
+  const missionWon = Boolean(mission && result.missionComplete);
+  const title = mission
+    ? (missionWon ? 'Mission complete' : 'Mission failed')
+    : (result.cleared ? 'Block cleared' : 'You went down');
+  const positive = mission ? missionWon : result.cleared;
 
   return (
     <ScreenLayout 
-      title={result.cleared ? 'Block cleared' : 'You went down'}
-      subtitle={area.name}
+      title={title}
+      subtitle={mission ? mission.name : area.name}
       backdrop={area.backdrop}
-      className={result.cleared ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
+      className={positive ? 'border-t-8 border-primary' : 'border-t-8 border-destructive'}
     >
       <div className="max-w-4xl mx-auto w-full space-y-8 mt-4">
+
+        {mission ? (
+          <section
+            className={`border p-5 ${missionWon ? 'border-amber-200/45 bg-amber-950/15' : 'border-destructive/45 bg-destructive/10'}`}
+            data-testid="section-mission-debrief"
+          >
+            <div className="flex items-center gap-2">
+              <Radio className={`h-4 w-4 ${missionWon ? 'text-amber-200' : 'text-destructive'}`} />
+              <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-white">
+                {missionWon ? 'Objectives met' : 'Objectives outstanding'}
+              </h2>
+            </div>
+            {!missionWon ? (
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-destructive/90">
+                Nothing banked — the campaign only advances on a completed mission.
+              </p>
+            ) : null}
+            <ul className="mt-3 space-y-1">
+              {mission.objectives.map((objective) => (
+                <li key={objective.id} className="font-mono text-[11px] text-white/80">
+                  · {objective.label}{objective.optional ? ' (optional)' : ''}
+                </li>
+              ))}
+            </ul>
+            {missionWon ? (
+              <p className="mt-3 border-t border-amber-200/20 pt-3 text-[13px] leading-relaxed text-white/80">
+                {mission.debrief}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         {result.completedDailyContracts && result.completedDailyContracts.length > 0 ? (
           <section className="border border-cyan-200/40 bg-cyan-950/15 p-5" data-testid="section-daily-contract-rewards">
@@ -74,7 +215,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
               <Radio className="h-5 w-5 text-cyan-200" />
               <div>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">Broadcast Board</p>
-                <h2 className="mt-1 text-xl font-black uppercase text-white">Signal answered</h2>
+                <h2 className="mt-1 text-xl font-black uppercase text-white">Call answered</h2>
               </div>
             </div>
             <div className="mt-4 space-y-2">
@@ -237,11 +378,15 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
               <>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><MapPin className="w-3 h-3 text-primary" /> Blocks walked</p>
-                  <p className="text-2xl font-mono font-bold text-white">{result.endless.blocksWalked}</p>
+                  <p className="text-2xl font-mono font-bold text-white">
+                    <AnimatedNumber value={result.endless.blocksWalked} disabled={prefersReducedMotion} />
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><TrendingDown className="w-3 h-3 text-primary" /> Depth</p>
-                  <p className="text-2xl font-mono font-bold text-white">{result.endless.dungeonDepth}</p>
+                  <p className="text-2xl font-mono font-bold text-white">
+                    <AnimatedNumber value={result.endless.dungeonDepth} disabled={prefersReducedMotion} />
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Sparkles className="w-3 h-3 text-primary" /> Edge reached</p>
@@ -251,23 +396,113 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
             ) : (
               <div>
                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Trophy className="w-3 h-3 text-primary" /> Time</p>
-                <p className="text-2xl font-mono font-bold text-white">{Math.floor(result.survivedSec)}s</p>
+                <p className="text-2xl font-mono font-bold text-white">
+                  <AnimatedNumber value={Math.floor(result.survivedSec)} suffix="s" disabled={prefersReducedMotion} />
+                </p>
               </div>
             )}
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Skull className="w-3 h-3 text-primary" /> Defeated</p>
-              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-kills">{result.kills}</p>
+              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-kills">
+                <AnimatedNumber value={result.kills} disabled={prefersReducedMotion} />
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Zap className="w-3 h-3 text-primary" /> Level</p>
-              <p className="text-2xl font-mono font-bold text-white">{result.level}</p>
+              <p className="text-2xl font-mono font-bold text-white">
+                <AnimatedNumber value={result.level} disabled={prefersReducedMotion} />
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1.5"><Coins className="w-3 h-3 text-primary" /> Cred</p>
-              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">{result.cred}</p>
+              <p className="text-2xl font-mono font-bold text-white" data-testid="text-run-cred">
+                <AnimatedNumber value={result.cred} durationMs={1400} disabled={prefersReducedMotion} />
+              </p>
             </div>
           </div>
         </div>
+        {onOpenAccount ? <AccountNudge runNumber={meta.totalRuns} onOpenAccount={onOpenAccount} /> : null}
+        {levelUpsThisRun > 0 && (
+          <motion.section
+            initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+            className="border border-cyan-300/30 bg-gradient-to-br from-cyan-950/30 to-transparent p-5 text-center"
+            data-testid="section-level-up-reveal"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-300">Level Up</p>
+            <p className="mt-1 text-4xl font-black" style={{ color: '#5EEAD4', textShadow: '0 0 32px rgba(94,234,212,0.45)' }}>
+              Lv <AnimatedNumber value={result.level} disabled={prefersReducedMotion} />
+            </p>
+            <p className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">
+              +<AnimatedNumber value={levelUpsThisRun} disabled={prefersReducedMotion} /> level-up{levelUpsThisRun === 1 ? '' : 's'} this run
+            </p>
+            {playerLevelAfter > playerLevelBefore && (
+              <motion.p
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-3 inline-flex items-center gap-1.5 border border-sky-300/40 bg-sky-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-sky-200"
+                data-testid="text-player-level-up"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Player Level {playerLevelAfter}
+              </motion.p>
+            )}
+            {characterLevelAfter > characterLevelBefore && (
+              <motion.p
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+                className="mt-2 inline-flex items-center gap-1.5 border border-emerald-300/40 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-emerald-200"
+                data-testid="text-character-level-up"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                {character.name} Lv {characterLevelAfter}
+                {characterRankAfter !== characterRankBefore ? ` — ${characterRankAfter}` : ''}
+              </motion.p>
+            )}
+          </motion.section>
+        )}
+        {result.highlights && result.highlights.length > 0 ? (
+          <section className="border border-primary/25 bg-primary/5 p-5" data-testid="section-run-highlights">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-primary">Highlights</p>
+            <ol className="mt-3 space-y-2">
+              {result.highlights.map((highlight, index) => {
+                const Icon = RUN_HIGHLIGHT_ICONS[highlight.kind] ?? Sparkles;
+                return (
+                  <li key={`${highlight.kind}-${highlight.atMs}-${index}`} className="flex items-center gap-3 text-sm text-white/85">
+                    <Icon className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span className="font-mono text-[11px] text-muted-foreground w-10 shrink-0">{highlight.detail}</span>
+                    <span>{highlight.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        ) : null}
+        <section className="border border-cyan-200/30 bg-cyan-950/10 p-5" data-testid="section-after-action-report">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">Live after-action report</p>
+              <p className="mt-1 text-sm text-white/75">Replay the run’s outcome, stats, and recorded match highlights as the built Remotion sequence.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAfterAction((visible) => !visible)}
+              aria-expanded={showAfterAction}
+              className="shrink-0 border border-cyan-200/40 bg-cyan-200/10 px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100 hover:border-cyan-100"
+              data-testid="button-toggle-after-action"
+            >
+              {showAfterAction ? 'Close report' : 'Play report'}
+            </button>
+          </div>
+          {showAfterAction ? (
+            <Suspense fallback={<div className="mt-4 aspect-video animate-pulse bg-black/40" aria-label="Loading after-action report" />}>
+              <RunRecapPlayer summary={recapSummary} autoPlay={!prefersReducedMotion} className="mt-4 overflow-hidden border border-cyan-100/20" />
+            </Suspense>
+          ) : null}
+        </section>
         {result.endless && (result.endless.discoveredBandIds.length > 1 || result.endless.discoveredRouteEventIds.length > 0) ? (
           <section className="border border-violet-300/25 bg-violet-300/5 p-5" data-testid="section-endless-discoveries">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-violet-200">Outer-city knowledge recovered</p>
@@ -661,14 +896,18 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, area
           >
             Run it back
           </button>
-          <button 
-            type="button" 
-            onClick={onReturnToHub} 
-            className="flex-1 border border-border bg-card text-white py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors" 
+          <button
+            type="button"
+            onClick={onReturnToHub}
+            className="flex-1 border border-border bg-card text-white py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors"
             data-testid="button-return-hub"
           >
             Back to Hideout
           </button>
+          <ShareRecapButton
+            summary={recapSummary}
+            className="flex-1 border border-primary/40 bg-primary/5 text-primary py-4 font-black uppercase tracking-widest text-sm hover:border-primary transition-colors disabled:opacity-50"
+          />
         </div>
 
       </div>

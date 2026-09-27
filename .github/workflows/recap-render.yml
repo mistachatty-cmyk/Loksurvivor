@@ -1,0 +1,45 @@
+name: Render run recap
+
+# Manual only. Nothing renders on push — an encode per commit is minutes of
+# runner time for a video nobody asked for.
+on:
+  workflow_dispatch:
+    inputs:
+      run_json:
+        description: Path to a run JSON in the repo (e.g. runs/2026-09-11.json)
+        required: true
+      wide:
+        description: Render 1920x1080 instead of 1080x1920
+        type: boolean
+        default: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # The runner image already ships Chrome; pointing Remotion at it skips a
+      # ~150MB download on every job.
+      - run: echo "CHROMIUM_PATH=$(which google-chrome || which chromium)" >> $GITHUB_ENV
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @lok/recap typecheck
+
+      - name: Render
+        run: |
+          pnpm --filter @lok/recap exec node scripts/render-run.mjs \
+            "${{ github.workspace }}/${{ inputs.run_json }}" \
+            ${{ inputs.wide && '--wide' || '' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recap
+          path: packages/recap/out/*.mp4
+          retention-days: 14

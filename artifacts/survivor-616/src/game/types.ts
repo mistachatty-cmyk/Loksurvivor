@@ -7,6 +7,8 @@
  */
 
 import type { BeatReaction } from '@/game/data/reactivity';
+import type { RunHighlight } from '@/game/data/runHighlights';
+import type { SfxStyleDef } from '@/game/audio/sfxCues';
 
 export interface Vec2 {
   x: number;
@@ -85,7 +87,7 @@ export interface SpriteRig {
 /* ------------------------------------------------------------------ */
 
 export interface LootPrizeDef {
-  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon' | 'lokpet';
+  kind: 'cred' | 'token' | 'heal' | 'stat' | 'weapon' | 'lokpet' | 'card-pack';
   amount?: number;
   label: string;
   /** Stat key when kind === 'stat'. */
@@ -94,19 +96,42 @@ export interface LootPrizeDef {
   add?: number;
   /** Generated companion payload when kind === 'lokpet'. */
   lokPet?: LokPetRoll;
+  cardPackId?: CardPackId;
+}
+
+export type CardPackId = 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher' | 'prism-lokpack' | 'elemental-pack' | 'apex-binder';
+export type CardVariant = 'standard' | 'foil' | 'neon' | 'glitch' | 'holo';
+export interface OwnedCardRecord {
+  cardId: string;
+  copies: number;
+  variants: Partial<Record<CardVariant, number>>;
+  bestVariant: CardVariant;
+  totalValue: number;
 }
 
 export type LokPetFamily = 'animal' | 'ghoul' | 'bat' | 'mote' | 'blob' | 'mechanical';
-export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jelly' | 'clockwork';
+export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jelly' | 'clockwork'
+  | 'prism-moth' | 'void-pup' | 'ember-koi' | 'clock-beetle'
+  | 'solar-owl' | 'shadow-mantis' | 'glitch-fox' | 'magnet-ursa'
+  | 'cyber-hydra' | 'plasma-kitsune' | 'nano-phoenix' | 'titan-colossus'
+  | 'chrono-hare' | 'byte-serpent' | 'cosmic-axolotl' | 'storm-griffin';
 export type LokPetAttackKind = 'shot' | 'rapid-shot' | 'heavy-shot' | 'pulse' | 'explosion';
 export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow';
 export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
+export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescue' | 'clock-pause'
+  | 'solar-flare' | 'mantis-slice' | 'phase-dash' | 'polar-pull'
+  | 'tri-laser' | 'plasma-orbit' | 'rebirth-burst' | 'seismic-slam'
+  | 'time-warp' | 'glitch-strike' | 'starlight-heal' | 'thunder-claw'
+  | 'cutify-getaway' | 'null-consume' | 'buzbee-pollen';
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
+  ink?: string;
   body: string;
   bodyDark: string;
   accent: string;
+  accentBright?: string;
+  skin?: string;
   glow: string;
   eye: string;
 }
@@ -119,6 +144,14 @@ export interface LokPetVariantDef {
   silhouette: LokPetSilhouette;
   palette: LokPetPalette;
   description: string;
+  /** Relative in-run render scale; authored pets deliberately do not all occupy one size. */
+  sizeScale?: number;
+  legendary?: boolean;
+  specialAbility?: LokPetSpecialAbility;
+  /** First-arrival companion, chosen during the digital-bush encounter. */
+  starter?: boolean;
+  /** Variant-roll weight. Legendary companions are deliberately scarce. */
+  weight?: number;
 }
 
 /** Rarity-tuned stat sheet used when a chest generates a LokPet. */
@@ -153,6 +186,11 @@ export interface LokPetRoll {
   description: string;
   stats: Omit<LokPetStatSheet, 'rarity' | 'label' | 'weight' | 'powerMultiplier'>;
   traitLabel: string;
+  sizeScale?: number;
+  legendary?: boolean;
+  specialAbility?: LokPetSpecialAbility;
+  /** Persistent companion level copied into a run for scaled starter behavior. */
+  level?: number;
 }
 
 /** A captured, repeatable LokPet blueprint stored in the player's kennel. */
@@ -161,6 +199,41 @@ export interface SavedLokPet {
   roll: LokPetRoll;
   /** One charge is spent when the pet joins a run; elixirs restore it. */
   stamina: number;
+  /** Current battle level (starter partners cap at 99; other companions cap at 50). */
+  level?: number;
+  /** Current battle experience points. */
+  exp?: number;
+  /** Lifetime battle victories in sparring, league, and gauntlet. */
+  battlesWon?: number;
+  /** Total battles fought. */
+  battlesFought?: number;
+  /** Pinned favorite in kennel and battle party selector. */
+  favorite?: boolean;
+  /** Equipped battle trinket/tag. */
+  equippedTrinket?: string;
+  /** Marks the one partner chosen during the first trip to the hideout. */
+  starter?: boolean;
+  /** Last hourly free full-health/stamina refresh boundary. */
+  lastFreeRefreshAt?: number;
+}
+
+/**
+ * A collectible card imported from another G-Six game via the shared
+ * `lok.card-exchange` protocol (see src/lib/lokCardExchange.ts). This is a
+ * display-only Archive record, never a `SavedLokPet` -- it cannot be
+ * selected for a run and never grants combat stats, since nothing on the
+ * receiving side can trust another game's numbers for balance.
+ */
+export interface VisitingLokCard {
+  /** From the export's `owned.instanceId`; used to de-duplicate re-imports. */
+  instanceId: string;
+  assetId: string;
+  name: string;
+  description?: string;
+  rarity: string;
+  sourceGame: string;
+  tags: string[];
+  importedAt: number;
 }
 
 /** A run-independent record of a LokPet variant seen in any run. */
@@ -225,6 +298,9 @@ export interface LokPetInstance extends LokPetRoll {
   ghost: boolean;
   readyAt: number;
   nextPulseAt: number;
+  specialReadyAt: number;
+  /** Clockwork Beetle accelerates its clock face while this timestamp is active. */
+  specialActiveUntil: number;
   hp: number;
   maxHp: number;
 }
@@ -367,7 +443,11 @@ export type WeaponKind =
   | 'follower'
   /** Telegraphs a ground reticle on a nearby enemy, then a comet drops from
    *  off-screen and strikes it. See run-presentation.md. */
-  | 'meteor';
+  | 'meteor'
+  /** 4th-wall breaking / system error attack: drags selection marquees, blue-screens, and corrupts memory. */
+  | 'glitch'
+  /** Easter egg weapon: classic DVD bouncing screensaver icon that ricochets and explodes on corner hits. */
+  | 'dvd-bounce';
 
 /**
  * Shared physical-impact spectrum for authored attacks.
@@ -379,6 +459,18 @@ export type WeaponKind =
 export type ImpactIntensity = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type PotholeTrigger = 'stomp' | 'ground-shock';
+
+export type LegendaryWeaponPattern =
+  | 'resonance-return'
+  | 'grind-charge'
+  | 'ghostlight-network'
+  | 'steam-harpoon'
+  | 'origami-decoys'
+  | 'event-horizon'
+  | 'root-network'
+  | 'royal-command'
+  | 'zero-split'
+  | 'tidal-memory';
 
 export interface WeaponDef {
   id: string;
@@ -435,6 +527,8 @@ export interface WeaponDef {
    */
   bonusVsStatusId?: string;
   bonusVsStatusMult?: number;
+  /** Focused mechanics for the 2026-09-09 legendary roster. */
+  legendaryPattern?: LegendaryWeaponPattern;
 }
 
 /** Designer-facing metadata for a combat status effect. */
@@ -486,6 +580,10 @@ export interface EvolutionDef {
   name: string;
   description: string;
   baseWeaponId: string;
+  /** Evolution partner weapon requirement: requires owning this weapon maxed (level 8). */
+  requiredWeaponId?: string;
+  requiredWeaponLevel?: number;
+  requiredBaseLevel?: number;
   /** Legacy passive gate retained for compatibility with the original three cards. */
   requiredPassiveId?: string;
   characterId?: string;
@@ -595,7 +693,36 @@ export type UnlockRule =
   | { kind: 'rescue'; allyId: string }
   | { kind: 'clearArea'; areaId: string }
   | { kind: 'discovery'; discoveryId: string }
-  | { kind: 'kills'; count: number };
+  | { kind: 'kills'; count: number }
+  | { kind: 'lokPetCards'; count: number }
+  | { kind: 'lokCollector'; runs: number; lokPets: number };
+
+export interface CharacterCrewIdentity {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export type LokPetCollectorRank =
+  | 'LokPet Collector'
+  | 'LokMaster'
+  | 'LokCaster'
+  | 'LokLegendary'
+  | 'LokSupreme'
+  | 'LokArchivist'
+  | 'LokApex';
+
+export interface LokPetCollectorConfig {
+  rank: LokPetCollectorRank;
+  /** Added to the normal three LokPet loadout slots, from one through seven. */
+  extraTeamSlots: number;
+  /** Chance after a non-boss kill to drop an extra LokPack on the floor. */
+  floorPackChance: number;
+  /** Multiplies the LokPet prize weight inside every opened pack. */
+  lokPetPrizeWeightMultiplier: number;
+  /** Added to the base Card Credit reward for every blue loot box opened. */
+  bonusCardCreditsPerLootBox: number;
+}
 
 export interface CharacterDef {
   id: string;
@@ -609,6 +736,13 @@ export interface CharacterDef {
   weapon: WeaponDef;
   ultimate: UltimateDef;
   unlock: UnlockRule;
+  rarity?: 'legendary';
+  /** Two locked identity hooks surfaced in the roster without changing older characters. */
+  signatureTraits?: readonly [string, string];
+  /** Optional group identity shown on the roster. */
+  crew?: CharacterCrewIdentity;
+  /** Marks this operative as part of the separately-listed LokPet Collector class. */
+  lokPetCollector?: LokPetCollectorConfig;
   /** Optional always-on ability the dash button also triggers or empowers. */
   dashSkill?: DashSkillDef;
   /** Path to the reference art the rig was built from, if any. */
@@ -620,6 +754,31 @@ export interface CharacterDef {
    * any future character could opt in the same way. See run-presentation.md.
    */
   stormCloud?: StormCloudConfig;
+  /**
+   * Zero Day's freeze-then-throw ability: a directional cast that petrifies
+   * a handful of enemies in front of the player, which can then be
+   * drag-selected RTS-style and thrown at other enemies. Optional -- any
+   * future character could opt in the same way `stormCloud` does. See
+   * zero-day-freeze-throw.md.
+   */
+  freezeThrow?: FreezeThrowConfig;
+}
+
+export interface FreezeThrowConfig {
+  /** How far in front of the player the freeze cone reaches, in world units. */
+  coneRangeUnits: number;
+  /** Full cone angle, in degrees (split evenly around the facing direction). */
+  coneAngleDeg: number;
+  /** Maximum enemies frozen per cast, nearest-first. */
+  maxFreezeTargets: number;
+  /** How long a frozen enemy stays "stone" before thawing if never thrown. */
+  freezeDurationMs: number;
+  /** Cooldown between casts. */
+  castCooldownMs: number;
+  /** Damage a thrown enemy deals to whatever it hits. */
+  throwDamage: number;
+  /** Travel speed of a thrown enemy, in world units/sec. */
+  throwSpeed: number;
 }
 
 /**
@@ -697,7 +856,29 @@ export type EnemyBehavior =
    *  position marks them with the drone's effect for `stickyMs` -- it
    *  "sticks" regardless of range afterward -- and pings every drone's
    *  cooldown independently. Drones despawn when the commander dies. */
-  | 'commander';
+  | 'commander'
+  /** Coordinated flank attack from opposing angles. */
+  | 'pincer'
+  /** Gravitational singularity that draws player, projectiles, and pickups. */
+  | 'singularity'
+  /** Armored vanguard that heavily resists frontal damage. */
+  | 'phalanx'
+  /** Photonic prism that reflects player shots into splitting laser needles. */
+  | 'prism'
+  /** Quantum tether that links to nearby allies with a hazardous beam. */
+  | 'weaver'
+  /** Cybernetic tree that roots into the ground and erupts branching thorn fissures. */
+  | 'root-trapper'
+  /** Camouflaged tree mimic that ambushes the player at close quarters. */
+  | 'mimic-tree'
+  /** Floating spore node that mortars digital lingering mist clouds. */
+  | 'spore-mortar'
+  /** Lev Syndicate: heavy anchor that gravitationally pulls the player in close, then detonates a radial kinetic ring. */
+  | 'vortex-crusher'
+  /** Lev Syndicate: agile flanker that periodically phase-blinks to a flanking angle behind the player. */
+  | 'nanite-swarm'
+  /** Lev Syndicate: mobile high-voltage station that bridges a directional electric arc at range. */
+  | 'arc-conductor';
 
 export interface EnemyDef {
   id: string;
@@ -837,7 +1018,7 @@ export interface WaveDef {
   group?: string[];
   /** Multiplier applied to enemy hp for this wave. */
   hpMult?: number;
-  formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait';
+  formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait' | 'spiral' | 'phalanx' | 'crossfire' | 'vortex';
   faction?: string;
 }
 
@@ -852,7 +1033,25 @@ export interface ObstacleDef {
      | 'building' | 'river' | 'metal-box' | 'bench' | 'pothole'
      | 'trash-can' | 'mailbox' | 'fire-hydrant' | 'parking-meter'
      /** A heavy, wonky sentry block: zaps the player with a short-range bolt on a cadence. See oddity-arenas.md. */
-     | 'attack-block';
+     | 'attack-block'
+     /** Null Sector only: a tall breakable server cabinet that overloads into a small AoE burst when destroyed. */
+     | 'server-rack'
+     /** Tree Null map: real cybernetic digital tree with dense foliage and data trunk. */
+     | 'tree-digital'
+     /** Tree Null map: holographic decoy tree that flickers and permits projectile/player pass-through. */
+     | 'tree-fake'
+     /** Lev Syndicate Spire only: multi-story monolith with lit cyber-window matrices and a rooftop hazard beacon. */
+     | 'skyscraper'
+     /** Lev Syndicate Spire only: industrial electrical transformer with caution striping and crackling micro-sparks. */
+     | 'transformer-station'
+     /** Lev Syndicate Spire only: illuminated suspension skyway deck. */
+     | 'skyline-bridge'
+     /** Lev Syndicate Spire only: communication lattice mast emitting broadcast wave pulses. */
+     | 'beacon-tower'
+     /** Lev Syndicate Spire only: reinforced blast barrier with a pulsing security laser tripwire. */
+     | 'security-gate'
+     /** Lev Syndicate Spire only: street-embedded blast shelter hatch. */
+     | 'bunker-hatch';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
@@ -871,7 +1070,13 @@ export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' |
  * `roofed` means there is no sky at all (cellars, interiors) -- every sky
  * effect is suppressed rather than dimmed.
  */
-export type AreaSky = 'clear' | 'overcast' | 'rain' | 'fog' | 'roofed';
+export type AreaSky = 'clear' | 'overcast' | 'rain' | 'fog' | 'roofed'
+  /** Lev Syndicate Spire: electric storm — ion sparks, ground discharges, violet distant lightning. */
+  | 'cyber-storm'
+  /** Reserved for a future Lev-themed area: dense industrial smog with bioluminescent spore motes. */
+  | 'toxic-haze'
+  /** Reserved for a future Lev-themed area: scorching radiation front with rising heat motes. */
+  | 'solar-flare';
 
 export interface AreaDef {
   id: string;
@@ -888,6 +1093,17 @@ export interface AreaDef {
     seam: string;
     glow: string;
   };
+  /** Optional player-authored ground patches drawn over the base street grid. */
+  authoredGroundTiles?: Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    base: string;
+    tile: string;
+    seam: string;
+    glow: string;
+  }>;
   /** Overhead conditions; defaults to 'clear' when omitted. */
   sky?: AreaSky;
   obstacles: ObstacleDef[];
@@ -914,13 +1130,39 @@ export interface AreaDef {
    */
   endless?: true;
   /**
+   * Procedural theme key for endless maps that determines chunk generation,
+   * building prefabs, hazard profiles, and distance band progressions.
+   */
+  endlessTheme?: EndlessThemeId;
+  /**
    * When set, pickups spawn at random points in the arena on a cadence,
    * independent of kills or breakables. See oddity-arenas.md.
    */
   randomDrops?: { intervalMs: number };
 }
 
-export type CustomMapAssetCategory = 'ground' | 'structure' | 'hazard' | 'landmark' | 'enemy' | 'encounter';
+export type EndlessThemeId =
+  | 'streets'
+  | 'rooftops'
+  | 'catacombs'
+  | 'alleys'
+  | 'null-sector'
+  | 'docks'
+  | 'wasteland';
+
+export type CustomMapAssetCategory =
+  | 'ground'
+  | 'tile'
+  | 'beacon'
+  | 'structure'
+  | 'hazard'
+  | 'landmark'
+  | 'enemy'
+  | 'encounter'
+  /** Where the player (or a Sector Command faction) enters the map. */
+  | 'spawn-point'
+  /** A named point a mission objective can reference (hold, escort, destroy). */
+  | 'objective-marker';
 
 export interface CustomMapPlacement {
   id: string;
@@ -954,8 +1196,16 @@ export interface CustomMapAsset {
   w?: number;
   h?: number;
   areaId?: string;
+  /** tile only: the complete source ground treatment to paint into this cell. */
+  groundStyle?: AreaDef['ground'];
   enemyId?: string;
   wave?: WaveDef;
+  /** spawn-point only: which side enters here. 'player' is the run's start position. */
+  spawnSide?: 'player' | 'hostile';
+  /** objective-marker only: what a mission objective can do with this point. */
+  markerRole?: 'hold' | 'destroy' | 'escort' | 'extract';
+  /** beacon only: which `SectorStructureDef` this placement builds. */
+  beaconId?: string;
 }
 
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
@@ -1007,6 +1257,132 @@ export interface DistrictIncursionState {
   propUids: number[];
 }
 
+/**
+ * Player-chosen run-wide toggles, picked on the Roster screen before launch
+ * and carried into `createWorld`'s `setup.modifiers`. Every field is
+ * additive/independent so any combination can be enabled together -- see
+ * `modifierHpMult`/`modifierSpawnMult`/`speedMult` in `engine/world.ts`.
+ */
+export interface RunModifiers {
+  /** Doubles enemy spawn rate and applies a flat 1.5x hp bump, stacking with everything else. */
+  doubleMode?: boolean;
+  /** Quadruples normal wave spawn rate. Overrides doubleMode's spawn portion when both are enabled. */
+  quadSpawnMode?: boolean;
+  /** Raises the live-enemy cap to 1,000 and uses an optimized 8x spawn cadence. */
+  unleashedMode?: boolean;
+  /** Mirrors the area's obstacle layout left-to-right at run start. */
+  invertedMap?: boolean;
+  /** Raises player and enemy movement speed. */
+  speedMode?: boolean;
+  /** Enemy hp scales up with the player's current level, capped. */
+  scalerMode?: boolean;
+  /** The area's timer never ends the run; the final wave repeats and escalates instead. */
+  infiniteMode?: boolean;
+  /** Enables the periodic HordeSpin wheel event. */
+  hordeSpinEnabled?: boolean;
+  /**
+   * Raises the odds the Director (see `data/directors.ts`) crashes the run
+   * with an unscripted squad once eligible. Unlocked permanently in
+   * `MetaState.directorModeUnlocked` after the player first defeats the
+   * Director's boss; the Director can still trigger at its base chance
+   * before that unlock, since the toggle only exists once there's an
+   * encounter on record to want more of.
+   */
+  directorModeEnabled?: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* Director events                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A scripted, low-probability mid-run escalation: a named "Director" cuts
+ * in with its own unique squad (see `data/factions.ts`), built from the
+ * existing `WaveDef`/`squadWave` machinery rather than bespoke sim code.
+ * Content lives in `data/directors.ts`; the engine only re-rolls the timer
+ * and spawns the roster -- see `updateDirector` in `engine/world.ts`.
+ */
+export interface DirectorDef {
+  id: string;
+  name: string;
+  /** Seconds into the run before the Director may trigger at all. */
+  triggerAfterSec: number;
+  /** Seconds between eligibility re-rolls once past `triggerAfterSec`. */
+  rerollIntervalSec: number;
+  /** Chance (0..1) the Director fires on each re-roll. */
+  chance: number;
+  /** Multiplier applied to `chance` when `RunModifiers.directorModeEnabled` is on. */
+  directorModeChanceMult: number;
+  /** Faction registered in `data/factions.ts` whose whole roster arrives together. */
+  factionId: string;
+  /** Enemy id (must be in the faction roster) whose defeat clears the encounter. */
+  bossEnemyId: string;
+  hpMult: number;
+  formation?: WaveDef['formation'];
+  warningText: string;
+  victoryText: string;
+  /** Meta unlock id recorded permanently once this Director's boss is defeated. */
+  unlockId: string;
+  /** Label shown on the Roster screen's Director Mode toggle once unlocked. */
+  toggleLabel: string;
+  toggleDescription: string;
+}
+
+/** Live per-run state for the (at most one, currently) active Director encounter. */
+export interface DirectorRunState {
+  phase: 'pending' | 'active' | 'resolved';
+  /** w.now the next eligibility roll happens. */
+  nextRollAt: number;
+  activeDirectorId: string | null;
+  /** uid of the spawned boss enemy for the active encounter, if any. */
+  bossUid: number | null;
+  /** True once the active/most recent encounter's boss was defeated. */
+  victorious: boolean;
+}
+
+/** A one-shot meta-progression announcement, drained and shown by the hub on return. See `MetaState.pendingNotifications`. */
+export interface PendingNotification {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: number;
+}
+
+export type HordeSpinTierId = '1x' | '2x' | '3x' | '4x' | '5x5' | '666';
+export type HordeSpinPhase = 'idle' | 'spinning' | 'result' | 'active';
+
+/** One weighted outcome on the HordeSpin wheel. Content lives in `data/hordeSpin.ts`. */
+export interface HordeSpinTierDef {
+  id: HordeSpinTierId;
+  label: string;
+  /** Relative odds; the pool doesn't need to sum to 100. */
+  weight: number;
+  /** Base horde size multiplier (base cluster size is fixed in the engine). */
+  spawnMultiplier: number;
+  hpMult: number;
+  rewardCred: number;
+  rare?: boolean;
+  /** 666 only: screen hue-shifts while the horde is active. */
+  colorFluctuation?: boolean;
+  /** Grants a guaranteed LokPet roll when the horde is cleared. */
+  grantsPet?: boolean;
+  celebration: 'mild' | 'big' | 'legendary';
+}
+
+/** Runtime state for the periodic HordeSpin wheel event. Null unless `RunModifiers.hordeSpinEnabled`. */
+export interface WheelSpinState {
+  phase: HordeSpinPhase;
+  /** w.now the wheel is next allowed to spin again (only meaningful while idle). */
+  nextSpinAt: number;
+  spinStartedAt: number;
+  resultAt: number;
+  resultTierId?: HordeSpinTierId;
+  activeEndsAt: number;
+  rewardGranted: boolean;
+  spinsThisRun: number;
+  colorFluctuation: boolean;
+}
+
 /** Authored story layer for the opening city thread. */
 export interface FirstNightChapter {
   areaId: string;
@@ -1035,7 +1411,13 @@ export interface DungeonEra {
   bounds: { w: number; h: number };
 }
 
-export type EndlessBandId = 'core' | 'floodwall' | 'rail-shadow' | 'industrial-fringe' | 'outer-threshold';
+export type EndlessBandId =
+  | 'core'
+  | 'floodwall'
+  | 'rail-shadow'
+  | 'industrial-fringe'
+  | 'outer-threshold'
+  | (string & {});
 
 export interface EndlessBandDef {
   id: EndlessBandId;
@@ -1325,7 +1707,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'account' | 'feedback'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -1383,7 +1765,7 @@ export type VendorItemCategory = 'stat' | 'utility' | 'challenge' | 'relic' | 'a
 
 export type VendorEffect =
   | { kind: 'stat'; stat: keyof BaseStats; add?: number; mult?: number; cap?: number }
-  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult'; amount: number };
+  | { kind: 'utility'; utility: 'starting-weapon-level' | 'reward-cred-mult' | 'extra-life' | 'threat-matrix' | 'universal-incursion' | 'corner-magnet' | 'tidal-anchor' | 'static-inverter'; amount: number };
 
 export interface VendorItemDef {
   id: string;
@@ -1440,6 +1822,12 @@ export interface UIThemeDef {
   description: string;
   /** Cred cost to unlock. 0 = always owned. */
   cost: number;
+  /** Visual progression label. Starter themes are always available. */
+  tier?: 'starter' | CosmeticTier;
+  /** Included in the always-available intro theme carousel. */
+  starter?: boolean;
+  /** Secret until earned through a rare reload takeover or Dev Mode. */
+  hidden?: boolean;
   /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
   swatches?: UIThemeSwatchDef[];
 }
@@ -1469,6 +1857,25 @@ export interface ThemedPaletteDef {
   effect?: PaletteEffectDef;
   /** Color palette to apply to sprites and world when active. */
   palette: SpritePalette;
+}
+
+/**
+ * A purchasable gameplay-SFX reskin sold in the Sound Booth. Mirrors
+ * `ThemedPaletteDef`'s shape exactly, one currency (`lootTokens`), one
+ * catalog pattern (`ownedSoundPackIds`/`activeSoundPackId`). `style` is the
+ * small set of synthesis knobs from `audio/sfxCues.ts` that reskins every
+ * cue uniformly -- a pack never redefines individual cues.
+ */
+export interface SoundPackDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Loot token cost to unlock. 0 = always owned. */
+  cost: number;
+  /** When true, this pack is included in the default owned set. */
+  owned?: boolean;
+  tier?: CosmeticTier;
+  style: SfxStyleDef;
 }
 
 /** Procedural player aura rendered during runs. These styles are visual only. */
@@ -1559,6 +1966,23 @@ export interface MetaState {
   levelUpPresentation: 'pause-focus' | 'compact-live' | 'random-live';
   /** Show the tactical map by default in the pause dashboard. */
   pauseMapVisible: boolean;
+  /**
+   * 'high' (default) matches every run's current, unchanged behavior --
+   * nothing about how the game looks changes unless the player opts into a
+   * lower tier. 'balanced'/'performance' trim decorative density (particle
+   * counts, damage popups, enemy outlines/shadows) starting at progressively
+   * lower enemy counts, useful on a slower device or a very dense swarm run.
+   */
+  graphicsQuality: 'high' | 'balanced' | 'performance';
+  /**
+   * Render pacing preference. The simulation remains fixed at 60 Hz, while
+   * 120 Hz redraws input and presentation between simulation updates on
+   * capable displays. The renderer automatically reduces its backing scale
+   * when a device cannot keep the requested cadence.
+   */
+  frameRateMode: 60 | 120;
+  /** Lifetime objective completions, used to reveal the ordered game soundtrack. */
+  soundtrackObjectiveCompletions: number;
   /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
   wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */
@@ -1571,16 +1995,42 @@ export interface MetaState {
   worldInvertEnabled: boolean;
   /** Cheat-code toggle from the Quartermaster's "Negative Exposure" unlock: inverts the run's color palette. Requires owning that vendor item. */
   paletteInvertEnabled: boolean;
+  /** Cheat-code toggle from the Quartermaster's "Wrong Side of the Street" unlock: mirrors the run left-to-right. Requires owning that vendor item. */
+  mirrorModeEnabled: boolean;
   /** 'grid' shows list-heavy hub panels as multi-column card grids; 'list' is the original single-column layout. */
   uiDensity: 'grid' | 'list';
+  /** Cosmetic presentation for LokPet portraits and cards. Never changes a companion's stats. */
+  lokPetArtStyle: 'pixel-core' | 'neon-signal' | 'holo-card';
+  /** Shared chrome shape for menu cards and controls. */
+  uiBorderStyle: 'square' | 'soft' | 'round';
+  /** Independent frame shape for collectible LokPet portraits. */
+  lokPetBorderStyle: 'square' | 'soft' | 'round';
+  /** Independent frame shape for playable-character portraits. */
+  characterBorderStyle: 'square' | 'soft' | 'round';
   /** Whether the game reacts to the soundtrack (beat pulses, on-beat crits). */
   musicReactiveEnabled: boolean;
   /** Optional procedural room ambience in the hideout (rain, pipe hum, cellar drips). Off by default. */
   hideoutAmbienceEnabled: boolean;
+  /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
+  hideoutWeatherEnabled: boolean;
+  /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
+  splashTextEnabled: boolean;
+  /** Shows the cleaner signature title lockup instead of the classic stacked two-line title. Off by default. */
+  oneLineTitleEnabled: boolean;
+  /** Lets the two title pieces be dragged with a gentle release momentum on the opening screen. On by default. */
+  introTitlePhysicsEnabled: boolean;
+  /** Seconds of inactivity before the intro pieces magnetically return home. */
+  introTitleReturnDelaySec: number;
+  /** Popup travel-encounter minigame on select hideout/run-launch triggers. On by default. See game/travelEncounter.ts. */
+  travelEncountersEnabled: boolean;
   /** Allows animated palette flourishes independently from the selected colors. */
   paletteAnimationsEnabled: boolean;
   /** Blends the global Artisan world palette over each character's personal skin. */
   worldPaletteBlendEnabled: boolean;
+  /** Extends the active world palette to recolor enemies and environment accents too, not just the player. Off by default to preserve the original look. */
+  worldColorFullRecolorEnabled: boolean;
+  /** Sector Command missions cleared at least once. */
+  completedSectorMissionIds: string[];
   /** Whether device tilt steers the player on supported hardware. */
   gyroEnabled: boolean;
   /** Tilt sensitivity, 0.5 (gentle) .. 2 (twitchy). */
@@ -1593,6 +2043,12 @@ export interface MetaState {
    * game does, so it is enabled deliberately or not at all.
    */
   studioPluginsEnabled: boolean;
+  /**
+   * Studio layout: 'auto' follows the device's own viewport (mobile-width
+   * devices get the tabbed touch layout, everything else gets the full
+   * multi-panel one); 'mobile'/'desktop' force one regardless of viewport.
+   */
+  studioLayout: 'auto' | 'mobile' | 'desktop';
   selectedCharacterId: string;
   /** Character id -> selected personal four-color skin id. */
   characterSkinByCharacterId: Record<string, string>;
@@ -1608,6 +2064,8 @@ export interface MetaState {
   savedLokPets: SavedLokPet[];
   /** Up to three saved companions selected for the next run. */
   selectedLokPetIds: string[];
+  /** Cards imported from other G-Six games. Display-only; see VisitingLokCard. */
+  visitingLokCards: VisitingLokCard[];
   /** Recovery currency, regenerated in groups of three every twenty minutes. */
   petElixirs: number;
   petElixirUpdatedAt: number;
@@ -1616,14 +2074,48 @@ export interface MetaState {
   totalKills: number;
   totalRuns: number;
   bestSurvivalSec: number;
+  /** Every level-up across every run, ever -- never resets. Feeds the persistent player level. */
+  totalLevelUps: number;
   /** Soft currency earned per run. */
   cred: number;
   /** Loot tokens spendable in the hideout. */
   lootTokens: number;
+  /** Currency earned from blue loot boxes and spent at the LokPet card shop. */
+  cardCredits: number;
+  cardCollection: OwnedCardRecord[];
+  activePassiveCardIds: string[];
+  /** Up to BATTLE_DECK_SLOTS owned card ids equipped for the travel-encounter minigame's Attack action. Empty deck falls back to an unarmed punch -- never blocks the player. See data/travelEncounters.ts. */
+  battleDeckCardIds: string[];
+  /** Legacy compatibility flag for players who previously owned Salvage Protocol. */
+  cardSalvageUnlocked: boolean;
+  /** Permanent companion-shop device. It keeps thrown cards in the binder and records companion details in Archives. */
+  handheldDigiScopeOwned: boolean;
+  /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
+  lokCollectorRuns: number;
+  /** Chest-origin LokPets caught during collector runs. */
+  lokCollectorPetsFound: number;
+  /** Sanctum LokPet League tier reached (0: unranked, 1-5: champion tiers). */
+  lokPetLeagueTier: number;
+  /** Total LokPet arena battles won. */
+  lokPetBattleWins: number;
+  /** Badges and crests earned from defeating league syndicate masters. */
+  lokPetBattleBadges: string[];
+  /** Treats available to feed and level up companions in the Lit Corner. */
+  lokPetTreats: number;
   /** Rare currency found by breaking street props, weighted toward endless mode. Spendable in the hideout vendor's relic category. */
   skeletonKeys: number;
+  /** Rentable/buildable passive cred generators the player owns. See `data/generators.ts`. */
+  ownedGeneratorIds: string[];
+  /** Wall-clock ms of the last time owned generators' income was settled into `cred`. */
+  generatorAccrualAt: number;
+  /** Run-wide toggles picked on the Roster screen before launch. See `RunModifiers`. */
+  runModifiers: RunModifiers;
   /** Whether the player has seen the intro briefing. */
   onboarded: boolean;
+  /** The one-time first-arrival LokPet rescue has been completed. */
+  starterLokPetOnboardingComplete: boolean;
+  /** Species chosen during the first-arrival encounter. */
+  starterLokPetVariantId: string | null;
   /** Farthest endless distance ever reached (world units). */
   endlessRecordDistancePx: number;
   /** Deepest dungeon depth ever reached in endless mode. */
@@ -1632,6 +2124,8 @@ export interface MetaState {
   endlessDiscoveryIds: string[];
   /** Character id -> current fatigue penalty percentage, capped at 5. */
   fatigueByCharacter: Record<string, number>;
+  /** Character id -> lifetime level-ups earned while playing that character specifically -- never resets. Feeds each character's own persistent mastery level. */
+  characterLevelUps: Record<string, number>;
   /** The active recovery session, if anyone is resting. */
   recovery: RecoverySession;
   /** Highest hideout facility purchased by the player. */
@@ -1670,10 +2164,20 @@ export interface MetaState {
   uiTheme: string;
   /** Selected accent swatch id per theme, for themes that offer swatches. */
   uiThemeSwatchByTheme: Record<string, string>;
+  /** Core Master upgrade: expands cycling beyond the starter theme set. */
+  themeCycleMastered: boolean;
+  /** Which collection the Core Master cycles through after it is unlocked. */
+  themeCycleCollection: 'starter' | 'owned';
   /** Purchased themed palette ids. The 'default' palette is always included. */
   ownedPaletteIds: string[];
   /** Currently active character/world color palette id. */
   activePaletteId: string;
+  /** Purchased sound pack ids, bought from the Sound Booth. The free 'house-pa' pack is always included. */
+  ownedSoundPackIds: string[];
+  /** Currently equipped gameplay-SFX sound pack id. */
+  activeSoundPackId: string;
+  /** Master on/off for gameplay sound effects (hits, pickups, UI...). Independent of music/ambience. */
+  sfxEnabled: boolean;
   /** Purchased procedural run aura ids. The street halo is always included. */
   ownedRunAuraIds: string[];
   /** Currently equipped procedural run aura id. */
@@ -1690,6 +2194,46 @@ export interface MetaState {
   dailyContractProgressById: Record<string, number>;
   /** Contracts already paid out for today's Broadcast board. */
   completedDailyContractIds: string[];
+  /** Achievement ids whose one-time currency reward has already been paid out. See `data/achievements.ts`. */
+  claimedAchievementIds: string[];
+  /** Director ids whose boss has been permanently defeated at least once. See `data/directors.ts`. */
+  defeatedDirectorIds: string[];
+  /** True once any Director has been defeated, unlocking the Director Mode run toggle. */
+  directorModeUnlocked: boolean;
+  /** Whether the Threat Matrix quarantine terminal is unlocked with lootkeys. */
+  threatMatrixUnlocked: boolean;
+  /** Bestiary enemy IDs contained/disabled from spawning in runs. */
+  disabledEnemyIds: string[];
+  /** Weapons quarantined / disabled from level-up rolls and loot chests. */
+  disabledWeaponIds: string[];
+  /** Passives quarantined / disabled from level-up rolls and loot chests. */
+  disabledPassiveIds: string[];
+  /** Threat Matrix sector calibrations (mass, hp, density, wave angles, special events). */
+  threatCalibrations: ThreatCalibrations;
+  /** Toggled reality upgrades in the Threat Matrix (e.g. universal-incursion, tidal-anchor). */
+  threatUpgrades: Record<string, boolean>;
+  /** Easter egg weapon unlocked status (DVD Bouncing Logo). */
+  dvdEasterEggUnlocked: boolean;
+  /** Generic queue of unlock/achievement announcements, drained by the hub screen on return. */
+  pendingNotifications: PendingNotification[];
+  /** Highest changelog version (see `data/changelog.ts`) the player has acknowledged via the update popup. */
+  lastSeenChangelogVersion: string;
+}
+
+export type ThreatAngleMode = 'standard' | 'pincer' | 'cardinal' | 'spiral' | 'corners';
+export type ThreatEventId = 'emp-storm' | 'gravity-anomaly' | 'glitch-surge' | 'solar-flare' | 'blood-overclock' | 'swarm-frenzy';
+
+export interface ThreatCalibrations {
+  /** Multiplier on enemy maximum health, 0.5x to 3.0x. Default 1.0 */
+  hpMult: number;
+  /** Multiplier on enemy physics mass and collision scale, 0.5x to 2.5x. Default 1.0 */
+  massMult: number;
+  /** Multiplier on enemy wave spawn rates and pack density, 0.5x to 2.5x. Default 1.0 */
+  densityMult: number;
+  /** Wave incursion angle vector mode. Default 'standard' */
+  angleMode: ThreatAngleMode;
+  /** Special events active during the run. */
+  activeEvents: ThreatEventId[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -1702,6 +2246,14 @@ export interface RunResult {
   cleared: boolean;
   /** Present for a failed run; distinguishes lethal environmental deaths. */
   deathCause?: 'lethal-pothole' | 'ordinary-hazard';
+  /** Sector Command: which mission this run was, if any. */
+  missionId?: string;
+  /**
+   * Sector Command: whether the mission's required objectives were all met.
+   * Campaign credit follows this, never `cleared` -- surviving the clock ends
+   * the run but does not complete the mission.
+   */
+  missionComplete?: boolean;
   survivedSec: number;
   kills: number;
   level: number;
@@ -1718,6 +2270,7 @@ export interface RunResult {
   lootBoxesOpened: number;
   /** Prize labels collected from loot boxes. */
   openedPrizes: string[];
+  cardPacksFound?: CardPackId[];
   /** LokPets generated from chest rewards during this run. */
   lokPets: Array<{
     origin: 'chest' | 'loadout';
@@ -1749,6 +2302,10 @@ export interface RunResult {
   fatigueAddedPct?: number;
   /** Operative's fatigue after this run, before recovery begins. */
   fatigueAfterPct?: number;
+  /** Director id that triggered during this run, if any. See `data/directors.ts`. */
+  directorEncounterId?: string;
+  /** True if this run's Director boss was defeated. */
+  directorDefeated?: boolean;
   /** Objectives completed this run. */
   completedObjectives: CompletedObjective[];
   /** Broadcast contracts completed by this run. */
@@ -1825,6 +2382,8 @@ export interface RunResult {
     discoveredBandIds: EndlessBandId[];
     discoveredRouteEventIds: string[];
   };
+  /** Bounded, capped list of notable moments captured during the run. See `game/data/runHighlights.ts`. */
+  highlights?: RunHighlight[];
 }
 
 export interface HudSnapshot {
@@ -1901,6 +2460,18 @@ export interface HudSnapshot {
     target: number;
     accent: string;
     remainingSec: number;
+  };
+  /** Present only when `RunModifiers.hordeSpinEnabled` was on at run start. */
+  wheelSpin?: {
+    phase: HordeSpinPhase;
+    resultTierId?: HordeSpinTierId;
+    resultLabel?: string;
+    rewardCred: number;
+    rare: boolean;
+    celebration: 'mild' | 'big' | 'legendary';
+    secondsToNextSpin: number;
+    activeRemainingSec: number;
+    colorFluctuation: boolean;
   };
   episode?: {
     id: string;
@@ -1987,3 +2558,126 @@ export interface HudSnapshot {
 }
 
 export type RunPhase = 'countdown' | 'playing' | 'levelup' | 'paused' | 'reel' | 'over';
+
+/* ------------------------------------------------------------------ */
+/* Sector Command (RTS/campaign mode)                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * How a mission gets its army. Only 'stolen' is implemented; the other two
+ * are declared now so missions can be authored against them and the runtime
+ * can fail loudly rather than silently mis-handling an unbuilt tier.
+ * See .agents/memory/sector-command-design.md.
+ */
+export type SectorEconomyTier =
+  /** Tier 1 (built): no production. Every unit is an enemy you captured. */
+  | 'stolen'
+  /** Tier 2 (reserved): a placeable beacon trickles basic units. */
+  | 'beacon'
+  /** Tier 3 (reserved): real build queue against a resource. */
+  | 'production';
+
+/** What a captured enemy becomes once it is fighting for you. */
+export interface SectorUnitDef {
+  /** The `EnemyDef` id this unit is captured from. */
+  enemyId: string;
+  name: string;
+  /** Cost against the mission's `squadCap`; elites cost more than swarm units. */
+  squadCost: number;
+  /** Applied to the captured enemy's stats when it changes sides. */
+  hpMult: number;
+  damageMult: number;
+  speedMult: number;
+  /** Capture only becomes available at or below this fraction of max HP. */
+  captureHpFraction: number;
+  role: 'line' | 'skirmisher' | 'siege' | 'support';
+  blurb: string;
+}
+
+export type MissionObjectiveKind =
+  | 'kill-any'
+  | 'kill-enemy'
+  | 'survive-sec'
+  | 'capture-units'
+  | 'hold-marker'
+  | 'reach-marker'
+  | 'destroy-marker';
+
+export interface MissionObjectiveDef {
+  id: string;
+  label: string;
+  kind: MissionObjectiveKind;
+  targetCount: number;
+  enemyId?: string;
+  /** For marker kinds: the `objective-marker:*` asset id placed on the map. */
+  markerAssetId?: string;
+  /** Bonus objectives never block completion; they upgrade the mission grade. */
+  optional?: boolean;
+}
+
+/**
+ * A scripted mid-mission beat. Modelled on `DistrictIncursionDef`'s proven
+ * phase machine, but a mission may hold several and they can fire off
+ * objective progress rather than only elapsed time. `line`/`speakerAllyId`
+ * are the seam where authored story (and later, cutscenes) plug in.
+ */
+export type MissionBeatTrigger =
+  | { kind: 'at-sec'; sec: number }
+  | { kind: 'objective-complete'; objectiveId: string }
+  | { kind: 'squad-wiped' };
+
+export interface MissionBeatDef {
+  id: string;
+  trigger: MissionBeatTrigger;
+  line: string;
+  speakerAllyId?: string;
+  /** Optional extra pressure the beat drops in when it fires. */
+  spawnWave?: WaveDef;
+}
+
+export interface SectorMissionDef {
+  id: string;
+  name: string;
+  /** Checked against the `FACTIONS` registry by `sectorMissions.test.ts`. */
+  factionId: string;
+  /** Must be an ally the player has actually rescued -- the campaign consumes base-game progression. */
+  commanderAllyId: string;
+  /** Id of an authored map in `data/sectorMaps.ts`. */
+  mapId: string;
+  economyTier: SectorEconomyTier;
+  /**
+   * Hides unscouted ground. Presentation and targeting only -- enemy AI is
+   * unchanged, so the fog never lies about what the simulation knows.
+   */
+  fogOfWar?: boolean;
+  durationSec: number;
+  /** Max total `squadCost` the player may command at once. Keep low for touch. */
+  squadCap: number;
+  briefing: string;
+  debrief: string;
+  objectives: MissionObjectiveDef[];
+  beats: MissionBeatDef[];
+  /** Standard gate (kills/clearArea/etc). Mission-to-mission order uses `requiresMissionIds`. */
+  unlock: UnlockRule;
+  requiresMissionIds?: string[];
+}
+
+/* Reserved for tiers 2-3 -- authored against, not yet consumed by the engine. */
+export interface SectorStructureDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Seconds between unit trickles. */
+  spawnIntervalSec: number;
+  /** Enemy id the structure produces. */
+  unitEnemyId: string;
+  hp: number;
+}
+
+export interface SectorResourceDef {
+  id: string;
+  name: string;
+  description: string;
+  /** Gained per enemy killed while the tier is active. */
+  perKill: number;
+}

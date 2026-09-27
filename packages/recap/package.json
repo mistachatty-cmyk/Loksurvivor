@@ -1,0 +1,34 @@
+{
+  "name": "@lok/recap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/adapter.ts",
+  "types": "src/adapter.ts",
+  "exports": {
+    ".": "./src/adapter.ts",
+    "./player": "./src/player.tsx",
+    "./schema": "./src/schema.ts",
+    "./poster": "./src/poster/drawPosterCard.ts"
+  },
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts RunRecapVertical out/recap.mp4",
+    "render:wide": "remotion render src/index.ts RunRecapWide out/recap-wide.mp4",
+    "still": "remotion still src/index.ts RunRecapVertical out/recap-card.png --frame=180",
+    "typecheck": "tsc --noEmit",
+    "render:run": "node scripts/render-run.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.523",
+    "@remotion/player": "^4.0.523",
+    "remotion": "^4.0.523",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "typescript": "~5.9.3"
+  }
+}

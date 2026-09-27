@@ -1,5 +1,8 @@
 import type { AreaDef } from '@/game/types';
 import { AREAS_2X } from './areas-2x';
+import { WEIRD_AREAS } from './areas-weird';
+import { AREAS_ENDLESS } from './areas-endless';
+import { AREAS_NULL_SECTOR } from './areas-null-sector';
 import { squadWave } from './authoring';
 
 /**
@@ -49,10 +52,12 @@ export const AREAS: AreaDef[] = [
     unlock: { kind: 'default' },
     waves: [
       { fromSec: 0, toSec: 40, enemyId: 'nightcrawler', ratePerSec: 1.1, burst: 1 },
-      { fromSec: 18, toSec: 75, enemyId: 'neon-leech', ratePerSec: 0.8, burst: 2, group: ['nightcrawler'], formation: 'wedge', faction: 'Street Chorus' },
+      { fromSec: 18, toSec: 75, enemyId: 'neon-leech', ratePerSec: 0.8, burst: 2, group: ['nightcrawler', 'pallet-wraith'], formation: 'wedge', faction: 'Street Chorus' },
       { fromSec: 45, toSec: 120, enemyId: 'nightcrawler', ratePerSec: 1.5, burst: 2, hpMult: 1.2 },
+      { fromSec: 55, toSec: 120, enemyId: 'marquee-static', ratePerSec: 0.3, burst: 1 },
       { fromSec: 62, toSec: 120, enemyId: 'bloodhound', ratePerSec: 0.45, burst: 1 },
       { fromSec: 76, toSec: 120, enemyId: 'corner-cutter', ratePerSec: 0.42, burst: 1, formation: 'pincer', faction: 'Afterimage Choir' },
+      { fromSec: 90, toSec: 120, enemyId: 'curb-stomper', ratePerSec: 0.1, burst: 1 },
       { fromSec: 95, toSec: 120, enemyId: 'crypt-bouncer', ratePerSec: 0.12, burst: 1 },
       squadWave({ fromSec: 30, toSec: 120, factionId: 'the-watch', ratePerSec: 0.25, formation: 'ring' }),
     ],
@@ -161,7 +166,7 @@ export const AREAS: AreaDef[] = [
     discoveryId: 'lantern-shard',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
     waves: [
-      { fromSec: 0, toSec: 55, enemyId: 'ash-wisp', ratePerSec: 1.6, burst: 2, group: ['spiral-moth'] },
+      { fromSec: 0, toSec: 55, enemyId: 'ash-wisp', ratePerSec: 1.6, burst: 2, group: ['spiral-moth', 'hollow-echo'] },
       { fromSec: 25, toSec: 100, enemyId: 'crypt-spitter', ratePerSec: 0.6, burst: 1 },
       { fromSec: 54, toSec: 120, enemyId: 'spiral-moth', ratePerSec: 0.55, burst: 1 },
       { fromSec: 50, toSec: 150, enemyId: 'nightcrawler', ratePerSec: 1.6, burst: 3, hpMult: 1.4 },
@@ -200,7 +205,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 40, toSec: 130, enemyId: 'bloodhound', ratePerSec: 1.1, burst: 2, hpMult: 1.4 },
       { fromSec: 60, toSec: 150, enemyId: 'crypt-spitter', ratePerSec: 0.7, burst: 2, hpMult: 1.3 },
       { fromSec: 78, toSec: 180, enemyId: 'bass-bruiser', ratePerSec: 0.24, burst: 1, hpMult: 1.2 },
-      { fromSec: 88, toSec: 180, enemyId: 'smoke-horn', ratePerSec: 0.12, burst: 1 },
+      { fromSec: 88, toSec: 180, enemyId: 'smoke-horn', ratePerSec: 0.12, burst: 1, group: ['ember-hauler', 'ash-caller'] },
       { fromSec: 90, toSec: 180, enemyId: 'crypt-bouncer', ratePerSec: 0.4, burst: 1, hpMult: 1.4 },
       { fromSec: 140, toSec: 141, enemyId: 'the-sire', ratePerSec: 1, burst: 1 },
     ],
@@ -246,7 +251,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 18, toSec: 100, enemyId: 'river-wraith', ratePerSec: 0.48, burst: 1 },
       { fromSec: 38, toSec: 125, enemyId: 'bridge-lookout', ratePerSec: 0.52, burst: 1, group: ['current-stag'] },
       { fromSec: 68, toSec: 175, enemyId: 'lightless-prowler', ratePerSec: 0.72, burst: 2 },
-      { fromSec: 58, toSec: 175, enemyId: 'current-stag', ratePerSec: 0.35, burst: 1 },
+      { fromSec: 58, toSec: 175, enemyId: 'current-stag', ratePerSec: 0.35, burst: 1, group: ['antler-fawn'] },
       { fromSec: 92, toSec: 175, enemyId: 'river-wraith', ratePerSec: 0.8, burst: 2, hpMult: 1.25 },
       { fromSec: 130, toSec: 175, enemyId: 'bass-bruiser', ratePerSec: 0.32, burst: 1, hpMult: 1.35 },
     ],
@@ -380,7 +385,7 @@ export const AREAS: AreaDef[] = [
     name: 'Northline Rail Yard',
     district: 'North cut',
     description:
-      'Dead rails divide a field of signal lights and freight cars. The city’s secret deliveries pass through here after midnight.',
+      'Dead rails divide a field of switch lights and freight cars. The city’s secret deliveries pass through here after midnight.',
     backdrop: 'art/alley.jpeg',
     bounds: { w: 1080, h: 620 },
     ground: { base: '#101820', tile: '#172632', seam: '#080d12', glow: '#f26b5e' },
@@ -406,7 +411,7 @@ export const AREAS: AreaDef[] = [
     discoveryId: 'northline-switch',
     landmark: {
       name: 'Northline Switch',
-      description: 'A signal tower blinks in a pattern only the crew recognizes.',
+      description: 'A switch tower blinks in a pattern only the crew recognizes.',
       kind: 'rail-yard',
       accent: '#f26b5e',
     },
@@ -418,7 +423,7 @@ export const AREAS: AreaDef[] = [
       { fromSec: 68, toSec: 190, enemyId: 'river-wraith', ratePerSec: 0.62, burst: 2 },
       { fromSec: 105, toSec: 190, enemyId: 'crypt-bouncer', ratePerSec: 0.27, burst: 1, hpMult: 1.45 },
       squadWave({ fromSec: 50, toSec: 190, factionId: 'prism-choir', ratePerSec: 0.2, formation: 'wall' }),
-      { fromSec: 75, toSec: 190, enemyId: 'signal-marshal', ratePerSec: 0.12, burst: 1 },
+      { fromSec: 75, toSec: 190, enemyId: 'relay-marshal', ratePerSec: 0.12, burst: 1 },
       { fromSec: 170, toSec: 171, enemyId: 'kaleidoscope', ratePerSec: 1, burst: 1 },
     ],
   },
@@ -516,6 +521,87 @@ export const AREAS: AreaDef[] = [
       { fromSec: 180, toSec: 210, enemyId: 'bubbleteer-shocker', ratePerSec: 0.4, burst: 1, hpMult: 1.4 },
     ],
   },
+  {
+    id: 'bubbleWash',
+    name: 'Bubble Wash',
+    district: 'Industrial Suds Basin',
+    description:
+      'A massive industrial runoff basin where pink Bubbleteers and blue Bubblenaughts wage turf wars. Alarms sound before devastating walls of suds wash the arena left and right!',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 1060, h: 760 },
+    ground: { base: '#0b192c', tile: '#1e3e62', seam: '#000000', glow: '#38bdf8' },
+    sky: 'roofed',
+    obstacles: [
+      { x: -360, y: -240, w: 120, h: 48, kind: 'barrier' },
+      { x: 360, y: -240, w: 120, h: 48, kind: 'barrier' },
+      { x: -360, y: 240, w: 120, h: 48, kind: 'barrier' },
+      { x: 360, y: 240, w: 120, h: 48, kind: 'barrier' },
+      { x: -280, y: 0, w: 60, h: 80, kind: 'planter' },
+      { x: 280, y: 0, w: 60, h: 80, kind: 'planter' },
+      { x: 0, y: -280, w: 64, h: 64, kind: 'neon-sign' },
+      { x: 0, y: 280, w: 64, h: 64, kind: 'neon-sign' },
+      { x: -160, y: -120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: 160, y: 120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: -160, y: 120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: 160, y: -120, w: 70, h: 50, kind: 'crate-breakable' },
+      { x: -420, y: 0, w: 50, h: 50, kind: 'barrel' },
+      { x: 420, y: 0, w: 50, h: 50, kind: 'barrel' },
+      { x: 0, y: 0, w: 80, h: 28, kind: 'cover' },
+    ],
+    durationSec: 180,
+    threat: 'severe',
+    discoveryId: 'bubble-wash-cleanse',
+    unlock: { kind: 'default' },
+    waves: [
+      { fromSec: 0, toSec: 60, enemyId: 'bubblenaught-drifter', ratePerSec: 2.0, burst: 2, formation: 'wedge', faction: 'Bubblenaught Tide' },
+      { fromSec: 10, toSec: 70, enemyId: 'bubbleteer-cadet', ratePerSec: 2.0, burst: 2, formation: 'pincer', faction: 'Bubbleteer Parade' },
+      { fromSec: 30, toSec: 90, enemyId: 'bubble-hopper', ratePerSec: 1.5, burst: 3, faction: 'Bubbleteer Parade' },
+      { fromSec: 40, toSec: 110, enemyId: 'cyan-lye-glob', ratePerSec: 0.8, burst: 1, faction: 'Bubblenaught Tide' },
+      { fromSec: 60, toSec: 130, enemyId: 'dust-mite', ratePerSec: 2.2, burst: 4, faction: 'Digitized Damned' },
+      { fromSec: 80, toSec: 150, enemyId: 'froth-behemoth', ratePerSec: 0.45, burst: 1, hpMult: 1.2, faction: 'Bubbleteer Parade' },
+      { fromSec: 90, toSec: 160, enemyId: 'soap-bubble-titan', ratePerSec: 0.4, burst: 1, hpMult: 1.3, faction: 'Bubblenaught Tide' },
+      { fromSec: 120, toSec: 180, enemyId: 'marshal-undertow', ratePerSec: 0.35, burst: 1, group: ['bubblenaught-drifter', 'cyan-lye-glob'] },
+      { fromSec: 130, toSec: 180, enemyId: 'captain-frothbite', ratePerSec: 0.35, burst: 1, group: ['bubbleteer-cadet', 'bubble-hopper'] },
+    ],
+  },
+  {
+    id: 'soul-foundry',
+    name: 'The Soul Foundry',
+    district: 'Digital Hellspace -- Sector 0xDEAD',
+    description:
+      'A surreal subterranean server labyrinth where The Director traps organic human souls, seeking to harvest their essence and compile them into living digital entities.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 1020, h: 780 },
+    ground: { base: '#050508', tile: '#0c0f1d', seam: '#00f0ff', glow: '#ff0055' },
+    sky: 'fog',
+    obstacles: [
+      { x: -320, y: -220, w: 130, h: 46, kind: 'barrier' },
+      { x: 320, y: -220, w: 130, h: 46, kind: 'barrier' },
+      { x: -320, y: 220, w: 130, h: 46, kind: 'barrier' },
+      { x: 320, y: 220, w: 130, h: 46, kind: 'barrier' },
+      { x: 0, y: -260, w: 58, h: 64, kind: 'neon-sign' },
+      { x: 0, y: 260, w: 58, h: 64, kind: 'neon-sign' },
+      { x: -180, y: 0, w: 60, h: 80, kind: 'crate-breakable' },
+      { x: 180, y: 0, w: 60, h: 80, kind: 'crate-breakable' },
+      { x: -380, y: 0, w: 58, h: 52, kind: 'barrel' },
+      { x: 380, y: 0, w: 58, h: 52, kind: 'barrel' },
+      { x: 0, y: 0, w: 96, h: 24, kind: 'cover' },
+    ],
+    durationSec: 200,
+    threat: 'severe',
+    discoveryId: 'digital-soul-core',
+    unlock: { kind: 'default' },
+    waves: [
+      { fromSec: 0, toSec: 70, enemyId: 'dust-mite', ratePerSec: 2.5, burst: 4, faction: 'Digitized Damned' },
+      { fromSec: 15, toSec: 90, enemyId: 'digitized-phantom', ratePerSec: 1.2, burst: 2, faction: 'Digitized Damned' },
+      { fromSec: 40, toSec: 120, enemyId: 'soul-extractor', ratePerSec: 0.8, burst: 1, faction: 'Digitized Damned' },
+      { fromSec: 60, toSec: 150, enemyId: 'bit-rot', ratePerSec: 0.7, burst: 1, faction: 'Digitized Damned' },
+      { fromSec: 90, toSec: 170, enemyId: 'cursor-hound', ratePerSec: 1.0, burst: 2, faction: 'Glitch Breach' },
+      { fromSec: 110, toSec: 200, enemyId: 'director-clapper', ratePerSec: 0.45, burst: 1, hpMult: 1.3, faction: 'Digitized Damned' },
+      { fromSec: 130, toSec: 200, enemyId: 'heap-colossus', ratePerSec: 0.35, burst: 1, hpMult: 1.4, faction: 'Glitch Breach' },
+      { fromSec: 150, toSec: 200, enemyId: 'the-director', ratePerSec: 0.15, burst: 1, hpMult: 1.6, faction: 'Reel Syndicate' },
+    ],
+  },
 
   /**
    * Oddity flats -- see .agents/memory/oddity-arenas.md. Timed arenas with no
@@ -542,6 +628,8 @@ export const AREAS: AreaDef[] = [
       { x: 160, y: -40, w: 36, h: 44, kind: 'flora' },
       { x: 60, y: 220, w: 30, h: 42, kind: 'trash-can' },
       { x: -60, y: -220, w: 30, h: 42, kind: 'trash-can' },
+      { x: 200, y: 60, w: 26, h: 26, kind: 'pothole' },
+      { x: -200, y: -60, w: 24, h: 30, kind: 'fire-hydrant' },
     ],
     durationSec: 150,
     threat: 'rising',
@@ -550,8 +638,8 @@ export const AREAS: AreaDef[] = [
     waves: [
       { fromSec: 0, toSec: 60, enemyId: 'nightcrawler', ratePerSec: 1.3, burst: 2 },
       { fromSec: 15, toSec: 90, enemyId: 'neon-leech', ratePerSec: 0.9, burst: 2 },
-      { fromSec: 50, toSec: 150, enemyId: 'bloodhound', ratePerSec: 0.5, burst: 1 },
-      { fromSec: 80, toSec: 150, enemyId: 'ring-runner', ratePerSec: 1.6, burst: 3, formation: 'ring' },
+      { fromSec: 50, toSec: 150, enemyId: 'bloodhound', ratePerSec: 0.5, burst: 1, formation: 'wedge' },
+      { fromSec: 80, toSec: 150, enemyId: 'ring-runner', ratePerSec: 1.6, burst: 3, formation: 'ring', group: ['loop-wisp'] },
     ],
   },
   {
@@ -731,25 +819,68 @@ export const AREAS: AreaDef[] = [
     ],
   },
 
-  // Endless mode -- no time limit, no walls, procedurally generated world.
   {
-    id: 'endless-streets',
-    name: 'Endless Streets',
-    district: 'All of 616',
+    id: 'lev-syndicate-spire',
+    name: 'Lev Syndicate Spire',
+    district: 'Lev Highline Concourse',
     description:
-      'A living grid of streets, marked facades, and districts that keep going. Walk into a building, find its way back out, and see how deep the city goes.',
-    backdrop: 'art/street.jpeg',
-    bounds: { w: 99999, h: 99999 }, // not used directly -- world is unbounded
-    ground: { base: '#141420', tile: '#1c1c2c', seam: '#0c0c14', glow: '#f0a848' },
-    sky: 'clear',
-     obstacles: [{ x: -140, y: 90, w: 100, h: 24, kind: 'cover' }, { x: 140, y: -90, w: 52, h: 52, kind: 'reflective-surface' }],
-    durationSec: 0, // endless -- win condition is "head home", loss is death
-    threat: 'rising',
-    unlock: { kind: 'clearArea', areaId: 'monroe-strip' },
-    waves: [], // spawning is procedural
-    endless: true,
+      'An elevated mega-plaza suspended hundreds of meters above the city between Lev Syndicate corporate towers. Features high-voltage transformer stations, suspension skyways, security laser gates, and violent cyber-storms.',
+    backdrop: 'art/rooftops.jpeg',
+    bounds: { w: 2200, h: 1000 },
+    ground: {
+      base: '#041017',
+      tile: '#0c2233',
+      seam: '#22d3ee',
+      glow: '#f59e0b',
+    },
+    sky: 'cyber-storm',
+    authoredGroundTiles: [
+      { x: 0, y: 0, w: 2000, h: 40, base: '#041017', tile: '#0c2233', seam: '#22d3ee', glow: '#22d3ee' },
+      { x: -500, y: -200, w: 300, h: 200, base: '#041017', tile: '#13354f', seam: '#38bdf8', glow: '#38bdf8' },
+      { x: 500, y: 200, w: 300, h: 200, base: '#041017', tile: '#13354f', seam: '#38bdf8', glow: '#38bdf8' },
+      { x: 0, y: -350, w: 800, h: 16, base: '#041017', tile: '#0c2233', seam: '#f59e0b', glow: '#f59e0b' },
+      { x: 0, y: 350, w: 800, h: 16, base: '#041017', tile: '#0c2233', seam: '#f59e0b', glow: '#f59e0b' },
+    ],
+    obstacles: [
+      { x: -750, y: -300, w: 160, h: 140, kind: 'skyscraper' },
+      { x: 750, y: 300, w: 160, h: 140, kind: 'skyscraper' },
+      { x: -380, y: 240, w: 80, h: 60, kind: 'transformer-station' },
+      { x: 380, y: -240, w: 80, h: 60, kind: 'transformer-station' },
+      { x: 0, y: -180, w: 140, h: 36, kind: 'skyline-bridge' },
+      { x: 0, y: 180, w: 140, h: 36, kind: 'skyline-bridge' },
+      { x: -520, y: 0, w: 50, h: 50, kind: 'beacon-tower' },
+      { x: 520, y: 0, w: 50, h: 50, kind: 'beacon-tower' },
+      { x: -160, y: 0, w: 90, h: 28, kind: 'security-gate' },
+      { x: 160, y: 0, w: 90, h: 28, kind: 'security-gate' },
+      { x: -300, y: -120, w: 56, h: 56, kind: 'bunker-hatch' },
+      { x: 300, y: 120, w: 56, h: 56, kind: 'bunker-hatch' },
+    ],
+    landmark: {
+      name: 'Lev Singularity Generator',
+      description: 'The central gravitational stabilization core of the Lev Syndicate Highline Concourse.',
+      kind: 'plaza',
+      accent: '#22d3ee',
+    },
+    durationSec: 200,
+    threat: 'severe',
+    discoveryId: 'lev-core-archive',
+    unlock: { kind: 'default' },
+    waves: [
+      { fromSec: 0, toSec: 40, enemyId: 'lev-drone-interceptor', ratePerSec: 1.2, burst: 3, faction: 'Lev Syndicate' },
+      { fromSec: 25, toSec: 80, enemyId: 'lev-nanite-phantom', ratePerSec: 0.8, burst: 2, formation: 'pincer', faction: 'Lev Syndicate' },
+      { fromSec: 50, toSec: 110, enemyId: 'lev-substation-brute', ratePerSec: 0.5, burst: 1, hpMult: 1.1, faction: 'Lev Syndicate' },
+      { fromSec: 75, toSec: 150, enemyId: 'lev-arc-conductor', ratePerSec: 0.6, burst: 2, faction: 'Lev Syndicate' },
+      { fromSec: 100, toSec: 170, enemyId: 'lev-singularity-colossus', ratePerSec: 0.35, burst: 1, hpMult: 1.25, faction: 'Lev Syndicate' },
+      { fromSec: 140, toSec: 200, enemyId: 'lev-drone-interceptor', ratePerSec: 2.2, burst: 4, formation: 'ring', faction: 'Lev Syndicate' },
+    ],
   },
+
+  ...WEIRD_AREAS,
+
+  // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.
+  ...AREAS_ENDLESS,
   ...AREAS_2X,
+  ...AREAS_NULL_SECTOR,
 ];
 
 export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(

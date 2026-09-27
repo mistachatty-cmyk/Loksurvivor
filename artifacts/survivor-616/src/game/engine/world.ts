@@ -9,7 +9,7 @@
  * snapshots out of it.
  */
 
-import { getEnemy } from '@/game/data/enemies';
+import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
@@ -20,29 +20,47 @@ import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
+import { SECTOR_STRUCTURES_BY_ID } from '@/game/data/sectorStructures';
+import { SECTOR_UNITS_BY_ENEMY_ID } from '@/game/data/sectorUnits';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getFirstNightChapter } from '@/game/data/firstNight';
+import { DIRECTORS } from '@/game/data/directors';
+import { getFaction } from '@/game/data/factions';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
 import { chooseDistrictIncursion, DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
-import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand } from '@/game/data/endlessBands';
+import { ENDLESS_BANDS, ENDLESS_BANDS_BY_ID, getEndlessBand, getEndlessBandById, getEndlessBandsForTheme } from '@/game/data/endlessBands';
+import type { ActiveCardEffects } from '@/game/data/passiveCards';
+import {
+  HORDE_SPIN_ACTIVE_MS_PER_STEP,
+  HORDE_SPIN_BASE_CLUSTER,
+  HORDE_SPIN_INTERVAL_MS,
+  HORDE_SPIN_RESULT_MS,
+  HORDE_SPIN_SPIN_MS,
+  getHordeSpinTier,
+  pickHordeSpinTier,
+} from '@/game/data/hordeSpin';
 import { SILENT_FRAME, msFromNearestBeat, type AudioFrame } from '@/game/audio/beatBus';
+import type { SfxCueId, SfxEvent } from '@/game/audio/sfxCues';
 import { reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type {
   ActiveCrewRumor,
   AreaDef,
   BaseStats,
+  CardPackId,
   CharacterEpisodeDef,
   ChallengeContractDef,
   CharacterDef,
   CompletedObjective,
   DashSkillDef,
   DistrictIncursionState,
+  DirectorRunState,
   EnemyDef,
   EndlessState,
   EvolutionBehavior,
   EvolutionDef,
   HudSnapshot,
   HatStyle,
+  HordeSpinTierId,
   LootPrizeDef,
   LokPetInstance,
   LokPetRoll,
@@ -50,6 +68,7 @@ import type {
   RunObjective,
   RunResult,
   RunAuraStyle,
+  RunModifiers,
   RunPassive,
   RunWeapon,
   StatusEffectInstance,
@@ -63,6 +82,14 @@ import type {
   RelicRecipeDef,
   StealthAbilityConfig,
   StormCloudMode,
+  WheelSpinState,
+  SpritePalette,
+  FreezeThrowConfig,
+  MissionBeatDef,
+  MissionObjectiveDef,
+  SectorMissionDef,
+  SectorStructureDef,
+  ThreatCalibrations,
 } from '@/game/types';
 
 import {
@@ -121,6 +148,23 @@ export interface PlayerActor extends Actor {
   dashReadyAt: number;
   dashStartedAt: number;
   dashHitUids: Set<number>;
+  /** Lil Buzbèè pollen: movement/healing buff, including the 1.5s linger. */
+  pollenSpeedUntil?: number;
+  pollenHealingUntil?: number;
+}
+
+/**
+ * LokSurvivorArena: an additional local/networked player sharing the host's
+ * `World`, outside the normal single-player weapon/leveling system -- see
+ * `arena/` for the movement/attack loop that drives these. Only ever
+ * non-empty when `World.arenaMode` is set; the campaign path never
+ * constructs one.
+ */
+export interface GuestPlayerActor extends Actor {
+  id: string;
+  /** Fixed for the whole match -- guests don't level up or evolve weapons, see arena/arenaWorld.ts. */
+  character: CharacterDef;
+  attackReadyAt: number;
 }
 
 export interface EnemyActor extends Actor {
@@ -165,6 +209,32 @@ export interface EnemyActor extends Actor {
   /** commander: true while it currently has the player found and is
    *  buffing nearby allies; false while shielded and searching to relock. */
   commanderLocked: boolean;
+  /** Zero Day: frozen "stone" and fully inert (no AI, no contact damage, undamageable) while `w.now < frozenUntil`. */
+  frozenUntil: number;
+  /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
+  selectedForThrow: boolean;
+  /**
+   * Sector Command: permanently captured and fighting for the player. Distinct
+   * from the legacy `convertedUntil` timer (the allymaker weapon), which stays
+   * exactly as it was -- only `commanded` units are excluded from player
+   * targeting, take hostile contact damage, and obey move orders.
+   */
+  commanded: boolean;
+  /** Sector Command: the standing order a commanded unit walks to and holds. */
+  orderKind: 'none' | 'move' | 'hold' | 'attack-move';
+  orderX: number;
+  orderY: number;
+  /** Sector Command: inside the current command-mode drag box. */
+  selectedForCommand: boolean;
+  /**
+   * Sector Command: primed for capture until this timestamp. While primed, the
+   * enemy cannot be killed by player damage -- see `damageEnemy`. This is what
+   * makes capture a decision instead of a reflex test.
+   */
+  capturableUntil: number;
+  /** Llamá Máma: mesmerized with heart eyes and bubbles, trailing baby llamas */
+  cutifiedUntil?: number;
+  cutifiedTargetUid?: number;
 }
 
 /** A free-roaming detection circle released by a 'commander' enemy. See `updateRoamingDetectors`. */
@@ -214,15 +284,51 @@ export interface Projectile {
   explosionRadius?: number;
   explosionDamage?: number;
   evolutionBehavior?: EvolutionBehavior;
+  /** Resonance Bell reverses once so a reflected tone can cross its route again. */
+  reverseAt?: number;
+  reversed?: boolean;
+  pausedUntil?: number;
+  /** Zero Day: when set, this projectile IS a thrown frozen enemy (that uid), resolved by resolveThrownEnemyImpact instead of the normal hit path. */
+  carriedEnemyUid?: number;
+  /** Custom projectile kind, such as the retro DVD bouncing screensaver icon, cascading solitaire windows, nyan cat, popup ad, dom tag, byte block, golden cookie. */
+  customKind?: 'dvd-logo' | 'solitaire' | 'baby-llama' | 'elemental-llama' | 'nyan-cat' | 'popup-window' | 'dom-tag' | 'byte-block' | 'golden-cookie';
+  weaponId?: string;
+  bounceCount?: number;
+  trampleNextAt?: number;
+  hasRefracted?: boolean;
+  isElementalLlama?: boolean;
+  popupTitle?: string;
+  popupText?: string;
+  popupKind?: 'warn' | 'ipod' | 'million' | 'hot' | 'error';
+  tagText?: string;
+  tagPair?: 'open' | 'close';
+  sinePhase?: number;
+  sineBaseX?: number;
+  sineBaseY?: number;
 }
 
 export type EffectKind = 'slash' | 'nova' | 'aura' | 'spark' | 'ring' | 'wave' | 'laser' | 'hazard' | 'teleport' | 'impact'
   /** A thin ambient connector line between two points -- no damage, purely a "you're webbed in" visual. */
-  | 'web';
+  | 'web'
+  /** Glitch / 4th-wall desktop marquee selection and CRT corruption box. */
+  | 'glitch'
+  /** Real-time stereo audio oscilloscope waveform ribbons. */
+  | 'waveform'
+  /** Hypnotic 8-bit retro dance floor with floating musical notes. */
+  | 'rickroll-disco'
+  /** Authentic full-screen cobalt blue BSOD CRT crash. */
+  | 'bsod-crash'
+  /** 56k dial-up baud audio carrier wave. */
+  | 'dialup-carrier'
+  /** Real-time digital terminal matrix green phosphor code rain. */
+  | 'matrix-rain';
 
 export interface Effect {
   uid: number;
   kind: EffectKind;
+  weaponId?: string;
+  bsodErrorText?: string;
+  discoBeat?: number;
   x: number;
   y: number;
   radius: number;
@@ -245,6 +351,9 @@ export interface Effect {
   /** Elemental-synergy bonus: extra damage when the target already carries this status. */
   bonusVsStatusId?: string;
   bonusVsStatusMult?: number;
+  /** Persistent inward force used by gravity-well fields. */
+  pullStrength?: number;
+  pausedUntil?: number;
 }
 
 export interface Orbiter {
@@ -303,7 +412,7 @@ function createDashSkillRuntime(def: DashSkillDef | undefined): DashSkillRuntime
   return { def, slotReadyAt: [0], wallReadyAt: 0, pendingLandings: [] };
 }
 
-export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'coin';
+export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'card-pack' | 'coin';
 
 export interface Pickup {
   uid: number;
@@ -460,6 +569,122 @@ export interface StormCloud {
 }
 
 /**
+ * Sector Command runtime state; null outside the campaign mode.
+ * Selection mirrors `FreezeThrowState`'s shape deliberately -- same marquee
+ * grammar, same uid-list contract -- but targets commanded units instead of
+ * frozen enemies.
+ */
+export interface SectorCommandState {
+  /** Max total `SectorUnitDef.squadCost` the player may hold at once. */
+  squadCap: number;
+  /** True while the player has command mode on: drag selects, tap orders. */
+  commandMode: boolean;
+  selecting: boolean;
+  selectionStart: { x: number; y: number } | null;
+  selectionEnd: { x: number; y: number } | null;
+  selectedUids: number[];
+  /** Mission bookkeeping: units taken and units lost across the mission. */
+  captures: number;
+  losses: number;
+  /**
+   * Control groups, as uid lists. Three, because that is how many chips fit
+   * within thumb reach -- there is no keyboard here, so groups are buttons.
+   * Pruned of dead units on read rather than on death.
+   */
+  groups: number[][];
+  /** Which order a tap issues: plain move, or attack-move. */
+  orderMode: 'move' | 'attack-move';
+}
+
+/** One objective's live progress. Progress is derived from world state each frame. */
+export interface MissionObjectiveRuntime {
+  def: MissionObjectiveDef;
+  progress: number;
+  /** Seconds banked for time-based objectives (hold-marker). */
+  accumulator: number;
+  done: boolean;
+  doneAt: number;
+}
+
+export interface MissionBeatRuntime {
+  def: MissionBeatDef;
+  fired: boolean;
+  firedAt: number;
+}
+
+/**
+ * Tier 2 economy: a placed reinforcement beacon.
+ *
+ * Mortal on purpose -- hostiles that reach it break it and the reinforcements
+ * stop, so a beacon is ground worth holding rather than a free tap.
+ */
+export interface BeaconActor {
+  uid: number;
+  def: SectorStructureDef;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  nextSpawnAt: number;
+  broken: boolean;
+  hitFlashUntil: number;
+}
+
+/**
+ * Fog of war: a coarse visibility grid.
+ *
+ * Deliberately *not* built on the renderer's shadow caster, which is a
+ * per-frame lighting effect over nearby breakables and cannot answer "has the
+ * player seen this cell". A grid can, costs a few KB at mission scale, and is
+ * cheap to stamp.
+ *
+ * Cells hold 0 = never seen, 1 = explored (terrain remembered, actors hidden),
+ * 2 = currently visible. This is read by the renderer only -- see
+ * `SectorMissionDef.fogOfWar`.
+ */
+export interface FogState {
+  cols: number;
+  rows: number;
+  cell: number;
+  /** Row-major, `cols * rows` entries. */
+  cells: Uint8Array;
+  nextUpdateAt: number;
+}
+
+/** Sector Command mission runtime; null outside a mission. */
+export interface MissionRuntime {
+  def: SectorMissionDef;
+  objectives: MissionObjectiveRuntime[];
+  beats: MissionBeatRuntime[];
+  /** Objective-marker positions lifted off the authored map. */
+  markers: Array<{ assetId: string; x: number; y: number }>;
+  complete: boolean;
+  /**
+   * Set when the clock runs out with a required objective outstanding. The run
+   * still ends through the ordinary timed-clear path -- `RunOutcome` stays
+   * `'running' | 'cleared' | 'dead'`, because widening it would ripple through
+   * summary, contracts, episodes and relics for no gain. Mission success is
+   * carried separately, on the mission and on `RunResult`.
+   */
+  failed: boolean;
+  /** Guards the squad-wiped beat so it cannot fire before you ever had a squad. */
+  everHadUnits: boolean;
+  lastBeatLine: string | null;
+  lastBeatAt: number;
+}
+
+/** Zero Day's freeze-then-throw runtime state. See createFreezeCone/updateFreezeSelection/throwSelectedFrozenEnemies. */
+export interface FreezeThrowState {
+  lastCastAt: number;
+  /** True while the player is actively dragging a selection box. */
+  selecting: boolean;
+  selectionStart: { x: number; y: number } | null;
+  selectionEnd: { x: number; y: number } | null;
+  /** Frozen enemy uids currently inside the (locked-in or in-progress) selection box. */
+  selectedUids: number[];
+}
+
+/**
  * Ground-hazard liquids. Never solid -- always kept out of `w.obstacles`.
  * `water`/`oil`/`coolant`/`runoff` spawn from breaking certain obstacles
  * (fire hydrant, car-wreck, ac-unit, dumpster); `fire-storm`/`acid-storm`/
@@ -537,9 +762,13 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'ac-unit': { variant: 'light-breakable', hp: 100 },
   /** Wonky sentry block: tough, pushable, and armed. See oddity-arenas.md. */
   'attack-block': { variant: 'heavy-metal', hp: 220 },
+  /** Null Sector only: overloads into an AoE burst on break. See null-sector.md. */
+  'server-rack': { variant: 'light-breakable', hp: 110 },
+  /** Tree Null map: tough cybernetic digital tree with dense foliage. */
+  'tree-digital': { variant: 'heavy-metal', hp: 800 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
-  'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench',
+  'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -654,6 +883,18 @@ export interface World {
   cycle: { phase: number; cycleMs: number };
 
   player: PlayerActor;
+  /**
+   * LokSurvivorArena: additional local/networked players sharing this world.
+   * Always empty outside arena mode -- the campaign path never touches this.
+   */
+  guests: GuestPlayerActor[];
+  /** LokSurvivorArena: gates every arena-only branch in stepWorld/draw. */
+  arenaMode: boolean;
+  /** LokSurvivorArena: kills attributed to each guest by id. The host's own kills stay in `kills`, unchanged. */
+  guestKills: Record<string, number>;
+  /** Short deterministic route history used only by Tidal Memory. */
+  playerTrail: Array<{ x: number; y: number; at: number }>;
+  nextPlayerTrailAt: number;
   enemies: EnemyActor[];
   projectiles: Projectile[];
   effects: Effect[];
@@ -661,6 +902,23 @@ export interface World {
   pendingMeteors: PendingMeteor[];
   /** Storm Chaser's draggable cloud; null for every other character. */
   stormCloud: StormCloud | null;
+  /** Zero Day's freeze-then-throw runtime state; null for every other character. */
+  freezeThrow: FreezeThrowState | null;
+  /** Sector Command runtime state; null outside the campaign mode. */
+  sectorCommand: SectorCommandState | null;
+  /** Tier 2 economy: reinforcement beacons authored onto the mission's map. */
+  beacons: BeaconActor[];
+  /** Fog of war; null unless the mission asked for it. */
+  fog: FogState | null;
+  /** Sector Command mission objectives/beats; null outside a mission. */
+  mission: MissionRuntime | null;
+  /** Fragmented Backup vendor item: a lethal hit restores 25% HP once per run instead of ending it. */
+  extraLifeAvailable: boolean;
+  extraLifeUsed: boolean;
+  /** Active world-color theme, when full recolor is enabled; undefined otherwise. */
+  worldColorPalette?: SpritePalette;
+  /** Settings toggle: also blend `worldColorPalette` into enemy sprites and environment colors, not just the player's own sprite. */
+  worldColorFullRecolor?: boolean;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
   /** Runtime bookkeeping for the character's dash skill, when it has one. */
@@ -680,8 +938,15 @@ export interface World {
   /** Cosmetic background life; never collided with or damaged. */
   ambient: AmbientActor[];
   lokPets: LokPetInstance[];
+  /** Dynamic companion cap: normal four in-run companions plus Collector slots. */
+  maxLokPets: number;
   /** All LokPets generated this run, including companions that have expired. */
   lokPetHistory: LokPetInstance[];
+  /** Llamá Máma passive & mechanics */
+  llamaMamaEnraged?: boolean;
+  llamaMamaRageUntil?: number;
+  llamaMamaLastBlastAt?: number;
+  llamaEgoScore?: number;
 
   obstacles: Aabb[];
   breakables: BreakableObstacle[];
@@ -730,6 +995,13 @@ export interface World {
 
   rescue: RescueState;
   alerts: Alert[];
+  /**
+   * Gameplay-SFX cues raised this tick, drained and played once per rendered
+   * frame in `RunScreen` (same pattern as `pendingReel`/`pendingLevelUps` --
+   * never read mid-substep, or a slow frame would retrigger a cue several
+   * times).
+   */
+  sfxEvents: SfxEvent[];
   outcome: RunOutcome;
   deathCause?: RunResult['deathCause'];
 
@@ -744,6 +1016,19 @@ export interface World {
   ambientRng: () => number;
   /** Rebuilt every frame for enemy separation. */
   grid: Map<number, EnemyActor[]>;
+  /** Rebuilt every frame from `obstacles` so per-actor collision only tests nearby boxes. */
+  obstacleGrid: Map<number, Aabb[]>;
+  /** True once `obstacleGrid` needs rebuilding (obstacles are static, so this only flips on add/break). */
+  obstacleGridDirty: boolean;
+  /**
+   * uid -> enemy, rebuilt alongside `grid` every frame (and kept in sync by
+   * the mid-frame spawn/removal sites) so uid-based lookups (homing-target
+   * refresh, thrown/carried enemy resolution, commanded-unit selection)
+   * don't have to linear-scan `w.enemies` -- that scan was O(enemies) per
+   * lookup, called per projectile/unit per frame, and dominated frame time
+   * once enemy counts got into the hundreds.
+   */
+  enemiesByUid: Map<number, EnemyActor>;
 
   /** Seed used to create rng; also forwarded to endless chunk generation. */
   rngSeed: number;
@@ -759,6 +1044,8 @@ export interface World {
   stealthConfig: StealthAbilityConfig | null;
   /** "Let Me Hold This" owned: hazard weapons never hurt whoever's holding them, native character or not. */
   hazardImmune: boolean;
+  /** "Low-Light Optics" owned: draw.ts cuts the night-time screen tint down instead of applying it in full. */
+  nightVisionEnabled: boolean;
   /** Timestamp (w.now) the current cloak activation ends; 0 or in the past when not cloaked. */
   stealthUntil: number;
   /** Timestamp (w.now) the cloak is next allowed to activate. */
@@ -813,6 +1100,18 @@ export interface World {
   firstNightBeatTriggeredAt: number;
   /** Optional, short landmark encounter selected for this run. */
   districtIncursion?: DistrictIncursionState;
+  /** Run-wide toggles picked on the Roster screen. See `RunModifiers`. */
+  modifiers: RunModifiers;
+  /**
+   * Player's persistent graphics preference (Settings), read once at
+   * creation. Render-only -- affects decorative density (particles, damage
+   * popups, enemy outlines/shadows), never difficulty or rewards.
+   */
+  graphicsQuality: 'high' | 'balanced' | 'performance';
+  /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
+  wheelSpin: WheelSpinState | null;
+  /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
+  director: DirectorRunState;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -829,6 +1128,8 @@ export interface World {
   lootTokensGained: number;
   /** Rare currency (skeleton keys) earned this run, found by breaking street props. */
   skeletonKeysGained: number;
+  cardPacksFound: import('@/game/types').CardPackId[];
+  cardEffects: ActiveCardEffects;
 
   /* ---- Objective system ---- */
   objectives: RunObjective[];
@@ -838,9 +1139,58 @@ export interface World {
     def: CharacterEpisodeDef;
     startingProgress: number;
   };
+  /* ---- Threat Matrix & Special mechanics ---- */
+  disabledEnemyIds?: string[];
+  disabledWeaponIds?: string[];
+  disabledPassiveIds?: string[];
+  threatCalibrations?: ThreatCalibrations;
+  threatEventTimers?: {
+    nextEmpAt: number;
+    nextGravityAt: number;
+    nextGlitchAt: number;
+    glitchActiveUntil: number;
+    nextSolarAt: number;
+    nextSwarmAt: number;
+    swarmActiveUntil: number;
+  };
+  threatUpgrades?: Record<string, boolean>;
+  dvdEasterEggUnlocked?: boolean;
+  bubbleWash?: BubbleWashState;
+  electricChains?: ElectricChain[];
 }
 
-const MAX_ENEMIES = 190;
+export interface BubbleWashState {
+  nextSurgeAt: number;
+  warningStartedAt: number;
+  surgeActiveUntil: number;
+  direction: -1 | 1;
+  state: 'idle' | 'warning' | 'surging';
+  foamParticles: Array<{ x: number; y: number; vx: number; vy: number; r: number; color: string; bornAt: number }>;
+}
+
+export interface ElectricChain {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  bornAt: number;
+  expiresAt: number;
+}
+
+export const NORMAL_ENEMY_CAP = 190;
+export const UNLEASHED_ENEMY_CAP = 1000;
+const UNLEASHED_PROJECTILE_BUDGET = 260;
+const UNLEASHED_ENEMY_EFFECT_BUDGET = 180;
+/**
+ * Ground pickups have no expiry and no per-mode budget gate -- unlike
+ * projectiles/effects, rejecting a new one would mean a kill silently pays
+ * no XP/cred, which reads as a bug, not a density limit. Instead this trims
+ * the *oldest* excess pickups each frame (evicting presumably-abandoned
+ * drops, never the one a kill just paid out) once the array is long enough
+ * that scanning it in `updatePickups` would otherwise grow without bound --
+ * e.g. a player who kills through a horde without backtracking to collect.
+ */
+const PICKUP_CAP = 600;
 const CELL = 48;
 
 /** Kill counts that drop a blue loot box (each fires once per run). */
@@ -908,6 +1258,7 @@ export function createWorld(
     sizeMult?: number;
     stealth?: StealthAbilityConfig | null;
     hazardImmune?: boolean;
+    nightVisionEnabled?: boolean;
     minimapEnemyRadar?: boolean;
     minimapLootSense?: boolean;
     minimapHazardSense?: boolean;
@@ -917,13 +1268,45 @@ export function createWorld(
     /** Progression-aware rescue selected by the meta layer. Undefined means this route is complete. */
     rescueAllyId?: string | undefined;
     startingLokPets?: LokPetRoll[];
+    modifiers?: RunModifiers;
+    graphicsQuality?: 'high' | 'balanced' | 'performance';
+    worldColorPalette?: SpritePalette;
+    worldColorFullRecolor?: boolean;
+    extraLifeAvailable?: boolean;
+    /** Sector Command: squad cap for this mission. Presence of this enables the mode. */
+    sectorSquadCap?: number;
+    /** Sector Command: where the authored map's player spawn point puts you. */
+    playerStart?: { x: number; y: number };
+    /** Sector Command: the mission being played, and its map's objective markers. */
+    mission?: SectorMissionDef;
+    missionMarkers?: Array<{ assetId: string; x: number; y: number }>;
+    /** Tier 2 economy: beacon placements lifted off the authored map. */
+    missionBeacons?: Array<{ beaconId: string; x: number; y: number }>;
+    cardEffects?: ActiveCardEffects;
+    disabledEnemyIds?: string[];
+    disabledWeaponIds?: string[];
+    disabledPassiveIds?: string[];
+    threatCalibrations?: ThreatCalibrations;
+    threatUpgrades?: Record<string, boolean>;
+    dvdEasterEggUnlocked?: boolean;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
+  const modifiers = setup.modifiers ?? {};
+  // `invertedMap` mirrors the area's authored obstacle layout left-to-right;
+  // area coordinates are centered at (0,0) (bounds are half-extents), so
+  // flipping is just negating x. All three of obstacles/breakables/potholes
+  // below are independently derived from `area.obstacles`, so the mirrored
+  // copy is built once here and reused for all three.
+  const obstacleDefs = modifiers.invertedMap
+    ? area.obstacles.map((o) => ({ ...o, x: -o.x }))
+    : area.obstacles;
   const player: PlayerActor = {
     uid: 1,
-    x: 0,
-    y: 0,
+    // Sector Command missions start you on the map's authored player spawn
+    // point; every other mode starts at the origin as it always has.
+    x: setup.playerStart?.x ?? 0,
+    y: setup.playerStart?.y ?? 0,
     vx: 0,
     vy: 0,
     kx: 0,
@@ -967,6 +1350,8 @@ export function createWorld(
     // run, so most runs see at most one transition.
     cycle: { phase: 0.5, cycleMs: 420000 },
     player,
+    playerTrail: [{ x: player.x, y: player.y, at: 0 }],
+    nextPlayerTrailAt: 100,
     enemies: [],
     projectiles: [],
     effects: [],
@@ -977,6 +1362,69 @@ export function createWorld(
           dragging: false, mode: 'rain', modeStartedAt: 0, nextTickAt: 0, autoCycle: true,
         }
       : null,
+    freezeThrow: character.freezeThrow
+      ? { lastCastAt: Number.NEGATIVE_INFINITY, selecting: false, selectionStart: null, selectionEnd: null, selectedUids: [] }
+      : null,
+    extraLifeAvailable: setup.extraLifeAvailable ?? false,
+    extraLifeUsed: false,
+    fog: setup.mission?.fogOfWar
+      ? (() => {
+          const cell = FOG_CELL;
+          const cols = Math.ceil(area.bounds.w / cell) + 2;
+          const rows = Math.ceil(area.bounds.h / cell) + 2;
+          return { cols, rows, cell, cells: new Uint8Array(cols * rows), nextUpdateAt: 0 };
+        })()
+      : null,
+    beacons: (setup.mission?.economyTier === 'beacon' ? setup.missionBeacons ?? [] : [])
+      .map((placement, index): BeaconActor | null => {
+        const def = SECTOR_STRUCTURES_BY_ID[placement.beaconId];
+        if (!def) return null;
+        return {
+          uid: 90000 + index,
+          def,
+          x: placement.x,
+          y: placement.y,
+          hp: def.hp,
+          maxHp: def.hp,
+          // Stagger the first trickle so a map with several beacons does not
+          // hand you a whole squad on one tick.
+          nextSpawnAt: def.spawnIntervalSec * 1000 * (0.5 + index * 0.25),
+          broken: false,
+          hitFlashUntil: 0,
+        };
+      })
+      .filter((beacon): beacon is BeaconActor => beacon !== null),
+    sectorCommand: setup.sectorSquadCap
+      ? {
+          squadCap: setup.sectorSquadCap,
+          commandMode: false,
+          selecting: false,
+          selectionStart: null,
+          selectionEnd: null,
+          selectedUids: [],
+          captures: 0,
+          losses: 0,
+          groups: [[], [], []],
+          orderMode: 'move',
+        }
+      : null,
+    mission: setup.mission
+      ? {
+          def: setup.mission,
+          objectives: setup.mission.objectives.map((objective) => ({
+            def: objective, progress: 0, accumulator: 0, done: false, doneAt: 0,
+          })),
+          beats: setup.mission.beats.map((beat) => ({ def: beat, fired: false, firedAt: 0 })),
+          markers: setup.missionMarkers ?? [],
+          complete: false,
+          everHadUnits: false,
+          failed: false,
+          lastBeatLine: null,
+          lastBeatAt: 0,
+        }
+      : null,
+    worldColorPalette: setup.worldColorPalette,
+    worldColorFullRecolor: setup.worldColorFullRecolor,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -991,8 +1439,9 @@ export function createWorld(
     followers: [],
     ambient: [],
     lokPets: [],
+    maxLokPets: 4 + (character.lokPetCollector?.extraTeamSlots ?? 0),
     lokPetHistory: [],
-    obstacles: area.obstacles
+    obstacles: obstacleDefs
       .filter((o) => o.kind !== 'pothole')
       .map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h })),
     breakables: [],
@@ -1000,6 +1449,9 @@ export function createWorld(
     nextAmbientDropAt: area.randomDrops ? 2500 : Number.POSITIVE_INFINITY,
     fluids: [],
     bounds: area.bounds,
+    guests: [],
+    arenaMode: false,
+    guestKills: {},
     camera: { x: 0, y: 0 },
     shake: 0,
     audio: SILENT_FRAME,
@@ -1030,6 +1482,7 @@ export function createWorld(
       allyId: 'rescueAllyId' in setup ? setup.rescueAllyId : area.rescueAllyId,
     },
     alerts: [],
+    sfxEvents: [],
     outcome: 'running',
     upgradeStacks: {},
     spawnCredit: area.waves.map(() => 0),
@@ -1037,6 +1490,9 @@ export function createWorld(
     rng,
     ambientRng: createRng(seed + 0x5eed),
     grid: new Map(),
+    obstacleGrid: new Map(),
+    obstacleGridDirty: true,
+    enemiesByUid: new Map(),
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
@@ -1044,6 +1500,7 @@ export function createWorld(
     playerSizeMult: sizeMult,
     stealthConfig: setup.stealth ?? null,
     hazardImmune: setup.hazardImmune ?? false,
+    nightVisionEnabled: setup.nightVisionEnabled ?? false,
     stealthUntil: 0,
     stealthReadyAt: setup.stealth ? 4000 : Number.POSITIVE_INFINITY,
     stealthAnchorX: 0,
@@ -1101,6 +1558,28 @@ export function createWorld(
           propUids: [],
         }
       : undefined,
+    modifiers,
+    graphicsQuality: setup.graphicsQuality ?? 'high',
+    wheelSpin: modifiers.hordeSpinEnabled
+      ? {
+          phase: 'idle',
+          nextSpinAt: HORDE_SPIN_INTERVAL_MS,
+          spinStartedAt: 0,
+          resultAt: 0,
+          resultTierId: undefined,
+          activeEndsAt: 0,
+          rewardGranted: false,
+          spinsThisRun: 0,
+          colorFluctuation: false,
+        }
+      : null,
+    director: {
+      phase: 'pending',
+      nextRollAt: 0,
+      activeDirectorId: null,
+      bossUid: null,
+      victorious: false,
+    },
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     claimedLootPrizes: new WeakSet(),
@@ -1108,6 +1587,32 @@ export function createWorld(
     openedPrizes: [],
     lootTokensGained: 0,
     skeletonKeysGained: 0,
+    cardPacksFound: [],
+    cardEffects: setup.cardEffects ?? { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false },
+    disabledEnemyIds: setup.disabledEnemyIds ?? [],
+    disabledWeaponIds: setup.disabledWeaponIds ?? [],
+    disabledPassiveIds: setup.disabledPassiveIds ?? [],
+    threatCalibrations: setup.threatCalibrations,
+    threatEventTimers: {
+      nextEmpAt: 7000,
+      nextGravityAt: 12000,
+      nextGlitchAt: 15000,
+      glitchActiveUntil: 0,
+      nextSolarAt: 20000,
+      nextSwarmAt: 25000,
+      swarmActiveUntil: 0,
+    },
+    threatUpgrades: setup.threatUpgrades ?? {},
+    dvdEasterEggUnlocked: setup.dvdEasterEggUnlocked ?? false,
+    bubbleWash: area.id === 'bubbleWash' ? {
+      nextSurgeAt: 20000,
+      warningStartedAt: 0,
+      surgeActiveUntil: 0,
+      direction: 1,
+      state: 'idle',
+      foamParticles: [],
+    } : undefined,
+    electricChains: [],
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
     episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
@@ -1121,14 +1626,19 @@ export function createWorld(
       : undefined,
   };
 
-  world.breakables = area.obstacles.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
-  world.potholes = area.obstacles.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
+  // Seed fog before the first simulation step so Sector Command does not
+  // render the countdown as a fully black map.
+  updateFog(world);
+
+  world.breakables = obstacleDefs.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
+  world.potholes = obstacleDefs.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
 
   if (area.endless) {
+    const initialBand = getEndlessBand(0, area.endlessTheme);
     world.endless = {
       maxDistancePx: 0,
-      currentBandId: 'core',
-      discoveredBandIds: new Set(['core']),
+      currentBandId: initialBand.id,
+      discoveredBandIds: new Set([initialBand.id]),
       discoveredRouteEventIds: new Set(),
       routeEvent: null,
       hazardNextAt: 0,
@@ -1174,6 +1684,47 @@ export function createWorld(
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
   for (const pet of setup.startingLokPets ?? []) spawnLokPet(world, pet, 'loadout');
   return world;
+}
+
+/**
+ * LokSurvivorArena: turns a freshly-created single-player `World` into an
+ * arena one by adding a guest sharing it with the host `player`. Call once
+ * per extra local/networked player (2-4 total including the host) right
+ * after `createWorld`, before the first `stepWorld` -- see
+ * `game/arena/arenaWorld.ts` for the actual match-setup call site. Never
+ * called from the campaign path, so campaign `World`s never carry guests.
+ */
+export function addGuestPlayer(
+  w: World,
+  id: string,
+  character: CharacterDef,
+  x: number,
+  y: number,
+): GuestPlayerActor {
+  w.arenaMode = true;
+  const guest: GuestPlayerActor = {
+    uid: uid(w),
+    id,
+    character,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    kx: 0,
+    ky: 0,
+    radius: 12,
+    hp: character.stats.maxHp,
+    maxHp: character.stats.maxHp,
+    facing: 1,
+    anim: 'idle',
+    animStartedAt: 0,
+    hitFlashUntil: 0,
+    falling: false,
+    fallStartedAt: 0,
+    attackReadyAt: 0,
+  };
+  w.guests.push(guest);
+  return guest;
 }
 
 function uid(w: World): number {
@@ -1244,6 +1795,18 @@ function pushAlert(w: World, text: string) {
 }
 
 /**
+ * Queues a gameplay-SFX cue. `onBeat` is read from `isOnBeat(w)` here so
+ * every call site gets beat-reactivity for free -- same on-beat-bonus idiom
+ * `damageEnemy`'s crit check already uses, never a fresh alternative. The
+ * length cap is a safety net (`RunScreen` drains this every rendered frame,
+ * so it should never approach 24), not a normal-path limit.
+ */
+function pushSfx(w: World, cue: SfxCueId, onBeat: boolean = isOnBeat(w)) {
+  w.sfxEvents.push({ cue, onBeat });
+  if (w.sfxEvents.length > 24) w.sfxEvents.shift();
+}
+
+/**
  * How long a one-shot story/event banner (first night beat, a fired rumor,
  * a finished district incursion) stays on the HUD before it fades. Past
  * this window the outcome is history, not something the player still needs
@@ -1261,15 +1824,71 @@ function ultActive(w: World): boolean {
 
 function damageMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.damageMult ?? 1) : 1;
-  return w.stats.power * ult;
+  const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
+  const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(2.5, w.llamaEgoScore * 0.05)) : 1;
+  return w.stats.power * ult * ego;
 }
 
 function areaMult(w: World): number {
-  return w.stats.area;
+  const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
+  const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(1.0, w.llamaEgoScore * 0.03)) : 1;
+  return w.stats.area * ego;
 }
 
 function speedMult(w: World): number {
-  return ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
+  const ult = ultActive(w) ? (w.character.ultimate.effect.speedMult ?? 1) : 1;
+  const isLlamaSovereign = w.character.id === 'llama-mama' || w.character.id === 'llama-overlord';
+  const ego = (isLlamaSovereign && w.llamaEgoScore) ? (1 + Math.min(0.6, w.llamaEgoScore * 0.025)) : 1;
+  return ult * (w.modifiers.speedMode ? 1.35 : 1) * ego;
+}
+
+/**
+ * Flat hp multiplier from run modifiers, internally bounded (max 1.5 * 3 =
+ * 4.5x) so timed-area callers can apply it directly. Endless-mode's own
+ * `Math.min(1.7, ...)` cap must still compose this *inside* the min per
+ * endless-mode-engine.md -- see `updateEndlessSpawning`.
+ */
+function modifierHpMult(w: World): number {
+  let mult = 1;
+  if (w.modifiers.doubleMode) mult *= 1.5;
+  if (w.modifiers.scalerMode) mult *= Math.min(3, 1 + (w.level - 1) * 0.06);
+  return mult;
+}
+
+/** Flat spawn-rate multiplier from run modifiers. See `modifierHpMult` for the endless-cap caveat. */
+function modifierSpawnMult(w: World): number {
+  if (w.modifiers.unleashedMode) return 8;
+  if (w.modifiers.quadSpawnMode) return 4;
+  return w.modifiers.doubleMode ? 2 : 1;
+}
+
+function enemyCap(w: World): number {
+  const base = w.modifiers.unleashedMode ? UNLEASHED_ENEMY_CAP : NORMAL_ENEMY_CAP;
+  const densityMult = w.threatCalibrations?.densityMult ?? 1;
+  return Math.round(base * densityMult);
+}
+
+function canSpawnEnemyProjectile(w: World): boolean {
+  return !w.modifiers.unleashedMode || w.projectiles.length < UNLEASHED_PROJECTILE_BUDGET;
+}
+
+function canSpawnEnemyEffect(w: World): boolean {
+  return !w.modifiers.unleashedMode || w.effects.length < UNLEASHED_ENEMY_EFFECT_BUDGET;
+}
+
+/**
+ * Whether decorative spawn budgets (particles, damage popups) should start
+ * trimming right now. At 'high' (default) this is unchanged from the
+ * original Unleashed-only gate: unaffected outside Unleashed mode, and only
+ * kicks in past 300 enemies within it. 'balanced'/'performance' trim earlier
+ * and apply regardless of Unleashed, since a slower device can want the
+ * headroom even at the normal 190-enemy cap.
+ */
+function isDenseForQuality(w: World): boolean {
+  const count = w.enemies.length;
+  if (w.graphicsQuality === 'performance') return count >= 80;
+  if (w.graphicsQuality === 'balanced') return count >= 150;
+  return Boolean(w.modifiers.unleashedMode) && count >= 300;
 }
 
 function cooldownMult(w: World): number {
@@ -1305,12 +1924,39 @@ function cellKey(x: number, y: number): number {
 
 function rebuildGrid(w: World) {
   w.grid.clear();
+  w.enemiesByUid.clear();
   for (const enemy of w.enemies) {
+    w.enemiesByUid.set(enemy.uid, enemy);
     if (enemy.dying) continue;
     const key = cellKey(enemy.x, enemy.y);
     const bucket = w.grid.get(key);
     if (bucket) bucket.push(enemy);
     else w.grid.set(key, [enemy]);
+  }
+}
+
+/**
+ * An obstacle can be larger than one cell (a building wall, a city block),
+ * so it's registered in every cell its bounding box touches -- unlike the
+ * point-sample enemy grid above, which only ever needs one cell per actor.
+ */
+function rebuildObstacleGrid(w: World) {
+  if (!w.obstacleGridDirty) return;
+  w.obstacleGridDirty = false;
+  w.obstacleGrid.clear();
+  for (const box of w.obstacles) {
+    const minCx = Math.floor((box.x - box.w / 2) / CELL);
+    const maxCx = Math.floor((box.x + box.w / 2) / CELL);
+    const minCy = Math.floor((box.y - box.h / 2) / CELL);
+    const maxCy = Math.floor((box.y + box.h / 2) / CELL);
+    for (let cx = minCx; cx <= maxCx; cx += 1) {
+      for (let cy = minCy; cy <= maxCy; cy += 1) {
+        const key = (cx + 512) * 4096 + (cy + 512);
+        const bucket = w.obstacleGrid.get(key);
+        if (bucket) bucket.push(box);
+        else w.obstacleGrid.set(key, [box]);
+      }
+    }
   }
 }
 
@@ -1331,8 +1977,43 @@ function forEachNearby(w: World, x: number, y: number, radius: number, fn: (e: E
 /* Spawning                                                            */
 /* ------------------------------------------------------------------ */
 
-function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
-  if (w.enemies.length >= MAX_ENEMIES) return;
+function computeSpawnAngle(w: World): number {
+  const mode = w.threatCalibrations?.angleMode ?? 'standard';
+  if (mode === 'pincer') {
+    const base = w.rng() < 0.5 ? 0 : Math.PI;
+    return base + randRange(w.rng, -0.35, 0.35);
+  }
+  if (mode === 'cardinal') {
+    const cardinals = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+    const pick = cardinals[Math.floor(w.rng() * 4)]!;
+    return pick + randRange(w.rng, -0.15, 0.15);
+  }
+  if (mode === 'corners') {
+    const corners = [Math.PI / 4, (3 * Math.PI) / 4, -(3 * Math.PI) / 4, -Math.PI / 4];
+    const pick = corners[Math.floor(w.rng() * 4)]!;
+    return pick + randRange(w.rng, -0.15, 0.15);
+  }
+  if (mode === 'spiral') {
+    return (w.now * 0.0018 + w.enemies.length * 0.45) % (Math.PI * 2);
+  }
+  return w.rng() * Math.PI * 2;
+}
+
+function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
+  if (w.enemies.length >= enemyCap(w)) return;
+
+  let def = incomingDef;
+  if (w.disabledEnemyIds && w.disabledEnemyIds.includes(incomingDef.id)) {
+    // If quarantined by threat matrix console, substitute with an enabled enemy or abort
+    const enabledPool = ENEMIES.filter((e) => !w.disabledEnemyIds?.includes(e.id));
+    if (enabledPool.length === 0) return;
+    def = enabledPool[Math.floor(w.rng() * enabledPool.length)]!;
+  } else if (w.threatUpgrades?.['universal-incursion'] && w.rng() < 0.22) {
+    const enabledPool = ENEMIES.filter((e) => !w.disabledEnemyIds?.includes(e.id));
+    if (enabledPool.length > 0) {
+      def = enabledPool[Math.floor(w.rng() * enabledPool.length)]!;
+    }
+  }
 
   let x = 0;
   let y = 0;
@@ -1343,7 +2024,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
   } else if (w.area.endless) {
     // No arena walls — spawn on a ring around the player, clamped only inside dungeon rooms.
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const angle = w.rng() * Math.PI * 2;
+      const angle = computeSpawnAngle(w);
       const radius = randRange(w.rng, 310, 430);
       x = w.player.x + Math.cos(angle) * radius;
       y = w.player.y + Math.sin(angle) * radius;
@@ -1361,7 +2042,7 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     const halfH = w.bounds.h / 2;
     // Spawn on a ring outside the player's view but inside the arena.
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const angle = w.rng() * Math.PI * 2;
+      const angle = computeSpawnAngle(w);
       const radius = randRange(w.rng, 310, 430);
       x = clamp(w.player.x + Math.cos(angle) * radius, -halfW + 24, halfW - 24);
       y = clamp(w.player.y + Math.sin(angle) * radius, -halfH + 24, halfH - 24);
@@ -1369,7 +2050,15 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     }
   }
 
-  const hp = def.hp * hpMult * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1);
+  // modifierHpMult lives here (not folded into any per-mode cap) so it
+  // applies to every spawn path uniformly -- incursions and the endless
+  // dungeon boss/elite rotation call spawnEnemy directly with their own
+  // hpMult and would otherwise never see doubleMode/scalerMode at all. This
+  // mirrors how w.challenges' enemyHealthMultiplier already stacks on top of
+  // endless mode's own Math.min(1.7, ...) cap uncapped -- see run-modifiers.md.
+  const calHpMult = w.threatCalibrations?.hpMult ?? 1;
+  const calMassMult = w.threatCalibrations?.massMult ?? 1;
+  const hp = def.hp * hpMult * modifierHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -1387,10 +2076,10 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     anim: 'walk',
     animStartedAt: w.now,
     hitFlashUntil: 0,
-    speed: def.speed,
+    speed: def.speed * (w.modifiers.speedMode ? 1.25 : 1),
     damage: def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1),
     xp: def.xp,
-    mass: def.mass,
+    mass: def.mass * calMassMult,
     contactReadyAt: 0,
     chargeReadyAt: w.now + randRange(w.rng, 800, 2600),
     chargeUntil: 0,
@@ -1415,8 +2104,17 @@ function spawnEnemy(w: World, def: EnemyDef, hpMult: number, position?: { x: num
     phaseUntil: 0,
     shieldedUntil: 0,
     commanderLocked: false,
+    frozenUntil: 0,
+    selectedForThrow: false,
+    commanded: false,
+    orderKind: 'none',
+    orderX: 0,
+    orderY: 0,
+    selectedForCommand: false,
+    capturableUntil: 0,
   };
   w.enemies.push(enemy);
+  w.enemiesByUid.set(enemy.uid, enemy);
 
   if (def.behavior === 'commander' && def.traits?.commander) {
     const cmd = def.traits.commander;
@@ -1469,11 +2167,17 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
       const a = angle + (Math.PI * 2 * i) / count;
       x = Math.cos(a) * distance;
       y = Math.sin(a) * distance;
-    } else if (formation === 'wedge' || formation === 'pincer') {
+    } else if (formation === 'wedge') {
       const side = i % 2 === 0 ? -1 : 1;
       const spread = (Math.floor(i / 2) + 1) * 34;
       x += Math.cos(angle + side * 0.55) * spread;
       y += Math.sin(angle + side * 0.55) * spread;
+    } else if (formation === 'pincer') {
+      const side = i % 2 === 0 ? 0 : Math.PI;
+      const offset = (Math.floor(i / 2) - Math.floor(count / 4)) * 36;
+      const armAngle = angle + side;
+      x = Math.cos(armAngle) * distance + Math.cos(armAngle + Math.PI / 2) * offset;
+      y = Math.sin(armAngle) * distance + Math.sin(armAngle + Math.PI / 2) * offset;
     } else if (formation === 'wall') {
       x += Math.cos(angle + Math.PI / 2) * ((t - 0.5) * 260);
       y += Math.sin(angle + Math.PI / 2) * ((t - 0.5) * 260);
@@ -1483,6 +2187,31 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
     } else if (formation === 'bait') {
       const bait = i === 0 ? 0.6 : 1;
       x *= bait; y *= bait;
+    } else if (formation === 'spiral') {
+      const a = angle + i * 0.45;
+      const r = 180 + i * (180 / Math.max(1, count));
+      x = Math.cos(a) * r;
+      y = Math.sin(a) * r;
+    } else if (formation === 'phalanx') {
+      const cols = Math.ceil(count / 2);
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const colOffset = (col - (cols - 1) / 2) * 34;
+      const rowOffset = row * 38;
+      x = Math.cos(angle) * (distance + rowOffset) + Math.cos(angle + Math.PI / 2) * colOffset;
+      y = Math.sin(angle) * (distance + rowOffset) + Math.sin(angle + Math.PI / 2) * colOffset;
+    } else if (formation === 'crossfire') {
+      const quadrant = i % 4;
+      const qAngle = angle + quadrant * (Math.PI / 2);
+      const spread = (Math.floor(i / 4) - 1) * 32;
+      x = Math.cos(qAngle) * distance + Math.cos(qAngle + Math.PI / 2) * spread;
+      y = Math.sin(qAngle) * distance + Math.sin(qAngle + Math.PI / 2) * spread;
+    } else if (formation === 'vortex') {
+      const arm = i % 2 === 0 ? 1 : -1;
+      const a = angle + arm * (i * 0.35);
+      const r = 220 + (i % 3) * 45;
+      x = Math.cos(a) * r;
+      y = Math.sin(a) * r;
     }
     positions.push({ x: w.player.x + x, y: w.player.y + y });
   }
@@ -1491,10 +2220,32 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
 
 function updateSpawning(w: World, dt: number) {
   const waves = w.area.waves;
+  const baseSpawnMult = modifierSpawnMult(w);
+  const infiniteMode = Boolean(w.modifiers.infiniteMode);
+  // Several authored areas' climaxes are multiple waves tied at the same
+  // (highest) toSec rather than one wave that happens to sit last in the
+  // array -- e.g. bar-siege has three waves ending at 180 but its last
+  // array entry ends at 141. Extending "the last array entry" would keep an
+  // arbitrary earlier-ending wave alive instead of the actual finale, so
+  // infiniteMode instead extends every wave tied at the area's max toSec.
+  const maxToSec = infiniteMode && waves.length > 0 ? Math.max(...waves.map((candidate) => candidate.toSec)) : 0;
   for (let i = 0; i < waves.length; i += 1) {
     const wave = waves[i]!;
-    if (w.time < wave.fromSec || w.time > wave.toSec) continue;
-    const spawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+    // `infiniteMode` keeps the run going past `durationSec` (see the run-end
+    // check in stepWorld); without this the finale wave(s)' `toSec` window
+    // would close and spawning would simply stop. Escalation is capped the
+    // same way endless mode caps its own difficulty (endless-mode-engine.md).
+    const infiniteActive = infiniteMode && wave.toSec === maxToSec && w.time > wave.toSec;
+    if (!infiniteActive && (w.time < wave.fromSec || w.time > wave.toSec)) continue;
+    // Edge-trigger: this substep is the one that crossed into the wave's
+    // spawn window. `w.time - dt` puts the previous substep still outside it.
+    if (!infiniteActive && w.time - dt < wave.fromSec) pushSfx(w, 'waveStart');
+    const infiniteTier = infiniteActive ? Math.floor((w.time - wave.toSec) / 20) : 0;
+    const infiniteHpMult = infiniteActive ? Math.min(1.7, 1 + infiniteTier * 0.07) : 1;
+    const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
+    const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
+    const densityMult = w.threatCalibrations?.densityMult ?? 1;
+    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult;
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
@@ -1503,10 +2254,13 @@ function updateSpawning(w: World, dt: number) {
       const total = wave.burst * ids.length;
       const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
       let positionIndex = 0;
+      // modifierHpMult isn't applied here -- spawnEnemy applies it to every
+      // caller uniformly (see its own comment for why).
+      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
       for (let b = 0; b < wave.burst; b += 1) {
-        spawnEnemy(w, def, wave.hpMult ?? 1, positions[positionIndex++]);
+        spawnEnemy(w, def, hpMult, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
-          spawnEnemy(w, getEnemy(groupEnemyId), wave.hpMult ?? 1, positions[positionIndex++]);
+          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++]);
         }
       }
     }
@@ -1780,7 +2534,10 @@ function updateDistrictIncursion(w: World, dt: number) {
 /* ------------------------------------------------------------------ */
 
 function spawnParticles(w: World, x: number, y: number, color: string, count: number, power = 90) {
-  for (let i = 0; i < count; i += 1) {
+  const denseUnleashed = isDenseForQuality(w);
+  const budget = denseUnleashed ? 160 : 320;
+  const emitted = denseUnleashed ? Math.max(1, Math.ceil(count * 0.35)) : count;
+  for (let i = 0; i < emitted; i += 1) {
     const angle = w.rng() * Math.PI * 2;
     const speed = randRange(w.rng, power * 0.3, power);
     w.particles.push({
@@ -1794,7 +2551,7 @@ function spawnParticles(w: World, x: number, y: number, color: string, count: nu
       lifeMs: randRange(w.rng, 220, 520),
     });
   }
-  if (w.particles.length > 320) w.particles.splice(0, w.particles.length - 320);
+  if (w.particles.length > budget) w.particles.splice(0, w.particles.length - budget);
 }
 
 function spawnFollower(w: World, weapon: WeaponDef, index: number) {
@@ -1829,10 +2586,11 @@ function spawnFollowers(w: World, weapon: WeaponDef) {
   spawnParticles(w, w.player.x, w.player.y, weapon.color ?? w.character.palette.accent, Math.min(10, spec.count * 2), 70);
 }
 
-const MAX_LOKPETS = 4;
 const LOKPET_GHOST_AFTER_MS = 60_000;
 
-function lokPetStatusId(pet: LokPetInstance): string | undefined {
+function lokPetStatusId(pet: LokPetInstance, w?: World): string | undefined {
+  if (w?.cardEffects.allElementLokPets) return ['burning', 'freeze', 'slow'][Math.floor(w.now / 900) % 3];
+  if (w?.cardEffects.clockworkSlow && pet.silhouette === 'clockwork') return 'slow';
   if (pet.element === 'fire') return 'burning';
   if (pet.element === 'freeze') return 'freeze';
   if (pet.element === 'slow') return 'slow';
@@ -1847,7 +2605,7 @@ function lokPetDamage(w: World, pet: LokPetInstance): number {
       : pet.attackKind === 'explosion'
         ? 0.95
         : 1;
-  return Math.max(1, pet.stats.damage * attackMultiplier * damageMult(w));
+  return Math.max(1, pet.stats.damage * attackMultiplier * damageMult(w) * w.cardEffects.lokPetDamageMult);
 }
 
 function showLokPetBurst(
@@ -1906,7 +2664,7 @@ function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
     pierce: pet.attackKind === 'heavy-shot' ? 1 : 0,
     hitUids: new Set(),
     obstacleInteraction: 'block',
-    statusEffectId: lokPetStatusId(pet),
+    statusEffectId: lokPetStatusId(pet, w),
     explosionRadius: explosion ? pet.stats.explosionRadius : undefined,
     explosionDamage: explosion ? lokPetDamage(w, pet) : undefined,
   });
@@ -1915,15 +2673,18 @@ function fireLokPetShot(w: World, pet: LokPetInstance, target: EnemyActor) {
 
 /** Spawn one generated chest companion, replacing the oldest at the mobile-safe cap. */
 export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['origin'] = 'chest'): LokPetInstance {
-  if (w.lokPets.length >= MAX_LOKPETS) {
+  if (w.lokPets.length >= w.maxLokPets) {
     const oldest = w.lokPets.shift();
     if (oldest) spawnParticles(w, oldest.x, oldest.y, oldest.palette.glow, 6, 65);
-    pushAlert(w, 'LokPet signal rotated');
+    pushAlert(w, 'LokPet orbit rotated');
   }
   const index = w.lokPets.length;
-  const orbitAngle = (Math.PI * 2 * index) / MAX_LOKPETS + w.rng() * 0.2;
+  const orbitAngle = (Math.PI * 2 * index) / w.maxLokPets + w.rng() * 0.2;
+  const starterPartner = roll.specialAbility === 'cutify-getaway' || roll.specialAbility === 'null-consume' || roll.specialAbility === 'buzbee-pollen';
+  const evolutionStage = (roll.level ?? 1) >= 66 ? 3 : (roll.level ?? 1) >= 33 ? 2 : 1;
   const pet: LokPetInstance = {
     ...roll,
+    sizeScale: (roll.sizeScale ?? 1) * (1 + (evolutionStage - 1) * 0.18),
     origin,
     uid: uid(w),
     x: w.player.x + Math.cos(orbitAngle) * (40 + index * 6),
@@ -1933,11 +2694,13 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
     orbitAngle,
     orbitRadius: 40 + index * 6,
     bornAt: w.now,
-    ghostAt: w.now + LOKPET_GHOST_AFTER_MS,
-    expiresAt: w.now + roll.stats.lifetimeMs,
+    ghostAt: starterPartner && origin === 'loadout' ? Number.POSITIVE_INFINITY : w.now + LOKPET_GHOST_AFTER_MS,
+    expiresAt: starterPartner && origin === 'loadout' ? Number.POSITIVE_INFINITY : w.now + roll.stats.lifetimeMs,
     ghost: false,
     readyAt: w.now + 500,
     nextPulseAt: w.now + 500,
+    specialReadyAt: w.now + 1800,
+    specialActiveUntil: 0,
     hp: roll.stats.health,
     maxHp: roll.stats.health,
   };
@@ -1946,6 +2709,186 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
   spawnParticles(w, pet.x, pet.y, pet.palette.glow, 10, 85);
   pushAlert(w, `${pet.name} joined the run`);
   return pet;
+}
+
+function showLokPetSpecial(w: World, pet: LokPetInstance, label: string, radius: number) {
+  w.effects.push({
+    uid: uid(w), kind: 'ring', x: pet.x, y: pet.y, radius, angle: 0, spread: 0,
+    bornAt: w.now, expiresAt: w.now + 460, color: pet.palette.glow,
+    damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+  });
+  spawnParticles(w, pet.x, pet.y, pet.palette.glow, 10, 90);
+  pushAlert(w, `${pet.name} — ${label}`);
+}
+
+function triggerSpecialLokPetAbility(w: World, pet: LokPetInstance) {
+  if (!pet.specialAbility || w.now < pet.specialReadyAt || pet.ghost) return;
+
+  if (pet.specialAbility === 'prism-collect') {
+    const candidates = w.pickups
+      .filter((pickup) => dist2(pickup.x, pickup.y, pet.x, pet.y) <= 360 ** 2)
+      .sort((a, b) => dist2(a.x, a.y, pet.x, pet.y) - dist2(b.x, b.y, pet.x, pet.y))
+      .slice(0, 4);
+    for (const pickup of candidates) {
+      const dx = w.player.x - pickup.x; const dy = w.player.y - pickup.y; const length = Math.hypot(dx, dy) || 1;
+      pickup.vx += (dx / length) * 760;
+      pickup.vy += (dy / length) * 760;
+      spawnParticles(w, pickup.x, pickup.y, pet.palette.accent, 3, 45);
+    }
+    showLokPetSpecial(w, pet, 'SPECTRUM SWEEP', 92);
+    pet.specialReadyAt = w.now + 3200;
+  } else if (pet.specialAbility === 'void-fetch') {
+    const pickup = w.pickups
+      .filter((candidate) => candidate.kind !== 'loot-box')
+      .sort((a, b) => dist2(a.x, a.y, w.player.x, w.player.y) - dist2(b.x, b.y, w.player.x, w.player.y))[0];
+    if (pickup) {
+      pickup.x = w.player.x + 12;
+      pickup.y = w.player.y;
+      pickup.vx = 0; pickup.vy = 0;
+    }
+    showLokPetBurst(w, pet.x, pet.y, 118, lokPetDamage(w, pet) * 0.55, pet.palette.glow, 'slow');
+    showLokPetSpecial(w, pet, 'EVENTIDE FETCH', 118);
+    pet.specialReadyAt = w.now + 4200;
+  } else if (pet.specialAbility === 'ember-rescue') {
+    const heal = 4;
+    w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+    const missed = [...w.pickups].sort((a, b) => a.bornAt - b.bornAt)[0];
+    if (missed && w.now - missed.bornAt > 2400) {
+      missed.x = w.player.x + 14;
+      missed.y = w.player.y + 4;
+      missed.vx = 0; missed.vy = 0;
+    }
+    w.popups.push({ x: w.player.x, y: w.player.y + 28, text: `+${heal} WARM CURRENT`, color: pet.palette.glow, bornAt: w.now, vy: 26 });
+    showLokPetSpecial(w, pet, 'LAST CATCH', 106);
+    pet.specialReadyAt = w.now + 4800;
+  } else if (pet.specialAbility === 'solar-flare') {
+    const heal = 3;
+    w.player.hp = Math.min(w.player.maxHp, w.player.hp + heal);
+    showLokPetBurst(w, pet.x, pet.y, 150, lokPetDamage(w, pet) * 0.85, pet.palette.glow, 'fire');
+    w.popups.push({ x: w.player.x, y: w.player.y + 28, text: `+${heal} DAWN SUNBURST`, color: pet.palette.glow, bornAt: w.now, vy: 26 });
+    showLokPetSpecial(w, pet, 'SOLAR FLARE', 150);
+    pet.specialReadyAt = w.now + 4400;
+  } else if (pet.specialAbility === 'mantis-slice') {
+    const target = nearestEnemy(w, pet.x, pet.y, 340);
+    if (target) {
+      const baseAngle = Math.atan2(target.y - pet.y, target.x - pet.x);
+      for (let i = -1.5; i <= 1.5; i += 1) {
+        const spreadAngle = baseAngle + i * 0.18;
+        w.projectiles.push({
+          uid: uid(w),
+          x: pet.x,
+          y: pet.y,
+          vx: Math.cos(spreadAngle) * 440,
+          vy: Math.sin(spreadAngle) * 440,
+          radius: 10,
+          damage: lokPetDamage(w, pet) * 0.9,
+          impactIntensity: 4,
+          fromPlayer: true,
+          expiresAt: w.now + 650,
+          targetUid: target.uid,
+          turnRate: 0,
+          color: pet.palette.glow,
+          trail: [],
+          pierce: 1,
+          hitUids: new Set(),
+          obstacleInteraction: 'block',
+          statusEffectId: 'freeze',
+        });
+      }
+    }
+    showLokPetSpecial(w, pet, 'MANTIS SCYTHE', 130);
+    pet.specialReadyAt = w.now + 3800;
+  } else if (pet.specialAbility === 'phase-dash') {
+    showLokPetBurst(w, pet.x, pet.y, 130, lokPetDamage(w, pet) * 0.75, pet.palette.glow, 'slow');
+    const pickups = w.pickups
+      .filter((p) => p.kind !== 'loot-box' && dist2(p.x, p.y, pet.x, pet.y) <= 320 ** 2)
+      .slice(0, 4);
+    for (const p of pickups) {
+      const dx = w.player.x - p.x; const dy = w.player.y - p.y; const len = Math.hypot(dx, dy) || 1;
+      p.vx += (dx / len) * 720; p.vy += (dy / len) * 720;
+    }
+    showLokPetSpecial(w, pet, 'PHASE STEP', 130);
+    pet.specialReadyAt = w.now + 4000;
+  } else if (pet.specialAbility === 'polar-pull') {
+    showLokPetBurst(w, pet.x, pet.y, 145, lokPetDamage(w, pet) * 0.9, pet.palette.glow, 'none');
+    for (const pickup of w.pickups) {
+      if (pickup.kind === 'loot-box') continue;
+      const d2 = dist2(pickup.x, pickup.y, pet.x, pet.y);
+      if (d2 <= 400 ** 2) {
+        const dx = pet.x - pickup.x; const dy = pet.y - pickup.y; const len = Math.hypot(dx, dy) || 1;
+        pickup.vx += (dx / len) * 820;
+        pickup.vy += (dy / len) * 820;
+      }
+    }
+    showLokPetSpecial(w, pet, 'POLAR GRAVITON', 145);
+    pet.specialReadyAt = w.now + 4500;
+  } else if (pet.specialAbility === 'cutify-getaway') {
+    const level = Math.max(1, Math.min(99, pet.level ?? 1));
+    const maxTargets = Math.min(6, 1 + Math.floor(level / 20));
+    const crowd = w.enemies
+      .filter((enemy) => !enemy.dying && dist2(enemy.x, enemy.y, pet.x, pet.y) <= 230 ** 2)
+      .sort((a, b) => dist2(a.x, a.y, pet.x, pet.y) - dist2(b.x, b.y, pet.x, pet.y));
+    for (const enemy of crowd.slice(0, maxTargets)) {
+      enemy.cutifiedUntil = w.now + 2800 + level * 22;
+      enemy.cutifiedTargetUid = pet.uid;
+      const dx = enemy.x - pet.x; const dy = enemy.y - pet.y; const len = Math.hypot(dx, dy) || 1;
+      enemy.kx += (dx / len) * (210 + level * 2.2);
+      enemy.ky += (dy / len) * (210 + level * 2.2);
+      spawnParticles(w, enemy.x, enemy.y, '#fb7185', 6, 65);
+    }
+    const getawayThreshold = Math.max(3, 7 - Math.floor(level / 22));
+    if (crowd.length >= getawayThreshold) {
+      showLokPetBurst(w, pet.x, pet.y, 128 + level * 0.7, lokPetDamage(w, pet) * 0.45, pet.palette.glow, 'slow');
+      showLokPetSpecial(w, pet, 'CUTIFY + GETAWAY', 128);
+    } else {
+      showLokPetSpecial(w, pet, 'CUTIFY', 96);
+    }
+    pet.specialReadyAt = w.now + Math.max(4300, 9000 - level * 45);
+  } else if (pet.specialAbility === 'null-consume') {
+    const level = Math.max(1, Math.min(99, pet.level ?? 1));
+    const radius = 112 + level * 0.75;
+    const tithe = w.player.hp > 1 ? 1 : 0;
+    w.player.hp = Math.max(1, w.player.hp - tithe);
+    showLokPetBurst(w, pet.x, pet.y, radius, lokPetDamage(w, pet) * (0.8 + level / 120), pet.palette.glow, 'freeze');
+    w.popups.push({ x: w.player.x, y: w.player.y + 28, text: tithe ? '-1 DATA TITHE' : 'TITHE REFUSED', color: pet.palette.accent, bornAt: w.now, vy: 26 });
+    showLokPetSpecial(w, pet, level >= 99 ? 'NOMAD-EATER ECHO' : 'DATA FEAST', radius);
+    pet.specialReadyAt = w.now + Math.max(3300, 5900 - level * 24);
+  } else if (pet.specialAbility === 'buzbee-pollen') {
+    const level = Math.max(1, Math.min(99, pet.level ?? 1));
+    const capacity = level >= 99 ? Number.POSITIVE_INFINITY : 2 + Math.floor(level / 12);
+    const pickups = w.pickups
+      .filter((pickup) => pickup.kind !== 'loot-box' && dist2(pickup.x, pickup.y, pet.x, pet.y) <= 520 ** 2)
+      .sort((a, b) => dist2(a.x, a.y, pet.x, pet.y) - dist2(b.x, b.y, pet.x, pet.y))
+      .slice(0, capacity);
+    for (const pickup of pickups) {
+      const dx = w.player.x - pickup.x; const dy = w.player.y - pickup.y; const len = Math.hypot(dx, dy) || 1;
+      pickup.vx += (dx / len) * 900;
+      pickup.vy += (dy / len) * 900;
+    }
+    // The pollen is dropped directly on the orbit path around the player;
+    // three seconds in-field plus a 1.5s linger keeps the touch interaction readable.
+    w.player.pollenSpeedUntil = w.now + 4500;
+    w.player.pollenHealingUntil = w.now + 4500;
+    showLokPetSpecial(w, pet, level >= 99 ? 'ROYAL POLLEN SWEEP' : 'BOOST POLLEN', 104);
+    pet.specialReadyAt = w.now + Math.max(3900, 6500 - level * 22);
+  } else {
+    const pauseUntil = w.now + 850;
+    for (const projectile of w.projectiles) {
+      if (!projectile.fromPlayer) projectile.pausedUntil = Math.max(projectile.pausedUntil ?? 0, pauseUntil);
+    }
+    for (const effect of w.effects) {
+      if (effect.hurtsPlayer) effect.pausedUntil = Math.max(effect.pausedUntil ?? 0, pauseUntil);
+    }
+    for (const enemy of w.enemies) {
+      enemy.chargeReadyAt += 850;
+      enemy.fireReadyAt += 850;
+      enemy.specialReadyAt += 850;
+    }
+    for (const weapon of w.weapons) weapon.readyAt = Math.max(w.now, weapon.readyAt - 520);
+    pet.specialActiveUntil = pauseUntil;
+    showLokPetSpecial(w, pet, 'BORROWED MOMENT', 128);
+    pet.specialReadyAt = w.now + 5600;
+  }
 }
 
 function updateLokPets(w: World, dt: number) {
@@ -1975,6 +2918,8 @@ function updateLokPets(w: World, dt: number) {
     pet.x += pet.vx * dt;
     pet.y += pet.vy * dt;
 
+    triggerSpecialLokPetAbility(w, pet);
+
     const target = nearestEnemy(w, pet.x, pet.y, pet.stats.range);
     if (!target || w.now < pet.readyAt) continue;
 
@@ -1986,13 +2931,13 @@ function updateLokPets(w: World, dt: number) {
         pet.stats.pulseRadius,
         lokPetDamage(w, pet),
         pet.palette.glow,
-        lokPetStatusId(pet),
+        lokPetStatusId(pet, w),
       );
-      pet.nextPulseAt = w.now + pet.stats.cooldownMs;
+      pet.nextPulseAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult;
       pet.readyAt = pet.nextPulseAt;
     } else {
       fireLokPetShot(w, pet, target);
-      pet.readyAt = w.now + pet.stats.cooldownMs;
+      pet.readyAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult;
     }
   }
 }
@@ -2235,22 +3180,70 @@ function damageEnemy(
   fromY: number,
   statusEffectId?: string,
   burstDepth = 0,
+  /** LokSurvivorArena: which guest dealt this damage, if any -- see killEnemy. */
+  killerId?: string,
 ) {
   if (enemy.dying) return;
+  // Sector Command: this is the single choke point for player-caused damage,
+  // so excluding captured units here is what makes them safe from *every*
+  // weapon, splash and status path at once -- `nearestEnemy`'s filter only
+  // stops them being aimed at. Their own mortality runs through
+  // `advanceCommandedUnit`, which touches hp directly.
+  if (enemy.commanded) return;
   // Wraiths can't be hurt while lurking invisible -- see oddity-arenas.md.
   if (w.now < enemy.invisibleUntil) return;
   // Commanders: a heavy shield while searching/re-locking -- still fully
   // visible and still able to contact-damage the player, just undamageable.
   if (w.now < enemy.shieldedUntil) return;
+  // Zero Day: frozen "stone" enemies are untargetable by normal damage --
+  // they're resolved directly via killEnemy() when thrown, not damageEnemy().
+  if (w.now < enemy.frozenUntil) return;
   if (statusEffectId) applyStatusEffect(w, enemy, statusEffectId);
+
+  let adjustedAmount = amount;
+  if (enemy.def.behavior === 'phalanx') {
+    const facingAngle = Math.atan2(w.player.y - enemy.y, w.player.x - enemy.x);
+    const hitAngle = Math.atan2(fromY - enemy.y, fromX - enemy.x);
+    let diff = Math.abs(hitAngle - facingAngle) % (Math.PI * 2);
+    if (diff > Math.PI) diff = Math.PI * 2 - diff;
+    if (diff < Math.PI * 0.45) {
+      adjustedAmount = Math.max(1, Math.round(amount * 0.3));
+      spawnParticles(w, enemy.x, enemy.y, '#f59e0b', 3, 40);
+    }
+  }
+
+  if (enemy.def.behavior === 'prism' && burstDepth === 0 && w.now >= enemy.chargeReadyAt) {
+    enemy.chargeReadyAt = w.now + 900;
+    const baseAngle = Math.atan2(enemy.y - fromY, enemy.x - fromX);
+    for (let i = -1; i <= 1; i += 1) {
+      const bAngle = baseAngle + i * 0.42;
+      w.projectiles.push({
+        uid: uid(w), x: enemy.x, y: enemy.y,
+        vx: Math.cos(bAngle) * 160, vy: Math.sin(bAngle) * 160,
+        radius: 6, damage: 4, impactIntensity: 0, fromPlayer: false,
+        expiresAt: w.now + 2400, targetUid: null, turnRate: 0,
+        color: '#06b6d4', trail: [], pierce: 0, hitUids: new Set(),
+      });
+    }
+  }
+
   const isCrit = burstDepth === 0 && w.rng() < w.stats.crit;
   // Landing a hit on the beat is its own bonus, stacking with a rolled crit.
   const onBeat = burstDepth === 0 && isOnBeat(w);
   const beatBonus = onBeat ? ON_BEAT_CRIT_MULT : 1;
   const stealthBonus = w.now < w.stealthUntil ? 1 + (w.stealthConfig?.damageBonusPct ?? 0) : 1;
-  const dealt = Math.max(1, Math.round((isCrit ? amount * 2 : amount) * beatBonus * stealthBonus));
+  const dealt = Math.max(1, Math.round((isCrit ? adjustedAmount * 2 : adjustedAmount) * beatBonus * stealthBonus));
   if (onBeat) w.onBeatHits += 1;
+  pushSfx(w, isCrit ? 'critHit' : 'hit', onBeat);
   enemy.hp -= dealt;
+  // Sector Command: an enemy you have already worked into its capture window,
+  // while standing next to it, must not evaporate to the next auto-fired shot.
+  // Flooring it at 1 hp for the priming window is what turns "I killed it
+  // before I could grab it" into a real choice. Missions only -- outside a
+  // mission `sectorCommand` is null and this is dead code.
+  if (w.sectorCommand && enemy.hp <= 0 && w.now < enemy.capturableUntil) {
+    enemy.hp = 1;
+  }
   enemy.hitFlashUntil = w.now + 90;
 
   if (w.stats.lifesteal > 0 && burstDepth === 0) {
@@ -2266,22 +3259,26 @@ function damageEnemy(
     enemy.ky += (dy / len) * impulse;
   }
 
-  w.popups.push({
-    x: enemy.x + randRange(w.rng, -5, 5),
-    y: enemy.y + enemy.radius + 10,
-    text: isCrit ? `${dealt}!` : String(dealt),
-    color: isCrit ? '#ff5c5c' : '#ffe8a3',
-    bornAt: w.now,
-    vy: isCrit ? 34 : 26,
-  });
-  if (w.popups.length > 40) w.popups.shift();
+  const denseUnleashed = isDenseForQuality(w);
+  if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
+    w.popups.push({
+      x: enemy.x + randRange(w.rng, -5, 5),
+      y: enemy.y + enemy.radius + 10,
+      text: isCrit ? `${dealt}!` : String(dealt),
+      color: isCrit ? '#ff5c5c' : '#ffe8a3',
+      bornAt: w.now,
+      vy: isCrit ? 34 : 26,
+    });
+    const popupBudget = denseUnleashed ? 24 : 40;
+    if (w.popups.length > popupBudget) w.popups.splice(0, w.popups.length - popupBudget);
+  }
 
   if (impactIntensity >= 5 && burstDepth === 0) {
     emitEnemyImpactBurst(w, enemy, dealt, '#fff1a8');
   }
 
   if (enemy.hp <= 0) {
-    killEnemy(w, enemy);
+    killEnemy(w, enemy, killerId);
   }
 }
 
@@ -2305,6 +3302,13 @@ function updateStatusEffects(w: World) {
         const tick = effect.id === 'burning' ? 2 : 1;
         effect.nextTickAt = w.now + 520;
         damageEnemy(w, enemy, tick * effect.stacks, 0, enemy.x, enemy.y);
+      }
+      if (effect.id === 'corrupted' && w.now >= (effect.nextTickAt ?? effect.appliedAt) && !enemy.dying && w.now >= enemy.frozenUntil) {
+        effect.nextTickAt = w.now + 900;
+        spawnParticles(w, enemy.x, enemy.y, '#ff2fd0', 6, 90);
+        enemy.x += randRange(w.rng, -60, 60);
+        enemy.y += randRange(w.rng, -60, 60);
+        spawnParticles(w, enemy.x, enemy.y, '#ff2fd0', 6, 90);
       }
     }
     enemy.activeEffects = enemy.activeEffects.filter((effect) => effect.expiresAt > w.now);
@@ -2409,7 +3413,7 @@ function statusSpeedMultiplier(enemy: EnemyActor): number {
   }, 1);
 }
 
-function killEnemy(w: World, enemy: EnemyActor) {
+function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   if (enemy.dying) return;
   enemy.dying = true;
   // Effects do not linger on a defeated actor or leak into later snapshots.
@@ -2419,7 +3423,22 @@ function killEnemy(w: World, enemy: EnemyActor) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  // LokSurvivorArena: a guest kill also counts toward `kills`/`killsByEnemy`
+  // above (so campaign-style read models keep working unmodified) *and*
+  // toward its own attributed counter for the arena scoreboard.
+  if (killerId) w.guestKills[killerId] = (w.guestKills[killerId] ?? 0) + 1;
+  pushSfx(w, enemy.def.family === 'Boss' ? 'bossKill' : 'kill');
   spawnParticles(w, enemy.x, enemy.y + enemy.radius, enemy.def.palette.accent, 8, 110);
+
+  if (w.director.phase === 'active' && enemy.uid === w.director.bossUid) {
+    w.director.phase = 'resolved';
+    w.director.victorious = true;
+    const director = DIRECTORS.find((d) => d.id === w.director.activeDirectorId);
+    if (director) {
+      pushAlert(w, director.victoryText);
+      w.shake = Math.max(w.shake, 14);
+    }
+  }
 
   // Loot.
   w.pickups.push({
@@ -2451,6 +3470,13 @@ function killEnemy(w: World, enemy: EnemyActor) {
       uid: uid(w), kind: 'sweep', x: enemy.x, y: enemy.y,
       vx: 0, vy: 0, value: 0, bornAt: w.now,
     });
+  }
+
+  const collector = w.character.lokPetCollector;
+  const packChance = 0.0015 + (collector?.floorPackChance ?? 0) + w.cardEffects.packDropBonus;
+  if (enemy.def.family !== 'Boss' && w.rng() < packChance) {
+    w.pickups.push({ uid: uid(w), kind: 'card-pack', x: enemy.x, y: enemy.y, vx: randRange(w.rng, -24, 24), vy: randRange(w.rng, -24, 24), value: 1, bornAt: w.now });
+    pushAlert(w, collector ? `${collector.rank} found a floor Lock Pack` : 'Lock Pack dropped');
   }
 
   if (enemy.def.family === 'Boss') {
@@ -2538,6 +3564,15 @@ function damagePlayer(
   if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
   p.hp -= reduced;
+  if (w.character.id === 'llama-mama' && p.hp > 0 && p.hp / p.maxHp <= 0.24 && !w.llamaMamaEnraged) {
+    w.llamaMamaEnraged = true;
+    w.llamaMamaRageUntil = w.now + 14000;
+    pushAlert(w, "WE'RE OVER IT! PERIOD!");
+    pushSfx(w, 'ultimate');
+    w.shake = Math.max(w.shake, 14);
+    spawnParticles(w, p.x, p.y, '#ff4500', 30, 220);
+  }
+  pushSfx(w, 'playerHurt');
   p.invulnUntil = w.now + 420;
   p.hitFlashUntil = w.now + 160;
   p.anim = 'hurt';
@@ -2554,11 +3589,21 @@ function damagePlayer(
   spawnParticles(w, p.x, p.y + 14, '#ff5f6d', 6, 80);
 
   if (p.hp <= 0) {
+    if (w.extraLifeAvailable && !w.extraLifeUsed) {
+      w.extraLifeUsed = true;
+      p.hp = p.maxHp * 0.25;
+      p.invulnUntil = w.now + 1200;
+      spawnParticles(w, p.x, p.y, '#4ade80', 16, 140);
+      pushAlert(w, 'FRAGMENTED BACKUP RESTORED');
+      pushSfx(w, 'extraLifeSave');
+      return;
+    }
     p.hp = 0;
     w.outcome = 'dead';
     w.deathCause = 'ordinary-hazard';
     p.anim = 'death';
     p.animStartedAt = w.now;
+    pushSfx(w, 'playerDown');
   }
 }
 
@@ -2595,17 +3640,46 @@ function rebuildOrbiters(w: World, runWeapon = w.weapons.find((entry) => entry.d
   }
 }
 
-function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?: Set<number>) {
+/**
+ * Grid-bucketed instead of a full `w.enemies` scan -- this is called from
+ * ~20 per-frame sites (once per weapon per frame, plus once per
+ * commanded/converted unit per frame), so at hundreds-to-a-thousand enemies
+ * a linear scan here was the dominant per-frame cost. Walks the same
+ * fixed cell box `forEachNearby` does, just tracking the closest hit
+ * instead of visiting every one.
+ */
+function nearestEnemy(
+  w: World,
+  x: number,
+  y: number,
+  maxRange: number,
+  exclude?: Set<number>,
+  excludeUid?: number,
+) {
   let best: EnemyActor | null = null;
   let bestDist = maxRange * maxRange;
-  for (const enemy of w.enemies) {
-    if (enemy.dying) continue;
-    if (exclude?.has(enemy.uid)) continue;
-    if (w.now < enemy.invisibleUntil) continue;
-    const d = dist2(enemy.x, enemy.y, x, y);
-    if (d < bestDist) {
-      bestDist = d;
-      best = enemy;
+  const cells = Math.ceil(maxRange / CELL);
+  const baseX = Math.floor(x / CELL);
+  const baseY = Math.floor(y / CELL);
+  for (let ix = -cells; ix <= cells; ix += 1) {
+    for (let iy = -cells; iy <= cells; iy += 1) {
+      const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+      if (!bucket) continue;
+      for (const enemy of bucket) {
+        if (enemy.dying) continue;
+        if (enemy.uid === excludeUid) continue;
+        if (exclude?.has(enemy.uid)) continue;
+        if (w.now < enemy.invisibleUntil) continue;
+        // Sector Command: your own captured units are never a target -- not for
+        // your weapons, and not for each other. (Legacy `convertedUntil` allies
+        // from the allymaker weapon keep their original behavior.)
+        if (enemy.commanded) continue;
+        const d = dist2(enemy.x, enemy.y, x, y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = enemy;
+        }
+      }
     }
   }
   return best;
@@ -2625,7 +3699,7 @@ function triggerEvolutionHit(
   if (!behavior) return;
   const radius = behavior.radius ?? 64;
   if (behavior.kind === 'chain') {
-    const target = nearestEnemy(w, x, y, radius + 90, excludeUid ? new Set([excludeUid]) : undefined);
+    const target = nearestEnemy(w, x, y, radius + 90, undefined, excludeUid);
     if (target) {
       damageEnemy(w, target, damage * 0.55, 0, x, y, statusEffectId);
       spawnParticles(w, target.x, target.y, color, 4, 55);
@@ -2656,6 +3730,167 @@ function triggerEvolutionHit(
   }
 }
 
+/**
+ * Compact, opt-in mechanics for the locked legendary signatures. These reuse
+ * the normal projectile/effect/damage paths so the roster stays playable
+ * without creating a second combat engine.
+ */
+function fireLegendaryWeapon(w: World, runWeapon: RunWeapon, damage: number, reach: number): boolean {
+  const weapon = runWeapon.def;
+  const pattern = weapon.legendaryPattern;
+  if (!pattern) return false;
+  const p = w.player;
+  const color = weapon.color ?? w.character.palette.accent;
+  const target = nearestEnemy(w, p.x, p.y, reach + 140);
+  const aim = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.facing > 0 ? 0 : Math.PI;
+
+  if (pattern === 'resonance-return') {
+    const shots = Math.max(1, runWeapon.count);
+    for (let i = 0; i < shots; i += 1) {
+      const angle = aim + (i - (shots - 1) / 2) * 0.24;
+      const speed = weapon.speed ?? 280;
+      w.projectiles.push({
+        uid: uid(w), x: p.x, y: p.y + 8, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        radius: 8, damage, impactIntensity: weaponImpact(weapon), fromPlayer: true,
+        expiresAt: w.now + (weapon.lifetimeMs ?? 1500), targetUid: null, turnRate: 0, color,
+        trail: [], pierce: 2, hitUids: new Set(), obstacleUids: new Set(), obstacleInteraction: 'reflect',
+        reverseAt: w.now + 620,
+      });
+    }
+    pushAlert(w, 'RESONANCE RETURN');
+  } else if (pattern === 'grind-charge') {
+    const dx = Math.cos(aim);
+    const dy = Math.sin(aim);
+    p.dashDirectionX = dx; p.dashDirectionY = dy;
+    p.dashStartedAt = w.now; p.dashUntil = w.now + 330; p.dashHitUids.clear();
+    p.vx = dx * DASH_SPEED; p.vy = dy * DASH_SPEED;
+    w.effects.push({
+      uid: uid(w), kind: 'slash', x: p.x, y: p.y, radius: reach, angle: aim, spread: 0.58,
+      bornAt: w.now, expiresAt: w.now + 360, color, damage, impactIntensity: weaponImpact(weapon),
+      impactTrigger: 'ground-shock', hitUids: new Set(), followPlayer: true,
+    });
+    pushAlert(w, 'GRINDWHEEL — COMMITTED');
+  } else if (pattern === 'ghostlight-network') {
+    const linked: EnemyActor[] = [];
+    const used = new Set<number>();
+    for (let i = 0; i < Math.max(2, runWeapon.count); i += 1) {
+      const enemy = nearestEnemy(w, p.x, p.y, reach, used);
+      if (!enemy) break;
+      used.add(enemy.uid); linked.push(enemy);
+      damageEnemy(w, enemy, damage, 0, p.x, p.y, 'slow');
+    }
+    for (let i = 0; i + 1 < linked.length; i += 1) {
+      const a = linked[i]!; const b = linked[i + 1]!;
+      w.effects.push({
+        uid: uid(w), kind: 'web', x: a.x, y: a.y, radius: Math.hypot(b.x - a.x, b.y - a.y),
+        angle: Math.atan2(b.y - a.y, b.x - a.x), spread: 0, bornAt: w.now, expiresAt: w.now + 900,
+        color, damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+      });
+    }
+    pushAlert(w, `GHOSTLIGHT LINK ×${linked.length}`);
+  } else if (pattern === 'steam-harpoon') {
+    if (target) {
+      const dx = target.x - p.x; const dy = target.y - p.y; const length = Math.hypot(dx, dy) || 1;
+      damageEnemy(w, target, damage, 2, target.x + dx, target.y + dy, 'slow');
+      target.kx -= (dx / length) * 360;
+      target.ky -= (dy / length) * 360;
+      w.effects.push({
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: Math.min(reach, length), angle: aim, spread: 0.035,
+        bornAt: w.now, expiresAt: w.now + 260, color, damage: 0, impactIntensity: 0,
+        hitUids: new Set(), followPlayer: false,
+      });
+      novaDamage(w, p.x, p.y, 54 * areaMult(w), damage * 0.45, 2, 'slow');
+    }
+    pushAlert(w, 'STEAM HARPOON');
+  } else if (pattern === 'origami-decoys') {
+    if (weapon.follower) spawnFollowers(w, weapon);
+    const shots = Math.max(3, runWeapon.count);
+    for (let i = 0; i < shots; i += 1) {
+      const angle = aim + (i - (shots - 1) / 2) * 0.34;
+      const speed = weapon.speed ?? 360;
+      w.projectiles.push({
+        uid: uid(w), x: p.x, y: p.y + 10, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        radius: 10, damage, impactIntensity: weaponImpact(weapon), fromPlayer: true,
+        expiresAt: w.now + (weapon.lifetimeMs ?? 1300), targetUid: null, turnRate: 0, color,
+        trail: [], pierce: weapon.pierce ?? 2, hitUids: new Set(), obstacleUids: new Set(), obstacleInteraction: 'reflect',
+      });
+    }
+    pushAlert(w, 'FALSE FOLDS DEPLOYED');
+  } else if (pattern === 'event-horizon') {
+    const x = target?.x ?? p.x + Math.cos(aim) * reach * 0.55;
+    const y = target?.y ?? p.y + Math.sin(aim) * reach * 0.55;
+    w.effects.push({
+      uid: uid(w), kind: 'hazard', x, y, radius: reach * 0.52, angle: 0, spread: Math.PI * 2,
+      bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 4200), color, damage,
+      impactIntensity: 0, hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+      hurtsPlayer: false, statusEffectId: 'slow', pullStrength: 46,
+    });
+    pushAlert(w, 'EVENT HORIZON');
+  } else if (pattern === 'root-network') {
+    const count = Math.max(4, runWeapon.count);
+    const positions: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < count; i += 1) {
+      const angle = (Math.PI * 2 * i) / count;
+      const x = p.x + Math.cos(angle) * reach;
+      const y = p.y + Math.sin(angle) * reach;
+      positions.push({ x, y });
+      w.effects.push({
+        uid: uid(w), kind: 'hazard', x, y, radius: reach * 0.34, angle: 0, spread: Math.PI * 2,
+        bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 3300), color, damage,
+        impactIntensity: 0, hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
+        hurtsPlayer: false, statusEffectId: 'slow',
+        evolutionBehavior: { kind: 'delayed-burst', radius: 1, statusEffectId: 'slow' },
+      });
+    }
+    for (let i = 0; i < count; i += 1) {
+      const a = positions[i]!; const b = positions[(i + 1) % count]!;
+      w.effects.push({ uid: uid(w), kind: 'web', x: a.x, y: a.y, radius: Math.hypot(b.x - a.x, b.y - a.y),
+        angle: Math.atan2(b.y - a.y, b.x - a.x), spread: 0, bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 3300),
+        color, damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false });
+    }
+    p.hp = Math.min(p.maxHp, p.hp + 3);
+    pushAlert(w, 'ROOT NETWORK PLANTED');
+  } else if (pattern === 'royal-command') {
+    const used = new Set<number>();
+    let converted = 0;
+    for (let i = 0; i < Math.max(2, runWeapon.count); i += 1) {
+      const enemy = nearestEnemy(w, p.x, p.y, reach, used);
+      if (!enemy) break;
+      used.add(enemy.uid); converted += 1;
+      enemy.convertedUntil = w.now + (weapon.durationMs ?? 4300);
+      enemy.convertedAttackReadyAt = w.now;
+      applyStatusEffect(w, enemy, 'slow');
+      damageEnemy(w, enemy, damage * 0.35, 0, p.x, p.y);
+    }
+    pushAlert(w, `ROYAL COMMAND ×${converted}`);
+  } else if (pattern === 'zero-split') {
+    for (const offset of [-0.48, 0.48]) {
+      w.effects.push({
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle: aim + offset, spread: 0.045,
+        bornAt: w.now, expiresAt: w.now + 360, color, damage, impactIntensity: weaponImpact(weapon),
+        hitUids: new Set(), followPlayer: false, statusEffectId: 'freeze',
+      });
+    }
+    pushAlert(w, 'ZERO SPLIT');
+  } else if (pattern === 'tidal-memory') {
+    const path = w.playerTrail.filter((_, index) => index % 4 === 0).slice(-8).reverse();
+    for (let i = 0; i < path.length; i += 1) {
+      const point = path[i]!;
+      novaDamage(w, point.x, point.y, 46 * areaMult(w), damage * 0.72, 2, 'slow');
+      w.effects.push({
+        uid: uid(w), kind: 'ring', x: point.x, y: point.y, radius: 46, angle: 0, spread: 0,
+        bornAt: w.now + i * 45, expiresAt: w.now + 420 + i * 45, color,
+        damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+      });
+    }
+    pushAlert(w, 'TIDAL MEMORY — ROUTE RETRACED');
+  }
+
+  p.anim = 'attack';
+  p.animStartedAt = w.now;
+  return true;
+}
+
 function fireWeapon(w: World, runWeapon: RunWeapon) {
   const weapon = runWeapon.def;
   const p = w.player;
@@ -2663,6 +3898,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
   const reach = weapon.range * areaMult(w);
   const palette = w.character.palette;
   const behavior = weaponEvolutionBehavior(w, weapon);
+
+  if (fireLegendaryWeapon(w, runWeapon, damage, reach)) return;
 
   switch (weapon.kind) {
     case 'follower': {
@@ -2718,6 +3955,17 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         evolutionBehavior: behavior,
       });
       novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
+      if (weapon.id === 'graviton-repulsor') {
+        forEachNearby(w, p.x, p.y, reach + 30, (enemy) => {
+          if (enemy.dying) return;
+          const dx = enemy.x - p.x;
+          const dy = enemy.y - p.y;
+          const d = Math.hypot(dx, dy) || 1;
+          enemy.kx += (dx / d) * 440;
+          enemy.ky += (dy / d) * 440;
+        });
+        w.shake = Math.max(w.shake, 6);
+      }
       if (behavior?.kind === 'field') {
         triggerEvolutionHit(w, behavior, p.x, p.y, damage, weapon.color ?? palette.accent, weaponImpact(weapon), weapon.statusEffectId);
       }
@@ -2730,8 +3978,24 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
 
     case 'aura': {
       // The aura is permanent; each activation is a damage tick.
-      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon));
+      novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
       damageBreakable(w, p.x, p.y, reach, damage, weaponImpact(weapon), p.x, p.y, weapon.impactTrigger);
+      w.effects.push({
+        uid: uid(w),
+        kind: 'ring',
+        x: p.x,
+        y: p.y,
+        radius: reach,
+        angle: 0,
+        spread: 0,
+        bornAt: w.now,
+        expiresAt: w.now + 220,
+        color: weapon.color ?? palette.accent,
+        damage: 0,
+        impactIntensity: 0,
+        hitUids: new Set(),
+        followPlayer: true,
+      });
       break;
     }
 
@@ -2739,12 +4003,15 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       const count = Math.max(1, runWeapon.count);
       const target = nearestEnemy(w, p.x, p.y, reach + 100);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      const isWaveform = weapon.id.includes('oscilloscope');
+      const isDialup = weapon.id === 'dialup-handshake';
       for (let i = 0; i < count; i += 1) {
         w.effects.push({
-          uid: uid(w), kind: 'wave', x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
-          angle, spread: 0.38, bornAt: w.now + i * 120, expiresAt: w.now + 330 + i * 120,
+          uid: uid(w), kind: isDialup ? 'dialup-carrier' : isWaveform ? 'waveform' : 'wave', weaponId: weapon.id, x: p.x, y: p.y, radius: reach * (0.55 + i * 0.22),
+          angle, spread: isDialup ? 0.58 : isWaveform ? 0.48 : 0.38, bornAt: w.now + i * 120, expiresAt: w.now + (isDialup ? 440 : 330) + i * 120,
           color: weapon.color ?? palette.accent, damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
           evolutionBehavior: behavior,
+          statusEffectId: weapon.statusEffectId,
         });
       }
       p.anim = 'attack'; p.animStartedAt = w.now;
@@ -2754,14 +4021,26 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
     case 'laser': {
       const target = nearestEnemy(w, p.x, p.y, reach);
       const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : (p.facing > 0 ? 0 : Math.PI);
+      const isInspect = weapon.id === 'inspect-element';
       w.effects.push({
-        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: 0.055,
-        bornAt: w.now, expiresAt: w.now + 260, color: weapon.color ?? palette.accent,
-         damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
+        uid: uid(w), kind: 'laser', x: p.x, y: p.y, radius: reach, angle, spread: isInspect ? 0.08 : 0.055,
+        bornAt: w.now, expiresAt: w.now + (isInspect ? 340 : 260), color: weapon.color ?? palette.accent,
+        damage, impactIntensity: weaponImpact(weapon), impactTrigger: weapon.impactTrigger, hitUids: new Set(), followPlayer: false,
         evolutionBehavior: behavior,
         bonusVsStatusId: weapon.bonusVsStatusId,
         bonusVsStatusMult: weapon.bonusVsStatusMult,
+        weaponId: weapon.id,
       });
+      if (isInspect && target) {
+        w.popups.push({
+          x: target.x,
+          y: target.y - 32,
+          text: 'display: none !important;',
+          color: '#38bdf8',
+          bornAt: w.now,
+          vy: 30,
+        });
+      }
       p.anim = 'attack'; p.animStartedAt = w.now;
       break;
     }
@@ -2771,6 +4050,8 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
       // as always. count > 1: spread that many fields into a ring around the
       // player instead of stacking them on top of each other, connected by
       // ambient 'web' strand effects. See run-presentation.md.
+      const isRickroll = weapon.id === 'rickroll-resonance';
+      const isMatrix = weapon.id === 'matrix-digital-rain';
       const nodeCount = Math.max(1, runWeapon.count);
       const ringRadius = nodeCount > 1 ? reach : 0;
       const nodeRadius = nodeCount > 1 ? reach * 0.4 : reach;
@@ -2781,12 +4062,14 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         const ny = p.y + Math.sin(nodeAngle) * ringRadius;
         nodePositions.push({ x: nx, y: ny });
         w.effects.push({
-          uid: uid(w), kind: 'hazard', x: nx, y: ny, radius: nodeRadius, angle: 0, spread: Math.PI * 2,
+          uid: uid(w), kind: isMatrix ? 'matrix-rain' : isRickroll ? 'rickroll-disco' : 'hazard', x: nx, y: ny, radius: nodeRadius, angle: 0, spread: Math.PI * 2,
           bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
           damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
-          hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
+          hurtsPlayer: isRickroll || isMatrix ? false : !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
           statusEffectId: weapon.statusEffectId,
+          pullStrength: weapon.id.includes('singularity') ? 160 : undefined,
           evolutionBehavior: behavior,
+          weaponId: weapon.id,
         });
       }
       if (nodeCount > 1) {
@@ -2803,7 +4086,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         }
         pushAlert(w, 'WEB ANCHORS SET');
       } else {
-        pushAlert(w, weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
+        pushAlert(w, isMatrix ? 'MATRIX RAIN' : isRickroll ? 'RICKROLL' : weapon.id === 'acid-garden' ? 'ACID GARDEN' : 'FIRE HAZARD');
       }
       break;
     }
@@ -2870,36 +4153,95 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         w.shake = Math.max(w.shake, 4);
       }
       const used = new Set<number>();
-      const shots = Math.max(1, runWeapon.count);
+      const isLlama = weapon.id === 'baby-llama-stampede';
+      const isElementalLlama = weapon.id === 'elemental-llama-stampede';
+      const isLlamaFamily = isLlama || isElementalLlama;
+      const shots = isLlamaFamily
+        ? Math.max(3, runWeapon.count + Math.floor(runWeapon.level * 1.5))
+        : Math.max(1, runWeapon.count);
+      const isMoving = Math.hypot(p.vx, p.vy) > 8;
+      const baseDirection = isMoving
+        ? Math.atan2(p.vy, p.vx)
+        : (w.rng() * Math.PI * 2);
+
       for (let i = 0; i < shots; i += 1) {
-        const target = nearestEnemy(w, p.x, p.y, weapon.range, used);
-        if (target) used.add(target.uid);
-        const angle = target
-          ? Math.atan2(target.y - p.y, target.x - p.x)
-          : (p.facing > 0 ? 0 : Math.PI) + randRange(w.rng, -0.4, 0.4);
+        let angle: number;
+        let target: EnemyActor | null = null;
+        if (isLlamaFamily) {
+          const spread = (i - (shots - 1) / 2) * 0.22;
+          angle = baseDirection + spread;
+        } else {
+          target = nearestEnemy(w, p.x, p.y, weapon.range, used);
+          if (target) used.add(target.uid);
+          angle = target
+            ? Math.atan2(target.y - p.y, target.x - p.x)
+            : (p.facing > 0 ? 0 : Math.PI) + randRange(w.rng, -0.4, 0.4);
+        }
         const speed = weapon.speed ?? 200;
+        const isSolitaire = weapon.id === 'solitaire-cascade' || weapon.id === 'infinite-solitaire';
+        const isBranch = weapon.id === 'binary-branch' || weapon.id === 'yggdrasil-null';
+        const isNyan = weapon.id === 'nyan-stream';
+        const isPopup = weapon.id === 'popup-ad-storm';
+        const isDom = weapon.id === 'dom-tree-slicer';
+        const isCookie = weapon.id === 'cookie-clicker';
+        const projRadius = isLlamaFamily ? 14 : isSolitaire ? 14 : isNyan ? 16 : isPopup ? 20 : isDom ? 13 : isCookie ? 16 : isBranch ? 10 : weapon.id === 'magma-coil' || weapon.id === 'solar-supernova' ? 12 : 6;
+
+        let popupData: { title: string; text: string; kind: 'warn' | 'ipod' | 'million' | 'hot' | 'error' } | undefined;
+        if (isPopup) {
+          const popupPool = [
+            { title: 'WinPopup.exe', text: 'YOU WON A FREE IPOD NANO!', kind: 'ipod' as const },
+            { title: 'CRITICAL ALERT', text: '1,492 THREATS DETECTED!', kind: 'warn' as const },
+            { title: 'CONGRATULATIONS!', text: '1,000,000th VISITOR CLICK!', kind: 'million' as const },
+            { title: '404 NOT FOUND', text: 'STREET NOT FOUND: ABORT', kind: 'error' as const },
+            { title: 'SYSTEM OPTIMIZER', text: 'DOWNLOAD MORE RAM NOW!', kind: 'hot' as const },
+          ];
+          popupData = popupPool[Math.floor(w.rng() * popupPool.length)];
+        }
+
+        let domTagText: string | undefined;
+        if (isDom) {
+          const domTags = [
+            '<canvas width="616">', '</canvas>',
+            '<div id="obliterate">', '</div>',
+            '<script src="chaos.js">', '</script>',
+            '<section role="hazard">', '</section>',
+            '<!-- TODO: SURVIVE -->', '<!DOCTYPE carnage>',
+          ];
+          domTagText = domTags[Math.floor(w.rng() * domTags.length)];
+        }
+
         w.projectiles.push({
           uid: uid(w),
           x: p.x,
           y: p.y + 10,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          radius: 6,
+          radius: projRadius,
           damage,
           impactIntensity: weaponImpact(weapon),
           fromPlayer: true,
-          expiresAt: w.now + (weapon.lifetimeMs ?? 2000),
+          expiresAt: w.now + (isLlamaFamily ? Math.round(((weapon.range ?? 560) / (weapon.speed ?? 300)) * 1000) : (weapon.lifetimeMs ?? 2000)),
           targetUid: weapon.kind === 'homing' ? (target?.uid ?? null) : null,
           turnRate: weapon.kind === 'homing' ? 5.2 : 0,
-          color: palette.accent,
+          color: weapon.color ?? palette.accent,
           trail: [],
-          pierce: weapon.pierce ?? 0,
+          pierce: isLlamaFamily ? 99 : (weapon.pierce ?? 0),
           hitUids: new Set(),
           obstacleUids: new Set(),
           obstacleInteraction: weapon.obstacleInteraction ?? 'block',
           statusEffectId: weapon.statusEffectId,
           impactTrigger: weapon.impactTrigger,
           evolutionBehavior: behavior,
+          weaponId: weapon.id,
+          customKind: isElementalLlama ? 'elemental-llama' : isLlama ? 'baby-llama' : isSolitaire ? 'solitaire' : isNyan ? 'nyan-cat' : isPopup ? 'popup-window' : isDom ? 'dom-tag' : isCookie ? 'golden-cookie' : undefined,
+          isElementalLlama: isElementalLlama,
+          popupTitle: popupData?.title,
+          popupText: popupData?.text,
+          popupKind: popupData?.kind,
+          tagText: domTagText,
+          sinePhase: isNyan ? (i * Math.PI + w.rng() * 1.5) : undefined,
+          sineBaseX: isNyan ? p.x : undefined,
+          sineBaseY: isNyan ? p.y + 10 : undefined,
         });
       }
       p.anim = 'attack';
@@ -2958,6 +4300,152 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         });
       }
       p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
+
+    case 'glitch': {
+      if (weapon.id === 'bsod-annihilator') {
+        w.effects.push({
+          uid: uid(w),
+          kind: 'bsod-crash',
+          weaponId: weapon.id,
+          x: p.x,
+          y: p.y,
+          radius: reach * 1.3,
+          angle: 0,
+          spread: 0,
+          bornAt: w.now,
+          expiresAt: w.now + 650,
+          color: '#1e40af',
+          damage,
+          impactIntensity: 5,
+          impactTrigger: 'stomp',
+          hitUids: new Set(),
+          followPlayer: true,
+          statusEffectId: 'freeze',
+          bsodErrorText: '*** STOP: 0x0000007B (0xF78D2524, 0xC0000034) INACCESSIBLE_BOOT_DEVICE',
+        });
+        novaDamage(w, p.x, p.y, reach * 1.3, damage, 5, 'freeze');
+        damageBreakable(w, p.x, p.y, reach * 1.3, damage, 5, p.x, p.y, 'stomp');
+
+        // Spawn falling byte blocks from above
+        for (let b = 0; b < 5; b += 1) {
+          const bx = p.x + randRange(w.rng, -reach * 0.75, reach * 0.75);
+          const by = p.y + randRange(w.rng, -reach * 0.75, reach * 0.75);
+          const bytePool = ['0xDEAD', '0xBEEF', '0xCAFE', '0x0000', '0xFFFF', '0xNULL', '0xBAAD'];
+          w.projectiles.push({
+            uid: uid(w),
+            weaponId: weapon.id,
+            customKind: 'byte-block',
+            tagText: bytePool[Math.floor(w.rng() * bytePool.length)],
+            x: bx,
+            y: by - 220,
+            vx: 0,
+            vy: 420,
+            radius: 18,
+            damage: damage * 0.8,
+            impactIntensity: 4,
+            fromPlayer: true,
+            expiresAt: w.now + 850,
+            targetUid: null,
+            turnRate: 0,
+            color: '#38bdf8',
+            trail: [],
+            pierce: 3,
+            hitUids: new Set(),
+            sineBaseY: by,
+          });
+        }
+        w.shake = Math.max(w.shake, 14);
+        pushAlert(w, 'KERNEL PANIC: BSOD');
+        pushSfx(w, 'bossWarning');
+        p.anim = 'attack';
+        p.animStartedAt = w.now;
+        break;
+      }
+
+      const target = nearestEnemy(w, p.x, p.y, reach + 120);
+      const cx = target ? target.x : p.x + (p.facing > 0 ? reach * 0.6 : -reach * 0.6);
+      const cy = target ? target.y : p.y;
+      w.effects.push({
+        uid: uid(w),
+        kind: 'glitch',
+        weaponId: weapon.id,
+        x: cx,
+        y: cy,
+        radius: reach * 0.75 * areaMult(w),
+        angle: 0,
+        spread: 0,
+        bornAt: w.now,
+        expiresAt: w.now + 480,
+        color: weapon.color ?? palette.accent,
+        damage,
+        impactIntensity: weaponImpact(weapon),
+        impactTrigger: weapon.impactTrigger,
+        hitUids: new Set(),
+        followPlayer: false,
+        statusEffectId: weapon.statusEffectId,
+        evolutionBehavior: behavior,
+      });
+      w.popups.push({
+        x: cx,
+        y: cy - 28,
+        text: weapon.id === 'dev-cursor' ? 'DEL [■]' : (weapon.id === 'kernel-panic' ? '0xBSOD' : 'GLITCH'),
+        color: weapon.color ?? '#38bdf8',
+        bornAt: w.now,
+        vy: 38,
+      });
+      p.anim = 'attack';
+      p.animStartedAt = w.now;
+      w.shake = Math.max(w.shake, 6);
+      break;
+    }
+
+    case 'dvd-bounce': {
+      const activeDvds = w.projectiles.filter((pr) => pr.customKind === 'dvd-logo');
+      const maxCount = Math.max(1, runWeapon.count);
+      if (activeDvds.length < maxCount) {
+        // Spawn persistent bouncing DVD screensaver icon
+        const angle = (w.rng() * Math.PI * 0.4) + (Math.PI * 0.1) + (Math.floor(w.rng() * 4) * (Math.PI / 2));
+        const speed = (weapon.speed ?? 290) * (1 + (runWeapon.level - 1) * 0.08);
+        const dvdColors = ['#38bdf8', '#f43f5e', '#a855f7', '#22c55e', '#eab308', '#ec4899', '#06b6d4'];
+        const startColor = dvdColors[Math.floor(w.rng() * dvdColors.length)] ?? '#38bdf8';
+        w.projectiles.push({
+          uid: uid(w),
+          weaponId: weapon.id,
+          customKind: 'dvd-logo',
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 22,
+          damage,
+          impactIntensity: weaponImpact(weapon),
+          fromPlayer: true,
+          expiresAt: w.now + 999999999,
+          targetUid: null,
+          turnRate: 0,
+          color: startColor,
+          trail: [],
+          pierce: 9999,
+          hitUids: new Set(),
+          evolutionBehavior: behavior,
+        });
+        pushAlert(w, weapon.id === 'dvd-screensaver' ? '★ DVD SCREENSAVER OVERDRIVE ACTIVE ★' : 'DVD BOUNCING LOGO DEPLOYED');
+      } else {
+        // Update stats on active DVD projectiles
+        for (const proj of activeDvds) {
+          proj.damage = damage;
+          const curSpeed = Math.hypot(proj.vx, proj.vy) || 290;
+          const targetSpeed = (weapon.speed ?? 290) * (1 + (runWeapon.level - 1) * 0.08);
+          const ratio = targetSpeed / curSpeed;
+          proj.vx *= ratio;
+          proj.vy *= ratio;
+          proj.evolutionBehavior = behavior;
+        }
+      }
+      p.anim = 'attack';
+      p.animStartedAt = w.now;
       break;
     }
   }
@@ -3039,8 +4527,73 @@ export function activateUltimate(w: World): boolean {
       followPlayer: false,
     });
   }
+  if (ult.id === 'llamaste-overload') {
+    const burstCount = 24;
+    const speed = 320;
+    for (let i = 0; i < burstCount; i += 1) {
+      const angle = (i / burstCount) * Math.PI * 2;
+      w.projectiles.push({
+        uid: uid(w),
+        x: w.player.x,
+        y: w.player.y + 10,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 15,
+        damage: 52 * damageMult(w),
+        impactIntensity: 3,
+        fromPlayer: true,
+        expiresAt: w.now + 3200,
+        targetUid: null,
+        turnRate: 0,
+        color: '#fb7185',
+        trail: [],
+        pierce: 99,
+        hitUids: new Set(),
+        obstacleUids: new Set(),
+        weaponId: 'baby-llama-stampede',
+        customKind: 'baby-llama',
+        isElementalLlama: true,
+      });
+    }
+    spawnParticles(w, w.player.x, w.player.y, '#fb7185', 25, 200);
+    spawnParticles(w, w.player.x, w.player.y, '#38bdf8', 16, 180);
+    spawnParticles(w, w.player.x, w.player.y, '#a855f7', 16, 180);
+  }
+  if (ult.id === 'apex-llamageddon') {
+    const burstCount = 28;
+    const speed = 360;
+    for (let i = 0; i < burstCount; i += 1) {
+      const angle = (i / burstCount) * Math.PI * 2;
+      w.projectiles.push({
+        uid: uid(w),
+        x: w.player.x,
+        y: w.player.y + 10,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: 17,
+        damage: 64 * damageMult(w),
+        impactIntensity: 4,
+        fromPlayer: true,
+        expiresAt: w.now + 3500,
+        targetUid: null,
+        turnRate: 0,
+        color: '#c084fc',
+        trail: [],
+        pierce: 99,
+        hitUids: new Set(),
+        obstacleUids: new Set(),
+        weaponId: 'elemental-llama-stampede',
+        customKind: 'elemental-llama',
+        isElementalLlama: true,
+      });
+    }
+    spawnParticles(w, w.player.x, w.player.y, '#c084fc', 35, 240);
+    spawnParticles(w, w.player.x, w.player.y, '#f59e0b', 20, 200);
+    spawnParticles(w, w.player.x, w.player.y, '#38bdf8', 20, 200);
+  }
   w.shake = Math.max(w.shake, 12);
   pushAlert(w, ult.name);
+  pushSfx(w, 'ultimate');
   return true;
 }
 
@@ -3089,23 +4642,42 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   }
   if (w.weapons.length < 6) {
     for (const weapon of Object.values(WEAPONS_BY_ID)) {
+      if (w.disabledWeaponIds && w.disabledWeaponIds.includes(weapon.id)) continue;
       if (!w.weapons.some((entry) => entry.def.id === weapon.id)) {
         pool.push({ id: `weapon-${weapon.id}`, name: weapon.name, description: weapon.description, weight: 5, maxStacks: 1, effects: [], cardKind: 'weapon', weaponId: weapon.id });
       }
     }
   }
   for (const passive of PASSIVES) {
+    if (w.disabledPassiveIds && w.disabledPassiveIds.includes(passive.id)) continue;
     const owned = w.passives.find((entry) => entry.def.id === passive.id);
     if ((!owned && w.passives.length < 6) || (owned && owned.stacks < passive.maxStacks)) {
       pool.push({ id: `passive-${passive.id}`, name: passive.name, description: passive.description, weight: passive.weight, maxStacks: passive.maxStacks, effects: passive.effects, cardKind: 'passive', passiveId: passive.id });
     }
   }
   for (const evolution of EVOLUTIONS) {
+    if (w.disabledWeaponIds && w.disabledWeaponIds.includes(evolution.id)) continue;
     const weapon = w.weapons.find((entry) => entry.def.id === evolution.baseWeaponId);
-    const passive = w.passives.find((entry) => entry.def.id === evolution.requiredPassiveId);
-    if (weapon && passive && weapon.def.id !== evolution.id) {
-      pool.push({ id: `evolution-${evolution.id}`, name: evolution.name, description: evolution.description, weight: 14, maxStacks: 1, effects: [], cardKind: 'evolution', evolutionId: evolution.id });
+    if (!weapon || weapon.def.id === evolution.id) continue;
+
+    // Check base weapon level (if requiredBaseLevel specified, or if requiredWeaponId is set default to 8 maxed)
+    const reqBase = evolution.requiredBaseLevel ?? (evolution.requiredWeaponId ? 8 : 1);
+    if (weapon.level < reqBase) continue;
+
+    // Check partner weapon if specified (e.g. requires another weapon maxed)
+    if (evolution.requiredWeaponId) {
+      const partner = w.weapons.find((entry) => entry.def.id === evolution.requiredWeaponId);
+      const reqPartner = evolution.requiredWeaponLevel ?? 8;
+      if (!partner || partner.level < reqPartner) continue;
     }
+
+    // Check passive if specified
+    if (evolution.requiredPassiveId) {
+      const passive = w.passives.find((entry) => entry.def.id === evolution.requiredPassiveId);
+      if (!passive) continue;
+    }
+
+    pool.push({ id: `evolution-${evolution.id}`, name: evolution.name, description: evolution.description, weight: 16, maxStacks: 1, effects: [], cardKind: 'evolution', evolutionId: evolution.id });
   }
   for (const recipe of RELIC_RECIPES) {
     const eligibility = relicRecipeEligibility(w, recipe);
@@ -3182,6 +4754,17 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
       weapon.level = Math.min(8, weapon.level + 1);
       if (weapon.def.kind === 'orbit') rebuildOrbiters(w, weapon);
       pushAlert(w, `${evolution.name} evolved`);
+      if (evolution.requiredWeaponId) {
+        w.popups.push({
+          x: w.player.x,
+          y: w.player.y + 32,
+          text: `★ FUSION · ${evolution.name} ★`,
+          color: evolution.color,
+          bornAt: w.now,
+          vy: 35,
+        });
+        w.shake = Math.max(w.shake, 4);
+      }
     }
   }
   if (upgrade.cardKind === 'relic-evolution' && upgrade.relicRecipeId) {
@@ -3292,6 +4875,10 @@ export function claimLootPrize(w: World, prize: LootPrizeDef) {
       });
       break;
     }
+    case 'card-pack':
+      if (prize.cardPackId) w.cardPacksFound.push(prize.cardPackId);
+      w.popups.push({ x: w.player.x, y: w.player.y + 30, text: prize.label, color: '#f0abfc', bornAt: w.now, vy: 28 });
+      break;
   }
 }
 
@@ -3351,6 +4938,7 @@ function gainXp(w: World, amount: number) {
     w.level += 1;
     w.xpToNext = xpForLevel(w.level);
     w.pendingLevelUps += 1;
+    pushSfx(w, 'levelUp');
   }
 }
 
@@ -3377,11 +4965,24 @@ function clampToArena(w: World, actor: Actor) {
 }
 
 function collideObstacles(w: World, actor: Actor) {
-  for (const box of w.obstacles) {
-    // Cheap reject before the precise test.
-    if (Math.abs(actor.x - box.x) > box.w / 2 + actor.radius + 4) continue;
-    if (Math.abs(actor.y - box.y) > box.h / 2 + actor.radius + 4) continue;
-    resolveCircleBox(actor, actor.radius, box);
+  // Only the cells within reach of the actor's radius can hold a box it
+  // might overlap -- was a scan of every obstacle for every actor, which
+  // dominated frame time once enemy counts climbed into the hundreds
+  // (profiled at ~40% of a step at 850 enemies on endless-streets).
+  const reach = Math.ceil((actor.radius + 4) / CELL);
+  const baseX = Math.floor(actor.x / CELL);
+  const baseY = Math.floor(actor.y / CELL);
+  for (let ix = -reach; ix <= reach; ix += 1) {
+    for (let iy = -reach; iy <= reach; iy += 1) {
+      const bucket = w.obstacleGrid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+      if (!bucket) continue;
+      for (const box of bucket) {
+        // Cheap reject before the precise test.
+        if (Math.abs(actor.x - box.x) > box.w / 2 + actor.radius + 4) continue;
+        if (Math.abs(actor.y - box.y) > box.h / 2 + actor.radius + 4) continue;
+        resolveCircleBox(actor, actor.radius, box);
+      }
+    }
   }
 }
 
@@ -3539,7 +5140,7 @@ function applyPropImpact(
     const velocityMultiplier = reverseLaunch ? 4 : 1;
     if (reverseLaunch) b.clickPrimed = false;
     b.impactVelocityMultiplier = velocityMultiplier;
-    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier;
+    const launchSpeed = resolveImpactTravel(intensity, b.mass, b.propVariant === 'heavy-metal' ? 0.15 : 0) * velocityMultiplier * w.cardEffects.propBounceMult;
     const pushScale = b.propVariant === 'heavy-metal' ? 0.62 : 0.78;
     b.vx += launchDirectionX * launchSpeed * pushScale;
     b.vy += launchDirectionY * launchSpeed * pushScale;
@@ -3555,6 +5156,7 @@ function syncObstacleAabbs(w: World) {
   w.obstacles = w.breakables
     .filter((b) => !b.broken)
     .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+  w.obstacleGridDirty = true;
 }
 
 function damageBreakable(
@@ -3570,6 +5172,7 @@ function damageBreakable(
   fromPlayer = true,
 ) {
   applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY, impactTrigger, fromPlayer);
+  if (w.cardEffects.unbreakableProps) return;
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
@@ -3580,6 +5183,7 @@ function damageBreakable(
     }
     b.broken = true;
     b.brokenAt = w.now;
+    pushSfx(w, 'obstacleBreak');
     const count = b.kind === 'barrel' ? 16 : b.kind === 'neon-sign' ? 6 : 10;
     spawnParticles(w, b.x, b.y, b.kind === 'neon-sign' ? '#4de1ff' : b.kind === 'barrel' ? '#f0760a' : '#c99055', count, 130);
     if (b.kind === 'barrel') {
@@ -3588,6 +5192,14 @@ function damageBreakable(
           damageEnemy(w, enemy, 18 * w.stats.power, 3, b.x, b.y);
         }
       });
+    }
+    if (b.kind === 'server-rack') {
+      forEachNearby(w, b.x, b.y, 90, (enemy) => {
+        if (dist2(enemy.x, enemy.y, b.x, b.y) <= (72 + enemy.radius) ** 2) {
+          damageEnemy(w, enemy, 14 * w.stats.power, 2, b.x, b.y);
+        }
+      });
+      pushAlert(w, 'RACK OVERLOAD');
     }
     if (b.kind === 'crate' || b.kind === 'crate-breakable' || b.kind === 'barrel') {
       w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: b.kind === 'barrel' ? 12 : 6, bornAt: w.now });
@@ -3790,6 +5402,216 @@ function updateFluids(w: World) {
   }
 }
 
+function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+}
+
+function updateDustMites(w: World, dt: number) {
+  if (w.electricChains) {
+    w.electricChains = w.electricChains.filter((c) => w.now < c.expiresAt);
+  } else {
+    w.electricChains = [];
+  }
+
+  const mites = w.enemies.filter((e) => (e.def.id === 'dust-mite' || e.def.id === 'dust-roller') && !e.dying);
+  if (mites.length < 2) return;
+
+  for (let i = 0; i < mites.length; i += 1) {
+    const a = mites[i]!;
+    for (let j = i + 1; j < mites.length; j += 1) {
+      const b = mites[j]!;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= 78) {
+        const existing = w.electricChains.find(
+          (c) => (Math.hypot(c.x1 - a.x, c.y1 - a.y) < 16 && Math.hypot(c.x2 - b.x, c.y2 - b.y) < 16) ||
+                 (Math.hypot(c.x1 - b.x, c.y1 - b.y) < 16 && Math.hypot(c.x2 - a.x, c.y2 - a.y) < 16)
+        );
+        if (!existing) {
+          w.electricChains.push({
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            bornAt: w.now,
+            expiresAt: w.now + 400,
+          });
+          spawnParticles(w, (a.x + b.x) / 2, (a.y + b.y) / 2, '#38bdf8', 4, 60);
+
+          const p = w.player;
+          const distToLine = distToSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+          if (distToLine <= p.radius + 8) {
+            if (w.threatUpgrades?.['static-inverter']) {
+              if (w.now > p.invulnUntil) {
+                p.hp = Math.min(p.maxHp, p.hp + 2);
+                p.invulnUntil = w.now + 350;
+                w.popups.push({
+                  x: p.x,
+                  y: p.y - 20,
+                  text: '+STATIC CHARGE',
+                  color: '#38bdf8',
+                  bornAt: w.now,
+                  vy: 30,
+                });
+                spawnParticles(w, p.x, p.y, '#38bdf8', 6, 80);
+              }
+            } else {
+              if (w.now > p.invulnUntil) {
+                p.hp -= 6;
+                p.hitFlashUntil = w.now + 120;
+                p.invulnUntil = w.now + 400;
+                w.shake = Math.max(w.shake, 3.5);
+                w.popups.push({
+                  x: p.x,
+                  y: p.y - 20,
+                  text: 'ZAP! -6',
+                  color: '#38bdf8',
+                  bornAt: w.now,
+                  vy: 35,
+                });
+              }
+            }
+          }
+
+          for (const other of w.enemies) {
+            if (other.uid === a.uid || other.uid === b.uid || other.dying) continue;
+            if (distToSegment(other.x, other.y, a.x, a.y, b.x, b.y) <= other.radius + 6) {
+              damageEnemy(w, other, 16, 2, other.x, other.y, 'shock');
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function updateBubbleWash(w: World, dt: number) {
+  if (!w.bubbleWash) return;
+  const bw = w.bubbleWash;
+  const p = w.player;
+
+  for (let i = bw.foamParticles.length - 1; i >= 0; i -= 1) {
+    const fp = bw.foamParticles[i]!;
+    fp.x += fp.vx * dt;
+    fp.y += fp.vy * dt;
+    if (w.now - fp.bornAt > 3500) {
+      bw.foamParticles.splice(i, 1);
+    }
+  }
+
+  if (bw.state === 'idle') {
+    if (w.now >= bw.nextSurgeAt - 4000) {
+      bw.state = 'warning';
+      bw.warningStartedAt = w.now;
+      bw.direction = w.rng() > 0.5 ? 1 : -1;
+      const dirText = bw.direction > 0 ? 'EAST ➔' : 'WEST ⬅';
+      pushAlert(w, `⚠️ TORRENTIAL BUBBLE WASH IMMINENT! HEADING ${dirText}`);
+      w.shake = Math.max(w.shake, 3);
+    }
+  } else if (bw.state === 'warning') {
+    w.shake = Math.max(w.shake, 2);
+    if (w.rng() < 0.35 && bw.foamParticles.length < 120) {
+      const halfW = w.bounds.w / 2;
+      const halfH = w.bounds.h / 2;
+      const startX = bw.direction > 0 ? -halfW - 50 : halfW + 50;
+      bw.foamParticles.push({
+        x: startX,
+        y: (w.rng() * 2 - 1) * halfH,
+        vx: bw.direction * (320 + w.rng() * 180),
+        vy: (w.rng() - 0.5) * 80,
+        r: 8 + w.rng() * 16,
+        color: w.rng() > 0.5 ? '#f472b6' : '#38bdf8',
+        bornAt: w.now,
+      });
+    }
+
+    if (w.now >= bw.nextSurgeAt) {
+      bw.state = 'surging';
+      bw.surgeActiveUntil = w.now + 5000;
+      pushAlert(w, '🌊 SUDS SURGE ACTIVE! WASHOUT IN PROGRESS!');
+      w.shake = Math.max(w.shake, 7);
+    }
+  } else if (bw.state === 'surging') {
+    w.shake = Math.max(w.shake, 4);
+    const halfW = w.bounds.w / 2;
+    const halfH = w.bounds.h / 2;
+    for (let c = 0; c < 4; c += 1) {
+      if (bw.foamParticles.length < 180) {
+        const startX = bw.direction > 0 ? -halfW - 30 : halfW + 30;
+        bw.foamParticles.push({
+          x: startX,
+          y: (w.rng() * 2 - 1) * halfH,
+          vx: bw.direction * (620 + w.rng() * 280),
+          vy: (w.rng() - 0.5) * 120,
+          r: 12 + w.rng() * 26,
+          color: w.rng() > 0.5 ? '#f472b6' : '#38bdf8',
+          bornAt: w.now,
+        });
+      }
+    }
+
+    const anchorReduction = w.threatUpgrades?.['tidal-anchor'] ? 0.25 : 1;
+    const pushP = bw.direction * 520 * anchorReduction * dt;
+    p.x += pushP;
+    p.x = clamp(p.x, -halfW + p.radius, halfW - p.radius);
+
+    for (const e of w.enemies) {
+      if (e.dying) continue;
+      e.x += bw.direction * 420 * dt;
+      e.x = clamp(e.x, -halfW + e.radius, halfW - e.radius);
+    }
+
+    if (w.now >= bw.surgeActiveUntil) {
+      bw.state = 'idle';
+      bw.nextSurgeAt = w.now + 18000;
+      pushAlert(w, 'Suds surge subsided.');
+    }
+  }
+
+  // Pink and Blue bubbles infighting
+  const PINK_BUBBLES = new Set(['bubble-scout', 'bubble-splitter', 'bubble-matriarch']);
+  const BLUE_BUBBLES = new Set(['bubble-grunt', 'bubble-drifter', 'bubble-colossus']);
+
+  const pinks = w.enemies.filter((e) => PINK_BUBBLES.has(e.def.id) && !e.dying);
+  const blues = w.enemies.filter((e) => BLUE_BUBBLES.has(e.def.id) && !e.dying);
+
+  if (pinks.length > 0 && blues.length > 0) {
+    for (const pink of pinks) {
+      let nearestB: EnemyActor | null = null;
+      let minDist2 = 150 * 150;
+      for (const blue of blues) {
+        const d2 = dist2(pink.x, pink.y, blue.x, blue.y);
+        if (d2 < minDist2) {
+          minDist2 = d2;
+          nearestB = blue;
+        }
+      }
+      if (nearestB) {
+        const reach = pink.radius + nearestB.radius + 8;
+        if (minDist2 <= reach * reach) {
+          pink.hp -= 24 * dt;
+          nearestB.hp -= 24 * dt;
+          if (w.rng() < 0.2) {
+            spawnParticles(w, (pink.x + nearestB.x) / 2, (pink.y + nearestB.y) / 2, '#ec4899', 3, 50);
+            spawnParticles(w, (pink.x + nearestB.x) / 2, (pink.y + nearestB.y) / 2, '#38bdf8', 3, 50);
+          }
+          if (pink.hp <= 0) {
+            killEnemy(w, pink);
+          }
+          if (nearestB.hp <= 0) {
+            killEnemy(w, nearestB);
+          }
+        }
+      }
+    }
+  }
+}
+
 function potholeContains(pothole: PotholeObstacle, actor: Actor): boolean {
   const dx = Math.max(Math.abs(actor.x - pothole.x) - pothole.w / 2, 0);
   const dy = Math.max(Math.abs(actor.y - pothole.y) - pothole.h / 2, 0);
@@ -3865,14 +5687,16 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
     const hitX = horizontal > vertical;
     const nx = hitX ? (dx < 0 ? -1 : 1) : 0;
     const ny = hitX ? 0 : (dy < 0 ? -1 : 1);
-    if (b.kind === 'reflective-surface' && proj.fromPlayer && proj.obstacleInteraction === 'reflect') {
+    if (proj.fromPlayer && proj.obstacleInteraction === 'reflect') {
       (proj.obstacleUids ??= new Set()).add(b.uid);
       if (hitX) proj.vx *= -1;
       else proj.vy *= -1;
       // Move clear of the face so a reflected shot cannot immediately collide again.
-      proj.x = b.x + nx * (b.w / 2 + proj.radius + 1);
-      proj.y = b.y + ny * (b.h / 2 + proj.radius + 1);
-      spawnParticles(w, proj.x, proj.y, '#d8b4fe', 5, 70);
+      proj.x = b.x + nx * (b.w / 2 + proj.radius + 2);
+      proj.y = b.y + ny * (b.h / 2 + proj.radius + 2);
+      proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
+      spawnParticles(w, proj.x, proj.y, proj.color ?? '#d8b4fe', 5, 70);
       pushAlert(w, 'Ricochet');
       continue;
     }
@@ -3880,11 +5704,9 @@ function collideProjectileObstacle(w: World, proj: Projectile): boolean {
       spawnParticles(w, proj.x, proj.y, '#d8b4fe', 3, 45);
       return true;
     }
-    if (b.kind === 'cover' || b.kind === 'crate-breakable' || b.kind === 'crate' || b.kind === 'barrel' || b.kind === 'street-lamp' || b.kind === 'metal-box' || b.kind === 'bench') {
-      damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
-      spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
-      return true;
-    }
+    damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage * 0.35, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
+    spawnParticles(w, proj.x, proj.y, b.kind === 'barrel' ? '#f0760a' : '#fbbf24', 4, 55);
+    return true;
   }
   return false;
 }
@@ -4158,7 +5980,8 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
   const coneSlow = w.now < w.playerConeUntil ? 1 - w.playerConeMag : 1;
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow;
+  const pollenSpeed = (p.pollenSpeedUntil ?? 0) > w.now ? 1.18 : 1;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed;
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -4211,6 +6034,50 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   }
 }
 
+const GUEST_ATTACK_RANGE = 60;
+const GUEST_ATTACK_INTERVAL_MS = 420;
+const GUEST_ATTACK_DAMAGE = 6;
+
+/**
+ * LokSurvivorArena: moves one guest and lets them fight back with a simple
+ * fixed melee pulse -- guests don't run the full `CharacterDef` weapon/
+ * leveling system (see `.agents/memory/loksurvivor-arena.md`), just the
+ * shared movement/collision physics `updatePlayer` already uses, plus a
+ * kill-attributed damage tick so the arena scoreboard has something real to
+ * count.
+ */
+function updateGuest(w: World, dt: number, moveX: number, moveY: number, guest: GuestPlayerActor) {
+  const speed = w.stats.speed * speedMult(w) * fluidSpeedMultiplierAt(w, guest.x, guest.y);
+  const len = Math.hypot(moveX, moveY);
+  const nx = len > 1 ? moveX / len : moveX;
+  const ny = len > 1 ? moveY / len : moveY;
+  guest.vx = nx * speed;
+  guest.vy = ny * speed;
+  guest.x += guest.vx * dt;
+  guest.y += guest.vy * dt;
+  applyKnockback(guest, dt);
+  if (Math.abs(nx) > 0.05) guest.facing = nx > 0 ? 1 : -1;
+  collideObstacles(w, guest);
+  clampToArena(w, guest);
+
+  const moving = len > 0.08;
+  const nextAnim: AnimState = moving ? 'walk' : 'idle';
+  if (guest.anim !== nextAnim) {
+    guest.anim = nextAnim;
+    guest.animStartedAt = w.now;
+  }
+
+  if (w.now >= guest.attackReadyAt) {
+    const target = nearestEnemy(w, guest.x, guest.y, GUEST_ATTACK_RANGE);
+    if (target) {
+      guest.attackReadyAt = w.now + GUEST_ATTACK_INTERVAL_MS;
+      guest.anim = 'attack';
+      guest.animStartedAt = w.now;
+      damageEnemy(w, target, GUEST_ATTACK_DAMAGE * w.stats.power, 1, guest.x, guest.y, undefined, 0, guest.id);
+    }
+  }
+}
+
 const DASH_SPEED = 760;
 const DASH_DURATION_MS = 180;
 const DASH_COOLDOWN_MS = 820;
@@ -4239,6 +6106,7 @@ export function dashPlayer(w: World, directionX: number, directionY: number): bo
   w.player.vy = w.player.dashDirectionY * DASH_SPEED;
   w.shake = Math.max(w.shake, 9);
   spawnParticles(w, w.player.x, w.player.y, w.character.palette.accentBright, 12, 150);
+  pushSfx(w, 'dash');
   w.popups.push({
     x: w.player.x,
     y: w.player.y - 28,
@@ -4371,7 +6239,8 @@ function updateDashSkill(w: World) {
     for (let i = dashSkill.pendingLandings.length - 1; i >= 0; i -= 1) {
       const landing = dashSkill.pendingLandings[i]!;
       if (w.now < landing.readyAt) continue;
-      const stillAlive = w.enemies.find((e) => e.uid === landing.uid && !e.dying);
+      const uidMatch = w.enemiesByUid.get(landing.uid);
+      const stillAlive = uidMatch && !uidMatch.dying ? uidMatch : undefined;
       const x = stillAlive?.x ?? landing.x;
       const y = stillAlive?.y ?? landing.y;
       novaDamage(w, x, y, landing.radius, landing.damage, 3);
@@ -4416,21 +6285,45 @@ function updateEnemies(w: World, dt: number) {
   const trackX = stealthed ? w.stealthAnchorX : p.x;
   const trackY = stealthed ? w.stealthAnchorY : p.y;
 
+  // Grid-backed lookups (nearestEnemy, enemiesByUid) run throughout this
+  // function -- including the converted-ally/commanded-unit targeting below,
+  // well before the separation pass's own rebuild -- so it has to be current
+  // before any of that runs, not just before separation. The later call is
+  // still worth keeping: it re-syncs against this frame's movement before
+  // the separation pass, exactly as before this function grew a top-of-frame
+  // rebuild too.
+  rebuildGrid(w);
+
+  const enemyMoveBreakables = w.breakables.filter((b) => !b.broken && b.movable);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
+    // Zero Day: frozen "stone" enemies are fully inert -- no AI, no attacks,
+    // no contact damage (the contact check further down never runs since we
+    // skip the rest of the loop body for them entirely).
+    if (w.now < enemy.frozenUntil) {
+      enemy.vx = 0;
+      enemy.vy = 0;
+      continue;
+    }
 
     if (enemy.convertedUntil > w.now) {
-      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, new Set([enemy.uid]));
+      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, undefined, enemy.uid);
       if (allyTarget && w.now >= enemy.convertedAttackReadyAt) {
         enemy.convertedAttackReadyAt = w.now + 650;
         damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8 * statusDamageMultiplier(enemy))), 2, enemy.x, enemy.y);
         const attackAngle = Math.atan2(allyTarget.y - enemy.y, allyTarget.x - enemy.x);
         const attackDistance = Math.hypot(allyTarget.x - enemy.x, allyTarget.y - enemy.y);
-        w.effects.push({
+        if (canSpawnEnemyEffect(w)) w.effects.push({
           uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: attackDistance, angle: attackAngle, spread: 0,
           bornAt: w.now, expiresAt: w.now + 180, color: '#65f6d1', damage: 0, impactIntensity: 0,
           hitUids: new Set(), followPlayer: false,
         });
+      }
+      // Sector Command: a captured unit walks to its standing order and is
+      // mortal. Legacy allymaker allies have `commanded === false` and keep
+      // their original stationary-turret behavior untouched.
+      if (enemy.commanded) {
+        advanceCommandedUnit(w, enemy, dt);
       }
       continue;
     }
@@ -4489,7 +6382,7 @@ function updateEnemies(w: World, dt: number) {
         else if (distance < 260) speed = 0;
         if (w.now >= enemy.fireReadyAt && distance < 420) {
           const ranged = enemy.def.ranged;
-          if (ranged) {
+          if (ranged && canSpawnEnemyProjectile(w)) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.2);
             w.projectiles.push({
               uid: uid(w),
@@ -4538,7 +6431,7 @@ function updateEnemies(w: World, dt: number) {
         enemy.weave += dt * 1.8;
         if (w.now >= enemy.fireReadyAt && distance < 480) {
           const ranged = enemy.def.ranged;
-          if (ranged) {
+          if (ranged && canSpawnEnemyProjectile(w)) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.15);
             w.projectiles.push({
               uid: uid(w), x: enemy.x, y: enemy.y + 8,
@@ -4578,7 +6471,7 @@ function updateEnemies(w: World, dt: number) {
               p.ky += dirY * push;
             }
           }
-          w.effects.push({
+          if (canSpawnEnemyEffect(w)) w.effects.push({
             uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius,
             angle: 0, spread: Math.PI * 2, bornAt: w.now, expiresAt: w.now + 360,
             color: enemy.def.palette.accent, damage: 0, impactIntensity: 0,
@@ -4629,7 +6522,7 @@ function updateEnemies(w: World, dt: number) {
         }
         if (revealed && w.now >= enemy.fireReadyAt) {
           const ranged = enemy.def.ranged;
-          if (ranged) {
+          if (ranged && canSpawnEnemyProjectile(w)) {
             enemy.fireReadyAt = w.now + ranged.cooldownMs * randRange(w.rng, 0.85, 1.2);
             const fdx = trackX - enemy.x;
             const fdy = trackY - enemy.y;
@@ -4666,7 +6559,7 @@ function updateEnemies(w: World, dt: number) {
             const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
             if (diff < halfAngle && w.now >= enemy.fireReadyAt) {
               enemy.fireReadyAt = w.now + 900;
-              w.effects.push({
+              if (canSpawnEnemyEffect(w)) w.effects.push({
                 uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: rdist, angle: toPlayer, spread: halfAngle * 2,
                 bornAt: w.now, expiresAt: w.now + 220, color: '#f59e0b', damage: 0, impactIntensity: 0,
                 hitUids: new Set(), followPlayer: false,
@@ -4812,6 +6705,225 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'pincer': {
+        enemy.weave += dt * 2.5;
+        if (w.now < enemy.chargeUntil) {
+          speed = enemy.speed * 2.8;
+        } else if (w.now >= enemy.chargeReadyAt && distance < 280) {
+          enemy.chargeUntil = w.now + 480;
+          enemy.chargeReadyAt = w.now + randRange(w.rng, 2000, 3400);
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+        }
+        break;
+      }
+      case 'singularity': {
+        speed *= 0.4;
+        const pullRadius = 240;
+        if (distance < pullRadius && distance > 10) {
+          const pullForce = (1 - distance / pullRadius) * 60;
+          p.x += -dirX * pullForce * dt;
+          p.y += -dirY * pullForce * dt;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 1200;
+          spawnParticles(w, enemy.x, enemy.y, '#9333ea', 6, 40);
+        }
+        break;
+      }
+      case 'phalanx': {
+        speed *= 0.72;
+        break;
+      }
+      case 'prism': {
+        speed *= 0.65;
+        if (w.now >= enemy.fireReadyAt && distance < 380) {
+          enemy.fireReadyAt = w.now + 2800;
+          const laserAngle = Math.atan2(dirY, dirX);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 220, angle: laserAngle, spread: 0.15,
+              bornAt: w.now, expiresAt: w.now + 320, color: '#06b6d4', damage: 8, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'weaver': {
+        speed *= 0.85;
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 350;
+          for (let oi = 0; oi < w.enemies.length; oi += 1) {
+            const other = w.enemies[oi]!;
+            if (other === enemy || other.dying || other.def.behavior !== 'weaver') continue;
+            const odx = other.x - enemy.x;
+            const ody = other.y - enemy.y;
+            const odist = Math.hypot(odx, ody);
+            if (odist < 220 && odist > 20) {
+              if (canSpawnEnemyEffect(w)) {
+                w.effects.push({
+                  uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: odist,
+                  angle: Math.atan2(ody, odx), spread: 0.08,
+                  bornAt: w.now, expiresAt: w.now + 180, color: '#a855f7', damage: 3, impactIntensity: 0,
+                  hitUids: new Set(), followPlayer: false,
+                });
+              }
+              break;
+            }
+          }
+        }
+        break;
+      }
+      case 'root-trapper': {
+        // Roots down when within 340px, channels a pulsing digital root circle,
+        // then erupts a branching laser root spike towards the player.
+        if (distance < 340) {
+          if (w.now < enemy.chargeUntil) {
+            // Actively channeling roots: immobilized and resistant
+            speed = 0;
+            if (w.now >= enemy.fireReadyAt) {
+              enemy.fireReadyAt = w.now + 250;
+              spawnParticles(w, enemy.x, enemy.y, '#10b981', 4, 30);
+            }
+          } else if (w.now >= enemy.chargeReadyAt) {
+            enemy.chargeUntil = w.now + 1100;
+            enemy.chargeReadyAt = w.now + 3800;
+            enemy.fireReadyAt = w.now + 100;
+            const rootAngle = Math.atan2(dirY, dirX);
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 260, angle: rootAngle, spread: 0.22,
+                bornAt: w.now + 600, expiresAt: w.now + 1100, color: '#10b981', damage: 12, impactIntensity: 1,
+                hitUids: new Set(), followPlayer: false,
+              });
+              w.effects.push({
+                uid: uid(w), kind: 'ring', x: p.x, y: p.y, radius: 45, angle: 0, spread: Math.PI * 2,
+                bornAt: w.now, expiresAt: w.now + 600, color: '#059669', damage: 0, impactIntensity: 0,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          } else {
+            speed *= 0.55;
+          }
+        }
+        break;
+      }
+      case 'mimic-tree': {
+        // Dormant until approached or damaged; explodes into a high-speed sprint & spin slash
+        if (enemy.hp === enemy.maxHp && distance > 140 && !enemy.chargeUntil) {
+          speed = 0; // Perfectly still, masquerading as a tree
+        } else {
+          if (!enemy.chargeUntil) {
+            enemy.chargeUntil = w.now + 6000;
+            pushAlert(w, 'MIMIC AMBUSH!');
+            spawnParticles(w, enemy.x, enemy.y, '#06b6d4', 12, 110);
+            w.shake = Math.max(w.shake, 2.5);
+          }
+          speed = enemy.speed * 1.85;
+          enemy.weave += dt * 5;
+        }
+        break;
+      }
+      case 'spore-mortar': {
+        // Floats at medium-long range (280-420px), lobbing lingering hazard clouds
+        if (distance < 260) {
+          speed = -enemy.speed * 0.7; // Back up if player gets too close
+        } else if (distance > 380) {
+          speed = enemy.speed * 1.2;
+        } else {
+          speed *= 0.35;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 3200;
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'hazard', x: p.x + randRange(w.rng, -30, 30), y: p.y + randRange(w.rng, -30, 30),
+              radius: 54, angle: 0, spread: Math.PI * 2, bornAt: w.now, expiresAt: w.now + 2600, color: '#34d399', damage: 5, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+            spawnParticles(w, enemy.x, enemy.y, '#34d399', 6, 60);
+          }
+        }
+        break;
+      }
+      case 'vortex-crusher': {
+        // Heavy anchor that pulls survivors with gravitational singularity pulses, then detonates
+        if (distance > 180) {
+          speed = enemy.speed * 1.1;
+        } else {
+          speed = enemy.speed * 0.45;
+        }
+        // Singularity vacuum pull when in proximity
+        if (distance < 280) {
+          const pullStrength = (1 - distance / 280) * 12;
+          p.x -= dirX * pullStrength * dt;
+          p.y -= dirY * pullStrength * dt;
+          if (Math.random() < 0.25) {
+            spawnParticles(w, enemy.x + randRange(w.rng, -35, 35), enemy.y + randRange(w.rng, -35, 35), '#38bdf8', 2, 25);
+          }
+        }
+        // Explosive radial kinetic pulse discharge
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 3600;
+          w.shake = Math.max(w.shake, 4);
+          spawnParticles(w, enemy.x, enemy.y, '#0284c7', 18, 140);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: 130, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now, expiresAt: w.now + 700, color: '#38bdf8', damage: 16, impactIntensity: 2,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'nanite-swarm': {
+        // Agile flanker that dissolves into magnetic nanites and phases behind survivor
+        enemy.weave += dt * 5;
+        speed = enemy.speed;
+
+        // Phase shift blink when close or timed
+        if (w.now >= enemy.chargeReadyAt && distance < 180) {
+          enemy.chargeReadyAt = w.now + 3200;
+          spawnParticles(w, enemy.x, enemy.y, '#c084fc', 14, 100);
+          // Teleport to flanking offset
+          const blinkAngle = Math.atan2(dirY, dirX) + (Math.random() > 0.5 ? 1.8 : -1.8);
+          enemy.x = p.x + Math.cos(blinkAngle) * 95;
+          enemy.y = p.y + Math.sin(blinkAngle) * 95;
+          spawnParticles(w, enemy.x, enemy.y, '#7c3aed', 10, 80);
+          speed = enemy.speed * 1.6;
+        }
+        break;
+      }
+      case 'arc-conductor': {
+        // High-voltage mobile station that bridges lethal electric arcs
+        if (distance < 160) {
+          speed = -enemy.speed * 0.6;
+        } else if (distance > 260) {
+          speed = enemy.speed;
+        } else {
+          speed = enemy.speed * 0.3;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 2600;
+          const arcAngle = Math.atan2(dirY, dirX);
+          spawnParticles(w, enemy.x, enemy.y, '#fbbf24', 8, 70);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 240, angle: arcAngle, spread: 0.15,
+              bornAt: w.now + 300, expiresAt: w.now + 750, color: '#f59e0b', damage: 14, impactIntensity: 1,
+              hitUids: new Set(), followPlayer: false,
+            });
+            w.effects.push({
+              uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: 30, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now, expiresAt: w.now + 300, color: '#fef08a', damage: 0, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
@@ -4819,6 +6931,29 @@ function updateEnemies(w: World, dt: number) {
 
     let moveX = dirX;
     let moveY = dirY;
+    if (enemy.cutifiedUntil && w.now < enemy.cutifiedUntil) {
+      speed *= 0.42;
+      const babyLlama = w.projectiles.find((pr) => pr.customKind === 'baby-llama' && pr.uid === enemy.cutifiedTargetUid)
+        ?? w.projectiles.find((pr) => pr.customKind === 'baby-llama');
+      if (babyLlama) {
+        const ldx = babyLlama.x - enemy.x;
+        const ldy = babyLlama.y - enemy.y;
+        const llen = Math.hypot(ldx, ldy) || 1;
+        moveX = ldx / llen;
+        moveY = ldy / llen;
+      } else {
+        moveX = -dirX * 0.75 + Math.sin(w.now / 240 + enemy.uid) * 0.6;
+        moveY = -dirY * 0.75 + Math.cos(w.now / 240 + enemy.uid) * 0.6;
+      }
+    } else if (enemy.def.behavior === 'pincer' && w.now >= enemy.chargeUntil) {
+      const pincerSide = (enemy.uid % 2 === 0 ? 1 : -1);
+      const wobble = pincerSide * 0.95;
+      moveX = dirX * 0.3 + -dirY * wobble;
+      moveY = dirY * 0.3 + dirX * wobble;
+      const l = Math.hypot(moveX, moveY) || 1;
+      moveX /= l;
+      moveY /= l;
+    }
     if (enemy.def.behavior === 'drifter') {
       // Weave perpendicular to the approach for a swarming feel.
       const wobble = Math.sin(enemy.weave) * 0.65;
@@ -4828,7 +6963,7 @@ function updateEnemies(w: World, dt: number) {
       moveX /= l;
       moveY /= l;
     }
-    if (enemy.def.behavior === 'flanker' || enemy.def.behavior === 'prowler' || enemy.def.behavior === 'lookout') {
+    if (enemy.def.behavior === 'flanker' || enemy.def.behavior === 'prowler' || enemy.def.behavior === 'lookout' || enemy.def.behavior === 'nanite-swarm') {
       const wobble = Math.sin(enemy.weave) * (enemy.def.behavior === 'lookout' ? 0.85 : 1.15);
       moveX = dirX + -dirY * wobble;
       moveY = dirY + dirX * wobble;
@@ -4844,8 +6979,8 @@ function updateEnemies(w: World, dt: number) {
     enemy.x += moveX * speed * dt;
     enemy.y += moveY * speed * dt;
     applyKnockback(enemy, dt);
-    for (const b of w.breakables) {
-      if (b.broken || !b.movable || w.now < b.nextEnemyImpactAt) continue;
+    for (const b of enemyMoveBreakables) {
+      if (b.broken || w.now < b.nextEnemyImpactAt) continue;
       if (Math.abs(enemy.x - b.x) < b.w / 2 + enemy.radius && Math.abs(enemy.y - b.y) < b.h / 2 + enemy.radius) {
         b.contacts += 1;
         if (b.kind === 'car-wreck' && b.contacts < 3) continue;
@@ -4857,7 +6992,8 @@ function updateEnemies(w: World, dt: number) {
 
     // Contact damage.
     const contact = enemy.radius + p.radius;
-    if (enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
+    const isCutified = enemy.cutifiedUntil && w.now < enemy.cutifiedUntil;
+    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
       damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
     }
@@ -4870,26 +7006,43 @@ function updateEnemies(w: World, dt: number) {
   }
 
   // Separation so enemies form a crowd instead of a single stacked sprite.
+  // Inlined rather than routed through `forEachNearby`'s callback: this is
+  // the one grid query that runs once per enemy (every other caller runs
+  // once per event -- a projectile, an effect tick), so at hundreds of
+  // enemies the per-enemy closure allocation and indirect call it would
+  // otherwise need were themselves a measurable share of frame time.
   rebuildGrid(w);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
-    forEachNearby(w, enemy.x, enemy.y, enemy.radius * 2, (other) => {
-      if (other === enemy) return;
-      const dx = other.x - enemy.x;
-      const dy = other.y - enemy.y;
-      const minDist = enemy.radius + other.radius;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= minDist * minDist || d2 < 1e-4) return;
-      const d = Math.sqrt(d2);
-      const overlap = (minDist - d) * 0.5;
-      const ox = (dx / d) * overlap;
-      const oy = (dy / d) * overlap;
-      const total = enemy.mass + other.mass;
-      enemy.x -= ox * (other.mass / total) * 2;
-      enemy.y -= oy * (other.mass / total) * 2;
-      other.x += ox * (enemy.mass / total) * 2;
-      other.y += oy * (enemy.mass / total) * 2;
-    });
+    const radius = enemy.radius * 2;
+    const cells = Math.ceil(radius / CELL);
+    const baseX = Math.floor(enemy.x / CELL);
+    const baseY = Math.floor(enemy.y / CELL);
+    for (let ix = -cells; ix <= cells; ix += 1) {
+      for (let iy = -cells; iy <= cells; iy += 1) {
+        const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+        if (!bucket) continue;
+        for (const other of bucket) {
+          // Every pair only needs one symmetric resolution. The previous
+          // loop processed A/B and B/A, doubling the hottest crowd-work path.
+          if (other.uid <= enemy.uid) continue;
+          const dx = other.x - enemy.x;
+          const dy = other.y - enemy.y;
+          const minDist = enemy.radius + other.radius;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= minDist * minDist || d2 < 1e-4) continue;
+          const d = Math.sqrt(d2);
+          const overlap = (minDist - d) * 0.5;
+          const ox = (dx / d) * overlap;
+          const oy = (dy / d) * overlap;
+          const total = enemy.mass + other.mass;
+          enemy.x -= ox * (other.mass / total) * 2;
+          enemy.y -= oy * (other.mass / total) * 2;
+          other.x += ox * (enemy.mass / total) * 2;
+          other.y += oy * (enemy.mass / total) * 2;
+        }
+      }
+    }
   }
 
   // Retire finished death animations.
@@ -4897,7 +7050,12 @@ function updateEnemies(w: World, dt: number) {
     const enemy = w.enemies[i]!;
     if (enemy.dying && w.now - enemy.deathAt > 560) {
       w.enemies.splice(i, 1);
+      w.enemiesByUid.delete(enemy.uid);
     }
+  }
+
+  if (w.character.id === 'llama-mama') {
+    w.llamaEgoScore = w.enemies.filter((e) => !e.dying && (e.cutifiedUntil ?? 0) > w.now).length;
   }
 }
 
@@ -4905,14 +7063,77 @@ function updateEnemies(w: World, dt: number) {
 /* Projectiles, effects, pickups                                       */
 /* ------------------------------------------------------------------ */
 
+function triggerDvdCornerStrike(w: World, proj: Projectile) {
+  const isEvolved = proj.weaponId === 'dvd-screensaver';
+  pushAlert(w, isEvolved ? '★★ HYPER-EVOLVED DVD CORNER CRITICAL! SCREEN CLEARED! ★★' : '★ PERFECT DVD CORNER HIT! 100% KINETIC DETONATION! ★');
+  w.shake = 18;
+  const radius = isEvolved ? 1200 : 450;
+  const blastDmg = proj.damage * (isEvolved ? 6 : 4);
+  w.effects.push({
+    uid: uid(w),
+    kind: 'nova',
+    x: proj.x,
+    y: proj.y,
+    radius: 180,
+    angle: 0,
+    spread: Math.PI * 2,
+    bornAt: w.now,
+    expiresAt: w.now + 650,
+    color: '#facc15',
+    damage: 0,
+    impactIntensity: 5,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  w.effects.push({
+    uid: uid(w),
+    kind: 'wave',
+    x: proj.x,
+    y: proj.y,
+    radius: 340,
+    angle: 0,
+    spread: Math.PI * 2,
+    bornAt: w.now,
+    expiresAt: w.now + 750,
+    color: '#ec4899',
+    damage: 0,
+    impactIntensity: 5,
+    hitUids: new Set(),
+    followPlayer: false,
+  });
+  novaDamage(w, proj.x, proj.y, radius, blastDmg, 5, 'burn');
+  damageBreakable(w, proj.x, proj.y, radius, blastDmg, 5, proj.x, proj.y, 'ground-shock');
+  spawnParticles(w, proj.x, proj.y, '#facc15', 30, 200);
+  spawnParticles(w, proj.x, proj.y, '#38bdf8', 30, 200);
+  spawnParticles(w, proj.x, proj.y, '#ec4899', 30, 200);
+  w.popups.push({
+    x: proj.x,
+    y: proj.y - 40,
+    text: 'CORNER HIT!!',
+    color: '#facc15',
+    bornAt: w.now,
+    vy: 55,
+  });
+}
+
 function updateProjectiles(w: World, dt: number) {
   const p = w.player;
 
   for (let i = w.projectiles.length - 1; i >= 0; i -= 1) {
     const proj = w.projectiles[i]!;
 
+    if (w.now < (proj.pausedUntil ?? 0)) continue;
+    if (proj.reverseAt && !proj.reversed && w.now >= proj.reverseAt) {
+      proj.vx *= -1;
+      proj.vy *= -1;
+      proj.reversed = true;
+      proj.hitUids.clear();
+      spawnParticles(w, proj.x, proj.y, proj.color, 5, 65);
+    }
+
     if (proj.targetUid !== null) {
-      const target = w.enemies.find((e) => e.uid === proj.targetUid && !e.dying);
+      const uidMatch = w.enemiesByUid.get(proj.targetUid);
+      const target = uidMatch && !uidMatch.dying ? uidMatch : undefined;
       if (target) {
         const desired = Math.atan2(target.y - proj.y, target.x - proj.x);
         const current = Math.atan2(proj.vy, proj.vx);
@@ -4942,7 +7163,118 @@ function updateProjectiles(w: World, dt: number) {
     // This runs before actor hits so a wall cannot be shot through.
     if (!remove && collideProjectileObstacle(w, proj)) remove = true;
 
-    if (!remove) {
+    if (proj.customKind === 'dvd-logo') {
+      remove = false; // Never cull DVD bouncing logo
+      const halfW = (w.area.endless ? 480 : w.bounds.w / 2) - 30;
+      const halfH = (w.area.endless ? 360 : w.bounds.h / 2) - 24;
+      const originX = w.area.endless ? p.x : 0;
+      const originY = w.area.endless ? p.y : 0;
+      const minX = originX - halfW;
+      const maxX = originX + halfW;
+      const minY = originY - halfH;
+      const maxY = originY + halfH;
+
+      let bouncedX = false;
+      let bouncedY = false;
+
+      // Corner Magnet upgrade: gently steer toward closest corner
+      if (w.threatUpgrades?.['corner-magnet']) {
+        const targetCornerX = proj.vx > 0 ? maxX : minX;
+        const targetCornerY = proj.vy > 0 ? maxY : minY;
+        const dx = targetCornerX - proj.x;
+        const dy = targetCornerY - proj.y;
+        const distToCorner = Math.hypot(dx, dy);
+        if (distToCorner < 220 && distToCorner > 10) {
+          const speed = Math.hypot(proj.vx, proj.vy);
+          const cornerAngle = Math.atan2(dy, dx);
+          const currentAngle = Math.atan2(proj.vy, proj.vx);
+          let angleDiff = cornerAngle - currentAngle;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          const steer = clamp(angleDiff, -2.5 * dt, 2.5 * dt);
+          const newAngle = currentAngle + steer;
+          proj.vx = Math.cos(newAngle) * speed;
+          proj.vy = Math.sin(newAngle) * speed;
+        }
+      }
+
+      if (proj.x <= minX && proj.vx < 0) {
+        proj.x = minX;
+        proj.vx = Math.abs(proj.vx);
+        bouncedX = true;
+      } else if (proj.x >= maxX && proj.vx > 0) {
+        proj.x = maxX;
+        proj.vx = -Math.abs(proj.vx);
+        bouncedX = true;
+      }
+
+      if (proj.y <= minY && proj.vy < 0) {
+        proj.y = minY;
+        proj.vy = Math.abs(proj.vy);
+        bouncedY = true;
+      } else if (proj.y >= maxY && proj.vy > 0) {
+        proj.y = maxY;
+        proj.vy = -Math.abs(proj.vy);
+        bouncedY = true;
+      }
+
+      if (bouncedX || bouncedY) {
+        proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+        proj.hitUids.clear(); // Clear hit records on bounce so it can slice through enemies again
+        const DVD_COLORS = ['#38bdf8', '#f43f5e', '#a855f7', '#22c55e', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
+        const nextColor = DVD_COLORS[Math.floor(w.rng() * DVD_COLORS.length)] ?? '#38bdf8';
+        proj.color = nextColor;
+        spawnParticles(w, proj.x, proj.y, proj.color, 10, 80);
+        w.shake = Math.max(w.shake, 2.5);
+
+        // Corner hit detection: both edges hit or close to corner
+        const distCornerX = Math.min(Math.abs(proj.x - minX), Math.abs(proj.x - maxX));
+        const distCornerY = Math.min(Math.abs(proj.y - minY), Math.abs(proj.y - maxY));
+        const isCornerHit = (bouncedX && bouncedY) || (distCornerX < 34 && distCornerY < 34);
+
+        if (isCornerHit) {
+          triggerDvdCornerStrike(w, proj);
+        }
+      }
+    } else if (proj.customKind === 'solitaire' || proj.weaponId === 'solitaire-cascade' || proj.weaponId === 'infinite-solitaire') {
+      const halfW = (w.area.endless ? 520 : w.bounds.w / 2) - 18;
+      const halfH = (w.area.endless ? 400 : w.bounds.h / 2) - 18;
+      const originX = w.area.endless ? p.x : 0;
+      const originY = w.area.endless ? p.y : 0;
+      const minX = originX - halfW;
+      const maxX = originX + halfW;
+      const minY = originY - halfH;
+      const maxY = originY + halfH;
+
+      let bounced = false;
+      if (proj.x <= minX && proj.vx < 0) {
+        proj.x = minX;
+        proj.vx = Math.abs(proj.vx);
+        bounced = true;
+      } else if (proj.x >= maxX && proj.vx > 0) {
+        proj.x = maxX;
+        proj.vx = -Math.abs(proj.vx);
+        bounced = true;
+      }
+
+      if (proj.y <= minY && proj.vy < 0) {
+        proj.y = minY;
+        proj.vy = Math.abs(proj.vy);
+        bounced = true;
+      } else if (proj.y >= maxY && proj.vy > 0) {
+        proj.y = maxY;
+        proj.vy = -Math.abs(proj.vy);
+        bounced = true;
+      }
+
+      if (bounced) {
+        proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+        proj.hitUids.clear(); // Re-arm collision after bounce
+        spawnParticles(w, proj.x, proj.y, proj.color ?? '#c084fc', 6, 75);
+        pushAlert(w, 'Cascade Bounce');
+      }
+      remove = false;
+    } else if (!remove) {
       if (w.area.endless) {
         // In endless mode, cull by distance from player rather than fixed arena walls.
         if (dist2(proj.x, proj.y, w.player.x, w.player.y) > 900 * 900) remove = true;
@@ -4953,8 +7285,82 @@ function updateProjectiles(w: World, dt: number) {
       }
     }
 
+    // Zero Day: a thrown frozen enemy is its own self-contained hit-test,
+    // separate from the generic pierce/split/evolution machinery below
+    // (none of which applies to a carried enemy).
+    if (proj.carriedEnemyUid !== undefined) {
+      let hit = false;
+      if (!remove) {
+        forEachNearby(w, proj.x, proj.y, 40, (enemy) => {
+          if (remove || hit || enemy.dying || enemy.uid === proj.carriedEnemyUid) return;
+          const reach = proj.radius + enemy.radius;
+          if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
+            hit = true;
+            damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y);
+            spawnParticles(w, proj.x, proj.y, proj.color, 10, 120);
+          }
+        });
+      }
+      if (hit) remove = true;
+      if (remove) {
+        resolveThrownEnemyImpact(w, proj.carriedEnemyUid, hit, proj.x, proj.y);
+        w.projectiles.splice(i, 1);
+      }
+      continue;
+    }
+
+    if (proj.customKind === 'nyan-cat') {
+      proj.sinePhase = (proj.sinePhase ?? 0) + dt * 14;
+      const fwdAngle = Math.atan2(proj.vy, proj.vx);
+      const perpX = -Math.sin(fwdAngle);
+      const perpY = Math.cos(fwdAngle);
+      const wobble = Math.sin(proj.sinePhase) * 110 * dt;
+      proj.x += perpX * wobble;
+      proj.y += perpY * wobble;
+      if (w.rng() < 0.35) {
+        const rainbowColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7'];
+        spawnParticles(w, proj.x - Math.cos(fwdAngle) * 16, proj.y - Math.sin(fwdAngle) * 16, rainbowColors[Math.floor(w.rng() * rainbowColors.length)]!, 2, 50);
+      }
+    }
+
+    if (proj.customKind === 'popup-window') {
+      const halfW = (w.area.endless ? 480 : w.bounds.w / 2) - 30;
+      const halfH = (w.area.endless ? 360 : w.bounds.h / 2) - 24;
+      const originX = w.area.endless ? p.x : 0;
+      const originY = w.area.endless ? p.y : 0;
+      let bounced = false;
+      if (proj.x <= originX - halfW && proj.vx < 0) { proj.x = originX - halfW; proj.vx = Math.abs(proj.vx); bounced = true; }
+      else if (proj.x >= originX + halfW && proj.vx > 0) { proj.x = originX + halfW; proj.vx = -Math.abs(proj.vx); bounced = true; }
+      if (proj.y <= originY - halfH && proj.vy < 0) { proj.y = originY - halfH; proj.vy = Math.abs(proj.vy); bounced = true; }
+      else if (proj.y >= originY + halfH && proj.vy > 0) { proj.y = originY + halfH; proj.vy = -Math.abs(proj.vy); bounced = true; }
+      if (bounced) {
+        proj.bounceCount = (proj.bounceCount ?? 0) + 1;
+        proj.hitUids.clear();
+        spawnParticles(w, proj.x, proj.y, '#0284c7', 6, 80);
+      }
+    }
+
+    if (proj.customKind === 'byte-block' && proj.sineBaseY !== undefined) {
+      if (proj.y >= proj.sineBaseY) {
+        proj.y = proj.sineBaseY;
+        novaDamage(w, proj.x, proj.y, 65, proj.damage * 1.5, 4, 'freeze');
+        damageBreakable(w, proj.x, proj.y, 65, proj.damage * 1.5, 4, proj.x, proj.y, 'stomp');
+        spawnParticles(w, proj.x, proj.y, '#1e40af', 14, 140);
+        spawnParticles(w, proj.x, proj.y, '#38bdf8', 8, 90);
+        w.shake = Math.max(w.shake, 7);
+        remove = true;
+      }
+    }
+
+    if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
+      if (!proj.trampleNextAt || w.now >= proj.trampleNextAt) {
+        proj.hitUids.clear();
+        proj.trampleNextAt = w.now + 380;
+      }
+    }
+
     if (!remove && proj.fromPlayer) {
-      forEachNearby(w, proj.x, proj.y, 30, (enemy) => {
+      forEachNearby(w, proj.x, proj.y, Math.max(36, proj.radius + 18), (enemy) => {
         if (remove || enemy.dying || proj.hitUids.has(enemy.uid)) return;
         const reach = proj.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, proj.x, proj.y) <= reach * reach) {
@@ -4972,6 +7378,63 @@ function updateProjectiles(w: World, dt: number) {
             );
           } else {
             damageEnemy(w, enemy, proj.damage, proj.impactIntensity, proj.x, proj.y, proj.statusEffectId);
+          }
+          if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
+            const pSpeed = Math.hypot(proj.vx, proj.vy) || 1;
+            const pushDirX = proj.vx / pSpeed;
+            const pushDirY = proj.vy / pSpeed;
+            enemy.kx += pushDirX * 380;
+            enemy.ky += pushDirY * 380;
+            enemy.cutifiedUntil = w.now + 5500;
+            enemy.cutifiedTargetUid = proj.uid;
+
+            // Maternal Ego & Sovereign Supremacy score boost
+            w.llamaEgoScore = (w.llamaEgoScore ?? 0) + 1;
+
+            if (proj.isElementalLlama || proj.customKind === 'elemental-llama') {
+              // Elemental benefits applied during Llamasté Overload or by Llamá Overlòrd
+              const statusPool = ['slow', 'burning', 'freeze', 'acid', 'chilled', 'corrupted'];
+              if (w.rng() < 0.75) {
+                const chosen = statusPool[Math.floor(w.rng() * statusPool.length)]!;
+                applyStatusEffect(w, enemy, chosen);
+              }
+              if (w.rng() < 0.45) applyStatusEffect(w, enemy, 'slow');
+              if (w.rng() < 0.35) applyStatusEffect(w, enemy, 'burning');
+              if (w.rng() < 0.28) applyStatusEffect(w, enemy, 'freeze');
+              if (w.rng() < 0.28) applyStatusEffect(w, enemy, 'acid');
+              if (w.rng() < 0.22) applyStatusEffect(w, enemy, 'chilled');
+
+              spawnParticles(w, enemy.x, enemy.y, '#c084fc', 8, 90);
+              spawnParticles(w, enemy.x, enemy.y, '#38bdf8', 6, 70);
+            } else {
+              // Base baby llama: heavy knockback, adoring cutify heart-eyes, and Ego boost!
+              spawnParticles(w, enemy.x, enemy.y, '#f43f5e', 8, 80);
+              spawnParticles(w, enemy.x, enemy.y, '#fb7185', 5, 60);
+            }
+          }
+          if (proj.weaponId === 'holofoil-cutter' && !proj.hasRefracted) {
+            proj.hasRefracted = true;
+            const baseAngle = Math.atan2(proj.vy, proj.vx);
+            for (const offset of [-0.48, 0.48]) {
+              const refAngle = baseAngle + offset;
+              w.effects.push({
+                uid: uid(w),
+                kind: 'laser',
+                x: proj.x,
+                y: proj.y,
+                radius: 130,
+                angle: refAngle,
+                spread: 0.045,
+                bornAt: w.now,
+                expiresAt: w.now + 190,
+                color: '#e879f9',
+                damage: proj.damage * 0.65,
+                impactIntensity: 2,
+                hitUids: new Set([enemy.uid]),
+                followPlayer: false,
+              });
+            }
+            spawnParticles(w, proj.x, proj.y, '#e879f9', 8, 90);
           }
           triggerEvolutionHit(
             w,
@@ -5015,10 +7478,15 @@ function updateProjectiles(w: World, dt: number) {
             proj.evolutionBehavior = undefined;
             pushAlert(w, 'SIGNATURE SPLIT');
           }
-            damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
+          damageBreakable(w, proj.x, proj.y, proj.radius, proj.damage, proj.impactIntensity, proj.x - proj.vx * 0.02, proj.y - proj.vy * 0.02, proj.impactTrigger, proj.fromPlayer);
           spawnParticles(w, proj.x, proj.y, proj.color, 3, 60);
-          if (proj.pierce > 0) proj.pierce -= 1;
-          else remove = true;
+          if (proj.customKind === 'baby-llama' || proj.customKind === 'elemental-llama') {
+            // Baby & elemental llamas keep stampeding without losing pierce per hit
+          } else if (proj.pierce > 0) {
+            proj.pierce -= 1;
+          } else {
+            remove = true;
+          }
         }
       });
     } else if (!remove) {
@@ -5029,8 +7497,809 @@ function updateProjectiles(w: World, dt: number) {
       }
     }
 
-    if (remove) w.projectiles.splice(i, 1);
+    if (remove) {
+      if (proj.customKind === 'popup-window') {
+        novaDamage(w, proj.x, proj.y, 90, proj.damage * 1.4, 3);
+        damageBreakable(w, proj.x, proj.y, 90, proj.damage * 1.4, 3, proj.x, proj.y);
+        const confetti = ['#ff0055', '#ffcc00', '#00ffcc', '#3b82f6', '#ec4899', '#ffffff'];
+        for (let c = 0; c < 14; c += 1) {
+          spawnParticles(w, proj.x, proj.y, confetti[c % confetti.length]!, 1, 130);
+        }
+        pushAlert(w, '[X] POPUP CLOSED');
+      }
+      w.projectiles.splice(i, 1);
+    }
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Zero Day: freeze -> select -> throw                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A carried enemy's fate once its throw resolves. `granted` means it hit
+ * something (a clean "combo kill", full XP/loot via the normal killEnemy
+ * path); otherwise it flew off into the arena bounds or expired without
+ * hitting anything, and is removed silently with no kill credit so flinging
+ * enemies into empty space can't be farmed for free kills.
+ */
+function resolveThrownEnemyImpact(w: World, carriedUid: number, granted: boolean, atX: number, atY: number) {
+  const carried = w.enemiesByUid.get(carriedUid);
+  if (!carried) return;
+  if (granted) {
+    // Move it to the impact point first so the death animation, particles,
+    // and loot drop land where it actually hit, not back at the freeze spot.
+    carried.x = atX;
+    carried.y = atY;
+    killEnemy(w, carried);
+  } else {
+    const index = w.enemies.indexOf(carried);
+    if (index !== -1) w.enemies.splice(index, 1);
+    w.enemiesByUid.delete(carriedUid);
+  }
+}
+
+/**
+ * Casts Zero Day's freeze cone: petrifies up to `maxFreezeTargets` enemies
+ * in a cone in front of the player (facing-based, like the directional-wall
+ * dash skill's `p.facing > 0 ? 0 : Math.PI`), nearest first. Bosses are
+ * exempt. A no-op for every character without `freezeThrow` configured, or
+ * while its cooldown hasn't elapsed. Returns the number of enemies frozen.
+ */
+export function castFreezeCone(w: World): number {
+  const config = w.character.freezeThrow;
+  const state = w.freezeThrow;
+  if (!config || !state) return 0;
+  if (w.now - state.lastCastAt < config.castCooldownMs) return 0;
+
+  const p = w.player;
+  const angle = p.facing > 0 ? 0 : Math.PI;
+  const halfSpread = (config.coneAngleDeg * Math.PI) / 360;
+
+  const candidates = w.enemies
+    .filter((enemy) => {
+      if (enemy.dying || enemy.def.family === 'Boss' || w.now < enemy.frozenUntil) return false;
+      const dx = enemy.x - p.x;
+      const dy = enemy.y - p.y;
+      if (dx * dx + dy * dy > config.coneRangeUnits * config.coneRangeUnits) return false;
+      const angleTo = Math.atan2(dy, dx);
+      let diff = Math.abs(angleTo - angle);
+      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+      return diff <= halfSpread;
+    })
+    .sort((a, b) => dist2(a.x, a.y, p.x, p.y) - dist2(b.x, b.y, p.x, p.y))
+    .slice(0, config.maxFreezeTargets);
+
+  for (const enemy of candidates) {
+    enemy.frozenUntil = w.now + config.freezeDurationMs;
+    enemy.vx = 0;
+    enemy.vy = 0;
+    enemy.kx = 0;
+    enemy.ky = 0;
+    spawnParticles(w, enemy.x, enemy.y, '#7ef9a0', 10, 90);
+  }
+  state.lastCastAt = w.now;
+  if (candidates.length > 0) pushAlert(w, `${candidates.length} FROZEN`);
+  return candidates.length;
+}
+
+/**
+ * Called every frame while the player drags a selection box (world-space
+ * coordinates -- RunScreen converts screen/touch coordinates the same way
+ * it already does for every other pointer mode). Recomputes which frozen
+ * enemies fall inside the box and marks them `selectedForThrow` for
+ * rendering. A no-op for every character without `freezeThrow`.
+ */
+export function updateFreezeSelection(w: World, startX: number, startY: number, endX: number, endY: number) {
+  const state = w.freezeThrow;
+  if (!state) return;
+  state.selecting = true;
+  state.selectionStart = { x: startX, y: startY };
+  state.selectionEnd = { x: endX, y: endY };
+
+  const minX = Math.min(startX, endX);
+  const maxX = Math.max(startX, endX);
+  const minY = Math.min(startY, endY);
+  const maxY = Math.max(startY, endY);
+
+  const selected: number[] = [];
+  for (const enemy of w.enemies) {
+    const inBox = w.now < enemy.frozenUntil && !enemy.dying &&
+      enemy.x >= minX && enemy.x <= maxX && enemy.y >= minY && enemy.y <= maxY;
+    enemy.selectedForThrow = inBox;
+    if (inBox) selected.push(enemy.uid);
+  }
+  state.selectedUids = selected;
+}
+
+/** Ends the drag without clearing the current selection -- the player can still throw it. */
+export function endFreezeSelectionDrag(w: World) {
+  if (w.freezeThrow) w.freezeThrow.selecting = false;
+}
+
+/**
+ * Throws every currently-selected frozen enemy at `targetX`/`targetY` as a
+ * projectile carrying that enemy's own uid (`Projectile.carriedEnemyUid`),
+ * resolved by the carriedEnemyUid branch in `updateProjectiles`. Clears the
+ * selection either way. Returns the number thrown.
+ */
+export function throwSelectedFrozenEnemies(w: World, targetX: number, targetY: number): number {
+  const config = w.character.freezeThrow;
+  const state = w.freezeThrow;
+  if (!config || !state || state.selectedUids.length === 0) return 0;
+
+  let thrown = 0;
+  for (const uidToThrow of state.selectedUids) {
+    const enemy = w.enemies.find((e) => e.uid === uidToThrow && w.now < e.frozenUntil && !e.dying);
+    if (!enemy) continue;
+    const dx = targetX - enemy.x;
+    const dy = targetY - enemy.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Frozen enemies are exempted from normal AI/render as a live enemy
+    // (see the frozenUntil guards in updateEnemies/damageEnemy) but stay in
+    // w.enemies until resolveThrownEnemyImpact removes them, the same way
+    // an invisibleUntil enemy stays present without acting.
+    // Stays inert and (via invisibleUntil, reusing the existing wraith-hidden
+    // render/damage path) unrendered at its old position for the flight --
+    // the projectile is what's actually visible now. resolveThrownEnemyImpact
+    // removes it from w.enemies on impact/expiry regardless of this timer.
+    enemy.frozenUntil = w.now + 60000;
+    enemy.invisibleUntil = w.now + 60000;
+    enemy.selectedForThrow = false;
+    w.projectiles.push({
+      uid: uid(w),
+      x: enemy.x,
+      y: enemy.y,
+      vx: (dx / len) * config.throwSpeed,
+      vy: (dy / len) * config.throwSpeed,
+      radius: enemy.radius,
+      damage: config.throwDamage,
+      impactIntensity: 3,
+      fromPlayer: true,
+      expiresAt: w.now + 2200,
+      targetUid: null,
+      turnRate: 0,
+      color: enemy.def.palette.accent,
+      trail: [],
+      pierce: 0,
+      hitUids: new Set(),
+      carriedEnemyUid: enemy.uid,
+    });
+    thrown += 1;
+  }
+  state.selectedUids = [];
+  return thrown;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sector Command: mission objectives and scripted beats               */
+/* ------------------------------------------------------------------ */
+
+const MARKER_HOLD_RADIUS = 90;
+
+/**
+ * Advances mission objectives and fires scripted beats. Objective progress is
+ * derived from live world state each frame (the `episodeSnapshot` approach)
+ * rather than being incremented from scattered call sites, so there is one
+ * place to read and no double-counting.
+ */
+function updateMission(w: World, dt: number) {
+  const mission = w.mission;
+  if (!mission || w.outcome !== 'running') return;
+  const p = w.player;
+
+  for (const objective of mission.objectives) {
+    if (objective.done) continue;
+    const def = objective.def;
+    switch (def.kind) {
+      case 'kill-any':
+        objective.progress = w.kills;
+        break;
+      case 'kill-enemy':
+        objective.progress = def.enemyId ? (w.killsByEnemy[def.enemyId] ?? 0) : 0;
+        break;
+      case 'survive-sec':
+        objective.progress = Math.floor(w.time);
+        break;
+      case 'capture-units':
+        objective.progress = w.sectorCommand?.captures ?? 0;
+        break;
+      case 'hold-marker': {
+        // Progress in seconds held: the player (or any commanded unit)
+        // standing inside any matching marker counts.
+        const held = mission.markers.some((marker) => {
+          if (marker.assetId !== def.markerAssetId) return false;
+          if (dist2(p.x, p.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS) return true;
+          return w.enemies.some((enemy) =>
+            enemy.commanded && !enemy.dying &&
+            dist2(enemy.x, enemy.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS);
+        });
+        if (held) objective.accumulator += dt;
+        objective.progress = Math.floor(objective.accumulator);
+        break;
+      }
+      case 'reach-marker': {
+        const reached = mission.markers.some((marker) =>
+          marker.assetId === def.markerAssetId &&
+          dist2(p.x, p.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS);
+        if (reached) objective.progress = Math.max(objective.progress, 1);
+        break;
+      }
+      case 'destroy-marker': {
+        // A demolition marker is cleared when no unbroken breakable remains
+        // near it -- reusing the existing obstacle destruction, not a new
+        // entity type.
+        let cleared = 0;
+        for (const marker of mission.markers) {
+          if (marker.assetId !== def.markerAssetId) continue;
+          const standing = w.breakables.some((breakable) =>
+            !breakable.broken &&
+            dist2(breakable.x, breakable.y, marker.x, marker.y) <= MARKER_HOLD_RADIUS * MARKER_HOLD_RADIUS);
+          if (!standing) cleared += 1;
+        }
+        objective.progress = cleared;
+        break;
+      }
+    }
+    if (objective.progress >= def.targetCount) {
+      objective.done = true;
+      objective.doneAt = w.now;
+      pushAlert(w, `OBJECTIVE: ${def.label.toUpperCase()}`);
+    }
+  }
+
+  // Scripted beats.
+  const squadWiped = mission.everHadUnits && commandedUnits(w).length === 0;
+  for (const beat of mission.beats) {
+    if (beat.fired) continue;
+    const trigger = beat.def.trigger;
+    const shouldFire =
+      trigger.kind === 'at-sec' ? w.time >= trigger.sec
+        : trigger.kind === 'objective-complete'
+          ? mission.objectives.some((objective) => objective.def.id === trigger.objectiveId && objective.done)
+          : squadWiped;
+    if (!shouldFire) continue;
+    beat.fired = true;
+    beat.firedAt = w.now;
+    mission.lastBeatLine = beat.def.line;
+    mission.lastBeatAt = w.now;
+    pushAlert(w, beat.def.line);
+    if (beat.def.spawnWave) w.area.waves.push(beat.def.spawnWave);
+  }
+  if (commandedUnits(w).length > 0) mission.everHadUnits = true;
+
+  // The mission is cleared once every required objective is done.
+  const required = mission.objectives.filter((objective) => !objective.def.optional);
+  if (required.length > 0 && required.every((objective) => objective.done)) {
+    mission.complete = true;
+    w.outcome = 'cleared';
+  } else if (!w.area.endless && w.time >= w.area.durationSec) {
+    // Out of time with work outstanding. The generic timed-clear below still
+    // ends the run; what it must not do is bank the mission.
+    mission.failed = true;
+  }
+}
+
+/** Live mission readout for the HUD. */
+export function missionSnapshot(w: World) {
+  const mission = w.mission;
+  if (!mission) return null;
+  return {
+    id: mission.def.id,
+    name: mission.def.name,
+    complete: mission.complete,
+    failed: mission.failed,
+    lastBeatLine: mission.lastBeatLine,
+    lastBeatAt: mission.lastBeatAt,
+    captureCandidates: captureCandidateCount(w),
+    orderMode: w.sectorCommand?.orderMode ?? 'move',
+    groupSizes: (w.sectorCommand?.groups ?? []).map((group) => group.length),
+    roster: commandedUnits(w).map((unit) => ({
+      uid: unit.uid,
+      name: SECTOR_UNITS_BY_ENEMY_ID[unit.defId]?.name ?? unit.def.name,
+      hpPct: Math.max(0, Math.round((unit.hp / unit.maxHp) * 100)),
+      selected: unit.selectedForCommand,
+    })),
+    beaconsStanding: w.beacons.filter((beacon) => !beacon.broken).length,
+    beaconsTotal: w.beacons.length,
+    squadCost: squadCostUsed(w),
+    squadCap: w.sectorCommand?.squadCap ?? 0,
+    units: commandedUnits(w).length,
+    losses: w.sectorCommand?.losses ?? 0,
+    objectives: mission.objectives.map((objective) => ({
+      id: objective.def.id,
+      label: objective.def.label,
+      optional: Boolean(objective.def.optional),
+      done: objective.done,
+      progress: Math.min(objective.progress, objective.def.targetCount),
+      target: objective.def.targetCount,
+    })),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Sector Command: capture -> select -> order                          */
+/* ------------------------------------------------------------------ */
+
+/** How close the player must be for capture, and for priming a target. */
+export const CAPTURE_REACH = 170;
+/** How long a primed enemy stays un-killable and grabbable. */
+const CAPTURE_GRACE_MS = 3500;
+/** Extra slack on the marquee, in world units, on top of a unit's radius. */
+const SELECTION_TOUCH_PAD = 14;
+/** How far a tap may miss a unit and still select it. */
+const TAP_SELECT_RADIUS = 46;
+
+/** True when this enemy can be captured right now. */
+export function isCaptureReady(w: World, enemy: EnemyActor): boolean {
+  if (enemy.dying || enemy.commanded || enemy.def.family === 'Boss') return false;
+  const unit = SECTOR_UNITS_BY_ENEMY_ID[enemy.defId];
+  if (!unit) return false;
+  return enemy.hp <= enemy.maxHp * unit.captureHpFraction;
+}
+
+/**
+ * Marks nearby weakened enemies as primed for capture.
+ *
+ * Runs every frame during a mission. Priming is what `damageEnemy` reads to
+ * stop the player's own auto-fire from finishing a target they are clearly
+ * trying to take, and what the renderer reads to draw a reticle -- so the
+ * player can see the opportunity instead of guessing at it.
+ */
+function updateCapturePriming(w: World) {
+  if (!w.sectorCommand) return;
+  const p = w.player;
+  for (const enemy of w.enemies) {
+    if (!isCaptureReady(w, enemy)) continue;
+    if (dist2(enemy.x, enemy.y, p.x, p.y) > CAPTURE_REACH * CAPTURE_REACH) continue;
+    enemy.capturableUntil = w.now + CAPTURE_GRACE_MS;
+  }
+}
+
+/** How many enemies are primed and grabbable right now -- drives the HUD button. */
+export function captureCandidateCount(w: World): number {
+  if (!w.sectorCommand) return 0;
+  let count = 0;
+  for (const enemy of w.enemies) {
+    if (w.now < enemy.capturableUntil && !enemy.commanded && !enemy.dying) count += 1;
+  }
+  return count;
+}
+
+/** Fog cell size, matched to the ground tile so the mask lines up with the art. */
+const FOG_CELL = 64;
+/** How far the player sees through fog. */
+const FOG_PLAYER_SIGHT = 300;
+/** How far a commanded unit sees -- less than you, so scouting costs something. */
+const FOG_UNIT_SIGHT = 190;
+/** Fog is restamped on a throttle; it does not need to be per-frame. */
+const FOG_UPDATE_MS = 120;
+
+/**
+ * Restamps the visibility grid from the player and every commanded unit.
+ *
+ * Presentation only. Nothing here touches enemy state, AI, or targeting -- a
+ * fog that changed what the simulation knew would be a different (and much
+ * larger) feature, and one that lied about the game underneath it.
+ */
+function updateFog(w: World) {
+  const fog = w.fog;
+  if (!fog) return;
+  if (w.now < fog.nextUpdateAt) return;
+  fog.nextUpdateAt = w.now + FOG_UPDATE_MS;
+
+  // Anything currently visible drops back to merely explored; sight sources
+  // then re-light what they can still see.
+  for (let i = 0; i < fog.cells.length; i += 1) {
+    if (fog.cells[i] === 2) fog.cells[i] = 1;
+  }
+
+  const stamp = (cx: number, cy: number, sight: number) => {
+    const halfW = w.bounds.w / 2;
+    const halfH = w.bounds.h / 2;
+    const minCol = Math.max(0, Math.floor((cx - sight + halfW) / fog.cell));
+    const maxCol = Math.min(fog.cols - 1, Math.ceil((cx + sight + halfW) / fog.cell));
+    const minRow = Math.max(0, Math.floor((cy - sight + halfH) / fog.cell));
+    const maxRow = Math.min(fog.rows - 1, Math.ceil((cy + sight + halfH) / fog.cell));
+    const sightSq = sight * sight;
+    for (let row = minRow; row <= maxRow; row += 1) {
+      for (let col = minCol; col <= maxCol; col += 1) {
+        const wx = col * fog.cell - halfW + fog.cell / 2;
+        const wy = row * fog.cell - halfH + fog.cell / 2;
+        if (dist2(wx, wy, cx, cy) > sightSq) continue;
+        fog.cells[row * fog.cols + col] = 2;
+      }
+    }
+  };
+
+  stamp(w.player.x, w.player.y, FOG_PLAYER_SIGHT);
+  for (const enemy of w.enemies) {
+    if (enemy.commanded && !enemy.dying) stamp(enemy.x, enemy.y, FOG_UNIT_SIGHT);
+  }
+}
+
+/** Visibility of a world point: 0 unseen, 1 explored, 2 visible. */
+export function fogAt(w: World, x: number, y: number): number {
+  const fog = w.fog;
+  if (!fog) return 2;
+  const col = Math.floor((x + w.bounds.w / 2) / fog.cell);
+  const row = Math.floor((y + w.bounds.h / 2) / fog.cell);
+  if (col < 0 || row < 0 || col >= fog.cols || row >= fog.rows) return 0;
+  return fog.cells[row * fog.cols + col] ?? 0;
+}
+
+/** How far a commanded unit reaches to trade blows. */
+const UNIT_REACH = 18;
+/** Cooldown on a unit's melee exchange. */
+const UNIT_ATTACK_MS = 620;
+/** How far a unit on attack-move will break off to engage. */
+const UNIT_AGGRO_RANGE = 190;
+
+/** How close a hostile must be to start breaking a beacon. */
+const BEACON_CONTACT_RADIUS = 46;
+
+/**
+ * Tier 2 economy: beacons trickle reinforcements and can be broken.
+ *
+ * Two invariants, both deliberate (see `data/sectorStructures.ts`):
+ *  - A beacon never pushes the squad past `squadCap`. When the squad is full
+ *    the tick is *skipped*, not queued, so the mobile unit ceiling stays
+ *    absolute and a beacon can never quietly inflate a squad.
+ *  - A beacon is mortal, so holding the ground around it is the point.
+ */
+function updateBeacons(w: World, dt: number) {
+  const state = w.sectorCommand;
+  if (!state || w.beacons.length === 0) return;
+
+  for (const beacon of w.beacons) {
+    if (beacon.broken) continue;
+
+    // Hostiles standing on a beacon chew through it. Commanded units are
+    // yours, so they never damage it.
+    for (const enemy of w.enemies) {
+      if (enemy.commanded || enemy.dying) continue;
+      if (dist2(enemy.x, enemy.y, beacon.x, beacon.y) > BEACON_CONTACT_RADIUS * BEACON_CONTACT_RADIUS) continue;
+      beacon.hp -= Math.max(1, enemy.damage) * dt;
+      beacon.hitFlashUntil = w.now + 90;
+    }
+    if (beacon.hp <= 0) {
+      beacon.broken = true;
+      spawnParticles(w, beacon.x, beacon.y, '#facc15', 18, 150);
+      pushAlert(w, `${beacon.def.name.toUpperCase()} DOWN`);
+      continue;
+    }
+
+    if (w.now < beacon.nextSpawnAt) continue;
+    beacon.nextSpawnAt = w.now + beacon.def.spawnIntervalSec * 1000;
+
+    const unit = SECTOR_UNITS_BY_ENEMY_ID[beacon.def.unitEnemyId];
+    const def = getEnemy(beacon.def.unitEnemyId);
+    if (!unit || !def) continue;
+    // Skip, never queue: a full squad means the beacon simply idles.
+    if (squadCostUsed(w) + unit.squadCost > state.squadCap) continue;
+
+    const before = w.enemies.length;
+    spawnEnemy(w, def, 1, { x: beacon.x, y: beacon.y + 34 });
+    const spawned = w.enemies[w.enemies.length - 1];
+    // `spawnEnemy` is a no-op at MAX_ENEMIES; only capture something it made.
+    if (w.enemies.length === before || !spawned) continue;
+    spawned.hp = spawned.maxHp * unit.captureHpFraction * 0.5;
+    captureEnemy(w, spawned);
+  }
+}
+
+/** How much of the squad cap the current commanded units use up. */
+export function squadCostUsed(w: World): number {
+  let total = 0;
+  for (const enemy of w.enemies) {
+    if (!enemy.commanded || enemy.dying) continue;
+    total += SECTOR_UNITS_BY_ENEMY_ID[enemy.defId]?.squadCost ?? 1;
+  }
+  return total;
+}
+
+/** Every commanded unit still standing. */
+export function commandedUnits(w: World): EnemyActor[] {
+  return w.enemies.filter((enemy) => enemy.commanded && !enemy.dying);
+}
+
+/**
+ * Tier-1 economy verb: take an enemy instead of killing it. Refuses bosses,
+ * enemies with no capture profile, healthy enemies (you have to soften them
+ * first), and anything that would exceed the mission's squad cap.
+ *
+ * Capturing deliberately forfeits the kill -- no XP, no drops -- so "army now
+ * vs. progression now" is a real decision every time.
+ */
+export function captureEnemy(w: World, enemy: EnemyActor): boolean {
+  const state = w.sectorCommand;
+  if (!state || enemy.dying || enemy.commanded) return false;
+  if (enemy.def.family === 'Boss') return false;
+  const unit = SECTOR_UNITS_BY_ENEMY_ID[enemy.defId];
+  if (!unit) return false;
+  if (enemy.hp > enemy.maxHp * unit.captureHpFraction) return false;
+  if (squadCostUsed(w) + unit.squadCost > state.squadCap) return false;
+
+  enemy.commanded = true;
+  enemy.convertedUntil = Number.POSITIVE_INFINITY;
+  enemy.activeEffects = [];
+  enemy.frozenUntil = 0;
+  enemy.selectedForThrow = false;
+  enemy.maxHp = Math.max(1, Math.round(enemy.def.hp * unit.hpMult));
+  enemy.hp = enemy.maxHp;
+  enemy.damage = enemy.damage * unit.damageMult;
+  enemy.speed = enemy.def.speed * unit.speedMult;
+  enemy.orderKind = 'hold';
+  enemy.orderX = enemy.x;
+  enemy.orderY = enemy.y;
+  state.captures += 1;
+  spawnParticles(w, enemy.x, enemy.y, '#65f6d1', 12, 110);
+  pushAlert(w, `${unit.name.toUpperCase()} TURNED`);
+  return true;
+}
+
+/** The player-facing capture button: takes the best eligible enemy in reach. */
+export function captureNearestEnemy(w: World, reach = CAPTURE_REACH): boolean {
+  const state = w.sectorCommand;
+  if (!state) return false;
+  const p = w.player;
+  const eligible = w.enemies
+    .filter((enemy) => {
+      // A primed enemy still counts even if something nudged it back over the
+      // threshold -- the window the player was shown is the window they get.
+      if (enemy.dying || enemy.commanded) return false;
+      if (!(w.now < enemy.capturableUntil) && !isCaptureReady(w, enemy)) return false;
+      return dist2(enemy.x, enemy.y, p.x, p.y) <= reach * reach;
+    })
+    .sort((a, b) => dist2(a.x, a.y, p.x, p.y) - dist2(b.x, b.y, p.x, p.y));
+  const target = eligible[0];
+  if (!target) return false;
+  return captureEnemy(w, target);
+}
+
+/** A lost unit is not a kill: no XP, no loot, just gone. */
+function destroyCommandedUnit(w: World, enemy: EnemyActor) {
+  if (enemy.dying) return;
+  enemy.dying = true;
+  enemy.deathAt = w.now;
+  enemy.anim = 'death';
+  enemy.animStartedAt = w.now;
+  enemy.commanded = false;
+  enemy.selectedForCommand = false;
+  spawnParticles(w, enemy.x, enemy.y, '#94a3b8', 8, 90);
+  if (w.sectorCommand) w.sectorCommand.losses += 1;
+}
+
+/**
+ * Per-frame update for one captured unit: take contact damage from hostiles
+ * standing on it, then walk toward its standing order.
+ *
+ * Movement is the storm cloud's steer-toward-a-point primitive with a sticky
+ * target, plus the same `collideObstacles`/`clampToArena` the player and
+ * enemies use -- so units slide along walls exactly like everything else in
+ * the game. There is no pathfinding anywhere in this engine, so a unit
+ * ordered around a concave obstacle cluster will press against it; keeping
+ * orders short and near the player is the design mitigation.
+ */
+function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
+  // The melee exchange. One cooldown covers both halves: a unit in contact
+  // trades blows rather than only absorbing them. Until this existed a
+  // captured unit could be ordered around and killed but contributed nothing
+  // to a fight, which made the whole economy decorative.
+  if (w.now >= enemy.contactReadyAt) {
+    const foe = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + UNIT_REACH, undefined, enemy.uid);
+    if (foe) {
+      enemy.contactReadyAt = w.now + UNIT_ATTACK_MS;
+      // Routed through `damageEnemy` on purpose: it is the single choke point,
+      // so a unit's kill counts toward `w.kills`, drops loot and XP, and feeds
+      // kill objectives exactly like the player's own. The deliberate
+      // consequence is that crit and lifesteal apply to a unit's hits too --
+      // your squad feeds you.
+      damageEnemy(w, foe, Math.max(1, enemy.damage), 2, enemy.x, enemy.y);
+      enemy.anim = 'attack';
+      enemy.animStartedAt = w.now;
+
+      // ...and it takes the return hit in the same exchange.
+      enemy.hp -= Math.max(1, foe.damage);
+      enemy.hitFlashUntil = w.now + 90;
+      if (enemy.hp <= 0) {
+        destroyCommandedUnit(w, enemy);
+        return;
+      }
+    }
+  }
+
+  // Attack-move: walk the order line, but break off for anything hostile that
+  // comes within aggro range, then resume once it is gone. This is the order
+  // you want for taking ground; plain 'move' is the one you want for
+  // disengaging, so both exist.
+  if (enemy.orderKind === 'attack-move') {
+    const target = nearestEnemy(w, enemy.x, enemy.y, UNIT_AGGRO_RANGE, undefined, enemy.uid);
+    if (target) {
+      const tdx = target.x - enemy.x;
+      const tdy = target.y - enemy.y;
+      const tdist = Math.hypot(tdx, tdy) || 1;
+      if (tdist > enemy.radius + UNIT_REACH * 0.8) {
+        const step = enemy.speed * statusSpeedMultiplier(enemy) * dt;
+        enemy.x += (tdx / tdist) * step;
+        enemy.y += (tdy / tdist) * step;
+        enemy.facing = tdx >= 0 ? 1 : -1;
+        enemy.anim = 'walk';
+        collideObstacles(w, enemy);
+        clampToArena(w, enemy);
+      }
+      return;
+    }
+  }
+
+  if (enemy.orderKind !== 'move' && enemy.orderKind !== 'attack-move') return;
+  const dx = enemy.orderX - enemy.x;
+  const dy = enemy.orderY - enemy.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 20) {
+    enemy.orderKind = 'hold';
+    enemy.orderX = enemy.x;
+    enemy.orderY = enemy.y;
+    return;
+  }
+  const step = enemy.speed * statusSpeedMultiplier(enemy) * dt;
+  enemy.x += (dx / distance) * step;
+  enemy.y += (dy / distance) * step;
+  enemy.facing = dx >= 0 ? 1 : -1;
+  enemy.anim = 'walk';
+  collideObstacles(w, enemy);
+  clampToArena(w, enemy);
+}
+
+/** Command mode swaps the pointer grammar: drag selects units, tap orders them. */
+export function setCommandMode(w: World, on: boolean) {
+  const state = w.sectorCommand;
+  if (!state) return;
+  state.commandMode = on;
+  if (!on) {
+    state.selecting = false;
+    state.selectionStart = null;
+    state.selectionEnd = null;
+  }
+}
+
+/** Recomputes which commanded units fall inside the drag box (world coords). */
+export function updateCommandSelection(w: World, startX: number, startY: number, endX: number, endY: number) {
+  const state = w.sectorCommand;
+  if (!state) return;
+  state.selecting = true;
+  state.selectionStart = { x: startX, y: startY };
+  state.selectionEnd = { x: endX, y: endY };
+
+  const minX = Math.min(startX, endX);
+  const maxX = Math.max(startX, endX);
+  const minY = Math.min(startY, endY);
+  const maxY = Math.max(startY, endY);
+  const selected: number[] = [];
+  for (const enemy of w.enemies) {
+    // Overlap, not containment: units render ~10px wide, so requiring the box
+    // to contain a unit's exact centre makes a quick thumb-drag across a squad
+    // select nothing. Inflating by the unit's radius (plus a touch margin) is
+    // what makes the marquee feel like it caught what it visibly crossed.
+    const pad = enemy.radius + SELECTION_TOUCH_PAD;
+    const inBox = enemy.commanded && !enemy.dying &&
+      enemy.x >= minX - pad && enemy.x <= maxX + pad &&
+      enemy.y >= minY - pad && enemy.y <= maxY + pad;
+    enemy.selectedForCommand = inBox;
+    if (inBox) selected.push(enemy.uid);
+  }
+  state.selectedUids = selected;
+}
+
+/**
+ * Tap-to-select: the nearest commanded unit within `radius` of a point.
+ *
+ * Without this, a tap in command mode can only ever *order*, so tapping
+ * directly on one of your own units does nothing -- which reads as the mode
+ * being broken. Returns the number of units selected (0 or 1).
+ */
+export function selectCommandedUnitAt(w: World, x: number, y: number, radius = TAP_SELECT_RADIUS): number {
+  const state = w.sectorCommand;
+  if (!state) return 0;
+  let best: EnemyActor | null = null;
+  let bestDist = radius * radius;
+  for (const enemy of w.enemies) {
+    if (!enemy.commanded || enemy.dying) continue;
+    const d = dist2(enemy.x, enemy.y, x, y);
+    if (d <= bestDist) {
+      bestDist = d;
+      best = enemy;
+    }
+  }
+  if (!best) return 0;
+  for (const enemy of w.enemies) enemy.selectedForCommand = enemy.uid === best.uid;
+  state.selectedUids = [best.uid];
+  return 1;
+}
+
+/** Stores the current selection as control group `index`. */
+export function assignControlGroup(w: World, index: number): number {
+  const state = w.sectorCommand;
+  if (!state || index < 0 || index >= state.groups.length) return 0;
+  state.groups[index] = [...state.selectedUids];
+  return state.groups[index]!.length;
+}
+
+/** Selects control group `index`, dropping any member that has since died. */
+export function selectControlGroup(w: World, index: number): number {
+  const state = w.sectorCommand;
+  if (!state || index < 0 || index >= state.groups.length) return 0;
+  const alive = state.groups[index]!.filter((uid) =>
+    w.enemies.some((enemy) => enemy.uid === uid && enemy.commanded && !enemy.dying));
+  state.groups[index] = alive;
+  for (const enemy of w.enemies) enemy.selectedForCommand = alive.includes(enemy.uid);
+  state.selectedUids = [...alive];
+  return alive.length;
+}
+
+/** Selects exactly one unit by uid -- the roster strip's tap target. */
+export function selectCommandedUnitByUid(w: World, uid: number): boolean {
+  const state = w.sectorCommand;
+  if (!state) return false;
+  const target = w.enemies.find((enemy) => enemy.uid === uid && enemy.commanded && !enemy.dying);
+  if (!target) return false;
+  for (const enemy of w.enemies) enemy.selectedForCommand = enemy.uid === uid;
+  state.selectedUids = [uid];
+  return true;
+}
+
+/** Ends the drag but keeps the selection -- the next tap is the order. */
+export function endCommandSelectionDrag(w: World) {
+  if (w.sectorCommand) w.sectorCommand.selecting = false;
+}
+
+/** Selects every commanded unit at once -- the touch-friendly "select all". */
+export function selectAllCommandedUnits(w: World): number {
+  const state = w.sectorCommand;
+  if (!state) return 0;
+  const selected: number[] = [];
+  for (const enemy of w.enemies) {
+    const eligible = enemy.commanded && !enemy.dying;
+    enemy.selectedForCommand = eligible;
+    if (eligible) selected.push(enemy.uid);
+  }
+  state.selectedUids = selected;
+  return selected.length;
+}
+
+/**
+ * Issues a move order to the current selection. Units spread around the
+ * target using the existing `formationPositions` geometry so a squad does not
+ * pile onto one pixel.
+ */
+export function orderSelectedUnits(
+  w: World,
+  targetX: number,
+  targetY: number,
+  kind: 'move' | 'attack-move' = 'move',
+): number {
+  const state = w.sectorCommand;
+  if (!state || state.selectedUids.length === 0) return 0;
+  const units = state.selectedUids
+    .map((selectedUid) => w.enemies.find((enemy) => enemy.uid === selectedUid && enemy.commanded && !enemy.dying))
+    .filter((enemy): enemy is EnemyActor => Boolean(enemy));
+  if (units.length === 0) return 0;
+
+  const spread = 34;
+  units.forEach((unit, index) => {
+    // Ring the destination so a multi-unit order reads as a formation.
+    const angle = (Math.PI * 2 * index) / units.length;
+    const radius = units.length === 1 ? 0 : spread * Math.ceil(units.length / 6);
+    unit.orderKind = kind;
+    unit.orderX = targetX + Math.cos(angle) * radius;
+    unit.orderY = targetY + Math.sin(angle) * radius;
+  });
+  w.effects.push({
+    uid: uid(w), kind: 'ring', x: targetX, y: targetY, radius: 26,
+    angle: 0, spread: 0, bornAt: w.now, expiresAt: w.now + 340,
+    color: '#65f6d1', damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+  });
+  return units.length;
 }
 
 const STORM_CLOUD_MODE_ORDER: StormCloudMode[] = ['rain', 'fire-rain', 'acid-rain', 'frost-rain'];
@@ -5120,6 +8389,153 @@ function updateStormCloud(w: World, dt: number) {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* HordeSpin                                                           */
+/* ------------------------------------------------------------------ */
+
+const HORDE_SPIN_FORMATIONS: Array<'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file'> = [
+  'ring', 'wedge', 'wall', 'file', 'escort', 'pincer',
+];
+
+/** Whichever area wave is active right now, falling back to the first wave (or a safe default). */
+function hordeSpinEnemyPool(w: World): string[] {
+  const waves = w.area.waves;
+  const activeWave = waves.find((wave) => w.time >= wave.fromSec && w.time <= wave.toSec) ?? waves[0];
+  if (!activeWave) return ['nightcrawler'];
+  return [activeWave.enemyId, ...(activeWave.group ?? [])];
+}
+
+/**
+ * 1x-4x spawn one scaled cluster; 5x5 and 666 spawn `spawnMultiplier`
+ * separate clusters (5 enemies each) in different formations, reading as
+ * distinct groups arriving in different shapes rather than one bigger blob.
+ */
+function spawnHordeSpinBurst(w: World, tier: ReturnType<typeof getHordeSpinTier>) {
+  const pool = hordeSpinEnemyPool(w);
+  // modifierHpMult is applied inside spawnEnemy itself now, so it isn't
+  // repeated here -- doing so would double-apply doubleMode/scalerMode.
+  const hpMult = tier.hpMult;
+  const useClusters = tier.id === '5x5' || tier.id === '666';
+  const clusterCount = useClusters ? tier.spawnMultiplier : 1;
+  const perCluster = useClusters ? HORDE_SPIN_BASE_CLUSTER : HORDE_SPIN_BASE_CLUSTER * tier.spawnMultiplier;
+  for (let c = 0; c < clusterCount; c += 1) {
+    const formation = HORDE_SPIN_FORMATIONS[c % HORDE_SPIN_FORMATIONS.length]!;
+    const positions = formationPositions(w, formation, perCluster);
+    for (let i = 0; i < perCluster; i += 1) {
+      const enemyId = pool[Math.floor(w.rng() * pool.length)]!;
+      spawnEnemy(w, getEnemy(enemyId), hpMult, positions[i]);
+    }
+  }
+}
+
+/**
+ * State machine for the periodic HordeSpin wheel: idle -> spinning -> result
+ * -> active (horde spawned, counting down) -> back to idle with a reward
+ * paid out. Follows the same `w.now`-driven timer shape as `updateStormCloud`
+ * above. Only runs when `modifiers.hordeSpinEnabled` gave the run a
+ * `w.wheelSpin` state to begin with.
+ */
+function updateWheelSpin(w: World) {
+  const state = w.wheelSpin;
+  if (!state) return;
+  const now = w.now;
+
+  if (state.phase === 'idle' && now >= state.nextSpinAt) {
+    state.phase = 'spinning';
+    state.spinStartedAt = now;
+    state.resultTierId = undefined;
+    pushAlert(w, 'HordeSpin — spinning...');
+  } else if (state.phase === 'spinning' && now - state.spinStartedAt >= HORDE_SPIN_SPIN_MS) {
+    const tier = pickHordeSpinTier(w.rng);
+    state.phase = 'result';
+    state.resultAt = now;
+    state.resultTierId = tier.id;
+    pushAlert(w, `HordeSpin landed on ${tier.label}!`);
+  } else if (state.phase === 'result' && state.resultTierId && now - state.resultAt >= HORDE_SPIN_RESULT_MS) {
+    const tier = getHordeSpinTier(state.resultTierId);
+    state.phase = 'active';
+    state.colorFluctuation = Boolean(tier.colorFluctuation);
+    state.rewardGranted = false;
+    state.activeEndsAt = now + HORDE_SPIN_ACTIVE_MS_PER_STEP * tier.spawnMultiplier;
+    spawnHordeSpinBurst(w, tier);
+    pushAlert(w, tier.rare ? `HORDE INCOMING — ${tier.label}` : 'Horde incoming');
+    w.shake = Math.max(w.shake, tier.rare ? 14 : 8);
+  } else if (state.phase === 'active' && state.resultTierId && now >= state.activeEndsAt) {
+    const tier = getHordeSpinTier(state.resultTierId);
+    if (!state.rewardGranted) {
+      state.rewardGranted = true;
+      w.cred += tier.rewardCred;
+      if (tier.grantsPet) spawnLokPet(w, rollLokPet(w.rng), 'chest');
+      pushAlert(w, `HordeSpin reward — +${tier.rewardCred} cred`);
+    }
+    state.phase = 'idle';
+    state.colorFluctuation = false;
+    state.spinsThisRun += 1;
+    state.nextSpinAt = now + HORDE_SPIN_INTERVAL_MS;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Director events                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Spawns a Director's whole faction roster together in one formation, the
+ * same way `spawnHordeSpinBurst` above spawns a wave burst -- generic engine
+ * plumbing, the actual cast lives in `data/enemies.ts`/`data/factions.ts`.
+ * Returns the uid of the spawned boss enemy so the encounter can be tracked
+ * to completion in `killEnemy`.
+ */
+function spawnDirectorSquad(w: World, def: (typeof DIRECTORS)[number]): number | null {
+  const faction = getFaction(def.factionId);
+  const positions = formationPositions(w, def.formation ?? 'ring', faction.roster.length);
+  let bossUid: number | null = null;
+  faction.roster.forEach((enemyId, i) => {
+    spawnEnemy(w, getEnemy(enemyId), def.hpMult, positions[i]);
+    if (enemyId === def.bossEnemyId) {
+      bossUid = w.enemies[w.enemies.length - 1]!.uid;
+    }
+  });
+  return bossUid;
+}
+
+/**
+ * State machine for the (at most one, currently) Director escalation:
+ * pending -> active (once triggered, tracked until its boss dies) ->
+ * resolved. Follows the same `w.now`-driven re-roll shape as
+ * `updateWheelSpin` above. Runs unconditionally -- unlike HordeSpin this is
+ * base content, not opt-in -- but `modifiers.directorModeEnabled` (only
+ * offered once a Director has been defeated at least once, see
+ * `MetaState.directorModeUnlocked`) raises the odds of a hit.
+ */
+function updateDirector(w: World) {
+  const state = w.director;
+  if (state.phase !== 'pending') return;
+  if (w.now < state.nextRollAt) return;
+
+  const director = DIRECTORS[0];
+  if (!director) return;
+
+  if (w.time < director.triggerAfterSec) {
+    state.nextRollAt = w.now + director.rerollIntervalSec * 1000;
+    return;
+  }
+
+  state.nextRollAt = w.now + director.rerollIntervalSec * 1000;
+  const chance = director.chance * (w.modifiers.directorModeEnabled ? director.directorModeChanceMult : 1);
+  if (w.rng() >= chance) return;
+
+  state.phase = 'active';
+  state.activeDirectorId = director.id;
+  pushAlert(w, director.warningText);
+  pushSfx(w, 'bossWarning');
+  w.shake = Math.max(w.shake, 10);
+  state.bossUid = spawnDirectorSquad(w, director);
+  // No boss in the roster (a data mistake) would otherwise strand the
+  // encounter in 'active' forever with nothing left to clear it.
+  if (state.bossUid === null) state.phase = 'resolved';
+}
+
 /** Resolves 'meteor' weapon strikes once their telegraph window elapses. See run-presentation.md. */
 function updateMeteors(w: World) {
   for (let i = w.pendingMeteors.length - 1; i >= 0; i -= 1) {
@@ -5143,13 +8559,14 @@ function updateEffects(w: World) {
 
   for (let i = w.effects.length - 1; i >= 0; i -= 1) {
     const effect = w.effects[i]!;
+    if (w.now < (effect.pausedUntil ?? 0)) continue;
     if (effect.followPlayer) {
       effect.x = p.x;
       effect.y = p.y;
     }
 
     const active = w.now >= effect.bornAt;
-    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'laser' || effect.kind === 'impact') && effect.damage > 0) {
+    if (active && (effect.kind === 'slash' || effect.kind === 'wave' || effect.kind === 'waveform' || effect.kind === 'dialup-carrier' || effect.kind === 'laser' || effect.kind === 'impact') && effect.damage > 0) {
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
         if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
         const reach = effect.radius + enemy.radius;
@@ -5178,7 +8595,32 @@ function updateEffects(w: World) {
         damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
     }
 
-    if (active && effect.kind === 'hazard' && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
+    if (active && effect.kind === 'glitch' && effect.damage > 0 && !effect.hitUids.has(-1)) {
+      effect.hitUids.add(-1);
+      const boxW = Math.max(90, effect.radius * 1.6);
+      const boxH = Math.max(70, effect.radius * 1.2);
+      forEachNearby(w, effect.x, effect.y, effect.radius * 1.2, (enemy) => {
+        if (enemy.dying || effect.hitUids.has(enemy.uid)) return;
+        if (Math.abs(enemy.x - effect.x) <= boxW / 2 && Math.abs(enemy.y - effect.y) <= boxH / 2) {
+          effect.hitUids.add(enemy.uid);
+          damageEnemy(w, enemy, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.statusEffectId ?? 'freeze');
+          triggerEvolutionHit(
+            w,
+            effect.evolutionBehavior,
+            enemy.x,
+            enemy.y,
+            effect.damage,
+            effect.color,
+            effect.impactIntensity,
+            effect.statusEffectId,
+            enemy.uid,
+          );
+        }
+      });
+      damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
+    }
+
+    if (active && (effect.kind === 'hazard' || effect.kind === 'rickroll-disco') && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
       effect.nextTickAt = w.now + 520;
       effect.hitUids.clear();
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {
@@ -5186,6 +8628,13 @@ function updateEffects(w: World) {
         const reach = effect.radius + enemy.radius;
         if (dist2(enemy.x, enemy.y, effect.x, effect.y) > reach * reach) return;
         effect.hitUids.add(enemy.uid);
+        if (effect.pullStrength) {
+          const dx = effect.x - enemy.x;
+          const dy = effect.y - enemy.y;
+          const distance = Math.hypot(dx, dy) || 1;
+          enemy.kx += (dx / distance) * effect.pullStrength;
+          enemy.ky += (dy / distance) * effect.pullStrength;
+        }
         damageEnemy(w, enemy, effect.damage, 0, effect.x, effect.y, effect.statusEffectId ?? (effect.color.includes('b8ff') ? 'acid' : 'burning'));
       });
       if (effect.hurtsPlayer && dist2(p.x, p.y, effect.x, effect.y) <= (effect.radius + p.radius) ** 2) {
@@ -5194,6 +8643,30 @@ function updateEffects(w: World) {
     }
 
     if (w.now > effect.expiresAt) {
+      if (effect.weaponId === 'singularity-core' || (effect.kind === 'hazard' && effect.pullStrength)) {
+        const collapseRadius = effect.radius * 1.5;
+        const collapseDamage = effect.damage * 2.4;
+        novaDamage(w, effect.x, effect.y, collapseRadius, collapseDamage, 4);
+        damageBreakable(w, effect.x, effect.y, collapseRadius, collapseDamage, 4, effect.x, effect.y);
+        w.effects.push({
+          uid: uid(w),
+          kind: 'ring',
+          x: effect.x,
+          y: effect.y,
+          radius: collapseRadius,
+          angle: 0,
+          spread: 0,
+          bornAt: w.now,
+          expiresAt: w.now + 260,
+          color: effect.color,
+          damage: 0,
+          impactIntensity: 0,
+          hitUids: new Set(),
+          followPlayer: false,
+        });
+        spawnParticles(w, effect.x, effect.y, effect.color, 16, 140);
+        pushSfx(w, 'obstacleBreak');
+      }
       if (effect.evolutionBehavior?.kind === 'delayed-burst') {
         const burstRadius = effect.radius * (effect.evolutionBehavior.radius ?? 0.82);
         const burstDamage = effect.damage * 0.55;
@@ -5333,33 +8806,64 @@ function updatePickups(w: World, dt: number) {
     pickup.vx *= Math.pow(0.02, dt);
     pickup.vy *= Math.pow(0.02, dt);
 
-    if (distance < p.radius + (pickup.kind === 'loot-box' ? 18 : 10)) {
+    if (distance < p.radius + (pickup.kind === 'loot-box' || pickup.kind === 'card-pack' ? 18 : 10)) {
       switch (pickup.kind) {
         case 'xp':
           gainXp(w, pickup.value);
+          pushSfx(w, 'pickupXp');
           break;
         case 'health':
-          w.player.hp = clamp(w.player.hp + pickup.value, 0, w.player.maxHp);
-          w.popups.push({ x: p.x, y: p.y + 26, text: `+${pickup.value}`, color: '#7dffb2', bornAt: w.now, vy: 30 });
+          {
+            const healing = Math.round(pickup.value * ((w.player.pollenHealingUntil ?? 0) > w.now ? 1.5 : 1));
+            w.player.hp = clamp(w.player.hp + healing, 0, w.player.maxHp);
+            w.popups.push({ x: p.x, y: p.y + 26, text: `+${healing}`, color: '#7dffb2', bornAt: w.now, vy: 30 });
+          }
+          pushSfx(w, 'pickupHealth');
           break;
         case 'cred':
           w.cred += pickup.value;
+          pushSfx(w, 'pickupCred');
           break;
         case 'coin':
           w.skeletonKeysGained += pickup.value;
           w.popups.push({ x: p.x, y: p.y - 20, text: `+${pickup.value} KEY`, color: '#e8d48a', bornAt: w.now, vy: 30 });
           pushAlert(w, 'Skeleton key found');
+          pushSfx(w, 'pickupKey');
           break;
         case 'loot-box': {
           // The prize is deliberately not granted until its reel lands. RunScreen
           // settles any unseen prize before it hands the result back to meta.
-          const prize = rollPrize(w.rng);
+          const prize = rollPrize(w.rng, w.character.lokPetCollector?.lokPetPrizeWeightMultiplier);
           w.lootBoxesOpened += 1;
           // Queue for the reel overlay in RunScreen.
           w.pendingReel.push(prize);
           spawnParticles(w, p.x, p.y + 10, '#3b82f6', 14, 120);
           w.shake = Math.max(w.shake, 8);
           pushAlert(w, `Box — ${prize.label}`);
+          pushSfx(w, 'lootBox');
+          break;
+        }
+        case 'card-pack': {
+          const roll = w.rng();
+          const collector = w.character.lokPetCollector;
+          const packId: CardPackId = collector && collector.rank === 'LokApex' && roll < 0.12
+            ? 'apex-binder'
+            : collector && (collector.rank === 'LokArchivist' || collector.rank === 'LokApex' || collector.rank === 'LokSupreme') && roll < 0.28
+            ? 'prism-lokpack'
+            : roll < 0.14
+            ? 'elemental-pack'
+            : roll < 0.38
+            ? 'street'
+            : roll < 0.64
+            ? 'lokpet'
+            : roll < 0.84
+            ? 'scenario'
+            : 'collector';
+          w.cardPacksFound.push(packId);
+          w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCK PACK', color: '#f0abfc', bornAt: w.now, vy: 30 });
+          spawnParticles(w, p.x, p.y, '#f0abfc', 14, 110);
+          pushAlert(w, 'Lock Pack secured');
+          pushSfx(w, 'cardPack');
           break;
         }
         case 'sweep': {
@@ -5378,6 +8882,12 @@ function updatePickups(w: World, dt: number) {
       }
       w.pickups.splice(i, 1);
     }
+  }
+
+  // Removals above only ever splice a single index out, so the array stays
+  // in the order pickups were born -- trimming the front evicts the oldest.
+  if (w.pickups.length > PICKUP_CAP) {
+    w.pickups.splice(0, w.pickups.length - PICKUP_CAP);
   }
 }
 
@@ -5583,8 +9093,9 @@ function updateEndlessRoute(w: World) {
   const e = w.endless!;
   if (e.inDungeon || e.inBuilding) return;
 
+  const themeId = w.area.endlessTheme ?? 'streets';
   const distance = Math.hypot(w.player.x, w.player.y);
-  const band = getEndlessBand(distance);
+  const band = getEndlessBand(distance, themeId);
   if (band.id !== e.currentBandId) {
     e.currentBandId = band.id;
     const firstBandVisit = !e.discoveredBandIds.has(band.id);
@@ -5593,7 +9104,9 @@ function updateEndlessRoute(w: World) {
       pushAlert(w, `${band.label} — ${band.riskLabel}`);
     }
     const eventId = `beacon:${band.id}`;
-    if (firstBandVisit && band.id !== 'core' && !e.discoveredRouteEventIds.has(eventId)) {
+    const themeBands = getEndlessBandsForTheme(themeId);
+    const bandIndex = Math.max(0, themeBands.findIndex((candidate) => candidate.id === band.id));
+    if (firstBandVisit && band.thresholdPx > 0 && !e.discoveredRouteEventIds.has(eventId)) {
       e.routeEvent = {
         id: eventId,
         bandId: band.id,
@@ -5602,8 +9115,8 @@ function updateEndlessRoute(w: World) {
         x: w.player.x + 150,
         y: w.player.y,
         phase: 'available',
-        rewardCred: 35 + ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) * 15,
-        rewardTokens: 1 + Math.floor(ENDLESS_BANDS.findIndex((candidate) => candidate.id === band.id) / 3),
+        rewardCred: 35 + bandIndex * 15,
+        rewardTokens: 1 + Math.floor(bandIndex / 3),
       };
       pushAlert(w, `OPTIONAL ROUTE — ${band.eventTitle}`);
     }
@@ -5633,17 +9146,19 @@ function updateEndlessBandHazard(w: World) {
     if (e.dungeonRoom === 3) damagePlayer(w, 2, hazardX, hazardY, 'hazard');
     return;
   }
-  const band = ENDLESS_BANDS_BY_ID[e.currentBandId];
-  if (!band || band.id === 'core') return;
+  const themeId = w.area.endlessTheme ?? 'streets';
+  const band = getEndlessBandById(e.currentBandId, themeId);
+  if (!band || band.thresholdPx === 0) return;
 
-  e.hazardNextAt = w.now + (band.id === 'outer-threshold' ? 2400 : 3100);
-  const radius = band.id === 'floodwall' ? 70 : band.id === 'rail-shadow' ? 56 : 48;
+  const isOuter = band.thresholdPx >= 6000;
+  e.hazardNextAt = w.now + (isOuter ? 2400 : 3100);
+  const radius = band.id.includes('floodwall') || band.id.includes('canal') ? 70 : 54;
   const hazardX = w.player.x + (w.player.vx === 0 ? 80 : Math.sign(w.player.vx) * 90);
   const hazardY = w.player.y + (w.player.vy === 0 ? -40 : Math.sign(w.player.vy) * 90);
   incursionEffect(w, hazardX, hazardY, radius, band.accent, 520);
-  if (band.id === 'outer-threshold') {
+  if (isOuter) {
     damagePlayer(w, 3, hazardX, hazardY, 'hazard');
-  } else if (band.id === 'industrial-fringe' || band.id === 'rail-shadow') {
+  } else if (band.thresholdPx >= 2800) {
     damagePlayer(w, 2, hazardX, hazardY, 'hazard');
   }
 }
@@ -5696,7 +9211,7 @@ function updateEndlessChunks(w: World) {
     const [cxStr, cyStr] = key.split(',');
     const cx = parseInt(cxStr!, 10);
     const cy = parseInt(cyStr!, 10);
-    const chunk = generateChunk(cx, cy, e.rngSeed);
+    const chunk = generateChunk(cx, cy, e.rngSeed, w.area.endlessTheme ?? 'streets');
     const origin = chunkOrigin(cx, cy);
     const cwx = origin.x + CHUNK_SIZE / 2;
     const cwy = origin.y + CHUNK_SIZE / 2;
@@ -5797,6 +9312,7 @@ function updateEndlessChunks(w: World) {
         }
       }
     }
+    w.obstacleGridDirty = true;
   }
 }
 
@@ -5821,6 +9337,13 @@ function updateEndlessLandmarkCue(w: World) {
 function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 'exit') {
   const e = w.endless!;
   const p = w.player;
+  // Re-anchor the movement-clamp center (clampToArena/arenaWallBounds read
+  // dungeonCenterX/Y) to match wherever this room's geometry is about to be
+  // placed below -- otherwise room 2+ centers its exit on the player's
+  // drifted position while the clamp still confines them to room 1's box,
+  // and the exit renders outside the reachable area.
+  e.dungeonCenterX = p.x;
+  e.dungeonCenterY = p.y;
   resolvePotholes(w);
   e.dungeonRoom = room;
   const era = DUNGEON_ERAS[e.dungeonEraIndex]!;
@@ -5844,6 +9367,7 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
      y: p.y + obs.y,
    }));
   w.fluids = [];
+  w.obstacleGridDirty = true;
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -5873,13 +9397,12 @@ function enterDungeon(w: World) {
   const e = w.endless!;
   e.streetReturnX = w.player.x;
   e.streetReturnY = w.player.y;
-  e.dungeonCenterX = w.player.x;
-  e.dungeonCenterY = w.player.y;
   e.dungeonDepth += 1;
   e.dungeonRoom = 1;
   e.dungeonBossDefeated = false;
   e.dungeonChest = null;
-  const bandIndex = ENDLESS_BANDS.findIndex((band) => band.id === e.currentBandId);
+  const themeBands = getEndlessBandsForTheme(w.area.endlessTheme);
+  const bandIndex = themeBands.findIndex((band) => band.id === e.currentBandId);
   e.dungeonEraIndex = (e.dungeonDepth - 1 + Math.max(0, bandIndex) * 2) % DUNGEON_ERAS.length;
   e.inDungeon = true;
   loadDungeonRoom(w, 1, 'enter');
@@ -5924,6 +9447,7 @@ function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]
   }));
   w.obstacles = [...interiorShell, ...interiorProps];
   w.breakables = [...interiorShell, ...interiorProps].map((obs) => createBreakable(w, { ...obs, kind: obs.kind }));
+  w.obstacleGridDirty = true;
   w.potholes = [];
   w.fluids = [];
   w.enemies = w.enemies.filter((en) => en.dying);
@@ -5996,6 +9520,7 @@ function restoreStreetObstacles(w: World) {
       }
     }
   }
+  w.obstacleGridDirty = true;
 }
 
 function updateEndlessDungeon(w: World) {
@@ -6043,7 +9568,7 @@ function updateEndlessDungeon(w: World) {
       Math.hypot(p.x - chest.x, p.y - chest.y) < 34 + p.radius) {
       chest.opened = true;
       for (let i = 0; i < 3; i += 1) {
-        const prize = rollPrize(w.rng);
+        const prize = rollPrize(w.rng, w.character.lokPetCollector?.lokPetPrizeWeightMultiplier);
         w.pendingReel.push(prize);
       }
       w.lootBoxesOpened += 1;
@@ -6078,10 +9603,19 @@ function updateEndlessSpawning(w: World, dt: number) {
   const tier = endlessDiffTier(e);
   const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
   const nightMult = nightDifficultyMult(w.cycle.phase);
-  const spawnRate = Math.min(3.2, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier);
+  // Automatic/environmental multipliers (tier, night) stay inside this cap
+  // per endless-mode-engine.md. modifierSpawnMult is folded in here to match
+  // how w.challenges' own enemySpawnMultiplier is already capped alongside
+  // it -- but modifierHpMult is deliberately NOT added to the hp cap below:
+  // w.challenges' enemyHealthMultiplier already stacks on top of this hp cap
+  // uncapped (inside spawnEnemy), and run modifiers are the same kind of
+  // player-opted-in multiplier as challenges, not an automatic one. Adding
+  // it here would also double-apply it, since spawnEnemy applies it too.
+  const spawnRateCap = w.modifiers.unleashedMode ? 12 : 3.2;
+  const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
   const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
-  const bandPool = ENDLESS_BANDS_BY_ID[e.currentBandId]?.enemyPool;
+  const bandPool = getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.enemyPool;
   const pool = bandPool?.length
     ? bandPool
     : ENDLESS_ENEMY_POOLS[Math.min(tier, ENDLESS_ENEMY_POOLS.length - 1)]!;
@@ -6194,6 +9728,139 @@ export interface StepInput {
    * that does not care about audio can omit it and get silence.
    */
   audio?: AudioFrame;
+  /**
+   * LokSurvivorArena: one entry per `World.guests[i]`, local-device or
+   * network in origin -- the engine doesn't care which. Missing entries (or
+   * a missing array entirely) just mean "no input this frame," same as
+   * `moveX`/`moveY` defaulting to 0 would.
+   */
+  guestInputs?: Array<{ moveX: number; moveY: number }>;
+}
+
+function updateThreatEvents(w: World, dt: number) {
+  const events = w.threatCalibrations?.activeEvents;
+  if (!events || events.length === 0 || !w.threatEventTimers) return;
+  const timers = w.threatEventTimers;
+
+  // 1. EMP Storm: Periodic lightning strike discharges that blast nearby enemies
+  if (events.includes('emp-storm') && w.now >= timers.nextEmpAt) {
+    timers.nextEmpAt = w.now + randRange(w.rng, 7000, 11000);
+    const targetX = w.player.x + randRange(w.rng, -180, 180);
+    const targetY = w.player.y + randRange(w.rng, -180, 180);
+    w.effects.push({
+      uid: uid(w), kind: 'spark', x: targetX, y: targetY, radius: 95, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 280, color: '#38bdf8', damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, targetX, targetY, '#38bdf8', 16, 120);
+    pushSfx(w, 'bossWarning');
+    w.shake = Math.max(w.shake, 8);
+    forEachNearby(w, targetX, targetY, 95, (enemy) => {
+      damageEnemy(w, enemy, 35, 2, targetX, targetY, 'shock');
+    });
+  }
+
+  // 2. Gravity Anomaly: Creates an implosion point drawing in surrounding enemies & drops
+  if (events.includes('gravity-anomaly') && w.now >= timers.nextGravityAt) {
+    timers.nextGravityAt = w.now + randRange(w.rng, 12000, 16000);
+    const gX = w.player.x + randRange(w.rng, -150, 150);
+    const gY = w.player.y + randRange(w.rng, -150, 150);
+    w.effects.push({
+      uid: uid(w), kind: 'nova', x: gX, y: gY, radius: 140, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 450, color: '#a855f7', damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, gX, gY, '#c084fc', 20, 80);
+    pushAlert(w, 'GRAVITY ANOMALY');
+    pushSfx(w, 'ultimate');
+    forEachNearby(w, gX, gY, 180, (enemy) => {
+      const edx = gX - enemy.x;
+      const edy = gY - enemy.y;
+      const elen = Math.hypot(edx, edy) || 1;
+      enemy.kx += (edx / elen) * 110;
+      enemy.ky += (edy / elen) * 110;
+    });
+  }
+
+  // 3. Glitch Surge: Visual static pulses across the field, increasing speed and crit
+  if (events.includes('glitch-surge')) {
+    if (w.now >= timers.nextGlitchAt) {
+      timers.nextGlitchAt = w.now + randRange(w.rng, 16000, 22000);
+      timers.glitchActiveUntil = w.now + 4000;
+      pushAlert(w, 'GLITCH SURGE ACTIVE');
+      pushSfx(w, 'waveStart');
+      w.shake = Math.max(w.shake, 6);
+    }
+    if (w.now < timers.glitchActiveUntil) {
+      if (w.rng() < 0.3) {
+        spawnParticles(w, w.player.x + randRange(w.rng, -120, 120), w.player.y + randRange(w.rng, -120, 120), '#ec4899', 2, 40);
+      }
+    }
+  }
+
+  // 4. Solar Flare: Periodic flash incinerating minor enemy projectiles
+  if (events.includes('solar-flare') && w.now >= timers.nextSolarAt) {
+    timers.nextSolarAt = w.now + randRange(w.rng, 18000, 24000);
+    pushAlert(w, 'SOLAR FLARE BURST');
+    pushSfx(w, 'bossKill');
+    w.effects.push({
+      uid: uid(w), kind: 'nova', x: w.player.x, y: w.player.y, radius: 320, angle: 0, spread: 0,
+      bornAt: w.now, expiresAt: w.now + 350, color: '#f59e0b', damage: 0, impactIntensity: 0,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, w.player.x, w.player.y, '#f59e0b', 24, 180);
+    for (let pi = w.projectiles.length - 1; pi >= 0; pi -= 1) {
+      const proj = w.projectiles[pi]!;
+      if (!proj.fromPlayer) {
+        spawnParticles(w, proj.x, proj.y, '#fbbf24', 4, 30);
+        w.projectiles.splice(pi, 1);
+      }
+    }
+  }
+}
+
+function updateLlamaMamaPassive(w: World) {
+  if (w.character.id !== 'llama-mama') return;
+  const p = w.player;
+  if (p.hp > 0 && p.hp / p.maxHp <= 0.24 && !w.llamaMamaEnraged) {
+    w.llamaMamaEnraged = true;
+    w.llamaMamaRageUntil = w.now + 14000;
+    pushAlert(w, "WE'RE OVER IT! PERIOD!");
+    pushSfx(w, 'ultimate');
+    w.shake = Math.max(w.shake, 14);
+    spawnParticles(w, p.x, p.y, '#ff4500', 30, 220);
+  }
+
+  if (w.llamaMamaRageUntil && w.now < w.llamaMamaRageUntil) {
+    if (!w.llamaMamaLastBlastAt || w.now - w.llamaMamaLastBlastAt >= 320) {
+      w.llamaMamaLastBlastAt = w.now;
+      const radius = 240 * areaMult(w);
+      const blastDamage = 28 * damageMult(w);
+      novaDamage(w, p.x, p.y, radius, blastDamage, 3, 'burn');
+      damageBreakable(w, p.x, p.y, radius, blastDamage, 3, p.x, p.y);
+      w.effects.push({
+        uid: uid(w),
+        kind: 'wave',
+        x: p.x,
+        y: p.y,
+        radius,
+        angle: 0,
+        spread: Math.PI * 2,
+        bornAt: w.now,
+        expiresAt: w.now + 320,
+        color: '#ff4500',
+        damage: 0,
+        impactIntensity: 0,
+        hitUids: new Set(),
+        followPlayer: true,
+      });
+      spawnParticles(w, p.x, p.y, '#ff7700', 8, 140);
+    }
+  } else if (w.llamaMamaRageUntil && w.now >= w.llamaMamaRageUntil) {
+    if (p.hp / p.maxHp > 0.24) {
+      w.llamaMamaEnraged = false;
+    }
+  }
 }
 
 export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
@@ -6205,6 +9872,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
+  rebuildObstacleGrid(w);
 
   if (
     w.firstNightChapter &&
@@ -6219,7 +9887,25 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  if (w.arenaMode) {
+    for (let i = 0; i < w.guests.length; i += 1) {
+      const gi = input.guestInputs?.[i];
+      updateGuest(w, dt, gi?.moveX ?? 0, gi?.moveY ?? 0, w.guests[i]!);
+    }
+  }
+  // A heartbeat, not a per-frame alarm: `shouldPlayCue`'s throttle (see
+  // sfxCues.ts's MIN_RETRIGGER_MS) turns this plain per-frame condition into
+  // a slow pulse rather than a constant tone while low.
+  if (w.outcome === 'running' && w.player.hp > 0 && w.player.hp <= w.player.maxHp * 0.25) {
+    pushSfx(w, 'lowHealth');
+  }
+  if (w.now >= w.nextPlayerTrailAt) {
+    w.playerTrail.push({ x: w.player.x, y: w.player.y, at: w.now });
+    w.nextPlayerTrailAt = w.now + 100;
+    while (w.playerTrail.length > 0 && w.now - w.playerTrail[0]!.at > 2800) w.playerTrail.shift();
+  }
   updateStealth(w);
+  updateLlamaMamaPassive(w);
   updateDistrictIncursion(w, dt);
 
   if (w.area.endless && w.endless) {
@@ -6239,10 +9925,20 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateLokPets(w, dt);
   updateFollowers(w, dt);
   updateStormCloud(w, dt);
+  updateWheelSpin(w);
+  updateDirector(w);
   updateEnemies(w, dt);
   updateRoamingDetectors(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
+  updateDustMites(w, dt);
+  updateBubbleWash(w, dt);
+  updateThreatEvents(w, dt);
+  // Runs after enemies/breakables so objectives read this frame's state.
+  updateCapturePriming(w);
+  updateFog(w);
+  updateBeacons(w, dt);
+  updateMission(w, dt);
 
   // Weapon cadence.
   updateOrbiters(w, dt);
@@ -6266,9 +9962,22 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateParticles(w, dt);
   updateRescue(w, dt);
 
-  // Camera lags slightly behind and leads the direction of travel.
-  const targetX = w.player.x + w.player.vx * 0.12;
-  const targetY = w.player.y + w.player.vy * 0.12;
+  // Camera lags slightly behind and leads the direction of travel. In arena
+  // mode this leads off the centroid of every player sharing the screen
+  // instead of just the host, so everyone stays in frame.
+  let targetX = w.player.x + w.player.vx * 0.12;
+  let targetY = w.player.y + w.player.vy * 0.12;
+  if (w.arenaMode && w.guests.length > 0) {
+    let sumX = targetX;
+    let sumY = targetY;
+    for (const guest of w.guests) {
+      sumX += guest.x + guest.vx * 0.12;
+      sumY += guest.y + guest.vy * 0.12;
+    }
+    const count = w.guests.length + 1;
+    targetX = sumX / count;
+    targetY = sumY / count;
+  }
   const follow = 1 - Math.pow(0.0001, dt);
   w.camera.x += (targetX - w.camera.x) * follow;
   w.camera.y += (targetY - w.camera.y) * follow;
@@ -6276,7 +9985,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (w.shake < 0.2) w.shake = 0;
 
   // Time-based clear (timed areas only — endless runs end via "head home").
-  if (!w.area.endless && w.time >= w.area.durationSec && w.outcome === 'running') {
+  // `infiniteMode` also skips this: the run only ends by death or abort.
+  if (!w.area.endless && !w.modifiers.infiniteMode && w.time >= w.area.durationSec && w.outcome === 'running') {
     w.outcome = 'cleared';
   }
 }
@@ -6426,6 +10136,22 @@ export function hudSnapshot(w: World): HudSnapshot {
             : 0,
         }
       : undefined,
+    wheelSpin: w.wheelSpin
+      ? (() => {
+          const tier = w.wheelSpin!.resultTierId ? getHordeSpinTier(w.wheelSpin!.resultTierId) : undefined;
+          return {
+            phase: w.wheelSpin!.phase,
+            resultTierId: w.wheelSpin!.resultTierId,
+            resultLabel: tier?.label,
+            rewardCred: tier?.rewardCred ?? 0,
+            rare: Boolean(tier?.rare),
+            celebration: tier?.celebration ?? 'mild',
+            secondsToNextSpin: w.wheelSpin!.phase === 'idle' ? Math.max(0, Math.ceil((w.wheelSpin!.nextSpinAt - w.now) / 1000)) : 0,
+            activeRemainingSec: w.wheelSpin!.phase === 'active' ? Math.max(0, Math.ceil((w.wheelSpin!.activeEndsAt - w.now) / 1000)) : 0,
+            colorFluctuation: w.wheelSpin!.colorFluctuation,
+          };
+        })()
+      : undefined,
     objectives: w.objectives.map((o) => ({
       label: o.def.label,
       progress: Math.min(o.def.targetCount, Math.round(o.progress)),
@@ -6446,10 +10172,10 @@ export function hudSnapshot(w: World): HudSnapshot {
             ? (DUNGEON_ERAS[e.dungeonEraIndex]?.name ?? 'Unknown')
             : '',
           currentBandId: e.currentBandId,
-          currentBandLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.label ?? 'Unknown edge',
-          currentBandAccent: ENDLESS_BANDS_BY_ID[e.currentBandId]?.accent ?? '#fff',
-          riskLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.riskLabel ?? '',
-          hazardLabel: ENDLESS_BANDS_BY_ID[e.currentBandId]?.hazardLabel ?? '',
+          currentBandLabel: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.label ?? 'Unknown edge',
+          currentBandAccent: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.accent ?? '#fff',
+          riskLabel: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.riskLabel ?? '',
+          hazardLabel: getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.hazardLabel ?? '',
           routeEvent: e.routeEvent
             ? { ...e.routeEvent }
             : undefined,
@@ -6503,6 +10229,10 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     areaId: w.area.id,
     characterId: w.character.id,
     cleared,
+    // Sector Command: campaign credit follows the mission, never the run's
+    // generic `cleared` -- surviving the clock is not completing objectives.
+    missionId: w.mission?.def.id,
+    missionComplete: w.mission ? w.mission.complete : undefined,
     survivedSec: survival,
     kills: w.kills,
     level: w.level,
@@ -6515,8 +10245,11 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),
       passives: w.passives.map((passive) => ({ id: passive.def.id, name: passive.def.name, stacks: passive.stacks })),
     },
+    directorEncounterId: w.director.activeDirectorId ?? undefined,
+    directorDefeated: w.director.victorious,
     lootBoxesOpened: w.lootBoxesOpened,
     openedPrizes: [...w.openedPrizes],
+    cardPacksFound: [...w.cardPacksFound],
     lokPets: w.lokPetHistory.map((pet) => ({
       origin: pet.origin,
       roll: {

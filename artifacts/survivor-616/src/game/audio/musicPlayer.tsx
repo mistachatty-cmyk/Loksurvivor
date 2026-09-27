@@ -23,15 +23,27 @@ import {
 import { MusicAnalyser } from './analysis';
 import { beatBus } from './beatBus';
 import { ConversionError, convertToMp3 } from './convert';
-import dontFly from '@assets/Don\'t_Fly_1787686881680.mp3?url';
-import fat from '@assets/F.A.T.$_2_1787686881680.m4a?url';
-import layback from '@assets/Layback_1787686881680.wav?url';
-import dodds from '@assets/Dodds_Ave_289-~Somethin_1787686881680.m4a?url';
-import rbm from '@assets/RBM_1787686881680.m4a?url';
-import neverMind from '@assets/NeverMind-Brkn-Part2_1787686881680.mp3?url';
-import demoTape from '@assets/That_One_Song-Demo_Tape_1787686881680.mp3?url';
-import goinLoco from '@assets/Goin_Loco_Mary_Sue_1787686881680.mp3?url';
-import dontFly2 from '@assets/Don\'t_Fly_2_1787686881680.mp3?url';
+import { useMeta } from '@/game/state/metaStore';
+import {
+  clearLocalTracks as clearStoredLocalTracks,
+  getLocalLibrarySummary,
+  loadLocalTracks,
+  removeLocalTrack as removeStoredLocalTrack,
+  saveLocalTrack,
+  type LocalLibrarySummary,
+} from './localTrackLibrary';
+import dataSpark from '@/assets/lokifed-take-1/00-data-spark-hidden.m4a?url';
+import saveMyGrace from '@/assets/lokifed-take-1/01-save-my-grace.m4a?url';
+import bonusMap from '@/assets/lokifed-take-1/02-bonus-map-should-we-survive.m4a?url';
+import merciMi from '@/assets/lokifed-take-1/03-merci-mi-shall-we-survive.m4a?url';
+import wantYou from '@/assets/lokifed-take-1/04-i-want-you-dont-you-want-it.m4a?url';
+import retrieveToKeep from '@/assets/lokifed-take-1/05-retrieve-to-keep.m4a?url';
+import idkDoYou from '@/assets/lokifed-take-1/06-idk-do-you.m4a?url';
+import blanksMarch from '@/assets/lokifed-take-1/07-blanks-march.m4a?url';
+import hideoutUnderSiege from '@/assets/lokifed-take-1/08-hideout-under-siege.m4a?url';
+import unraveled from '@/assets/lokifed-take-1/09-unraveled.m4a?url';
+import nullVoid from '@/assets/lokifed-take-1/10-null-void.m4a?url';
+import exoBite from '@/assets/lokifed-take-1/11-exo-bite-brkn.m4a?url';
 
 export interface Track {
   id: string;
@@ -44,18 +56,38 @@ export interface Track {
   /** Seconds; filled in once metadata loads. */
   duration: number | null;
   source: 'bundled' | 'local';
+  /** True after a file has been restored from the device-local library. */
+  restoredFromLibrary?: boolean;
+  /** Device-only file identity used for duplicate protection and favorites. */
+  fingerprint?: string;
+  favorite?: boolean;
   /**
    * True for a video container (mp4/mov/webm/mkv) added for its audio track.
    * Gates the "Convert to MP3" affordance -- there is no reason to offer it
    * on a file that is already a plain audio format.
    */
   isVideoContainer?: boolean;
+  /** Authored releases stay grouped even when a player adds their own files. */
+  album?: string;
+  trackNumber?: number;
+  /** Objective completions required before an authored release can be played. */
+  unlockObjectiveCount?: number;
+  locked?: boolean;
 }
 
 export interface Playlist {
   id: string;
   name: string;
   /** Track ids in play order. Ids the library no longer has are skipped at read time. */
+  trackIds: string[];
+  /** Built-in albums are always available and cannot be renamed or removed. */
+  builtIn?: boolean;
+  kind?: 'album' | 'playlist';
+}
+
+export interface SoundtrackAlbum {
+  id: string;
+  title: string;
   trackIds: string[];
 }
 
@@ -65,6 +97,18 @@ export interface ConversionState {
   trackId: string;
   phase: 'decoding' | 'encoding';
   ratio: number;
+}
+
+/** A player supplied by its original streaming service. These are deliberately
+ * separate from Track: embedded streams cannot be analysed or mixed into the
+ * game's reactive local-audio transport. */
+export interface StreamingEmbed {
+  id: string;
+  service: 'spotify' | 'youtube' | 'soundcloud' | 'bandlab';
+  sourceUrl: string;
+  /** Null means the source is saved as an openable link until that service has
+   * a verified embeddable player route. */
+  embedUrl: string | null;
 }
 
 export interface MusicPlayerValue {
@@ -80,6 +124,9 @@ export interface MusicPlayerValue {
   durationSec: number;
   error: string | null;
   addFiles: (files: FileList | File[]) => number;
+  lastImport: { added: number; duplicates: number; rejected: number } | null;
+  dismissImportReport: () => void;
+  toggleTrackFavorite: (id: string) => void;
   /**
    * Fetches a direct link to a media file and adds it like a dropped file.
    * Resolves false (and sets `error`) on a bad URL, a blocked streaming-service
@@ -105,6 +152,15 @@ export interface MusicPlayerValue {
   toggleShuffle: () => void;
   cycleRepeat: () => void;
   dismissError: () => void;
+  streamingEmbeds: StreamingEmbed[];
+  /** Saves a recognized service URL as an official player/source card. Returns
+   * false for a direct media URL so the caller can use addFromUrl instead. */
+  addStreamingEmbed: (url: string) => boolean;
+  removeStreamingEmbed: (id: string) => void;
+  /** Files and bytes stored for this browser only; never sent to a server. */
+  localLibrary: LocalLibrarySummary & { ready: boolean };
+  albums: SoundtrackAlbum[];
+  soundtrackObjectiveCompletions: number;
   /**
    * The one `AudioContext` the app owns, or null before it has been created.
    * The studio adopts this rather than creating a second context -- two
@@ -138,11 +194,11 @@ export interface MusicPlayerValue {
 const MusicContext = createContext<MusicPlayerValue | null>(null);
 
 /** Plain audio formats -- decoded and played as-is, no conversion offered. */
-const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus)$/i;
+const AUDIO_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|aif|aiff)$/i;
 /** Containers that carry a video track alongside audio; `<audio>` still plays
  * just the audio track, but these are the ones "Convert to MP3" applies to. */
 const VIDEO_CONTAINER_EXTENSIONS = /\.(mp4|m4v|mov|webm|mkv)$/i;
-const MEDIA_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|mp4|m4v|mov|webm|mkv)$/i;
+const MEDIA_EXTENSIONS = /\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|aif|aiff|mp4|m4v|mov|webm|mkv)$/i;
 
 /** Direct-link import fetches whatever URL it's given; these are refused up
  * front rather than attempted, since scraping them isn't what "paste a link"
@@ -160,21 +216,66 @@ const STREAMING_SERVICE_HOSTS = [
 ];
 
 const PLAYLISTS_STORAGE_KEY = 'survivor616.playlists.v1';
+const STREAMING_EMBEDS_STORAGE_KEY = 'survivor616.streaming-embeds.v1';
+const FAVORITE_FINGERPRINTS_STORAGE_KEY = 'survivor616.favorite-track-fingerprints.v1';
 
-const BUNDLED_TRACKS: Track[] = ([
-  { id: 'dont-fly', title: "Don't Fly", url: dontFly, source: 'bundled' },
-  { id: 'fat-2', title: 'F.A.T.$ 2', url: fat, source: 'bundled' },
-  { id: 'layback', title: 'Layback', url: layback, source: 'bundled' },
-  { id: 'dodds-ave-somethin', title: 'Dodds Ave ~ Somethin', url: dodds, source: 'bundled' },
-  { id: 'rbm', title: 'RBM', url: rbm, source: 'bundled' },
-  { id: 'never-mind-brkn-part-2', title: 'NeverMind — Brkn Part 2', url: neverMind, source: 'bundled' },
-  { id: 'that-one-song-demo-tape', title: 'That One Song — Demo Tape', url: demoTape, source: 'bundled' },
-  { id: 'goin-loco-mary-sue', title: 'Goin Loco — Mary Sue', url: goinLoco, source: 'bundled' },
-  { id: 'dont-fly-2', title: "Don't Fly 2", url: dontFly2, source: 'bundled' },
-] as const).map((track) => ({ ...track, size: 0, duration: null }));
+const LOKIFED_TAKE_ONE = 'Lokifed — Take 1';
+
+const BUNDLED_TRACKS: Track[] = (
+  [
+    { id: 'lokifed-00-data-spark', title: 'Data Spark — Hidden Track 0', url: dataSpark, source: 'bundled', trackNumber: 0, unlockObjectiveCount: 0 },
+    { id: 'lokifed-01-save-my-grace', title: 'Save My Grace', url: saveMyGrace, source: 'bundled', trackNumber: 1, unlockObjectiveCount: 1 },
+    { id: 'lokifed-02-bonus-map', title: 'Bonus Map — Should We Survive?', url: bonusMap, source: 'bundled', trackNumber: 2, unlockObjectiveCount: 2 },
+    { id: 'lokifed-03-merci-mi', title: 'Merci Mi — Shall We Survive', url: merciMi, source: 'bundled', trackNumber: 3, unlockObjectiveCount: 3 },
+    { id: 'lokifed-04-i-want-you', title: "I Want You, Don't You Want It", url: wantYou, source: 'bundled', trackNumber: 4, unlockObjectiveCount: 4 },
+    { id: 'lokifed-05-retrieve-to-keep', title: 'Retrieve to Keep', url: retrieveToKeep, source: 'bundled', trackNumber: 5, unlockObjectiveCount: 5 },
+    { id: 'lokifed-06-idk-do-you', title: 'IDK, Do You?', url: idkDoYou, source: 'bundled', trackNumber: 6, unlockObjectiveCount: 6 },
+    { id: 'lokifed-07-blanks-march', title: "Blank's March — Marche à blanc", url: blanksMarch, source: 'bundled', trackNumber: 7, unlockObjectiveCount: 7 },
+    { id: 'lokifed-08-hideout-under-siege', title: 'Hideout Under Siege — IDC, Do You?', url: hideoutUnderSiege, source: 'bundled', trackNumber: 8, unlockObjectiveCount: 8 },
+    { id: 'lokifed-09-unraveled', title: 'Unraveled', url: unraveled, source: 'bundled', trackNumber: 9, unlockObjectiveCount: 9 },
+    { id: 'lokifed-10-null-void', title: 'Null Void', url: nullVoid, source: 'bundled', trackNumber: 10, unlockObjectiveCount: 10 },
+    { id: 'lokifed-11-exo-bite', title: 'Exo Bite — Brkn', url: exoBite, source: 'bundled', trackNumber: 11, unlockObjectiveCount: 11 },
+  ] as const
+).map((track) => ({ ...track, album: LOKIFED_TAKE_ONE, size: 0, duration: null }));
+
+const BUNDLED_ALBUMS: SoundtrackAlbum[] = [{
+  id: 'album-lokifed-take-1',
+  title: LOKIFED_TAKE_ONE,
+  trackIds: BUNDLED_TRACKS.map((track) => track.id),
+}];
+
+const BUNDLED_ALBUM_PLAYLISTS: Playlist[] = BUNDLED_ALBUMS.map((album) => ({
+  id: album.id,
+  name: album.title,
+  trackIds: album.trackIds,
+  builtIn: true,
+  kind: 'album',
+}));
+
+function withSoundtrackLocks(source: Track[], objectiveCompletions: number): Track[] {
+  return source.map((track) =>
+    track.source === 'bundled'
+      ? { ...track, locked: (track.unlockObjectiveCount ?? 0) > objectiveCompletions }
+      : track,
+  );
+}
 
 function titleFromFile(file: File): string {
   return file.name.replace(MEDIA_EXTENSIONS, '').replace(/[_-]+/g, ' ').trim() || file.name;
+}
+
+function fileFingerprint(file: Pick<File, 'name' | 'size' | 'lastModified'>): string {
+  return `${file.name.toLowerCase()}::${file.size}::${file.lastModified}`;
+}
+
+function loadFavoriteFingerprints(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(FAVORITE_FINGERPRINTS_STORAGE_KEY) ?? '[]') as unknown;
+    return new Set(Array.isArray(stored) ? stored.filter((value): value is string => typeof value === 'string') : []);
+  } catch {
+    return new Set();
+  }
 }
 
 function looksLikeMedia(file: { type: string; name: string }): boolean {
@@ -188,6 +289,83 @@ function looksLikeVideoContainer(file: { type: string; name: string }): boolean 
 function isStreamingServiceUrl(url: URL): boolean {
   const host = url.hostname.toLowerCase().replace(/^www\./, '');
   return STREAMING_SERVICE_HOSTS.some((blocked) => host === blocked || host.endsWith(`.${blocked}`));
+}
+
+function isHost(url: URL, host: string): boolean {
+  const actual = url.hostname.toLowerCase().replace(/^www\./, '');
+  return actual === host || actual.endsWith(`.${host}`);
+}
+
+function createStreamingEmbed(rawUrl: string): StreamingEmbed | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+
+  const id = `stream-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  if (isHost(url, 'spotify.com')) {
+    const [kind, entityId] = url.pathname.split('/').filter(Boolean);
+    if (!entityId || !['track', 'album', 'playlist', 'artist', 'show', 'episode'].includes(kind ?? '')) return null;
+    return {
+      id,
+      service: 'spotify',
+      sourceUrl: url.toString(),
+      embedUrl: `https://open.spotify.com/embed/${kind}/${entityId}`,
+    };
+  }
+  if (isHost(url, 'youtube.com') || isHost(url, 'youtu.be')) {
+    const videoId = isHost(url, 'youtu.be')
+      ? url.pathname.split('/').filter(Boolean)[0]
+      : (url.searchParams.get('v') ??
+        url.pathname
+          .split('/')
+          .filter(Boolean)
+          .find((part, index, path) => (path[index - 1] === 'embed' || path[index - 1] === 'shorts') && Boolean(part)));
+    if (!videoId) return null;
+    return {
+      id,
+      service: 'youtube',
+      sourceUrl: url.toString(),
+      embedUrl: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?playsinline=1&rel=0`,
+    };
+  }
+  if (isHost(url, 'soundcloud.com')) {
+    return {
+      id,
+      service: 'soundcloud',
+      sourceUrl: url.toString(),
+      embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(url.toString())}&visual=true`,
+    };
+  }
+  if (isHost(url, 'bandlab.com')) {
+    return { id, service: 'bandlab', sourceUrl: url.toString(), embedUrl: null };
+  }
+  return null;
+}
+
+function loadStreamingEmbeds(): StreamingEmbed[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(STREAMING_EMBEDS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is StreamingEmbed => {
+      if (typeof item !== 'object' || item === null) return false;
+      const candidate = item as Partial<StreamingEmbed>;
+      return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.sourceUrl === 'string' &&
+        ['spotify', 'youtube', 'soundcloud', 'bandlab'].includes(candidate.service ?? '') &&
+        (typeof candidate.embedUrl === 'string' || candidate.embedUrl === null)
+      );
+    });
+  } catch {
+    return [];
+  }
 }
 
 interface StoredPlaylists {
@@ -205,8 +383,7 @@ function loadStoredPlaylists(): StoredPlaylists {
     if (!parsed || !Array.isArray(parsed.playlists)) return empty;
     const playlists = parsed.playlists
       .filter(
-        (p): p is Playlist =>
-          typeof p?.id === 'string' && typeof p?.name === 'string' && Array.isArray(p?.trackIds),
+        (p): p is Playlist => typeof p?.id === 'string' && typeof p?.name === 'string' && Array.isArray(p?.trackIds),
       )
       .map((p) => ({
         id: p.id,
@@ -223,6 +400,7 @@ function loadStoredPlaylists(): StoredPlaylists {
 }
 
 export function MusicProvider({ children }: { children: ReactNode }) {
+  const { meta } = useMeta();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tracksRef = useRef<Track[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -230,8 +408,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const analysisRef = useRef<MusicAnalyser | null>(null);
 
-  const [tracks, setTracks] = useState<Track[]>(BUNDLED_TRACKS);
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [tracks, setTracks] = useState<Track[]>(() => withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions));
+  // Data Spark is the title-screen default. Browsers still require an explicit
+  // gesture before sound begins, so this selects it without forcing autoplay.
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolumeState] = useState(0.7);
   const [muted, setMuted] = useState(false);
@@ -241,14 +421,41 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [lastImport, setLastImport] = useState<{ added: number; duplicates: number; rejected: number } | null>(null);
+  const [favoriteFingerprints, setFavoriteFingerprints] = useState<Set<string>>(() => loadFavoriteFingerprints());
+  const [localLibrary, setLocalLibrary] = useState<LocalLibrarySummary & { ready: boolean }>({
+    count: 0,
+    bytes: 0,
+    ready: false,
+  });
+  const [streamingEmbeds, setStreamingEmbeds] = useState<StreamingEmbed[]>(() => loadStreamingEmbeds());
   const [conversion, setConversion] = useState<ConversionState | null>(null);
-  const [playlists, setPlaylists] = useState<Playlist[]>(() => loadStoredPlaylists().playlists);
+  const [playlists, setPlaylists] = useState<Playlist[]>(() => [
+    ...BUNDLED_ALBUM_PLAYLISTS,
+    ...loadStoredPlaylists().playlists.filter((playlist) => !BUNDLED_ALBUM_PLAYLISTS.some((album) => album.id === playlist.id)),
+  ]);
   const [activePlaylistId, setActivePlaylistIdState] = useState<string | null>(
     () => loadStoredPlaylists().activePlaylistId,
   );
   const reactiveRootRef = useRef<HTMLDivElement | null>(null);
 
   tracksRef.current = tracks;
+
+  // Completing an objective is the only path that reveals the next authored
+  // release. Local files remain fully player-controlled.
+  useEffect(() => {
+    setTracks((previous) => {
+      const next = withSoundtrackLocks(previous, meta.soundtrackObjectiveCompletions);
+      tracksRef.current = next;
+      return next;
+    });
+  }, [meta.soundtrackObjectiveCompletions]);
+
+  const refreshLocalLibrary = useCallback(() => {
+    void getLocalLibrarySummary()
+      .then((summary) => setLocalLibrary({ ...summary, ready: true }))
+      .catch(() => setLocalLibrary((current) => ({ ...current, ready: true })));
+  }, []);
 
   // One audio element for the whole app so music survives screen changes.
   if (audioRef.current === null && typeof Audio !== 'undefined') {
@@ -294,7 +501,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const ensureAudioContext = useCallback((): AudioContext | null => {
     if (typeof window === 'undefined') return null;
     const AudioContextConstructor =
-      window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      window.AudioContext ??
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextConstructor) return null;
     if (!audioContextRef.current) {
       try {
@@ -326,12 +534,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   }, [ensureAudioContext]);
 
   /** The id queue playback actually walks: the active playlist, filtered to
-   * tracks that still exist, or every track when no playlist is selected. */
+   * tracks that exist and have been unlocked, or every unlocked track when no
+   * playlist is selected. */
   const activeQueueIds = useCallback((): string[] => {
-    if (!activePlaylistId) return tracksRef.current.map((t) => t.id);
+    if (!activePlaylistId) return tracksRef.current.filter((track) => !track.locked).map((t) => t.id);
     const playlist = playlists.find((p) => p.id === activePlaylistId);
-    if (!playlist) return tracksRef.current.map((t) => t.id);
-    const known = new Set(tracksRef.current.map((t) => t.id));
+    if (!playlist) return tracksRef.current.filter((track) => !track.locked).map((t) => t.id);
+    const known = new Set(tracksRef.current.filter((track) => !track.locked).map((t) => t.id));
     return playlist.trackIds.filter((id) => known.has(id));
   }, [playlists, activePlaylistId]);
 
@@ -361,33 +570,40 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [shuffle, repeat, activeQueueIds],
   );
 
-  const playIndex = useCallback((index: number) => {
-    const audio = audioRef.current;
-    const track = tracksRef.current[index];
-    if (!audio || !track) return;
-    if (!track.url) {
-      setError(`"${track.title}" is no longer available -- add the file again.`);
-      return;
-    }
-    setCurrentIndex(index);
-    audio.src = track.url;
-    audio.currentTime = 0;
-    void audio
-      .play()
-      .then(() => {
-        connectAnalyser();
-        // A new track has a new tempo -- drop the old grid rather than easing
-        // toward the new one from a stale estimate.
-        analysisRef.current?.reset();
-        startEnergyMeter();
-        setIsPlaying(true);
-        setError(null);
-      })
-      .catch(() => {
-        setIsPlaying(false);
-        setError(`Could not play "${track.title}". The browser may not support this format.`);
-      });
-  }, [connectAnalyser, startEnergyMeter]);
+  const playIndex = useCallback(
+    (index: number) => {
+      const audio = audioRef.current;
+      const track = tracksRef.current[index];
+      if (!audio || !track) return;
+      if (track.locked) {
+        setError(`Finish ${track.unlockObjectiveCount ?? 0} objectives to unlock "${track.title}".`);
+        return;
+      }
+      if (!track.url) {
+        setError(`"${track.title}" is no longer available -- add the file again.`);
+        return;
+      }
+      setCurrentIndex(index);
+      audio.src = track.url;
+      audio.currentTime = 0;
+      void audio
+        .play()
+        .then(() => {
+          connectAnalyser();
+          // A new track has a new tempo -- drop the old grid rather than easing
+          // toward the new one from a stale estimate.
+          analysisRef.current?.reset();
+          startEnergyMeter();
+          setIsPlaying(true);
+          setError(null);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setError(`Could not play "${track.title}". The browser may not support this format.`);
+        });
+    },
+    [connectAnalyser, startEnergyMeter],
+  );
 
   /* --------------------------------------------------------------- */
   /* Audio element wiring                                             */
@@ -447,17 +663,75 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     audio.muted = muted;
   }, [volume, muted]);
 
+  // Restore only files the player has already chosen to keep on this device.
+  // The game never uploads these bytes or attempts to sync them elsewhere.
+  useEffect(() => {
+    let cancelled = false;
+    void loadLocalTracks()
+      .then((stored) => {
+        if (cancelled) return;
+        const restored: Track[] = stored.map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          url: URL.createObjectURL(entry.file),
+          size: entry.file.size,
+          duration: null,
+          source: 'local',
+          isVideoContainer: entry.isVideoContainer,
+          restoredFromLibrary: true,
+          fingerprint: entry.fingerprint ?? fileFingerprint(entry.file),
+          favorite: favoriteFingerprints.has(entry.fingerprint ?? fileFingerprint(entry.file)),
+        }));
+        setTracks((previous) => {
+          const knownIds = new Set(previous.map((track) => track.id));
+          const knownFingerprints = new Set(previous.map((track) => track.fingerprint).filter(Boolean));
+          const merged = [...previous, ...restored.filter((track) => !knownIds.has(track.id) && !knownFingerprints.has(track.fingerprint))];
+          tracksRef.current = merged;
+          return merged;
+        });
+        const bytes = stored.reduce((total, entry) => total + entry.file.size, 0);
+        setLocalLibrary({ count: stored.length, bytes, ready: true });
+      })
+      .catch(() => {
+        if (!cancelled) setLocalLibrary((current) => ({ ...current, ready: true }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(FAVORITE_FINGERPRINTS_STORAGE_KEY, JSON.stringify([...favoriteFingerprints]));
+    } catch {
+      // Favorites are optional organization metadata; the audio library remains intact.
+    }
+  }, [favoriteFingerprints]);
+
   // Persist playlists (metadata + order only -- see Playlist management below
   // for why local-file entries don't survive a reload).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const payload: StoredPlaylists = { playlists, activePlaylistId };
+      const payload: StoredPlaylists = {
+        playlists: playlists.filter((playlist) => !playlist.builtIn),
+        activePlaylistId: BUNDLED_ALBUM_PLAYLISTS.some((album) => album.id === activePlaylistId) ? null : activePlaylistId,
+      };
       window.localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Storage may be unavailable (private browsing, quota) -- playlists just won't persist.
     }
   }, [playlists, activePlaylistId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(STREAMING_EMBEDS_STORAGE_KEY, JSON.stringify(streamingEmbeds));
+    } catch {
+      // The streaming shelf is a convenience; playback still works without persistence.
+    }
+  }, [streamingEmbeds]);
 
   // Release every object URL when the app unmounts.
   useEffect(() => {
@@ -483,13 +757,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   /* --------------------------------------------------------------- */
   /* Playlist management                                              */
   /*                                                                   */
-  /* Playlists store track *ids*, not tracks. Bundled ids are stable   */
-  /* across sessions so those entries survive a reload; a local file's */
-  /* id is tied to an object URL that dies with the tab, so those      */
-  /* entries are silently dropped at read time (`activeQueueIds`) and  */
-  /* actively pruned below whenever a track is actually removed -- the */
-  /* same "reference the player's files, don't carry them, skip what's */
-  /* missing" tradeoff the studio's project model makes.               */
+  /* Playlists store track *ids*, not tracks. Bundled and IndexedDB-   */
+  /* restored local ids are stable across sessions. Missing references */
+  /* are skipped at read time and actively pruned when a track is       */
+  /* removed.                                                           */
   /* --------------------------------------------------------------- */
 
   const createPlaylist = useCallback((name: string): string => {
@@ -502,11 +773,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const renamePlaylist = useCallback((id: string, name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setPlaylists((prev) => prev.map((p) => (p.id === id ? { ...p, name: trimmed } : p)));
+    setPlaylists((prev) => prev.map((p) => (p.id === id && !p.builtIn ? { ...p, name: trimmed } : p)));
   }, []);
 
   const deletePlaylist = useCallback((id: string) => {
-    setPlaylists((prev) => prev.filter((p) => p.id !== id));
+    setPlaylists((prev) => prev.filter((p) => p.id !== id || p.builtIn));
     setActivePlaylistIdState((current) => (current === id ? null : current));
   }, []);
 
@@ -517,89 +788,135 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const addToPlaylist = useCallback((playlistId: string, trackId: string) => {
     setPlaylists((prev) =>
       prev.map((p) =>
-        p.id === playlistId && !p.trackIds.includes(trackId)
-          ? { ...p, trackIds: [...p.trackIds, trackId] }
-          : p,
+        p.id === playlistId && !p.builtIn && !p.trackIds.includes(trackId) ? { ...p, trackIds: [...p.trackIds, trackId] } : p,
       ),
     );
   }, []);
 
   const removeFromPlaylist = useCallback((playlistId: string, trackId: string) => {
     setPlaylists((prev) =>
-      prev.map((p) => (p.id === playlistId ? { ...p, trackIds: p.trackIds.filter((id) => id !== trackId) } : p)),
+      prev.map((p) => (p.id === playlistId && !p.builtIn ? { ...p, trackIds: p.trackIds.filter((id) => id !== trackId) } : p)),
     );
   }, []);
 
   const reorderPlaylistTracks = useCallback((playlistId: string, trackIds: string[]) => {
-    setPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, trackIds } : p)));
+    setPlaylists((prev) => prev.map((p) => (p.id === playlistId && !p.builtIn ? { ...p, trackIds } : p)));
   }, []);
 
   /* --------------------------------------------------------------- */
   /* Library management                                               */
   /* --------------------------------------------------------------- */
 
-  const addFiles = useCallback((files: FileList | File[]): number => {
-    const incoming = Array.from(files);
-    const accepted: Track[] = [];
-    const rejected: string[] = [];
+  const addFiles = useCallback(
+    (files: FileList | File[]): number => {
+      const incoming = Array.from(files);
+      const accepted: Track[] = [];
+      const acceptedFiles: Array<{ track: Track; file: File }> = [];
+      const rejected: string[] = [];
+      let duplicates = 0;
+      const knownFingerprints = new Set(tracksRef.current.map((track) => track.fingerprint).filter(Boolean));
 
-    for (const file of incoming) {
-      if (!looksLikeMedia(file)) {
-        rejected.push(file.name);
-        continue;
-      }
-      accepted.push({
-        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-        title: titleFromFile(file),
-        url: URL.createObjectURL(file),
-        size: file.size,
-        duration: null,
-        source: 'local',
-        isVideoContainer: looksLikeVideoContainer(file),
-      });
-    }
-
-    if (rejected.length > 0) {
-      setError(
-        rejected.length === 1
-          ? `"${rejected[0]}" is not an audio or video file.`
-          : `${rejected.length} files were skipped because they are not audio or video.`,
-      );
-    } else if (accepted.length > 0) {
-      setError(null);
-    }
-
-    if (accepted.length > 0) {
-      setTracks((prev) => {
-        const merged = [...prev, ...accepted];
-        tracksRef.current = merged;
-        return merged;
-      });
-      // Read durations without disturbing playback. Works for a video
-      // container too -- an <audio> element still reads container metadata.
-      for (const track of accepted) {
-        const probe = new Audio();
-        probe.preload = 'metadata';
-        // A probe that never fires either event would otherwise hold its
-        // decoder and the object URL alive for the life of the tab.
-        const release = () => {
-          probe.removeEventListener('loadedmetadata', onProbeMeta);
-          probe.removeEventListener('error', release);
-          probe.removeAttribute('src');
-          probe.load();
+      for (const file of incoming) {
+        if (!looksLikeMedia(file)) {
+          rejected.push(file.name);
+          continue;
+        }
+        const fingerprint = fileFingerprint(file);
+        if (knownFingerprints.has(fingerprint)) {
+          duplicates += 1;
+          continue;
+        }
+        knownFingerprints.add(fingerprint);
+        const track: Track = {
+          id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+          title: titleFromFile(file),
+          url: URL.createObjectURL(file),
+          size: file.size,
+          duration: null,
+          source: 'local',
+          isVideoContainer: looksLikeVideoContainer(file),
+          fingerprint,
+          favorite: favoriteFingerprints.has(fingerprint),
         };
-        const onProbeMeta = () => {
-          const seconds = Number.isFinite(probe.duration) ? probe.duration : null;
-          setTracks((prev) => prev.map((t) => (t.id === track.id ? { ...t, duration: seconds } : t)));
-          release();
-        };
-        probe.addEventListener('loadedmetadata', onProbeMeta);
-        probe.addEventListener('error', release);
-        probe.src = track.url;
+        accepted.push(track);
+        acceptedFiles.push({ track, file });
       }
-    }
 
-    return accepted.length;
+      setLastImport({ added: accepted.length, duplicates, rejected: rejected.length });
+
+      if (rejected.length > 0) {
+        setError(
+          rejected.length === 1
+            ? `"${rejected[0]}" is not an audio or video file.`
+            : `${rejected.length} files were skipped because they are not audio or video.`,
+        );
+      } else if (accepted.length > 0) {
+        setError(null);
+      }
+
+      if (accepted.length > 0) {
+        setTracks((prev) => {
+          const merged = [...prev, ...accepted];
+          tracksRef.current = merged;
+          return merged;
+        });
+        // Read durations without disturbing playback. Works for a video
+        // container too -- an <audio> element still reads container metadata.
+        for (const track of accepted) {
+          const probe = new Audio();
+          probe.preload = 'metadata';
+          // A probe that never fires either event would otherwise hold its
+          // decoder and the object URL alive for the life of the tab.
+          const release = () => {
+            probe.removeEventListener('loadedmetadata', onProbeMeta);
+            probe.removeEventListener('error', release);
+            probe.removeAttribute('src');
+            probe.load();
+          };
+          const onProbeMeta = () => {
+            const seconds = Number.isFinite(probe.duration) ? probe.duration : null;
+            setTracks((prev) => prev.map((t) => (t.id === track.id ? { ...t, duration: seconds } : t)));
+            release();
+          };
+          probe.addEventListener('loadedmetadata', onProbeMeta);
+          probe.addEventListener('error', release);
+          probe.src = track.url;
+        }
+        for (const { track, file } of acceptedFiles) {
+          void saveLocalTrack({
+            id: track.id,
+            title: track.title,
+            file,
+            fingerprint: track.fingerprint,
+            isVideoContainer: Boolean(track.isVideoContainer),
+            addedAt: Date.now(),
+          })
+            .then(refreshLocalLibrary)
+            .catch(() => {
+              setError('The track was added for this session, but this browser could not save it for later.');
+            });
+        }
+      }
+
+      return accepted.length;
+    },
+    [favoriteFingerprints, refreshLocalLibrary],
+  );
+
+  const dismissImportReport = useCallback(() => setLastImport(null), []);
+
+  const toggleTrackFavorite = useCallback((id: string) => {
+    const track = tracksRef.current.find((entry) => entry.id === id);
+    if (!track || track.source !== 'local' || !track.fingerprint) return;
+    setFavoriteFingerprints((previous) => {
+      const next = new Set(previous);
+      if (next.has(track.fingerprint!)) next.delete(track.fingerprint!);
+      else next.add(track.fingerprint!);
+      return next;
+    });
+    setTracks((previous) => previous.map((entry) =>
+      entry.id === id ? { ...entry, favorite: !entry.favorite } : entry,
+    ));
   }, []);
 
   /**
@@ -626,8 +943,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       }
       if (isStreamingServiceUrl(url)) {
         setError(
-          'Streaming-service links (YouTube, Spotify, SoundCloud, etc.) aren\'t supported here -- ' +
-            'save the file to your device and drop it in instead.',
+          'That is a streaming-service share link, not a downloadable media file. ' +
+            "Import a file you own from Files, or use the service's official player when streaming embeds are added.",
         );
         return false;
       }
@@ -657,7 +974,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         return true;
       } catch {
         setError(
-          "Could not load that link directly -- the site likely blocks cross-origin downloads. " +
+          'Could not load that link directly -- the site likely blocks cross-origin downloads. ' +
             'Save the file and drop it in instead.',
         );
         return false;
@@ -667,6 +984,25 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     },
     [addFiles],
   );
+
+  const addStreamingEmbed = useCallback(
+    (rawUrl: string): boolean => {
+      const embed = createStreamingEmbed(rawUrl);
+      if (!embed) return false;
+      if (streamingEmbeds.some((item) => item.sourceUrl === embed.sourceUrl)) {
+        setError('That streaming link is already on your soundtrack desk.');
+        return true;
+      }
+      setStreamingEmbeds((previous) => [...previous, embed]);
+      setError(null);
+      return true;
+    },
+    [streamingEmbeds],
+  );
+
+  const removeStreamingEmbed = useCallback((id: string) => {
+    setStreamingEmbeds((previous) => previous.filter((item) => item.id !== id));
+  }, []);
 
   /**
    * Re-encodes a local video-container track to a real .mp3 in place. The id
@@ -716,9 +1052,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         }
         setError(null);
       } catch (err) {
-        setError(
-          err instanceof ConversionError ? err.message : `Could not convert "${track.title}" to MP3.`,
-        );
+        setError(err instanceof ConversionError ? err.message : `Could not convert "${track.title}" to MP3.`);
       } finally {
         setConversion(null);
       }
@@ -738,6 +1072,17 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       const track = prev[index]!;
       if (track.source === 'bundled') return;
       if (track.source === 'local') URL.revokeObjectURL(track.url);
+      if (track.source === 'local')
+        void removeStoredLocalTrack(id)
+          .then(refreshLocalLibrary)
+          .catch(() => {});
+      if (track.source === 'local' && track.fingerprint) {
+        setFavoriteFingerprints((previous) => {
+          const next = new Set(previous);
+          next.delete(track.fingerprint!);
+          return next;
+        });
+      }
 
       const next = prev.filter((t) => t.id !== id);
       tracksRef.current = next;
@@ -752,9 +1097,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       } else if (index < currentIndex) {
         setCurrentIndex(currentIndex - 1);
       }
-      setPlaylists((prevLists) =>
-        prevLists.map((p) => ({ ...p, trackIds: p.trackIds.filter((tid) => tid !== id) })),
-      );
+      setPlaylists((prevLists) => prevLists.map((p) => ({ ...p, trackIds: p.trackIds.filter((tid) => tid !== id) })));
     },
     [currentIndex],
   );
@@ -764,15 +1107,20 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     for (const track of tracksRef.current) {
       if (track.source === 'local') URL.revokeObjectURL(track.url);
     }
-    tracksRef.current = BUNDLED_TRACKS;
-    setTracks(BUNDLED_TRACKS);
+    void clearStoredLocalTracks()
+      .then(refreshLocalLibrary)
+      .catch(() => {});
+    setFavoriteFingerprints(new Set());
+    const bundled = withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions);
+    tracksRef.current = bundled;
+    setTracks(bundled);
     setCurrentIndex(-1);
     setIsPlaying(false);
     setProgressSec(0);
     setDurationSec(0);
     const bundledIds = new Set(BUNDLED_TRACKS.map((t) => t.id));
     setPlaylists((prev) => prev.map((p) => ({ ...p, trackIds: p.trackIds.filter((id) => bundledIds.has(id)) })));
-  }, []);
+  }, [meta.soundtrackObjectiveCompletions]);
 
   /* --------------------------------------------------------------- */
   /* Transport                                                        */
@@ -791,12 +1139,15 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     [currentIndex, playIndex],
   );
 
-  const playTrackOnRepeat = useCallback((id: string) => {
-    const index = tracksRef.current.findIndex((track) => track.id === id);
-    if (index === -1) return;
-    setRepeat('one');
-    playIndex(index);
-  }, [playIndex]);
+  const playTrackOnRepeat = useCallback(
+    (id: string) => {
+      const index = tracksRef.current.findIndex((track) => track.id === id);
+      if (index === -1) return;
+      setRepeat('one');
+      playIndex(index);
+    },
+    [playIndex],
+  );
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -814,6 +1165,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       const firstIndex = tracksRef.current.findIndex((t) => t.id === ids[0]);
       if (firstIndex === -1) return;
       playIndex(firstIndex);
+      return;
+    }
+    // The title-screen default is selected before any user gesture. Its source
+    // is intentionally not loaded until that first gesture, so start it here.
+    if (!audio.src) {
+      playIndex(currentIndex);
       return;
     }
     if (audio.paused) {
@@ -861,10 +1218,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
-  const cycleRepeat = useCallback(
-    () => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')),
-    [],
-  );
+  const cycleRepeat = useCallback(() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')), []);
   const dismissError = useCallback(() => setError(null), []);
   const getAudioContext = useCallback(() => audioContextRef.current, []);
 
@@ -882,6 +1236,9 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       durationSec,
       error,
       addFiles,
+      lastImport,
+      dismissImportReport,
+      toggleTrackFavorite,
       addFromUrl,
       linkLoading,
       convertTrackToMp3,
@@ -899,6 +1256,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       toggleShuffle,
       cycleRepeat,
       dismissError,
+      streamingEmbeds,
+      addStreamingEmbed,
+      removeStreamingEmbed,
+      localLibrary,
+      albums: BUNDLED_ALBUMS,
+      soundtrackObjectiveCompletions: meta.soundtrackObjectiveCompletions,
       getAudioContext,
       ensureAudioContext,
       playlists,
@@ -913,23 +1276,61 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       reorderPlaylistTracks,
     }),
     [
-      tracks, currentTrack, currentIndex, isPlaying, volume, muted, shuffle, repeat,
-      progressSec, durationSec, error, addFiles, addFromUrl, linkLoading, convertTrackToMp3,
-      conversion, removeTrack, clearTracks, playTrack, togglePlay, next, previous, seek,
-      setVolume, toggleMute, toggleShuffle, cycleRepeat, dismissError, getAudioContext, ensureAudioContext,
+      tracks,
+      currentTrack,
+      currentIndex,
+      isPlaying,
+      volume,
+      muted,
+      shuffle,
+      repeat,
+      progressSec,
+      durationSec,
+      error,
+      addFiles,
+      lastImport,
+      dismissImportReport,
+      toggleTrackFavorite,
+      addFromUrl,
+      linkLoading,
+      convertTrackToMp3,
+      streamingEmbeds,
+      addStreamingEmbed,
+      removeStreamingEmbed,
+      localLibrary,
+      meta.soundtrackObjectiveCompletions,
+      conversion,
+      removeTrack,
+      clearTracks,
+      playTrack,
+      togglePlay,
+      next,
+      previous,
+      seek,
+      setVolume,
+      toggleMute,
+      toggleShuffle,
+      cycleRepeat,
+      dismissError,
+      getAudioContext,
+      ensureAudioContext,
       playTrackOnRepeat,
-      playlists, activePlaylistId, activePlaylist, setActivePlaylist, createPlaylist,
-      renamePlaylist, deletePlaylist, addToPlaylist, removeFromPlaylist, reorderPlaylistTracks,
+      playlists,
+      activePlaylistId,
+      activePlaylist,
+      setActivePlaylist,
+      createPlaylist,
+      renamePlaylist,
+      deletePlaylist,
+      addToPlaylist,
+      removeFromPlaylist,
+      reorderPlaylistTracks,
     ],
   );
 
   return (
     <MusicContext.Provider value={value}>
-      <div
-        className="music-reactive-root"
-        ref={reactiveRootRef}
-        style={{ '--music-energy': 0 } as CSSProperties}
-      >
+      <div className="music-reactive-root" ref={reactiveRootRef} style={{ '--music-energy': 0 } as CSSProperties}>
         {children}
       </div>
     </MusicContext.Provider>

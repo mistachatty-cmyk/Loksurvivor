@@ -56,7 +56,7 @@ export function TiltReadout({ enabled, sensitivity, invertY }: TiltReadoutProps)
         dotRef.current.style.opacity = reading.active ? '1' : '0.25';
       }
       if (statusRef.current) {
-        statusRef.current.textContent = reading.active ? 'receiving' : 'no signal';
+        statusRef.current.textContent = reading.active ? 'receiving' : 'offline';
         statusRef.current.className = reading.active
           ? 'font-mono text-emerald-300'
           : 'font-mono text-amber-300';
@@ -102,7 +102,7 @@ export function TiltReadout({ enabled, sensitivity, invertY }: TiltReadoutProps)
         <dl className="min-w-0 flex-1 space-y-1 text-xs">
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Sensor</dt>
-            <dd><span ref={statusRef} className="font-mono text-amber-300" data-testid="text-tilt-status">no signal</span></dd>
+            <dd><span ref={statusRef} className="font-mono text-amber-300" data-testid="text-tilt-status">offline</span></dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Raw</dt>

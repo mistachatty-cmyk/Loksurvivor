@@ -3,12 +3,15 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
-import { ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
+import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
+import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { getRunAuraStyle } from '@/game/data/runAuras';
@@ -16,32 +19,56 @@ import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
+import { activeCardEffects } from '@/game/data/passiveCards';
 import { getFirstNightChapter } from '@/game/data/firstNight';
 import { nextRescueAllyId } from '@/game/data/progression';
+import { createRunHighlightRecorder } from '@/game/data/runHighlights';
+import { createClipRecorder } from '@/game/media/clipRecorder';
+import { beaconsOf, customMapToArea, objectiveMarkersOf, spawnPointsOf } from '@/game/data/customMaps';
+import { CUSTOM_MAP_ASSETS_BY_ID } from '@/game/data/customMaps';
+import { SECTOR_MAPS_BY_ID } from '@/game/data/sectorMaps';
+import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   applyUpgrade,
   buildResult,
+  castFreezeCone,
+  captureNearestEnemy,
   claimLootPrize,
   claimRumorEmergencyHeal,
   createWorld,
   dashPlayer,
+  endCommandSelectionDrag,
+  endFreezeSelectionDrag,
   hudSnapshot,
+  missionSnapshot,
+  orderSelectedUnits,
+  assignControlGroup,
+  selectAllCommandedUnits,
+  selectCommandedUnitAt,
+  selectCommandedUnitByUid,
+  selectControlGroup,
+  setCommandMode,
+  updateCommandSelection,
   primePhysicsObject,
   rollUpgradeChoices,
   setStormCloudMode,
   stepWorld,
+  throwSelectedFrozenEnemies,
+  updateFreezeSelection,
   type World,
 } from '@/game/engine/world';
 import { useGyroInput } from '@/game/input/gyro';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
-import { renderWorld } from '@/game/render/draw';
+import { renderWorld, targetViewForWidth } from '@/game/render/draw';
 import {
   effectiveStats,
   giantSizeMult,
+  hasExtraLife,
   hazardImmunityUnlocked,
   minimapUnlockTiers,
+  nightVisionUnlocked,
   physicsObjectClickRadiusBonus,
   rewardCredMultiplier,
   startingWeaponLevel,
@@ -50,10 +77,36 @@ import {
 } from '@/game/state/metaStore';
 import type { AreaDef, HudSnapshot, LootPrizeDef, RunPhase, RunResult, StormCloudMode, UpgradeDef } from '@/game/types';
 import { ChestTally } from '@/ui/ChestTally';
+import { HordeSpinWheel } from '@/ui/HordeSpinWheel';
 import { HazardImmuneBadge } from '@/ui/HazardImmuneBadge';
 import { Minimap } from '@/ui/Minimap';
+import { MusicPanel } from '@/ui/MusicPanel';
+import { LevelUpAnnouncement, LevelUpFlash } from '@/anim/components/LevelUpFlash';
+import { LootFeed, type LootPickup } from '@/anim/components/LootPop';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
+
+/**
+ * Screen point -> world point, using the same camera math `renderWorld` uses.
+ * (The `targetView` expression is duplicated inline elsewhere in this file for
+ * the older pointer paths; new code should call this.)
+ */
+function toWorldPoint(
+  canvas: HTMLCanvasElement,
+  world: World,
+  clientX: number,
+  clientY: number,
+  targetViewOverride?: number,
+) {
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, rect.width);
+  const targetView = targetViewForWidth(width, targetViewOverride);
+  const zoom = width / targetView;
+  return {
+    x: (clientX - rect.left - width / 2) / zoom + world.camera.x,
+    y: (clientY - rect.top - rect.height / 2) / zoom + world.camera.y,
+  };
+}
 
 /** Resolve the weapon a level-up card represents, if any, for its icon. */
 function resolveCardWeapon(upgrade: UpgradeDef) {
@@ -70,6 +123,8 @@ export interface RunScreenProps {
   physicsObjectClicksEnabled?: boolean;
   episodeId?: string;
   areaOverride?: AreaDef;
+  /** Sector Command: plays this mission on its authored map. */
+  missionId?: string;
   onAbort: () => void;
   onFinish: (result: RunResult) => void;
 }
@@ -83,7 +138,7 @@ interface StickState {
   dy: number;
 }
 
-type PointerMode = 'none' | 'stick' | 'object' | 'cloud';
+type PointerMode = 'none' | 'stick' | 'object' | 'cloud' | 'freezeSelect' | 'commandSelect';
 
 interface TapRecord {
   time: number;
@@ -106,6 +161,8 @@ interface RandomUpgradeReveal {
 }
 
 const STICK_RADIUS = 54;
+/** Sector Command: movement under this many px is a tap (an order), not a drag (a selection). */
+const COMMAND_TAP_SLOP = 12;
 
 /** Storm Chaser's weather picker: label/color per mode, matching the cloud's own on-canvas colors. */
 const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: string }> = [
@@ -118,6 +175,7 @@ const STORM_CLOUD_OPTIONS: Array<{ mode: StormCloudMode; label: string; color: s
 const FIXED_STEP = 1 / 60;
 /** Most catch-up steps allowed in one frame before time is dropped. */
 const MAX_SUBSTEPS = 6;
+const FRAME_INTERVAL_MS: Record<60 | 120, number> = { 60: 1000 / 60, 120: 1000 / 120 };
 
 function formatClock(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -135,6 +193,7 @@ export function RunScreen({
   physicsObjectClicksEnabled = true,
   episodeId,
   areaOverride,
+  missionId,
   onAbort,
   onFinish,
 }: RunScreenProps) {
@@ -143,8 +202,13 @@ export function RunScreen({
     setMinimapExpanded,
     setMinimapPosition,
   } = useMeta();
+  const music = useMusicPlayer();
+  const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<World | null>(null);
+  const highlightRecorderRef = useRef(createRunHighlightRecorder());
+  const clipRecorderRef = useRef(createClipRecorder(() => canvasRef.current));
+  const capturedHighlightCountRef = useRef(0);
   const phaseRef = useRef<RunPhase>('countdown');
   const finishedRef = useRef(false);
   const keysRef = useRef(new Set<string>());
@@ -160,17 +224,44 @@ export function RunScreen({
   const pointerModeRef = useRef<PointerMode>('none');
   const cloudPointerIdRef = useRef<number | null>(null);
   const lastTapRef = useRef<TapRecord | null>(null);
+  const freezeSelectPointerIdRef = useRef<number | null>(null);
+  const freezeSelectOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
+  const commandPointerIdRef = useRef<number | null>(null);
+  const groupHoldRef = useRef<number | null>(null);
+  /**
+   * Sector Command's second camera mode. A fully detached, drag-to-pan
+   * commander camera would fight the marquee for the same drag on touch, so
+   * the shipped "commander view" instead pulls the existing player-locked
+   * camera way back through `targetViewOverride` -- you see the whole
+   * engagement and can marquee across it, without a second pan gesture.
+   */
+  const commanderViewRef = useRef(false);
+  /** The target view the last rendered frame actually used, so pointer math matches it. */
+  const renderTargetViewRef = useRef<number | undefined>(undefined);
+  const commandOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
   const [choices, setChoices] = useState<UpgradeDef[]>([]);
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
+  const [freezeSelectBox, setFreezeSelectBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [commandBox, setCommandBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [commandModeOn, setCommandModeOn] = useState(false);
+  const [commanderView, setCommanderView] = useState(false);
+  const [commandHint, setCommandHint] = useState<string | null>(null);
+  const [missionHud, setMissionHud] = useState<ReturnType<typeof missionSnapshot>>(null);
   const [reel, setReel] = useState<ReelState | null>(null);
   const [reelTick, setReelTick] = useState(0);
   const [chestFlight, setChestFlight] = useState(0);
   const [celebration, setCelebration] = useState(false);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
+  const [pauseSoundtrackOpen, setPauseSoundtrackOpen] = useState(false);
+  const [lootPickups, setLootPickups] = useState<LootPickup[]>([]);
+  const expireLootPickup = useCallback(
+    (id: string) => setLootPickups((prev) => prev.filter((pickup) => pickup.id !== id)),
+    [],
+  );
   const [hudMinimized, setHudMinimized] = useState(false);
   const [levelUpMinimized, setLevelUpMinimized] = useState(true);
   const [queuedPrizes, setQueuedPrizes] = useState<LootPrizeDef[]>([]);
@@ -196,6 +287,10 @@ export function RunScreen({
   presentationRef.current = meta;
   const musicReactiveRef = useRef(meta.musicReactiveEnabled);
   musicReactiveRef.current = meta.musicReactiveEnabled;
+  // Kept in a ref so changing pacing in Settings applies to the next drawn
+  // frame without rebuilding the world or restarting a run.
+  const frameRateModeRef = useRef<60 | 120>(meta.frameRateMode);
+  frameRateModeRef.current = meta.frameRateMode;
 
   // Tilt steering. The hook is inert unless the setting is on, and the ref is
   // read straight from the loop so orientation events never re-render.
@@ -205,14 +300,36 @@ export function RunScreen({
     invertY: meta.gyroInvertY,
   });
 
-  const area = areaOverride ?? getArea(areaId);
+  // Sector Command: a mission owns its map, its markers and its player spawn,
+  // so it supplies the whole area rather than going through AREAS.
+  const mission = missionId ? SECTOR_MISSIONS_BY_ID[missionId] : undefined;
+  const missionMap = mission ? SECTOR_MAPS_BY_ID[mission.mapId] : undefined;
+  const missionArea = missionMap ? customMapToArea(missionMap) : undefined;
+  const missionMarkers = missionMap
+    ? objectiveMarkersOf(missionMap).map((placement) => ({ assetId: placement.assetId, x: placement.x, y: placement.y }))
+    : undefined;
+  const missionBeacons = missionMap
+    ? beaconsOf(missionMap)
+        .map((placement) => ({
+          beaconId: CUSTOM_MAP_ASSETS_BY_ID[placement.assetId]?.beaconId ?? '',
+          x: placement.x,
+          y: placement.y,
+        }))
+        .filter((placement) => placement.beaconId)
+    : undefined;
+  const missionPlayerStart = missionMap
+    ? spawnPointsOf(missionMap, 'player').map((placement) => ({ x: placement.x, y: placement.y }))[0]
+    : undefined;
+
+  const area = missionArea ?? areaOverride ?? getArea(areaId);
   const baseCharacter = getCharacter(characterId);
+  const activeWorldPalette = meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId);
   const character = {
     ...baseCharacter,
     palette: resolveCharacterCosmeticPalette(
       baseCharacter,
       meta.characterSkinByCharacterId[baseCharacter.id],
-      meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
+      activeWorldPalette,
       meta.worldPaletteBlendEnabled,
     ),
   };
@@ -227,6 +344,13 @@ export function RunScreen({
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
   const prefersReducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // The command hint is a nudge, not a state: it clears itself.
+  useEffect(() => {
+    if (!commandHint) return;
+    const timer = window.setTimeout(() => setCommandHint(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [commandHint]);
 
   const setPhaseBoth = useCallback((next: RunPhase) => {
     // Once a run is over it stays over -- nothing may steal the hand-off.
@@ -256,6 +380,8 @@ export function RunScreen({
         sizeMult: giantSizeMult(meta),
         stealth: stealthConfig(meta),
         hazardImmune: hazardImmunityUnlocked(meta),
+        nightVisionEnabled: nightVisionUnlocked(meta),
+        extraLifeAvailable: hasExtraLife(meta),
         minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,
         minimapLootSense: minimapUnlockTiers(meta).lootSense,
         minimapHazardSense: minimapUnlockTiers(meta).hazardSense,
@@ -263,7 +389,23 @@ export function RunScreen({
         hatStyle: getHatStyle(meta.activeHatId),
         paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
-        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => pet.roll),
+        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => ({ ...pet.roll, level: pet.level ?? 1 })),
+        modifiers: meta.runModifiers,
+        graphicsQuality: meta.graphicsQuality,
+        worldColorPalette: activeWorldPalette,
+        worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
+        sectorSquadCap: mission?.squadCap,
+        playerStart: missionPlayerStart,
+        mission,
+        missionMarkers,
+        missionBeacons,
+        cardEffects: activeCardEffects(meta),
+        disabledEnemyIds: meta.disabledEnemyIds,
+        disabledWeaponIds: meta.disabledWeaponIds,
+        disabledPassiveIds: meta.disabledPassiveIds,
+        threatCalibrations: meta.threatCalibrations,
+        threatUpgrades: meta.threatUpgrades,
+        dvdEasterEggUnlocked: meta.dvdEasterEggUnlocked,
       },
     );
   }
@@ -326,6 +468,23 @@ export function RunScreen({
 
     const canvas = canvasRef.current;
     const world = worldRef.current;
+
+    // Sector Command: with command mode on, the pointer stops steering the
+    // player entirely -- a drag marquee-selects units, a tap orders whatever
+    // is selected. This is the one thing that makes an RTS grammar and a
+    // virtual movement stick coexist on a touchscreen: they never share a
+    // pointer-down.
+    if (canvas && world && world.sectorCommand?.commandMode) {
+      const point = toWorldPoint(canvas, world, event.clientX, event.clientY, renderTargetViewRef.current);
+      pointerModeRef.current = 'commandSelect';
+      commandPointerIdRef.current = event.pointerId;
+      commandOriginRef.current = { worldX: point.x, worldY: point.y, clientX: event.clientX, clientY: event.clientY };
+      // Show the box immediately at zero size. Waiting for the slop threshold
+      // to draw anything made the marquee feel like it had failed to start.
+      setCommandBox({ x: event.clientX, y: event.clientY, w: 0, h: 0 });
+      return;
+    }
+
     const now = performance.now();
     const previousTap = lastTapRef.current;
     if (canvas && world && previousTap &&
@@ -333,7 +492,7 @@ export function RunScreen({
       Math.hypot(event.clientX - previousTap.x, event.clientY - previousTap.y) <= 48) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       const targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -351,7 +510,7 @@ export function RunScreen({
       const config = world.character.stormCloud;
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -366,10 +525,38 @@ export function RunScreen({
       }
     }
 
+    // Zero Day: everyone else has no world.freezeThrow, so this whole block
+    // is a no-op for the rest of the roster. A held selection throws on the
+    // next tap; otherwise, pointer-down starts a drag-select box over
+    // whatever is currently frozen (suspending movement for that drag, the
+    // same way grabbing the storm cloud above does).
+    if (canvas && world && world.freezeThrow) {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = targetViewForWidth(width);
+      const zoom = width / targetView;
+      const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      if (world.freezeThrow.selectedUids.length > 0) {
+        throwSelectedFrozenEnemies(world, worldX, worldY);
+        pointerModeRef.current = 'none';
+        return;
+      }
+      const hasFrozen = world.enemies.some((enemy) => world.now < enemy.frozenUntil);
+      if (hasFrozen) {
+        pointerModeRef.current = 'freezeSelect';
+        freezeSelectPointerIdRef.current = event.pointerId;
+        freezeSelectOriginRef.current = { worldX, worldY, clientX: event.clientX, clientY: event.clientY };
+        updateFreezeSelection(world, worldX, worldY, worldX, worldY);
+        setFreezeSelectBox({ x: event.clientX, y: event.clientY, w: 0, h: 0 });
+        return;
+      }
+    }
+
     if (physicsObjectClicksEnabled && canvas && world) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const target = primePhysicsObject(
         world,
@@ -396,13 +583,51 @@ export function RunScreen({
   }, [dungeonTransition, physicsObjectClicksEnabled]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointerModeRef.current === 'commandSelect') {
+      const canvas = canvasRef.current;
+      const world = worldRef.current;
+      const origin = commandOriginRef.current;
+      if (!canvas || !world || !origin || commandPointerIdRef.current !== event.pointerId) return;
+      // Under the tap threshold this is still a pending order, not a drag --
+      // don't wipe the standing selection just because a thumb wobbled.
+      if (Math.hypot(event.clientX - origin.clientX, event.clientY - origin.clientY) <= COMMAND_TAP_SLOP) return;
+      const point = toWorldPoint(canvas, world, event.clientX, event.clientY, renderTargetViewRef.current);
+      updateCommandSelection(world, origin.worldX, origin.worldY, point.x, point.y);
+      setCommandBox({
+        x: Math.min(origin.clientX, event.clientX),
+        y: Math.min(origin.clientY, event.clientY),
+        w: Math.abs(event.clientX - origin.clientX),
+        h: Math.abs(event.clientY - origin.clientY),
+      });
+      return;
+    }
+    if (pointerModeRef.current === 'freezeSelect') {
+      const canvas = canvasRef.current;
+      const world = worldRef.current;
+      const origin = freezeSelectOriginRef.current;
+      if (!canvas || !world || !world.freezeThrow || !origin || freezeSelectPointerIdRef.current !== event.pointerId) return;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const targetView = targetViewForWidth(width);
+      const zoom = width / targetView;
+      const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
+      const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
+      updateFreezeSelection(world, origin.worldX, origin.worldY, worldX, worldY);
+      setFreezeSelectBox({
+        x: Math.min(origin.clientX, event.clientX),
+        y: Math.min(origin.clientY, event.clientY),
+        w: Math.abs(event.clientX - origin.clientX),
+        h: Math.abs(event.clientY - origin.clientY),
+      });
+      return;
+    }
     if (pointerModeRef.current === 'cloud') {
       const canvas = canvasRef.current;
       const world = worldRef.current;
       if (!canvas || !world || !world.stormCloud || cloudPointerIdRef.current !== event.pointerId) return;
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       world.stormCloud.targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       world.stormCloud.targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -424,6 +649,41 @@ export function RunScreen({
 
   const endPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const stick = stickRef.current;
+    if (pointerModeRef.current === 'commandSelect') {
+      const world = worldRef.current;
+      const origin = commandOriginRef.current;
+      pointerModeRef.current = 'none';
+      commandPointerIdRef.current = null;
+      commandOriginRef.current = null;
+      setCommandBox(null);
+      if (!world || !origin) return;
+      const wasTap = event.type !== 'pointercancel'
+        && Math.hypot(event.clientX - origin.clientX, event.clientY - origin.clientY) <= COMMAND_TAP_SLOP;
+      if (!wasTap) {
+        endCommandSelectionDrag(world);
+        return;
+      }
+      // Tap grammar, in priority order: a tap on one of your own units selects
+      // just that unit (the touch stand-in for clicking a portrait, and the
+      // only way to pick one unit out of a stack); any other tap orders the
+      // standing selection. Without the first branch, tapping a unit did
+      // nothing at all, which reads as command mode being broken.
+      if (selectCommandedUnitAt(world, origin.worldX, origin.worldY) > 0) return;
+      const orderMode = world.sectorCommand?.orderMode ?? 'move';
+      if (orderSelectedUnits(world, origin.worldX, origin.worldY, orderMode) === 0) {
+        setCommandHint('Select units first — drag over them, or tap one');
+      }
+      return;
+    }
+    if (pointerModeRef.current === 'freezeSelect') {
+      pointerModeRef.current = 'none';
+      freezeSelectPointerIdRef.current = null;
+      freezeSelectOriginRef.current = null;
+      const world = worldRef.current;
+      if (world) endFreezeSelectionDrag(world);
+      setFreezeSelectBox(null);
+      return;
+    }
     if (pointerModeRef.current === 'cloud') {
       pointerModeRef.current = 'none';
       cloudPointerIdRef.current = null;
@@ -469,9 +729,21 @@ export function RunScreen({
     let countdownLeft = 1500;
     let sizeCheckedAt = 0;
     let accumulator = 0;
+    let lastRenderAt = -Infinity;
+    let nextRenderAt = 0;
+    let scheduledRate: 60 | 120 = frameRateModeRef.current;
+    let backingScale = 1;
+    let performanceWindowAt = last;
+    let renderSamples = 0;
+    let missedCadenceSamples = 0;
+    let totalRenderCost = 0;
 
     const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      // Preserve crispness whenever the device has headroom. Under sustained
+      // load this backs the canvas down in a few small, reversible steps;
+      // that is substantially cheaper than allowing a heavy frame to block
+      // input or trigger a long fixed-step catch-up burst.
+      const ratio = Math.max(0.5, Math.min(window.devicePixelRatio || 1, 2) * backingScale);
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
       const height = Math.max(1, rect.height);
@@ -487,6 +759,8 @@ export function RunScreen({
     };
 
     let view = resize();
+
+    clipRecorderRef.current.start(world.now);
 
     const frame = (time: number) => {
       raf = requestAnimationFrame(frame);
@@ -542,6 +816,14 @@ export function RunScreen({
           if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
         }
 
+        // Drain gameplay-SFX cues once per rendered frame, same reasoning as
+        // reading `audio` once above: draining inside the substep loop would
+        // let a slow frame retrigger the same cue several times.
+        if (world.sfxEvents.length > 0) {
+          const events = world.sfxEvents.splice(0);
+          for (const event of events) sfx.play(event.cue, event.onBeat);
+        }
+
         // Detect dungeon room transitions and briefly flash the screen.
         if (world.endless?.pendingTransition) {
           setDungeonTransition(world.endless.pendingTransition);
@@ -593,11 +875,85 @@ export function RunScreen({
         }
       }
 
-      renderWorld(ctx, world, view);
+      // Commander view: same player-locked camera, pulled back to squad scale.
+      const commanderTargetView = commanderViewRef.current
+        ? (view.width < 620 ? 900 : Math.min(1700, view.width * 1.4))
+        : undefined;
+      renderTargetViewRef.current = commanderTargetView;
+
+      const requestedRate = frameRateModeRef.current;
+      const targetFrameMs = FRAME_INTERVAL_MS[requestedRate];
+      const sinceLastRender = time - lastRenderAt;
+      if (requestedRate !== scheduledRate) {
+        scheduledRate = requestedRate;
+        nextRenderAt = time;
+      }
+      // RAF itself chooses the display cadence. In 60 mode, deliberately
+      // skip only redundant high-refresh redraws; simulation is still fixed
+      // 60 Hz. A deadline (instead of "every N RAFs") also paces correctly
+      // on 90 Hz and 144 Hz panels.
+      const shouldRender = time + 0.75 >= nextRenderAt;
+      if (shouldRender) {
+        const renderStartedAt = performance.now();
+        const visualPressure = world.effects.length + world.particles.length + world.popups.length;
+        const visualBudget = backingScale <= 0.72 || visualPressure > 430
+          ? 'minimal'
+          : backingScale < 1 || visualPressure > 230
+            ? 'reduced'
+            : undefined;
+        renderWorld(
+          ctx,
+          world,
+          commanderTargetView
+            ? { ...view, targetViewOverride: commanderTargetView, visualBudget }
+            : { ...view, visualBudget },
+        );
+        const renderCost = performance.now() - renderStartedAt;
+        totalRenderCost += renderCost;
+        renderSamples += 1;
+        if (lastRenderAt > 0 && sinceLastRender > targetFrameMs * 1.35) missedCadenceSamples += 1;
+        lastRenderAt = time;
+        nextRenderAt += targetFrameMs;
+        // If a tab resumed after a long pause, restart the pacing clock
+        // rather than attempting to pay back a backlog of visual frames.
+        if (nextRenderAt < time - targetFrameMs) nextRenderAt = time + targetFrameMs;
+
+        // Do not bounce resolution every frame. A half-second window makes
+        // this respond to a true swarm/effects spike while restoring detail
+        // gradually once the pressure is gone.
+        if (time - performanceWindowAt >= 500) {
+          const averageCost = totalRenderCost / Math.max(1, renderSamples);
+          const overloaded = missedCadenceSamples >= 3 || averageCost > targetFrameMs * 0.8;
+          const comfortablyFast = missedCadenceSamples === 0 && averageCost < targetFrameMs * 0.42;
+          const nextScale = overloaded
+            ? Math.max(0.6, backingScale - 0.15)
+            : comfortablyFast
+              ? Math.min(1, backingScale + 0.1)
+              : backingScale;
+          if (nextScale !== backingScale) {
+            backingScale = nextScale;
+            view = resize();
+          }
+          performanceWindowAt = time;
+          renderSamples = 0;
+          missedCadenceSamples = 0;
+          totalRenderCost = 0;
+        }
+      }
+
+      highlightRecorderRef.current.observe(world);
+      clipRecorderRef.current.tick(world.now);
+      const highlightsSoFar = highlightRecorderRef.current.getHighlights();
+      for (let i = capturedHighlightCountRef.current; i < highlightsSoFar.length; i += 1) {
+        const highlight = highlightsSoFar[i]!;
+        clipRecorderRef.current.requestClip(highlight.kind, highlight.atMs, highlight.label);
+      }
+      capturedHighlightCountRef.current = highlightsSoFar.length;
 
       if (time - hudAt > 60) {
         hudAt = time;
         setHud(hudSnapshot(world));
+        if (world.mission) setMissionHud(missionSnapshot(world));
       }
     };
 
@@ -610,11 +966,19 @@ export function RunScreen({
     if (phase !== 'over' || finishedRef.current) return;
     const world = worldRef.current;
     if (!world) return;
-    const timer = window.setTimeout(() => {
+    const timer = window.setTimeout(async () => {
       if (finishedRef.current) return;
       finishedRef.current = true;
       for (const prize of [...world.pendingReel, ...queuedPrizes, ...(reel ? [reel.prize] : [])]) claimReelPrize(prize);
-      onFinish(buildResult(world, finalRewardMultiplier));
+      const result = buildResult(world, finalRewardMultiplier);
+      const highlights = highlightRecorderRef.current.getHighlights();
+      const clips = await clipRecorderRef.current.finalize(world.now);
+      const clipAssetIdByKey = new Map(clips.map((clip) => [`${clip.kind}:${clip.atMs}`, clip.assetId]));
+      result.highlights = highlights.map((highlight) => {
+        const clipAssetId = clipAssetIdByKey.get(`${highlight.kind}:${highlight.atMs}`);
+        return clipAssetId ? { ...highlight, clipAssetId } : highlight;
+      });
+      onFinish(result);
     }, 1100);
     return () => window.clearTimeout(timer);
   }, [claimReelPrize, finalRewardMultiplier, onFinish, phase, queuedPrizes, reel]);
@@ -624,6 +988,13 @@ export function RunScreen({
       const world = worldRef.current;
       if (!world) return;
       applyUpgrade(world, upgrade);
+      const tier: LootPickup['tier'] =
+        upgrade.cardKind === 'evolution' || upgrade.cardKind === 'relic-evolution'
+          ? 'evolved'
+          : upgrade.cardKind === 'weapon' || upgrade.cardKind === 'passive'
+            ? 'rare'
+            : 'common';
+      setLootPickups((prev) => [...prev, { id: crypto.randomUUID(), label: upgrade.name, tier }]);
       if (world.pendingLevelUps > 0) {
         const nextChoices = rollUpgradeChoices(world);
         upgradeChoicesRef.current = nextChoices;
@@ -770,16 +1141,31 @@ export function RunScreen({
     }
   })();
 
+  const chaosTransform = [
+    meta.worldInvertEnabled ? 'rotate(180deg)' : '',
+    meta.mirrorModeEnabled ? 'scaleX(-1)' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <div
       className="relative h-dvh w-full overflow-hidden bg-black select-none"
       style={{
-        transform: meta.worldInvertEnabled ? 'rotate(180deg)' : undefined,
+        transform: chaosTransform || undefined,
         filter: meta.paletteInvertEnabled ? 'invert(1)' : undefined,
+        animation: hud?.wheelSpin?.colorFluctuation ? 'hordespin-hue 2.2s linear infinite' : undefined,
       }}
       data-testid="screen-run"
     >
+      {/* 666 HordeSpin tier only -- pure screen-space decoration, never touches the simulation. */}
+      <style>{`@keyframes hordespin-hue { from { filter: hue-rotate(0deg) saturate(1.4); } to { filter: hue-rotate(360deg) saturate(1.4); } }`}</style>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+
+      {/* Fires on level change only, never on mount -- loading a run mid-level stays quiet. The one full-screen effect in the game. */}
+      <LevelUpFlash level={hud?.level ?? 1} />
+      <LevelUpAnnouncement level={hud?.level ?? 1} />
+
+      {/* A level-up card taken is this game's "drop" -- new weapon/passive or an evolution reads as rarer than a plain stack. */}
+      <LootFeed pickups={lootPickups} onExpire={expireLootPickup} />
 
       {/* Touch surface: dragging anywhere steers. */}
       <div
@@ -790,6 +1176,15 @@ export function RunScreen({
         onPointerCancel={endPointer}
         data-testid="surface-controls"
       />
+
+      {/* Zero Day: RTS-style drag-select box over frozen enemies. Screen-space DOM overlay, not a canvas draw call. */}
+      {freezeSelectBox ? (
+        <div
+          className="pointer-events-none absolute z-30 border-2 border-emerald-300/80 bg-emerald-300/10"
+          style={{ left: freezeSelectBox.x, top: freezeSelectBox.y, width: freezeSelectBox.w, height: freezeSelectBox.h }}
+          data-testid="freeze-select-box"
+        />
+      ) : null}
 
       {/* Top HUD */}
       <div
@@ -826,7 +1221,7 @@ export function RunScreen({
               </div>
               <div className="h-0.5 w-full overflow-hidden bg-black/70">
                 <div
-                  className="h-full bg-[#6ee7ff] transition-[width] duration-150"
+                  className="h-full bg-gradient-to-r from-[#22b8d6] to-[#6ee7ff] shadow-[0_0_4px_rgba(110,231,255,0.7)] transition-[width] duration-150"
                   style={{ width: `${xpPct}%` }}
                   data-testid="bar-xp"
                 />
@@ -1013,6 +1408,8 @@ export function RunScreen({
           </div>
         ) : null}
 
+        {hud?.wheelSpin ? <HordeSpinWheel wheelSpin={hud.wheelSpin} /> : null}
+
         {hud?.evolution ? (
           <div
             className="mx-auto flex w-fit max-w-full items-center gap-2 border px-3 py-1.5 text-center"
@@ -1108,6 +1505,218 @@ export function RunScreen({
         </div>
       ) : null}
 
+      {/* Sector Command: the marquee. Same DOM overlay pattern as Zero Day's. */}
+      {commandBox ? (
+        <div
+          className="pointer-events-none absolute z-30 border-2 border-amber-300/80 bg-amber-300/10"
+          style={{ left: commandBox.x, top: commandBox.y, width: commandBox.w, height: commandBox.h }}
+          data-testid="command-select-box"
+        />
+      ) : null}
+
+      {/* Sector Command: objective checklist + squad readout. Mission runs only. */}
+      {missionHud ? (
+        <div
+          className="pointer-events-none absolute left-2 top-[4.75rem] z-40 w-[min(52vw,190px)] border border-amber-300/40 bg-black/80 p-1.5 font-mono text-[9px] uppercase tracking-wider text-amber-100"
+          data-testid="mission-hud"
+        >
+          <div className="truncate text-amber-300">{missionHud.name}</div>
+          <div className="text-white/60">
+            Squad {missionHud.squadCost}/{missionHud.squadCap} · Units {missionHud.units} · Lost {missionHud.losses}
+          </div>
+          {missionHud.beaconsTotal > 0 ? (
+            <div className={missionHud.beaconsStanding > 0 ? 'text-amber-200/80' : 'text-red-300'}>
+              Beacons {missionHud.beaconsStanding}/{missionHud.beaconsTotal}
+              {missionHud.beaconsStanding === 0 ? ' — no reinforcements' : ''}
+            </div>
+          ) : null}
+          <ul className="mt-1 space-y-0.5">
+            {missionHud.objectives.map((objective) => (
+              <li key={objective.id} className={objective.done ? 'text-emerald-300' : 'text-white/80'}>
+                {objective.done ? '[x]' : '[ ]'} {objective.label}
+                {objective.target > 1 && !objective.done ? ` ${objective.progress}/${objective.target}` : ''}
+                {objective.optional ? ' (opt)' : ''}
+              </li>
+            ))}
+          </ul>
+          {missionHud.lastBeatLine ? (
+            <div className="mt-1 border-t border-amber-300/20 pt-1 text-amber-200/90 normal-case tracking-normal">
+              {missionHud.lastBeatLine}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Sector Command: the squad roster. Tapping a chip selects that one unit,
+          which is the only way to pick a unit out of a stack with a thumb. */}
+      {missionHud && missionHud.roster.length > 0 ? (
+        <div
+          // One scrolling row, not a wrapping grid: at a full squad of 8 the
+          // wrapped version was four rows deep and swallowed the screen.
+          className="absolute inset-x-2 bottom-[17.5rem] z-40 flex gap-1 overflow-x-auto pb-0.5"
+          data-testid="unit-roster"
+        >
+          {missionHud.roster.map((unit) => (
+            <button
+              key={unit.uid}
+              type="button"
+              onClick={() => { const world = worldRef.current; if (world) selectCommandedUnitByUid(world, unit.uid); }}
+              className={`w-[3.75rem] shrink-0 border px-1 py-0.5 text-left font-mono text-[8px] uppercase tracking-wider ${
+                unit.selected ? 'border-emerald-300 bg-emerald-300/20 text-emerald-100' : 'border-white/20 bg-black/75 text-white/70'
+              }`}
+              data-testid={`unit-chip-${unit.uid}`}
+            >
+              {/* Every capture profile is named "Turned <enemy>"; the prefix is
+                  the same on every chip, so it is pure noise in a 60px box. */}
+              <span className="block truncate">{unit.name.replace(/^Turned /i, '')}</span>
+              <span className="mt-0.5 block h-1 w-full bg-black/70">
+                <span
+                  className={`block h-full ${unit.hpPct > 35 ? 'bg-emerald-400' : 'bg-red-400'}`}
+                  style={{ width: `${unit.hpPct}%` }}
+                />
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Sector Command: control groups. Tap recalls, long-press assigns --
+          there is no keyboard, so 1-9 hotkeys become three thumb chips. */}
+      {missionHud && commandModeOn ? (
+        <div className="absolute bottom-[15.5rem] left-2 z-40 flex gap-1" data-testid="group-chips">
+          {(missionHud.groupSizes.length > 0 ? missionHud.groupSizes : [0, 0, 0]).map((size, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => {
+                const world = worldRef.current;
+                if (!world) return;
+                if (selectControlGroup(world, index) === 0) setCommandHint(`Group ${index + 1} is empty — hold to assign`);
+              }}
+              onPointerDown={() => {
+                groupHoldRef.current = window.setTimeout(() => {
+                  const world = worldRef.current;
+                  if (!world) return;
+                  const n = assignControlGroup(world, index);
+                  setCommandHint(n > 0 ? `Group ${index + 1} set (${n})` : 'Select units first');
+                }, 550);
+              }}
+              onPointerUp={() => { if (groupHoldRef.current) window.clearTimeout(groupHoldRef.current); }}
+              onPointerLeave={() => { if (groupHoldRef.current) window.clearTimeout(groupHoldRef.current); }}
+              className="h-8 w-8 rounded-sm border border-amber-300/45 bg-black/75 font-mono text-[9px] uppercase text-amber-100"
+              data-testid={`group-chip-${index + 1}`}
+            >
+              {index + 1}
+              <span className="block text-[7px] text-white/45">{size}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Sector Command: one-line coaching when an action did nothing. */}
+      {commandHint ? (
+        <div
+          className="pointer-events-none absolute bottom-[14.5rem] left-1/2 z-40 max-w-[70vw] -translate-x-1/2 border border-amber-300/50 bg-black/85 px-2 py-1 text-center font-mono text-[9px] uppercase leading-snug tracking-wider text-amber-100"
+          data-testid="command-hint"
+        >
+          {commandHint}
+        </div>
+      ) : null}
+
+      {/* Sector Command: the thumb dock. Command mode swaps the pointer grammar. */}
+      {missionHud ? (
+        <div className="absolute bottom-5 left-3 z-40 flex flex-col gap-1.5 sm:bottom-8 sm:left-6" data-testid="command-dock">
+          <button
+            type="button"
+            onClick={() => {
+              const world = worldRef.current;
+              if (!world) return;
+              const next = !(world.sectorCommand?.commandMode ?? false);
+              setCommandMode(world, next);
+              setCommandModeOn(next);
+              setCommandBox(null);
+              pointerModeRef.current = 'none';
+            }}
+            className={`h-12 w-[5.5rem] rounded-md border-2 font-mono text-[9px] font-bold uppercase tracking-wider ${
+              commandModeOn
+                ? 'border-amber-300 bg-amber-300/25 text-amber-100'
+                : 'border-white/25 bg-black/75 text-white/75'
+            }`}
+            data-testid="button-command-mode"
+          >
+            {commandModeOn ? 'Command On' : 'Command'}
+          </button>
+          <button
+            type="button"
+            disabled={(missionHud.captureCandidates ?? 0) === 0}
+            onClick={() => {
+              const world = worldRef.current;
+              if (world && !captureNearestEnemy(world)) setCommandHint('Nothing in reach is weak enough yet');
+            }}
+            className="h-11 w-[5.5rem] rounded-md border-2 border-emerald-300/60 bg-black/75 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-100 disabled:border-white/20 disabled:text-white/35"
+            data-testid="button-capture"
+          >
+            {missionHud.captureCandidates > 0 ? `Capture ${missionHud.captureCandidates}` : 'Capture'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !commanderViewRef.current;
+              commanderViewRef.current = next;
+              setCommanderView(next);
+            }}
+            className={`h-9 w-[5.5rem] rounded-md border font-mono text-[9px] uppercase tracking-wider ${
+              commanderView ? 'border-cyan-300 bg-cyan-300/20 text-cyan-100' : 'border-white/25 bg-black/75 text-white/70'
+            }`}
+            data-testid="button-commander-view"
+          >
+            {commanderView ? 'Embodied' : 'Cmdr View'}
+          </button>
+          {commandModeOn ? (
+            <button
+              type="button"
+              onClick={() => {
+                const world = worldRef.current;
+                if (!world?.sectorCommand) return;
+                const next = world.sectorCommand.orderMode === 'move' ? 'attack-move' : 'move';
+                world.sectorCommand.orderMode = next;
+                setCommandHint(next === 'attack-move' ? 'Taps now order attack-move' : 'Taps now order move');
+              }}
+              className={`h-9 w-[5.5rem] rounded-md border font-mono text-[9px] uppercase tracking-wider ${
+                missionHud.orderMode === 'attack-move'
+                  ? 'border-orange-300 bg-orange-300/20 text-orange-100'
+                  : 'border-white/25 bg-black/75 text-white/70'
+              }`}
+              data-testid="button-order-mode"
+            >
+              {missionHud.orderMode === 'attack-move' ? 'Atk-Move' : 'Move'}
+            </button>
+          ) : null}
+          {commandModeOn ? (
+            <button
+              type="button"
+              onClick={() => { const world = worldRef.current; if (world) selectAllCommandedUnits(world); }}
+              className="h-9 w-[5.5rem] rounded-md border border-amber-300/45 bg-black/75 font-mono text-[9px] uppercase tracking-wider text-amber-100"
+              data-testid="button-select-all-units"
+            >
+              Select All
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Zero Day: freeze cast button. Hidden for every other character. */}
+      {character.freezeThrow ? (
+        <button
+          type="button"
+          onClick={() => { if (worldRef.current) castFreezeCone(worldRef.current); }}
+          className="absolute bottom-5 right-24 h-14 w-14 rounded-full border-2 border-emerald-300/60 bg-black/75 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider text-emerald-100 sm:bottom-8 sm:right-28 sm:h-16 sm:w-16 sm:text-[9px]"
+          data-testid="button-freeze-cone"
+        >
+          Freeze
+        </button>
+      ) : null}
+
       {/* Ultimate */}
       <button
         type="button"
@@ -1130,7 +1739,7 @@ export function RunScreen({
       {chestFlight > 0 ? (
         <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
       ) : null}
-      <div className="absolute bottom-[5.25rem] right-2 z-40 flex items-stretch sm:bottom-[6.5rem] sm:right-5">
+      <div className="absolute right-2 top-[max(4.25rem,calc(env(safe-area-inset-top)+4rem))] z-40 flex items-stretch sm:right-5">
         <button
           type="button"
           onClick={openQueuedPrize}
@@ -1329,10 +1938,59 @@ export function RunScreen({
       ) : null}
 
       {/* Pause */}
-      {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen ? (
+      {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen && !pauseSoundtrackOpen ? (
         <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
           <div className="pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
-            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div>
+            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><div className="flex gap-2">{liveDashboardOpen ? <button type="button" onClick={() => { setLiveDashboardOpen(false); setPhaseBoth('paused'); }} className="border border-amber-300/40 px-3 py-2 font-mono text-[10px] uppercase text-amber-100">Pause</button> : null}<button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div></div>
+            {!liveDashboardOpen ? (
+              <div className="mb-3 flex items-center gap-2 border border-cyan-200/20 bg-[#08111a] px-3 py-2" data-testid="pause-music-bar">
+                <button
+                  type="button"
+                  onClick={music.previous}
+                  disabled={!music.currentTrack}
+                  className="grid h-7 w-7 shrink-0 place-items-center border border-white/20 text-white hover:border-cyan-300 hover:text-cyan-200 disabled:opacity-30"
+                  aria-label="Previous track"
+                  data-testid="button-pause-music-prev"
+                >
+                  <SkipBack className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={music.togglePlay}
+                  disabled={!music.currentTrack}
+                  className="grid h-7 w-7 shrink-0 place-items-center border border-white/20 text-white hover:border-cyan-300 hover:text-cyan-200 disabled:opacity-30"
+                  aria-label={music.isPlaying ? 'Pause soundtrack' : 'Play soundtrack'}
+                  data-testid="button-pause-music-toggle"
+                >
+                  {music.isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={music.next}
+                  disabled={!music.currentTrack}
+                  className="grid h-7 w-7 shrink-0 place-items-center border border-white/20 text-white hover:border-cyan-300 hover:text-cyan-200 disabled:opacity-30"
+                  aria-label="Next track"
+                  data-testid="button-pause-music-next"
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-0 flex-1 truncate font-mono text-[10px] uppercase tracking-wider text-white/70" title={music.currentTrack?.title}>
+                  {music.currentTrack ? music.currentTrack.title : 'No track loaded'}
+                </span>
+                <Volume2 className="h-3.5 w-3.5 shrink-0 text-white/50" aria-hidden="true" />
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={music.volume}
+                  onChange={(event) => music.setVolume(Number(event.target.value))}
+                  className="h-1 w-16 shrink-0 accent-cyan-300"
+                  aria-label="Soundtrack volume"
+                  data-testid="input-pause-music-volume"
+                />
+              </div>
+            ) : null}
             <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
               {meta.pauseMapVisible ? <div className="min-h-44 border border-cyan-200/20 bg-[#08111a] p-3">{hud?.endless ? <div className="relative h-52 overflow-hidden"><Minimap map={hud.endless} expanded position={{x:0,y:0}} onPositionChange={() => undefined} onToggleExpanded={() => undefined} /></div> : <div className="grid h-44 place-items-center"><div className="relative h-32 w-52 border border-white/15 bg-[radial-gradient(circle_at_center,rgba(34,211,238,.16),transparent_55%)]"><span className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-cyan-300 shadow-[0_0_14px_#67e8f9]"/><span className="absolute left-2 top-2 font-mono text-[9px] uppercase text-white/45">{area.district}</span><span className="absolute bottom-2 right-2 font-mono text-[9px] uppercase text-white/45">{area.name}</span></div></div>}</div> : null}
               <div className="space-y-3">
@@ -1359,6 +2017,16 @@ export function RunScreen({
             >
               Settings
             </button>
+            {!liveDashboardOpen ? (
+              <button
+                type="button"
+                onClick={() => setPauseSoundtrackOpen(true)}
+                className="w-full rounded-sm border border-cyan-200/40 bg-cyan-300/10 px-4 py-3 font-bold uppercase tracking-widest text-cyan-100"
+                data-testid="button-pause-soundtrack"
+              >
+                Soundtrack
+              </button>
+            ) : null}
             {area.endless && !liveDashboardOpen && (
               <button
                 type="button"
@@ -1369,14 +2037,14 @@ export function RunScreen({
                 Head home
               </button>
             )}
-            {!liveDashboardOpen ? <button
+            <button
               type="button"
               onClick={onAbort}
               className="w-full rounded-sm border border-white/15 px-4 py-3 font-mono text-xs uppercase tracking-widest text-white/70"
               data-testid="button-abandon"
             >
-              Abandon run
-            </button> : null}
+              Leave run
+            </button>
             </div>
           </div>
         </div>
@@ -1388,10 +2056,16 @@ export function RunScreen({
         </div>
       ) : null}
 
+      {phase === 'paused' && pauseSoundtrackOpen ? (
+        <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-pause-soundtrack">
+          <MusicPanel onBack={() => setPauseSoundtrackOpen(false)} />
+        </div>
+      ) : null}
+
       {/* Loot box reel overlay */}
       {reel ? (
         <div
-          className={meta.liveModeEnabled ? 'absolute bottom-20 right-2 z-50 flex max-h-[42dvh] w-[min(58vw,220px)] flex-col items-center justify-center overflow-y-auto border border-blue-300/45 bg-black/90 p-2 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/92'}
+          className={meta.liveModeEnabled ? 'absolute bottom-20 right-2 z-50 flex max-h-[42dvh] w-[min(58vw,220px)] flex-col items-center justify-center overflow-y-auto border border-blue-300/45 bg-black/90 p-2 shadow-[0_0_28px_rgba(96,165,250,.25)]' : 'absolute inset-0 z-50 flex max-h-dvh flex-col items-center justify-center overflow-y-auto bg-black/92 px-4 py-6'}
           data-testid="overlay-reel"
         >
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.4em] text-white/50">Blue Box</p>
@@ -1436,7 +2110,7 @@ export function RunScreen({
               {reel.prize.lokPet ? (
                 <div className={`${meta.liveModeEnabled ? 'mt-1 px-2 py-1 text-[8px]' : 'mt-3 px-4 py-3 text-[11px]'} border border-pink-400/30 bg-pink-400/5 text-left font-mono uppercase tracking-widest text-white/80`}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="font-black text-pink-200">{reel.prize.lokPet.rarityLabel} {reel.prize.lokPet.family} signal</span>
+                    <span className="font-black text-pink-200">{reel.prize.lokPet.rarityLabel} {reel.prize.lokPet.family} companion</span>
                     <span className="text-pink-300">{reel.prize.lokPet.elementLabel}</span>
                   </div>
                   <p className="mt-1 text-white">{reel.prize.lokPet.traitLabel}</p>
@@ -1455,7 +2129,7 @@ export function RunScreen({
           <button
             type="button"
             onClick={dismissReel}
-            className="border border-white/20 bg-white/5 px-8 py-3 font-mono text-xs uppercase tracking-widest text-white/70 hover:bg-white/10"
+            className={`shrink-0 border border-white/20 bg-white/5 font-mono uppercase tracking-widest text-white/70 hover:bg-white/10 ${meta.liveModeEnabled ? 'px-4 py-1.5 text-[10px]' : 'px-8 py-3 text-xs'}`}
             data-testid="button-reel-skip"
           >
             {reel.phase === 'landed' ? 'Continue' : 'Skip'}

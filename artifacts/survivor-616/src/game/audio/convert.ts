@@ -49,12 +49,16 @@ export async function convertToMp3(
   }
   onProgress?.({ phase: 'decoding', ratio: 1 });
 
+  if (buffer.numberOfChannels <= 0) {
+    throw new ConversionError(`Audio file has no audio channels.`);
+  }
+
   const { Mp3Encoder } = await import('@breezystack/lamejs');
   const channels = Math.min(2, buffer.numberOfChannels) as 1 | 2;
   const encoder = new Mp3Encoder(channels, buffer.sampleRate, MP3_KBPS);
 
   const left = floatTo16BitPCM(buffer.getChannelData(0));
-  const right = channels > 1 ? floatTo16BitPCM(buffer.getChannelData(1)) : null;
+  const right = channels > 1 && buffer.numberOfChannels > 1 ? floatTo16BitPCM(buffer.getChannelData(1)) : null;
   const totalSamples = left.length;
 
   const chunks: Uint8Array[] = [];

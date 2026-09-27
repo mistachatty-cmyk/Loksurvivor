@@ -48,11 +48,11 @@ export const CHARACTER_EPISODES: CharacterEpisodeDef[] = [
     evolutionId: 'void-echo',
   }),
   episode({
-    id: 'queenbee-hive-signal', characterId: 'queenbee', title: 'Hive Signal',
+    id: 'queenbee-hive-signal', characterId: 'queenbee', title: 'Hive Call',
     teaser: 'A lost frequency is calling the hive below Fulton.',
     cityLocation: 'Fulton Back Alley · the painted service door',
     areaId: 'back-alley', crewAllyId: 'deacon',
-    objective: rescue('queenbee-hive-signal-rescue', 'Free the trapped signal runner', 'deacon'),
+    objective: rescue('queenbee-hive-signal-rescue', 'Free the trapped route runner', 'deacon'),
     completionText: 'The hive finds its second voice in the alley walls.',
     evolutionId: 'queen-swarm',
   }),
@@ -62,7 +62,7 @@ export const CHARACTER_EPISODES: CharacterEpisodeDef[] = [
     cityLocation: 'Rooftop Line · the water tower',
     areaId: 'rooftops', crewAllyId: 'nyx',
     objective: killEnemy('lilstinger-rooftop-bats', 'Down 12 Belfry Bats', 'belfry-bat', 12),
-    completionText: 'Lil Stinger marks the roof as safe enough for the next signal.',
+    completionText: 'Lil Stinger marks the roof as safe enough for the next call.',
     evolutionId: 'king-crown',
   }),
   episode({

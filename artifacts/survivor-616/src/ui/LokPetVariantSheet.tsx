@@ -15,7 +15,8 @@ export function LokPetIcon({
 }) {
   return (
     <div
-      className={`shrink-0 border ${className}`}
+      className={`relative shrink-0 overflow-hidden border ${className}`}
+      data-lokpet-icon
       style={{
         width: size,
         height: size,
@@ -35,21 +36,22 @@ export function LokPetVariantSheet() {
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="flex items-center gap-2">
           <span className="text-lg text-pink-300">✦</span>
-          <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet signal sheet</h2>
+          <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet field guide</h2>
         </div>
-        <span className="text-[10px] uppercase tracking-widest text-pink-300">original temporary companions</span>
-        <span className="ml-auto text-[10px] uppercase tracking-widest text-muted-foreground">12 variants · 6 silhouettes</span>
+        <span className="text-[10px] uppercase tracking-widest text-pink-300">original companions + legendary partners</span>
+        <span className="ml-auto text-[10px] uppercase tracking-widest text-muted-foreground">{LOKPET_VARIANTS.length} variants · {new Set(LOKPET_VARIANTS.map((v) => v.silhouette)).size} silhouettes</span>
       </div>
       <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-muted-foreground">
         Every blue box can generate a different little ally. The silhouette and palette are rolled separately from its combat trait, so a bat might freeze, a ghoul might burn, or a jelly might fire rapidly.
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {LOKPET_VARIANTS.map((variant) => (
-          <div key={variant.id} className="flex min-w-0 items-center gap-2 border border-white/10 bg-black/35 p-2">
+          <div key={variant.id} className={`flex min-w-0 items-center gap-2 border bg-black/35 p-2 ${variant.legendary ? 'border-amber-300/50 shadow-[0_0_16px_rgba(253,224,71,0.12)]' : 'border-white/10'}`}>
             <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} />
             <div className="min-w-0">
               <p className="truncate text-[10px] font-black uppercase tracking-wide text-white">{variant.name}</p>
               <p className="truncate text-[9px] uppercase tracking-wider" style={{ color: variant.palette.accent }}>{variant.family} · {variant.silhouette}</p>
+              {variant.legendary ? <p className="mt-0.5 font-mono text-[7px] font-black uppercase tracking-widest text-amber-300">Legendary</p> : null}
             </div>
           </div>
         ))}

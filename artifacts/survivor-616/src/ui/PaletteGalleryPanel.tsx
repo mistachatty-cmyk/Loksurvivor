@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CloudRain, Flame, Lock, Palette, Radar, ScanLine, Sparkles } from 'lucide-react';
 
 import { RUN_AURAS } from '@/game/data/runAuras';
@@ -7,9 +7,11 @@ import { CELEBRATIONS, getCelebrationStyle } from '@/game/data/celebrations';
 import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { getCharacter } from '@/game/data/characters';
-import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { blendSpritePalettes, getCharacterSkin } from '@/game/data/characterSkins';
 import { humanoidRig } from '@/game/sprites/rigs';
 import { isPrimeFlickerVisit, isPrimeTakeoverActive, useMeta } from '@/game/state/metaStore';
+import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
+import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import type { AnimName, CosmeticTier, PaletteEffectKind, RunAuraStyle, SpritePalette } from '@/game/types';
 import { CosmeticPreview } from './CosmeticPreview';
 import { ScreenLayout } from './ScreenLayout';
@@ -95,6 +97,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
 
 export function PaletteGalleryPanel({ onBack }: Props) {
   const { meta, buyPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
+  const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const [category, setCategory] = useState<ShopCategory>('palettes');
   const [previewPaletteId, setPreviewPaletteId] = useState(meta.activePaletteId);
   const [previewAuraId, setPreviewAuraId] = useState(meta.activeRunAuraId);
@@ -137,6 +140,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     const palette = THEMED_PALETTES.find((entry) => entry.id === paletteId);
     if (!palette || meta.ownedPaletteIds.includes(palette.id) || meta.lootTokens < palette.cost) return;
     buyPalette(palette.id);
+    sfx.play('purchase');
     triggerReaction(`${palette.name} purchased for ${palette.cost} loot token${palette.cost === 1 ? '' : 's'}.`);
   };
 
@@ -144,15 +148,26 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     const aura = RUN_AURAS.find((entry) => entry.id === auraId);
     if (!aura || meta.ownedRunAuraIds.includes(aura.id) || meta.lootTokens < aura.cost) return;
     buyRunAura(aura.id);
+    sfx.play('purchase');
     triggerReaction(`${aura.name} purchased for ${aura.cost} loot token${aura.cost === 1 ? '' : 's'}.`);
   };
-  const buyCosmetic = (id: string, kind: 'hat' | 'celebration') => kind === 'hat' ? buyHat(id) : buyCelebration(id);
+  const buyCosmetic = (id: string, kind: 'hat' | 'celebration') => {
+    sfx.play('purchase');
+    if (kind === 'hat') buyHat(id); else buyCelebration(id);
+  };
 
   const previewWorldPalette = previewPaletteId === 'default' ? undefined : THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette;
   const previewPaletteEffect = meta.paletteAnimationsEnabled ? THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.effect?.kind : undefined;
-  const previewPalette = primeShowing
-    ? resolveCharacterCosmeticPalette(PRIME, meta.characterSkinByCharacterId[PRIME.id], previewWorldPalette, meta.worldPaletteBlendEnabled)
-    : ARTISAN_VALOR_PALETTE;
+  // Memoized so RigPortrait's animation loop (keyed on palette identity)
+  // doesn't restart on every unrelated re-render (a quip firing, a purchase
+  // completing) -- only when the colors it actually resolves to change.
+  const skinId = meta.characterSkinByCharacterId[PRIME.id];
+  const previewPalette = useMemo(() => {
+    const personal = primeShowing ? getCharacterSkin(PRIME, skinId).palette : ARTISAN_VALOR_PALETTE;
+    // A shop preview must visibly demonstrate the selected commission for
+    // both Valor forms even if the player's in-run blending preference is off.
+    return previewWorldPalette ? blendSpritePalettes(personal, previewWorldPalette, 0.72) : personal;
+  }, [primeShowing, skinId, previewWorldPalette]);
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);
@@ -187,7 +202,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">{category === 'palettes' ? 'World & character colors' : category === 'auras' ? 'Procedural run effects' : category === 'hats' ? 'Floating headwear' : 'Reward reveal effects'}</p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Signal auras' : category === 'hats' ? 'Hover hats' : 'Celebrations'}</h2>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Run auras' : category === 'hats' ? 'Hover hats' : 'Celebrations'}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                 {category === 'palettes'
                   ? 'Recolor your fighter, weapon effects, and world accents. Premium palettes cost more, but nothing here changes combat power.'

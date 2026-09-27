@@ -8,7 +8,7 @@ export const RUN_AURAS: RunAuraDef[] = [
   {
     id: 'street-halo',
     name: 'Street Halo',
-    description: 'The original soft signal ring. Clean, readable, and always yours.',
+    description: 'The original soft pulse ring. Clean, readable, and always yours.',
     cost: 0,
     tier: 'standard',
     style: 'street-halo',
@@ -31,7 +31,7 @@ export const RUN_AURAS: RunAuraDef[] = [
   },
   {
     id: 'rain-signal',
-    name: 'Rain Signal',
+    name: 'Rain Pulse',
     description: 'A private downpour of luminous dashes follows you through the city.',
     cost: 3,
     tier: 'rare',

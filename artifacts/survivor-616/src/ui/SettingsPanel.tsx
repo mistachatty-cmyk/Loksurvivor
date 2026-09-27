@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ChangeEvent } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -6,6 +6,7 @@ import {
   Check,
   Compass,
   Dices,
+  Download,
   FlaskConical,
   FlipVertical2,
   LayoutDashboard,
@@ -18,12 +19,15 @@ import {
   PanelRight,
   PauseCircle,
   Plug,
+  Save,
   Settings2,
   Smartphone,
+  Upload,
 } from 'lucide-react';
 
+import { toast } from '@/hooks/use-toast';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
-import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { activeUiThemeSwatchId, parseMetaFile, serializeMeta, useMeta } from '@/game/state/metaStore';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
@@ -35,11 +39,13 @@ import {
 import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
+import { UiTransparencyControls } from './UiTransparencyControls';
 
 export interface SettingsPanelProps {
   onBack: () => void;
+  onOpenLooksAndLokPets?: () => void;
 }
-export function SettingsPanel({ onBack }: SettingsPanelProps) {
+export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
   const {
     meta,
     setPhysicsObjectClicks,
@@ -47,6 +53,8 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     setLootPresentation,
     setLevelUpPresentation,
     setPauseMapVisible,
+    setGraphicsQuality,
+    setFrameRateMode,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
@@ -56,18 +64,30 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     equipUiTheme,
     selectUiThemeSwatch,
     cycleUiLook,
+    unlockThemeCycleMastery,
+    setThemeCycleCollection,
     unlockDevModeAccess,
     setDevModeAllUnlocks,
     setMusicReactive,
+    setSfxEnabled,
     setHideoutAmbience,
+    setHideoutWeather,
+    setSplashTextEnabled,
+    setOneLineTitleEnabled,
+    setIntroTitlePhysicsEnabled,
+    setIntroTitleReturnDelay,
+    setTravelEncountersEnabled,
     setGyroEnabled,
     setGyroSensitivity,
     setGyroInvertY,
     setStudioPlugins,
     setWorldInvertEnabled,
     setPaletteInvertEnabled,
+    setMirrorModeEnabled,
     setPaletteAnimations,
     setWorldPaletteBlend,
+    importMeta,
+    setWorldColorFullRecolor,
   } = useMeta();
   const activeSwatchId = activeUiThemeSwatchId(meta);
   const effectiveUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
@@ -103,9 +123,44 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
     });
   }, [unlockDevModeAccess]);
 
+  const handleExportSave = useCallback(() => {
+    const blob = new Blob([serializeMeta(meta)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `616-survivor-save-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Save exported', description: 'Saved to your downloads.' });
+  }, [meta]);
+
+  const handleImportSave = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      void file.text().then((text) => {
+        const parsed = parseMetaFile(text);
+        if (!parsed) {
+          toast({
+            title: "Couldn't import save",
+            description: "That file doesn't look like a 616 Survivor save.",
+            variant: 'destructive',
+          });
+          return;
+        }
+        if (!window.confirm('Importing will replace your current progress with this save file. Continue?')) return;
+        importMeta(parsed);
+        toast({ title: 'Save imported', description: 'Your progress has been replaced with the imported save.' });
+      });
+    },
+    [importMeta],
+  );
+
   return (
-    <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack}>
+    <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">Looks &amp; LokPets</button> : undefined}>
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
+        <UiTransparencyControls />
         <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
@@ -136,6 +191,50 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
                 <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['high', 'balanced', 'performance'] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setGraphicsQuality(value)}
+                        aria-pressed={meta.graphicsQuality === value}
+                        className={`border p-2 uppercase ${meta.graphicsQuality === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-graphics-quality-${value}`}
+                      >
+                        {value === 'high' ? 'High' : value === 'balanced' ? 'Balanced' : 'Performance'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    High matches how the game has always looked. Balanced and Performance
+                    trim decorative density (particles, damage numbers, enemy outlines/
+                    shadows) starting at a lower enemy count -- useful on a slower device
+                    or a very dense swarm run. Never affects difficulty or rewards.
+                  </p>
+                </div>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Frame pacing</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {([60, 120] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFrameRateMode(value)}
+                        aria-pressed={meta.frameRateMode === value}
+                        className={`border p-2 uppercase ${meta.frameRateMode === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-frame-rate-${value}`}
+                      >
+                        {value} FPS
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    60 FPS saves battery and holds the simulation steady. 120 FPS uses a compatible high-refresh display;
+                    visual resolution and nonessential effects scale back automatically during a heavy swarm.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -230,6 +329,31 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               <div className="mt-5 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Gameplay SFX</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Hits, pickups, level-ups, dashes and menu sounds -- all synthesized in your browser, styled by
+                      whichever pack you have equipped from the Sound Booth. Turn this off for a silent run; your
+                      soundtrack keeps playing either way.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSfxEnabled(!meta.sfxEnabled)}
+                    aria-pressed={meta.sfxEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.sfxEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-sfx-enabled"
+                  >
+                    {meta.sfxEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
                     <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout ambience</h3>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
                       Optional room sound in the hideout, synthesized in your browser -- rain on the awning upstairs,
@@ -249,6 +373,145 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     data-testid="button-toggle-hideout-ambience"
                   >
                     {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout weather</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Drifting clouds, room-specific weather (rain, fog, heat haze, embers), and the small
+                      birds/drones/motes over each room's backdrop. Purely visual, silent CSS decoration --
+                      turn it off for a calmer or faster hideout screen.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHideoutWeather(!meta.hideoutWeatherEnabled)}
+                    aria-pressed={meta.hideoutWeatherEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.hideoutWeatherEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-hideout-weather"
+                  >
+                    {meta.hideoutWeatherEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Splash text</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      The rotating one-liner next to the title on the opening screen -- a fresh one shows up each
+                      time you load the game. Purely cosmetic; turn it off if you'd rather see a clean title screen.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSplashTextEnabled(!meta.splashTextEnabled)}
+                    aria-pressed={meta.splashTextEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.splashTextEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-splash-text"
+                  >
+                    {meta.splashTextEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Alternate title layout</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Keeps the official Survivor616 name on one line. Leave this off for the original 616-over-Survivor lockup.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOneLineTitleEnabled(!meta.oneLineTitleEnabled)}
+                    aria-pressed={meta.oneLineTitleEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.oneLineTitleEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-one-line-title"
+                  >
+                    {meta.oneLineTitleEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Intro physics</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Touch, grow, pull, and throw the nonessential intro copy. Pieces bounce off the screen and each other before returning home.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIntroTitlePhysicsEnabled(!meta.introTitlePhysicsEnabled)}
+                    aria-pressed={meta.introTitlePhysicsEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.introTitlePhysicsEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-intro-title-physics"
+                  >
+                    {meta.introTitlePhysicsEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+                {meta.introTitlePhysicsEnabled ? (
+                  <label className="mt-4 block border-t border-border/60 pt-4" htmlFor="intro-return-delay">
+                    <span className="flex items-center justify-between gap-4 font-mono text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Magnetic return delay
+                      <output className="text-primary">{meta.introTitleReturnDelaySec}s</output>
+                    </span>
+                    <input
+                      id="intro-return-delay"
+                      type="range"
+                      min="1"
+                      max="12"
+                      step="1"
+                      value={meta.introTitleReturnDelaySec}
+                      onChange={(event) => setIntroTitleReturnDelay(Number(event.currentTarget.value))}
+                      className="mt-3 w-full accent-primary"
+                      data-testid="input-intro-return-delay"
+                    />
+                  </label>
+                ) : null}
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      A short pop-up scrap can trigger when you enter DigiScope or head out on a run --
+                      throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
+                      off to skip it entirely.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTravelEncountersEnabled(!meta.travelEncountersEnabled)}
+                    aria-pressed={meta.travelEncountersEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.travelEncountersEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-travel-encounters"
+                  >
+                    {meta.travelEncountersEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>
@@ -451,7 +714,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
           </div>
         </section>
 
-        {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 ? (
+        {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 || vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
           <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
@@ -462,7 +725,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-300">Quartermaster cheats</p>
                   <h2 className="mt-1 text-xl font-black uppercase text-white">Chaos toggles</h2>
                   <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                    Unlocked in the Field ops shop. Purely cosmetic, purely for chaos — flip either back off any time.
+                    Unlocked in the Field ops shop. Purely cosmetic, purely for chaos — flip any of these back off any time.
                   </p>
                 </div>
                 {vendorPurchaseCount(meta, 'invert-world') > 0 ? (
@@ -504,6 +767,27 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                       data-testid="button-toggle-palette-invert"
                     >
                       {meta.paletteInvertEnabled ? 'Inverted' : 'Off'}
+                    </button>
+                  </div>
+                ) : null}
+                {vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold uppercase tracking-wide text-white">Wrong Side of the Street</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Mirror the whole run left-to-right.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMirrorModeEnabled(!meta.mirrorModeEnabled)}
+                      aria-pressed={meta.mirrorModeEnabled}
+                      className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                        meta.mirrorModeEnabled
+                          ? 'border-fuchsia-400 bg-fuchsia-400 text-black'
+                          : 'border-border bg-background text-muted-foreground hover:border-fuchsia-400 hover:text-white'
+                      }`}
+                      data-testid="button-toggle-mirror-mode"
+                    >
+                      {meta.mirrorModeEnabled ? 'Mirrored' : 'Off'}
                     </button>
                   </div>
                 ) : null}
@@ -654,7 +938,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
               <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
                   Set the hideout&rsquo;s mood without changing the action. Themes change the menu chrome; palettes
-                  change its signal color and are remembered independently for every theme.
+                  change its accent color and are remembered independently for every theme.
                 </p>
                 <button
                   type="button"
@@ -666,6 +950,32 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <Dices className="h-4 w-4" />
                   Roll the look
                 </button>
+              </div>
+              <div className="mt-4 border border-primary/30 bg-primary/5 p-3" data-testid="section-core-master-theme-cycle">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Core Master · theme cycle</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {meta.themeCycleMastered
+                        ? 'Choose whether Roll the Look rotates the five starter looks or every theme you have unlocked.'
+                        : 'Upgrade to add your unlocked theme collection to the quick cycle. The starter carousel stays free.'}
+                    </p>
+                  </div>
+                  {!meta.themeCycleMastered ? (
+                    <button type="button" onClick={unlockThemeCycleMastery} disabled={meta.cred < 2400} className="shrink-0 border border-primary px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-primary disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground" data-testid="button-unlock-core-master-theme-cycle">
+                      Unlock · 2400 cred
+                    </button>
+                  ) : null}
+                </div>
+                {meta.themeCycleMastered ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {(['starter', 'owned'] as const).map((collection) => (
+                      <button key={collection} type="button" onClick={() => setThemeCycleCollection(collection)} aria-pressed={meta.themeCycleCollection === collection} className={`border px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-widest ${meta.themeCycleCollection === collection ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-theme-cycle-${collection}`}>
+                        {collection === 'starter' ? 'Starter themes' : 'Unlocked themes'}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 Theme combinations: {ownedLookCount} owned
@@ -689,9 +999,19 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                   <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">Animated palette motion</span>
                   <span className="mt-1 block text-xs">{meta.paletteAnimationsEnabled ? 'Effects moving' : 'Colors remain, motion off'}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setWorldColorFullRecolor(!meta.worldColorFullRecolorEnabled)}
+                  aria-pressed={meta.worldColorFullRecolorEnabled}
+                  className={`border px-3 py-3 text-left transition-colors ${meta.worldColorFullRecolorEnabled ? 'border-primary bg-primary/10 text-white' : 'border-border bg-background text-muted-foreground'}`}
+                  data-testid="button-toggle-world-color-full-recolor"
+                >
+                  <span className="block font-mono text-[10px] font-bold uppercase tracking-widest">Full world recolor</span>
+                  <span className="mt-1 block text-xs">{meta.worldColorFullRecolorEnabled ? 'Enemies + environment recolored too' : 'Your fighter only (original look)'}</span>
+                </button>
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {UI_THEMES.map((theme) => {
+                {UI_THEMES.filter((theme) => !theme.hidden || hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds)).map((theme) => {
                   const owned = hasCatalogItem(meta, 'uiThemes', theme.id, meta.ownedUiThemeIds);
                   const equipped = meta.uiTheme === theme.id;
                   const affordable = meta.cred >= theme.cost;
@@ -701,6 +1021,7 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                         <h3 className="text-sm font-black uppercase tracking-wide text-white">{theme.name}</h3>
                         {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
                       </div>
+                      {theme.tier ? <span className="mt-2 inline-block border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest text-primary">{theme.tier}</span> : null}
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{theme.description}</p>
                       {theme.swatches ? (
                         <div
@@ -785,6 +1106,39 @@ export function SettingsPanel({ onBack }: SettingsPanelProps) {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              <Save className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Save data</p>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">Back up or transfer your progress</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                Export a save file to keep as a backup or move to another browser or device. Signing in
+                under Account keeps your progress synced automatically instead.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportSave}
+                  className="flex items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
+                  data-testid="button-export-save"
+                >
+                  <Download className="h-4 w-4" /> Export save
+                </button>
+                <label
+                  className="flex cursor-pointer items-center gap-2 border border-border bg-background px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white hover:border-primary"
+                  data-testid="button-import-save"
+                >
+                  <Upload className="h-4 w-4" /> Import save
+                  <input type="file" accept="application/json" className="hidden" onChange={handleImportSave} />
+                </label>
               </div>
             </div>
           </div>

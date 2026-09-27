@@ -212,7 +212,7 @@ export const ALLIES: AllyDef[] = [
   {
     id: 'frankie',
     name: 'Frankie Reyes',
-    role: 'Rail yard signalman',
+    role: 'Rail yard switch operator',
     blurb: 'Worked the switch by lantern long after the yard stopped running trains on schedule. Still logs every arrival, real or otherwise.',
     room: 'the-cellar',
     boost: { haste: -0.04 },
@@ -269,6 +269,20 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#fef9c3', skin: '#c2410c', glow: '#fde047',
     },
   },
+  {
+    id: 'archivist',
+    name: 'Archivist',
+    role: 'Rogue process',
+    blurb: 'Something in Null Sector that kept a log nobody asked it to. Followed the exit route out and never stopped indexing the hideout.',
+    room: 'the-cellar',
+    boost: { crit: 0.04 },
+    boostLabel: '+4% crit chance',
+    preferredActivityIds: ['study-anomalies', 'press-new-records'],
+    palette: {
+      ink: '#020617', body: '#052e1a', bodyDark: '#031a0f', accent: '#22c55e',
+      accentBright: '#bbf7d0', skin: '#0f3d24', glow: '#4ade80',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
@@ -316,7 +330,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'vendor', 'workshop', 'allies', 'music', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['runs', 'roster', 'allies', 'settings', 'account', 'feedback'],
   },
   {
     id: 'rooftop-perch',
@@ -334,11 +348,11 @@ export const HUB_ROOMS: HubRoomDef[] = [
     name: 'The Cellar',
     subtitle: 'Hidden room',
     description:
-      'Behind the walk-in cooler, down a hatch nobody mentions. Lantern light, glass growths, and a record wall.',
+      'Behind the walk-in cooler: your playable cabinets and the crypto-mining rigs. Nothing else competes for the cellar floor.',
     backdrop: 'art/cellar.jpeg',
     biome: 'cellar',
     unlock: { kind: 'discovery', discoveryId: 'lantern-shard' },
-    features: ['music', 'bestiary', 'allies', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['allies', 'settings', 'account', 'feedback'],
   },
   {
     id: 'the-alley',
@@ -349,18 +363,20 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/alley.jpeg',
     biome: 'alley',
     unlock: { kind: 'discovery', discoveryId: 'floodwall-mark' },
-    features: ['vendor', 'workshop', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['vendor', 'workshop', 'allies', 'settings', 'account', 'feedback'],
   },
   {
     id: 'the-storefront',
-    name: 'The Storefront',
-    subtitle: 'Street-level records room',
+    name: 'The Neon Sleeve',
+    subtitle: 'The Neon Sleeve',
     description:
-      'A shuttered storefront with the old ledger books still on the counter. Every name in the neighborhood ends up here eventually.',
+      'A bright little storefront where Lock Packs, passive decks, duplicate cards, and rare variants change hands under a humming sign.',
     backdrop: 'art/street.jpeg',
     biome: 'archive',
-    unlock: { kind: 'discovery', discoveryId: 'sire-ledger' },
-    features: ['bestiary', 'unlocks', 'allies', 'settings', 'palette-store', 'account', 'feedback'],
+    // A travel destination outside the hideout. Selecting it launches the
+    // Neon Sleeve shop immediately through App's room routing.
+    unlock: { kind: 'default' },
+    features: ['card-shop'],
   },
   {
     id: 'the-back-room',
@@ -371,7 +387,20 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/street.jpeg',
     biome: 'archive',
     unlock: { kind: 'discovery', discoveryId: 'arcade-high-score' },
-    features: ['allies', 'vendor', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['allies', 'bestiary', 'unlocks', 'settings', 'account', 'feedback'],
+  },
+  {
+    id: 'the-sound-booth',
+    name: 'The Sound Booth',
+    subtitle: 'Patch bay and foldback',
+    description:
+      'A converted phone-booth-sized closet wired with a patch bay and a foldback speaker. Every hit and pickup out on the streets gets its character mixed in here.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    // Same reasoning as the-storefront: a Hideout destination from the start
+    // so a fresh player can always find where their loot-token SFX packs live.
+    unlock: { kind: 'default' },
+    features: ['music', 'studio', 'sound-booth', 'settings', 'account', 'feedback'],
   },
 ];
 
@@ -397,6 +426,8 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'choir-hymn', name: 'The Choir\'s Hymn', blurb: 'Twenty verses, one voice each, none of them singing anything you could ever hum back.' },
   { id: 'arcade-high-score', name: 'The High Score', blurb: 'A cabinet screen still glowing under the dust, top of the board initials burned into the phosphor.' },
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
+  { id: 'null-sector-log', name: 'The Null Sector Log', blurb: 'A maintenance log with no author field. Every entry ends the same way: "still running."' },
+  { id: 'lev-core-archive', name: 'The Lev Core Archive', blurb: 'A cracked data slate salvaged from the singularity generator, still cycling schematics for a spire that was never finished.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

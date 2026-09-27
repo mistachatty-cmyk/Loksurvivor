@@ -66,6 +66,15 @@ export const STATUS_EFFECTS: StatusEffectDef[] = [
     speedMultiplier: 1.3,
     damageMultiplier: 1.25,
   },
+  {
+    id: 'corrupted',
+    name: 'Corrupted',
+    description: 'Its position keeps dropping packets. Periodically blinks a short random distance while this holds.',
+    color: '#ff2fd0',
+    durationMs: 3000,
+    maxStacks: 1,
+    speedMultiplier: 1,
+  },
 ];
 
 export const STATUS_EFFECTS_BY_ID: Record<string, StatusEffectDef> =

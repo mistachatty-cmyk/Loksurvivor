@@ -493,6 +493,8 @@ interface SerpentOptions {
    *  (reusing `legL`/`legR` as the two phase groups) for a real slither
    *  instead of one rigid block bobbing. */
   segments?: number;
+  /** Head-end segment height in px; tail tapers from 3px up to this. Default 8. */
+  thickness?: number;
 }
 
 /**
@@ -502,7 +504,7 @@ interface SerpentOptions {
  * See run-presentation.md.
  */
 export function serpentRig(options: SerpentOptions = {}): SpriteRig {
-  const { length = 26, segments = 5 } = options;
+  const { length = 26, segments = 5, thickness = 8 } = options;
   const segLen = length / segments;
   const half = length / 2;
   const parts: SpritePart[] = [
@@ -510,7 +512,7 @@ export function serpentRig(options: SerpentOptions = {}): SpriteRig {
   ];
   for (let i = 0; i < segments; i += 1) {
     const t = segments === 1 ? 1 : i / (segments - 1); // 0 tail .. 1 head
-    const segH = 3 + t * 5; // tapers narrow at the tail, wide near the head
+    const segH = 3 + t * (thickness - 3); // tapers narrow at the tail, wide near the head
     const isHead = i === segments - 1;
     parts.push({
       key: isHead ? 'head' : i % 2 === 0 ? 'legL' : 'legR',

@@ -12,16 +12,21 @@ import { RigPortrait } from './RigPortrait';
 import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
+import { NotificationToasts } from './NotificationToasts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+import { RENTABLE_GENERATORS } from '@/game/data/generators';
+import { Coins } from 'lucide-react';
+import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
+import { LokPetIcon } from './LokPetVariantSheet';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'settings' | 'palette-store' | 'account' | 'feedback';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -29,6 +34,16 @@ export interface HubScreenProps {
   onChangeRoom: (roomId: string) => void;
   onOpen: (panel: HubPanel) => void;
   onOpenMapEditor: () => void;
+  /** Opens the playable tactical campaign from the Sanctum computer. */
+  onOpenSectorCommand: () => void;
+  /** Opens the LokPet battle arena & sparring sandbox in the Lit Corner. */
+  onOpenLokPetBattle?: () => void;
+  /** Opens the LokSurvivorArena seat/area picker. */
+  onOpenArena: () => void;
+  /** Reopens the companion and visual setup screen without starting a run. */
+  onOpenRunSetup: () => void;
+  /** Returns to the cold-open title screen. */
+  onBack?: () => void;
 }
 
 const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string; description: string }> = {
@@ -41,10 +56,13 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
+  'card-shop': { label: 'Lock Pack Counter', icon: CreditCard, testId: 'button-open-card-shop', description: 'Open packs & build your Lock Deck' },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
   'palette-store': { label: 'Customization Shop', icon: Palette, testId: 'button-open-palette-store', description: 'Palettes & run auras' },
+  'sound-booth': { label: 'The Sound Booth', icon: Disc3, testId: 'button-open-sound-booth', description: 'Buy & preview SFX packs' },
   account: { label: 'Account', icon: Mail, testId: 'button-open-account', description: 'Waitlist & sign in' },
   feedback: { label: 'Feedback', icon: MessageSquareHeart, testId: 'button-open-feedback', description: 'Ideas & bug reports' },
+  'threat-matrix': { label: 'Threat Matrix', icon: ShieldAlert, testId: 'button-open-threat-matrix', description: 'Override & quarantine enemies' },
 };
 
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
@@ -82,10 +100,12 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun } = useMeta();
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
+  const roomNavRef = useRef<HTMLElement>(null);
+  useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
   const enterRoom = (nextRoomId: string) => {
     onChangeRoom(nextRoomId);
@@ -106,6 +126,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
   const primeTakeoverActive = isPrimeTakeoverActive(meta, Date.now());
   const primePalette = primeTakeoverActive ? getCharacter('artisanvalor').palette : null;
   const [isPageVisible, setIsPageVisible] = useState(true);
+  const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
 
   useEffect(() => {
     const updateVisibility = () => setIsPageVisible(document.visibilityState === 'visible');
@@ -113,6 +134,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
     document.addEventListener('visibilitychange', updateVisibility);
     return () => document.removeEventListener('visibilitychange', updateVisibility);
   }, []);
+
+  useEffect(() => {
+    refreshGeneratorIncome();
+    const timer = window.setInterval(refreshGeneratorIncome, 15_000);
+    return () => window.clearInterval(timer);
+  }, [refreshGeneratorIncome]);
 
   /**
    * Optional procedural ambience for the room you are standing in. Off unless
@@ -145,6 +172,28 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
       animate={{ opacity: 1 }}
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
+      <NotificationToasts />
+      <button
+        type="button"
+        onClick={onOpenRunSetup}
+        className="fixed right-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
+        data-testid="button-open-run-setup"
+        title="Change LokPets and looks anytime"
+      >
+        <Sparkles className="h-4 w-4 text-cyan-200" />
+        <span>Looks &amp; LokPets</span>
+      </button>
+      {companion && (
+        <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
+          <LokPetIcon silhouette={companion.roll.silhouette} palette={companion.roll.palette} size={42} />
+          <div className="min-w-0">
+            <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.roll.name}</p>
+            <p className="font-mono text-[8px] uppercase tracking-wider text-white/55">
+              {companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}
+            </p>
+          </div>
+        </div>
+      )}
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}
@@ -164,7 +213,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
             aria-hidden="true"
           />
            <div
-             className={`hideout-ambient absolute inset-0 z-20 ${weatherClass(scene.weather)} ${primeTakeoverActive ? 'palette-preview-pulse' : ''}`}
+             // Bounded to one viewport, not `inset-0` against this screen's
+             // full (much taller) scrollable height -- every child here uses
+             // percentage positioning tuned for a viewport-height box. See
+             // .agents/memory/hideout-ambiance.md for the bug this fixed.
+             className={`hideout-ambient absolute inset-x-0 top-0 h-[100dvh] z-20 ${weatherClass(scene.weather)}`}
              style={{
                '--scene-accent': primePalette?.accent ?? scene.homeAccent,
                '--scene-sky': primePalette?.bodyDark ?? scene.skyAccent,
@@ -173,14 +226,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
              aria-hidden="true"
            >
              <div className="hideout-sky-glow" />
-             <div className="hideout-cloud hideout-cloud-one" />
-             <div className="hideout-cloud hideout-cloud-two" />
-             <div className={`hideout-fliers hideout-fliers-${scene.motionKind}`}>
-               <span className="hideout-flier flier-one">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
-               <span className="hideout-flier flier-two">{scene.motionKind === 'motes' ? '·' : scene.motionKind === 'drones' ? '◇' : '⌁'}</span>
-               <span className="hideout-flier flier-three">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
-             </div>
-             <div className="hideout-weather-particles" />
+             {meta.hideoutWeatherEnabled && (
+               <>
+                 <div className="hideout-cloud hideout-cloud-one" />
+                 <div className="hideout-cloud hideout-cloud-two" />
+                 <div className={`hideout-fliers hideout-fliers-${scene.motionKind}`}>
+                   <span className="hideout-flier flier-one">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
+                   <span className="hideout-flier flier-two">{scene.motionKind === 'motes' ? '·' : scene.motionKind === 'drones' ? '◇' : '⌁'}</span>
+                   <span className="hideout-flier flier-three">{scene.motionKind === 'motes' ? '✦' : scene.motionKind === 'drones' ? '◆' : '⌁'}</span>
+                 </div>
+                 <div className="hideout-weather-particles" />
+               </>
+             )}
              <div className="hideout-home-art">
                {scene.biome === 'sanctum' && <div className="hideout-window-grid"><span /><span /><span /></div>}
                {scene.biome === 'rooftop' && <RadioTower className="h-20 w-20 opacity-40" />}
@@ -196,13 +253,28 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
         <header className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="group mb-6 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary"
+                  data-testid="button-hub-back-to-intro"
+                >
+                  <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                  Back
+                </button>
+              )}
               <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">The Sanctum</p>
               <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">Hideout</h1>
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Session Stats</p>
+              <p className="flex items-center gap-1.5 justify-start sm:justify-end text-lg font-black text-amber-300" data-testid="text-cred-balance">
+                <Coins className={`h-4 w-4 ${meta.ownedGeneratorIds.length > 0 ? 'hub-cred-pulse' : ''}`} />
+                {meta.cred} cred
+              </p>
               <p className="text-sm font-bold">
-                <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated <span className="opacity-50">/</span> <span className="text-white">{meta.cred}</span> cred
+                <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated
               </p>
               {meta.lootTokens > 0 && (
                 <p className="text-xs font-mono text-amber-400 mt-1">
@@ -217,17 +289,58 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
             </div>
           </div>
 
-          <nav className="flex flex-wrap gap-2 mb-6">
+          <section className="mb-6 border border-amber-400/25 bg-card p-3" data-testid="section-generators">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-amber-300">Passive income</p>
+              <span className="text-[10px] text-muted-foreground">Rent it once, it keeps paying while you're away</span>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {RENTABLE_GENERATORS.map((generator) => {
+                const owned = meta.ownedGeneratorIds.includes(generator.id);
+                const affordable = meta.cred >= generator.cost;
+                return (
+                  <div
+                    key={generator.id}
+                    className={`flex items-center justify-between gap-2 border p-2 ${owned ? 'border-amber-400/50 bg-amber-400/5' : 'border-border bg-black/20'}`}
+                    data-testid={`generator-${generator.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[11px] font-bold uppercase text-white">{generator.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {owned ? `+${generator.credPerMinute} cred/min` : `${generator.cost} cred · +${generator.credPerMinute}/min`}
+                      </p>
+                    </div>
+                    {owned ? (
+                      <Coins className="h-4 w-4 shrink-0 text-amber-300 hub-cred-pulse" />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => buyGenerator(generator.id)}
+                        disabled={!affordable}
+                        className="shrink-0 border border-amber-400/40 bg-amber-400/10 px-2 py-1 font-mono text-[9px] font-bold uppercase text-amber-200 disabled:opacity-30"
+                        data-testid={`button-buy-generator-${generator.id}`}
+                      >
+                        Rent
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <nav ref={roomNavRef} className="flex flex-wrap gap-2 mb-6">
             {unlockedRooms.map((room) => {
               const isActive = room.id === roomId;
               return (
                 <button
                   key={room.id}
                   type="button"
+                  data-nav-item
                   onClick={() => enterRoom(room.id)}
                   className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border ${
-                    isActive 
-                      ? 'bg-primary text-primary-foreground border-primary' 
+                    isActive
+                      ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-white'
                   }`}
                   data-active={isActive}
@@ -297,6 +410,51 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
                       <span className="block text-[10px] text-cyan-100/60">Open map builder</span>
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-cyan-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenSectorCommand}
+                    data-testid="button-hideout-sector-command"
+                    className="group flex items-center gap-3 border border-amber-200/35 bg-amber-950/30 px-3 py-2 text-left transition hover:border-amber-200/80 hover:bg-amber-950/60"
+                  >
+                    <Radio className="h-5 w-5 text-amber-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-100">Sector Command</span>
+                      <span className="block text-[10px] text-amber-100/60">Direct captured units · campaign</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && onOpenLokPetBattle && (
+                  <button
+                    type="button"
+                    onClick={onOpenLokPetBattle}
+                    data-testid="button-hideout-lokpet-battle"
+                    className="group flex items-center gap-3 border border-pink-400/40 bg-pink-950/40 px-3 py-2 text-left transition hover:border-pink-300 hover:bg-pink-950/70"
+                  >
+                    <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
+                      <span className="block text-[10px] text-pink-200/70">Experimental · LokPet Battles · Sparring & League</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenArena}
+                    data-testid="button-hideout-arena"
+                    className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
+                  >
+                    <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
+                      <span className="block text-[10px] text-violet-100/60">Experimental · 2-4 players · most kills wins</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
                   </button>
                 )}
               </div>
@@ -396,6 +554,33 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor }: Hub
             })}
           </div>
         </section>
+
+        {(meta.threatMatrixUnlocked || (meta.vendorPurchases?.['threat-matrix-console'] ?? 0) > 0) && (
+          <section className="mb-8 border border-cyan-500/40 bg-cyan-950/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg shadow-lg" data-testid="section-threat-matrix-banner">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded border border-cyan-400/50 bg-cyan-900/40 text-cyan-300">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">Security Override Terminal</span>
+                  <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-200">ONLINE</span>
+                </div>
+                <h3 className="text-base font-black uppercase text-white tracking-wide">Threat Matrix Quarantine Console</h3>
+                <p className="text-xs text-cyan-200/70">
+                  Override spawn tables, quarantine enemy specimens, or trigger Universal Cross-Map Incursions.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpen('threat-matrix')}
+              className="flex shrink-0 items-center justify-center gap-2 rounded border border-cyan-400 bg-cyan-500/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/35 transition-all shadow-md"
+            >
+              Access Terminal
+            </button>
+          </section>
+        )}
 
          {newlyRescuedAlly && (
            <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
