@@ -1739,6 +1739,12 @@ export function RunScreen({
       {chestFlight > 0 ? (
         <span key={chestFlight} className="pointer-events-none absolute left-1/2 top-1/2 z-50 text-2xl" style={{ animation: 'chest-pocket-fly 700ms cubic-bezier(.2,.85,.25,1) forwards' }} aria-hidden="true">▣</span>
       ) : null}
+      {/* The Intel drawer (run-hud-safe-zone, above) and the live tactical
+          dashboard both occupy this same top-right footprint and can grow
+          tall enough to sit under the loot tray -- hide it rather than let
+          two interactive panels overlap. It reappears the instant either
+          closes. */}
+      {!hudIntelOpen && !liveDashboardOpen ? (
       <div className="absolute right-2 top-[max(4.25rem,calc(env(safe-area-inset-top)+4rem))] z-40 flex items-stretch sm:right-5">
         <button
           type="button"
@@ -1771,6 +1777,7 @@ export function RunScreen({
           </aside>
         ) : null}
       </div>
+      ) : null}
 
       {/* Virtual stick */}
       {stickVisual.active ? (
