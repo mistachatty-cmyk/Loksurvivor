@@ -61,6 +61,18 @@ export const AREAS: AreaDef[] = [
       { fromSec: 95, toSec: 120, enemyId: 'crypt-bouncer', ratePerSec: 0.12, burst: 1 },
       squadWave({ fromSec: 30, toSec: 120, factionId: 'the-watch', ratePerSec: 0.25, formation: 'ring' }),
     ],
+    musicEvents: [
+      {
+        id: 'monroe-strip-bass-swell',
+        trigger: { source: 'band', band: 'bass', threshold: 0.75, cooldownMs: 20_000 },
+        effect: { kind: 'burst', enemyId: 'nightcrawler', count: 4, formation: 'ring' },
+      },
+      {
+        id: 'monroe-strip-choir-arrival',
+        trigger: { source: 'energy', threshold: 0.85, cooldownMs: 45_000 },
+        effect: { kind: 'squad', factionId: 'afterimage-choir', formation: 'wedge' },
+      },
+    ],
   },
   {
     id: 'back-alley',

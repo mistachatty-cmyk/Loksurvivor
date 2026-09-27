@@ -7,6 +7,7 @@
  */
 
 import type { BeatReaction } from '@/game/data/reactivity';
+import type { MusicSpawnEvent } from '@/game/data/musicEvents';
 import type { RunHighlight } from '@/game/data/runHighlights';
 import type { SfxStyleDef } from '@/game/audio/sfxCues';
 
@@ -1039,6 +1040,8 @@ export interface AreaDef {
   /** Seconds the player must survive to clear the area. */
   durationSec: number;
   waves: WaveDef[];
+  /** Optional music-reactive gameplay events; empty/absent for most areas. */
+  musicEvents?: MusicSpawnEvent[];
   unlock: UnlockRule;
   /** Ally that can be rescued here (spawns a rescue cage mid-run). */
   rescueAllyId?: string;

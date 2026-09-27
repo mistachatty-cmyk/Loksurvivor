@@ -73,23 +73,51 @@ certainly WebKit's known sample-rate-after-route-change issue, which needs
 tearing down and rebuilding the `MediaElementAudioSourceNode`/analyser graph,
 not just a `resume()` call.
 
-## Future idea (not built): let the music drive spawns/waves, never audio
+## Built 2026-09: music-driven spawn/palette events, audio still untouched
 
-The user has floated reusing `beatBus`'s energy/frequency-band data (already
-published every frame by `analysis.ts`) to trigger *gameplay* events when the
-music crosses a loudness/frequency threshold -- a tactical wave shape, a
-named faction arriving, a burst of more enemies or more ranged enemies, a
-palette/color shift, or a one-off special event. This is explicitly a later
-feature, not requested to be built now, and explicitly must **never** alter
-the audio itself (no volume/pitch/EQ changes tied to gameplay) -- the fix
-above exists specifically to keep mid-run audio untouched, and any such
-future work must preserve that boundary.
+The future idea below shipped as `data/musicEvents.ts`'s `MusicSpawnEvent`
+(`trigger` + `effect`) plus `world.ts`'s `applyMusicEvents`, consulted once
+per tick from `updateSpawning` -- a new, separate seam from `musicMultiplier`,
+because this is *discrete/edge-triggered* (a one-shot action once a
+band/energy threshold crosses, gated by a per-event `cooldownMs`) rather than
+`BeatReaction`'s *continuous* multipliers. `AreaDef.musicEvents` is optional
+and empty on every area except `monroe-strip` (two events: a bass-threshold
+enemy burst, an energy-threshold `afterimage-choir` squad arrival), so this
+never affects an area that hasn't opted in.
 
-If it does get built, it slots into the existing "reactions are content, not
-code" shape above: a new consumer of `beatBus` (bands/energy, not raw FFT
-data) feeding into `stepWorld`'s wave-selection logic the same way
-`musicMultiplier` already feeds speed/damage, with named presets in data
-rather than one-off checks in the loop. `WaveDef`'s existing `burst`/`group`/
-`formation` fields and `squadWave()` (see `content-authoring-system.md`) are
-probably the right vocabulary for "a certain faction" or "more enemies in
-general" once someone actually designs the trigger thresholds.
+Three effect kinds exist: `squad` (spawns a named faction's whole roster via
+a new dedicated `spawnMusicSquad`, deliberately not `spawnDirectorSquad`,
+which is coupled to `DIRECTORS`/boss tracking this has no use for), `burst`
+(spawns N copies of one enemy id -- the vocabulary for both "more enemies in
+general" and "more ranged," by simply picking a ranged enemy id), and
+`palette` (resolves a `paletteId` against the existing `THEMED_PALETTES`
+registry). Both spawn kinds reuse `spawnEnemy`, which already no-ops past
+`enemyCap(w)`, so no new cap logic was needed.
+
+**The palette effect is additive, never destructive.** `World.worldColorPalette`/
+`worldColorFullRecolor` are the player's own settings-driven theme choice, set
+once at `createWorld`. A music event instead sets a new, separate
+`World.musicColorOverride`, and the three `draw.ts` tint sites (`groundTint`,
+`worldTint`, the enemy-palette blend cache) check `musicColorOverride ??`
+that settings-driven pair -- so a music event can add a color shift on top,
+but can never overwrite or lose the player's own choice. It's sticky (no
+timer) until a different palette event fires or the run ends.
+
+**Still true: this never touches audio playback.** `applyMusicEvents` only
+reads `w.audio`/`w.now`/`w.area`; it has no reference to `musicPlayer.tsx`,
+`beatBus`, or any `AudioContext`/`<audio>` element, and stays inside
+`stepWorld`'s existing purity contract (consult `w.audio`, nothing else).
+
+**Deliberately deferred to v2, not silently skipped:**
+- **Endless-mode wiring.** `updateEndlessSpawning` is a separate spawn path
+  with its own difficulty-cap composition rules (`hpMult` ≤ 1.7, spawn rate
+  ≤ 3.2/s, composed *inside* `Math.min()` per `endless-mode-engine.md`) --
+  music events don't fire there yet.
+- **Any sustained/decaying effect kind** (e.g. "boost spawn rate for N
+  seconds"). v1 is one-shot only by design, specifically to avoid having to
+  compose a new multiplier inside those same difficulty caps for a first
+  ship.
+- **Open-ended "special events"** beyond squad/burst/palette --
+  `MusicEventEffect` is a closed discriminated union; add a variant plus a
+  `fireMusicEvent` case when a concrete fourth kind is actually designed,
+  rather than a speculative generic hook.
