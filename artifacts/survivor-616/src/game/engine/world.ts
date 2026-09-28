@@ -1075,6 +1075,12 @@ export interface World {
    * falls back to `DIRECTORS[0]` in `updateDirector`.
    */
   activeDirectorPersonalityId: string | null;
+  /**
+   * w.now the next bonus faction-favor spawn is allowed. Only consulted
+   * when the active personality's `effect.kind === 'factionFavor'` --
+   * see `applyDirectorFactionFavor` in updateSpawning/updateEndlessSpawning.
+   */
+  nextFactionFavorSpawnAt: number;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -1393,6 +1399,7 @@ export function createWorld(
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
     activeDirectorPersonalityId: setup.activeDirectorPersonalityId ?? null,
+    nextFactionFavorSpawnAt: 0,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -1832,6 +1839,45 @@ function modifierSpawnMult(w: World): number {
   return w.modifiers.doubleMode ? 2 : 1;
 }
 
+/**
+ * The active Director personality's `DirectorPersonalityEffect` tuning, or
+ * the neutral identity for `'none'`/unset. Only ever consulted from
+ * `updateSpawning`/`updateEndlessSpawning`, and always composed *inside*
+ * each call site's own difficulty cap (see endless-mode-engine.md) --
+ * never applied on top of it. `factionFavor`'s spawnRateMult only biases
+ * `applyDirectorFactionFavor`'s bonus spawns below, not the global rate,
+ * so it reads as neutral here.
+ */
+function activeDirectorEffect(w: World): { spawnRateMult: number; hpMult: number } {
+  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId) ?? DIRECTORS[0];
+  const effect = director?.effect;
+  if (effect?.kind === 'spawnBias') return { spawnRateMult: effect.spawnRateMult, hpMult: effect.hpMult };
+  return { spawnRateMult: 1, hpMult: 1 };
+}
+
+const FACTION_FAVOR_INTERVAL_SEC = 20;
+
+/**
+ * When the active Director personality is `factionFavor`, periodically drops
+ * one extra copy of a random enemy from its favored faction's roster --
+ * regular `AreaDef.waves` have no other way to inject a faction that isn't
+ * authored into that area. Mirrors `spawnMusicSquad`'s "own small seam,
+ * deliberately not spawnDirectorSquad" shape: this has no boss/encounter
+ * tracking to hook into, just a bonus enemy. Gated on `enemyCap(w)` the same
+ * as every other spawn path, via `spawnEnemy`'s own guard.
+ */
+function applyDirectorFactionFavor(w: World) {
+  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId) ?? DIRECTORS[0];
+  const effect = director?.effect;
+  if (effect?.kind !== 'factionFavor') return;
+  if (w.time < director!.triggerAfterSec) return;
+  if (w.now < w.nextFactionFavorSpawnAt) return;
+  w.nextFactionFavorSpawnAt = w.now + (FACTION_FAVOR_INTERVAL_SEC * 1000) / Math.max(0.01, effect.spawnRateMult);
+  const faction = getFaction(effect.favoredFactionId);
+  const enemyId = faction.roster[Math.floor(w.rng() * faction.roster.length)]!;
+  spawnEnemy(w, getEnemy(enemyId), 1);
+}
+
 function enemyCap(w: World): number {
   const base = w.modifiers.unleashedMode ? UNLEASHED_ENEMY_CAP : NORMAL_ENEMY_CAP;
   const densityMult = w.threatCalibrations?.densityMult ?? 1;
@@ -2162,8 +2208,10 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
 
 function updateSpawning(w: World, dt: number) {
   applyMusicEvents(w);
+  applyDirectorFactionFavor(w);
   const waves = w.area.waves;
-  const baseSpawnMult = modifierSpawnMult(w);
+  const directorEffect = activeDirectorEffect(w);
+  const baseSpawnMult = modifierSpawnMult(w) * directorEffect.spawnRateMult;
   const infiniteMode = Boolean(w.modifiers.infiniteMode);
   // Several authored areas' climaxes are multiple waves tied at the same
   // (highest) toSec rather than one wave that happens to sit last in the
@@ -2184,7 +2232,12 @@ function updateSpawning(w: World, dt: number) {
     // spawn window. `w.time - dt` puts the previous substep still outside it.
     if (!infiniteActive && w.time - dt < wave.fromSec) pushSfx(w, 'waveStart');
     const infiniteTier = infiniteActive ? Math.floor((w.time - wave.toSec) / 20) : 0;
-    const infiniteHpMult = infiniteActive ? Math.min(1.7, 1 + infiniteTier * 0.07) : 1;
+    // directorEffect.hpMult composes *inside* infinite mode's own hp cap,
+    // per endless-mode-engine.md; outside infinite mode there's no other
+    // ceiling to compose inside of, so it applies directly below via
+    // wave.hpMult -- authored effect values stay in a conservative range
+    // (see data/directors.ts) since nothing else bounds them there.
+    const infiniteHpMult = infiniteActive ? Math.min(1.7, (1 + infiniteTier * 0.07) * directorEffect.hpMult) : 1;
     const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
     const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
     const densityMult = w.threatCalibrations?.densityMult ?? 1;
@@ -2198,8 +2251,10 @@ function updateSpawning(w: World, dt: number) {
       const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
       let positionIndex = 0;
       // modifierHpMult isn't applied here -- spawnEnemy applies it to every
-      // caller uniformly (see its own comment for why).
-      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
+      // caller uniformly (see its own comment for why). directorEffect.hpMult
+      // is already folded into infiniteHpMult (and its cap) when infinite
+      // mode is active, so it's only applied here directly otherwise.
+      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult * (infiniteActive ? 1 : directorEffect.hpMult);
       for (let b = 0; b < wave.burst; b += 1) {
         spawnEnemy(w, def, hpMult, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
@@ -9345,10 +9400,12 @@ const SURGE_CYCLE_SEC = 20;
 const ELITE_ROTATION = ['crypt-bouncer', 'smoke-horn'];
 
 function updateEndlessSpawning(w: World, dt: number) {
+  applyDirectorFactionFavor(w);
   const e = w.endless!;
   const tier = endlessDiffTier(e);
   const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
   const nightMult = nightDifficultyMult(w.cycle.phase);
+  const directorEffect = activeDirectorEffect(w);
   // Automatic/environmental multipliers (tier, night) stay inside this cap
   // per endless-mode-engine.md. modifierSpawnMult is folded in here to match
   // how w.challenges' own enemySpawnMultiplier is already capped alongside
@@ -9357,9 +9414,12 @@ function updateEndlessSpawning(w: World, dt: number) {
   // uncapped (inside spawnEnemy), and run modifiers are the same kind of
   // player-opted-in multiplier as challenges, not an automatic one. Adding
   // it here would also double-apply it, since spawnEnemy applies it too.
+  // directorEffect.hpMult is different: unlike modifierHpMult, spawnEnemy
+  // never applies it on its own, so it's composed inside this cap directly
+  // (same treatment as tier/night) rather than being dropped.
   const spawnRateCap = w.modifiers.unleashedMode ? 12 : 3.2;
-  const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
-  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
+  const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w) * directorEffect.spawnRateMult);
+  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult * directorEffect.hpMult);
 
   const bandPool = getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.enemyPool;
   const pool = bandPool?.length

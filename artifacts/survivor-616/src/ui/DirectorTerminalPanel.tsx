@@ -30,8 +30,10 @@ export function DirectorTerminalPanel({ onBack }: DirectorTerminalPanelProps) {
       <div className="mb-6 flex items-start gap-3 border border-primary/30 bg-primary/5 p-4">
         <ScanEye className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Something bigger than any one Director keeps this terminal running. It never explains itself, only files. Each
-          entry below is a Director it has let out onto the streets -- defeat one to read its file and unlock it here.
+          Something bigger than any one Director keeps this terminal running -- an unnamed process a few tiers up,
+          quietly greenlighting which "personality" gets to run a scene next. It never explains itself, only files.
+          Each entry below is a Director it has let out onto the streets, on its own schedule, for its own reasons --
+          defeat one to read its file and unlock it here.
         </p>
       </div>
 

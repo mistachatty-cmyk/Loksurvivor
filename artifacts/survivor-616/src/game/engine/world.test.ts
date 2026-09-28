@@ -2624,6 +2624,56 @@ test('a palette music event overrides rendering without mutating the settings-dr
   assert.equal(world.worldColorPalette, undefined);
 });
 
+/* ------------------------------------------------------------------ */
+/* Director personality effects                                        */
+/* ------------------------------------------------------------------ */
+
+function areaWithWave(ratePerSec: number): AreaDef {
+  return {
+    ...testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }),
+    waves: [{ enemyId: 'nightcrawler', fromSec: 0, toSec: 300, ratePerSec, burst: 1 }],
+  };
+}
+
+test('an unknown activeDirectorPersonalityId falls back to take-two, changing nothing', () => {
+  const world = createWorld(areaWithWave(45), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'not-a-real-director',
+  });
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.enemies.length, 1);
+});
+
+test("the Cutting Room's spawnBias spawns more, individually squishier enemies", () => {
+  const baseline = createWorld(areaWithWave(45), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(baseline, 1 / 30, neutralInput);
+  assert.equal(baseline.enemies.length, 1, 'baseline: one spawn credit crosses 1 this step');
+
+  const biased = createWorld(areaWithWave(45), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'cutting-room',
+  });
+  stepWorld(biased, 1 / 30, neutralInput);
+  assert.equal(biased.enemies.length, 2, 'spawnRateMult 1.35 crosses a second spawn credit this step');
+  assert.ok(biased.enemies[0]!.hp < baseline.enemies[0]!.hp, 'hpMult 0.85 makes each spawn individually squishier');
+});
+
+test('Continuity periodically spawns a bonus enemy from its favored faction once eligible', () => {
+  const world = createWorld(areaWithWave(0), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'continuity',
+  });
+  world.time = 181; // past triggerAfterSec (180)
+  stepWorld(world, 1 / 30, neutralInput);
+  const favoredRoster = new Set(getFaction('afterimage-choir').roster);
+  assert.ok(world.enemies.some((e) => favoredRoster.has(e.defId)), 'a favored-faction enemy should have spawned');
+});
+
+test("Continuity's faction favor is a no-op before triggerAfterSec", () => {
+  const world = createWorld(areaWithWave(0), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'continuity',
+  });
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.enemies.length, 0);
+});
+
 test("Static Nomad's pulse-shield fires an all-direction burst the instant the character dashes", () => {
   const character = getCharacter('staticnomad');
   const world = createWorld(testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }), character, character.stats, 701);

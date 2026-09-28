@@ -1,10 +1,11 @@
 ---
-name: GRPD Station and the Director Terminal (Stage 1 of a larger roadmap)
-description: A new hub location (GRPD Station off Division), the Director-personality terminal it houses, the SWAT Sauna's unique reward hole, Rapid Guard's K9 counter, and the full deferred roadmap (factions, The Running Man, new weapons, the Artiste) this is Stage 1 of.
+name: GRPD Station and the Director Terminal (Stages 1-2 of a larger roadmap)
+description: A new hub location (GRPD Station off Division), the Director-personality terminal it houses (now with 3 personalities and real spawnBias/factionFavor tuning), the SWAT Sauna's unique reward hole, Rapid Guard's K9 counter, and the full deferred roadmap (factions, The Running Man, new weapons, the Artiste) this is Stages 1-2 of.
 ---
 
 Read before touching `data/directors.ts`, the `DirectorPersonalityEffect`
-union in `types.ts`, `HUB_ROOMS`/`ALLIES`/`DISCOVERIES` in
+union in `types.ts`, `activeDirectorEffect`/`applyDirectorFactionFavor` in
+`engine/world.ts`, `HUB_ROOMS`/`ALLIES`/`DISCOVERIES` in
 `data/progression.ts`, `RECOVERY_FACILITIES`/`RECOVERY_HUTS`/
 `SAUNA_HOLE_REWARDS` in `data/recovery.ts`, the `'lokpet'` `VendorItemDef`
 category, or the `k9-hound`/`wolf`/`digi-wolf` LokPet content in
@@ -18,8 +19,8 @@ expansion of the existing single-Director boss system into multiple
 selectable "personalities" reached from a new police-station location, new
 vendor/pet content, two new enemy factions, several new weapons, and a new
 playable character with a novel draw-to-dodge ability. Given the scope,
-this was explicitly staged: **only Stage 1 (this doc) is built**; Stages
-2-7 are recorded below as a roadmap, not built, so the full vision survives
+this was explicitly staged: **Stages 1-2 (this doc) are built**; Stages
+3-7 are recorded below as a roadmap, not built, so the full vision survives
 without needing to be re-derived or re-asked for.
 
 ## Stage 1, built: GRPD Station + Director Terminal
@@ -158,12 +159,66 @@ capture**: `killEnemy` in `engine/world.ts` has a dedicated branch keyed on
 `SPECIAL_LOKPET_LOADOUTS` legendary, same shape as the three starters) and
 calls the same `spawnLokPet` any other pickup-triggered grant uses.
 
-## Explicitly deferred (Stage 2 onward, not built)
+## Stage 2, built: two more Director personalities + AI-hierarchy lore
 
-- **Stage 2**: real `DirectorPersonalityEffect` tuning for 2 more
-  `DirectorDef` entries (new faction rosters + bosses each), and the actual
-  "who/what controls the Directors" lore paragraph written into the
-  terminal's framing text.
+Two new `DirectorDef` entries in `data/directors.ts`, each with its own
+`FactionDef` (`data/factions.ts`) + roster + `family: 'Boss'` enemy
+(`data/enemies.ts`), following `reel-syndicate`/`the-director`'s own
+pattern exactly (a faction that only ever spawns from `data/directors.ts`,
+never from an area's authored `waves`):
+
+- **The Cutting Room** (`id: 'cutting-room'`, faction `cutting-room-crew`,
+  boss `the-splice`) -- `effect: { kind: 'spawnBias', spawnRateMult: 1.35,
+  hpMult: 0.85 }`: more enemies for the rest of the run, each individually
+  squishier.
+- **Continuity** (`id: 'continuity'`, faction `continuity-desk`, boss
+  `the-take`) -- `effect: { kind: 'factionFavor', favoredFactionId:
+  'afterimage-choir', spawnRateMult: 1.5 }`: biases a specific *existing*
+  named faction to show up more throughout the run, on top of its own
+  encounter roster.
+
+Both effect kinds needed real engine wiring (Stage 1 shipped only the type
+shape). New helper `activeDirectorEffect(w)` in `engine/world.ts` reads
+`w.activeDirectorPersonalityId`'s `effect` and returns neutral
+`{spawnRateMult: 1, hpMult: 1}` for `'none'`/`factionFavor` (factionFavor's
+own `spawnRateMult` only scales its bonus-spawn cadence, not the global
+rate). `spawnBias` composes into both spawn seams, **inside** each seam's
+own existing difficulty cap per `endless-mode-engine.md`'s hard rule:
+- `updateSpawning` -- folded into `baseSpawnMult` (spawn rate) and into
+  `infiniteHpMult`'s `Math.min(1.7, ...)` when infinite mode is active
+  (applied directly to `hpMult` otherwise, since normal-mode waves have no
+  other ceiling to compose inside of -- this is why `directors.ts`'s
+  `spawnBias` values stay conservative, e.g. 0.85/1.35, not aggressive).
+- `updateEndlessSpawning` -- folded directly into the existing
+  `Math.min(spawnRateCap, ...)`/`Math.min(1.7, ...)` calls, same treatment
+  as `tier`/`nightMult` since (unlike `modifierHpMult`) nothing else
+  applies it automatically.
+
+`factionFavor` needed a genuinely new small seam -- regular waves have no
+way to inject a faction that isn't authored into that area. New function
+`applyDirectorFactionFavor(w)` (mirrors `spawnMusicSquad`'s "own small
+seam, not `spawnDirectorSquad`" shape, since this has no boss/encounter
+tracking to hook into): every ~20s (scaled by `spawnRateMult`) past
+`triggerAfterSec`, spawns one bonus copy of a random enemy from
+`favoredFactionId`'s roster, subject to `spawnEnemy`'s own `enemyCap`
+guard. Called once at the top of both `updateSpawning` and
+`updateEndlessSpawning`, next to the existing `applyMusicEvents(w)` call.
+
+`DirectorTerminalPanel.tsx`'s framing paragraph now names (without ever
+fully explaining) an unnamed process a few tiers up that greenlights which
+Director personality runs a scene next -- new lore, nothing pre-existing
+conflicts with it.
+
+Tests: `directors.test.ts`/`factions.test.ts` cover the 2 new entries
+automatically (both already loop over every registered `DirectorDef`/
+`FactionDef`, no changes needed). New `world.test.ts` cases (`/* Director
+personality effects */` section) cover: an unknown
+`activeDirectorPersonalityId` falling back to `take-two` unchanged,
+`cutting-room`'s spawn-rate/hp bias, and `continuity`'s favored-faction
+bonus spawn firing only past `triggerAfterSec`.
+
+## Explicitly deferred (Stage 3 onward, not built)
+
 - **Stage 3**: the Rapid faction (human resistance -- riot team, gardeners,
   fighting dogs/rare cats, firefighters, teachers, bar owners, retired
   people, scared residents, briefcase-throwing management, and military
