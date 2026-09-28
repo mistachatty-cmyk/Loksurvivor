@@ -73,18 +73,23 @@ that same package is `z.string()` (free string, per `schema.ts`), so the
 new kind flows into the real clip-cutting `HighlightReel` scene without any
 recap-side change needed.
 
-## Still requested, not yet built: a "music surge" highlight
+## Music-surge highlight, built as a follow-up
 
-The user also asked for a highlight tied to a surge in the music (the
-existing beat-bus reactivity system, see `music-reactivity.md`). Not
-attempted in this pass: `runHighlights.ts`'s `RunHighlightObservable` is
-deliberately narrow (see the file's own header comment) and reads only
-already-public `World` fields; a music-surge trigger needs a new signal
-piped in from whatever component owns the beat bus (`RunScreen`, most
-likely), which means touching the reactivity system's public surface --
-that should be scoped and read against `music-reactivity.md` first rather
-than guessed at. The `kill-streak` addition above shows the shape a second
-observed-field highlight should take once that signal exists.
+Landed once `music-reactivity.md` was actually read: `World.audio` is
+already a plain public field (`AudioFrame` from `audio/beatBus.ts`, read
+elsewhere via `w.audio.energy`/`w.audio.source` in `world.ts`'s
+`applyMusicEvents`/`musicMultiplier`), so this needed no new signal piped
+in from `RunScreen` at all -- `RunHighlightObservable` just grew a narrowed
+`audio: { energy: number; source: 'none' | 'detected' | 'studio' }` field
+(not the full `AudioFrame`, so this file still never imports `beatBus.ts`),
+and the real `World` object `RunScreen` already passes to `observe()`
+satisfies it structurally. Fires on the rising edge past
+`MUSIC_SURGE_ENERGY_THRESHOLD` (0.85) with its own
+`MUSIC_SURGE_COOLDOWN_MS` (15000ms) so a sustained loud section doesn't
+retrigger every frame, and never fires while `source === 'none'` (nothing
+playing, or detection hasn't locked on) regardless of reported energy.
+Wired into `RunSummary.tsx`'s icon map (`Music` icon) the same way
+`kill-streak` was.
 
 ## Everything new here is optional, on the user's explicit request
 

@@ -22,7 +22,7 @@ import { loadMediaAssets } from '@/game/audio/localMediaStore';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '@/state/authStore';
 import { motion } from 'framer-motion';
-import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound, Flame } from 'lucide-react';
+import { Skull, Coins, Zap, Trophy, Heart, Unlock, MapPin, TrendingDown, Package, CheckCircle, BatteryLow, BookOpen, Sparkles, Bell, Magnet, SprayCan, Utensils, Radio, KeyRound, Flame, Music } from 'lucide-react';
 import { characterLevelProgress, playerLevelProgress, useMeta } from '@/game/state/metaStore';
 import { characterRankTitle } from '@/game/data/characterMastery';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
@@ -60,6 +60,7 @@ const RUN_HIGHLIGHT_ICONS: Record<RunHighlightKind, typeof Zap> = {
   ultimate: Sparkles,
   'ally-rescued': Unlock,
   'kill-streak': Flame,
+  'music-surge': Music,
   'run-cleared': Trophy,
   'run-ended': BatteryLow,
 };

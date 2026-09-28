@@ -26,6 +26,7 @@ export type RunHighlightKind =
   | 'ultimate'
   | 'ally-rescued'
   | 'kill-streak'
+  | 'music-surge'
   | 'run-cleared'
   | 'run-ended';
 
@@ -54,6 +55,13 @@ export interface RunHighlightObservable {
   ultActiveUntil: number;
   rescue: { status: 'pending' | 'available' | 'freeing' | 'freed'; allyId?: string };
   player: { hp: number; maxHp: number };
+  /**
+   * Narrowed from `World.audio` (`AudioFrame`, see `audio/beatBus.ts`) --
+   * only the two fields this needs, so this file still never imports the
+   * beat-bus module itself. `source: 'none'` (nothing playing, or analysis
+   * hasn't locked on yet) never produces a highlight regardless of `energy`.
+   */
+  audio: { energy: number; source: 'none' | 'detected' | 'studio' };
 }
 
 const MAX_HIGHLIGHTS = 6;
@@ -62,6 +70,8 @@ const CLOSE_CALL_COOLDOWN_MS = 9000;
 const KILL_STREAK_WINDOW_MS = 3000;
 const KILL_STREAK_THRESHOLD = 8;
 const KILL_STREAK_COOLDOWN_MS = 12000;
+const MUSIC_SURGE_ENERGY_THRESHOLD = 0.85;
+const MUSIC_SURGE_COOLDOWN_MS = 15000;
 
 interface RecorderState {
   highlights: RunHighlight[];
@@ -71,6 +81,8 @@ interface RecorderState {
   /** Rolling window of recent per-frame kill counts, for the kill-streak highlight. */
   recentKills: { atMs: number; count: number }[];
   lastKillStreakAt: number;
+  lastAudioEnergy: number;
+  lastMusicSurgeAt: number;
   lastRescueStatus: string | undefined;
   lastUltActiveUntil: number;
   lastCloseCallAt: number;
@@ -118,6 +130,8 @@ export function createRunHighlightRecorder() {
     lastTotalKills: 0,
     recentKills: [],
     lastKillStreakAt: -Infinity,
+    lastAudioEnergy: 0,
+    lastMusicSurgeAt: -Infinity,
     lastRescueStatus: undefined,
     lastUltActiveUntil: 0,
     lastCloseCallAt: -Infinity,
@@ -166,6 +180,17 @@ export function createRunHighlightRecorder() {
       });
       state.lastKillStreakAt = world.now;
     }
+
+    if (
+      world.audio.source !== 'none'
+      && world.audio.energy >= MUSIC_SURGE_ENERGY_THRESHOLD
+      && state.lastAudioEnergy < MUSIC_SURGE_ENERGY_THRESHOLD
+      && world.now - state.lastMusicSurgeAt > MUSIC_SURGE_COOLDOWN_MS
+    ) {
+      pushBounded(state, { kind: 'music-surge', atMs: world.now, label: 'The track surged' });
+      state.lastMusicSurgeAt = world.now;
+    }
+    state.lastAudioEnergy = world.audio.energy;
 
     if (world.ultActiveUntil > world.now && world.ultActiveUntil !== state.lastUltActiveUntil) {
       pushBounded(state, { kind: 'ultimate', atMs: world.now, label: 'Ultimate unleashed' });
