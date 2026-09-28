@@ -40,3 +40,9 @@ test('GRPD Station exposes the kennel as a first-class destination', () => {
   assert.ok(station.features.includes('kennel'));
   assert.ok(station.features.includes('vendor'));
 });
+
+test('GRPD Vault opens when the Site Crew recovery zone is cleared', () => {
+  const vault = HUB_ROOMS.find((room) => room.id === 'grpd-vault');
+  assert.ok(vault);
+  assert.deepEqual(vault.unlock, { kind: 'clearArea', areaId: 'site-crew-active-zone' });
+});

@@ -25,6 +25,7 @@ import { RENTABLE_GENERATORS } from '@/game/data/generators';
 import { Coins } from 'lucide-react';
 import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
 import { LokPetIcon } from './LokPetVariantSheet';
+import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal';
 
@@ -103,7 +104,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
   const roomNavRef = useRef<HTMLElement>(null);
@@ -129,6 +130,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const primePalette = primeTakeoverActive ? getCharacter('artisanvalor').palette : null;
   const [isPageVisible, setIsPageVisible] = useState(true);
   const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
+  const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
+  const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
 
   useEffect(() => {
     const updateVisibility = () => setIsPageVisible(document.visibilityState === 'visible');
@@ -462,6 +465,39 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               </div>
            </div>
         </header>
+
+        {activeRoom.id === 'grpd-vault' && blue616 && (
+          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
+                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
+                </div>
+                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
+                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
+              </div>
+              {legendaryPoliceDog ? (
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
+                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
+                    <ShieldCheck className="h-4 w-4" /> Recovered
+                  </div>
+                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
+                    Equip LokPet
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
+                  <Dog className="h-5 w-5" /> Claim Blue 616
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="mb-8 border border-[#fbbf24]/45 bg-black/45 p-4 sm:p-5" data-testid="section-crew-rumor">
           {activeRumor && meta.activeCrewRumor && rumorAlly ? (

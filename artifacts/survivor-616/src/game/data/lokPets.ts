@@ -60,6 +60,7 @@ export const LOKPET_VARIANTS: LokPetVariantDef[] = [
   // rare/mythic spread like any other pet, per the "rarities" ask.
   { id: 'k9-greyhound', name: 'K9 Greyhound', family: 'animal', silhouette: 'k9-hound', palette: { body: '#94a3b8', bodyDark: '#334155', accent: '#1d4ed8', glow: '#60a5fa', eye: '#0f172a' }, description: 'A lean patrol dog in a stitched-up police vest, still faster than anything else on four legs.' },
   { id: 'k9-shepherd', name: 'K9 Shepherd', family: 'animal', silhouette: 'k9-hound', palette: { body: '#5b3a21', bodyDark: '#2b1a0f', accent: '#1d4ed8', glow: '#93c5fd', eye: '#1c1917' }, description: 'A retired precinct shepherd, badge clipped to its vest, that never quite stopped working the beat.' },
+  { id: 'blue-616', name: 'Blue 616', family: 'animal', silhouette: 'k9-hound', palette: { body: '#1e3a5f', bodyDark: '#08111f', accent: '#facc15', glow: '#60a5fa', eye: '#e0f2fe' }, description: 'The GRPD vault guardian. Blue held the last watch alone and still answers the old 616 call sign.', sizeScale: 1.1, legendary: true, weight: 0 },
   { id: 'wolf', name: 'Alley Wolf', family: 'animal', silhouette: 'wolf', palette: { body: '#44403c', bodyDark: '#1c1917', accent: '#a8a29e', glow: '#38bdf8', eye: '#fef3c7' }, description: 'A real wolf that wandered into the city and decided the streets were just a bigger forest.', weight: 3 },
 
   // GRPD Station K9 Unit -- broader dog-breed pool, merged in from the
@@ -157,6 +158,7 @@ const SPECIAL_LOKPET_LOADOUTS: Record<string, {
   'cosmic-axolotl': { attackKind: 'pulse', element: 'slow', elementLabel: 'starlight pulse', traitLabel: 'Astral Dew · serene lullaby', stats: { health: 115, moveSpeed: 145, damage: 20, cooldownMs: 680, range: 350, projectileSpeed: 360, explosionRadius: 0, pulseRadius: 125, lifetimeMs: 120000 } },
   'storm-griffin': { attackKind: 'heavy-shot', element: 'none', elementLabel: 'volt storm', traitLabel: 'Tempest Arc · thunder talon', stats: { health: 125, moveSpeed: 185, damage: 29, cooldownMs: 700, range: 340, projectileSpeed: 460, explosionRadius: 65, pulseRadius: 0, lifetimeMs: 115000 } },
   'digi-wolf': { attackKind: 'rapid-shot', element: 'freeze', elementLabel: 'corrupted frost', traitLabel: 'Digi-Fang · packet bite', stats: { health: 118, moveSpeed: 190, damage: 25, cooldownMs: 560, range: 320, projectileSpeed: 440, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 115000 } },
+  'blue-616': { attackKind: 'heavy-shot', element: 'freeze', elementLabel: 'blue-line frost', traitLabel: 'Last Watch · vault guardian', stats: { health: 150, moveSpeed: 160, damage: 29, cooldownMs: 680, range: 340, projectileSpeed: 440, explosionRadius: 58, pulseRadius: 100, lifetimeMs: 120000 } },
 };
 
 function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element: LokPetElement; label: string } {
