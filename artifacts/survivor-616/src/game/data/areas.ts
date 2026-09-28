@@ -1013,6 +1013,50 @@ export const AREAS: AreaDef[] = [
     ],
   },
 
+  {
+    id: 'site-crew-active-zone',
+    name: 'The Site Crew — Active Zone',
+    district: 'Division reconstruction cut',
+    description:
+      'The street is being rebuilt while you cross it. Barrier teams squeeze the safe lanes, nailers cover the openings, crane hooks drag trespassers off-route, and Foreman Slab keeps the concrete moving.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 1040, h: 760 },
+    ground: { base: '#16130f', tile: '#29231b', seam: '#090806', glow: '#f97316' },
+    sky: 'overcast',
+    obstacles: [
+      { x: -420, y: -230, w: 150, h: 28, kind: 'cover' },
+      { x: -140, y: -90, w: 150, h: 28, kind: 'cover' },
+      { x: 140, y: 90, w: 150, h: 28, kind: 'cover' },
+      { x: 420, y: 230, w: 150, h: 28, kind: 'cover' },
+      { x: -360, y: 190, w: 70, h: 70, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 360, y: -190, w: 70, h: 70, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -230, y: 40, w: 58, h: 58, kind: 'barrel' },
+      { x: 230, y: -40, w: 58, h: 58, kind: 'barrel' },
+      { x: 0, y: -300, w: 130, h: 30, kind: 'security-gate' },
+      { x: 0, y: 300, w: 130, h: 30, kind: 'security-gate' },
+      { x: -70, y: 160, w: 58, h: 58, kind: 'crate-breakable' },
+      { x: 70, y: -160, w: 58, h: 58, kind: 'crate-breakable' },
+    ],
+    landmark: {
+      name: 'The Moving Pour',
+      description: 'A mixer-frame feeds a concrete trench that never seems to fill, turning the whole block into a shifting construction line.',
+      kind: 'plaza',
+      accent: '#f97316',
+    },
+    durationSec: 210,
+    threat: 'severe',
+    discoveryId: 'site-crew-permit',
+    unlock: { kind: 'clearArea', areaId: 'supabuilda-heavy-floor' },
+    waves: [
+      { fromSec: 0, toSec: 55, enemyId: 'site-crew-apprentice', ratePerSec: 1.35, burst: 3, faction: 'The Site Crew' },
+      { fromSec: 25, toSec: 100, enemyId: 'site-crew-nailer', ratePerSec: 0.58, burst: 1, faction: 'The Site Crew' },
+      { fromSec: 55, toSec: 150, enemyId: 'site-crew-barrier-setter', ratePerSec: 0.38, burst: 1, formation: 'wedge', faction: 'The Site Crew' },
+      { fromSec: 90, toSec: 190, enemyId: 'site-crew-crane-hook', ratePerSec: 0.28, burst: 1, formation: 'pincer', faction: 'The Site Crew' },
+      { fromSec: 135, toSec: 205, enemyId: 'site-crew-apprentice', ratePerSec: 2, burst: 4, group: ['site-crew-nailer', 'site-crew-barrier-setter'], formation: 'ring', faction: 'The Site Crew' },
+      { fromSec: 200, toSec: 210, enemyId: 'site-crew-foreman', ratePerSec: 0.1, burst: 1, hpMult: 1.25, faction: 'The Site Crew' },
+    ],
+  },
+
   ...WEIRD_AREAS,
 
   // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.
