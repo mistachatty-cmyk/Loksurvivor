@@ -1,6 +1,6 @@
 import type { CharacterDef, SpritePalette } from '@/game/types';
 
-export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'episode';
+export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'cel-broadcast' | 'episode';
 
 export interface CharacterSkinDef {
   id: string;
@@ -49,6 +49,17 @@ function paletteVariant(base: SpritePalette, style: CharacterSkinStyle, seed: nu
     skin: mixColor(base.skin, base.accentBright, 0.18),
     glow: mixColor(base.glow, hot, 0.6),
   };
+  if (style === 'cel-broadcast') return {
+    // Anime cel-shading: near-black ink lines, a flat saturated body, and a
+    // blown-out white-hot rim light standing in for a specular highlight.
+    ink: mixColor(base.ink, '#000000', 0.7),
+    body: mixColor(base.accent, hot, 0.4),
+    bodyDark: mixColor(base.bodyDark, base.ink, 0.5),
+    accent: mixColor(hot, cool, 0.3),
+    accentBright: '#ffffff',
+    skin: mixColor(base.skin, '#fff4e0', 0.35),
+    glow: mixColor(hot, '#ffffff', 0.25),
+  };
   return {
     ink: mixColor(base.ink, '#000000', 0.3),
     body: mixColor(base.body, hot, 0.34),
@@ -70,6 +81,7 @@ export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
     { style: 'original', name: 'Original', description: 'The character’s authored street colors.', episodeRequired: false },
     { style: 'nocturne', name: 'Nocturne', description: 'A cool late-night version of the original look.', episodeRequired: false },
     { style: 'countertone', name: 'Countertone', description: 'A loud complementary remix unique to this fighter.', episodeRequired: false },
+    { style: 'cel-broadcast', name: 'Cel Broadcast', description: 'A hand-inked anime rebroadcast — flat saturated color and a blown-out rim light.', episodeRequired: false },
     { style: 'episode', name: 'Afterstory', description: 'The personal colorway earned by completing this character’s episode.', episodeRequired: true },
   ];
   return variants.map((skin) => ({

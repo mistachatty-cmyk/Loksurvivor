@@ -53,6 +53,14 @@ export const RUN_AURAS: RunAuraDef[] = [
     tier: 'legendary',
     style: 'mothlight',
   },
+  {
+    id: 'tile-bloom',
+    name: 'Tile Bloom',
+    description: 'A small grid of pavement tiles lights up underfoot and blooms with every step.',
+    cost: 3,
+    tier: 'rare',
+    style: 'tile-bloom',
+  },
 ];
 
 export const RUN_AURAS_BY_ID: Record<string, RunAuraDef> = Object.fromEntries(

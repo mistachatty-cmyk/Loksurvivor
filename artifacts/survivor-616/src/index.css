@@ -529,6 +529,73 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='block-party'][data-ui-swatch='flyer-yellow'] { --primary: 50 100% 62%; --accent-foreground: 50 100% 62%; --ring: 50 100% 62%; }
 [data-ui-theme='block-party'][data-ui-swatch='porch-teal'] { --primary: 166 88% 58%; --accent-foreground: 166 88% 58%; --ring: 166 88% 58%; }
 
+/* Aurora Transit: a night-bus window with a slow northern-lights curtain. */
+[data-ui-theme='aurora-transit'] {
+  --background: 200 45% 6%; --foreground: 190 40% 94%;
+  --card: 202 38% 10%; --card-foreground: 190 40% 94%; --card-border: 190 55% 30%;
+  --popover: 202 38% 10%; --popover-foreground: 190 40% 94%; --popover-border: 190 55% 30%;
+  --primary: 168 90% 60%; --primary-foreground: 200 45% 6%;
+  --secondary: 202 30% 15%; --secondary-foreground: 190 40% 94%;
+  --muted: 202 30% 12%; --muted-foreground: 190 18% 63%;
+  --accent: 168 60% 15%; --accent-foreground: 168 90% 60%;
+  --border: 190 55% 30%; --input: 190 55% 30%; --ring: 168 90% 60%;
+  background-image: conic-gradient(from 200deg at 50% 0%, hsl(168 90% 55% / .1), hsl(275 85% 60% / .1), hsl(190 60% 70% / .1), hsl(168 90% 55% / .1));
+  animation: aurora-drift-bg 12s linear infinite;
+}
+[data-ui-theme='aurora-transit'][data-ui-swatch='violet-curtain'] { --primary: 275 85% 68%; --accent-foreground: 275 85% 68%; --ring: 275 85% 68%; }
+[data-ui-theme='aurora-transit'][data-ui-swatch='frost-white'] { --primary: 190 60% 85%; --accent-foreground: 190 60% 85%; --ring: 190 60% 85%; }
+
+/* Chrome Vespers: rooftop dusk breathing slowly across polished chrome panels. */
+[data-ui-theme='chrome-vespers'] {
+  --background: 255 28% 6%; --foreground: 260 30% 95%;
+  --card: 254 26% 10%; --card-foreground: 260 30% 95%; --card-border: 255 45% 32%;
+  --popover: 254 26% 10%; --popover-foreground: 260 30% 95%; --popover-border: 255 45% 32%;
+  --primary: 35 90% 62%; --primary-foreground: 255 28% 6%;
+  --secondary: 255 22% 16%; --secondary-foreground: 260 30% 95%;
+  --muted: 255 22% 13%; --muted-foreground: 260 16% 66%;
+  --accent: 255 55% 17%; --accent-foreground: 35 90% 62%;
+  --border: 255 45% 32%; --input: 255 45% 32%; --ring: 35 90% 62%;
+  background-image: linear-gradient(160deg, hsl(35 90% 55% / .07), transparent 45%, hsl(255 55% 45% / .08));
+  animation: vespers-breathe 6s ease-in-out infinite;
+}
+[data-ui-theme='chrome-vespers'][data-ui-swatch='rose-chrome'] { --primary: 340 85% 68%; --accent-foreground: 340 85% 68%; --ring: 340 85% 68%; }
+[data-ui-theme='chrome-vespers'][data-ui-swatch='steel-violet'] { --primary: 255 55% 68%; --accent-foreground: 255 55% 68%; --ring: 255 55% 68%; }
+
+/* Neon Foundry: a working metal shop under molten orange and cyan work light. */
+[data-ui-theme='neon-foundry'] {
+  --background: 18 20% 6%; --foreground: 30 30% 93%;
+  --card: 18 18% 11%; --card-foreground: 30 30% 93%; --card-border: 20 55% 30%;
+  --popover: 18 18% 11%; --popover-foreground: 30 30% 93%; --popover-border: 20 55% 30%;
+  --primary: 16 100% 58%; --primary-foreground: 18 20% 6%;
+  --secondary: 18 18% 16%; --secondary-foreground: 30 30% 93%;
+  --muted: 18 18% 13%; --muted-foreground: 28 14% 63%;
+  --accent: 190 70% 15%; --accent-foreground: 190 100% 55%;
+  --border: 20 55% 30%; --input: 20 55% 30%; --ring: 16 100% 58%;
+  background-image: repeating-linear-gradient(70deg, transparent 0 3.5rem, hsl(190 100% 55% / .03) 3.55rem 3.62rem);
+}
+[data-ui-theme='neon-foundry'][data-ui-swatch='foundry-cyan'] { --primary: 190 100% 55%; --accent-foreground: 190 100% 55%; --ring: 190 100% 55%; }
+[data-ui-theme='neon-foundry'][data-ui-swatch='spark-yellow'] { --primary: 48 100% 62%; --accent-foreground: 48 100% 62%; --ring: 48 100% 62%; }
+
+/* Paper Lantern: warm festival light through rice paper, unsteady and handmade. */
+[data-ui-theme='paper-lantern'] {
+  --background: 28 25% 7%; --foreground: 35 35% 94%;
+  --card: 28 22% 11%; --card-foreground: 35 35% 94%; --card-border: 30 50% 30%;
+  --popover: 28 22% 11%; --popover-foreground: 35 35% 94%; --popover-border: 30 50% 30%;
+  --primary: 28 90% 62%; --primary-foreground: 28 25% 7%;
+  --secondary: 28 20% 16%; --secondary-foreground: 35 35% 94%;
+  --muted: 28 20% 13%; --muted-foreground: 33 16% 64%;
+  --accent: 28 70% 16%; --accent-foreground: 28 90% 62%;
+  --border: 30 50% 30%; --input: 30 50% 30%; --ring: 28 90% 62%;
+  background-image: radial-gradient(circle at 50% 0%, hsl(28 90% 60% / .1), transparent 40%);
+  animation: lantern-flicker 4.2s ease-in-out infinite;
+}
+[data-ui-theme='paper-lantern'][data-ui-swatch='paper-cream'] { --primary: 42 60% 88%; --accent-foreground: 42 60% 88%; --ring: 42 60% 88%; }
+[data-ui-theme='paper-lantern'][data-ui-swatch='ember-red'] { --primary: 8 85% 62%; --accent-foreground: 8 85% 62%; --ring: 8 85% 62%; }
+
+@keyframes aurora-drift-bg { to { filter: hue-rotate(30deg); } }
+@keyframes vespers-breathe { 50% { filter: brightness(1.1) saturate(1.08); } }
+@keyframes lantern-flicker { 0%, 100% { filter: brightness(1); } 38% { filter: brightness(0.94); } 52% { filter: brightness(1.08); } 70% { filter: brightness(0.97); } }
+
 /* Small shop previews for palettes whose in-run glow is animated by Canvas2D. */
 @keyframes palette-preview-glow { 50% { filter: brightness(1.45); box-shadow: 0 0 10px currentColor; } }
 @keyframes palette-preview-pulse { 50% { transform: scaleY(0.62); filter: brightness(1.35); } }
