@@ -99,7 +99,7 @@ export interface LootPrizeDef {
   cardPackId?: CardPackId;
 }
 
-export type CardPackId = 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher' | 'prism-lokpack' | 'elemental-pack' | 'apex-binder';
+export type CardPackId = 'penny-sleeve' | 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher' | 'prism-lokpack' | 'elemental-pack' | 'operative-elite' | 'apex-binder' | 'mega-vault';
 export type CardVariant = 'standard' | 'foil' | 'neon' | 'glitch' | 'holo';
 export interface OwnedCardRecord {
   cardId: string;
@@ -2135,6 +2135,10 @@ export interface MetaState {
   activePassiveCardIds: string[];
   /** Up to BATTLE_DECK_SLOTS owned card ids equipped for the travel-encounter minigame's Attack action. Empty deck falls back to an unarmed punch -- never blocks the player. See data/travelEncounters.ts. */
   battleDeckCardIds: string[];
+  /** Purchased or found packs not yet opened, keyed by pack id. Opened via `openStoredCardPack`. */
+  unopenedCardPacks: Partial<Record<CardPackId, number>>;
+  /** When true (default), buying or finding a pack opens it immediately, matching legacy behavior. When false, packs are added to `unopenedCardPacks` for the player to open later. */
+  autoOpenPacksEnabled: boolean;
   /** Legacy compatibility flag for players who previously owned Salvage Protocol. */
   cardSalvageUnlocked: boolean;
   /** Permanent companion-shop device. It keeps thrown cards in the binder and records companion details in Archives. */
