@@ -394,6 +394,8 @@ export function RunScreen({
         graphicsQuality: meta.graphicsQuality,
         worldColorPalette: activeWorldPalette,
         worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
+        activeDirectorPersonalityId: meta.activeDirectorPersonalityId,
+        bonusWeaponId: meta.pendingSaunaReward?.weaponId,
         sectorSquadCap: mission?.squadCap,
         playerStart: missionPlayerStart,
         mission,
@@ -1282,6 +1284,22 @@ export function RunScreen({
         {hud?.rescueAvailable ? (
           <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
             {hud.rescueAllyName ? `${hud.rescueAllyName} is caged` : 'Someone is caged'} — stand with them {hud.rescueProgressPct > 0 ? `(${hud.rescueProgressPct}%)` : ''}
+          </div>
+        ) : null}
+
+        {hud?.pressureRescue ? (
+          <div
+            className={`mx-auto flex w-fit max-w-[92vw] items-center gap-2 border bg-black/75 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest ${
+              hud.pressureRescue.criticalSystems > 0
+                ? 'border-red-300/70 text-red-200'
+                : 'border-emerald-300/45 text-emerald-200'
+            }`}
+            data-testid="indicator-pressure-rescue"
+          >
+            <span>Rapid line {hud.pressureRescue.integrityPct}%</span>
+            <span className="text-white/50">·</span>
+            <span>{hud.pressureRescue.exposedSystems} systems holding</span>
+            {hud.pressureRescue.criticalSystems > 0 ? <span>· {hud.pressureRescue.criticalSystems} chewed</span> : null}
           </div>
         ) : null}
 

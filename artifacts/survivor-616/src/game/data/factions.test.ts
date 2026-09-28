@@ -36,3 +36,36 @@ test('squadWave spawns the whole roster as one lead + group', () => {
 test('squadWave rejects an unknown faction id', () => {
   assert.throws(() => squadWave({ fromSec: 0, toSec: 10, factionId: 'not-a-faction', ratePerSec: 1 }));
 });
+
+test('Supabuilda ships as a distinct five-role gym faction', () => {
+  const faction = FACTIONS.find((candidate) => candidate.id === 'supabuilda');
+  assert.ok(faction);
+  assert.deepEqual(faction.roster, [
+    'supabuilda-gym-rat',
+    'supabuilda-plate-slinger',
+    'supabuilda-spotter',
+    'supabuilda-deadlift-bruiser',
+    'supabuilda-prime',
+  ]);
+  const roster = faction.roster.map((id) => ENEMIES.find((enemy) => enemy.id === id));
+  assert.ok(roster.every(Boolean));
+  assert.ok(roster.some((enemy) => enemy?.behavior === 'grappler'));
+  assert.ok(roster.some((enemy) => enemy?.ranged));
+});
+
+test('The Site Crew remains mechanically distinct from Supabuilda', () => {
+  const faction = FACTIONS.find((candidate) => candidate.id === 'the-site-crew');
+  assert.ok(faction);
+  assert.deepEqual(faction.roster, [
+    'site-crew-apprentice',
+    'site-crew-nailer',
+    'site-crew-barrier-setter',
+    'site-crew-crane-hook',
+    'site-crew-foreman',
+  ]);
+  const roster = faction.roster.map((id) => ENEMIES.find((enemy) => enemy.id === id));
+  assert.ok(roster.every(Boolean));
+  assert.ok(roster.some((enemy) => enemy?.behavior === 'phalanx'));
+  assert.ok(roster.some((enemy) => enemy?.behavior === 'grappler'));
+  assert.ok(roster.some((enemy) => enemy?.behavior === 'current'));
+});

@@ -54,6 +54,7 @@ import {
   stepWorld,
   isOnBeat,
   musicMultiplier,
+  updateRunningMan,
 } from '@/game/engine/world';
 import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
 import { generateChunk } from '@/game/engine/chunks';
@@ -359,6 +360,117 @@ test('killing the Director boss resolves the encounter and marks the run result 
   const result = buildResult(world);
   assert.equal(result.directorEncounterId, 'take-two');
   assert.equal(result.directorDefeated, true);
+});
+
+test('The Running Man schedule is deterministic and never creates a targetable enemy', () => {
+  const area = testArea({ x: 260, y: 220, w: 20, h: 20, kind: 'barrier' });
+  const first = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616158);
+  const second = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616158);
+
+  assert.equal(first.runningMan.triggerAt, second.runningMan.triggerAt);
+  assert.equal(first.runningMan.directionX, second.runningMan.directionX);
+  assert.equal(first.runningMan.directionY, second.runningMan.directionY);
+  assert.equal(first.enemies.some((enemy) => enemy.defId === 'running-man'), false);
+});
+
+test('The Running Man throws enemies and movable props to opposite sides of his line exactly once', () => {
+  const world = createWorld(
+    testArea({ x: -35, y: -24, w: 54, h: 44, kind: 'dumpster' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    616159,
+  );
+  const above = addEnemy(world, 'nightcrawler', -45, 24);
+  const below = addEnemy(world, 'nightcrawler', -45, -24);
+  below.uid = 901;
+  const prop = world.breakables[0]!;
+  assert.equal(prop.movable, true);
+  const playerStart = { x: world.player.x, y: world.player.y };
+
+  Object.assign(world.runningMan, {
+    phase: 'running' as const,
+    startedAt: 0,
+    endsAt: 1_050,
+    startX: -100,
+    startY: 0,
+    endX: 100,
+    endY: 0,
+    directionX: 1,
+    directionY: 0,
+    lastProgress: 0,
+  });
+  world.now = 525;
+  updateRunningMan(world);
+
+  assert.ok(above.ky > 0, 'an enemy above the route should be thrown upward');
+  assert.ok(below.ky < 0, 'an enemy below the route should be thrown downward');
+  assert.ok(prop.vy < 0, 'a movable prop below the route should be thrown downward');
+  assert.deepEqual({ x: world.player.x, y: world.player.y }, playerStart, 'the sighting should never shove the player');
+  assert.equal(world.runningMan.pushedEnemyUids.size, 2);
+  assert.equal(world.runningMan.pushedPropUids.size, 1);
+
+  world.now = 1_100;
+  updateRunningMan(world);
+  const settledVelocity = { above: above.ky, below: below.ky, prop: prop.vy };
+  updateRunningMan(world);
+  assert.equal(world.runningMan.phase, 'complete');
+  assert.deepEqual({ above: above.ky, below: below.ky, prop: prop.vy }, settledVelocity);
+});
+
+test('Data-Gobs chew exposed world props and deepen raw data breakage', () => {
+  const area: AreaDef = {
+    ...AREAS[0]!,
+    id: 'data-gob-chew-test',
+    durationSec: 999,
+    waves: [],
+    obstacles: [{ x: 40, y: 0, w: 48, h: 48, kind: 'fuse-box' }],
+    rawDataBreakage: { ambientPerSec: 0.001, damageVulnerability: 1 },
+    rescueAllyId: undefined,
+  };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const gob = addEnemy(world, 'data-gob-nibbler', 58, 0);
+  gob.fireReadyAt = 0;
+  const prop = world.breakables[0]!;
+  const startingHp = prop.hp;
+
+  for (let i = 0; i < 90; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(prop.rawDataBreakage > 0.1, 'the prop should visibly expose raw data');
+  assert.ok(prop.hp < startingHp, 'the Data-Gob should chew structural HP');
+  assert.ok(world.player.hp > world.player.maxHp * 0.95, 'an edible prop keeps the Data-Gob focused away from the survivor');
+});
+
+test('the Rapid pressure wing exposes a live integrity readout for the rescue route', () => {
+  const area = AREAS.find((candidate) => candidate.id === 'rapid-pressure-rooms');
+  assert.ok(area);
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  const intact = hudSnapshot(world).pressureRescue;
+  assert.ok(intact);
+  assert.equal(intact.exposedSystems, 12);
+  assert.equal(intact.criticalSystems, 0);
+  assert.ok(intact.integrityPct >= 99);
+
+  const arch = world.breakables.find((prop) => prop.kind === 'digi-arch');
+  assert.ok(arch);
+  arch.rawDataBreakage = 0.8;
+  const damaged = hudSnapshot(world).pressureRescue;
+  assert.ok(damaged);
+  assert.equal(damaged.criticalSystems, 1);
+  assert.ok(damaged.integrityPct < intact.integrityPct);
+});
+
+test('Supabuilda grapplers pull the player into slam range', () => {
+  const area: AreaDef = { ...AREAS[0]!, id: 'grapple-test', durationSec: 999, waves: [], obstacles: [], rescueAllyId: undefined };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const grappler = addEnemy(world, 'supabuilda-deadlift-bruiser', 120, 0);
+  grappler.fireReadyAt = 0;
+
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(world.player.kx > 0, 'the grapple should pull the player toward the bruiser');
+  assert.ok(world.alerts.some((alert) => alert.text === 'GRAPPLE'));
 });
 
 test('a reflective surface redirects a compatible projectile', () => {
@@ -3302,4 +3414,25 @@ test('crazy internet culture and canvas weapons are defined, fire properly, and 
 
     assert.ok(fired, `weapon ${id} should spawn projectiles or effects upon firing`);
   }
+});
+
+test('Clock fires three staggered hands and slows enemies it strikes', () => {
+  const clock = WEAPONS_BY_ID.clock;
+  assert.ok(clock, 'Clock must be registered in WEAPONS_BY_ID');
+  assert.equal(clock.kind, 'wave');
+  assert.equal(clock.count, 3);
+  assert.equal(clock.statusEffectId, 'slow');
+
+  const area = { ...AREAS[0]!, durationSec: 120, waves: [], obstacles: [] };
+  const world = createWorld(area, testCharacter('clock'), CHARACTERS[0]!.stats, 616);
+  const enemy = addEnemy(world, 'nightcrawler', 80, 0);
+  world.weapons[0]!.readyAt = 0;
+
+  stepWorld(world, 1 / 30, neutralInput);
+
+  const hands = world.effects.filter((effect) => effect.weaponId === 'clock');
+  assert.equal(hands.length, 3);
+  assert.deepEqual(hands.map((hand) => Math.round(hand.bornAt - hands[0]!.bornAt)), [0, 120, 240]);
+  assert.ok(enemy.hp < enemy.maxHp, 'the first active clock hand should damage its target');
+  assert.ok(enemy.activeEffects.some((effect) => effect.id === 'slow'), 'Clock hits should apply slow');
 });

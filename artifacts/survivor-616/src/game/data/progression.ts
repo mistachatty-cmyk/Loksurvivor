@@ -283,6 +283,66 @@ export const ALLIES: AllyDef[] = [
       accentBright: '#bbf7d0', skin: '#0f3d24', glow: '#4ade80',
     },
   },
+  {
+    id: 'sarge',
+    name: 'Sarge Holloway',
+    role: 'Last officer standing',
+    blurb: 'Never got the call to stand down, so she never did. Still runs the station like the shift never ended.',
+    room: 'grpd-station',
+    boost: { armor: 0.03 },
+    boostLabel: '+3% armor',
+    preferredActivityIds: ['run-the-drills'],
+    rigHint: 'cap',
+    palette: {
+      ink: '#0a0f1a', body: '#1e3a5f', bodyDark: '#0b192c', accent: '#facc15',
+      accentBright: '#fef08a', skin: '#334155', glow: '#93c5fd',
+    },
+  },
+  {
+    id: 'patch-mercer',
+    name: 'Patch Mercer',
+    role: 'Rapid Digi-Arch maintainer',
+    blurb: 'Kept three emergency rooms pressurized with a watch battery and stripped wiring after both Digi-Arches went dark.',
+    room: 'rapid-shelter',
+    boost: { haste: -0.03 },
+    boostLabel: '3% faster cooldowns',
+    preferredActivityIds: ['tune-the-rig', 'study-anomalies'],
+    rigHint: 'hood',
+    palette: {
+      ink: '#052e16', body: '#166534', bodyDark: '#14532d', accent: '#22d3ee',
+      accentBright: '#cffafe', skin: '#3f6212', glow: '#86efac',
+    },
+  },
+  {
+    id: 'mara-vance',
+    name: 'Mara Vance',
+    role: 'Rapid pressure runner',
+    blurb: 'Moved air canisters between sealed rooms whenever the pressure locks cycled. Never left anyone alone long enough to panic.',
+    room: 'rapid-shelter',
+    boost: { speed: 5 },
+    boostLabel: '+5 move speed',
+    preferredActivityIds: ['scout-routes', 'stretch-before-dawn'],
+    rigHint: 'puffs',
+    palette: {
+      ink: '#172554', body: '#1d4ed8', bodyDark: '#1e3a8a', accent: '#86efac',
+      accentBright: '#dcfce7', skin: '#92400e', glow: '#67e8f9',
+    },
+  },
+  {
+    id: 'latch-brooks',
+    name: 'Latch Brooks',
+    role: 'Rapid emergency-door keeper',
+    blurb: 'Held the manual pressure wheel shut while Data-Gobs chewed the door code out from the other side.',
+    room: 'rapid-shelter',
+    boost: { maxHp: 16 },
+    boostLabel: '+16 max HP',
+    preferredActivityIds: ['fortify-doors', 'field-rations'],
+    rigHint: 'bulk',
+    palette: {
+      ink: '#1c1917', body: '#57534e', bodyDark: '#292524', accent: '#facc15',
+      accentBright: '#fef9c3', skin: '#7c2d12', glow: '#86efac',
+    },
+  },
 ];
 
 export const ALLIES_BY_ID: Record<string, AllyDef> = Object.fromEntries(
@@ -298,6 +358,7 @@ export const RESCUE_ROUTE_BY_AREA: Record<string, string[]> = {
   'monroe-strip': ['vee', 'pippa', 'theo'],
   rooftops: ['nyx', 'morrow'],
   'crystal-cellar': ['sable', 'cinder'],
+  'rapid-pressure-rooms': ['patch-mercer', 'mara-vance', 'latch-brooks'],
 };
 // riverfront/old-market/northline-yard/civic-plaza each grant exactly one
 // ally via their own `AreaDef.rescueAllyId` (denny/ruth/frankie/constance)
@@ -402,6 +463,39 @@ export const HUB_ROOMS: HubRoomDef[] = [
     unlock: { kind: 'default' },
     features: ['music', 'studio', 'sound-booth', 'settings', 'account', 'feedback'],
   },
+  {
+    id: 'grpd-station',
+    name: 'GRPD Station',
+    subtitle: 'Division St.',
+    description:
+      'A rundown precinct off Division nobody ever formally closed. The Digital Archive terminal hums in back, and Rapid Guard runs the K9 counter by the old holding cells.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    unlock: { kind: 'discovery', discoveryId: 'grpd-station-found' },
+    features: ['director-terminal', 'kennel', 'vendor', 'allies', 'settings', 'account', 'feedback'],
+  },
+  {
+    id: 'grpd-vault',
+    name: 'The Vault',
+    subtitle: 'Sealed evidence room',
+    description:
+      'The Site Crew finally cut through the super-safe door. Inside, one legendary K9 is still standing the last watch.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    unlock: { kind: 'clearArea', areaId: 'site-crew-active-zone' },
+    features: [],
+  },
+  {
+    id: 'rapid-shelter',
+    name: 'Rapid Shelter',
+    subtitle: 'Digi-Arch safe side',
+    description:
+      'The cut-off Rapid camp after the pressure rooms reopen. One Digi-Arch is stable enough for supply runs; the other stays under Patch’s wrench and everyone’s suspicion.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    unlock: { kind: 'discovery', discoveryId: 'rapid-pressure-rooms-cleared' },
+    features: ['runs', 'allies', 'recovery', 'settings', 'account', 'feedback'],
+  },
 ];
 
 export const HUB_ROOMS_BY_ID: Record<string, HubRoomDef> = Object.fromEntries(
@@ -428,6 +522,10 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
   { id: 'null-sector-log', name: 'The Null Sector Log', blurb: 'A maintenance log with no author field. Every entry ends the same way: "still running."' },
   { id: 'lev-core-archive', name: 'The Lev Core Archive', blurb: 'A cracked data slate salvaged from the singularity generator, still cycling schematics for a spire that was never finished.' },
+  { id: 'grpd-station-found', name: 'GRPD Station — Division St.', blurb: 'A precinct nobody decommissioned on paper. The lights are still department-metered.' },
+  { id: 'rapid-pressure-rooms-cleared', name: 'Rapid Shelter Reconnected', blurb: 'The Data-Gobs scattered, the pressure doors opened, and one Digi-Arch finally held a route long enough to bring the trapped Rapids through.' },
+  { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },
+  { id: 'site-crew-permit', name: 'Site Crew Work Permit', blurb: 'A stamped permit recovered from the moving pour. Every inspection box is checked except “leave the block alive.”' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

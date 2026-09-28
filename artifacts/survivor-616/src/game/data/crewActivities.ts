@@ -245,6 +245,15 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
     icon: 'calculator',
     effects: [{ stat: 'crit', add: 0.03 }],
   },
+  {
+    id: 'run-the-drills',
+    roomId: 'grpd-station',
+    name: 'Run the drills',
+    description: 'Sarge keeps the muster board full even with a roster of one. Everyone leaves standing straighter.',
+    benefitLabel: '+4% armor',
+    icon: 'shield',
+    effects: [{ stat: 'armor', add: 0.04 }],
+  },
 ];
 
 export const CREW_ACTIVITIES_BY_ID: Record<CrewActivityId, CrewActivityDef> =
@@ -266,7 +275,7 @@ export function isValidCrewActivity(allyId: string, activityId: unknown): activi
     preferredActivitiesForAlly(allyId).some((activity) => activity.id === activityId);
 }
 
-function stableHash(value: string): number {
+export function stableHash(value: string): number {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);

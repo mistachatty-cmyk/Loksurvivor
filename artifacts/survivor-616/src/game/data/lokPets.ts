@@ -45,12 +45,39 @@ export const LOKPET_VARIANTS: LokPetVariantDef[] = [
   { id: 'byte-serpent', name: 'Byte Serpent', family: 'blob', silhouette: 'byte-serpent', palette: { body: '#10b981', bodyDark: '#022c22', accent: '#34d399', glow: '#6ee7b7', eye: '#ecfdf5' }, description: 'A segmented cybernetic viper that infects targets with code corruption.', sizeScale: 1.20, legendary: true, specialAbility: 'glitch-strike', weight: 1 },
   { id: 'cosmic-axolotl', name: 'Cosmic Axolotl', family: 'animal', silhouette: 'cosmic-axolotl', palette: { body: '#ec4899', bodyDark: '#500724', accent: '#a855f7', glow: '#f472b6', eye: '#fdf2f8' }, description: 'An ethereal deep-space axolotl radiating gentle starlight regenerative waves.', sizeScale: 0.90, legendary: true, specialAbility: 'starlight-heal', weight: 1 },
   { id: 'storm-griffin', name: 'Storm Griffin', family: 'bat', silhouette: 'storm-griffin', palette: { body: '#0284c7', bodyDark: '#0c4a6e', accent: '#facc15', glow: '#38bdf8', eye: '#fef08a' }, description: 'An electrified raptor with crackling talons and thunderous wingbeats.', sizeScale: 1.10, legendary: true, specialAbility: 'thunder-claw', weight: 1 },
+  // Never rolled from a chest (weight: 0, same as the starters) -- only
+  // reachable by defeating the rare Digi-Wolf event enemy, see killEnemy's
+  // digi-wolf branch in engine/world.ts.
+  { id: 'digi-wolf', name: 'Digi-Wolf', family: 'animal', silhouette: 'digi-wolf', palette: { body: '#0e7490', bodyDark: '#083344', accent: '#22d3ee', glow: '#67e8f9', eye: '#ecfeff' }, description: 'A wolf rendered half out of code, still hunting, now hunting for you.', sizeScale: 1.05, legendary: true, specialAbility: 'digi-fang', weight: 0 },
   { id: 'dusk-pouncer', name: 'Dusk Pouncer', family: 'animal', silhouette: 'pouncer', palette: { body: '#312e81', bodyDark: '#1e1b4b', accent: '#a855f7', glow: '#c084fc', eye: '#fae8ff' }, description: 'An agile alley stalker that thrives when city neon flickers low.' },
   { id: 'echo-skull', name: 'Echo Skull', family: 'ghoul', silhouette: 'skull', palette: { body: '#475569', bodyDark: '#1e293b', accent: '#34d399', glow: '#10b981', eye: '#ecfdf5' }, description: 'A curious specter that vibrates in resonance with distant sirens.' },
   { id: 'volt-wing', name: 'Volt Wing', family: 'bat', silhouette: 'winglet', palette: { body: '#1e3a5f', bodyDark: '#0b192c', accent: '#facc15', glow: '#38bdf8', eye: '#ffffff' }, description: 'A high-voltage bat that discharges static arcs upon contact.' },
   { id: 'nova-mote', name: 'Nova Mote', family: 'mote', silhouette: 'spark', palette: { body: '#ea580c', bodyDark: '#7c2d12', accent: '#fde047', glow: '#f97316', eye: '#fffbeb' }, description: 'A miniature star fragment burning with unharnessed fusion energy.' },
   { id: 'tar-jelly', name: 'Tar Jelly', family: 'blob', silhouette: 'jelly', palette: { body: '#18181b', bodyDark: '#09090b', accent: '#e11d48', glow: '#fb7185', eye: '#ffe4e6' }, description: 'A viscous droplet that adheres to enemy footsteps to slow momentum.' },
   { id: 'gyro-sentry', name: 'Gyro Sentry', family: 'mechanical', silhouette: 'clockwork', palette: { body: '#52525b', bodyDark: '#27272a', accent: '#22c55e', glow: '#4ade80', eye: '#f0fdf4' }, description: 'A dual-axis stabilizer drone patrolling alongside its operative.' },
+  // GRPD Station K9 Unit -- Rapid Guard's counter. Ordinary variants (no
+  // SPECIAL_LOKPET_LOADOUTS entry) so they roll the full common/charged/
+  // rare/mythic spread like any other pet, per the "rarities" ask.
+  { id: 'k9-greyhound', name: 'K9 Greyhound', family: 'animal', silhouette: 'k9-hound', palette: { body: '#94a3b8', bodyDark: '#334155', accent: '#1d4ed8', glow: '#60a5fa', eye: '#0f172a' }, description: 'A lean patrol dog in a stitched-up police vest, still faster than anything else on four legs.' },
+  { id: 'k9-shepherd', name: 'K9 Shepherd', family: 'animal', silhouette: 'k9-hound', palette: { body: '#5b3a21', bodyDark: '#2b1a0f', accent: '#1d4ed8', glow: '#93c5fd', eye: '#1c1917' }, description: 'A retired precinct shepherd, badge clipped to its vest, that never quite stopped working the beat.' },
+  { id: 'blue-616', name: 'Blue 616', family: 'animal', silhouette: 'k9-hound', palette: { body: '#1e3a5f', bodyDark: '#08111f', accent: '#facc15', glow: '#60a5fa', eye: '#e0f2fe' }, description: 'The GRPD vault guardian. Blue held the last watch alone and still answers the old 616 call sign.', sizeScale: 1.1, legendary: true, weight: 0 },
+  { id: 'wolf', name: 'Alley Wolf', family: 'animal', silhouette: 'wolf', palette: { body: '#44403c', bodyDark: '#1c1917', accent: '#a8a29e', glow: '#38bdf8', eye: '#fef3c7' }, description: 'A real wolf that wandered into the city and decided the streets were just a bigger forest.', weight: 3 },
+
+  // GRPD Station K9 Unit -- broader dog-breed pool, merged in from the
+  // dogBreedsDraft.ts review file. `weight` here is breed-pool weight (how
+  // often this breed is picked at all), separate from the common/charged/
+  // rare/mythic *stat* rarity these still roll independently, per
+  // pickWeightedVariant/LOKPET_STAT_SHEETS above.
+  { id: 'junkyard-cur', name: 'Junkyard Cur', family: 'animal', silhouette: 'k9-hound', palette: { body: '#78716c', bodyDark: '#292524', accent: '#a3a3a3', glow: '#d6d3d1', eye: '#1c1917' }, description: 'Grew up between two chain-link fences and a dumpster. Barks first, asks never.', weight: 12 },
+  { id: 'alley-mutt', name: 'Alley Mutt', family: 'animal', silhouette: 'k9-hound', palette: { body: '#92764f', bodyDark: '#3f2f1c', accent: '#d9c9a3', glow: '#f5deb3', eye: '#2b1d0e' }, description: "No two people agree what breeds went into this one. It doesn't care either.", weight: 11 },
+  { id: 'corner-stray', name: 'Corner Stray', family: 'animal', silhouette: 'wolf', palette: { body: '#57534e', bodyDark: '#1c1917', accent: '#a8a29e', glow: '#78716c', eye: '#fef3c7' }, description: 'Owns exactly one street corner and has never lost an argument about it.', weight: 10 },
+  { id: 'rust-belt-terrier', name: 'Rust Belt Terrier', family: 'animal', silhouette: 'k9-hound', palette: { body: '#8a5a3c', bodyDark: '#3d2717', accent: '#e8b04b', glow: '#f4c78a', eye: '#1a1208' }, description: 'Small, wiry, and personally offended by every rat in a four-block radius.', weight: 7 },
+  { id: 'frostline-husky', name: 'Frostline Husky', family: 'animal', silhouette: 'k9-hound', palette: { body: '#cbd5e1', bodyDark: '#475569', accent: '#38bdf8', glow: '#bae6fd', eye: '#0c4a6e' }, description: 'Built for a colder city than this one. Makes do, loudly, at 3am.', weight: 6 },
+  { id: 'onyx-doberman', name: 'Onyx Doberman', family: 'animal', silhouette: 'wolf', palette: { body: '#18181b', bodyDark: '#09090b', accent: '#b91c1c', glow: '#f87171', eye: '#fafafa' }, description: 'Moves like it already knows how this ends. Usually does.', weight: 3 },
+  { id: 'ridge-runner', name: 'Ridge Runner', family: 'animal', silhouette: 'wolf', palette: { body: '#c2703d', bodyDark: '#5c2f16', accent: '#78350f', glow: '#fdba74', eye: '#292524' }, description: 'A stripe of stiff hair down its spine that stands up before it does. Bred for something bigger than this city has left.', weight: 2 },
+  { id: 'palace-borzoi', name: 'Palace Borzoi', family: 'animal', silhouette: 'wolf', palette: { body: '#f5f5f4', bodyDark: '#a8a29e', accent: '#d4af37', glow: '#fef3c7', eye: '#44403c' }, description: 'Ran with royalty once, or its owner says so. Carries itself like the claim is true.', weight: 1 },
+  { id: 'imperial-akita', name: 'Imperial Akita', family: 'animal', silhouette: 'k9-hound', palette: { body: '#ea9c3d', bodyDark: '#78430f', accent: '#fef3c7', glow: '#fde68a', eye: '#1c1917' }, description: 'Composed, watchful, and unmistakably certain that it, personally, is the reason nothing bad has happened yet.', weight: 1 },
+  { id: 'velvet-saluki', name: 'Velvet Saluki', family: 'animal', silhouette: 'wolf', palette: { body: '#3f3245', bodyDark: '#1a1423', accent: '#c084fc', glow: '#e9d5ff', eye: '#faf5ff' }, description: 'Feathered, silent, and faster than anything this build implies. A hunting line with nothing left to hunt but time.', weight: 1 },
 ];
 
 export const LOKPET_STAT_SHEETS: LokPetStatSheet[] = [
@@ -130,6 +157,8 @@ const SPECIAL_LOKPET_LOADOUTS: Record<string, {
   'byte-serpent': { attackKind: 'heavy-shot', element: 'freeze', elementLabel: 'glitch cipher', traitLabel: 'Byte Byte · null pointer shock', stats: { health: 130, moveSpeed: 155, damage: 27, cooldownMs: 760, range: 320, projectileSpeed: 420, explosionRadius: 60, pulseRadius: 0, lifetimeMs: 118000 } },
   'cosmic-axolotl': { attackKind: 'pulse', element: 'slow', elementLabel: 'starlight pulse', traitLabel: 'Astral Dew · serene lullaby', stats: { health: 115, moveSpeed: 145, damage: 20, cooldownMs: 680, range: 350, projectileSpeed: 360, explosionRadius: 0, pulseRadius: 125, lifetimeMs: 120000 } },
   'storm-griffin': { attackKind: 'heavy-shot', element: 'none', elementLabel: 'volt storm', traitLabel: 'Tempest Arc · thunder talon', stats: { health: 125, moveSpeed: 185, damage: 29, cooldownMs: 700, range: 340, projectileSpeed: 460, explosionRadius: 65, pulseRadius: 0, lifetimeMs: 115000 } },
+  'digi-wolf': { attackKind: 'rapid-shot', element: 'freeze', elementLabel: 'corrupted frost', traitLabel: 'Digi-Fang · packet bite', stats: { health: 118, moveSpeed: 190, damage: 25, cooldownMs: 560, range: 320, projectileSpeed: 440, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 115000 } },
+  'blue-616': { attackKind: 'heavy-shot', element: 'freeze', elementLabel: 'blue-line frost', traitLabel: 'Last Watch · vault guardian', stats: { health: 150, moveSpeed: 160, damage: 29, cooldownMs: 680, range: 340, projectileSpeed: 440, explosionRadius: 58, pulseRadius: 100, lifetimeMs: 120000 } },
 };
 
 function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element: LokPetElement; label: string } {
@@ -261,6 +290,9 @@ export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
   'byte-serpent': 'Byte Serpent',
   'cosmic-axolotl': 'Cosmic Axolotl',
   'storm-griffin': 'Storm Griffin',
+  'k9-hound': 'K9 Hound',
+  wolf: 'Wolf',
+  'digi-wolf': 'Digi-Wolf',
 };
 
 /**
@@ -445,6 +477,36 @@ function stormGriffinRig(): SpriteRig {
   return rig;
 }
 
+function k9HoundRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 15, length: 18, ears: true });
+  rig.parts.push(
+    // Uniform "vest" band across the torso reads as police gear at this scale.
+    { key: 'torso', x: -6, y: 5, w: 12, h: 3, color: 'accent', z: 3 },
+    { key: 'crest', x: -1, y: 12, w: 2, h: 2, color: 'accentBright', z: 8 },
+  );
+  return rig;
+}
+
+function wolfRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 17, length: 20, ears: true });
+  rig.parts.push(
+    { key: 'crest', x: 6, y: 13, w: 3, h: 3, color: 'bodyDark', z: 8 },
+    { key: 'aura', x: -12, y: 2, w: 6, h: 4, color: 'glow', z: 0 },
+  );
+  return rig;
+}
+
+function digiWolfRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 17, length: 20, ears: true });
+  rig.parts.push(
+    { key: 'aura', x: -13, y: 1, w: 8, h: 5, color: 'glow', z: 0 },
+    { key: 'aura', x: 5, y: 2, w: 7, h: 4, color: 'accent', z: 0 },
+    { key: 'crest', x: 6, y: 13, w: 3, h: 3, color: 'accentBright', z: 8 },
+  );
+  rig.pixelHeight = 20;
+  return rig;
+}
+
 const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   pouncer: blobRig({ height: 15, width: 12, tendrils: true }),
   skull: blobRig({ height: 14, width: 11, spikes: true }),
@@ -468,6 +530,9 @@ const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   'byte-serpent': byteSerpentRig(),
   'cosmic-axolotl': cosmicAxolotlRig(),
   'storm-griffin': stormGriffinRig(),
+  'k9-hound': k9HoundRig(),
+  wolf: wolfRig(),
+  'digi-wolf': digiWolfRig(),
 };
 
 export function lokPetRig(silhouette: LokPetSilhouette): SpriteRig {
