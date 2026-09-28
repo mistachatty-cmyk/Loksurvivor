@@ -472,7 +472,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/street.jpeg',
     biome: 'archive',
     unlock: { kind: 'discovery', discoveryId: 'grpd-station-found' },
-    features: ['director-terminal', 'vendor', 'allies', 'settings', 'account', 'feedback'],
+    features: ['director-terminal', 'kennel', 'vendor', 'allies', 'settings', 'account', 'feedback'],
   },
   {
     id: 'grpd-vault',

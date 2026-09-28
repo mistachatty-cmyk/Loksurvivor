@@ -41,9 +41,7 @@ import {
 } from '@/game/data/hordeSpin';
 import { SILENT_FRAME, msFromNearestBeat, type AudioFrame } from '@/game/audio/beatBus';
 import type { SfxCueId, SfxEvent } from '@/game/audio/sfxCues';
-import { reactionIntensity, reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
-import type { MusicEventEffect } from '@/game/data/musicEvents';
-import { THEMED_PALETTES } from '@/game/data/themedPalettes';
+import { reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -927,13 +925,6 @@ export interface World {
   worldColorPalette?: SpritePalette;
   /** Settings toggle: also blend `worldColorPalette` into enemy sprites and environment colors, not just the player's own sprite. */
   worldColorFullRecolor?: boolean;
-  /**
-   * Runtime-only palette override from a `musicEvents` `'palette'` effect.
-   * Never set from settings; takes priority over `worldColorPalette` in
-   * `render/draw.ts` when present, so a music event never clobbers the
-   * player's own theme choice -- it just layers over it.
-   */
-  musicColorOverride?: SpritePalette;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
   /** Runtime bookkeeping for the character's dash skill, when it has one. */
@@ -1022,8 +1013,6 @@ export interface World {
 
   upgradeStacks: Record<string, number>;
   spawnCredit: number[];
-  /** Per-`area.musicEvents` entry cooldown tracker, `w.now` of the next allowed fire. */
-  musicEventCooldownUntil: number[];
   nextUid: number;
   rng: () => number;
   /**
@@ -1514,7 +1503,6 @@ export function createWorld(
     outcome: 'running',
     upgradeStacks: {},
     spawnCredit: area.waves.map(() => 0),
-    musicEventCooldownUntil: (area.musicEvents ?? []).map(() => 0),
     nextUid: 100,
     rng,
     ambientRng: createRng(seed + 0x5eed),
@@ -2273,7 +2261,6 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
 }
 
 function updateSpawning(w: World, dt: number) {
-  applyMusicEvents(w);
   const waves = w.area.waves;
   const baseSpawnMult = modifierSpawnMult(w);
   const infiniteMode = Boolean(w.modifiers.infiniteMode);
@@ -2320,66 +2307,6 @@ function updateSpawning(w: World, dt: number) {
       }
     }
   }
-}
-
-/* ------------------------------------------------------------------ */
-/* Music-driven gameplay events                                       */
-/*                                                                     */
-/* A threshold on the soundtrack's loudness/frequency-band energy      */
-/* (`w.audio`) triggers a one-shot spawn/palette action -- discrete    */
-/* and edge-cooldown-gated, unlike `musicMultiplier`'s continuous       */
-/* per-actor multipliers. Never touches audio playback itself; only    */
-/* ever reads `w.audio`/`w.now`/`w.area`, so `stepWorld` stays a pure   */
-/* function of its `StepInput`. See data/musicEvents.ts and             */
-/* .agents/memory/music-reactivity.md.                                 */
-/* ------------------------------------------------------------------ */
-
-function applyMusicEvents(w: World) {
-  const events = w.area.musicEvents;
-  if (!events || events.length === 0 || w.audio.source === 'none') return;
-  for (let i = 0; i < events.length; i += 1) {
-    const event = events[i]!;
-    if (w.now < (w.musicEventCooldownUntil[i] ?? 0)) continue;
-    const intensity = reactionIntensity(event.trigger, w.audio, audioPulses(w));
-    if (intensity < event.trigger.threshold) continue;
-    w.musicEventCooldownUntil[i] = w.now + event.trigger.cooldownMs;
-    fireMusicEvent(w, event.effect);
-  }
-}
-
-function fireMusicEvent(w: World, effect: MusicEventEffect) {
-  switch (effect.kind) {
-    case 'squad':
-      spawnMusicSquad(w, effect.factionId, effect.formation ?? 'ring', effect.hpMult ?? 1);
-      break;
-    case 'burst': {
-      const def = getEnemy(effect.enemyId);
-      const positions = effect.formation ? formationPositions(w, effect.formation, effect.count) : [];
-      for (let i = 0; i < effect.count; i += 1) spawnEnemy(w, def, effect.hpMult ?? 1, positions[i]);
-      break;
-    }
-    case 'palette': {
-      const palette = THEMED_PALETTES.find((theme) => theme.id === effect.paletteId)?.palette;
-      if (palette) w.musicColorOverride = palette;
-      break;
-    }
-  }
-}
-
-/**
- * Dedicated squad spawn for music events -- deliberately not
- * `spawnDirectorSquad` below, which is coupled to `DIRECTORS`/boss tracking
- * this feature has no use for.
- */
-function spawnMusicSquad(
-  w: World,
-  factionId: string,
-  formation: NonNullable<import('@/game/types').WaveDef['formation']>,
-  hpMult: number,
-) {
-  const faction = getFaction(factionId);
-  const positions = formationPositions(w, formation, faction.roster.length);
-  faction.roster.forEach((enemyId, i) => spawnEnemy(w, getEnemy(enemyId), hpMult, positions[i]));
 }
 
 /* ------------------------------------------------------------------ */

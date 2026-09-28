@@ -32,8 +32,6 @@ import {
   Heart,
   LockKeyhole,
   Disc3,
-  ChevronDown,
-  Pencil,
 } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
 
@@ -52,11 +50,6 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
-  const [creditEditId, setCreditEditId] = useState<string | null>(null);
-  const [creditLabelDraft, setCreditLabelDraft] = useState('');
-  const [creditUrlDraft, setCreditUrlDraft] = useState('');
-  const [creditApplyToAlbum, setCreditApplyToAlbum] = useState(false);
 
   const playlistTracks: Track[] = player.activePlaylist
     ? player.activePlaylist.trackIds
@@ -91,30 +84,6 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
   const finishRename = (id: string) => {
     if (renameDraft.trim()) player.renamePlaylist(id, renameDraft);
     setRenamingId(null);
-  };
-
-  const startCreditEdit = (track: Track) => {
-    setCreditEditId(track.id);
-    setCreditLabelDraft(track.creditLabel ?? '');
-    setCreditUrlDraft(track.creditUrl ?? '');
-    setCreditApplyToAlbum(false);
-  };
-
-  const saveCreditEdit = (track: Track) => {
-    const label = creditLabelDraft.trim();
-    const url = creditUrlDraft.trim();
-    if (!label || !url) return;
-    if (creditApplyToAlbum && track.album) player.setAlbumCredit(track.album, label, url);
-    else player.setTrackCredit(track.id, label, url);
-    setCreditEditId(null);
-  };
-
-  const removeCredit = (track: Track) => {
-    // Clears whichever level is actually supplying the visible link (its own
-    // override, its album's, or both) rather than making the player figure
-    // out which one is in effect.
-    player.clearTrackCredit(track.id);
-    if (track.album) player.clearAlbumCredit(track.album);
   };
 
   return (
@@ -501,19 +470,15 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
               {viewedTracks.map((track) => {
                 const isCurrent = player.currentTrack?.id === track.id;
                 const converting = player.conversion?.trackId === track.id;
-                const canShowCredit = track.source === 'local' || Boolean(track.creditUrl);
-                const isExpanded = expandedTrackId === track.id;
-                const isEditingCredit = creditEditId === track.id;
                 return (
                   <Reorder.Item
                     key={track.id}
                     value={track}
                     drag={player.activePlaylist && !player.activePlaylist.builtIn && !favoritesOnly ? 'y' : false}
-                    className={`group flex min-w-0 flex-col border transition-colors ${
+                    className={`group flex min-w-0 items-center justify-between border p-1 pr-3 transition-colors ${
                       isCurrent ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
                     }`}
                   >
-                  <div className="flex min-w-0 items-center justify-between p-1 pr-3">
                     {player.activePlaylist && !player.activePlaylist.builtIn && (
                       <span className="cursor-grab px-1 text-muted-foreground/50 active:cursor-grabbing" aria-hidden>
                         <GripVertical className="w-4 h-4" />
@@ -621,130 +586,7 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                       ) : (
                         <span className="px-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">{track.album ?? 'Built in'}</span>
                       )}
-
-                      {canShowCredit && (
-                        <button
-                          type="button"
-                          onClick={() => setExpandedTrackId((current) => (current === track.id ? null : track.id))}
-                          className={`p-2 transition-colors ${isExpanded || track.creditUrl ? 'text-primary' : 'text-muted-foreground opacity-70 hover:text-primary group-hover:opacity-100'}`}
-                          title={track.creditUrl ? `Artist link: ${track.creditLabel}` : 'Add an artist link'}
-                          aria-label={isExpanded ? `Hide artist link for ${track.title}` : `Show artist link options for ${track.title}`}
-                          aria-expanded={isExpanded}
-                          data-testid={`button-credit-toggle-${track.id}`}
-                        >
-                          <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                        </button>
-                      )}
                     </div>
-                  </div>
-
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden border-t border-border/50 px-3 py-2"
-                      data-testid={`panel-credit-${track.id}`}
-                    >
-                      {isEditingCredit ? (
-                        <div className="flex flex-col gap-2">
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <input
-                              type="text"
-                              value={creditLabelDraft}
-                              onChange={(e) => setCreditLabelDraft(e.target.value)}
-                              placeholder="Link name (e.g. artist's site)"
-                              className="min-w-0 flex-1 border border-border bg-black px-2 py-1.5 text-xs text-white outline-none focus:border-primary"
-                              data-testid={`input-credit-label-${track.id}`}
-                            />
-                            <input
-                              type="url"
-                              value={creditUrlDraft}
-                              onChange={(e) => setCreditUrlDraft(e.target.value)}
-                              placeholder="https://..."
-                              className="min-w-0 flex-1 border border-border bg-black px-2 py-1.5 text-xs text-white outline-none focus:border-primary"
-                              data-testid={`input-credit-url-${track.id}`}
-                            />
-                          </div>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            {track.album && (
-                              <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
-                                <input
-                                  type="checkbox"
-                                  checked={creditApplyToAlbum}
-                                  onChange={(e) => setCreditApplyToAlbum(e.target.checked)}
-                                  data-testid={`checkbox-credit-album-${track.id}`}
-                                />
-                                Apply to whole album ({track.album})
-                              </label>
-                            )}
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setCreditEditId(null)}
-                                className="border border-border px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-white"
-                                data-testid={`button-credit-cancel-${track.id}`}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => saveCreditEdit(track)}
-                                disabled={!creditLabelDraft.trim() || !creditUrlDraft.trim()}
-                                className="bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary-foreground hover:bg-white disabled:opacity-40"
-                                data-testid={`button-credit-save-${track.id}`}
-                              >
-                                Save
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : track.creditUrl ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <a
-                            href={track.creditUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-white"
-                            data-testid={`link-credit-${track.id}`}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" /> {track.creditLabel}
-                          </a>
-                          {track.source === 'local' && (
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => startCreditEdit(track)}
-                                className="p-1.5 text-muted-foreground transition-colors hover:text-primary"
-                                aria-label={`Edit artist link for ${track.title}`}
-                                data-testid={`button-credit-edit-${track.id}`}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeCredit(track)}
-                                className="p-1.5 text-muted-foreground transition-colors hover:text-destructive"
-                                aria-label={`Remove artist link for ${track.title}`}
-                                data-testid={`button-credit-remove-${track.id}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startCreditEdit(track)}
-                          className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-primary"
-                          data-testid={`button-credit-add-${track.id}`}
-                        >
-                          <Link2 className="h-3.5 w-3.5" /> Add artist link
-                        </button>
-                      )}
-                    </motion.div>
-                  )}
                   </Reorder.Item>
                 );
               })}

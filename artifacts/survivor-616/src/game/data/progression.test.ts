@@ -33,3 +33,10 @@ test('the Rapid shelter remains locked behind the pressure-room rescue', () => {
   assert.deepEqual(shelter.unlock, { kind: 'discovery', discoveryId: 'rapid-pressure-rooms-cleared' });
   assert.ok(shelter.features.includes('allies'));
 });
+
+test('GRPD Station exposes the kennel as a first-class destination', () => {
+  const station = HUB_ROOMS.find((room) => room.id === 'grpd-station');
+  assert.ok(station);
+  assert.ok(station.features.includes('kennel'));
+  assert.ok(station.features.includes('vendor'));
+});
