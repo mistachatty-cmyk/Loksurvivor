@@ -169,6 +169,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#86efac',
     roster: ['data-gob-nibbler', 'data-gob-pipechewer', 'data-gob-brickbiter', 'data-gob-archgnawer'],
   },
+  {
+    id: 'supabuilda',
+    name: 'Supabuilda',
+    description: 'A territorial gym faction that turned membership, spotting, iron plates, grapples, and raw momentum into a street-combat doctrine.',
+    accent: '#facc15',
+    roster: ['supabuilda-gym-rat', 'supabuilda-plate-slinger', 'supabuilda-spotter', 'supabuilda-deadlift-bruiser', 'supabuilda-prime'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(
