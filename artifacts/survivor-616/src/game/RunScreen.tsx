@@ -30,13 +30,17 @@ import { SECTOR_MAPS_BY_ID } from '@/game/data/sectorMaps';
 import { SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import {
+  armArtisteDraw,
   applyUpgrade,
+  beginArtisteDraw,
   buildResult,
+  cancelArtisteDraw,
   castFreezeCone,
   captureNearestEnemy,
   claimLootPrize,
   claimRumorEmergencyHeal,
   createWorld,
+  commitArtisteDraw,
   dashPlayer,
   endCommandSelectionDrag,
   endFreezeSelectionDrag,
@@ -50,6 +54,7 @@ import {
   selectControlGroup,
   setCommandMode,
   updateCommandSelection,
+  updateArtisteDraw,
   primePhysicsObject,
   rollUpgradeChoices,
   setStormCloudMode,
@@ -138,7 +143,7 @@ interface StickState {
   dy: number;
 }
 
-type PointerMode = 'none' | 'stick' | 'object' | 'cloud' | 'freezeSelect' | 'commandSelect';
+type PointerMode = 'none' | 'stick' | 'object' | 'cloud' | 'freezeSelect' | 'commandSelect' | 'draw';
 
 interface TapRecord {
   time: number;
@@ -226,6 +231,7 @@ export function RunScreen({
   const lastTapRef = useRef<TapRecord | null>(null);
   const freezeSelectPointerIdRef = useRef<number | null>(null);
   const freezeSelectOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
+  const artisteDrawPointerIdRef = useRef<number | null>(null);
   const commandPointerIdRef = useRef<number | null>(null);
   const groupHoldRef = useRef<number | null>(null);
   /**
@@ -246,6 +252,8 @@ export function RunScreen({
   const [stickVisual, setStickVisual] = useState<StickState>(stickRef.current);
   const [dungeonTransition, setDungeonTransition] = useState<'enter' | 'exit' | null>(null);
   const [freezeSelectBox, setFreezeSelectBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [artisteStroke, setArtisteStroke] = useState<Array<{ x: number; y: number }> | null>(null);
+  const [artisteArmed, setArtisteArmed] = useState(false);
   const [commandBox, setCommandBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [commandModeOn, setCommandModeOn] = useState(false);
   const [commanderView, setCommanderView] = useState(false);
@@ -487,6 +495,29 @@ export function RunScreen({
       return;
     }
 
+    // Artiste: once the Draw button arms the brush, this pointer belongs to
+    // the freeform path until release. It never shares a gesture with the
+    // movement stick, physics props, or another character-specific mode.
+    if (canvas && world && world.artisteDraw?.armed) {
+      const point = toWorldPoint(canvas, world, event.clientX, event.clientY, renderTargetViewRef.current);
+      if (beginArtisteDraw(world, point.x, point.y)) {
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(1, rect.width);
+        const zoom = width / targetViewForWidth(width, renderTargetViewRef.current);
+        pointerModeRef.current = 'draw';
+        artisteDrawPointerIdRef.current = event.pointerId;
+        setArtisteArmed(false);
+        setArtisteStroke([
+          {
+            x: rect.width / 2 + (world.player.x - world.camera.x) * zoom,
+            y: rect.height / 2 + (world.player.y - world.camera.y) * zoom,
+          },
+          { x: event.clientX - rect.left, y: event.clientY - rect.top },
+        ]);
+        return;
+      }
+    }
+
     const now = performance.now();
     const previousTap = lastTapRef.current;
     if (canvas && world && previousTap &&
@@ -603,6 +634,17 @@ export function RunScreen({
       });
       return;
     }
+    if (pointerModeRef.current === 'draw') {
+      const canvas = canvasRef.current;
+      const world = worldRef.current;
+      if (!canvas || !world || artisteDrawPointerIdRef.current !== event.pointerId) return;
+      const point = toWorldPoint(canvas, world, event.clientX, event.clientY, renderTargetViewRef.current);
+      if (updateArtisteDraw(world, point.x, point.y)) {
+        const rect = canvas.getBoundingClientRect();
+        setArtisteStroke((stroke) => [...(stroke ?? []), { x: event.clientX - rect.left, y: event.clientY - rect.top }]);
+      }
+      return;
+    }
     if (pointerModeRef.current === 'freezeSelect') {
       const canvas = canvasRef.current;
       const world = worldRef.current;
@@ -675,6 +717,18 @@ export function RunScreen({
       if (orderSelectedUnits(world, origin.worldX, origin.worldY, orderMode) === 0) {
         setCommandHint('Select units first — drag over them, or tap one');
       }
+      return;
+    }
+    if (pointerModeRef.current === 'draw') {
+      pointerModeRef.current = 'none';
+      artisteDrawPointerIdRef.current = null;
+      const world = worldRef.current;
+      if (world) {
+        if (event.type === 'pointercancel') cancelArtisteDraw(world);
+        else commitArtisteDraw(world);
+      }
+      setArtisteArmed(false);
+      setArtisteStroke(null);
       return;
     }
     if (pointerModeRef.current === 'freezeSelect') {
@@ -1178,6 +1232,29 @@ export function RunScreen({
         onPointerCancel={endPointer}
         data-testid="surface-controls"
       />
+
+      {/* Artiste: a cheap screen-space live stroke while the pointer is down. */}
+      {artisteStroke && artisteStroke.length > 1 ? (
+        <svg className="pointer-events-none absolute inset-0 z-30 h-full w-full" aria-hidden="true" data-testid="artiste-live-stroke">
+          <polyline
+            points={artisteStroke.map((point) => `${point.x},${point.y}`).join(' ')}
+            fill="none"
+            stroke={character.palette.accent}
+            strokeWidth="12"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.5"
+          />
+          <polyline
+            points={artisteStroke.map((point) => `${point.x},${point.y}`).join(' ')}
+            fill="none"
+            stroke={character.palette.accentBright}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
 
       {/* Zero Day: RTS-style drag-select box over frozen enemies. Screen-space DOM overlay, not a canvas draw call. */}
       {freezeSelectBox ? (
@@ -1721,6 +1798,29 @@ export function RunScreen({
             </button>
           ) : null}
         </div>
+      ) : null}
+
+      {/* Artiste: arm the next freeform pointer route. Hidden for every other character. */}
+      {character.artisteDraw ? (
+        <button
+          type="button"
+          onClick={() => {
+            const world = worldRef.current;
+            if (!world?.artisteDraw) return;
+            if (world.artisteDraw.armed) {
+              cancelArtisteDraw(world);
+              setArtisteArmed(false);
+              return;
+            }
+            if (armArtisteDraw(world)) setArtisteArmed(true);
+          }}
+          className={`absolute bottom-5 right-24 h-14 w-14 rounded-full border-2 bg-black/75 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider sm:bottom-8 sm:right-28 sm:h-16 sm:w-16 sm:text-[9px] ${
+            artisteArmed ? 'border-yellow-200 bg-fuchsia-500/30 text-yellow-100' : 'border-fuchsia-300/60 text-fuchsia-100'
+          }`}
+          data-testid="button-artiste-draw"
+        >
+          {artisteArmed ? 'Cancel' : 'Draw'}
+        </button>
       ) : null}
 
       {/* Zero Day: freeze cast button. Hidden for every other character. */}

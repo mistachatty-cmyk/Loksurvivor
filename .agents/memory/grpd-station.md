@@ -262,15 +262,10 @@ deleted content the other side never touched."
   applies the existing bounded slow status on hit. It joins the normal weapon
   pool and Threat Matrix catalog automatically, without borrowing or changing
   the Clockwork Beetle's hazard-pause identity.
-- **Stage 7**: the **Artiste** character and its draw-to-dodge weapon --
-  the single largest remaining lift, deliberately last. Not data: a new
-  `PointerMode: 'draw'`, a new `World.artisteDraw` state capturing an
-  arbitrary polyline (Zero Day's `freezeSelectBox`/`updateFreezeSelection`
-  only ever handles an axis-aligned rectangle, per
-  `zero-day-freeze-throw.md` -- it doesn't generalize to a freeform path),
-  and a live-stroke render layer (an SVG overlay or a second always-cleared
-  canvas, since the existing one-`div` DOM-overlay technique can't draw a
-  polyline). Follow the Zero Day precedent's proven shape (opt-in
-  `CharacterDef` field, dedicated `World` runtime state, a new `PointerMode`
-  value) rather than `DashSkillDef`/`UltimateDef.effect`, both proven poor
-  fits for anything stateful across input frames.
+- **Stage 7 -- built**: **Artiste** and the **Living Line** weapon complete
+  the roadmap. An Artiste-only Draw button arms `PointerMode: 'draw'`; the
+  next mouse/touch drag records a bounded freeform `World.artisteDraw`
+  polyline and displays it through a live SVG stroke. Release performs one
+  invulnerable dodge to the collision-resolved endpoint and damages each
+  crossed hostile once. Short/cancelled marks are free, while successful
+  routes start the authored cooldown. See `artiste-draw-dodge.md`.

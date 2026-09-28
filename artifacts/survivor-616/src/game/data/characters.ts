@@ -27,6 +27,23 @@ function emberAsceticRig(): SpriteRig {
   return rig;
 }
 
+/** Artiste: asymmetrical paint coat, bright beret and an oversized light-brush. */
+function artisteRig(): SpriteRig {
+  const rig = humanoidRig({ height: 22, width: 10, cap: true, flarePants: true, torsoColor: 'bodyDark' });
+  rig.parts.unshift(
+    { key: 'aura', x: -12, y: 4, w: 7, h: 18, color: 'body', z: 0 },
+    { key: 'aura', x: 6, y: 7, w: 4, h: 14, color: 'accent', z: 0 },
+  );
+  rig.parts.push(
+    { key: 'crest', x: -7, y: 27, w: 13, h: 3, color: 'accentBright', z: 9 },
+    { key: 'armR', x: 6, y: 13, w: 15, h: 2, color: 'glow', z: 8 },
+    { key: 'crest', x: 18, y: 11, w: 4, h: 6, color: 'accentBright', z: 9 },
+    { key: 'aura', x: 20, y: 8, w: 3, h: 3, color: 'accent', z: 0 },
+  );
+  rig.pixelHeight = 31;
+  return rig;
+}
+
 /** Switchback reads as a courier in a cropped jacket, route visor and trailing signal ribbons. */
 function switchbackRig(): SpriteRig {
   const rig = humanoidRig({ height: 19, width: 9, cap: true, torsoColor: 'bodyDark' });
@@ -1964,6 +1981,56 @@ export const CHARACTERS: CharacterDef[] = [
     },
     signatureTraits: ['Gravity Defector', '+35% Nova Area'],
     unlock: { kind: 'clearArea', areaId: 'lev-syndicate-spire' },
+  },
+  {
+    id: 'artiste',
+    react: REACTION_PRESETS.playerBob,
+    name: 'Artiste',
+    handle: 'The Living Line',
+    tagline: 'If the street closes in, redraw the exit.',
+    bio: 'A muralist who learned to turn one uninterrupted gesture into an escape route. Every finished line becomes a step through danger, leaving the crowd inside the composition.',
+    palette: {
+      ink: '#10051f',
+      body: '#5b21b6',
+      bodyDark: '#24103f',
+      accent: '#f43f8c',
+      accentBright: '#fef08a',
+      skin: '#c084fc',
+      glow: '#67e8f9',
+    },
+    rig: artisteRig(),
+    stats: { maxHp: 96, speed: 112, power: 1.06, area: 1.12, haste: 1.08, magnet: 64, armor: 0.03, crit: 0.09, lifesteal: 0 },
+    weapon: {
+      id: 'living-line',
+      name: 'Living Line',
+      kind: 'laser',
+      description: 'Snaps a bright brushstroke through the nearest opening in the crowd.',
+      damage: 20,
+      cooldownMs: 920,
+      range: 360,
+      levelDamageScale: 0.27,
+      impactIntensity: 2,
+      color: '#f43f8c',
+    },
+    ultimate: {
+      id: 'gallery-opening',
+      name: 'Gallery Opening',
+      description: 'Floods the block with living color, buying room for the next impossible mark.',
+      cooldownMs: 25000,
+      durationMs: 4200,
+      effect: { novaDamage: 88, novaRadius: 220, damageMult: 1.45, speedMult: 1.3, invulnerable: true },
+    },
+    artisteDraw: {
+      maxPathLength: 420,
+      maxPoints: 48,
+      minPointDistance: 12,
+      cooldownMs: 6500,
+      damage: 34,
+      trailRadius: 18,
+      invulnerabilityMs: 700,
+    },
+    signatureTraits: ['Freehand Escape', 'Painted I-Frames'],
+    unlock: { kind: 'clearArea', areaId: 'grpd-station-division' },
   },
   {
     id: 'zero-day',

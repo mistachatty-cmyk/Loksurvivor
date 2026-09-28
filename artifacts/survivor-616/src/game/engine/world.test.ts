@@ -23,7 +23,9 @@ import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPal
 import { DISTRICT_INCURSIONS, DISTRICT_INCURSIONS_BY_ID, chooseDistrictIncursion } from '@/game/data/incursions';
 import { ENDLESS_BANDS, getEndlessBand } from '@/game/data/endlessBands';
 import {
+  armArtisteDraw,
   createWorld,
+  beginArtisteDraw,
   dashPlayer,
   buildResult,
   claimLootPrize,
@@ -57,6 +59,9 @@ import {
   isOnBeat,
   musicMultiplier,
   updateRunningMan,
+  updateArtisteDraw,
+  commitArtisteDraw,
+  cancelArtisteDraw,
 } from '@/game/engine/world';
 import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
 import { generateChunk } from '@/game/engine/chunks';
@@ -3591,4 +3596,40 @@ test('Clock fires three staggered hands and slows enemies it strikes', () => {
   assert.deepEqual(hands.map((hand) => Math.round(hand.bornAt - hands[0]!.bornAt)), [0, 120, 240]);
   assert.ok(enemy.hp < enemy.maxHp, 'the first active clock hand should damage its target');
   assert.ok(enemy.activeEffects.some((effect) => effect.id === 'slow'), 'Clock hits should apply slow');
+});
+
+test('Artiste resolves a bounded freeform route as one damaging invulnerable dodge', () => {
+  const artiste = getCharacter('artiste');
+  assert.ok(artiste.artisteDraw);
+  const area = { ...AREAS[0]!, durationSec: 120, waves: [], obstacles: [] };
+  const world = createWorld(area, artiste, artiste.stats, 617);
+  const crossed = addEnemy(world, 'nightcrawler', 180, 0);
+
+  assert.ok(world.artisteDraw);
+  assert.equal(armArtisteDraw(world), true);
+  assert.equal(beginArtisteDraw(world, 90, 0), true);
+  assert.equal(updateArtisteDraw(world, 900, 0), true);
+  assert.equal(world.artisteDraw.pathLength, artiste.artisteDraw.maxPathLength);
+  assert.equal(commitArtisteDraw(world), true);
+
+  assert.equal(Math.round(world.player.x), artiste.artisteDraw.maxPathLength);
+  assert.ok(crossed.hp < crossed.maxHp, 'the painted route should damage a crossed enemy');
+  assert.ok(world.player.invulnUntil >= world.now + artiste.artisteDraw.invulnerabilityMs);
+  assert.equal(world.artisteDraw.nextReadyAt, world.now + artiste.artisteDraw.cooldownMs);
+  assert.equal(armArtisteDraw(world), false, 'a committed route should start the cooldown');
+});
+
+test('Artiste can cancel or discard a short mark without consuming cooldown', () => {
+  const artiste = getCharacter('artiste');
+  const world = createWorld({ ...AREAS[0]!, waves: [], obstacles: [] }, artiste, artiste.stats, 618);
+
+  assert.equal(armArtisteDraw(world), true);
+  assert.equal(beginArtisteDraw(world, 2, 0), true);
+  assert.equal(commitArtisteDraw(world), false);
+  assert.equal(world.artisteDraw?.nextReadyAt, 0);
+
+  assert.equal(armArtisteDraw(world), true);
+  cancelArtisteDraw(world);
+  assert.equal(world.artisteDraw?.armed, false);
+  assert.equal(world.artisteDraw?.nextReadyAt, 0);
 });
