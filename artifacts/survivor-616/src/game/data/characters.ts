@@ -327,6 +327,23 @@ function apexCollectorRig(): SpriteRig {
   return rig;
 }
 
+/** Mirrorball Monarch's rig: a chrome-plated stance topped with a faceted mirrorball head that catches accentBright/glow light from every angle. */
+function mirrorballMonarchRig(): SpriteRig {
+  const rig = humanoidRig({ height: 21, width: 12, visor: true, torsoColor: 'body', headColor: 'body' });
+  rig.parts.push(
+    // Faceted mirrorball panels layered onto the head block.
+    { key: 'crest', x: -5, y: 20, w: 3, h: 3, color: 'accentBright', z: 9 },
+    { key: 'crest', x: 2, y: 20, w: 3, h: 3, color: 'glow', z: 9 },
+    { key: 'crest', x: -2, y: 23, w: 3, h: 3, color: 'accentBright', z: 9 },
+    { key: 'crest', x: -6, y: 24, w: 2, h: 2, color: 'glow', z: 9 },
+    { key: 'crest', x: 5, y: 23, w: 2, h: 2, color: 'accentBright', z: 9 },
+    // A thin orbiting halo of caught light around the head.
+    { key: 'aura', x: -10, y: 21, w: 3, h: 3, color: 'glow', z: 0 },
+    { key: 'aura', x: 8, y: 25, w: 3, h: 3, color: 'accentBright', z: 0 },
+  );
+  return rig;
+}
+
 /**
  * The playable roster. Each entry is fully data-driven: silhouette, palette,
  * base stats, signature weapon, ultimate and unlock condition.
@@ -2087,6 +2104,48 @@ export const CHARACTERS: CharacterDef[] = [
       throwSpeed: 520,
     },
     unlock: { kind: 'clearArea', areaId: 'null-sector' },
+  },
+  {
+    id: 'mirrorball-monarch',
+    name: 'Mirrorball Monarch',
+    handle: 'The Chrome Royale',
+    tagline: 'Every facet finds you eventually.',
+    bio: "Crowned off a trophy nobody wanted back, chrome-plated and endlessly turning. Found the Digital Disco floor still spinning long after everyone else left, and decided that was reason enough to stay.",
+    palette: {
+      ink: '#0a0a0c',
+      body: '#a8b0bc',
+      bodyDark: '#565f6b',
+      accent: '#e8b64e',
+      accentBright: '#fff8e7',
+      skin: '#8b93a0',
+      glow: '#f5dfa0',
+    },
+    rig: mirrorballMonarchRig(),
+    stats: { maxHp: 98, speed: 108, power: 1.02, area: 1.08, haste: 1.05, magnet: 56, armor: 0.05, crit: 0.08, lifesteal: 0 },
+    weapon: {
+      id: 'facet-cascade',
+      name: 'Facet Cascade',
+      kind: 'orbit',
+      description: 'The exclusive weapon earned by clearing Digital Disco: a ring of chrome mirror-facets that catches every strobe pulse and throws refracted light-shards back at anyone who gets close.',
+      damage: 15,
+      cooldownMs: 0,
+      range: 70,
+      speed: 3.0,
+      count: 3,
+      levelDamageScale: 0.24,
+      impactIntensity: 1,
+      color: '#e8b64e',
+    },
+    ultimate: {
+      id: 'full-brightness',
+      name: 'Full Brightness',
+      description: 'The mirrorball hits full brightness: every facet flares at once and the whole floor answers.',
+      cooldownMs: 25000,
+      durationMs: 4200,
+      effect: { novaDamage: 90, novaRadius: 215, damageMult: 1.45, speedMult: 1.15 },
+    },
+    signatureTraits: ['Refracted Facets', 'Full Brightness'],
+    unlock: { kind: 'clearArea', areaId: 'digital-disco' },
   },
 ];
 

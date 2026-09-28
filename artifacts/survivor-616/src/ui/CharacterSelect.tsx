@@ -535,6 +535,7 @@ const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; descr
   { key: 'scalerMode', name: 'Scaler', description: "Enemy hp scales up with your level as the run goes." },
   { key: 'infiniteMode', name: 'Infinite Mode', description: 'The clock never runs out -- the final wave repeats and escalates instead.' },
   { key: 'hordeSpinEnabled', name: 'HordeSpin', description: 'Every 45s, spin a wheel for a scaled horde event and a reward. 5x5 and 666 are rare.' },
+  { key: 'discoMode', name: 'Disco Mode', description: 'Cycles the whole map through a shifting disco palette for the run. Pure visuals -- no change to spawns or hp.' },
   // Only shown once meta.directorModeUnlocked -- see RunModifiersChecklist below.
   { key: 'directorModeEnabled', name: 'Director Mode', description: 'Raises the odds the Director crashes the run with its crew, once eligible.' },
 ];

@@ -152,6 +152,7 @@ function addEnemy(
     chargeUntil: 0,
     fireReadyAt: Number.POSITIVE_INFINITY,
     weave: 0,
+    wobblePhase: 0,
     specialReadyAt: Number.POSITIVE_INFINITY,
     telegraphUntil: 0,
     specialUntil: 0,

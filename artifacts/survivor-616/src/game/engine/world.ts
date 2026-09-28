@@ -186,6 +186,10 @@ export interface EnemyActor extends Actor {
   fireReadyAt: number;
   /** Drifters weave around their heading. */
   weave: number;
+  /** Per-instance phase seed for `traits.wobbleMs`'s sine offset -- kept
+   *  separate from `weave` because 'tracker' (this family's behavior)
+   *  already uses `weave` for its narrowing lock-cone half-angle. */
+  wobblePhase: number;
   specialReadyAt: number;
   telegraphUntil: number;
   specialUntil: number;
@@ -2219,6 +2223,30 @@ function spawnEnemy(
     }
   }
 
+  // Per-instance randomization: this spawn gets its own cloned def with a
+  // random subset of trait fragments merged in and a random palette, so
+  // repeated spawns of the same enemy id don't all look/act the same.
+  // `def` is reassigned here (never mutating `incomingDef`/`ENEMIES`) so
+  // every read below -- hp, palette, traits -- sees the randomized copy.
+  if (def.traitRandomizer) {
+    const { traitPool, paletteVariants } = def.traitRandomizer;
+    const pickCount = Math.min(traitPool.length, 1 + Math.floor(w.rng() * 3));
+    const pool = [...traitPool];
+    const picked: NonNullable<EnemyDef['traits']>[] = [];
+    for (let i = 0; i < pickCount && pool.length > 0; i += 1) {
+      const index = Math.floor(w.rng() * pool.length);
+      picked.push(pool.splice(index, 1)[0]!);
+    }
+    const palette = paletteVariants.length > 0
+      ? paletteVariants[Math.floor(w.rng() * paletteVariants.length)]!
+      : def.palette;
+    def = {
+      ...def,
+      traits: Object.assign({}, def.traits, ...picked),
+      palette,
+    };
+  }
+
   // modifierHpMult lives here (not folded into any per-mode cap) so it
   // applies to every spawn path uniformly -- incursions and the endless
   // dungeon boss/elite rotation call spawnEnemy directly with their own
@@ -2254,6 +2282,11 @@ function spawnEnemy(
     chargeUntil: 0,
     fireReadyAt: w.now + randRange(w.rng, 600, 2400),
     weave: w.rng() * Math.PI * 2,
+    // Only draws from the seeded RNG when this instance actually has
+    // traits.wobbleMs (including one picked by traitRandomizer above) --
+    // an unconditional draw here would shift every other enemy's RNG
+    // stream and change unrelated deterministic-seed test outcomes.
+    wobblePhase: def.traits?.wobbleMs ? w.rng() * Math.PI * 2 : 0,
     specialReadyAt: w.now + randRange(w.rng, 1400, 3200),
     telegraphUntil: 0,
     specialUntil: 0,
@@ -6653,6 +6686,18 @@ function updateEnemies(w: World, dt: number) {
         ? enemy.baseRadius * (traits.shiftScale ?? 1.45)
         : enemy.baseRadius;
       spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
+    }
+    if (traits?.wobbleMs) {
+      // A dance-step sine offset layered on top of whatever behavior this
+      // enemy has. Applied as the *change* in a sine curve since last frame
+      // (rather than an absolute offset) so it settles into a net-zero-drift
+      // wiggle instead of accumulating a runaway displacement.
+      const amp = traits.wobbleAmp ?? 6;
+      const twoPi = Math.PI * 2;
+      const angleNow = ((w.now + enemy.wobblePhase) / traits.wobbleMs) * twoPi;
+      const anglePrev = ((w.now - dt * 1000 + enemy.wobblePhase) / traits.wobbleMs) * twoPi;
+      enemy.x += (Math.sin(angleNow) - Math.sin(anglePrev)) * amp;
+      enemy.y += (Math.cos(angleNow) - Math.cos(anglePrev)) * amp;
     }
 
     const dataGobFleeing = w.area.id === 'rapid-pressure-rooms'

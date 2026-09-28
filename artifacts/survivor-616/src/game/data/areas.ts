@@ -1,5 +1,7 @@
 import type { AreaDef } from '@/game/types';
 import { AREAS_2X } from './areas-2x';
+import { AREAS_4X } from './areas-4x';
+import { AREAS_DISCO } from './areas-disco';
 import { WEIRD_AREAS } from './areas-weird';
 import { AREAS_ENDLESS } from './areas-endless';
 import { AREAS_NULL_SECTOR } from './areas-null-sector';
@@ -1080,6 +1082,8 @@ export const AREAS: AreaDef[] = [
   // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.
   ...AREAS_ENDLESS,
   ...AREAS_2X,
+  ...AREAS_4X,
+  ...AREAS_DISCO,
   ...AREAS_NULL_SECTOR,
 ];
 
