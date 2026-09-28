@@ -18,3 +18,9 @@ test('every DirectorDef references a registered faction and a boss inside its ro
     assert.ok(director.chance > 0 && director.chance <= 1, `${director.id} chance must be in (0, 1]`);
   }
 });
+
+test('the Digital Archive ships three distinct Director personalities', () => {
+  assert.equal(DIRECTORS.length, 3);
+  assert.deepEqual(DIRECTORS.map((director) => director.id), ['take-two', 'the-warden', 'the-promoter']);
+  assert.deepEqual(DIRECTORS.map((director) => director.effect.kind), ['none', 'spawnBias', 'factionFavor']);
+});

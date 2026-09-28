@@ -35,6 +35,7 @@ import {
 import type { AreaDef, RunResult } from '@/game/types';
 import type { ArenaSeat } from '@/game/arena/arenaWorld';
 import { ArchivePanel } from '@/ui/ArchivePanel';
+import { DirectorTerminalPanel } from '@/ui/DirectorTerminalPanel';
 import { AreaSelect } from '@/ui/AreaSelect';
 import { BestiaryPanel } from '@/ui/BestiaryPanel';
 import { CharacterSelect } from '@/ui/CharacterSelect';
@@ -90,6 +91,7 @@ type Screen =
   | { name: 'account' }
   | { name: 'feedback' }
   | { name: 'threat-matrix' }
+  | { name: 'director-terminal' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
@@ -137,7 +139,8 @@ function initialScreen(): Screen {
       requested === 'settings' ||
       requested === 'account' ||
       requested === 'feedback' ||
-      requested === 'threat-matrix'
+      requested === 'threat-matrix' ||
+      requested === 'director-terminal'
     ) {
       return { name: requested };
     }
@@ -215,6 +218,9 @@ function Game() {
         break;
       case 'threat-matrix':
         setScreen({ name: 'threat-matrix' });
+        break;
+      case 'director-terminal':
+        setScreen({ name: 'director-terminal' });
         break;
     }
   }, [sfx]);
@@ -442,6 +448,9 @@ function Game() {
 
     case 'threat-matrix':
       return <ThreatMatrixScreen onBack={goHub} />;
+
+    case 'director-terminal':
+      return <DirectorTerminalPanel onBack={goHub} />;
 
     case 'run':
       {

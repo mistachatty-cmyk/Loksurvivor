@@ -361,6 +361,30 @@ test('killing the Director boss resolves the encounter and marks the run result 
   assert.equal(result.directorDefeated, true);
 });
 
+test('Data-Gobs chew exposed world props and deepen raw data breakage', () => {
+  const area: AreaDef = {
+    ...AREAS[0]!,
+    id: 'data-gob-chew-test',
+    durationSec: 999,
+    waves: [],
+    obstacles: [{ x: 40, y: 0, w: 48, h: 48, kind: 'fuse-box' }],
+    rawDataBreakage: { ambientPerSec: 0.001, damageVulnerability: 1 },
+    rescueAllyId: undefined,
+  };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const gob = addEnemy(world, 'data-gob-nibbler', 58, 0);
+  gob.fireReadyAt = 0;
+  const prop = world.breakables[0]!;
+  const startingHp = prop.hp;
+
+  for (let i = 0; i < 90; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(prop.rawDataBreakage > 0.1, 'the prop should visibly expose raw data');
+  assert.ok(prop.hp < startingHp, 'the Data-Gob should chew structural HP');
+  assert.ok(world.player.hp > world.player.maxHp * 0.95, 'an edible prop keeps the Data-Gob focused away from the survivor');
+});
+
 test('a reflective surface redirects a compatible projectile', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 24, h: 40, kind: 'reflective-surface' }),
