@@ -274,6 +274,9 @@ export function createInitialMeta(): MetaState {
     sfxEnabled: true,
     hideoutAmbienceEnabled: false,
     hideoutWeatherEnabled: true,
+    hideoutSectionsCollapsedByDefault: false,
+    hideoutPreviewEnabled: true,
+    hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
     introTitlePhysicsEnabled: true,
@@ -1085,6 +1088,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // making noise on its own for a returning save that predates it.
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
+    hideoutSectionsCollapsedByDefault: parsed.hideoutSectionsCollapsedByDefault === true,
+    hideoutPreviewEnabled: parsed.hideoutPreviewEnabled !== false,
+    hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
     introTitlePhysicsEnabled: parsed.introTitlePhysicsEnabled !== false,
@@ -1713,6 +1719,9 @@ type Action =
   | { type: 'setMusicReactive'; enabled: boolean }
   | { type: 'setHideoutAmbience'; enabled: boolean }
   | { type: 'setHideoutWeather'; enabled: boolean }
+  | { type: 'setHideoutSectionsCollapsedByDefault'; enabled: boolean }
+  | { type: 'setHideoutPreview'; enabled: boolean }
+  | { type: 'setHideoutStickyHeadOut'; enabled: boolean }
   | { type: 'setSplashTextEnabled'; enabled: boolean }
   | { type: 'setOneLineTitleEnabled'; enabled: boolean }
   | { type: 'setIntroTitlePhysicsEnabled'; enabled: boolean }
@@ -2652,6 +2661,15 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setHideoutWeather':
       return { ...state, meta: { ...state.meta, hideoutWeatherEnabled: action.enabled } };
 
+    case 'setHideoutSectionsCollapsedByDefault':
+      return { ...state, meta: { ...state.meta, hideoutSectionsCollapsedByDefault: action.enabled } };
+
+    case 'setHideoutPreview':
+      return { ...state, meta: { ...state.meta, hideoutPreviewEnabled: action.enabled } };
+
+    case 'setHideoutStickyHeadOut':
+      return { ...state, meta: { ...state.meta, hideoutStickyHeadOutEnabled: action.enabled } };
+
     case 'setSplashTextEnabled':
       return { ...state, meta: { ...state.meta, splashTextEnabled: action.enabled } };
 
@@ -3227,6 +3245,9 @@ export interface MetaContextValue {
   setMusicReactive: (enabled: boolean) => void;
   setHideoutAmbience: (enabled: boolean) => void;
   setHideoutWeather: (enabled: boolean) => void;
+  setHideoutSectionsCollapsedByDefault: (enabled: boolean) => void;
+  setHideoutPreview: (enabled: boolean) => void;
+  setHideoutStickyHeadOut: (enabled: boolean) => void;
   setSplashTextEnabled: (enabled: boolean) => void;
   setOneLineTitleEnabled: (enabled: boolean) => void;
   setIntroTitlePhysicsEnabled: (enabled: boolean) => void;
@@ -3396,6 +3417,18 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setHideoutWeather = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutWeather', enabled }),
+    [],
+  );
+  const setHideoutSectionsCollapsedByDefault = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setHideoutSectionsCollapsedByDefault', enabled }),
+    [],
+  );
+  const setHideoutPreview = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setHideoutPreview', enabled }),
+    [],
+  );
+  const setHideoutStickyHeadOut = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setHideoutStickyHeadOut', enabled }),
     [],
   );
   const setSplashTextEnabled = useCallback(
@@ -3624,6 +3657,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMusicReactive,
       setHideoutAmbience,
       setHideoutWeather,
+      setHideoutSectionsCollapsedByDefault,
+      setHideoutPreview,
+      setHideoutStickyHeadOut,
       setSplashTextEnabled,
       setOneLineTitleEnabled,
       setIntroTitlePhysicsEnabled,
@@ -3747,6 +3783,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMusicReactive,
     setHideoutAmbience,
     setHideoutWeather,
+    setHideoutSectionsCollapsedByDefault,
+    setHideoutPreview,
+    setHideoutStickyHeadOut,
     setSplashTextEnabled,
     setOneLineTitleEnabled,
     setIntroTitlePhysicsEnabled,

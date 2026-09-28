@@ -98,6 +98,38 @@ test('highlight list stays capped and keeps the boss kill over repeated level-up
   assert.ok(highlights.some((h) => h.kind === 'boss-defeated'));
 });
 
+test('kill streak fires once eight kills land inside the rolling window', () => {
+  const recorder = createRunHighlightRecorder();
+  recorder.observe(baseWorld({ now: 0, killsByEnemy: { grunt: 0 } }));
+  recorder.observe(baseWorld({ now: 500, killsByEnemy: { grunt: 3 } }));
+  recorder.observe(baseWorld({ now: 1500, killsByEnemy: { grunt: 8 } }));
+  const streaks = recorder.getHighlights().filter((h) => h.kind === 'kill-streak');
+  assert.equal(streaks.length, 1);
+  assert.equal(streaks[0]?.atMs, 1500);
+});
+
+test('kills spread outside the rolling window do not add up to a streak', () => {
+  const recorder = createRunHighlightRecorder();
+  recorder.observe(baseWorld({ now: 0, killsByEnemy: { grunt: 4 } }));
+  recorder.observe(baseWorld({ now: 10_000, killsByEnemy: { grunt: 8 } }));
+  const streaks = recorder.getHighlights().filter((h) => h.kind === 'kill-streak');
+  assert.equal(streaks.length, 0);
+});
+
+test('kill streak has a cooldown so a sustained kill rate does not spam it every frame', () => {
+  const recorder = createRunHighlightRecorder();
+  let kills = 0;
+  for (let now = 0; now <= 20_000; now += 250) {
+    kills += 1;
+    recorder.observe(baseWorld({ now, killsByEnemy: { grunt: kills } }));
+  }
+  const streaks = recorder.getHighlights().filter((h) => h.kind === 'kill-streak');
+  assert.ok(streaks.length >= 1);
+  for (let i = 1; i < streaks.length; i += 1) {
+    assert.ok(streaks[i]!.atMs - streaks[i - 1]!.atMs > 12_000);
+  }
+});
+
 test('getHighlights returns highlights sorted by time', () => {
   const recorder = createRunHighlightRecorder();
   recorder.observe(baseWorld({ now: 3000, level: 2 }));
