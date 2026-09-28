@@ -14,14 +14,17 @@
  * lightweight steering bot play it until it dies or clears, then start a
  * new one. Level-ups are resolved immediately with a random upgrade (same
  * pattern as the `random-live` presentation option in `RunScreen`) so the
- * run never stalls waiting on input that will never come.
+ * run never stalls waiting on input that will never come. A fraction of
+ * rotations instead show a non-combat "showcase" scene (see
+ * `attractShowcase.ts`) -- 2-3 characters posed together for a few seconds.
  *
  * Zone: basement/front-door presentation layer, not the protected baseline.
  * It shares the world/render contracts read-only and never touches saved
- * progression, meta state, or account data -- turning it off, or deleting
- * this file, changes nothing else about the game.
+ * progression except the one persistent `meta.attractModeEnabled` toggle
+ * (surfaced both here and in Settings) -- turning it off, or deleting this
+ * file, changes nothing else about the game.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -38,15 +41,28 @@ import {
   type World,
 } from '@/game/engine/world';
 import { renderWorld, type Viewport } from '@/game/render/draw';
+import { useMeta } from '@/game/state/metaStore';
+import { createShowcaseScene, drawShowcaseScene, stepShowcaseScene, type ShowcaseScene } from './attractShowcase';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 6;
-const STORAGE_KEY = 'survivor616.attractMode';
 const SCENE_RESTART_DELAY_MS = 2200;
 const ULTIMATE_ATTEMPT_INTERVAL_MS = 3000;
 const KITE_RADIUS = 100;
 const ENGAGE_RADIUS = 340;
 const EDGE_MARGIN = 80;
+const SHOWCASE_CHANCE = 0.25;
+const SHOWCASE_DURATION_MS = 7000;
+/**
+ * Total world units this decorative backdrop shows vertically, regardless of
+ * device aspect. A real run's camera correctly shows *more* vertical field
+ * on a tall phone screen -- but for a purely decorative loop that just
+ * reveals empty void/map edges past a typical area's populated extent (the
+ * "bugged out at the top" report: content clusters near the map's authored
+ * region, everything past it is dead space). Capping the vertical span here
+ * keeps a portrait phone's crop close to what desktop already shows.
+ */
+const MAX_VERTICAL_WORLD_SPAN = 700;
 
 interface BotState {
   wanderAngle: number;
@@ -143,19 +159,13 @@ export function AttractMode({ className }: AttractModeProps) {
   const worldRef = useRef<World | null>(null);
   const botRef = useRef<BotState>({ wanderAngle: Math.random() * Math.PI * 2, nextUltimateAt: 0 });
   const sceneRef = useRef<{ characterId?: string; areaId?: string }>({});
+  const showcaseRef = useRef<ShowcaseScene | null>(null);
 
-  const [enabled, setEnabled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    return window.localStorage.getItem(STORAGE_KEY) !== 'off';
-  });
+  const { meta, setAttractMode } = useMeta();
+  const enabled = meta.attractModeEnabled;
 
   const reducedMotion = typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(STORAGE_KEY, enabled ? 'on' : 'off');
-  }, [enabled]);
 
   useEffect(() => {
     if (!enabled || reducedMotion) return;
@@ -170,6 +180,8 @@ export function AttractMode({ className }: AttractModeProps) {
     let accumulator = 0;
     let sizeCheckedAt = 0;
     let restartAt = 0;
+    let mode: 'combat' | 'showcase' = 'combat';
+    let showcaseEndsAt = 0;
     let view: Viewport = { width: 1, height: 1, dpr: 1 };
 
     const resize = (): Viewport => {
@@ -185,18 +197,32 @@ export function AttractMode({ className }: AttractModeProps) {
         canvas.width = backingW;
         canvas.height = backingH;
       }
-      return { width, height, dpr: backingW / width };
+      // Cap the effective vertical world-span shown on a tall/narrow (portrait
+      // phone) viewport -- see MAX_VERTICAL_WORLD_SPAN's comment above.
+      const targetViewOverride = height > width
+        ? MAX_VERTICAL_WORLD_SPAN * (width / height)
+        : undefined;
+      return { width, height, dpr: backingW / width, targetViewOverride };
     };
 
     const startScene = () => {
+      worldRef.current = null;
+      showcaseRef.current = null;
+      if (Math.random() < SHOWCASE_CHANCE) {
+        mode = 'showcase';
+        showcaseEndsAt = performance.now() + SHOWCASE_DURATION_MS;
+        showcaseRef.current = createShowcaseScene(performance.now(), view.width, view.height);
+        return;
+      }
+      mode = 'combat';
       const { character, area } = pickScene(sceneRef.current.characterId, sceneRef.current.areaId);
       sceneRef.current = { characterId: character.id, areaId: area.id };
       worldRef.current = createWorld(area, character, character.stats, Math.floor(Math.random() * 1_000_000));
       botRef.current = { wanderAngle: Math.random() * Math.PI * 2, nextUltimateAt: 0 };
     };
 
-    startScene();
     view = resize();
+    startScene();
 
     const frame = (time: number) => {
       if (cancelled) return;
@@ -207,6 +233,19 @@ export function AttractMode({ className }: AttractModeProps) {
       if (time - sizeCheckedAt > 500) {
         sizeCheckedAt = time;
         view = resize();
+      }
+
+      if (mode === 'showcase') {
+        const scene = showcaseRef.current;
+        if (!scene) return;
+        stepShowcaseScene(scene, time);
+        const safeDpr = Number.isFinite(view.dpr) && view.dpr > 0 ? view.dpr : 1;
+        ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
+        ctx.fillStyle = '#06060a';
+        ctx.fillRect(0, 0, view.width, view.height);
+        drawShowcaseScene(ctx, scene, time);
+        if (time >= showcaseEndsAt) startScene();
+        return;
       }
 
       const world = worldRef.current;
@@ -257,10 +296,19 @@ export function AttractMode({ className }: AttractModeProps) {
     };
     document.addEventListener('visibilitychange', handleVisibility);
 
+    // Mobile browsers resize the *visual* viewport (toolbar show/hide)
+    // without necessarily firing a `resize` on `window` promptly -- catch it
+    // immediately instead of waiting up to 500ms on the poll above.
+    const handleViewportResize = () => {
+      view = resize();
+    };
+    window.visualViewport?.addEventListener('resize', handleViewportResize);
+
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.visualViewport?.removeEventListener('resize', handleViewportResize);
     };
   }, [enabled, reducedMotion]);
 
@@ -286,7 +334,7 @@ export function AttractMode({ className }: AttractModeProps) {
 
       <button
         type="button"
-        onClick={() => setEnabled((v) => !v)}
+        onClick={() => setAttractMode(!enabled)}
         aria-pressed={enabled}
         aria-label={enabled ? 'Turn off background gameplay' : 'Turn on background gameplay'}
         data-testid="button-attract-mode-toggle"

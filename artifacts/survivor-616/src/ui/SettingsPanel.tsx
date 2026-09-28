@@ -71,6 +71,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setMusicReactive,
     setSfxEnabled,
     setHideoutAmbience,
+    setAttractMode,
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
@@ -376,6 +377,31 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     data-testid="button-toggle-hideout-ambience"
                   >
                     {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Background gameplay on title screen</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      A bot-piloted run of the real game plays behind the title screen while you're deciding what to
+                      do -- random character, random area, occasionally a little non-combat show. Turn it off for a
+                      plain, still title screen.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAttractMode(!meta.attractModeEnabled)}
+                    aria-pressed={meta.attractModeEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.attractModeEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-attract-mode"
+                  >
+                    {meta.attractModeEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>

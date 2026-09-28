@@ -2098,6 +2098,8 @@ export interface MetaState {
   hideoutAmbienceEnabled: boolean;
   /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
   hideoutWeatherEnabled: boolean;
+  /** The bot-piloted background simulation on the title screen (see AttractMode.tsx). On by default. */
+  attractModeEnabled: boolean;
   /** Whether the Hideout's generators/scene-links/rumor/First Night+Contract sections start collapsed. Off by default. */
   hideoutSectionsCollapsedByDefault: boolean;
   /** The animated walking-rig hero at the top of the Hideout screen. On by default; off reverts to the classic static layout. */
