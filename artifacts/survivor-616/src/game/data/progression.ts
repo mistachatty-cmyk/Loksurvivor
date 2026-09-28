@@ -472,7 +472,13 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/street.jpeg',
     biome: 'archive',
     unlock: { kind: 'discovery', discoveryId: 'grpd-station-found' },
-    features: ['director-terminal', 'kennel', 'vendor', 'allies', 'settings', 'account', 'feedback'],
+    // 'recovery' opens the shared Recovery panel (RECOVERY_HUTS, filtered to
+    // unlocked huts regardless of entry room) -- this is the only way to
+    // reach the SWAT Sauna hut (grpd-swat-sauna) from the station itself;
+    // it shipped in Stage 1 with the hut/facility data but this feature
+    // literal was never added, so the room had no path to it. See
+    // .agents/memory/grpd-station.md.
+    features: ['director-terminal', 'kennel', 'vendor', 'allies', 'recovery', 'settings', 'account', 'feedback'],
   },
   {
     id: 'grpd-vault',
