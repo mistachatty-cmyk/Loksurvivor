@@ -385,6 +385,25 @@ test('Data-Gobs chew exposed world props and deepen raw data breakage', () => {
   assert.ok(world.player.hp > world.player.maxHp * 0.95, 'an edible prop keeps the Data-Gob focused away from the survivor');
 });
 
+test('the Rapid pressure wing exposes a live integrity readout for the rescue route', () => {
+  const area = AREAS.find((candidate) => candidate.id === 'rapid-pressure-rooms');
+  assert.ok(area);
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  const intact = hudSnapshot(world).pressureRescue;
+  assert.ok(intact);
+  assert.equal(intact.exposedSystems, 12);
+  assert.equal(intact.criticalSystems, 0);
+  assert.ok(intact.integrityPct >= 99);
+
+  const arch = world.breakables.find((prop) => prop.kind === 'digi-arch');
+  assert.ok(arch);
+  arch.rawDataBreakage = 0.8;
+  const damaged = hudSnapshot(world).pressureRescue;
+  assert.ok(damaged);
+  assert.equal(damaged.criticalSystems, 1);
+  assert.ok(damaged.integrityPct < intact.integrityPct);
+});
+
 test('a reflective surface redirects a compatible projectile', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 24, h: 40, kind: 'reflective-surface' }),

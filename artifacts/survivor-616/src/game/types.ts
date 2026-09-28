@@ -2475,6 +2475,12 @@ export interface HudSnapshot {
   rescueProgressPct: number;
   /** The trapped ally's name, when known, so the HUD banner can name them. */
   rescueAllyName?: string;
+  /** Pressure-room-only integrity readout for exposed Digi-Arch systems. */
+  pressureRescue?: {
+    integrityPct: number;
+    exposedSystems: number;
+    criticalSystems: number;
+  };
   lootBoxesOpened: number;
   /** Generated companions currently following the player. */
   lokPets: Array<{
