@@ -18,6 +18,8 @@ import { rollLokPet } from '@/game/data/lokPets';
 import { CHALLENGE_CONTRACTS_BY_ID, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { RELIC_RECIPES, RELIC_RECIPES_BY_ID } from '@/game/data/relics';
+import { getFaction } from '@/game/data/factions';
+import { DEFAULT_PALETTE_ID, THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { DISTRICT_INCURSIONS, DISTRICT_INCURSIONS_BY_ID, chooseDistrictIncursion } from '@/game/data/incursions';
 import { ENDLESS_BANDS, getEndlessBand } from '@/game/data/endlessBands';
 import {
@@ -81,6 +83,9 @@ function testArea(obstacle: AreaDef['obstacles'][number]): AreaDef {
     obstacles: [obstacle],
     waves: [],
     rescueAllyId: undefined,
+    // Isolate from AREAS[0] (monroe-strip)'s own authored music events, same
+    // reason `waves` is cleared above.
+    musicEvents: undefined,
   };
 }
 
@@ -2585,6 +2590,157 @@ test('reaction records drive multipliers without touching enemies that declare n
   assert.equal(musicMultiplier(world, getEnemy('ash-wisp').react, 'speed'), 1);
   // A declared reaction only drives the target it names.
   assert.equal(musicMultiplier(world, getEnemy('bass-bruiser').react, 'speed'), 1);
+});
+
+/* ------------------------------------------------------------------ */
+/* Music-driven spawns                                                  */
+/* ------------------------------------------------------------------ */
+
+function areaWithMusicEvents(musicEvents: AreaDef['musicEvents']): AreaDef {
+  return {
+    ...testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }),
+    musicEvents,
+  };
+}
+
+test('a music event is a no-op when the area declares none, or when no music is playing', () => {
+  const noEvents = createWorld(testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(noEvents, 1 / 30, { ...neutralInput, audio: audioFrame({ bands: { ...SILENT_FRAME.bands, bass: 1 }, energy: 1 }) });
+  assert.equal(noEvents.enemies.length, 0);
+
+  const silent = createWorld(
+    areaWithMusicEvents([{ id: 'burst', trigger: { source: 'energy', threshold: 0.1, cooldownMs: 1000 }, effect: { kind: 'burst', enemyId: 'nightcrawler', count: 3 } }]),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    7,
+  );
+  stepWorld(silent, 1 / 30, neutralInput); // no `audio` -> source stays 'none'
+  assert.equal(silent.enemies.length, 0);
+});
+
+test('a band-threshold music event fires a burst on crossing', () => {
+  const world = createWorld(
+    areaWithMusicEvents([
+      { id: 'bass-burst', trigger: { source: 'band', band: 'bass', threshold: 0.5, cooldownMs: 20_000 }, effect: { kind: 'burst', enemyId: 'nightcrawler', count: 3, formation: 'ring' } },
+    ]),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    7,
+  );
+  assert.equal(world.enemies.length, 0);
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ bands: { ...SILENT_FRAME.bands, bass: 0.9 } }) });
+  assert.equal(world.enemies.length, 3);
+});
+
+test("a music event's cooldown prevents an immediate re-fire", () => {
+  const world = createWorld(
+    areaWithMusicEvents([
+      { id: 'bass-burst', trigger: { source: 'band', band: 'bass', threshold: 0.5, cooldownMs: 20_000 }, effect: { kind: 'burst', enemyId: 'nightcrawler', count: 3 } },
+    ]),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    7,
+  );
+  const loudBass = audioFrame({ bands: { ...SILENT_FRAME.bands, bass: 0.9 } });
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: loudBass });
+  assert.equal(world.enemies.length, 3, 'first crossing fires once');
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: loudBass });
+  assert.equal(world.enemies.length, 3, 'still within cooldown, no re-fire');
+});
+
+test('a squad music event spawns the whole named faction roster', () => {
+  const world = createWorld(
+    areaWithMusicEvents([
+      { id: 'choir', trigger: { source: 'energy', threshold: 0.5, cooldownMs: 20_000 }, effect: { kind: 'squad', factionId: 'afterimage-choir', formation: 'wedge' } },
+    ]),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    7,
+  );
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ energy: 0.9 }) });
+  assert.equal(world.enemies.length, getFaction('afterimage-choir').roster.length);
+});
+
+test('a palette music event overrides rendering without mutating the settings-driven base palette', () => {
+  const world = createWorld(
+    areaWithMusicEvents([
+      { id: 'palette-shift', trigger: { source: 'energy', threshold: 0.5, cooldownMs: 20_000 }, effect: { kind: 'palette', paletteId: DEFAULT_PALETTE_ID } },
+    ]),
+    testCharacter('chain-whip'),
+    CHARACTERS[0]!.stats,
+    7,
+  );
+  assert.equal(world.worldColorFullRecolor, undefined);
+  assert.equal(world.worldColorPalette, undefined);
+  assert.equal(world.musicColorOverride, undefined);
+
+  stepWorld(world, 1 / 30, { ...neutralInput, audio: audioFrame({ energy: 0.9 }) });
+
+  assert.deepEqual(world.musicColorOverride, THEMED_PALETTES_BY_ID[DEFAULT_PALETTE_ID]!.palette);
+  // The player's own (unset, in this test) theme settings are untouched.
+  assert.equal(world.worldColorFullRecolor, undefined);
+  assert.equal(world.worldColorPalette, undefined);
+});
+
+/* ------------------------------------------------------------------ */
+/* Director personality effects                                        */
+/* ------------------------------------------------------------------ */
+
+function areaWithWave(ratePerSec: number): AreaDef {
+  return {
+    ...testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }),
+    waves: [{ enemyId: 'nightcrawler', fromSec: 0, toSec: 300, ratePerSec, burst: 1 }],
+  };
+}
+
+test('an unknown activeDirectorPersonalityId reads as no ambient Director effect', () => {
+  const world = createWorld(areaWithWave(45), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'not-a-real-director',
+  });
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.enemies.length, 1);
+});
+
+test("the Cutting Room's spawnBias spawns more, individually squishier enemies", () => {
+  const baseline = createWorld(areaWithWave(45), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(baseline, 1 / 30, neutralInput);
+  assert.equal(baseline.enemies.length, 1, 'baseline: one spawn credit crosses 1 this step');
+
+  const biased = createWorld(areaWithWave(45), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'cutting-room',
+  });
+  stepWorld(biased, 1 / 30, neutralInput);
+  assert.equal(biased.enemies.length, 2, 'spawnRateMult 1.35 crosses a second spawn credit this step');
+  assert.ok(biased.enemies[0]!.hp < baseline.enemies[0]!.hp, 'hpMult 0.85 makes each spawn individually squishier');
+});
+
+function areaWithFactionWave(ratePerSec: number, faction?: string): AreaDef {
+  return {
+    ...testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }),
+    waves: [{ enemyId: 'nightcrawler', fromSec: 0, toSec: 300, ratePerSec, burst: 1, faction }],
+  };
+}
+
+test("Continuity's factionFavor boosts spawn rate only on a wave labeled with its favored faction", () => {
+  const favoredFactionName = getFaction('afterimage-choir').name;
+
+  const baseline = createWorld(areaWithFactionWave(45, favoredFactionName), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(baseline, 1 / 30, neutralInput);
+  assert.equal(baseline.enemies.length, 1, 'baseline: one spawn credit crosses 1 this step');
+
+  const boosted = createWorld(areaWithFactionWave(45, favoredFactionName), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'continuity',
+  });
+  stepWorld(boosted, 1 / 30, neutralInput);
+  assert.equal(boosted.enemies.length, 2, 'spawnRateMult 1.5 on a favored-faction wave crosses a second spawn credit this step');
+});
+
+test("Continuity's factionFavor does not boost a wave labeled with a different faction", () => {
+  const world = createWorld(areaWithFactionWave(45, 'Some Other Faction'), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+    activeDirectorPersonalityId: 'continuity',
+  });
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.enemies.length, 1, 'a wave not labeled with the favored faction spawns at the normal rate');
 });
 
 test("Static Nomad's pulse-shield fires an all-direction burst the instant the character dashes", () => {

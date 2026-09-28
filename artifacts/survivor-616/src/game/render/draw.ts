@@ -1544,7 +1544,7 @@ function drawArenaEdges(
   ctx.fillRect(outLeft, -halfH, -halfW - outLeft, w.bounds.h);
   ctx.fillRect(halfW, -halfH, outRight - halfW, w.bounds.h);
 
-  const groundTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
+  const groundTint = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
   ctx.fillStyle = groundTint ? mixHex(w.area.ground.seam, groundTint.bodyDark, 0.3) : w.area.ground.seam;
   ctx.globalAlpha = 0.85;
   ctx.fillRect(-halfW, -halfH, w.bounds.w, 4);
@@ -1861,7 +1861,7 @@ function drawObstacles(
     obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind });
   }
 
-  const worldTint = w.worldColorFullRecolor ? w.worldColorPalette : undefined;
+  const worldTint = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
   for (const obstacle of obstacleList) {
     const baseColors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
     const colors = worldTint
@@ -4878,12 +4878,13 @@ function drawActors(
   // world-color theme, same math as the player's own blend
   // (characterSkins.ts's blendSpritePalettes). Cached per enemy id per frame
   // since many enemies on screen share one EnemyDef.
-  const enemyPaletteCache = w.worldColorFullRecolor && w.worldColorPalette ? new Map<string, SpritePalette>() : null;
+  const enemyColorTheme = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
+  const enemyPaletteCache = enemyColorTheme ? new Map<string, SpritePalette>() : null;
   const resolveEnemyPalette = (def: EnemyDef): SpritePalette => {
-    if (!enemyPaletteCache || !w.worldColorPalette) return def.palette;
+    if (!enemyPaletteCache || !enemyColorTheme) return def.palette;
     const cached = enemyPaletteCache.get(def.id);
     if (cached) return cached;
-    const blended = blendSpritePalettes(def.palette, w.worldColorPalette, 0.35);
+    const blended = blendSpritePalettes(def.palette, enemyColorTheme, 0.35);
     enemyPaletteCache.set(def.id, blended);
     return blended;
   };

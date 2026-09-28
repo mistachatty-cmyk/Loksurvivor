@@ -73,6 +73,19 @@ export interface Track {
   /** Objective completions required before an authored release can be played. */
   unlockObjectiveCount?: number;
   locked?: boolean;
+  /**
+   * Optional cross-promotion backlink: wherever the artist/label wants
+   * credit for this song sent (their own page, store, etc). Set per-track
+   * or inherited from the track's album -- see `CreditLink` below.
+   */
+  creditLabel?: string;
+  creditUrl?: string;
+}
+
+/** A player-supplied cross-promotion backlink for a song or album. */
+export interface CreditLink {
+  label: string;
+  url: string;
 }
 
 export interface Playlist {
@@ -127,6 +140,13 @@ export interface MusicPlayerValue {
   lastImport: { added: number; duplicates: number; rejected: number } | null;
   dismissImportReport: () => void;
   toggleTrackFavorite: (id: string) => void;
+  /** Sets or replaces this track's own backlink. Overrides any album-level link. */
+  setTrackCredit: (id: string, label: string, url: string) => void;
+  /** Removes this track's own backlink; the track falls back to its album's link, if any. */
+  clearTrackCredit: (id: string) => void;
+  /** Sets a backlink for every track sharing this `Track.album` name that has no link of its own. */
+  setAlbumCredit: (album: string, label: string, url: string) => void;
+  clearAlbumCredit: (album: string) => void;
   /**
    * Fetches a direct link to a media file and adds it like a dropped file.
    * Resolves false (and sets `error`) on a bad URL, a blocked streaming-service
@@ -218,6 +238,8 @@ const STREAMING_SERVICE_HOSTS = [
 const PLAYLISTS_STORAGE_KEY = 'survivor616.playlists.v1';
 const STREAMING_EMBEDS_STORAGE_KEY = 'survivor616.streaming-embeds.v1';
 const FAVORITE_FINGERPRINTS_STORAGE_KEY = 'survivor616.favorite-track-fingerprints.v1';
+const TRACK_CREDITS_STORAGE_KEY = 'survivor616.track-credit-links.v1';
+const ALBUM_CREDITS_STORAGE_KEY = 'survivor616.album-credit-links.v1';
 
 const LOKIFED_TAKE_ONE = 'Lokifed — Take 1';
 
@@ -276,6 +298,39 @@ function loadFavoriteFingerprints(): Set<string> {
   } catch {
     return new Set();
   }
+}
+
+function loadCreditMap(key: string): Record<string, CreditLink> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(key) ?? '{}') as unknown;
+    if (!stored || typeof stored !== 'object') return {};
+    const result: Record<string, CreditLink> = {};
+    for (const [entryKey, value] of Object.entries(stored as Record<string, unknown>)) {
+      if (
+        value &&
+        typeof value === 'object' &&
+        typeof (value as CreditLink).label === 'string' &&
+        typeof (value as CreditLink).url === 'string'
+      ) {
+        result[entryKey] = { label: (value as CreditLink).label, url: (value as CreditLink).url };
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+/** Local tracks are keyed by device-file fingerprint (survives re-import); every other track by its stable id. */
+function creditKeyFor(track: Pick<Track, 'id' | 'fingerprint'>): string {
+  return track.fingerprint ?? track.id;
+}
+
+function withCredit(track: Track, trackCredits: Record<string, CreditLink>, albumCredits: Record<string, CreditLink>): Track {
+  const own = trackCredits[creditKeyFor(track)];
+  const inherited = own ?? (track.album ? albumCredits[track.album] : undefined);
+  return inherited ? { ...track, creditLabel: inherited.label, creditUrl: inherited.url } : track;
 }
 
 function looksLikeMedia(file: { type: string; name: string }): boolean {
@@ -408,7 +463,12 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const analysisRef = useRef<MusicAnalyser | null>(null);
 
-  const [tracks, setTracks] = useState<Track[]>(() => withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions));
+  const [tracks, setTracks] = useState<Track[]>(() => {
+    const locked = withSoundtrackLocks(BUNDLED_TRACKS, meta.soundtrackObjectiveCompletions);
+    const initialTrackCredits = loadCreditMap(TRACK_CREDITS_STORAGE_KEY);
+    const initialAlbumCredits = loadCreditMap(ALBUM_CREDITS_STORAGE_KEY);
+    return locked.map((track) => withCredit(track, initialTrackCredits, initialAlbumCredits));
+  });
   // Data Spark is the title-screen default. Browsers still require an explicit
   // gesture before sound begins, so this selects it without forcing autoplay.
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -423,6 +483,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [linkLoading, setLinkLoading] = useState(false);
   const [lastImport, setLastImport] = useState<{ added: number; duplicates: number; rejected: number } | null>(null);
   const [favoriteFingerprints, setFavoriteFingerprints] = useState<Set<string>>(() => loadFavoriteFingerprints());
+  const [trackCredits, setTrackCredits] = useState<Record<string, CreditLink>>(() => loadCreditMap(TRACK_CREDITS_STORAGE_KEY));
+  const [albumCredits, setAlbumCredits] = useState<Record<string, CreditLink>>(() => loadCreditMap(ALBUM_CREDITS_STORAGE_KEY));
   const [localLibrary, setLocalLibrary] = useState<LocalLibrarySummary & { ready: boolean }>({
     count: 0,
     bytes: 0,
@@ -670,18 +732,25 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     void loadLocalTracks()
       .then((stored) => {
         if (cancelled) return;
-        const restored: Track[] = stored.map((entry) => ({
-          id: entry.id,
-          title: entry.title,
-          url: URL.createObjectURL(entry.file),
-          size: entry.file.size,
-          duration: null,
-          source: 'local',
-          isVideoContainer: entry.isVideoContainer,
-          restoredFromLibrary: true,
-          fingerprint: entry.fingerprint ?? fileFingerprint(entry.file),
-          favorite: favoriteFingerprints.has(entry.fingerprint ?? fileFingerprint(entry.file)),
-        }));
+        const restored: Track[] = stored.map((entry) => {
+          const fingerprint = entry.fingerprint ?? fileFingerprint(entry.file);
+          return withCredit(
+            {
+              id: entry.id,
+              title: entry.title,
+              url: URL.createObjectURL(entry.file),
+              size: entry.file.size,
+              duration: null,
+              source: 'local',
+              isVideoContainer: entry.isVideoContainer,
+              restoredFromLibrary: true,
+              fingerprint,
+              favorite: favoriteFingerprints.has(fingerprint),
+            },
+            trackCredits,
+            albumCredits,
+          );
+        });
         setTracks((previous) => {
           const knownIds = new Set(previous.map((track) => track.id));
           const knownFingerprints = new Set(previous.map((track) => track.fingerprint).filter(Boolean));
@@ -709,6 +778,24 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     }
   }, [favoriteFingerprints]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(TRACK_CREDITS_STORAGE_KEY, JSON.stringify(trackCredits));
+    } catch {
+      // Backlinks are optional cross-promotion metadata; the audio library remains intact.
+    }
+  }, [trackCredits]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(ALBUM_CREDITS_STORAGE_KEY, JSON.stringify(albumCredits));
+    } catch {
+      // Backlinks are optional cross-promotion metadata; the audio library remains intact.
+    }
+  }, [albumCredits]);
+
   // Persist playlists (metadata + order only -- see Playlist management below
   // for why local-file entries don't survive a reload).
   useEffect(() => {
@@ -732,6 +819,25 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       // The streaming shelf is a convenience; playback still works without persistence.
     }
   }, [streamingEmbeds]);
+
+  // Mobile browsers suspend the shared AudioContext when the tab is
+  // backgrounded (locking the screen, switching apps, a notification banner)
+  // to save power, and nothing else resumes it automatically. Left alone,
+  // that reads to the player as "my soundtrack got messed up mid-run" --
+  // silence, or a stuck/garbled few seconds -- until they happen to open a
+  // panel that calls `ensureAudioContext()` for an unrelated reason. This
+  // only ever resumes the existing context; it never touches volume, pitch,
+  // or any other property of the music itself.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const context = audioContextRef.current;
+      if (context && context.state === 'suspended') void context.resume().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   // Release every object URL when the app unmounts.
   useEffect(() => {
@@ -827,17 +933,21 @@ export function MusicProvider({ children }: { children: ReactNode }) {
           continue;
         }
         knownFingerprints.add(fingerprint);
-        const track: Track = {
-          id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-          title: titleFromFile(file),
-          url: URL.createObjectURL(file),
-          size: file.size,
-          duration: null,
-          source: 'local',
-          isVideoContainer: looksLikeVideoContainer(file),
-          fingerprint,
-          favorite: favoriteFingerprints.has(fingerprint),
-        };
+        const track: Track = withCredit(
+          {
+            id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+            title: titleFromFile(file),
+            url: URL.createObjectURL(file),
+            size: file.size,
+            duration: null,
+            source: 'local',
+            isVideoContainer: looksLikeVideoContainer(file),
+            fingerprint,
+            favorite: favoriteFingerprints.has(fingerprint),
+          },
+          trackCredits,
+          albumCredits,
+        );
         accepted.push(track);
         acceptedFiles.push({ track, file });
       }
@@ -900,7 +1010,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
       return accepted.length;
     },
-    [favoriteFingerprints, refreshLocalLibrary],
+    [favoriteFingerprints, trackCredits, albumCredits, refreshLocalLibrary],
   );
 
   const dismissImportReport = useCallback(() => setLastImport(null), []);
@@ -918,6 +1028,61 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       entry.id === id ? { ...entry, favorite: !entry.favorite } : entry,
     ));
   }, []);
+
+  /**
+   * Cross-promotion backlink for one song. Takes priority over any
+   * album-level link set with `setAlbumCredit` below.
+   */
+  const setTrackCredit = useCallback((id: string, label: string, url: string) => {
+    const track = tracksRef.current.find((entry) => entry.id === id);
+    if (!track) return;
+    const key = creditKeyFor(track);
+    setTrackCredits((previous) => ({ ...previous, [key]: { label, url } }));
+    setTracks((previous) => previous.map((entry) =>
+      entry.id === id ? { ...entry, creditLabel: label, creditUrl: url } : entry,
+    ));
+  }, []);
+
+  const clearTrackCredit = useCallback((id: string) => {
+    const track = tracksRef.current.find((entry) => entry.id === id);
+    if (!track) return;
+    const key = creditKeyFor(track);
+    setTrackCredits((previous) => {
+      if (!(key in previous)) return previous;
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
+    // Falls back to the track's album-level link, if any, rather than clearing it outright.
+    const fallback = track.album ? albumCredits[track.album] : undefined;
+    setTracks((previous) => previous.map((entry) =>
+      entry.id === id ? { ...entry, creditLabel: fallback?.label, creditUrl: fallback?.url } : entry,
+    ));
+  }, [albumCredits]);
+
+  /** Backlink applied to every track sharing this album name that has no link of its own. */
+  const setAlbumCredit = useCallback((album: string, label: string, url: string) => {
+    setAlbumCredits((previous) => ({ ...previous, [album]: { label, url } }));
+    setTracks((previous) => previous.map((entry) =>
+      entry.album === album && !trackCredits[creditKeyFor(entry)]
+        ? { ...entry, creditLabel: label, creditUrl: url }
+        : entry,
+    ));
+  }, [trackCredits]);
+
+  const clearAlbumCredit = useCallback((album: string) => {
+    setAlbumCredits((previous) => {
+      if (!(album in previous)) return previous;
+      const next = { ...previous };
+      delete next[album];
+      return next;
+    });
+    setTracks((previous) => previous.map((entry) =>
+      entry.album === album && !trackCredits[creditKeyFor(entry)]
+        ? { ...entry, creditLabel: undefined, creditUrl: undefined }
+        : entry,
+    ));
+  }, [trackCredits]);
 
   /**
    * Fetches a direct link to a media file client-side and adds it exactly
@@ -1239,6 +1404,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       lastImport,
       dismissImportReport,
       toggleTrackFavorite,
+      setTrackCredit,
+      clearTrackCredit,
+      setAlbumCredit,
+      clearAlbumCredit,
       addFromUrl,
       linkLoading,
       convertTrackToMp3,
@@ -1291,6 +1460,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       lastImport,
       dismissImportReport,
       toggleTrackFavorite,
+      setTrackCredit,
+      clearTrackCredit,
+      setAlbumCredit,
+      clearAlbumCredit,
       addFromUrl,
       linkLoading,
       convertTrackToMp3,

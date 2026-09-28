@@ -70,7 +70,7 @@ export function isVisualTarget(target: ReactionTarget): boolean {
  * Continuous sources ignore it and read the frame directly.
  */
 export function reactionIntensity(
-  reaction: BeatReaction,
+  reaction: Pick<BeatReaction, 'source' | 'band'>,
   frame: AudioFrame,
   pulses: { beat: number; downbeat: number; onset: number },
 ): number {
