@@ -1683,6 +1683,7 @@ type Action =
   | { type: 'equipPalette'; id: string }
   | { type: 'equipDirectorPersonality'; id: string | null }
   | { type: 'claimSaunaHoleReward' }
+  | { type: 'claimLegendaryPoliceDog' }
   | { type: 'buySoundPack'; id: string }
   | { type: 'equipSoundPack'; id: string }
   | { type: 'setSfxEnabled'; enabled: boolean }
@@ -2427,6 +2428,38 @@ export function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, pendingSaunaReward: { weaponId: reward.weaponId } } };
     }
 
+    case 'claimLegendaryPoliceDog': {
+      if (!state.meta.clearedAreaIds.includes('site-crew-active-zone')) return state;
+      if (state.meta.savedLokPets.some((pet) => pet.roll.variantId === 'blue-616')) return state;
+      const roll = rollLokPet(() => 0.616, { fixedVariantId: 'blue-616' });
+      const now = Date.now();
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: [{
+            id: 'pet-grpd-blue-616',
+            roll,
+            stamina: PET_STAMINA_MAX,
+            level: 1,
+            exp: 0,
+            battlesWon: 0,
+            battlesFought: 0,
+            favorite: true,
+          }, ...state.meta.savedLokPets].slice(0, 48),
+          pendingNotifications: [
+            ...state.meta.pendingNotifications,
+            {
+              id: `grpd-vault-k9-${now}`,
+              title: 'Blue 616 joined the kennel',
+              body: 'The legendary GRPD vault guardian is ready for runs and LokPet battles.',
+              createdAt: now,
+            },
+          ],
+        },
+      };
+    }
+
     case 'buySoundPack': {
       const pack = SOUND_PACKS_BY_ID[action.id];
       if (!pack || state.meta.ownedSoundPackIds.includes(pack.id) || state.meta.lootTokens < pack.cost) return state;
@@ -3163,6 +3196,8 @@ export interface MetaContextValue {
   equipDirectorPersonality: (id: string | null) => void;
   /** SWAT Sauna's "reach through the hole" hub action -- queues a bonus weapon for the next run. */
   claimSaunaHoleReward: () => void;
+  /** GRPD Vault action -- adds its named legendary police K9 to the kennel once. */
+  claimLegendaryPoliceDog: () => void;
   buySoundPack: (id: string) => void;
   equipSoundPack: (id: string) => void;
   setSfxEnabled: (enabled: boolean) => void;
@@ -3317,6 +3352,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
   const equipDirectorPersonality = useCallback((id: string | null) => dispatch({ type: 'equipDirectorPersonality', id }), []);
   const claimSaunaHoleReward = useCallback(() => dispatch({ type: 'claimSaunaHoleReward' }), []);
+  const claimLegendaryPoliceDog = useCallback(() => dispatch({ type: 'claimLegendaryPoliceDog' }), []);
   const buySoundPack = useCallback((id: string) => dispatch({ type: 'buySoundPack', id }), []);
   const equipSoundPack = useCallback((id: string) => dispatch({ type: 'equipSoundPack', id }), []);
   const setSfxEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setSfxEnabled', enabled }), []);
@@ -3558,6 +3594,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       equipPalette,
       equipDirectorPersonality,
       claimSaunaHoleReward,
+      claimLegendaryPoliceDog,
       buySoundPack,
       equipSoundPack,
       setSfxEnabled,
@@ -3680,6 +3717,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     equipPalette,
     equipDirectorPersonality,
     claimSaunaHoleReward,
+    claimLegendaryPoliceDog,
     buySoundPack,
     equipSoundPack,
     setSfxEnabled,

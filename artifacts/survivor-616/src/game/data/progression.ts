@@ -479,14 +479,10 @@ export const HUB_ROOMS: HubRoomDef[] = [
     name: 'The Vault',
     subtitle: 'Sealed evidence room',
     description:
-      'A super-safe door nobody in the department ever shared the combination for. Whatever is behind it stays behind it, for now.',
+      'The Site Crew finally cut through the super-safe door. Inside, one legendary K9 is still standing the last watch.',
     backdrop: 'art/street.jpeg',
     biome: 'archive',
-    // Deliberately unreachable: 'grpd-vault-code' has no DISCOVERIES entry
-    // and is never granted anywhere. See .agents/memory/grpd-station.md --
-    // this is an intentional, precedented "not built yet" content hook, not
-    // a bug to fix.
-    unlock: { kind: 'discovery', discoveryId: 'grpd-vault-code' },
+    unlock: { kind: 'clearArea', areaId: 'site-crew-active-zone' },
     features: [],
   },
   {
@@ -530,9 +526,6 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'rapid-pressure-rooms-cleared', name: 'Rapid Shelter Reconnected', blurb: 'The Data-Gobs scattered, the pressure doors opened, and one Digi-Arch finally held a route long enough to bring the trapped Rapids through.' },
   { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },
   { id: 'site-crew-permit', name: 'Site Crew Work Permit', blurb: 'A stamped permit recovered from the moving pour. Every inspection box is checked except “leave the block alive.”' },
-  // 'grpd-vault-code' is deliberately absent -- the vault room references it
-  // and is intentionally never unlockable yet. See grpd-vault in HUB_ROOMS
-  // below and .agents/memory/grpd-station.md.
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(
