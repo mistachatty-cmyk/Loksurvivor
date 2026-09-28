@@ -820,6 +820,8 @@ export type StormCloudMode = 'rain' | 'fire-rain' | 'acid-rain' | 'frost-rain';
 export type EnemyBehavior =
   | 'chase'
   | 'charger'
+  /** Close-range wrestler that yanks the player toward its body before a slam. */
+  | 'grappler'
   | 'spitter'
   | 'drifter'
   | 'flanker'

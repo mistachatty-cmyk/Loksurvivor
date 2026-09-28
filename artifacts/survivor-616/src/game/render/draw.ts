@@ -5103,6 +5103,66 @@ function drawActors(
     );
     ctx.restore();
 
+    if (!hidden && !enemy.dying && enemy.def.faction === 'Data Goblins') {
+      const fleeing = w.area.id === 'rapid-pressure-rooms'
+        && w.rescue.status === 'freed'
+        && enemy.def.id !== 'data-gob-archgnawer';
+      let nearbyData: (typeof w.breakables)[number] | undefined;
+      let nearbyDistance = Number.POSITIVE_INFINITY;
+      for (const prop of w.breakables) {
+        if (prop.broken || !prop.breakable) continue;
+        const candidateDistance = Math.hypot(enemy.x - prop.x, enemy.y - prop.y);
+        if (candidateDistance >= nearbyDistance) continue;
+        nearbyData = prop;
+        nearbyDistance = candidateDistance;
+      }
+      const chewing = !fleeing && enemy.anim === 'attack' && nearbyData
+        && nearbyDistance < 150;
+      ctx.save();
+      if (fleeing) {
+        ctx.strokeStyle = '#86efac';
+        ctx.globalAlpha = 0.7;
+        ctx.lineWidth = 2;
+        for (let trail = 0; trail < 3; trail += 1) {
+          const offset = 12 + trail * 8;
+          ctx.beginPath();
+          ctx.moveTo(enemy.x - enemy.facing * offset, enemy.y - 5);
+          ctx.lineTo(enemy.x - enemy.facing * (offset + 6), enemy.y);
+          ctx.lineTo(enemy.x - enemy.facing * offset, enemy.y + 5);
+          ctx.stroke();
+        }
+      } else if (chewing && nearbyData) {
+        ctx.strokeStyle = '#67e8f9';
+        ctx.fillStyle = '#d9f99d';
+        ctx.globalAlpha = 0.82;
+        ctx.setLineDash([3, 5]);
+        ctx.lineDashOffset = -w.now / 45;
+        ctx.beginPath();
+        ctx.moveTo(enemy.x, enemy.y);
+        ctx.lineTo(nearbyData.x, nearbyData.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (let bit = 0; bit < 3; bit += 1) {
+          const phase = ((w.now / 420) + bit / 3) % 1;
+          ctx.fillRect(
+            nearbyData.x + (enemy.x - nearbyData.x) * phase - 1.5,
+            nearbyData.y + (enemy.y - nearbyData.y) * phase - 1.5,
+            3,
+            3,
+          );
+        }
+      } else {
+        ctx.strokeStyle = '#86efac';
+        ctx.globalAlpha = 0.38 + Math.sin((w.now + enemy.uid * 70) / 170) * 0.12;
+        ctx.setLineDash([2, 6]);
+        ctx.lineDashOffset = w.now / 70;
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, enemy.radius + 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // Health bar for anything meaningfully tough.
     if (!hidden && !enemy.dying && enemy.hp < enemy.maxHp && enemy.maxHp > 60) {
       const width = Math.max(22, enemy.radius * 2.2);

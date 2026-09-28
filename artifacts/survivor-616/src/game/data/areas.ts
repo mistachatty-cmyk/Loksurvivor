@@ -971,6 +971,48 @@ export const AREAS: AreaDef[] = [
     ],
   },
 
+  {
+    id: 'supabuilda-heavy-floor',
+    name: 'Supabuilda Gym — Heavy Floor',
+    district: 'South Division iron block',
+    description:
+      'The Supabuilda claimed an abandoned strength club and welded every rack into a fighting lane. Survive the floor, dodge thrown plates, and break the champion’s grip.',
+    backdrop: 'art/street.jpeg',
+    bounds: { w: 980, h: 720 },
+    ground: { base: '#180b0b', tile: '#291313', seam: '#090404', glow: '#facc15' },
+    sky: 'roofed',
+    obstacles: [
+      { x: -350, y: -220, w: 110, h: 34, kind: 'cover' },
+      { x: 350, y: 220, w: 110, h: 34, kind: 'cover' },
+      { x: -350, y: 220, w: 68, h: 68, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: 350, y: -220, w: 68, h: 68, kind: 'metal-box', propVariant: 'heavy-metal' },
+      { x: -190, y: 0, w: 54, h: 54, kind: 'barrel' },
+      { x: 190, y: 0, w: 54, h: 54, kind: 'barrel' },
+      { x: 0, y: -250, w: 120, h: 30, kind: 'security-gate' },
+      { x: 0, y: 250, w: 120, h: 30, kind: 'security-gate' },
+      { x: -90, y: -100, w: 52, h: 52, kind: 'crate-breakable' },
+      { x: 90, y: 100, w: 52, h: 52, kind: 'crate-breakable' },
+    ],
+    landmark: {
+      name: 'The Main Event Rack',
+      description: 'A championship belt hangs above a bar nobody has moved since Supabuilda Prime took the floor.',
+      kind: 'plaza',
+      accent: '#facc15',
+    },
+    durationSec: 200,
+    threat: 'severe',
+    discoveryId: 'supabuilda-belt',
+    unlock: { kind: 'clearArea', areaId: 'rapid-pressure-rooms' },
+    waves: [
+      { fromSec: 0, toSec: 55, enemyId: 'supabuilda-gym-rat', ratePerSec: 1.25, burst: 3, faction: 'Supabuilda' },
+      { fromSec: 30, toSec: 100, enemyId: 'supabuilda-plate-slinger', ratePerSec: 0.5, burst: 1, faction: 'Supabuilda' },
+      { fromSec: 60, toSec: 145, enemyId: 'supabuilda-spotter', ratePerSec: 0.34, burst: 1, formation: 'wedge', faction: 'Supabuilda' },
+      { fromSec: 95, toSec: 185, enemyId: 'supabuilda-deadlift-bruiser', ratePerSec: 0.3, burst: 1, formation: 'pincer', faction: 'Supabuilda' },
+      { fromSec: 130, toSec: 195, enemyId: 'supabuilda-gym-rat', ratePerSec: 1.9, burst: 4, group: ['supabuilda-plate-slinger'], formation: 'ring', faction: 'Supabuilda' },
+      { fromSec: 190, toSec: 200, enemyId: 'supabuilda-prime', ratePerSec: 0.1, burst: 1, hpMult: 1.25, faction: 'Supabuilda' },
+    ],
+  },
+
   ...WEIRD_AREAS,
 
   // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.

@@ -404,6 +404,19 @@ test('the Rapid pressure wing exposes a live integrity readout for the rescue ro
   assert.ok(damaged.integrityPct < intact.integrityPct);
 });
 
+test('Supabuilda grapplers pull the player into slam range', () => {
+  const area: AreaDef = { ...AREAS[0]!, id: 'grapple-test', durationSec: 999, waves: [], obstacles: [], rescueAllyId: undefined };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const grappler = addEnemy(world, 'supabuilda-deadlift-bruiser', 120, 0);
+  grappler.fireReadyAt = 0;
+
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(world.player.kx > 0, 'the grapple should pull the player toward the bruiser');
+  assert.ok(world.alerts.some((alert) => alert.text === 'GRAPPLE'));
+});
+
 test('a reflective surface redirects a compatible projectile', () => {
   const world = createWorld(
     testArea({ x: 0, y: 0, w: 24, h: 40, kind: 'reflective-surface' }),

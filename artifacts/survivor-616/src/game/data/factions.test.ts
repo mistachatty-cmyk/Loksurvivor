@@ -36,3 +36,19 @@ test('squadWave spawns the whole roster as one lead + group', () => {
 test('squadWave rejects an unknown faction id', () => {
   assert.throws(() => squadWave({ fromSec: 0, toSec: 10, factionId: 'not-a-faction', ratePerSec: 1 }));
 });
+
+test('Supabuilda ships as a distinct five-role gym faction', () => {
+  const faction = FACTIONS.find((candidate) => candidate.id === 'supabuilda');
+  assert.ok(faction);
+  assert.deepEqual(faction.roster, [
+    'supabuilda-gym-rat',
+    'supabuilda-plate-slinger',
+    'supabuilda-spotter',
+    'supabuilda-deadlift-bruiser',
+    'supabuilda-prime',
+  ]);
+  const roster = faction.roster.map((id) => ENEMIES.find((enemy) => enemy.id === id));
+  assert.ok(roster.every(Boolean));
+  assert.ok(roster.some((enemy) => enemy?.behavior === 'grappler'));
+  assert.ok(roster.some((enemy) => enemy?.ranged));
+});

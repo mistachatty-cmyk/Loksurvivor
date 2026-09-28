@@ -6434,11 +6434,15 @@ function updateEnemies(w: World, dt: number) {
       spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
     }
 
-    const chewTarget = traits?.dataChew
+    const dataGobFleeing = w.area.id === 'rapid-pressure-rooms'
+      && enemy.def.faction === 'Data Goblins'
+      && w.rescue.status === 'freed'
+      && enemy.def.id !== 'data-gob-archgnawer';
+    const chewTarget = traits?.dataChew && !dataGobFleeing
       ? nearestDataChewTarget(w, enemy.x, enemy.y, traits.dataChew.targetRange)
       : undefined;
-    const targetX = chewTarget?.x ?? trackX;
-    const targetY = chewTarget?.y ?? trackY;
+    const targetX = dataGobFleeing ? enemy.x + (enemy.x - trackX) * 2 : chewTarget?.x ?? trackX;
+    const targetY = dataGobFleeing ? enemy.y + (enemy.y - trackY) * 2 : chewTarget?.y ?? trackY;
     const dx = targetX - enemy.x;
     const dy = targetY - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
@@ -6449,6 +6453,7 @@ function updateEnemies(w: World, dt: number) {
 
     let speed = enemy.speed * statusSpeedMultiplier(enemy) * fluidOilBoostAt(w, enemy.x, enemy.y);
     speed *= musicMultiplier(w, enemy.def.react, 'speed');
+    if (dataGobFleeing) speed *= 1.55;
     if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;
@@ -6476,6 +6481,28 @@ function updateEnemies(w: World, dt: number) {
           enemy.chargeReadyAt = w.now + randRange(w.rng, 2200, 3800);
           enemy.anim = 'attack';
           enemy.animStartedAt = w.now;
+        }
+        break;
+      }
+      case 'grappler': {
+        const grabRange = enemy.def.sizeClass === 'giant' ? 205 : 155;
+        const slamRange = enemy.def.sizeClass === 'giant' ? 92 : 68;
+        if (distance < grabRange) speed *= 0.45;
+        if (w.now >= enemy.fireReadyAt && distance < grabRange) {
+          enemy.fireReadyAt = w.now + (enemy.def.sizeClass === 'giant' ? 2200 : 2850);
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+          const pull = enemy.def.sizeClass === 'giant' ? 330 : 235;
+          p.kx -= dirX * pull;
+          p.ky -= dirY * pull;
+          if (distance <= slamRange) damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y);
+          if (canSpawnEnemyEffect(w)) w.effects.push({
+            uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: distance,
+            angle: Math.atan2(p.y - enemy.y, p.x - enemy.x), spread: 0.1,
+            bornAt: w.now, expiresAt: w.now + 260, color: enemy.def.palette.accent,
+            damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+          });
+          pushAlert(w, enemy.def.sizeClass === 'giant' ? 'MAIN EVENT GRAB' : 'GRAPPLE');
         }
         break;
       }
