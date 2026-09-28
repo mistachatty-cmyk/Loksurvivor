@@ -258,6 +258,7 @@ export function createInitialMeta(): MetaState {
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
     graphicsQuality: 'high',
+    companionRevealStyle: 'ambush',
     frameRateMode: 60,
     soundtrackObjectiveCompletions: 0,
     wildlifeSheltersInRain: true,
@@ -1070,6 +1071,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
         ? parsed.graphicsQuality
         : 'high',
+    companionRevealStyle: parsed.companionRevealStyle === 'classic' ? 'classic' : 'ambush',
     frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
     soundtrackObjectiveCompletions: counter(parsed.soundtrackObjectiveCompletions),
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
@@ -1142,7 +1144,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lokPetHistory: normalizeLokPetHistory(parsed.lokPetHistory),
     savedLokPets,
     selectedLokPetIds: savedLokPets
-      .filter((pet) => pet.stamina > 0 && Array.isArray(parsed.selectedLokPetIds) && parsed.selectedLokPetIds.includes(pet.id))
+      .filter((pet) => (pet.starter || pet.stamina > 0) && Array.isArray(parsed.selectedLokPetIds) && parsed.selectedLokPetIds.includes(pet.id))
       .map((pet) => pet.id)
       .slice(0, lokPetTeamCapacity(getCharacter(selectedCharacterId))),
     visitingLokCards: normalizeVisitingLokCards(parsed.visitingLokCards),
@@ -1738,6 +1740,7 @@ type Action =
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
+  | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
   | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
@@ -2708,6 +2711,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
+    case 'setCompanionRevealStyle':
+      return { ...state, meta: { ...state.meta, companionRevealStyle: action.style } };
 
     case 'setFrameRateMode':
       return { ...state, meta: { ...state.meta, frameRateMode: action.mode } };
@@ -3055,9 +3060,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
         ...result.lokPets
           .filter((pet) => pet.origin === 'chest')
           .map((pet, index) => ({ id: `pet-${Date.now().toString(36)}-${index}-${pet.variantId}`, roll: pet.roll, stamina: PET_STAMINA_MAX })),
-        ...prev.savedLokPets.map((pet) => spentPetIds.has(pet.id) ? { ...pet, stamina: Math.max(0, pet.stamina - 1) } : pet),
+        ...prev.savedLokPets.map((pet) => spentPetIds.has(pet.id) && !pet.starter ? { ...pet, stamina: Math.max(0, pet.stamina - 1) } : pet),
       ].slice(0, 48);
-      const selectedLokPetIds = prev.selectedLokPetIds.filter((id) => savedLokPets.some((pet) => pet.id === id && pet.stamina > 0));
+      const selectedLokPetIds = prev.selectedLokPetIds.filter((id) => savedLokPets.some((pet) => pet.id === id && (('starter' in pet && pet.starter) || pet.stamina > 0)));
       const lokPetDiscoveries = getLokPetDiscoveries(prev.lokPetCatalog, result.lokPets);
       const lokPetHistory = lokPetDiscoveries.length > 0
         ? [
@@ -3313,6 +3318,7 @@ export interface MetaContextValue {
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
+  setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
   setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
@@ -3484,6 +3490,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
+  const setCompanionRevealStyle = useCallback((style: MetaState['companionRevealStyle']) => dispatch({ type: 'setCompanionRevealStyle', style }), []);
   const setFrameRateMode = useCallback((mode: MetaState['frameRateMode']) => dispatch({ type: 'setFrameRateMode', mode }), []);
   const setWildlifeSheltersInRain = useCallback(
     (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
@@ -3739,6 +3746,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPresentation,
       setPauseMapVisible,
       setGraphicsQuality,
+      setCompanionRevealStyle,
       setFrameRateMode,
       setWildlifeSheltersInRain,
       setMinimapVisible,
@@ -3869,6 +3877,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setCompanionRevealStyle,
     setFrameRateMode,
     setWildlifeSheltersInRain,
     setMinimapVisible,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, PackageOpen, Shield, Sparkles, Swords, Zap } from 'lucide-react';
 
@@ -9,7 +9,8 @@ import type { CharacterDef, EnemyDef } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
 import { RigPortrait } from '@/ui/RigPortrait';
 
-type Phase = 'fists' | 'rustle' | 'choose' | 'partner' | 'victory';
+type Phase = 'fists' | 'rustle' | 'ambush' | 'choose' | 'partner' | 'victory';
+const AMBUSH_REVEAL_MS = 1300;
 
 const STARTER_DETAILS: Record<StarterLokPetId, { role: string; active: string; passive: string; evolution: string }> = {
   'lil-llama': {
@@ -61,7 +62,7 @@ function EnemyModel({ enemy, hp }: { enemy: EnemyDef; hp: number }) {
 }
 
 export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () => void }) {
-  const { completeStarterLokPetOnboarding, selectedCharacter, unlockedCharacters } = useMeta();
+  const { completeStarterLokPetOnboarding, selectedCharacter, unlockedCharacters, meta } = useMeta();
   const [starterCharacter] = useState<CharacterDef>(() => (
     unlockedCharacters[Math.floor(Math.random() * unlockedCharacters.length)] ?? selectedCharacter
   ));
@@ -72,20 +73,28 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
   const [chosen, setChosen] = useState<StarterLokPetId | null>(null);
   const [hits, setHits] = useState(0);
   const chosenVariant = chosen ? LOKPET_VARIANTS_BY_ID[chosen] : null;
+  const classicReveal = meta.companionRevealStyle === 'classic';
   const phaseCopy = useMemo(() => {
     if (phase === 'fists') return `${starterCharacter.name} drew the short route. No deck. No weapon. Get through the block.`;
     if (phase === 'rustle') return 'Something digital is moving in the brush.';
-    if (phase === 'choose') return inspected ? `${LOKPET_VARIANTS_BY_ID[inspected].name} steps out of the brush. This partner stays with you.` : 'Three companions answer from the brush. Meet one.';
-    if (phase === 'partner') return `${chosenVariant?.name ?? 'Your partner'} is with ${starterCharacter.name}. Finish the fight.`;
-    return `First night survived. ${starterCharacter.name} and your new partner are coming home.`;
+    if (phase === 'ambush') return 'Something ambushes the crew before you even see it coming.';
+    if (phase === 'choose') return inspected ? `${LOKPET_VARIANTS_BY_ID[inspected].name} steps out of the brush. This partner stays with you.` : 'Three companions answer the call. Meet one.';
+    if (phase === 'partner') return `${chosenVariant?.name ?? 'Your partner'} fights beside ${starterCharacter.name} from here on. Finish the fight.`;
+    return `First night survived. ${starterCharacter.name} and your new partner are coming home -- together, for every fight after this one.`;
   }, [chosenVariant?.name, inspected, phase, starterCharacter.name]);
 
   const punch = () => {
     const nextHits = hits + 1;
     setHits(nextHits);
     setEnemyHp(Math.max(42, enemyHp - 19));
-    if (nextHits >= 3) setPhase('rustle');
+    if (nextHits >= 3) setPhase(classicReveal ? 'rustle' : 'ambush');
   };
+
+  useEffect(() => {
+    if (phase !== 'ambush') return;
+    const timer = window.setTimeout(() => setPhase('choose'), AMBUSH_REVEAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
 
   const partnerStrike = () => {
     const next = Math.max(0, enemyHp - 24);
@@ -113,20 +122,15 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
           <p className="max-w-32 pt-1 text-right font-mono text-[10px] font-black uppercase tracking-[.16em] text-cyan-100/75">{starterCharacter.name}</p>
         </header>
 
-        <section className="relative my-5 min-h-[320px] overflow-hidden border-y border-white/15 bg-black/30 p-4 shadow-[inset_0_0_60px_rgba(0,0,0,.65)] sm:min-h-[390px] sm:p-7">
+        <section className="relative my-5 min-h-[360px] overflow-hidden border-y border-white/15 bg-black/30 p-5 shadow-[inset_0_0_60px_rgba(0,0,0,.65)] sm:min-h-[420px] sm:p-8">
           <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(transparent,rgba(249,115,22,.09))]" />
           <div className="absolute inset-x-8 bottom-16 h-px bg-gradient-to-r from-transparent via-orange-200/20 to-transparent" />
 
-          <div className="relative grid min-h-[285px] grid-cols-[1fr_.72fr_1fr] items-end gap-2 sm:min-h-[335px] sm:gap-6">
-            <div className="min-w-0 pb-2 text-center">
-              <FighterModel character={starterCharacter} hits={hits} />
-              <p className="mt-3 truncate text-sm font-black uppercase tracking-wide text-white">{starterCharacter.name}</p>
-              <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[.18em] text-cyan-100/65">Fists up · moving to the beat</p>
-            </div>
-
-            <div className="relative flex min-h-40 items-end justify-center pb-8">
-              <AnimatePresence mode="wait">
-                {(phase === 'rustle' || phase === 'choose') && !chosenVariant ? (
+          <div className="relative grid min-h-[310px] grid-cols-1 items-end gap-8 sm:min-h-[360px] sm:grid-cols-[1.2fr_1fr] sm:gap-6">
+            <div className="relative min-w-0 pb-2 text-center">
+              {/* Classic reveal: a static "something's in the brush" prompt near the fighter, tapped to advance. */}
+              <AnimatePresence>
+                {phase === 'rustle' && !chosenVariant && (
                   <motion.button
                     key="rustle"
                     type="button"
@@ -135,23 +139,48 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
                     exit={{ opacity: 0, scale: .75 }}
                     transition={{ scale: { repeat: Infinity, duration: 1.4 }, rotate: { repeat: Infinity, duration: .35 } }}
                     onClick={() => setPhase('choose')}
-                    className="absolute bottom-10 left-1/2 w-24 -translate-x-1/2 border border-cyan-300/60 bg-cyan-950/80 px-2 py-4 text-center shadow-[0_0_32px_rgba(34,211,238,.32)]"
+                    className="absolute right-2 top-2 z-10 w-24 border border-cyan-300/60 bg-cyan-950/80 px-2 py-4 text-center shadow-[0_0_32px_rgba(34,211,238,.32)] sm:right-0"
                     data-testid="button-investigate-bush"
                   >
                     <Sparkles className="mx-auto h-6 w-6 text-cyan-100" />
                     <span className="mt-2 block font-mono text-[9px] font-black uppercase tracking-[.18em] text-cyan-50">Digital rustle</span>
                   </motion.button>
-                ) : chosenVariant ? (
-                  <motion.div key="partner" initial={{ opacity: 0, y: 24, scale: .7 }} animate={{ opacity: 1, y: [0, -5, 0], scale: 1 }} transition={{ y: { repeat: Infinity, duration: 1.8 } }} className="text-center">
-                    <div className="rounded-full bg-cyan-300/5 p-1 shadow-[0_0_35px_rgba(34,211,238,.22)]">
-                      <LokPetIcon silhouette={chosenVariant.silhouette} palette={chosenVariant.palette} size={76} className="bg-black/55" />
-                    </div>
-                    <p className="mt-2 font-mono text-[9px] font-black uppercase tracking-wider text-cyan-100">Partner</p>
-                  </motion.div>
-                ) : (
-                  <motion.div key="empty" className="mb-10 h-px w-12 bg-white/10" />
+                )}
+                {phase === 'ambush' && (
+                  <motion.div
+                    key="ambush"
+                    initial={{ opacity: 0, x: 140, scaleX: 2.4 }}
+                    animate={{ opacity: [0, 1, 1, 0], x: [140, 0, 0, -10] }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: AMBUSH_REVEAL_MS / 1000, times: [0, .35, .75, 1] }}
+                    className="absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-cyan-200/70 via-cyan-300/20 to-transparent"
+                    data-testid="ambush-flash"
+                  />
                 )}
               </AnimatePresence>
+
+              <div className="flex items-end justify-center gap-2">
+                <FighterModel character={starterCharacter} hits={hits} />
+                {chosenVariant && (
+                  <motion.div
+                    key="partner-beside-fighter"
+                    initial={{ opacity: 0, x: 24, scale: .6 }}
+                    animate={{ opacity: 1, x: 0, scale: 1, y: [0, -4, 0] }}
+                    transition={{ y: { repeat: Infinity, duration: 1.8 } }}
+                    className="relative mb-1"
+                  >
+                    <div className="rounded-full bg-cyan-300/5 p-1 shadow-[0_0_35px_rgba(34,211,238,.22)]">
+                      <LokPetIcon silhouette={chosenVariant.silhouette} palette={chosenVariant.palette} size={56} className="bg-black/55" />
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+              <p className="mt-3 truncate text-sm font-black uppercase tracking-wide text-white">
+                {starterCharacter.name}{chosenVariant ? ` + ${chosenVariant.name}` : ''}
+              </p>
+              <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-[.18em] text-cyan-100/65">
+                {chosenVariant ? 'Companion · fighting together' : 'Fists up · moving to the beat'}
+              </p>
             </div>
 
             <div className="min-w-0 pb-2 text-center">
@@ -170,13 +199,14 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
         )}
 
         {phase === 'rustle' && <p className="text-center font-mono text-xs uppercase tracking-[.25em] text-cyan-100">Tap the movement in the brush</p>}
+        {phase === 'ambush' && <p className="text-center font-mono text-xs uppercase tracking-[.25em] text-cyan-100">Hold on -- something just joined the fight</p>}
 
         {phase === 'choose' && (
           <div className="fixed inset-0 z-30 overflow-y-auto bg-black/94 p-4 backdrop-blur-md sm:p-8">
             <div className="mx-auto max-w-4xl pb-8">
               <p className="text-center font-mono text-[11px] font-black uppercase tracking-[.32em] text-cyan-100">Choose your first LokPet companion</p>
-              <h2 className="mt-2 text-center text-3xl font-black uppercase">Three companions. One partner.</h2>
-              <p className="mx-auto mt-2 max-w-xl text-center text-sm text-white/55">Each companion moves in the brush. Tap one to see their role, abilities, and growth path beside them.</p>
+              <h2 className="mt-2 text-center text-3xl font-black uppercase">Three companions. One partner, for good.</h2>
+              <p className="mx-auto mt-2 max-w-xl text-center text-sm text-white/55">Whichever one you pick fights beside you in every run from here on -- it never sits out. Tap one to see their role, abilities, and growth path.</p>
 
               <div className="mt-6 grid gap-3">
                 {STARTER_LOKPET_IDS.map((id, index) => {
@@ -238,10 +268,10 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
             <h2 className="mt-2 text-2xl font-black uppercase">{starterCharacter.name} + {chosenVariant?.name}</h2>
             <p className="mt-1 text-sm text-white/55">Your first field team is ready for the hideout.</p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold uppercase tracking-wide sm:flex sm:flex-wrap sm:justify-center">
+              <span className="border border-pink-300/40 bg-pink-300/10 px-3 py-2 text-pink-100">Companion · never benched</span>
               <span className="border border-white/15 px-3 py-2">First companion card</span>
               <span className="border border-white/15 px-3 py-2">2 free LokPacks</span>
               <span className="border border-white/15 px-3 py-2">40 Card Credits</span>
-              <span className="border border-white/15 px-3 py-2">Hourly full refresh</span>
             </div>
             <button type="button" onClick={onEnterHideout} className="mt-5 inline-flex min-h-14 items-center gap-2 bg-orange-400 px-7 py-4 text-xs font-black uppercase tracking-[.2em] text-black active:scale-[.98]" data-testid="button-enter-hideout-after-starter"><PackageOpen className="h-5 w-5" /> Enter hideout & open packs</button>
           </motion.section>

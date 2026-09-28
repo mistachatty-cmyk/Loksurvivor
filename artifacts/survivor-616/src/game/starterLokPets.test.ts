@@ -3,6 +3,30 @@ import test from 'node:test';
 
 import { STARTER_LOKPET_FREE_REFRESH_MS, createInitialMeta, reducer } from './state/metaStore';
 import { STARTER_LOKPET_IDS, starterLokPetEvolutionStage } from './data/lokPets';
+import { AREAS } from './data/areas';
+import type { RunResult } from './types';
+
+function resultFor(characterId: string): RunResult {
+  return {
+    areaId: AREAS[0]!.id,
+    characterId,
+    cleared: false,
+    survivedSec: 30,
+    kills: 10,
+    level: 2,
+    cred: 10,
+    killsByEnemy: {},
+    newlyUnlockedCharacterIds: [],
+    loadout: { weapons: [], passives: [] },
+    lootBoxesOpened: 0,
+    openedPrizes: [],
+    lokPets: [],
+    lokPetDiscoveries: [],
+    lootTokensGained: 0,
+    skeletonKeysGained: 0,
+    completedObjectives: [],
+  };
+}
 
 test('starter encounter grants exactly one partner, two LokPacks, and 40 card credits', () => {
   const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
@@ -36,6 +60,23 @@ test('starter partners refill for free on an hourly boundary', () => {
   };
   const refreshed = reducer(depleted, { type: 'refreshPetElixirs', now: 1000 + STARTER_LOKPET_FREE_REFRESH_MS });
   assert.equal(refreshed.meta.savedLokPets[0]?.stamina, 3);
+});
+
+test('the starter companion never benches, even after its stamina would otherwise run out', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
+  const completed = reducer(initial, { type: 'completeStarterLokPetOnboarding', variantId: 'lil-buzbee', characterId: 'shade', now: 500 });
+  const starterId = completed.meta.savedLokPets[0]!.id;
+  assert.equal(completed.meta.savedLokPets[0]?.starter, true);
+
+  let state = completed;
+  for (let run = 0; run < 6; run += 1) {
+    state = reducer(state, { type: 'completeRun', result: resultFor('shade') });
+  }
+
+  const starterAfterRuns = state.meta.savedLokPets.find((pet) => pet.id === starterId);
+  assert.ok(starterAfterRuns, 'the starter companion is never dropped from savedLokPets');
+  assert.equal(starterAfterRuns?.stamina, 3, 'the starter companion never loses stamina from runs');
+  assert.ok(state.meta.selectedLokPetIds.includes(starterId), 'the starter companion stays selected for every future run');
 });
 
 test('all starter choices have three level-driven evolution phases', () => {
