@@ -53,18 +53,15 @@ export const PASSIVE_CARDS_BY_ID: Record<string, PassiveCardDef> = Object.fromEn
 
 export interface PurchasableCardPack { id: CardPackId; name: string; description: string; cost: number; cards: number; pool: 'all' | PassiveCardType | 'operative'; rarityBoost: number }
 export const CARD_SHOP_PACKS: PurchasableCardPack[] = [
-  { id: 'penny-sleeve', name: 'Penny Sleeve', description: 'A single card, cheap entry into the binder.', cost: 4, cards: 1, pool: 'all', rarityBoost: 0 },
   { id: 'street', name: 'Street Sleeve', description: 'One card from the full Survivor 616 catalog.', cost: 8, cards: 1, pool: 'all', rarityBoost: 0 },
   { id: 'operative', name: 'Roster Roll', description: 'Two character cards from the playable roster.', cost: 12, cards: 2, pool: 'operative', rarityBoost: 0.02 },
   { id: 'scenario', name: 'Beyond the Grid', description: 'Two rule-bending Scenario Cards.', cost: 14, cards: 2, pool: 'scenario', rarityBoost: 0.03 },
   { id: 'lokpet', name: 'LokPack', description: 'Two LokPet subject or passive cards.', cost: 14, cards: 2, pool: 'lokpet', rarityBoost: 0.03 },
   { id: 'elemental-pack', name: 'Elemental LokPack', description: 'Three elemental synergy and companion cards.', cost: 18, cards: 3, pool: 'lokpet', rarityBoost: 0.06 },
   { id: 'collector', name: 'Collector Cache', description: 'Three mixed cards with stronger variant odds.', cost: 22, cards: 3, pool: 'all', rarityBoost: 0.08 },
-  { id: 'operative-elite', name: 'Elite Roster Roll', description: 'Three character cards with boosted variant odds.', cost: 24, cards: 3, pool: 'operative', rarityBoost: 0.09 },
   { id: 'prism-lokpack', name: 'Prism LokPack', description: 'Three LokPet cards with boosted mythic & holo odds.', cost: 26, cards: 3, pool: 'lokpet', rarityBoost: 0.12 },
   { id: 'cipher', name: 'Neon Cipher', description: 'Three passive cards with high rare and Holo odds.', cost: 30, cards: 3, pool: 'all', rarityBoost: 0.16 },
   { id: 'apex-binder', name: 'Apex Vault Pack', description: 'Five premium cards with maximum variant & holo rates.', cost: 42, cards: 5, pool: 'all', rarityBoost: 0.22 },
-  { id: 'mega-vault', name: 'Mega Vault Pack', description: 'Seven premium cards -- the deepest pull in the Bar, with the highest holo rate around.', cost: 64, cards: 7, pool: 'all', rarityBoost: 0.3 },
 ];
 export const CARD_SHOP_PACKS_BY_ID = Object.fromEntries(CARD_SHOP_PACKS.map((pack) => [pack.id, pack])) as Record<CardPackId, PurchasableCardPack>;
 const VARIANT_VALUE: Record<CardVariant, number> = { standard: 1, foil: 2, neon: 4, glitch: 7, holo: 12 };

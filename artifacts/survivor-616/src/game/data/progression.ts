@@ -529,6 +529,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'grpd-station-found', name: 'GRPD Station — Division St.', blurb: 'A precinct nobody decommissioned on paper. The lights are still department-metered.' },
   { id: 'rapid-pressure-rooms-cleared', name: 'Rapid Shelter Reconnected', blurb: 'The Data-Gobs scattered, the pressure doors opened, and one Digi-Arch finally held a route long enough to bring the trapped Rapids through.' },
   { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },
+  { id: 'site-crew-permit', name: 'Site Crew Work Permit', blurb: 'A stamped permit recovered from the moving pour. Every inspection box is checked except “leave the block alive.”' },
   // 'grpd-vault-code' is deliberately absent -- the vault room references it
   // and is intentionally never unlockable yet. See grpd-vault in HUB_ROOMS
   // below and .agents/memory/grpd-station.md.

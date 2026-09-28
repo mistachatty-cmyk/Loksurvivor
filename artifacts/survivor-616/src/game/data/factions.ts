@@ -190,6 +190,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#facc15',
     roster: ['supabuilda-gym-rat', 'supabuilda-plate-slinger', 'supabuilda-spotter', 'supabuilda-deadlift-bruiser', 'supabuilda-prime'],
   },
+  {
+    id: 'the-site-crew',
+    name: 'The Site Crew',
+    description: 'Actual builders who control streets as active work zones—barriers shape movement, nailers punish open lanes, crane hooks relocate survivors, and concrete pressure keeps everyone moving.',
+    accent: '#f97316',
+    roster: ['site-crew-apprentice', 'site-crew-nailer', 'site-crew-barrier-setter', 'site-crew-crane-hook', 'site-crew-foreman'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

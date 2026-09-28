@@ -92,15 +92,12 @@ function FocalCard({ pull, flipped, isNew, onTap }: { pull: CardPull; flipped: b
 export function PackOpeningReveal({
   reveal,
   cardCredits,
-  storedQty = 0,
   sfx,
   onOpenAnother,
   onClose,
 }: {
   reveal: CardPackReveal;
   cardCredits: number;
-  /** Sealed copies of this pack already sitting in storage -- opening one of those costs nothing further. */
-  storedQty?: number;
   sfx?: SfxPlayer;
   onOpenAnother: () => void;
   onClose: () => void;
@@ -111,7 +108,7 @@ export function PackOpeningReveal({
   const [flippingAll, setFlippingAll] = useState(false);
   const advancedRef = useRef(false);
   const done = focusIndex >= reveal.pulls.length;
-  const canReopen = storedQty > 0 || cardCredits >= pack.cost;
+  const canReopen = cardCredits >= pack.cost;
 
   const flipUp = () => {
     setFocalFlipped(true);
@@ -233,7 +230,7 @@ export function PackOpeningReveal({
                 className="border border-fuchsia-200/50 bg-fuchsia-300/10 px-5 py-2.5 font-mono text-[10px] font-black uppercase text-fuchsia-100 transition-all active:scale-[0.97] disabled:opacity-35 disabled:active:scale-100"
                 data-testid="button-open-another-pack"
               >
-                {storedQty > 0 ? `Open Another · Stored x${storedQty}` : `Open Another · ${pack.cost} CC`}
+                Open Another · {pack.cost} CC
               </button>
               <button
                 type="button"
