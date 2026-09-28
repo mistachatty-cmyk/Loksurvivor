@@ -19,8 +19,15 @@ test('every DirectorDef references a registered faction and a boss inside its ro
   }
 });
 
-test('the Digital Archive ships three distinct Director personalities', () => {
-  assert.equal(DIRECTORS.length, 3);
-  assert.deepEqual(DIRECTORS.map((director) => director.id), ['take-two', 'the-warden', 'the-promoter']);
-  assert.deepEqual(DIRECTORS.map((director) => director.effect.kind), ['none', 'spawnBias', 'factionFavor']);
+test('the Digital Archive ships five distinct Director personalities', () => {
+  assert.equal(DIRECTORS.length, 5);
+  assert.deepEqual(
+    DIRECTORS.map((director) => director.id),
+    ['take-two', 'the-warden', 'the-promoter', 'cutting-room', 'continuity'],
+  );
+  assert.deepEqual(
+    DIRECTORS.map((director) => director.effect.kind),
+    ['none', 'spawnBias', 'factionFavor', 'spawnBias', 'factionFavor'],
+  );
+  assert.equal(new Set(DIRECTORS.map((director) => director.id)).size, DIRECTORS.length, 'no duplicate ids');
 });

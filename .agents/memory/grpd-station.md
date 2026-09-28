@@ -156,12 +156,82 @@ capture**: `killEnemy` in `engine/world.ts` has a dedicated branch keyed on
 `SPECIAL_LOKPET_LOADOUTS` legendary, same shape as the three starters) and
 calls the same `spawnLokPet` any other pickup-triggered grant uses.
 
+## Stage 2, built: four new Director personalities + AI-hierarchy lore
+
+Shipped as two independent efforts that both extended the same
+`DirectorPersonalityEffect` type: **4 new `DirectorDef` entries total**,
+each with its own `FactionDef`/roster + `family: 'Boss'` enemy (two of
+them reusing an already-registered faction instead of a new one),
+following `reel-syndicate`/`the-director`'s own pattern (a faction that
+only ever spawns from `data/directors.ts`, never from an area's authored
+`waves`, unless noted below):
+
+- **The Warden** (`id: 'the-warden'`, faction `prism-choir`, boss
+  `prism-warden`) -- `effect: { kind: 'spawnBias', spawnRateMult: 1.18,
+  hpMult: 1.1 }`.
+- **The Promoter** (`id: 'the-promoter'`, faction `high-roller-syndicate`,
+  boss `marquee-reaper`) -- `effect: { kind: 'factionFavor',
+  favoredFactionId: 'high-roller-syndicate', spawnRateMult: 1.65 }`.
+- **The Cutting Room** (`id: 'cutting-room'`, faction `cutting-room-crew`,
+  boss `the-splice`) -- `effect: { kind: 'spawnBias', spawnRateMult: 1.35,
+  hpMult: 0.85 }`: more enemies for the rest of the run, each individually
+  squishier.
+- **Continuity** (`id: 'continuity'`, faction `continuity-desk`, boss
+  `the-take`) -- `effect: { kind: 'factionFavor', favoredFactionId:
+  'afterimage-choir', spawnRateMult: 1.5 }`: biases a specific *existing*
+  named faction to show up more throughout the run, on top of its own
+  encounter roster.
+
+**Engine mechanism:** `selectedDirector(w)` returns the `DirectorDef`
+matching `w.activeDirectorPersonalityId` (no fallback -- an unset/unknown
+id reads as no ambient effect). `directorHpMult(w)` returns a `spawnBias`
+director's `hpMult` (else `1`), applied once, uniformly, inside
+`spawnEnemy`'s hp formula alongside `modifierHpMult(w)` -- so it affects
+*every* spawn path (normal waves, bursts, endless mode) with no
+per-call-site duplication. `directorWaveSpawnMult(w, factionName?)`
+returns a `spawnBias` director's `spawnRateMult` unconditionally, or a
+`factionFavor` director's `spawnRateMult` **only when `factionName`
+matches `getFaction(effect.favoredFactionId).name`** -- folded into
+`updateSpawning`'s `spawnMultiplier` via `wave.faction`. This means
+`factionFavor` biases an *area's own authored, faction-labeled waves*
+(e.g. `back-alley`'s corner-cutter wave already carries `faction:
+'Afterimage Choir'`) rather than injecting a faction that isn't authored
+into that area at all. **Endless mode gets no director-effect wiring at
+all** (a known gap, not silently patched over). `updateDirector`'s own
+encounter-trigger fallback, when no personality is selected, picks a
+**random** registered Director rather than always `DIRECTORS[0]` -- keeps
+every personality discoverable/unlockable through ordinary play once
+there are several.
+
+`DirectorTerminalPanel.tsx` has an `effectReadout(director)` helper
+(renders what `spawnBias`/`factionFavor` actually does, plus a "Can cut in
+after M:SS" line from `triggerAfterSec`) and a framing paragraph that
+names (without ever fully explaining) an unnamed process a few tiers up
+that greenlights which Director personality runs a scene next.
+
+**Cautionary tale, read this if you're about to touch `directors.ts`/
+`factions.ts`/`enemies.ts`/`world.test.ts` near Director content:** this
+exact Stage 2 section, plus the whole music-driven-events feature
+(`data/musicEvents.ts`), a mobile-audio resume fix, and a soundtrack
+artist-backlinks feature, were **silently deleted from `main`** by a later
+PR (GRPD K9-counter exposure) whose branch was based on a stale snapshot
+predating all of it -- not a real 3-way merge, a wholesale file overwrite
+that dropped ~900 lines across 19 files with no conflict ever surfacing,
+because the deleting commit had a single parent and GitHub's merge never
+flagged it. It was caught by comparing `DIRECTORS.length` before and after
+and tracing the git graph commit-by-commit, then restored via the same
+`git merge-file` three-way-merge technique (current tip as "ours", the
+pre-deletion commit as "base", the pre-deletion-but-with-content commit as
+"theirs") rather than hand-copying, so anything legitimately added *after*
+the deleting commit was preserved automatically. If you're merging a
+branch whose base predates recent `main` history, diff your branch's
+content registries (`DIRECTORS.length`, `FACTIONS.length`, etc.) against
+current `main` before and after merging -- a line-level 3-way merge only
+catches conflicts where both sides touched the *same lines*, not "one side
+deleted content the other side never touched."
+
 ## Roadmap status after focused follow-up passes
 
-- **Stage 2 -- built**: real `DirectorPersonalityEffect` tuning for 2 more
-  `DirectorDef` entries (new faction rosters + bosses each), and the actual
-  "who/what controls the Directors" lore paragraph written into the
-  terminal's framing text.
 - **Stage 3 -- core thread built, broader roster remains expandable**: the Rapid faction (human resistance -- riot team, gardeners,
   fighting dogs/rare cats, firefighters, teachers, bar owners, retired
   people, scared residents, briefcase-throwing management, and military
