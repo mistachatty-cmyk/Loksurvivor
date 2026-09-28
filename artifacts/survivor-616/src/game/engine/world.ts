@@ -1036,6 +1036,8 @@ export interface World {
   xp: number;
   xpToNext: number;
   pendingLevelUps: number;
+  /** Level-up rerolls left this run, spent via `consumeReroll`. */
+  rerollsRemaining: number;
 
   weaponLevel: number;
   weaponCount: number;
@@ -1557,6 +1559,7 @@ export function createWorld(
     xp: 0,
     xpToNext: xpForLevel(1),
     pendingLevelUps: 0,
+    rerollsRemaining: LEVEL_UP_REROLLS_PER_RUN,
     weaponLevel: startingWeaponLevel,
     weaponCount: signatureWeapon.count ?? 1,
     ultCooldownMult: 1,
@@ -4933,6 +4936,9 @@ export function relicRecipeEligibility(
   return { eligible: true, reason: recipe.triggerLabel };
 }
 
+/** Level-up rerolls granted per run (flat cap, no meta-progression scaling yet). */
+const LEVEL_UP_REROLLS_PER_RUN = 3;
+
 export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   const pool: UpgradeDef[] = UPGRADES.filter((u) => {
     if (u.weaponKinds && !w.weapons.some((weapon) => u.weaponKinds!.includes(weapon.def.kind))) return false;
@@ -5108,6 +5114,18 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
     applyEffect(w, effect);
   }
   w.pendingLevelUps = Math.max(0, w.pendingLevelUps - 1);
+}
+
+/** Decline every offered upgrade for the current level-up without applying any effect. */
+export function skipLevelUp(w: World) {
+  w.pendingLevelUps = Math.max(0, w.pendingLevelUps - 1);
+}
+
+/** Consume one of the run's limited level-up rerolls. Returns false if none remain. */
+export function consumeReroll(w: World): boolean {
+  if (w.rerollsRemaining <= 0) return false;
+  w.rerollsRemaining -= 1;
+  return true;
 }
 
 /** Apply a revealed chest prize exactly when its reel lands (or is skipped). */
@@ -10650,6 +10668,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     level: w.level,
     xp: Math.round(w.xp),
     xpToNext: Math.round(w.xpToNext),
+    rerollsRemaining: w.rerollsRemaining,
     elapsedSec: w.time,
     durationSec: w.area.durationSec,
     kills: w.kills,

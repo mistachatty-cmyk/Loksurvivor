@@ -2550,6 +2550,8 @@ export interface HudSnapshot {
   elapsedSec: number;
   durationSec: number;
   kills: number;
+  /** Level-up rerolls left this run (see `consumeReroll`). */
+  rerollsRemaining: number;
   /** Million Horde only: total represented population and its bounded live subset. */
   millionHorde?: { population: number; peakPopulation: number; defeatedPopulation: number; liveActors: number };
   cred: number;
