@@ -18,7 +18,7 @@ import { HideoutPreview } from './HideoutPreview';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle, Clapperboard } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -36,7 +36,7 @@ import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -68,6 +68,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   kennel: { label: 'K9 Counter', icon: Dog, testId: 'button-open-kennel', description: 'Rapid Guard’s rotating kennel' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
   'card-shop': { label: 'Lock Pack Counter', icon: CreditCard, testId: 'button-open-card-shop', description: 'Open packs & build your Lock Deck' },
+  'weapon-bans': { label: 'Studio 28', icon: Clapperboard, testId: 'button-open-weapon-bans', description: "Tonight's ban list" },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
   'palette-store': { label: 'Customization Shop', icon: Palette, testId: 'button-open-palette-store', description: 'Palettes & run auras' },
   'sound-booth': { label: 'The Sound Booth', icon: Disc3, testId: 'button-open-sound-booth', description: 'Buy & preview SFX packs' },

@@ -78,8 +78,77 @@ function hashCell(x: number, y: number): number {
 /* Ground                                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Rotates a hex color's hue by `degrees`, keeping saturation/lightness --
+ * used only by `discoMode` (see `RunModifiers.discoMode`) to cycle an
+ * area's static ground colors into a shifting disco palette. Pure function
+ * of its inputs, so callers drive it off `w.now` (run-elapsed ms) the same
+ * way `World.cycle.phase` is derived, per CLAUDE.md.
+ */
+function rotateHueHex(hex: string, degrees: number): string {
+  const raw = hex.replace('#', '');
+  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+  const r = (parseInt(full.slice(0, 2), 16) || 0) / 255;
+  const g = (parseInt(full.slice(2, 4), 16) || 0) / 255;
+  const b = (parseInt(full.slice(4, 6), 16) || 0) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  const d = max - min;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  h = (h + degrees) % 360;
+  if (h < 0) h += 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let [r2, g2, b2] = [0, 0, 0];
+  if (h < 60) [r2, g2, b2] = [c, x, 0];
+  else if (h < 120) [r2, g2, b2] = [x, c, 0];
+  else if (h < 180) [r2, g2, b2] = [0, c, x];
+  else if (h < 240) [r2, g2, b2] = [0, x, c];
+  else if (h < 300) [r2, g2, b2] = [x, 0, c];
+  else [r2, g2, b2] = [c, 0, x];
+  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`;
+}
+
+/**
+ * Rotates every color in a `SpritePalette` by `degrees` via `rotateHueHex`,
+ * except `ink` (kept as-is so the silhouette outline stays readable) --
+ * used by `traits.hueShiftMs` (see `withHueShift` below) the same way
+ * `rotateHueHex` alone drives `RunModifiers.discoMode`'s ground cycling.
+ */
+function hueShiftPalette(base: SpritePalette, degrees: number): SpritePalette {
+  return {
+    ink: base.ink,
+    body: rotateHueHex(base.body, degrees),
+    bodyDark: rotateHueHex(base.bodyDark, degrees),
+    accent: rotateHueHex(base.accent, degrees),
+    accentBright: rotateHueHex(base.accentBright, degrees),
+    skin: rotateHueHex(base.skin, degrees),
+    glow: rotateHueHex(base.glow, degrees),
+  };
+}
+
 function drawGround(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
-  const ground = w.area.ground;
+  const areaGround = w.area.ground;
+  const ground = w.modifiers.discoMode
+    ? {
+        base: rotateHueHex(areaGround.base, (w.now / 20) % 360),
+        tile: rotateHueHex(areaGround.tile, (w.now / 20 + 90) % 360),
+        seam: areaGround.seam,
+        glow: rotateHueHex(areaGround.glow, (w.now / 20 + 180) % 360),
+      }
+    : areaGround;
   ctx.fillStyle = ground.base;
   ctx.fillRect(left, top, right - left, bottom - top);
 
@@ -5182,6 +5251,16 @@ function drawActors(
     enemyPaletteCache.set(def.id, blended);
     return blended;
   };
+  // traits.hueShiftMs: purely visual, continuous hue rotation, never cached
+  // per def id like resolveEnemyPalette above -- it varies per instance
+  // (offset by uid) and per frame (driven by w.now), so it's computed fresh
+  // on top of whatever palette resolveEnemyPalette already produced.
+  const withHueShift = (def: EnemyDef, uid: number, base: SpritePalette): SpritePalette => {
+    const hueShiftMs = def.traits?.hueShiftMs;
+    if (!hueShiftMs) return base;
+    const degrees = ((w.now + uid * 137) / hueShiftMs) * 360;
+    return hueShiftPalette(base, degrees);
+  };
 
   for (const enemy of sorted) {
     // Fog of war: hostiles are only drawn where you can currently see. An
@@ -5374,7 +5453,7 @@ function drawActors(
       enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
     ctx.save();
     ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
-    const enemyPalette = resolveEnemyPalette(enemy.def);
+    const enemyPalette = withHueShift(enemy.def, enemy.uid, resolveEnemyPalette(enemy.def));
     drawRig(
       ctx,
       enemy.def.rig,

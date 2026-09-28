@@ -54,6 +54,7 @@ import { SoundBoothPanel } from '@/ui/SoundBoothPanel';
 import { AccountPanel } from '@/ui/AccountPanel';
 import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { CardShopPanel } from '@/ui/CardShopPanel';
+import { WeaponBansScreen } from '@/ui/WeaponBansScreen';
 import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
@@ -87,6 +88,7 @@ type Screen =
   | { name: 'vendor'; initialCategory?: VendorItemCategory }
   | { name: 'workshop' }
   | { name: 'card-shop' }
+  | { name: 'weapon-bans' }
   | { name: 'settings' }
   | { name: 'palette-store' }
   | { name: 'sound-booth' }
@@ -138,6 +140,7 @@ function initialScreen(): Screen {
       requested === 'vendor' ||
       requested === 'workshop' ||
       requested === 'card-shop' ||
+      requested === 'weapon-bans' ||
       requested === 'settings' ||
       requested === 'account' ||
       requested === 'feedback' ||
@@ -210,6 +213,9 @@ function Game() {
         break;
       case 'card-shop':
         setScreen({ name: 'card-shop' });
+        break;
+      case 'weapon-bans':
+        setScreen({ name: 'weapon-bans' });
         break;
       case 'settings':
         setScreen({ name: 'settings' });
@@ -352,6 +358,11 @@ function Game() {
               setScreen({ name: 'card-shop' });
               return;
             }
+            if (nextRoomId === 'studio-28') {
+              sfx.play('uiNav');
+              setScreen({ name: 'weapon-bans' });
+              return;
+            }
             attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); });
           }}
           onOpen={openPanel}
@@ -450,6 +461,9 @@ function Game() {
 
     case 'card-shop':
       return <CardShopPanel onBack={goHub} />;
+
+    case 'weapon-bans':
+      return <WeaponBansScreen onBack={goHub} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} onOpenLooksAndLokPets={() => setScreen({ name: 'run-setup', destination: 'hub' })} />;

@@ -32,6 +32,8 @@ import { availableChallengeContracts } from '@/game/data/vendor';
 import {
   armArtisteDraw,
   applyUpgrade,
+  consumeReroll,
+  skipLevelUp,
   beginArtisteDraw,
   buildResult,
   cancelArtisteDraw,
@@ -1048,18 +1050,9 @@ export function RunScreen({
     return () => window.clearTimeout(timer);
   }, [claimReelPrize, finalRewardMultiplier, onFinish, phase, queuedPrizes, reel]);
 
-  const pickUpgrade = useCallback(
-    (upgrade: UpgradeDef) => {
-      const world = worldRef.current;
-      if (!world) return;
-      applyUpgrade(world, upgrade);
-      const tier: LootPickup['tier'] =
-        upgrade.cardKind === 'evolution' || upgrade.cardKind === 'relic-evolution'
-          ? 'evolved'
-          : upgrade.cardKind === 'weapon' || upgrade.cardKind === 'passive'
-            ? 'rare'
-            : 'common';
-      setLootPickups((prev) => [...prev, { id: crypto.randomUUID(), label: upgrade.name, tier }]);
+  /** After a level-up step resolves (picked or skipped): roll the next choices if another is owed, else close out. */
+  const advancePastLevelUpStep = useCallback(
+    (world: World) => {
       if (world.pendingLevelUps > 0) {
         const nextChoices = rollUpgradeChoices(world);
         upgradeChoicesRef.current = nextChoices;
@@ -1072,6 +1065,40 @@ export function RunScreen({
     },
     [setPhaseBoth],
   );
+
+  const pickUpgrade = useCallback(
+    (upgrade: UpgradeDef) => {
+      const world = worldRef.current;
+      if (!world) return;
+      applyUpgrade(world, upgrade);
+      const tier: LootPickup['tier'] =
+        upgrade.cardKind === 'evolution' || upgrade.cardKind === 'relic-evolution'
+          ? 'evolved'
+          : upgrade.cardKind === 'weapon' || upgrade.cardKind === 'passive'
+            ? 'rare'
+            : 'common';
+      setLootPickups((prev) => [...prev, { id: crypto.randomUUID(), label: upgrade.name, tier }]);
+      advancePastLevelUpStep(world);
+    },
+    [advancePastLevelUpStep],
+  );
+
+  const skipUpgrade = useCallback(() => {
+    const world = worldRef.current;
+    if (!world) return;
+    skipLevelUp(world);
+    advancePastLevelUpStep(world);
+  }, [advancePastLevelUpStep]);
+
+  const rerollChoices = useCallback(() => {
+    const world = worldRef.current;
+    if (!world) return;
+    if (!consumeReroll(world)) return;
+    const nextChoices = rollUpgradeChoices(world, upgradeChoicesRef.current.length || 3);
+    upgradeChoicesRef.current = nextChoices;
+    setChoices(nextChoices);
+    setHud(hudSnapshot(world));
+  }, []);
 
   const claimRumorHeal = useCallback(() => {
     const world = worldRef.current;
@@ -2007,6 +2034,25 @@ export function RunScreen({
                 );
               })}
             </div>
+            <div className="flex items-center gap-2 border-t border-white/10 pt-2">
+              <button
+                type="button"
+                onClick={() => rerollChoices()}
+                disabled={(hud?.rerollsRemaining ?? 0) <= 0}
+                className="flex-1 border border-white/15 bg-transparent p-1.5 text-center font-mono text-[9px] uppercase tracking-wider text-white/50 transition hover:border-white/40 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-40"
+                data-testid="button-upgrade-reroll"
+              >
+                Reroll{(hud?.rerollsRemaining ?? 0) > 0 ? ` (${hud?.rerollsRemaining} left)` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => skipUpgrade()}
+                className="flex-1 border border-white/15 bg-transparent p-1.5 text-center font-mono text-[9px] uppercase tracking-wider text-white/50 transition hover:border-white/40 hover:text-white/80"
+                data-testid="button-upgrade-skip"
+              >
+                Skip
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -2066,6 +2112,25 @@ export function RunScreen({
                       </button>
                     );
                   })}
+                </div>
+                <div className="flex items-center gap-1.5 border-t border-white/10 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => rerollChoices()}
+                    disabled={(hud?.rerollsRemaining ?? 0) <= 0}
+                    className="flex-1 border border-white/15 bg-transparent p-1 text-center font-mono text-[8px] uppercase tracking-wider text-white/50 transition hover:border-white/40 hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-40"
+                    data-testid="button-continuous-upgrade-reroll"
+                  >
+                    Reroll{(hud?.rerollsRemaining ?? 0) > 0 ? ` (${hud?.rerollsRemaining} left)` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => skipUpgrade()}
+                    className="flex-1 border border-white/15 bg-transparent p-1 text-center font-mono text-[8px] uppercase tracking-wider text-white/50 transition hover:border-white/40 hover:text-white/80"
+                    data-testid="button-continuous-upgrade-skip"
+                  >
+                    Skip
+                  </button>
                 </div>
               </>
             )}

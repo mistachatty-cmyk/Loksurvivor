@@ -197,6 +197,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#f97316',
     roster: ['site-crew-apprentice', 'site-crew-nailer', 'site-crew-barrier-setter', 'site-crew-crane-hook', 'site-crew-foreman'],
   },
+  {
+    id: 'lockstep-remix',
+    name: 'Lockstep Remix',
+    description: "Cousins of Lockstep's lock-on cones, gone feral in the glitch of the Digital Disco floor -- the same narrowing stare, remixed with teleports, wood-grain armor, and too many colors at once.",
+    accent: '#f472b6',
+    roster: ['discoball-marshal', 'strobe-fault', 'parquet-warden', 'chromatic-hustler', 'kaleidoscope-fault', 'mirrorball-sovereign'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

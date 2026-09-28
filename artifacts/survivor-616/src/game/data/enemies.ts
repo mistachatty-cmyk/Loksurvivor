@@ -2289,6 +2289,153 @@ export const ENEMIES: EnemyDef[] = [
     rig: giantRig(32),
     lore: 'The concrete foreman who never stopped pouring. His mixer-frame turns wet aggregate into moving walls and throws everything else out of the lane.',
   },
+  // -- Lockstep Remix: five cousins of Clampjaw/Deadlock's lock-on cones,
+  // gone feral in the glitch of the Digital Disco floor. All five keep the
+  // 'tracker' behavior (see the "Enemy behavior and traits are orthogonal"
+  // section of CLAUDE.md) but layer teleport/ghost traits, temperament and
+  // looks differently per enemy -- nothing here is a palette swap of
+  // clampjaw/deadlock. See data/factions.ts for the roster registration.
+  {
+    id: 'discoball-marshal',
+    name: 'Discoball Marshal',
+    family: 'Disco',
+    behavior: 'tracker',
+    hp: 34,
+    speed: 44,
+    damage: 6,
+    radius: 11,
+    xp: 6,
+    mass: 1.3,
+    faction: 'Lockstep Remix',
+    // Standard cousin tuning, distinct numbers from clampjaw/deadlock.
+    traits: { lockCone: { range: 230, startHalfAngleDeg: 28, minHalfAngleDeg: 1.5, closeMs: 2400, explodeDamagePct: 0.24, resetMs: 1400 } },
+    palette: palette({ ink: '#0a0a12', body: '#cbd5e1', bodyDark: '#64748b', accent: '#fbbf24', accentBright: '#fffbea', glow: '#f8fafc' }),
+    rig: expressiveRig('prism', 15),
+    lore: 'Chrome-plated and buffed nightly. It catches every strobe pulse off the floor and throws the light straight back at whoever it has locked onto.',
+  },
+  {
+    id: 'strobe-fault',
+    name: 'Strobe Fault',
+    family: 'Disco',
+    behavior: 'tracker',
+    hp: 26,
+    speed: 50,
+    damage: 6,
+    radius: 9,
+    xp: 6,
+    mass: 1.0,
+    faction: 'Lockstep Remix',
+    // The "holistically new tactic": a cone that locks on, then teleports
+    // and briefly goes untargetable mid-lock -- a combination nothing else
+    // in the file uses (existing teleport/ghost users are all
+    // flanker/drifter, never 'tracker').
+    traits: { lockCone: { range: 210, startHalfAngleDeg: 32, minHalfAngleDeg: 1.5, closeMs: 2000, explodeDamagePct: 0.2, resetMs: 1000 }, teleportMs: 3800, ghostMs: 480 },
+    palette: palette({ ink: '#050505', body: '#3f3f46', bodyDark: '#18181b', accent: '#f43f5e', accentBright: '#fecdd3', glow: '#f43f5e' }),
+    rig: blobRig({ height: 11, width: 9, wings: true }),
+    lore: "Its lock keeps skipping frames -- gone mid-cone, back a half-second later, closer than anything should be able to track.",
+  },
+  {
+    id: 'parquet-warden',
+    name: 'Parquet Warden',
+    family: 'Disco',
+    behavior: 'tracker',
+    hp: 62,
+    speed: 26,
+    damage: 9,
+    radius: 13,
+    xp: 8,
+    mass: 2.4,
+    faction: 'Lockstep Remix',
+    // Deliberately not colorful -- the one cousin with zero neon accent, to
+    // contrast against the rest of the family.
+    traits: { lockCone: { range: 240, startHalfAngleDeg: 24, minHalfAngleDeg: 1.5, closeMs: 3200, explodeDamagePct: 0.4, resetMs: 2200 } },
+    palette: palette({ ink: '#1c1006', body: '#7c4a24', bodyDark: '#3f2311', accent: '#9a6a3a', accentBright: '#c99a63', glow: '#8a5a2e' }),
+    rig: humanoidRig({ height: 19, width: 12, bulk: true }),
+    lore: 'Cut from the dance floor itself and still keeping the beat. When its grain finally splits, it splits for a lot of your health.',
+  },
+  {
+    id: 'chromatic-hustler',
+    name: 'Chromatic Hustler',
+    family: 'Disco',
+    behavior: 'tracker',
+    hp: 24,
+    speed: 58,
+    damage: 6,
+    radius: 9,
+    xp: 6,
+    mass: 1.0,
+    faction: 'Lockstep Remix',
+    // Fastest close of the family -- punishes hesitation instead of range.
+    traits: { lockCone: { range: 200, startHalfAngleDeg: 34, minHalfAngleDeg: 1.5, closeMs: 1500, explodeDamagePct: 0.22, resetMs: 900 } },
+    palette: { ink: '#0a0a12', body: '#7c3aed', bodyDark: '#4c1d95', accent: '#f472b6', accentBright: '#facc15', skin: '#7c3aed', glow: '#22d3ee' },
+    rig: arachnidRig({ height: 11, span: 15 }),
+    lore: 'Every color at once and none of them still. Hesitate near it and the cone is already a line.',
+  },
+  {
+    id: 'mirrorball-sovereign',
+    name: 'Mirrorball Sovereign',
+    family: 'Boss',
+    behavior: 'tracker',
+    hp: 560,
+    speed: 34,
+    damage: 20,
+    radius: 20,
+    xp: 60,
+    mass: 5,
+    sizeClass: 'giant',
+    faction: 'Lockstep Remix',
+    // The family's capstone: the widest-range lock plus BOTH teleport and
+    // ghost, the "does everything" boss of the roster. See the Digital
+    // Disco area's waves for its dedicated late-run entrance.
+    traits: { lockCone: { range: 280, startHalfAngleDeg: 34, minHalfAngleDeg: 1.5, closeMs: 3000, explodeDamagePct: 0.38, resetMs: 1600 }, teleportMs: 3000, ghostMs: 600 },
+    palette: { ink: '#0a0a12', body: '#e2e8f0', bodyDark: '#94a3b8', accent: '#a855f7', accentBright: '#ffffff', skin: '#e2e8f0', glow: '#f0abfc' },
+    rig: giantRig(30),
+    lore: "Every facet of it is one of its cousins' cones, spinning together into a single light that never stops finding you.",
+  },
+  {
+    id: 'kaleidoscope-fault',
+    name: 'Kaleidoscope Fault',
+    family: 'Disco',
+    behavior: 'tracker',
+    hp: 30,
+    speed: 46,
+    damage: 6,
+    radius: 10,
+    xp: 7,
+    mass: 1.1,
+    faction: 'Lockstep Remix',
+    // Fixed identity: a baseline lock, same as any other cousin. Everything
+    // else about this one is randomized per spawn -- see traitRandomizer.
+    traits: { lockCone: { range: 220, startHalfAngleDeg: 30, minHalfAngleDeg: 1.5, closeMs: 2600, explodeDamagePct: 0.26, resetMs: 1400 } },
+    // spawnEnemy() merges 1-3 of these into a per-instance copy of `traits`
+    // above and swaps in one random palette below, so no two Kaleidoscope
+    // Faults on the floor at once look or act quite the same. See
+    // "traitRandomizer" in types.ts and spawnEnemy() in engine/world.ts.
+    traitRandomizer: {
+      traitPool: [
+        { teleportMs: 4000 },
+        { ghostMs: 500 },
+        { teleportMs: 3400, ghostMs: 420 },
+        { shiftMs: 2600, shiftScale: 1.4 },
+        { wobbleMs: 900, wobbleAmp: 10 },
+        { hueShiftMs: 2200 },
+        { wobbleMs: 700, wobbleAmp: 14, hueShiftMs: 1800 },
+        { shiftMs: 3200, shiftScale: 1.6, teleportMs: 5000 },
+      ],
+      paletteVariants: [
+        palette({ ink: '#0a0a12', body: '#cbd5e1', bodyDark: '#64748b', accent: '#fbbf24', accentBright: '#fffbea', glow: '#f8fafc' }),
+        palette({ ink: '#1c1006', body: '#7c4a24', bodyDark: '#3f2311', accent: '#9a6a3a', accentBright: '#c99a63', glow: '#8a5a2e' }),
+        { ink: '#0a0a12', body: '#7c3aed', bodyDark: '#4c1d95', accent: '#f472b6', accentBright: '#facc15', skin: '#7c3aed', glow: '#22d3ee' },
+        palette({ ink: '#0a0a12', body: '#e2e8f0', bodyDark: '#94a3b8', accent: '#a855f7', accentBright: '#ffffff', glow: '#f0abfc' }),
+        palette({ ink: '#020617', body: '#134e4a', bodyDark: '#042f2e', accent: '#2dd4bf', accentBright: '#ccfbf1', glow: '#5eead4' }),
+        palette({ ink: '#100510', body: '#3b0764', bodyDark: '#1e0342', accent: '#e879f9', accentBright: '#fae8ff', glow: '#f0abfc' }),
+        palette({ ink: '#0a0a0a', body: '#1c1917', bodyDark: '#0c0a09', accent: '#eab308', accentBright: '#fef9c3', glow: '#facc15' }),
+      ],
+    },
+    palette: palette({ ink: '#0a0a12', body: '#94a3b8', bodyDark: '#475569', accent: '#f472b6', accentBright: '#fef3c7', glow: '#c4b5fd' }),
+    rig: quadrupedRig({ height: 14, length: 17 }),
+    lore: "No two sightings ever match: same cone, different every time it locks. Whatever is actually glitching in there never crashes the same way twice.",
+  },
 ];
 
 export const ENEMIES_BY_ID: Record<string, EnemyDef> = Object.fromEntries(

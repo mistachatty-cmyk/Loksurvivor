@@ -186,6 +186,10 @@ export interface EnemyActor extends Actor {
   fireReadyAt: number;
   /** Drifters weave around their heading. */
   weave: number;
+  /** Per-instance phase seed for `traits.wobbleMs`'s sine offset -- kept
+   *  separate from `weave` because 'tracker' (this family's behavior)
+   *  already uses `weave` for its narrowing lock-cone half-angle. */
+  wobblePhase: number;
   specialReadyAt: number;
   telegraphUntil: number;
   specialUntil: number;
@@ -1032,6 +1036,8 @@ export interface World {
   xp: number;
   xpToNext: number;
   pendingLevelUps: number;
+  /** Level-up rerolls left this run, spent via `consumeReroll`. */
+  rerollsRemaining: number;
 
   weaponLevel: number;
   weaponCount: number;
@@ -1553,6 +1559,7 @@ export function createWorld(
     xp: 0,
     xpToNext: xpForLevel(1),
     pendingLevelUps: 0,
+    rerollsRemaining: LEVEL_UP_REROLLS_PER_RUN,
     weaponLevel: startingWeaponLevel,
     weaponCount: signatureWeapon.count ?? 1,
     ultCooldownMult: 1,
@@ -2219,6 +2226,30 @@ function spawnEnemy(
     }
   }
 
+  // Per-instance randomization: this spawn gets its own cloned def with a
+  // random subset of trait fragments merged in and a random palette, so
+  // repeated spawns of the same enemy id don't all look/act the same.
+  // `def` is reassigned here (never mutating `incomingDef`/`ENEMIES`) so
+  // every read below -- hp, palette, traits -- sees the randomized copy.
+  if (def.traitRandomizer) {
+    const { traitPool, paletteVariants } = def.traitRandomizer;
+    const pickCount = Math.min(traitPool.length, 1 + Math.floor(w.rng() * 3));
+    const pool = [...traitPool];
+    const picked: NonNullable<EnemyDef['traits']>[] = [];
+    for (let i = 0; i < pickCount && pool.length > 0; i += 1) {
+      const index = Math.floor(w.rng() * pool.length);
+      picked.push(pool.splice(index, 1)[0]!);
+    }
+    const palette = paletteVariants.length > 0
+      ? paletteVariants[Math.floor(w.rng() * paletteVariants.length)]!
+      : def.palette;
+    def = {
+      ...def,
+      traits: Object.assign({}, def.traits, ...picked),
+      palette,
+    };
+  }
+
   // modifierHpMult lives here (not folded into any per-mode cap) so it
   // applies to every spawn path uniformly -- incursions and the endless
   // dungeon boss/elite rotation call spawnEnemy directly with their own
@@ -2254,6 +2285,11 @@ function spawnEnemy(
     chargeUntil: 0,
     fireReadyAt: w.now + randRange(w.rng, 600, 2400),
     weave: w.rng() * Math.PI * 2,
+    // Only draws from the seeded RNG when this instance actually has
+    // traits.wobbleMs (including one picked by traitRandomizer above) --
+    // an unconditional draw here would shift every other enemy's RNG
+    // stream and change unrelated deterministic-seed test outcomes.
+    wobblePhase: def.traits?.wobbleMs ? w.rng() * Math.PI * 2 : 0,
     specialReadyAt: w.now + randRange(w.rng, 1400, 3200),
     telegraphUntil: 0,
     specialUntil: 0,
@@ -4900,6 +4936,9 @@ export function relicRecipeEligibility(
   return { eligible: true, reason: recipe.triggerLabel };
 }
 
+/** Level-up rerolls granted per run (flat cap, no meta-progression scaling yet). */
+const LEVEL_UP_REROLLS_PER_RUN = 3;
+
 export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   const pool: UpgradeDef[] = UPGRADES.filter((u) => {
     if (u.weaponKinds && !w.weapons.some((weapon) => u.weaponKinds!.includes(weapon.def.kind))) return false;
@@ -5075,6 +5114,18 @@ export function applyUpgrade(w: World, upgrade: UpgradeDef) {
     applyEffect(w, effect);
   }
   w.pendingLevelUps = Math.max(0, w.pendingLevelUps - 1);
+}
+
+/** Decline every offered upgrade for the current level-up without applying any effect. */
+export function skipLevelUp(w: World) {
+  w.pendingLevelUps = Math.max(0, w.pendingLevelUps - 1);
+}
+
+/** Consume one of the run's limited level-up rerolls. Returns false if none remain. */
+export function consumeReroll(w: World): boolean {
+  if (w.rerollsRemaining <= 0) return false;
+  w.rerollsRemaining -= 1;
+  return true;
 }
 
 /** Apply a revealed chest prize exactly when its reel lands (or is skipped). */
@@ -6653,6 +6704,18 @@ function updateEnemies(w: World, dt: number) {
         ? enemy.baseRadius * (traits.shiftScale ?? 1.45)
         : enemy.baseRadius;
       spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
+    }
+    if (traits?.wobbleMs) {
+      // A dance-step sine offset layered on top of whatever behavior this
+      // enemy has. Applied as the *change* in a sine curve since last frame
+      // (rather than an absolute offset) so it settles into a net-zero-drift
+      // wiggle instead of accumulating a runaway displacement.
+      const amp = traits.wobbleAmp ?? 6;
+      const twoPi = Math.PI * 2;
+      const angleNow = ((w.now + enemy.wobblePhase) / traits.wobbleMs) * twoPi;
+      const anglePrev = ((w.now - dt * 1000 + enemy.wobblePhase) / traits.wobbleMs) * twoPi;
+      enemy.x += (Math.sin(angleNow) - Math.sin(anglePrev)) * amp;
+      enemy.y += (Math.cos(angleNow) - Math.cos(anglePrev)) * amp;
     }
 
     const dataGobFleeing = w.area.id === 'rapid-pressure-rooms'
@@ -10605,6 +10668,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     level: w.level,
     xp: Math.round(w.xp),
     xpToNext: Math.round(w.xpToNext),
+    rerollsRemaining: w.rerollsRemaining,
     elapsedSec: w.time,
     durationSec: w.area.durationSec,
     kills: w.kills,

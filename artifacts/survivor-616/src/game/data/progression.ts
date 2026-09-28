@@ -445,6 +445,20 @@ export const HUB_ROOMS: HubRoomDef[] = [
     features: ['card-shop'],
   },
   {
+    id: 'studio-28',
+    name: 'Studio 28',
+    subtitle: 'One-screen picture house',
+    description:
+      'Used to be the coolest theatre on this stretch of the city, and it still thinks it is. The marquee bulbs are hand-replaced one at a time, the popcorn machine runs on spite, and the booth never went dark, not even during what everyone on this block still calls the eclipse. Come sundown the projectionist curates tonight’s show — including which weapons are cleared to leave the lobby.',
+    backdrop: 'art/street.jpeg',
+    biome: 'archive',
+    // A travel destination outside the hideout, like 'the-storefront'.
+    // Selecting it launches the weapon-bans screen immediately through
+    // App's room routing.
+    unlock: { kind: 'default' },
+    features: ['weapon-bans'],
+  },
+  {
     id: 'the-back-room',
     name: 'The Back Room',
     subtitle: 'Salvaged cabinet row',
@@ -540,6 +554,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'rapid-pressure-rooms-cleared', name: 'Rapid Shelter Reconnected', blurb: 'The Data-Gobs scattered, the pressure doors opened, and one Digi-Arch finally held a route long enough to bring the trapped Rapids through.' },
   { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },
   { id: 'site-crew-permit', name: 'Site Crew Work Permit', blurb: 'A stamped permit recovered from the moving pour. Every inspection box is checked except “leave the block alive.”' },
+  { id: 'mirrorball-frequency', name: 'The Mirrorball Frequency', blurb: 'A pulse of broadcast noise looping under the parquet, still keeping time for a dance floor nobody unplugged.' },
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

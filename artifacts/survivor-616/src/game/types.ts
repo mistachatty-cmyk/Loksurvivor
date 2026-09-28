@@ -953,6 +953,20 @@ export interface EnemyDef {
     shiftMs?: number;
     shiftScale?: number;
     burstSpeed?: number;
+    /** A periodic lateral wobble/dance motion layered on top of whatever
+     *  `behavior` the enemy has -- the same "applies regardless of behavior"
+     *  contract as `teleportMs`/`ghostMs`/`shiftMs`. See the pre-switch trait
+     *  block in `updateEnemyAI` (`engine/world.ts`) for the sine-wave offset
+     *  this drives, using `EnemyActor.wobblePhase` as its per-instance seed. */
+    wobbleMs?: number;
+    /** World-unit amplitude of the `wobbleMs` sine offset. Defaults to 6. */
+    wobbleAmp?: number;
+    /** Purely visual: continuously rotates this enemy's palette hue over
+     *  `hueShiftMs` -- no simulation/gameplay effect. Applied at draw time
+     *  (see `resolveEnemyPalette`/`hueShiftPalette` in `render/draw.ts`),
+     *  never by mutating the static `SpritePalette` object, and offset per
+     *  instance by `EnemyActor.uid` so multiple copies don't shift in lockstep. */
+    hueShiftMs?: number;
     /** wraith/ringer: orbit radius around the player, in world units. */
     swayRadius?: number;
     /** wraith: how long each circling phase lasts before it teleports to a new angle. */
@@ -1031,6 +1045,21 @@ export interface EnemyDef {
       biteMs: number;
       playerDamage: number;
     };
+  };
+  /**
+   * If set, `spawnEnemy()` builds a per-instance def for this enemy by
+   * merging a random subset of trait fragments and picking a random
+   * palette, so no two spawned instances look or act quite the same. The
+   * base `traits`/`palette` on this `EnemyDef` still apply as its fixed
+   * identity (e.g. a baseline `lockCone`); the randomizer only adds to
+   * `traits` and swaps `palette` wholesale, per spawn, on a cloned def --
+   * `ENEMIES`/the original `EnemyDef` are never mutated. See CLAUDE.md.
+   */
+  traitRandomizer?: {
+    /** Each fragment is merged into a copy of the base `traits`; 1-3 are picked per spawn. */
+    traitPool: NonNullable<EnemyDef['traits']>[];
+    /** A random one of these replaces the base `palette` per spawn. */
+    paletteVariants: SpritePalette[];
   };
   /** How this enemy moves to the music. See `data/reactivity.ts`. */
   react?: BeatReaction[];
@@ -1347,6 +1376,14 @@ export interface RunModifiers {
    * encounter on record to want more of.
    */
   directorModeEnabled?: boolean;
+  /**
+   * Bathes the area's ground/lighting in a cycling disco palette for the
+   * whole run -- a pure rendering effect (see `drawGround` in
+   * `render/draw.ts`), never touching spawn rate, hp, or collision.
+   * Thematically paired with the Digital Disco bonus area, but works on
+   * any area like `invertedMap`/`speedMode`.
+   */
+  discoMode?: boolean;
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';
@@ -1791,7 +1828,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -2522,6 +2559,8 @@ export interface HudSnapshot {
   elapsedSec: number;
   durationSec: number;
   kills: number;
+  /** Level-up rerolls left this run (see `consumeReroll`). */
+  rerollsRemaining: number;
   /** Million Horde only: total represented population and its bounded live subset. */
   millionHorde?: { population: number; peakPopulation: number; defeatedPopulation: number; liveActors: number };
   cred: number;
