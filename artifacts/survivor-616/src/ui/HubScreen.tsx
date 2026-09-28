@@ -13,6 +13,8 @@ import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
+import { CollapsibleSection } from './CollapsibleSection';
+import { HideoutPreview } from './HideoutPreview';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog } from 'lucide-react';
@@ -192,6 +194,22 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <Sparkles className="h-4 w-4 text-cyan-200" />
         <span>Looks &amp; LokPets</span>
       </button>
+      {/* Mobile-only: the full Head Out tile lives at the bottom of a screen
+          that can scroll several pages on a phone -- this keeps the primary
+          action reachable without hunting for it. Hidden at sm+ where the
+          desktop layout is short enough that this would be redundant.
+          Optional -- meta.hideoutStickyHeadOutEnabled, Settings > Hideout. */}
+      {meta.hideoutStickyHeadOutEnabled && (
+        <button
+          type="button"
+          onClick={() => onOpen('runs')}
+          className="fixed inset-x-3 bottom-3 z-50 flex min-h-12 items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden"
+          data-testid="button-open-runs-sticky"
+        >
+          Head out
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      )}
       {companion && (
         <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
           <LokPetIcon silhouette={companion.roll.silhouette} palette={companion.roll.palette} size={42} />
@@ -258,7 +276,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         </motion.div>
       </AnimatePresence>
 
-      <div className="relative z-20 flex-1 flex flex-col p-6">
+      <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
+        {meta.hideoutPreviewEnabled && (
+          <HideoutPreview
+            rig={selectedCharacter.rig}
+            palette={selectedCharacterPalette}
+            className="mb-6 -mx-6 w-auto sm:mx-0 sm:w-full"
+          />
+        )}
         <header className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
@@ -278,7 +303,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Session Stats</p>
-              <p className="flex items-center gap-1.5 justify-start sm:justify-end text-lg font-black text-amber-300" data-testid="text-cred-balance">
+              <p
+                className="flex items-center gap-1.5 justify-start sm:justify-end text-lg font-black text-amber-300"
+                data-testid="text-cred-balance"
+                title="Cred — the main currency, earned per run and spent at the Quartermaster, Relic Workshop, and other rooms."
+              >
                 <Coins className={`h-4 w-4 ${meta.ownedGeneratorIds.length > 0 ? 'hub-cred-pulse' : ''}`} />
                 {meta.cred} cred
               </p>
@@ -286,12 +315,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                 <span className="text-white">{meta.totalRuns}</span> runs <span className="opacity-50">/</span> <span className="text-white">{meta.totalKills}</span> defeated
               </p>
               {meta.lootTokens > 0 && (
-                <p className="text-xs font-mono text-amber-400 mt-1">
+                <p
+                  className="text-xs font-mono text-amber-400 mt-1"
+                  title="Loot tokens — earned from runs, spent at the Customization Shop on palettes and run auras."
+                >
                   <Package className="inline w-3 h-3 mr-1" />{meta.lootTokens} loot tokens
                 </p>
               )}
               {meta.skeletonKeys > 0 && (
-                <p className="text-xs font-mono text-sky-400 mt-1">
+                <p
+                  className="text-xs font-mono text-sky-400 mt-1"
+                  title="Skeleton keys — rarer drops, spent at the Quartermaster on things cred alone can't buy."
+                >
                   <KeyRound className="inline w-3 h-3 mr-1" />{meta.skeletonKeys} skeleton keys
                 </p>
               )}
@@ -301,6 +336,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   onClick={() => onOpen('account')}
                   className="mt-1 flex items-center gap-1 text-xs font-mono text-violet-300 hover:text-violet-200 justify-start sm:justify-end w-full"
                   data-testid="button-lok-token-balance"
+                  title="LokTokens — your account-linked balance, tied to sign-in rather than this device's save. Tap to open Account."
                 >
                   <Sparkles className="inline w-3 h-3" />{lokBalance} LokTokens
                 </button>
@@ -308,12 +344,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </div>
 
-          <section className="mb-6 border border-amber-400/25 bg-card p-3" data-testid="section-generators">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[9px] font-bold uppercase tracking-widest text-amber-300">Passive income</p>
-              <span className="text-[10px] text-muted-foreground">Rent it once, it keeps paying while you're away</span>
-            </div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          <div className="mb-6">
+            <CollapsibleSection
+              title="Passive income"
+              subtitle="Rent it once, it keeps paying while you're away"
+              defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+              testId="section-generators"
+            >
+            <div className="grid gap-2 sm:grid-cols-3">
               {RENTABLE_GENERATORS.map((generator) => {
                 const owned = meta.ownedGeneratorIds.includes(generator.id);
                 const affordable = meta.cred >= generator.cost;
@@ -346,7 +384,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                 );
               })}
             </div>
-          </section>
+            </CollapsibleSection>
+          </div>
 
           <nav ref={roomNavRef} className="flex flex-wrap gap-2 mb-6">
             {unlockedRooms.map((room) => {
@@ -397,7 +436,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
             <p className="text-sm text-muted-foreground">{activeRoom.description}</p>
           </div>
-            <div className="mt-3 grid gap-3 border border-primary/30 bg-black/35 p-4 sm:grid-cols-[auto_1fr_auto] sm:items-center" data-testid="hideout-scene">
+            <div className="mt-3">
+            <CollapsibleSection
+              title="Scene & Sanctum links"
+              subtitle={`${scene.weatherLabel} · ${scene.homeName}`}
+              defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+              testId="hideout-scene"
+            >
+            <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
              <div className="flex items-center gap-3">
                <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
                  {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
@@ -477,7 +523,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   </button>
                 )}
               </div>
-           </div>
+            </div>
+            </CollapsibleSection>
+            </div>
         </header>
 
         {activeRoom.id === 'grpd-vault' && blue616 && (
@@ -513,7 +561,13 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           </section>
         )}
 
-        <section className="mb-8 border border-[#fbbf24]/45 bg-black/45 p-4 sm:p-5" data-testid="section-crew-rumor">
+        <div className="mb-8">
+        <CollapsibleSection
+          title="Rumor for the road"
+          subtitle={activeRumor ? activeRumor.name : 'No rumor active'}
+          defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+          testId="section-crew-rumor"
+        >
           {activeRumor && meta.activeCrewRumor && rumorAlly ? (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               <div
@@ -553,13 +607,22 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               </div>
             </div>
           )}
-        </section>
+        </CollapsibleSection>
+        </div>
 
-        <section className="mb-8">
+        <div className="mb-8">
+        <CollapsibleSection
+          title="First Night & Contracts"
+          subtitle="Daily boards and the crew's ongoing contracts"
+          defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+          testId="section-first-night-contracts"
+        >
           <FirstNightBoard compact />
-        </section>
-
-        <ContractBoard onHeadOut={() => onOpen('runs')} />
+          <div className="mt-3">
+            <ContractBoard onHeadOut={() => onOpen('runs')} />
+          </div>
+        </CollapsibleSection>
+        </div>
 
         <section className="mb-10 flex-1">
           <div className="flex items-center gap-3 mb-6">

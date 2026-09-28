@@ -25,6 +25,7 @@ export type RunHighlightKind =
   | 'close-call'
   | 'ultimate'
   | 'ally-rescued'
+  | 'kill-streak'
   | 'run-cleared'
   | 'run-ended';
 
@@ -58,11 +59,18 @@ export interface RunHighlightObservable {
 const MAX_HIGHLIGHTS = 6;
 const CLOSE_CALL_HP_RATIO = 0.12;
 const CLOSE_CALL_COOLDOWN_MS = 9000;
+const KILL_STREAK_WINDOW_MS = 3000;
+const KILL_STREAK_THRESHOLD = 8;
+const KILL_STREAK_COOLDOWN_MS = 12000;
 
 interface RecorderState {
   highlights: RunHighlight[];
   lastLevel: number;
   lastKillsByEnemy: Record<string, number>;
+  lastTotalKills: number;
+  /** Rolling window of recent per-frame kill counts, for the kill-streak highlight. */
+  recentKills: { atMs: number; count: number }[];
+  lastKillStreakAt: number;
   lastRescueStatus: string | undefined;
   lastUltActiveUntil: number;
   lastCloseCallAt: number;
@@ -107,6 +115,9 @@ export function createRunHighlightRecorder() {
     highlights: [],
     lastLevel: 1,
     lastKillsByEnemy: {},
+    lastTotalKills: 0,
+    recentKills: [],
+    lastKillStreakAt: -Infinity,
     lastRescueStatus: undefined,
     lastUltActiveUntil: 0,
     lastCloseCallAt: -Infinity,
@@ -136,6 +147,25 @@ export function createRunHighlightRecorder() {
       }
     }
     state.lastKillsByEnemy = { ...world.killsByEnemy };
+
+    const totalKills = Object.values(world.killsByEnemy).reduce((sum, n) => sum + n, 0);
+    if (totalKills > state.lastTotalKills) {
+      state.recentKills.push({ atMs: world.now, count: totalKills - state.lastTotalKills });
+      state.lastTotalKills = totalKills;
+    }
+    state.recentKills = state.recentKills.filter((k) => world.now - k.atMs <= KILL_STREAK_WINDOW_MS);
+    const killsInWindow = state.recentKills.reduce((sum, k) => sum + k.count, 0);
+    if (
+      killsInWindow >= KILL_STREAK_THRESHOLD
+      && world.now - state.lastKillStreakAt > KILL_STREAK_COOLDOWN_MS
+    ) {
+      pushBounded(state, {
+        kind: 'kill-streak',
+        atMs: world.now,
+        label: `${killsInWindow} down in ${(KILL_STREAK_WINDOW_MS / 1000).toFixed(0)}s`,
+      });
+      state.lastKillStreakAt = world.now;
+    }
 
     if (world.ultActiveUntil > world.now && world.ultActiveUntil !== state.lastUltActiveUntil) {
       pushBounded(state, { kind: 'ultimate', atMs: world.now, label: 'Ultimate unleashed' });

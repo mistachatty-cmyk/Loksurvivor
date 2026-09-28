@@ -2067,6 +2067,12 @@ export interface MetaState {
   hideoutAmbienceEnabled: boolean;
   /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
   hideoutWeatherEnabled: boolean;
+  /** Whether the Hideout's generators/scene-links/rumor/First Night+Contract sections start collapsed. Off by default. */
+  hideoutSectionsCollapsedByDefault: boolean;
+  /** The animated walking-rig hero at the top of the Hideout screen. On by default; off reverts to the classic static layout. */
+  hideoutPreviewEnabled: boolean;
+  /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */
+  hideoutStickyHeadOutEnabled: boolean;
   /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
   splashTextEnabled: boolean;
   /** Shows the cleaner signature title lockup instead of the classic stacked two-line title. Off by default. */
