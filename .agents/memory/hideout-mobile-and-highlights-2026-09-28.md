@@ -114,9 +114,17 @@ a selectable option, not a replacement. Not attempted in this pass --
 scope it as its own design pass rather than bolting a partial redesign onto
 this one.
 
-## Currency tooltips
+## Currency glossary
 
 Added `title` attributes (cred / loot tokens / skeleton keys / LokTokens)
-to the Session Stats block in `HubScreen.tsx` -- the cheap first step of a
-larger "new players don't know what four currencies mean" problem. A real
-onboarding pass (first-run tour, in-context glossary) is still open.
+to the Session Stats block in `HubScreen.tsx` first, as a cheap step --
+then caught, on review, that `title` tooltips need hover, which does not
+exist on a touch screen. The device this entire thread of work has been
+about could not actually use them. Fixed with `ui/CurrencyGlossary.tsx`, a
+tap-to-reveal card toggled by a `HelpCircle` button next to "Session
+Stats" (local `showCurrencyGlossary` state, no new settings field -- this
+is a discoverability aid, not a persistent preference). The `title`
+attributes stay as a desktop-hover bonus, not the primary mechanism.
+
+Still open: a proper first-run tour (walking a new player through the
+Hideout's rooms, not just currencies) is a bigger, separate piece of work.

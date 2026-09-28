@@ -15,9 +15,10 @@ import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { CollapsibleSection } from './CollapsibleSection';
 import { HideoutPreview } from './HideoutPreview';
+import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -149,6 +150,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const primeTakeoverActive = isPrimeTakeoverActive(meta, Date.now());
   const primePalette = primeTakeoverActive ? getCharacter('artisanvalor').palette : null;
   const [isPageVisible, setIsPageVisible] = useState(true);
+  const [showCurrencyGlossary, setShowCurrencyGlossary] = useState(false);
   const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
   const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
@@ -321,7 +323,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">Hideout</h1>
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Session Stats</p>
+              <div className="mb-1 flex items-center gap-1.5 justify-start sm:justify-end">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">Session Stats</p>
+                <button
+                  type="button"
+                  onClick={() => setShowCurrencyGlossary((value) => !value)}
+                  aria-expanded={showCurrencyGlossary}
+                  aria-label="What do these currencies mean?"
+                  className="text-muted-foreground transition-colors hover:text-primary"
+                  data-testid="button-toggle-currency-glossary"
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                </button>
+              </div>
               <p
                 className="flex items-center gap-1.5 justify-start sm:justify-end text-lg font-black text-amber-300"
                 data-testid="text-cred-balance"
@@ -360,6 +374,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   <Sparkles className="inline w-3 h-3" />{lokBalance} LokTokens
                 </button>
               )}
+              {showCurrencyGlossary && <CurrencyGlossary />}
             </div>
           </div>
 
