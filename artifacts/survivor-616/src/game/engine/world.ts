@@ -10107,6 +10107,19 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 export function hudSnapshot(w: World): HudSnapshot {
   const ultRemaining = Math.max(0, w.ultReadyAt - w.now);
   const ultTotal = w.character.ultimate.cooldownMs * w.ultCooldownMult;
+  const pressureSystems = w.area.id === 'rapid-pressure-rooms'
+    ? w.breakables.filter((prop) => ['digi-arch', 'data-pipe', 'pressure-door'].includes(prop.kind))
+    : [];
+  const pressureRescue = pressureSystems.length > 0
+    ? {
+      integrityPct: Math.round(
+        pressureSystems.reduce((total, prop) => total + (prop.broken ? 0 : 1 - prop.rawDataBreakage), 0)
+        / pressureSystems.length * 100,
+      ),
+      exposedSystems: pressureSystems.filter((prop) => !prop.broken).length,
+      criticalSystems: pressureSystems.filter((prop) => prop.broken || prop.rawDataBreakage >= 0.7).length,
+    }
+    : undefined;
   const e = w.endless;
   const effectCounts = new Map<string, number>();
   for (const enemy of w.enemies) {
@@ -10137,6 +10150,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     rescueAvailable: w.rescue.status === 'available' || w.rescue.status === 'freeing',
     rescueProgressPct: Math.round(w.rescue.progress * 100),
     rescueAllyName: w.rescue.allyId ? ALLIES_BY_ID[w.rescue.allyId]?.name : undefined,
+    pressureRescue,
     lootBoxesOpened: w.lootBoxesOpened,
     lokPets: w.lokPets.map((pet) => ({
       uid: pet.uid,

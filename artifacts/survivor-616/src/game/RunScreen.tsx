@@ -1287,6 +1287,22 @@ export function RunScreen({
           </div>
         ) : null}
 
+        {hud?.pressureRescue ? (
+          <div
+            className={`mx-auto flex w-fit max-w-[92vw] items-center gap-2 border bg-black/75 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest ${
+              hud.pressureRescue.criticalSystems > 0
+                ? 'border-red-300/70 text-red-200'
+                : 'border-emerald-300/45 text-emerald-200'
+            }`}
+            data-testid="indicator-pressure-rescue"
+          >
+            <span>Rapid line {hud.pressureRescue.integrityPct}%</span>
+            <span className="text-white/50">·</span>
+            <span>{hud.pressureRescue.exposedSystems} systems holding</span>
+            {hud.pressureRescue.criticalSystems > 0 ? <span>· {hud.pressureRescue.criticalSystems} chewed</span> : null}
+          </div>
+        ) : null}
+
         {challenges.length > 0 ? (
           <div className="mx-auto flex w-fit flex-wrap justify-center gap-1.5" data-testid="row-active-contracts">
             {challenges.map((challenge) => (
