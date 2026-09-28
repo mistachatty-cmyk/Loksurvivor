@@ -37,6 +37,27 @@ export const FACTIONS: FactionDef[] = [
     roster: ['watchlight', 'floodline', 'sodium-lamp', 'phalanx-bulwark'],
   },
   {
+    id: 'lockstep',
+    name: 'Lockstep',
+    description: 'Cones that lock onto you and narrow to a line before detonating for a chunk of your health.',
+    accent: '#ff2d55',
+    roster: ['clampjaw', 'deadlock'],
+  },
+  {
+    id: 'relay-corps',
+    name: 'Relay Corps',
+    description: "Commanders that never close the distance themselves -- they just keep detector circles wandering the block until one sticks to you.",
+    accent: '#67e8f9',
+    roster: ['relay-marshal'],
+  },
+  {
+    id: 'prism-choir',
+    name: 'Prism Choir',
+    description: 'Color-coded beacons -- pull, slow, or elemental damage depending on the beam color, with a version that flickers through all of them.',
+    accent: '#c4b5fd',
+    roster: ['lure-lamp', 'drag-net', 'cinder-eye', 'frost-eye', 'volt-eye', 'flare-duo', 'undertow', 'prism-warden'],
+  },
+  {
     id: 'afterimage-choir',
     name: 'Afterimage Choir',
     description: 'Shadow-born flankers that never approach in a straight line.',
@@ -153,7 +174,14 @@ export const FACTIONS: FactionDef[] = [
     name: 'Lev Syndicate',
     description: 'A high-altitude cybernetic and industrial cartel commanding the skyway concourses -- gravitational war machines, phase-shifting nanite operatives, and high-voltage field engineers.',
     accent: '#38bdf8',
-    roster: ['lev-singularity-colossus', 'lev-nanite-phantom', 'lev-arc-conductor', 'lev-substation-brute', 'lev-drone-interceptor'],
+    roster: ['lev-singularity-colossus', 'lev-nanite-phantom', 'lev-arc-conductor', 'lev-substation-brute', 'lev-drone-interceptor', 'lev-overlord-prime'],
+  },
+  {
+    id: 'data-goblins',
+    name: 'Data Goblins',
+    description: 'Data-Gobs roam 616 looking for raw data breakage to chew. They prefer failing pipes, walls, vehicles, watches, and Digi-Arches to a fight—but a survivor is made of data too.',
+    accent: '#86efac',
+    roster: ['data-gob-nibbler', 'data-gob-pipechewer', 'data-gob-brickbiter', 'data-gob-archgnawer'],
   },
 ];
 

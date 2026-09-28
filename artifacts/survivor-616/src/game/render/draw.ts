@@ -1382,6 +1382,19 @@ function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
     ctx.stroke();
     ctx.fillRect(x - 4, y - 80, 8, 28);
     ctx.fillRect(x - 4, y + 52, 8, 28);
+  } else if (landmark.kind === 'pressure-rooms') {
+    ctx.globalAlpha = 0.72;
+    for (const roomX of [-122, 0, 122]) {
+      ctx.fillRect(x + roomX - 48, y - 46, 96, 92);
+      ctx.strokeRect(x + roomX - 48, y - 46, 96, 92);
+      ctx.strokeRect(x + roomX - 18, y - 30, 36, 62);
+    }
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(x, y + 76, 34, Math.PI, 0);
+    ctx.stroke();
+    ctx.fillStyle = landmark.accent;
+    ctx.fillRect(x - 30, y + 76, 60, 5);
   } else {
     // Floodgate: twin buttresses and a central gate face.
     ctx.fillRect(x - 170, y - 38, 340, 76);
@@ -1707,6 +1720,9 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'beacon-tower': { top: '#3b0764', side: '#2e1065', trim: '#ec4899' },
   'security-gate': { top: '#451a03', side: '#291003', trim: '#f97316' },
   'bunker-hatch': { top: '#1c1917', side: '#0c0a09', trim: '#a8a29e' },
+  'data-pipe': { top: '#12372f', side: '#071d19', trim: '#86efac' },
+  'digi-arch': { top: '#12324a', side: '#071923', trim: '#22d3ee' },
+  'pressure-door': { top: '#374151', side: '#171f2b', trim: '#facc15' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -1826,14 +1842,24 @@ function drawPotholes(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
-function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
+function drawObstacles(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  viewBounds: { left: number; top: number; right: number; bottom: number },
+) {
   const height = 16;
+  const margin = 80;
   // Draw the live prop records so streamed chunks and moving props share the
-  // same authored silhouette and profile.
-  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> =
-    w.area.endless
-      ? w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }))
-      : w.breakables.filter((b) => !b.broken).map((o) => ({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind }));
+  // same authored silhouette and profile. Culled to the camera viewport --
+  // endless mode can have a full 5x5 chunk window's worth of breakables
+  // loaded at once, and this ran unfiltered every frame before.
+  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> = [];
+  for (const o of w.breakables) {
+    if (o.broken) continue;
+    if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
+      || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
+    obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind });
+  }
 
   const worldTint = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
   for (const obstacle of obstacleList) {
@@ -2278,6 +2304,26 @@ function drawObstacles(ctx: CanvasRenderingContext2D, w: World) {
     }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+    if (live && live.rawDataBreakage > 0.025) {
+      ctx.save();
+      const severity = live.rawDataBreakage;
+      const blocks = Math.max(1, Math.ceil(severity * 7));
+      ctx.globalAlpha = 0.22 + severity * 0.55;
+      ctx.fillStyle = severity > 0.65 ? '#facc15' : '#86efac';
+      for (let i = 0; i < blocks; i += 1) {
+        const rx = hashCell(live.uid, i * 13) * Math.max(4, obstacle.w - 8);
+        const ry = hashCell(live.uid + 31, i * 17) * Math.max(4, obstacle.h - 8);
+        const size = 3 + Math.floor(hashCell(live.uid + 67, i * 19) * 6);
+        ctx.fillRect(x + 4 + rx, y - height + 4 + ry, size, size);
+      }
+      if (severity > 0.72) {
+        ctx.globalAlpha = 0.8;
+        ctx.font = 'bold 8px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('RAW DATA', obstacle.x, y - height - 5);
+      }
+      ctx.restore();
+    }
     if (live?.chainActive && !live.landedHeatActive) {
       ctx.save();
       const speed = Math.hypot(live.vx, live.vy);
@@ -4316,6 +4362,99 @@ function drawAmbient(ctx: CanvasRenderingContext2D, w: World) {
   }
 }
 
+function coneColorForKind(kind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock'): string {
+  return kind === 'pull' ? '#f472b6'
+    : kind === 'slow' ? '#38bdf8'
+    : kind === 'chill' ? '#93c5fd'
+    : kind === 'burn' ? '#fb923c'
+    : '#a78bfa';
+}
+
+/**
+ * Fills a cone and animates a thin "scan" arc sweeping from its origin to
+ * its edge every ~900ms, so every cone in the game (sentry/tracker/beacon/
+ * commander drones) reads as a live beam instead of a static wedge.
+ */
+function drawScanCone(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  x: number,
+  y: number,
+  range: number,
+  centerAngle: number,
+  halfAngle: number,
+  color: string,
+  alpha: number,
+  now: number,
+  react?: Parameters<typeof reactionMultiplier>[0],
+) {
+  // Music-reactive cones: 'scale' breathes the cone's reach with the track,
+  // 'glow' brightens its fill on the beat -- both no-ops without a `react`
+  // array on the enemy (musicVisual returns 1), so most cones stay static.
+  const drawRange = range * musicVisual(w, react, 'scale');
+  const drawAlpha = alpha * musicVisual(w, react, 'glow');
+  ctx.save();
+  ctx.globalAlpha = drawAlpha;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, drawRange, centerAngle - halfAngle, centerAngle + halfAngle);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  const sweepT = (now / 900) % 1;
+  ctx.save();
+  ctx.globalAlpha = drawAlpha * 1.6 * (1 - sweepT);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(x, y, drawRange * sweepT, centerAngle - halfAngle, centerAngle + halfAngle);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A wandering detection circle spawned by a 'commander' enemy -- pulses like a radar contact. */
+function drawRoamingDetector(ctx: CanvasRenderingContext2D, w: World, detector: World['roamingDetectors'][number]) {
+  const color = coneColorForKind(detector.effectKind);
+  const pulse = 0.5 + 0.5 * Math.sin(w.now / 260);
+  ctx.save();
+  ctx.globalAlpha = 0.16 + pulse * 0.08;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(detector.x, detector.y, detector.radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.lineDashOffset = -w.now / 20;
+  ctx.beginPath();
+  ctx.arc(detector.x, detector.y, detector.radius * (0.75 + pulse * 0.2), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** The "stuck" marker floating over the player while a beacon/commander effect is riding them. */
+function drawPlayerConeMark(ctx: CanvasRenderingContext2D, w: World) {
+  if (w.now >= w.playerConeUntil || !w.playerConeKind) return;
+  const color = coneColorForKind(w.playerConeKind);
+  const bob = Math.sin(w.now / 180) * 3;
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(w.player.x, w.player.y - 34 + bob, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawRoamingDetectors(ctx: CanvasRenderingContext2D, w: World) {
+  for (const detector of w.roamingDetectors) {
+    drawRoamingDetector(ctx, w, detector);
+  }
+}
+
 function drawActors(
   ctx: CanvasRenderingContext2D,
   w: World,
@@ -4760,14 +4899,43 @@ function drawActors(
     if (!enemy.dying && enemy.def.behavior === 'sentry' && enemy.def.traits?.coneDetect) {
       const detect = enemy.def.traits.coneDetect;
       const halfAngle = (detect.halfAngleDeg * Math.PI) / 180;
+      drawScanCone(ctx, w, enemy.x, enemy.y, detect.range, enemy.weave, halfAngle, '#f59e0b', 0.22, w.now, enemy.def.react);
+    }
+    if (!enemy.dying && enemy.def.behavior === 'tracker' && enemy.def.traits?.lockCone) {
+      const lock = enemy.def.traits.lockCone;
+      const startHalf = (lock.startHalfAngleDeg * Math.PI) / 180;
+      const minHalf = (lock.minHalfAngleDeg * Math.PI) / 180;
+      const closeness = 1 - clamp((enemy.weave - minHalf) / Math.max(0.001, startHalf - minHalf), 0, 1);
+      const faceAngle = Math.atan2(w.player.y - enemy.y, w.player.x - enemy.x);
+      const color = closeness > 0.7 ? '#ff2d55' : '#ef4444';
+      drawScanCone(ctx, w, enemy.x, enemy.y, lock.range, faceAngle, enemy.weave, color, 0.2 + closeness * 0.35, w.now, enemy.def.react);
+    }
+    if (!enemy.dying && enemy.def.behavior === 'beacon' && enemy.def.traits?.colorCone) {
+      const cone = enemy.def.traits.colorCone;
+      const halfAngle = (cone.halfAngleDeg * Math.PI) / 180;
+      const activeKind = cone.kinds[Math.floor(w.now / (cone.flickerMs ?? 1400)) % cone.kinds.length] ?? cone.kinds[0];
+      drawScanCone(ctx, w, enemy.x, enemy.y, cone.range, enemy.weave, halfAngle, coneColorForKind(activeKind), 0.26, w.now, enemy.def.react);
+    }
+    if (!enemy.dying && enemy.def.behavior === 'commander') {
+      const shielded = w.now < enemy.shieldedUntil;
       ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = '#f59e0b';
+      if (shielded) {
+        // Heavy shield: a solid, slowly rotating hex-ish ring -- undamageable.
+        const pulse = 0.6 + 0.4 * Math.sin(w.now / 220);
+        ctx.globalAlpha = 0.35 + pulse * 0.25;
+        ctx.strokeStyle = '#67e8f9';
+        ctx.lineWidth = 4;
+      } else {
+        // Locked on: a thin dashed ring around whoever it's currently buffing.
+        ctx.globalAlpha = 0.55;
+        ctx.strokeStyle = '#f472b6';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 5]);
+        ctx.lineDashOffset = -w.now / 15;
+      }
       ctx.beginPath();
-      ctx.moveTo(enemy.x, enemy.y);
-      ctx.arc(enemy.x, enemy.y, detect.range, enemy.weave - halfAngle, enemy.weave + halfAngle);
-      ctx.closePath();
-      ctx.fill();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 9, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
     if (!enemy.dying && (enemy.telegraphUntil > w.now || enemy.specialUntil > w.now)) {
@@ -5136,6 +5304,21 @@ function drawBubbleWash(ctx: CanvasRenderingContext2D, w: World) {
 /* Entry point                                                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * How many world units are shown across the screen's width, before the
+ * `zoom = width / targetView` division that turns it into a scale factor.
+ * Keeping the width:targetView ratio constant (~0.78) is what keeps the
+ * camera showing "roughly the same slice of the world" as screen width
+ * changes -- the cap below exists only to bound the view distance on truly
+ * huge (ultra-wide/4K) monitors, and must stay well above the width of
+ * ordinary desktop/laptop screens (1280-1920) or those screens creep past
+ * the intended ratio and the camera reads as progressively more zoomed in
+ * the wider the window gets.
+ */
+export function targetViewForWidth(width: number, override?: number): number {
+  return Math.max(1, override ?? (width < 620 ? 470 : Math.min(1500, width * 0.78)));
+}
+
 export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewport) {
   const { width, height, dpr } = view;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
@@ -5144,7 +5327,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   // Show roughly the same slice of the world regardless of screen size,
   // unless a caller (the map editor's whole-map preview) asks for a
   // specific slice width.
-  const targetView = Math.max(1, view.targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78)));
+  const targetView = targetViewForWidth(width, view.targetViewOverride);
   const zoom = Math.max(0.001, width / targetView);
 
   ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
@@ -5232,9 +5415,11 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawFluids(ctx, w);
   drawPotholes(ctx, w);
   drawAmbient(ctx, w);
-  drawObstacles(ctx, w);
+  drawObstacles(ctx, w, viewBounds);
   drawAwarenessArrow(ctx, w);
+  drawRoamingDetectors(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
+  drawPlayerConeMark(ctx, w);
   drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
   drawEffects(ctx, w, viewBounds, visualBudget);

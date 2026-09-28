@@ -199,8 +199,18 @@ export interface EnemyActor extends Actor {
   activeEffects: StatusEffectInstance[];
   /** wraith: undamageable and unrendered while `w.now < invisibleUntil`. */
   invisibleUntil: number;
-  /** wraith: w.now this circling phase ends and the next teleport fires. */
+  /** wraith: w.now this circling phase ends and the next teleport fires.
+   *  tracker: one-time init flag for the narrowing half-angle (weave spawns
+   *  randomized, so it can't double as its own "not yet set up" sentinel).
+   *  commander: w.now the current phase (shielded-and-searching, or locked)
+   *  ends. */
   phaseUntil: number;
+  /** commander: undamageable (still rendered, still able to contact-damage
+   *  the player) while `w.now < shieldedUntil` -- its "heavy shield". */
+  shieldedUntil: number;
+  /** commander: true while it currently has the player found and is
+   *  buffing nearby allies; false while shielded and searching to relock. */
+  commanderLocked: boolean;
   /** Zero Day: frozen "stone" and fully inert (no AI, no contact damage, undamageable) while `w.now < frozenUntil`. */
   frozenUntil: number;
   /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
@@ -227,6 +237,25 @@ export interface EnemyActor extends Actor {
   /** Llamá Máma: mesmerized with heart eyes and bubbles, trailing baby llamas */
   cutifiedUntil?: number;
   cutifiedTargetUid?: number;
+}
+
+/** A free-roaming detection circle released by a 'commander' enemy. See `updateRoamingDetectors`. */
+export interface RoamingDetector {
+  uid: number;
+  /** EnemyActor.uid of the commander that spawned it; removed when that enemy dies. */
+  ownerUid: number;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  speed: number;
+  radius: number;
+  effectKind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock';
+  stickyMs: number;
+  slowPct: number;
+  tickDamagePerSec: number;
+  /** w.now before this drone can mark the player again after a hit. */
+  cooldownUntil: number;
 }
 
 export interface Projectile {
@@ -493,6 +522,8 @@ export interface BreakableObstacle extends Aabb {
   nextImpactDamageAt: number;
   broken: boolean;
   brokenAt: number;
+  /** 0..1 visible corruption caused by raw-data decay and Data-Gob bites. */
+  rawDataBreakage: number;
   contacts: number;
   /** The most recent direction this prop was hit from by the player. */
   lastPlayerImpactX: number;
@@ -739,9 +770,13 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'server-rack': { variant: 'light-breakable', hp: 110 },
   /** Tree Null map: tough cybernetic digital tree with dense foliage. */
   'tree-digital': { variant: 'heavy-metal', hp: 800 },
+  'data-pipe': { variant: 'light-breakable', hp: 105 },
+  'digi-arch': { variant: 'heavy-metal', hp: 360 },
+  'pressure-door': { variant: 'heavy-metal', hp: 300 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
+  'data-pipe', 'digi-arch', 'pressure-door',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -1000,6 +1035,17 @@ export interface World {
   grid: Map<number, EnemyActor[]>;
   /** Rebuilt every frame from `obstacles` so per-actor collision only tests nearby boxes. */
   obstacleGrid: Map<number, Aabb[]>;
+  /** True once `obstacleGrid` needs rebuilding (obstacles are static, so this only flips on add/break). */
+  obstacleGridDirty: boolean;
+  /**
+   * uid -> enemy, rebuilt alongside `grid` every frame (and kept in sync by
+   * the mid-frame spawn/removal sites) so uid-based lookups (homing-target
+   * refresh, thrown/carried enemy resolution, commanded-unit selection)
+   * don't have to linear-scan `w.enemies` -- that scan was O(enemies) per
+   * lookup, called per projectile/unit per frame, and dominated frame time
+   * once enemy counts got into the hundreds.
+   */
+  enemiesByUid: Map<number, EnemyActor>;
 
   /** Seed used to create rng; also forwarded to endless chunk generation. */
   rngSeed: number;
@@ -1049,6 +1095,20 @@ export interface World {
   rumorSpeedUntil: number;
   rumorPantryAvailable: boolean;
   rumorBroadcastAvailable: boolean;
+  /** Beacon/commander cone effects: timestamp (w.now) the current debuff ends. A
+   *  non-sticky beam refreshes this every frame the player stays inside it; a
+   *  sticky one (traits.colorCone.stickyMs / traits.commander.stickyMs) sets a
+   *  flat duration on first contact that keeps ticking after they leave. */
+  playerConeUntil: number;
+  playerConeKind: 'slow' | 'chill' | 'burn' | 'shock' | null;
+  /** slow/chill: fraction of move speed removed. burn/shock: damage per tick. */
+  playerConeMag: number;
+  /** burn/shock only: w.now the next damage tick fires. */
+  playerConeNextTickAt: number;
+  /** Free-roaming detector circles released by 'commander' enemies -- wander the
+   *  arena independent of their owner, marking the player with a sticky cone
+   *  effect on contact. Cleared when the owning commander dies. */
+  roamingDetectors: RoamingDetector[];
   rumorMagnetNextAt: number;
   /** Authored opening-campaign cue for this area, when one exists. */
   firstNightChapter?: ReturnType<typeof getFirstNightChapter>;
@@ -1075,12 +1135,6 @@ export interface World {
    * falls back to `DIRECTORS[0]` in `updateDirector`.
    */
   activeDirectorPersonalityId: string | null;
-  /**
-   * w.now the next bonus faction-favor spawn is allowed. Only consulted
-   * when the active personality's `effect.kind === 'factionFavor'` --
-   * see `applyDirectorFactionFavor` in updateSpawning/updateEndlessSpawning.
-   */
-  nextFactionFavorSpawnAt: number;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -1399,7 +1453,6 @@ export function createWorld(
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
     activeDirectorPersonalityId: setup.activeDirectorPersonalityId ?? null,
-    nextFactionFavorSpawnAt: 0,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -1467,6 +1520,8 @@ export function createWorld(
     ambientRng: createRng(seed + 0x5eed),
     grid: new Map(),
     obstacleGrid: new Map(),
+    obstacleGridDirty: true,
+    enemiesByUid: new Map(),
     rngSeed: seed,
     endless: undefined,
     physicsObjectClicksEnabled,
@@ -1498,6 +1553,11 @@ export function createWorld(
     rumorSpeedUntil: activeCrewRumor?.rumorId === 'painted-shortcut' ? 6500 : 0,
     rumorPantryAvailable: activeCrewRumor?.rumorId === 'pantry-surge',
     rumorBroadcastAvailable: activeCrewRumor?.rumorId === 'basement-broadcast',
+    playerConeUntil: 0,
+    playerConeKind: null,
+    playerConeMag: 0,
+    playerConeNextTickAt: 0,
+    roamingDetectors: [],
     rumorMagnetNextAt: activeCrewRumor?.rumorId === 'magnet-parade' ? 8500 : Number.POSITIVE_INFINITY,
     firstNightChapter: getFirstNightChapter(area.id),
     firstNightBeatTriggered: false,
@@ -1729,6 +1789,7 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     nextImpactDamageAt: 0,
     broken: false,
     brokenAt: 0,
+    rawDataBreakage: 0,
     contacts: 0,
     lastPlayerImpactX: 0,
     lastPlayerImpactY: 0,
@@ -1839,43 +1900,20 @@ function modifierSpawnMult(w: World): number {
   return w.modifiers.doubleMode ? 2 : 1;
 }
 
-/**
- * The active Director personality's `DirectorPersonalityEffect` tuning, or
- * the neutral identity for `'none'`/unset. Only ever consulted from
- * `updateSpawning`/`updateEndlessSpawning`, and always composed *inside*
- * each call site's own difficulty cap (see endless-mode-engine.md) --
- * never applied on top of it. `factionFavor`'s spawnRateMult only biases
- * `applyDirectorFactionFavor`'s bonus spawns below, not the global rate,
- * so it reads as neutral here.
- */
-function activeDirectorEffect(w: World): { spawnRateMult: number; hpMult: number } {
-  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId) ?? DIRECTORS[0];
-  const effect = director?.effect;
-  if (effect?.kind === 'spawnBias') return { spawnRateMult: effect.spawnRateMult, hpMult: effect.hpMult };
-  return { spawnRateMult: 1, hpMult: 1 };
+function selectedDirector(w: World): (typeof DIRECTORS)[number] | undefined {
+  return DIRECTORS.find((director) => director.id === w.activeDirectorPersonalityId);
 }
 
-const FACTION_FAVOR_INTERVAL_SEC = 20;
+function directorHpMult(w: World): number {
+  const effect = selectedDirector(w)?.effect;
+  return effect?.kind === 'spawnBias' ? effect.hpMult : 1;
+}
 
-/**
- * When the active Director personality is `factionFavor`, periodically drops
- * one extra copy of a random enemy from its favored faction's roster --
- * regular `AreaDef.waves` have no other way to inject a faction that isn't
- * authored into that area. Mirrors `spawnMusicSquad`'s "own small seam,
- * deliberately not spawnDirectorSquad" shape: this has no boss/encounter
- * tracking to hook into, just a bonus enemy. Gated on `enemyCap(w)` the same
- * as every other spawn path, via `spawnEnemy`'s own guard.
- */
-function applyDirectorFactionFavor(w: World) {
-  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId) ?? DIRECTORS[0];
-  const effect = director?.effect;
-  if (effect?.kind !== 'factionFavor') return;
-  if (w.time < director!.triggerAfterSec) return;
-  if (w.now < w.nextFactionFavorSpawnAt) return;
-  w.nextFactionFavorSpawnAt = w.now + (FACTION_FAVOR_INTERVAL_SEC * 1000) / Math.max(0.01, effect.spawnRateMult);
-  const faction = getFaction(effect.favoredFactionId);
-  const enemyId = faction.roster[Math.floor(w.rng() * faction.roster.length)]!;
-  spawnEnemy(w, getEnemy(enemyId), 1);
+function directorWaveSpawnMult(w: World, factionName?: string): number {
+  const effect = selectedDirector(w)?.effect;
+  if (!effect || effect.kind === 'none') return 1;
+  if (effect.kind === 'spawnBias') return effect.spawnRateMult;
+  return getFaction(effect.favoredFactionId).name === factionName ? effect.spawnRateMult : 1;
 }
 
 function enemyCap(w: World): number {
@@ -1940,7 +1978,9 @@ function cellKey(x: number, y: number): number {
 
 function rebuildGrid(w: World) {
   w.grid.clear();
+  w.enemiesByUid.clear();
   for (const enemy of w.enemies) {
+    w.enemiesByUid.set(enemy.uid, enemy);
     if (enemy.dying) continue;
     const key = cellKey(enemy.x, enemy.y);
     const bucket = w.grid.get(key);
@@ -1955,6 +1995,8 @@ function rebuildGrid(w: World) {
  * point-sample enemy grid above, which only ever needs one cell per actor.
  */
 function rebuildObstacleGrid(w: World) {
+  if (!w.obstacleGridDirty) return;
+  w.obstacleGridDirty = false;
   w.obstacleGrid.clear();
   for (const box of w.obstacles) {
     const minCx = Math.floor((box.x - box.w / 2) / CELL);
@@ -2070,7 +2112,7 @@ function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: 
   // endless mode's own Math.min(1.7, ...) cap uncapped -- see run-modifiers.md.
   const calHpMult = w.threatCalibrations?.hpMult ?? 1;
   const calMassMult = w.threatCalibrations?.massMult ?? 1;
-  const hp = def.hp * hpMult * modifierHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
+  const hp = def.hp * hpMult * modifierHpMult(w) * directorHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -2114,6 +2156,8 @@ function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: 
     fallStartedAt: 0,
     invisibleUntil: def.traits?.revealMs ? w.now + def.traits.revealMs : 0,
     phaseUntil: 0,
+    shieldedUntil: 0,
+    commanderLocked: false,
     frozenUntil: 0,
     selectedForThrow: false,
     commanded: false,
@@ -2124,6 +2168,28 @@ function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: 
     capturableUntil: 0,
   };
   w.enemies.push(enemy);
+  w.enemiesByUid.set(enemy.uid, enemy);
+
+  if (def.behavior === 'commander' && def.traits?.commander) {
+    const cmd = def.traits.commander;
+    for (let i = 0; i < cmd.droneCount; i += 1) {
+      w.roamingDetectors.push({
+        uid: uid(w),
+        ownerUid: enemy.uid,
+        x: enemy.x + randRange(w.rng, -80, 80),
+        y: enemy.y + randRange(w.rng, -80, 80),
+        targetX: enemy.x,
+        targetY: enemy.y,
+        speed: cmd.droneSpeed,
+        radius: cmd.droneRadius,
+        effectKind: cmd.effectKind,
+        stickyMs: cmd.stickyMs,
+        slowPct: cmd.slowPct ?? 0.35,
+        tickDamagePerSec: cmd.tickDamagePerSec ?? 6,
+        cooldownUntil: 0,
+      });
+    }
+  }
 
   if (
     w.activeCrewRumor?.rumorId === 'basement-broadcast' &&
@@ -2208,10 +2274,8 @@ function formationPositions(w: World, formation: NonNullable<import('@/game/type
 
 function updateSpawning(w: World, dt: number) {
   applyMusicEvents(w);
-  applyDirectorFactionFavor(w);
   const waves = w.area.waves;
-  const directorEffect = activeDirectorEffect(w);
-  const baseSpawnMult = modifierSpawnMult(w) * directorEffect.spawnRateMult;
+  const baseSpawnMult = modifierSpawnMult(w);
   const infiniteMode = Boolean(w.modifiers.infiniteMode);
   // Several authored areas' climaxes are multiple waves tied at the same
   // (highest) toSec rather than one wave that happens to sit last in the
@@ -2232,16 +2296,11 @@ function updateSpawning(w: World, dt: number) {
     // spawn window. `w.time - dt` puts the previous substep still outside it.
     if (!infiniteActive && w.time - dt < wave.fromSec) pushSfx(w, 'waveStart');
     const infiniteTier = infiniteActive ? Math.floor((w.time - wave.toSec) / 20) : 0;
-    // directorEffect.hpMult composes *inside* infinite mode's own hp cap,
-    // per endless-mode-engine.md; outside infinite mode there's no other
-    // ceiling to compose inside of, so it applies directly below via
-    // wave.hpMult -- authored effect values stay in a conservative range
-    // (see data/directors.ts) since nothing else bounds them there.
-    const infiniteHpMult = infiniteActive ? Math.min(1.7, (1 + infiniteTier * 0.07) * directorEffect.hpMult) : 1;
+    const infiniteHpMult = infiniteActive ? Math.min(1.7, 1 + infiniteTier * 0.07) : 1;
     const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
     const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
     const densityMult = w.threatCalibrations?.densityMult ?? 1;
-    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult;
+    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult * directorWaveSpawnMult(w, wave.faction);
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
@@ -2251,10 +2310,8 @@ function updateSpawning(w: World, dt: number) {
       const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
       let positionIndex = 0;
       // modifierHpMult isn't applied here -- spawnEnemy applies it to every
-      // caller uniformly (see its own comment for why). directorEffect.hpMult
-      // is already folded into infiniteHpMult (and its cap) when infinite
-      // mode is active, so it's only applied here directly otherwise.
-      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult * (infiniteActive ? 1 : directorEffect.hpMult);
+      // caller uniformly (see its own comment for why).
+      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
       for (let b = 0; b < wave.burst; b += 1) {
         spawnEnemy(w, def, hpMult, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
@@ -3250,6 +3307,9 @@ function damageEnemy(
   if (enemy.commanded) return;
   // Wraiths can't be hurt while lurking invisible -- see oddity-arenas.md.
   if (w.now < enemy.invisibleUntil) return;
+  // Commanders: a heavy shield while searching/re-locking -- still fully
+  // visible and still able to contact-damage the player, just undamageable.
+  if (w.now < enemy.shieldedUntil) return;
   // Zero Day: frozen "stone" enemies are untargetable by normal damage --
   // they're resolved directly via killEnemy() when thrown, not damageEnemy().
   if (w.now < enemy.frozenUntil) return;
@@ -3370,6 +3430,97 @@ function updateStatusEffects(w: World) {
   }
 }
 
+/** Ticks the player's active beacon/commander cone mark. Slow/chill are read
+ *  directly off `playerConeMag` by updatePlayer's speed calc; burn/shock tick
+ *  damage here on a 500ms cadence for as long as `playerConeUntil` holds,
+ *  independent of whether the source cone is still touching the player. */
+function updatePlayerConeEffects(w: World) {
+  if (w.now >= w.playerConeUntil) {
+    w.playerConeKind = null;
+    return;
+  }
+  if ((w.playerConeKind === 'burn' || w.playerConeKind === 'shock') && w.now >= w.playerConeNextTickAt) {
+    w.playerConeNextTickAt = w.now + 500;
+    damagePlayer(w, w.playerConeMag, w.player.x, w.player.y);
+    spawnParticles(w, w.player.x, w.player.y, coneEffectColor(w.playerConeKind), 3, 30);
+  }
+}
+
+/** Free-roaming detector circles released by 'commander' enemies (see
+ *  spawnEnemy). They wander toward a random point in the arena, forever
+ *  re-targeting once close, and mark the player with their sticky cone
+ *  effect on contact. Removed once their owning commander dies. */
+function updateRoamingDetectors(w: World, dt: number) {
+  if (w.roamingDetectors.length === 0) return;
+  const ownerAlive = new Set(w.enemies.filter((e) => !e.dying).map((e) => e.uid));
+  w.roamingDetectors = w.roamingDetectors.filter((d) => ownerAlive.has(d.ownerUid));
+  const halfW = w.bounds.w / 2 - 40;
+  const halfH = w.bounds.h / 2 - 40;
+  for (const d of w.roamingDetectors) {
+    const dx = d.targetX - d.x;
+    const dy = d.targetY - d.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 24) {
+      d.targetX = randRange(w.rng, -halfW, halfW);
+      d.targetY = randRange(w.rng, -halfH, halfH);
+    } else {
+      d.x += (dx / dist) * d.speed * dt;
+      d.y += (dy / dist) * d.speed * dt;
+    }
+    if (w.now < d.cooldownUntil) continue;
+    const rdist = Math.hypot(w.player.x - d.x, w.player.y - d.y);
+    if (rdist >= d.radius) continue;
+    d.cooldownUntil = w.now + d.stickyMs + 800;
+    if (d.effectKind === 'pull') {
+      const pdx = w.player.x - d.x;
+      const pdy = w.player.y - d.y;
+      const plen = Math.hypot(pdx, pdy) || 1;
+      // A single strong yank, not a continuous force -- the drone's contact is
+      // one instant, unlike a beacon's cone which the player can stand inside.
+      w.player.kx += (-pdx / plen) * 240;
+      w.player.ky += (-pdy / plen) * 240;
+      pushAlert(w, 'MARKED');
+    } else {
+      const mag = coneEffectMagnitude(d.effectKind, d.slowPct, d.tickDamagePerSec);
+      applyConeMark(w, d.effectKind, mag, d.stickyMs);
+    }
+    if (w.now < w.stealthUntil) {
+      w.stealthUntil = w.now;
+      w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+    }
+  }
+}
+
+/** Shared by 'beacon' cones and commander drones so both read the same
+ *  slow/chill/burn/shock magnitude out of a colorCone/commander trait. */
+function coneEffectMagnitude(kind: 'slow' | 'chill' | 'burn' | 'shock', slowPct: number, tickDamagePerSec: number): number {
+  if (kind === 'chill') return slowPct * 1.4;
+  if (kind === 'slow') return slowPct;
+  return tickDamagePerSec * 0.5;
+}
+
+/** Marks the player with a beacon/commander cone effect. Sticky effects hold
+ *  for a flat duration regardless of range afterward; non-sticky ones just
+ *  refresh a short rolling window while contact continues. */
+function applyConeMark(w: World, kind: 'slow' | 'chill' | 'burn' | 'shock', mag: number, stickyMs: number | undefined) {
+  w.playerConeUntil = w.now + (stickyMs ?? 260);
+  if (w.playerConeKind !== kind) w.playerConeNextTickAt = w.now + 500;
+  w.playerConeKind = kind;
+  w.playerConeMag = mag;
+  if (stickyMs) {
+    pushAlert(w, 'MARKED');
+    spawnParticles(w, w.player.x, w.player.y, coneEffectColor(kind), 14, 100);
+  }
+}
+
+function coneEffectColor(kind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock'): string {
+  return kind === 'pull' ? '#f472b6'
+    : kind === 'slow' ? '#38bdf8'
+    : kind === 'chill' ? '#93c5fd'
+    : kind === 'burn' ? '#fb923c'
+    : '#a78bfa';
+}
+
 function statusSpeedMultiplier(enemy: EnemyActor): number {
   return enemy.activeEffects.reduce((multiplier, effect) => {
     const def = STATUS_EFFECTS_BY_ID[effect.id];
@@ -3411,6 +3562,16 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
     const pet = rollLokPet(w.rng, { fixedVariantId: 'digi-wolf' });
     spawnLokPet(w, pet);
     pushAlert(w, `${pet.name} follows you home`);
+  }
+
+  // Data-Gobs are feeding, not hunting. Driving one off releases the loose
+  // packets it swallowed and briefly patches nearby exposed world objects.
+  if (enemy.def.faction === 'Data Goblins') {
+    for (const prop of w.breakables) {
+      if (prop.broken || dist2(prop.x, prop.y, enemy.x, enemy.y) > 180 * 180) continue;
+      prop.rawDataBreakage = Math.max(0, prop.rawDataBreakage - 0.14);
+    }
+    w.popups.push({ x: enemy.x, y: enemy.y - 18, text: 'DATA PATCH', color: '#86efac', bornAt: w.now, vy: 26 });
   }
 
   // Loot.
@@ -3613,21 +3774,46 @@ function rebuildOrbiters(w: World, runWeapon = w.weapons.find((entry) => entry.d
   }
 }
 
-function nearestEnemy(w: World, x: number, y: number, maxRange: number, exclude?: Set<number>) {
+/**
+ * Grid-bucketed instead of a full `w.enemies` scan -- this is called from
+ * ~20 per-frame sites (once per weapon per frame, plus once per
+ * commanded/converted unit per frame), so at hundreds-to-a-thousand enemies
+ * a linear scan here was the dominant per-frame cost. Walks the same
+ * fixed cell box `forEachNearby` does, just tracking the closest hit
+ * instead of visiting every one.
+ */
+function nearestEnemy(
+  w: World,
+  x: number,
+  y: number,
+  maxRange: number,
+  exclude?: Set<number>,
+  excludeUid?: number,
+) {
   let best: EnemyActor | null = null;
   let bestDist = maxRange * maxRange;
-  for (const enemy of w.enemies) {
-    if (enemy.dying) continue;
-    if (exclude?.has(enemy.uid)) continue;
-    if (w.now < enemy.invisibleUntil) continue;
-    // Sector Command: your own captured units are never a target -- not for
-    // your weapons, and not for each other. (Legacy `convertedUntil` allies
-    // from the allymaker weapon keep their original behavior.)
-    if (enemy.commanded) continue;
-    const d = dist2(enemy.x, enemy.y, x, y);
-    if (d < bestDist) {
-      bestDist = d;
-      best = enemy;
+  const cells = Math.ceil(maxRange / CELL);
+  const baseX = Math.floor(x / CELL);
+  const baseY = Math.floor(y / CELL);
+  for (let ix = -cells; ix <= cells; ix += 1) {
+    for (let iy = -cells; iy <= cells; iy += 1) {
+      const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+      if (!bucket) continue;
+      for (const enemy of bucket) {
+        if (enemy.dying) continue;
+        if (enemy.uid === excludeUid) continue;
+        if (exclude?.has(enemy.uid)) continue;
+        if (w.now < enemy.invisibleUntil) continue;
+        // Sector Command: your own captured units are never a target -- not for
+        // your weapons, and not for each other. (Legacy `convertedUntil` allies
+        // from the allymaker weapon keep their original behavior.)
+        if (enemy.commanded) continue;
+        const d = dist2(enemy.x, enemy.y, x, y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = enemy;
+        }
+      }
     }
   }
   return best;
@@ -3647,7 +3833,7 @@ function triggerEvolutionHit(
   if (!behavior) return;
   const radius = behavior.radius ?? 64;
   if (behavior.kind === 'chain') {
-    const target = nearestEnemy(w, x, y, radius + 90, excludeUid ? new Set([excludeUid]) : undefined);
+    const target = nearestEnemy(w, x, y, radius + 90, undefined, excludeUid);
     if (target) {
       damageEnemy(w, target, damage * 0.55, 0, x, y, statusEffectId);
       spawnParticles(w, target.x, target.y, color, 4, 55);
@@ -5104,6 +5290,7 @@ function syncObstacleAabbs(w: World) {
   w.obstacles = w.breakables
     .filter((b) => !b.broken)
     .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+  w.obstacleGridDirty = true;
 }
 
 function damageBreakable(
@@ -5123,7 +5310,8 @@ function damageBreakable(
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
-    b.hp -= Math.max(1, amount);
+    const breakageMult = 1 + b.rawDataBreakage * (w.area.rawDataBreakage?.damageVulnerability ?? 0);
+    b.hp -= Math.max(1, amount * breakageMult);
     if (b.hp > 0) {
       if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
       continue;
@@ -5878,6 +6066,29 @@ function updateBreakables(w: World, dt: number) {
   syncObstacleAabbs(w);
 }
 
+function updateRawDataBreakage(w: World, dt: number) {
+  const config = w.area.rawDataBreakage;
+  if (!config) return;
+  for (const prop of w.breakables) {
+    if (prop.broken) continue;
+    const susceptibility = prop.breakable ? 1 : 0.28;
+    prop.rawDataBreakage = clamp(prop.rawDataBreakage + config.ambientPerSec * susceptibility * dt, 0, 1);
+  }
+}
+
+function nearestDataChewTarget(w: World, x: number, y: number, range: number): BreakableObstacle | undefined {
+  let closest: BreakableObstacle | undefined;
+  let closestD2 = range * range;
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.breakable) continue;
+    const d2 = dist2(x, y, prop.x, prop.y);
+    if (d2 >= closestD2) continue;
+    closestD2 = d2;
+    closest = prop;
+  }
+  return closest;
+}
+
 function applyKnockback(actor: Actor, dt: number) {
   actor.x += actor.kx * dt;
   actor.y += actor.ky * dt;
@@ -5926,8 +6137,9 @@ function knockEnemiesAlongDash(w: World, previousX: number, previousY: number) {
 function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const p = w.player;
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
+  const coneSlow = w.now < w.playerConeUntil ? 1 - w.playerConeMag : 1;
   const pollenSpeed = (p.pollenSpeedUntil ?? 0) > w.now ? 1.18 : 1;
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * pollenSpeed;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed;
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -6185,7 +6397,8 @@ function updateDashSkill(w: World) {
     for (let i = dashSkill.pendingLandings.length - 1; i >= 0; i -= 1) {
       const landing = dashSkill.pendingLandings[i]!;
       if (w.now < landing.readyAt) continue;
-      const stillAlive = w.enemies.find((e) => e.uid === landing.uid && !e.dying);
+      const uidMatch = w.enemiesByUid.get(landing.uid);
+      const stillAlive = uidMatch && !uidMatch.dying ? uidMatch : undefined;
       const x = stillAlive?.x ?? landing.x;
       const y = stillAlive?.y ?? landing.y;
       novaDamage(w, x, y, landing.radius, landing.damage, 3);
@@ -6230,6 +6443,15 @@ function updateEnemies(w: World, dt: number) {
   const trackX = stealthed ? w.stealthAnchorX : p.x;
   const trackY = stealthed ? w.stealthAnchorY : p.y;
 
+  // Grid-backed lookups (nearestEnemy, enemiesByUid) run throughout this
+  // function -- including the converted-ally/commanded-unit targeting below,
+  // well before the separation pass's own rebuild -- so it has to be current
+  // before any of that runs, not just before separation. The later call is
+  // still worth keeping: it re-syncs against this frame's movement before
+  // the separation pass, exactly as before this function grew a top-of-frame
+  // rebuild too.
+  rebuildGrid(w);
+
   const enemyMoveBreakables = w.breakables.filter((b) => !b.broken && b.movable);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
@@ -6243,7 +6465,7 @@ function updateEnemies(w: World, dt: number) {
     }
 
     if (enemy.convertedUntil > w.now) {
-      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, new Set([enemy.uid]));
+      const allyTarget = nearestEnemy(w, enemy.x, enemy.y, 180, undefined, enemy.uid);
       if (allyTarget && w.now >= enemy.convertedAttackReadyAt) {
         enemy.convertedAttackReadyAt = w.now + 650;
         damageEnemy(w, allyTarget, Math.max(1, Math.round(enemy.damage * 0.8 * statusDamageMultiplier(enemy))), 2, enemy.x, enemy.y);
@@ -6285,9 +6507,15 @@ function updateEnemies(w: World, dt: number) {
       spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
     }
 
-    const dx = trackX - enemy.x;
-    const dy = trackY - enemy.y;
+    const chewTarget = traits?.dataChew
+      ? nearestDataChewTarget(w, enemy.x, enemy.y, traits.dataChew.targetRange)
+      : undefined;
+    const targetX = chewTarget?.x ?? trackX;
+    const targetY = chewTarget?.y ?? trackY;
+    const dx = targetX - enemy.x;
+    const dy = targetY - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
+    const playerDistance = Math.hypot(trackX - enemy.x, trackY - enemy.y) || 1;
     const dirX = dx / distance;
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
@@ -6298,6 +6526,18 @@ function updateEnemies(w: World, dt: number) {
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;
       enemy.chargeReadyAt = w.now + 2200;
+    }
+
+    if (chewTarget && traits?.dataChew && distance <= enemy.radius + Math.max(chewTarget.w, chewTarget.h) * 0.52) {
+      speed = 0;
+      if (w.now >= enemy.fireReadyAt) {
+        enemy.fireReadyAt = w.now + traits.dataChew.biteMs;
+        enemy.anim = 'attack';
+        enemy.animStartedAt = w.now;
+        chewTarget.rawDataBreakage = clamp(chewTarget.rawDataBreakage + 0.12, 0, 1);
+        damageBreakable(w, chewTarget.x, chewTarget.y, 2, traits.dataChew.chewDamage, 0, enemy.x, enemy.y, undefined, false);
+        spawnParticles(w, chewTarget.x, chewTarget.y, '#86efac', 4, 42);
+      }
     }
 
     switch (enemy.def.behavior) {
@@ -6509,6 +6749,134 @@ function updateEnemies(w: World, dt: number) {
                 spawnParticles(w, p.x, p.y, '#ff5f6d', 10, 90);
               }
             }
+          }
+        }
+        break;
+      }
+      case 'tracker': {
+        // Cone always faces the player's real position and narrows the whole
+        // time it's locked (in range, past the detonation cooldown); leaving
+        // range lets it reopen instead of resetting instantly, so backing
+        // off is a real counterplay. See traits.lockCone.
+        const lock = traits?.lockCone;
+        if (lock) {
+          const startHalf = (lock.startHalfAngleDeg * Math.PI) / 180;
+          const minHalf = (lock.minHalfAngleDeg * Math.PI) / 180;
+          // enemy.weave spawns at a random angle (staggers sweep-cone enemies);
+          // reclaim it as "current half-angle" via phaseUntil as a one-time init flag.
+          if (enemy.phaseUntil === 0) {
+            enemy.weave = startHalf;
+            enemy.phaseUntil = 1;
+          }
+          const rdx = p.x - enemy.x;
+          const rdy = p.y - enemy.y;
+          const rdist = Math.hypot(rdx, rdy);
+          const shrinkPerSec = (startHalf - minHalf) / (lock.closeMs / 1000);
+          if (rdist < lock.range && w.now >= enemy.fireReadyAt) {
+            enemy.weave = Math.max(minHalf, enemy.weave - shrinkPerSec * dt);
+            if (enemy.weave <= minHalf + 0.001) {
+              damagePlayer(w, p.maxHp * lock.explodeDamagePct, enemy.x, enemy.y);
+              pushAlert(w, 'LOCK DETONATION');
+              spawnParticles(w, p.x, p.y, '#ff2d55', 20, 160);
+              w.shake = Math.max(w.shake, 12);
+              enemy.weave = startHalf;
+              enemy.fireReadyAt = w.now + (lock.resetMs ?? 1800);
+            }
+            if (w.now < w.stealthUntil) {
+              w.stealthUntil = w.now;
+              w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+            }
+          } else if (w.now >= enemy.fireReadyAt) {
+            enemy.weave = Math.min(startHalf, enemy.weave + shrinkPerSec * dt);
+          }
+        }
+        break;
+      }
+      case 'beacon': {
+        // Sweeps a cone like 'sentry', but standing inside it applies
+        // whichever effect the active color carries instead of breaking
+        // stealth. `kinds.length > 1` flickers the active color/effect on
+        // `flickerMs` -- the "prism" and boss tiers cycle every version.
+        speed *= 0.4;
+        const cone = traits?.colorCone;
+        if (cone) {
+          enemy.weave += dt * (cone.sweepSpeed ?? 0.5);
+          const faceAngle = enemy.weave;
+          const rdx = p.x - enemy.x;
+          const rdy = p.y - enemy.y;
+          const rdist = Math.hypot(rdx, rdy) || 1;
+          const activeKind = cone.kinds[Math.floor(w.now / (cone.flickerMs ?? 1400)) % cone.kinds.length] ?? cone.kinds[0];
+          if (rdist < cone.range && activeKind) {
+            const toPlayer = Math.atan2(rdy, rdx);
+            let diff = Math.abs(toPlayer - faceAngle) % (Math.PI * 2);
+            if (diff > Math.PI) diff = Math.PI * 2 - diff;
+            const halfAngle = (cone.halfAngleDeg * Math.PI) / 180;
+            if (diff < halfAngle) {
+              if (activeKind === 'pull') {
+                const pull = cone.pullForce ?? 55;
+                p.kx += (-rdx / rdist) * pull * dt;
+                p.ky += (-rdy / rdist) * pull * dt;
+              } else {
+                const mag = coneEffectMagnitude(activeKind, cone.slowPct ?? 0.35, cone.tickDamagePerSec ?? 6);
+                if (cone.stickyMs) {
+                  if (w.now >= enemy.fireReadyAt) {
+                    enemy.fireReadyAt = w.now + cone.stickyMs + 500;
+                    applyConeMark(w, activeKind, mag, cone.stickyMs);
+                  }
+                } else {
+                  applyConeMark(w, activeKind, mag, undefined);
+                }
+              }
+            }
+          }
+        }
+        break;
+      }
+      case 'commander': {
+        // Doesn't hunt directly -- releases its roaming detector circles once
+        // (see spawnEnemy/updateRoamingDetectors) and just ambles toward the
+        // player at a fraction of its stated speed while they do the work.
+        // Separately, it cycles its own shield/lock state: shielded and
+        // searching for the player's *true* position, then locked-on and
+        // buffing nearby allies, then back to searching. See traits.commander.
+        speed *= 0.5;
+        const cmd = traits?.commander;
+        if (cmd) {
+          const shieldMs = cmd.shieldMs ?? 30000;
+          const lockMs = cmd.lockDurationMs ?? 14000;
+          const relockRange = cmd.relockRange ?? 260;
+          if (enemy.phaseUntil === 0) {
+            enemy.shieldedUntil = w.now + shieldMs;
+            enemy.phaseUntil = w.now + shieldMs;
+          }
+          if (!enemy.commanderLocked) {
+            const realDist = Math.hypot(p.x - enemy.x, p.y - enemy.y);
+            if (realDist < relockRange) {
+              enemy.commanderLocked = true;
+              enemy.shieldedUntil = w.now;
+              enemy.phaseUntil = w.now + lockMs;
+              pushAlert(w, 'COMMANDER LOCKED ON');
+              spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 16, 120);
+              w.shake = Math.max(w.shake, 6);
+              if (w.now < w.stealthUntil) {
+                w.stealthUntil = w.now;
+                w.stealthReadyAt = Math.max(w.stealthReadyAt, w.now + 3000);
+              }
+            } else if (w.now >= enemy.phaseUntil) {
+              // Shield window ran out before it could relock -- re-arm and keep searching.
+              enemy.shieldedUntil = w.now + shieldMs;
+              enemy.phaseUntil = w.now + shieldMs;
+            }
+          } else if (w.now >= enemy.phaseUntil) {
+            // Deliberately loses the thread after its locked window, and re-shields.
+            enemy.commanderLocked = false;
+            enemy.shieldedUntil = w.now + shieldMs;
+            enemy.phaseUntil = w.now + shieldMs;
+          }
+          if (enemy.commanderLocked) {
+            forEachNearby(w, enemy.x, enemy.y, cmd.allyBuffRadius ?? 220, (ally) => {
+              if (ally.uid !== enemy.uid && !ally.dying) applyStatusEffect(w, ally, 'irradiated');
+            });
           }
         }
         break;
@@ -6801,9 +7169,10 @@ function updateEnemies(w: World, dt: number) {
     // Contact damage.
     const contact = enemy.radius + p.radius;
     const isCutified = enemy.cutifiedUntil && w.now < enemy.cutifiedUntil;
-    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
+    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && playerDistance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
-      damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
+      const contactDamage = traits?.dataChew?.playerDamage ?? enemy.damage;
+      damagePlayer(w, contactDamage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
     }
     const elapsed = w.now - enemy.animStartedAt;
     if (enemy.anim === 'attack' && elapsed < 260) continue;
@@ -6858,6 +7227,7 @@ function updateEnemies(w: World, dt: number) {
     const enemy = w.enemies[i]!;
     if (enemy.dying && w.now - enemy.deathAt > 560) {
       w.enemies.splice(i, 1);
+      w.enemiesByUid.delete(enemy.uid);
     }
   }
 
@@ -6939,7 +7309,8 @@ function updateProjectiles(w: World, dt: number) {
     }
 
     if (proj.targetUid !== null) {
-      const target = w.enemies.find((e) => e.uid === proj.targetUid && !e.dying);
+      const uidMatch = w.enemiesByUid.get(proj.targetUid);
+      const target = uidMatch && !uidMatch.dying ? uidMatch : undefined;
       if (target) {
         const desired = Math.atan2(target.y - proj.y, target.x - proj.x);
         const current = Math.atan2(proj.vy, proj.vx);
@@ -7330,7 +7701,7 @@ function updateProjectiles(w: World, dt: number) {
  * enemies into empty space can't be farmed for free kills.
  */
 function resolveThrownEnemyImpact(w: World, carriedUid: number, granted: boolean, atX: number, atY: number) {
-  const carried = w.enemies.find((e) => e.uid === carriedUid);
+  const carried = w.enemiesByUid.get(carriedUid);
   if (!carried) return;
   if (granted) {
     // Move it to the impact point first so the death animation, particles,
@@ -7341,6 +7712,7 @@ function resolveThrownEnemyImpact(w: World, carriedUid: number, granted: boolean
   } else {
     const index = w.enemies.indexOf(carried);
     if (index !== -1) w.enemies.splice(index, 1);
+    w.enemiesByUid.delete(carriedUid);
   }
 }
 
@@ -7892,7 +8264,7 @@ function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
   // captured unit could be ordered around and killed but contributed nothing
   // to a fight, which made the whole economy decorative.
   if (w.now >= enemy.contactReadyAt) {
-    const foe = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + UNIT_REACH, new Set([enemy.uid]));
+    const foe = nearestEnemy(w, enemy.x, enemy.y, enemy.radius + UNIT_REACH, undefined, enemy.uid);
     if (foe) {
       enemy.contactReadyAt = w.now + UNIT_ATTACK_MS;
       // Routed through `damageEnemy` on purpose: it is the single choke point,
@@ -7919,7 +8291,7 @@ function advanceCommandedUnit(w: World, enemy: EnemyActor, dt: number) {
   // you want for taking ground; plain 'move' is the one you want for
   // disengaging, so both exist.
   if (enemy.orderKind === 'attack-move') {
-    const target = nearestEnemy(w, enemy.x, enemy.y, UNIT_AGGRO_RANGE, new Set([enemy.uid]));
+    const target = nearestEnemy(w, enemy.x, enemy.y, UNIT_AGGRO_RANGE, undefined, enemy.uid);
     if (target) {
       const tdx = target.x - enemy.x;
       const tdy = target.y - enemy.y;
@@ -8305,7 +8677,7 @@ function spawnDirectorSquad(w: World, def: (typeof DIRECTORS)[number]): number |
 }
 
 /**
- * State machine for the (at most one, currently) Director escalation:
+ * State machine for the (at most one) Director escalation:
  * pending -> active (once triggered, tracked until its boss dies) ->
  * resolved. Follows the same `w.now`-driven re-roll shape as
  * `updateWheelSpin` above. Runs unconditionally -- unlike HordeSpin this is
@@ -8318,7 +8690,11 @@ function updateDirector(w: World) {
   if (state.phase !== 'pending') return;
   if (w.now < state.nextRollAt) return;
 
-  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId) ?? DIRECTORS[0];
+  // A defeated personality selected at the Archive is guaranteed to cut in.
+  // Until one is selected, any Director can invade, making every personality
+  // discoverable and unlockable through ordinary play.
+  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId)
+    ?? DIRECTORS[Math.floor(w.rng() * DIRECTORS.length)];
   if (!director) return;
 
   if (w.time < director.triggerAfterSec) {
@@ -9117,6 +9493,7 @@ function updateEndlessChunks(w: World) {
         }
       }
     }
+    w.obstacleGridDirty = true;
   }
 }
 
@@ -9171,6 +9548,7 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
      y: p.y + obs.y,
    }));
   w.fluids = [];
+  w.obstacleGridDirty = true;
 
   // Exit doorway on the far side of the room.
   e.exitZone = {
@@ -9250,6 +9628,7 @@ function enterBuilding(w: World, door: EndlessState['buildingEntrances'][number]
   }));
   w.obstacles = [...interiorShell, ...interiorProps];
   w.breakables = [...interiorShell, ...interiorProps].map((obs) => createBreakable(w, { ...obs, kind: obs.kind }));
+  w.obstacleGridDirty = true;
   w.potholes = [];
   w.fluids = [];
   w.enemies = w.enemies.filter((en) => en.dying);
@@ -9322,6 +9701,7 @@ function restoreStreetObstacles(w: World) {
       }
     }
   }
+  w.obstacleGridDirty = true;
 }
 
 function updateEndlessDungeon(w: World) {
@@ -9400,12 +9780,10 @@ const SURGE_CYCLE_SEC = 20;
 const ELITE_ROTATION = ['crypt-bouncer', 'smoke-horn'];
 
 function updateEndlessSpawning(w: World, dt: number) {
-  applyDirectorFactionFavor(w);
   const e = w.endless!;
   const tier = endlessDiffTier(e);
   const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
   const nightMult = nightDifficultyMult(w.cycle.phase);
-  const directorEffect = activeDirectorEffect(w);
   // Automatic/environmental multipliers (tier, night) stay inside this cap
   // per endless-mode-engine.md. modifierSpawnMult is folded in here to match
   // how w.challenges' own enemySpawnMultiplier is already capped alongside
@@ -9414,12 +9792,9 @@ function updateEndlessSpawning(w: World, dt: number) {
   // uncapped (inside spawnEnemy), and run modifiers are the same kind of
   // player-opted-in multiplier as challenges, not an automatic one. Adding
   // it here would also double-apply it, since spawnEnemy applies it too.
-  // directorEffect.hpMult is different: unlike modifierHpMult, spawnEnemy
-  // never applies it on its own, so it's composed inside this cap directly
-  // (same treatment as tier/night) rather than being dropped.
   const spawnRateCap = w.modifiers.unleashedMode ? 12 : 3.2;
-  const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w) * directorEffect.spawnRateMult);
-  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult * directorEffect.hpMult);
+  const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
+  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
   const bandPool = getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.enemyPool;
   const pool = bandPool?.length
@@ -9726,13 +10101,16 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   }
 
   updateStatusEffects(w);
+  updatePlayerConeEffects(w);
   updateAmbient(w, dt);
   updateLokPets(w, dt);
   updateFollowers(w, dt);
   updateStormCloud(w, dt);
   updateWheelSpin(w);
   updateDirector(w);
+  updateRawDataBreakage(w, dt);
   updateEnemies(w, dt);
+  updateRoamingDetectors(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);
   updateDustMites(w, dt);
@@ -9802,6 +10180,19 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 export function hudSnapshot(w: World): HudSnapshot {
   const ultRemaining = Math.max(0, w.ultReadyAt - w.now);
   const ultTotal = w.character.ultimate.cooldownMs * w.ultCooldownMult;
+  const pressureSystems = w.area.id === 'rapid-pressure-rooms'
+    ? w.breakables.filter((prop) => ['digi-arch', 'data-pipe', 'pressure-door'].includes(prop.kind))
+    : [];
+  const pressureRescue = pressureSystems.length > 0
+    ? {
+      integrityPct: Math.round(
+        pressureSystems.reduce((total, prop) => total + (prop.broken ? 0 : 1 - prop.rawDataBreakage), 0)
+        / pressureSystems.length * 100,
+      ),
+      exposedSystems: pressureSystems.filter((prop) => !prop.broken).length,
+      criticalSystems: pressureSystems.filter((prop) => prop.broken || prop.rawDataBreakage >= 0.7).length,
+    }
+    : undefined;
   const e = w.endless;
   const effectCounts = new Map<string, number>();
   for (const enemy of w.enemies) {
@@ -9832,6 +10223,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     rescueAvailable: w.rescue.status === 'available' || w.rescue.status === 'freeing',
     rescueProgressPct: Math.round(w.rescue.progress * 100),
     rescueAllyName: w.rescue.allyId ? ALLIES_BY_ID[w.rescue.allyId]?.name : undefined,
+    pressureRescue,
     lootBoxesOpened: w.lootBoxesOpened,
     lokPets: w.lokPets.map((pet) => ({
       uid: pet.uid,

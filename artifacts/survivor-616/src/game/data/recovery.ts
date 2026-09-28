@@ -110,6 +110,14 @@ export const RECOVERY_HUTS: RecoveryHutDef[] = [
     facility: 'swat-sauna',
     unlock: { kind: 'clearArea', areaId: 'grpd-station-division' },
   },
+  {
+    id: 'rapid-watch-room',
+    name: 'Rapid Watch Room',
+    areaId: 'rapid-pressure-rooms',
+    description: 'A dry cot behind the repaired Digi-Arch, with Patch’s diagnostic lights keeping watch over the one stable route out.',
+    facility: 'hot-tub',
+    unlock: { kind: 'clearArea', areaId: 'rapid-pressure-rooms' },
+  },
 ];
 
 /**

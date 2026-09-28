@@ -7,6 +7,17 @@ export interface DirectorTerminalPanelProps {
   onBack: () => void;
 }
 
+function effectReadout(director: (typeof DIRECTORS)[number]) {
+  switch (director.effect.kind) {
+    case 'spawnBias':
+      return `Run effect: all waves arrive ${Math.round((director.effect.spawnRateMult - 1) * 100)}% faster and enemies gain ${Math.round((director.effect.hpMult - 1) * 100)}% integrity.`;
+    case 'factionFavor':
+      return `Run effect: ${director.name}'s favored faction appears ${Math.round((director.effect.spawnRateMult - 1) * 100)}% more often in compatible waves.`;
+    default:
+      return 'Run effect: no global modifier. The original Reel Syndicate encounter remains the balanced baseline.';
+  }
+}
+
 /**
  * The Digital Archive's terminal into whatever runs the Directors. Each
  * Director is a "personality" file, unlocked permanently the first time its
@@ -68,6 +79,12 @@ export function DirectorTerminalPanel({ onBack }: DirectorTerminalPanelProps) {
                 {active ? <Check className="h-5 w-5 shrink-0 text-primary" aria-label="Currently active" /> : null}
               </div>
               <p className="text-sm leading-relaxed text-muted-foreground">{director.codexLore}</p>
+              <div className="border border-white/10 bg-black/25 p-2 font-mono text-[10px] leading-relaxed text-primary/85">
+                {effectReadout(director)}
+              </div>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                Can cut in after {Math.floor(director.triggerAfterSec / 60)}:{String(director.triggerAfterSec % 60).padStart(2, '0')}
+              </p>
               <button
                 type="button"
                 onClick={() => equipDirectorPersonality(director.id)}

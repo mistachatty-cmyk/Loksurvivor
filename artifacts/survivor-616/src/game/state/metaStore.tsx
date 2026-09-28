@@ -311,6 +311,8 @@ export function createInitialMeta(): MetaState {
     cardCollection: [],
     activePassiveCardIds: [],
     battleDeckCardIds: [],
+    unopenedCardPacks: {},
+    autoOpenPacksEnabled: true,
     cardSalvageUnlocked: false,
     handheldDigiScopeOwned: false,
     lokCollectorRuns: 0,
@@ -425,6 +427,28 @@ function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
     const bestVariant = typeof entry.bestVariant === 'string' && validVariants.has(entry.bestVariant as CardVariant) ? entry.bestVariant as CardVariant : 'standard';
     return [{ cardId: entry.cardId, copies, variants, bestVariant, totalValue: Math.max(copies, counter(entry.totalValue, copies)) }];
   }).slice(0, 500);
+}
+
+function rollPackForReveal(meta: MetaState, packId: CardPackId, seed: number): { pulls: CardPull[]; newFlags: boolean[] } {
+  const pulls = rollCardPack(packId, createRng(seed), CARD_MANIFESTS.map((card) => card.id));
+  const ownedBeforeIds = new Set(meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
+  const seenThisPack = new Set<string>();
+  const newFlags = pulls.map((pull) => {
+    const isNew = !ownedBeforeIds.has(pull.cardId) && !seenThisPack.has(pull.cardId);
+    seenThisPack.add(pull.cardId);
+    return isNew;
+  });
+  return { pulls, newFlags };
+}
+
+function normalizeUnopenedCardPacks(value: unknown): MetaState['unopenedCardPacks'] {
+  if (!isRecord(value)) return {};
+  const result: Partial<Record<CardPackId, number>> = {};
+  for (const packId of Object.keys(CARD_SHOP_PACKS_BY_ID) as CardPackId[]) {
+    const count = counter(value[packId]);
+    if (count > 0) result[packId] = count;
+  }
+  return result;
 }
 
 /** Removes one copy of a record's own `bestVariant` (the one a throw would have used) and recomputes `bestVariant`/`totalValue`. Returns null once copies reach 0, so the caller drops the record entirely -- mirrors normalizeCardCollection's own "a 0-copy record doesn't exist" rule. */
@@ -1131,6 +1155,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     cardCollection,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
     battleDeckCardIds: Array.isArray(parsed.battleDeckCardIds) ? [...new Set(parsed.battleDeckCardIds.filter((id): id is string => typeof id === 'string' && ownedCardIds.has(id)))].slice(0, BATTLE_DECK_SLOTS) : [],
+    unopenedCardPacks: normalizeUnopenedCardPacks(parsed.unopenedCardPacks),
+    autoOpenPacksEnabled: parsed.autoOpenPacksEnabled !== false,
     cardSalvageUnlocked: parsed.cardSalvageUnlocked === true,
     handheldDigiScopeOwned: parsed.handheldDigiScopeOwned === true || parsed.cardSalvageUnlocked === true,
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
@@ -1652,6 +1678,8 @@ type Action =
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
+  | { type: 'openStoredCardPack'; packId: CardPackId; now: number }
+  | { type: 'setAutoOpenPacksEnabled'; enabled: boolean }
   | { type: 'togglePassiveCard'; cardId: string }
   | { type: 'toggleBattleDeckCard'; cardId: string }
   | { type: 'consumeThrownCard'; cardId: string }
@@ -1821,25 +1849,44 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'buyCardPack': {
       const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
       if (!pack || state.meta.cardCredits < pack.cost) return state;
+      const meta = { ...state.meta, cardCredits: state.meta.cardCredits - pack.cost };
+      if (!state.meta.autoOpenPacksEnabled) {
+        return {
+          ...state,
+          meta: {
+            ...meta,
+            unopenedCardPacks: { ...meta.unopenedCardPacks, [pack.id]: (meta.unopenedCardPacks[pack.id] ?? 0) + 1 },
+          },
+        };
+      }
       const seed = (action.now ^ state.meta.totalRuns ^ state.meta.cardCredits ^ state.meta.cardCollection.length) >>> 0;
-      const pulls = rollCardPack(pack.id, createRng(seed), CARD_MANIFESTS.map((card) => card.id));
-      const ownedBeforeIds = new Set(state.meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
-      const seenThisPack = new Set<string>();
-      const newFlags = pulls.map((pull) => {
-        const isNew = !ownedBeforeIds.has(pull.cardId) && !seenThisPack.has(pull.cardId);
-        seenThisPack.add(pull.cardId);
-        return isNew;
-      });
+      const { pulls, newFlags } = rollPackForReveal(meta, pack.id, seed);
       return {
         ...state,
-        meta: {
-          ...state.meta,
-          cardCredits: state.meta.cardCredits - pack.cost,
-          cardCollection: mergeCardPulls(state.meta.cardCollection, pulls),
-        },
+        meta: { ...meta, cardCollection: mergeCardPulls(meta.cardCollection, pulls) },
         lastCardPackReveal: { packId: pack.id, pulls, newFlags },
       };
     }
+
+    case 'openStoredCardPack': {
+      const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
+      const owned = state.meta.unopenedCardPacks[action.packId] ?? 0;
+      if (!pack || owned <= 0) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ owned ^ state.meta.cardCollection.length) >>> 0;
+      const { pulls, newFlags } = rollPackForReveal(state.meta, pack.id, seed);
+      const remaining = owned - 1;
+      const unopenedCardPacks = { ...state.meta.unopenedCardPacks };
+      if (remaining > 0) unopenedCardPacks[pack.id] = remaining;
+      else delete unopenedCardPacks[pack.id];
+      return {
+        ...state,
+        meta: { ...state.meta, unopenedCardPacks, cardCollection: mergeCardPulls(state.meta.cardCollection, pulls) },
+        lastCardPackReveal: { packId: pack.id, pulls, newFlags },
+      };
+    }
+
+    case 'setAutoOpenPacksEnabled':
+      return { ...state, meta: { ...state.meta, autoOpenPacksEnabled: action.enabled } };
 
     case 'clearCardPackReveal':
       return { ...state, lastCardPackReveal: null };
@@ -2969,7 +3016,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
         cred: prev.cred + result.cred + dailyContracts.rewardCred,
         lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
         cardCredits: prev.cardCredits + cardCreditsForRun(runCharacter, result.lootBoxesOpened),
-        cardCollection: (result.cardPacksFound ?? []).reduce((collection, packId, index) => mergeCardPulls(collection, rollCardPack(packId, createRng(((prev.totalRuns + 1) * 616 + result.kills * 17 + index * 97) >>> 0), CARD_MANIFESTS.map((card) => card.id))), prev.cardCollection),
+        cardCollection: prev.autoOpenPacksEnabled
+          ? (result.cardPacksFound ?? []).reduce((collection, packId, index) => mergeCardPulls(collection, rollCardPack(packId, createRng(((prev.totalRuns + 1) * 616 + result.kills * 17 + index * 97) >>> 0), CARD_MANIFESTS.map((card) => card.id))), prev.cardCollection)
+          : prev.cardCollection,
+        unopenedCardPacks: prev.autoOpenPacksEnabled
+          ? prev.unopenedCardPacks
+          : (result.cardPacksFound ?? []).reduce((packs, packId) => ({ ...packs, [packId]: (packs[packId] ?? 0) + 1 }), prev.unopenedCardPacks),
         lokCollectorRuns: prev.lokCollectorRuns + (collectorRun ? 1 : 0),
         lokCollectorPetsFound: prev.lokCollectorPetsFound + collectorPetsFound,
         skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
@@ -3130,6 +3182,8 @@ export interface MetaContextValue {
   completeRun: (result: RunResult) => void;
   resolveTravelEncounter: (result: TravelEncounterResult) => void;
   buyCardPack: (packId: CardPackId) => void;
+  openStoredCardPack: (packId: CardPackId) => void;
+  setAutoOpenPacksEnabled: (enabled: boolean) => void;
   buyLokPetCardPack: () => void;
   togglePassiveCard: (cardId: string) => void;
   toggleBattleDeckCard: (cardId: string) => void;
@@ -3272,6 +3326,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
+  const openStoredCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'openStoredCardPack', packId, now: Date.now() }), []);
+  const setAutoOpenPacksEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setAutoOpenPacksEnabled', enabled }), []);
   const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyCardPack', packId: 'lokpet', now: Date.now() }), []);
   const togglePassiveCard = useCallback((cardId: string) => dispatch({ type: 'togglePassiveCard', cardId }), []);
   const toggleBattleDeckCard = useCallback((cardId: string) => dispatch({ type: 'toggleBattleDeckCard', cardId }), []);
@@ -3527,6 +3583,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       completeRun,
       resolveTravelEncounter,
       buyCardPack,
+      openStoredCardPack,
+      setAutoOpenPacksEnabled,
       buyLokPetCardPack,
       togglePassiveCard,
       toggleBattleDeckCard,
@@ -3649,6 +3707,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     completeRun,
     resolveTravelEncounter,
     buyCardPack,
+    openStoredCardPack,
+    setAutoOpenPacksEnabled,
     buyLokPetCardPack,
     togglePassiveCard,
     toggleBattleDeckCard,

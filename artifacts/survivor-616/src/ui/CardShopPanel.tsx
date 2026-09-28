@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Check, CreditCard, Layers3, LockKeyhole, PackageOpen, Sparkles, Swords } from 'lucide-react';
+import { Check, CreditCard, Layers3, LockKeyhole, Package, PackageOpen, Sparkles, Swords } from 'lucide-react';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
-import { CARD_SHOP_PACKS, PASSIVE_CARDS, activeCardEffects, passiveDeckSlots } from '@/game/data/passiveCards';
+import { CARD_SHOP_PACKS, CARD_SHOP_PACKS_BY_ID, PASSIVE_CARDS, activeCardEffects, passiveDeckSlots } from '@/game/data/passiveCards';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { BATTLE_DECK_SLOTS, cardThrowOutcome, describeOwnedCard } from '@/game/data/travelEncounters';
 import { BASE_CARD_CREDITS_PER_LOOT_BOX, useMeta } from '@/game/state/metaStore';
+import type { CardPackId } from '@/game/types';
 import { LockDeckCollection } from './LockDeckCollection';
 import { PackOpeningReveal } from './PackOpeningReveal';
 import { ScreenLayout } from './ScreenLayout';
@@ -20,7 +21,7 @@ const SHOP_TABS: { id: ShopTab; label: string; icon: typeof PackageOpen }[] = [
 ];
 
 export function CardShopPanel({ onBack }: { onBack: () => void }) {
-  const { meta, buyCardPack, togglePassiveCard, toggleBattleDeckCard, lastCardPackReveal, clearCardPackReveal } = useMeta();
+  const { meta, buyCardPack, openStoredCardPack, setAutoOpenPacksEnabled, togglePassiveCard, toggleBattleDeckCard, lastCardPackReveal, clearCardPackReveal } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const [tab, setTab] = useState<ShopTab>('binder');
   const [showAll, setShowAll] = useState(false);
@@ -132,6 +133,51 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         </div>
       </section>
 
+      <section className="mb-6 flex flex-col gap-3 border border-white/15 bg-white/[.025] p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="section-pack-auto-open">
+        <div>
+          <p className="font-display text-sm font-black uppercase text-white">Auto-open packs</p>
+          <p className="mt-1 text-[10px] uppercase tracking-widest text-white/45">
+            {meta.autoOpenPacksEnabled ? 'Bought and found packs rip open instantly.' : 'Bought and found packs are stored sealed -- open them yourself, whenever you want.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setAutoOpenPacksEnabled(!meta.autoOpenPacksEnabled); sfx.play('uiClick'); }}
+          aria-pressed={meta.autoOpenPacksEnabled}
+          className={`shrink-0 border px-4 py-2 font-mono text-[10px] font-black uppercase tracking-widest transition-all active:scale-[0.97] ${meta.autoOpenPacksEnabled ? 'border-fuchsia-300 bg-fuchsia-300/10 text-fuchsia-100' : 'border-white/20 text-white/50 hover:border-white/40'}`}
+          data-testid="button-toggle-auto-open-packs"
+        >
+          {meta.autoOpenPacksEnabled ? 'On · open instantly' : 'Off · store sealed'}
+        </button>
+      </section>
+
+      {Object.entries(meta.unopenedCardPacks).some(([, qty]) => (qty ?? 0) > 0) && (
+        <section className="mb-8 border border-sky-300/30 bg-sky-300/[.04] p-4" data-testid="section-pack-storage">
+          <div className="mb-3 flex items-center gap-2">
+            <Package className="h-4 w-4 text-sky-200" />
+            <p className="font-display text-sm font-black uppercase text-white">Sealed Packs in Storage</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(Object.entries(meta.unopenedCardPacks) as [CardPackId, number][]).filter(([, qty]) => (qty ?? 0) > 0).map(([packId, qty]) => {
+              const pack = CARD_SHOP_PACKS_BY_ID[packId];
+              if (!pack) return null;
+              return (
+                <button
+                  key={packId}
+                  type="button"
+                  onClick={() => { openStoredCardPack(packId); sfx.play('cardPack'); }}
+                  className="flex items-center gap-2 border border-sky-300/40 bg-black/30 px-3 py-2.5 font-mono text-[10px] font-black uppercase text-sky-100 transition-all active:scale-[0.97] hover:border-sky-200"
+                  data-testid={`button-open-stored-pack-${packId}`}
+                >
+                  <PackageOpen className="h-3.5 w-3.5" />
+                  {pack.name} · x{qty}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <div className="mb-8 flex snap-x gap-3 overflow-x-auto pb-3 sm:grid sm:snap-none sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 sm:overflow-visible sm:pb-0">
         {CARD_SHOP_PACKS.map((pack) => (
           <article key={pack.id} className="flex min-h-56 w-[220px] shrink-0 snap-start flex-col border border-white/15 bg-black/30 p-4 sm:w-auto">
@@ -145,7 +191,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
               className="mt-auto border border-fuchsia-200/50 bg-fuchsia-300/10 px-3 py-2.5 font-mono text-[10px] font-black uppercase text-fuchsia-100 transition-all active:scale-[0.97] disabled:opacity-35 disabled:active:scale-100"
               data-testid={`button-buy-pack-${pack.id}`}
             >
-              Open · {pack.cost} CC
+              {meta.autoOpenPacksEnabled ? 'Open' : 'Buy'} · {pack.cost} CC
             </button>
           </article>
         ))}
@@ -191,8 +237,13 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         <PackOpeningReveal
           reveal={lastCardPackReveal}
           cardCredits={meta.cardCredits}
+          storedQty={meta.unopenedCardPacks[lastCardPackReveal.packId] ?? 0}
           sfx={sfx}
-          onOpenAnother={() => buyCardPack(lastCardPackReveal.packId)}
+          onOpenAnother={() => {
+            const storedQty = meta.unopenedCardPacks[lastCardPackReveal.packId] ?? 0;
+            if (storedQty > 0) openStoredCardPack(lastCardPackReveal.packId);
+            else buyCardPack(lastCardPackReveal.packId);
+          }}
           onClose={clearCardPackReveal}
         />
       )}

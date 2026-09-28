@@ -7,9 +7,8 @@ import {
   uiLooksForOwnedThemeIds,
 } from '@/game/data/uiThemes';
 
-test('the palette catalog has one free default and unique theme ids', () => {
-  assert.equal(UI_THEMES[0]?.id, DEFAULT_UI_THEME_ID);
-  assert.equal(UI_THEMES[0]?.cost, 0);
+test('the palette catalog includes a free default and unique theme ids', () => {
+  assert.equal(UI_THEMES.find((theme) => theme.id === DEFAULT_UI_THEME_ID)?.cost, 0);
   assert.equal(new Set(UI_THEMES.map((theme) => theme.id)).size, UI_THEMES.length);
 });
 

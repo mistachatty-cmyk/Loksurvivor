@@ -61,7 +61,7 @@ import {
 import { useGyroInput } from '@/game/input/gyro';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
-import { renderWorld } from '@/game/render/draw';
+import { renderWorld, targetViewForWidth } from '@/game/render/draw';
 import {
   effectiveStats,
   giantSizeMult,
@@ -100,7 +100,7 @@ function toWorldPoint(
 ) {
   const rect = canvas.getBoundingClientRect();
   const width = Math.max(1, rect.width);
-  const targetView = targetViewOverride ?? (width < 620 ? 470 : Math.min(980, width * 0.78));
+  const targetView = targetViewForWidth(width, targetViewOverride);
   const zoom = width / targetView;
   return {
     x: (clientX - rect.left - width / 2) / zoom + world.camera.x,
@@ -494,7 +494,7 @@ export function RunScreen({
       Math.hypot(event.clientX - previousTap.x, event.clientY - previousTap.y) <= 48) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       const targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -512,7 +512,7 @@ export function RunScreen({
       const config = world.character.stormCloud;
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -535,7 +535,7 @@ export function RunScreen({
     if (canvas && world && world.freezeThrow) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -558,7 +558,7 @@ export function RunScreen({
     if (physicsObjectClicksEnabled && canvas && world) {
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const target = primePhysicsObject(
         world,
@@ -610,7 +610,7 @@ export function RunScreen({
       if (!canvas || !world || !world.freezeThrow || !origin || freezeSelectPointerIdRef.current !== event.pointerId) return;
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       const worldX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       const worldY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -629,7 +629,7 @@ export function RunScreen({
       if (!canvas || !world || !world.stormCloud || cloudPointerIdRef.current !== event.pointerId) return;
       const rect = canvas.getBoundingClientRect();
       const width = Math.max(1, rect.width);
-      const targetView = width < 620 ? 470 : Math.min(980, width * 0.78);
+      const targetView = targetViewForWidth(width);
       const zoom = width / targetView;
       world.stormCloud.targetX = (event.clientX - rect.left - width / 2) / zoom + world.camera.x;
       world.stormCloud.targetY = (event.clientY - rect.top - rect.height / 2) / zoom + world.camera.y;
@@ -1284,6 +1284,22 @@ export function RunScreen({
         {hud?.rescueAvailable ? (
           <div className="mx-auto w-fit rounded-sm border border-[#ffe08a]/40 bg-black/70 px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-[#ffe08a]" data-testid="text-rescue">
             {hud.rescueAllyName ? `${hud.rescueAllyName} is caged` : 'Someone is caged'} — stand with them {hud.rescueProgressPct > 0 ? `(${hud.rescueProgressPct}%)` : ''}
+          </div>
+        ) : null}
+
+        {hud?.pressureRescue ? (
+          <div
+            className={`mx-auto flex w-fit max-w-[92vw] items-center gap-2 border bg-black/75 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest ${
+              hud.pressureRescue.criticalSystems > 0
+                ? 'border-red-300/70 text-red-200'
+                : 'border-emerald-300/45 text-emerald-200'
+            }`}
+            data-testid="indicator-pressure-rescue"
+          >
+            <span>Rapid line {hud.pressureRescue.integrityPct}%</span>
+            <span className="text-white/50">·</span>
+            <span>{hud.pressureRescue.exposedSystems} systems holding</span>
+            {hud.pressureRescue.criticalSystems > 0 ? <span>· {hud.pressureRescue.criticalSystems} chewed</span> : null}
           </div>
         ) : null}
 

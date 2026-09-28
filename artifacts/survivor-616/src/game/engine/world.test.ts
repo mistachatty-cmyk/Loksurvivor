@@ -162,6 +162,8 @@ function addEnemy(
     ghostUntil: 0,
     invisibleUntil: 0,
     phaseUntil: 0,
+    shieldedUntil: 0,
+    commanderLocked: false,
     burstUntil: 0,
     baseRadius: def.radius,
     frozenUntil: 0,
@@ -362,6 +364,49 @@ test('killing the Director boss resolves the encounter and marks the run result 
   const result = buildResult(world);
   assert.equal(result.directorEncounterId, 'take-two');
   assert.equal(result.directorDefeated, true);
+});
+
+test('Data-Gobs chew exposed world props and deepen raw data breakage', () => {
+  const area: AreaDef = {
+    ...AREAS[0]!,
+    id: 'data-gob-chew-test',
+    durationSec: 999,
+    waves: [],
+    obstacles: [{ x: 40, y: 0, w: 48, h: 48, kind: 'fuse-box' }],
+    rawDataBreakage: { ambientPerSec: 0.001, damageVulnerability: 1 },
+    rescueAllyId: undefined,
+  };
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  const gob = addEnemy(world, 'data-gob-nibbler', 58, 0);
+  gob.fireReadyAt = 0;
+  const prop = world.breakables[0]!;
+  const startingHp = prop.hp;
+
+  for (let i = 0; i < 90; i += 1) stepWorld(world, 1 / 60, neutralInput);
+
+  assert.ok(prop.rawDataBreakage > 0.1, 'the prop should visibly expose raw data');
+  assert.ok(prop.hp < startingHp, 'the Data-Gob should chew structural HP');
+  assert.ok(world.player.hp > world.player.maxHp * 0.95, 'an edible prop keeps the Data-Gob focused away from the survivor');
+});
+
+test('the Rapid pressure wing exposes a live integrity readout for the rescue route', () => {
+  const area = AREAS.find((candidate) => candidate.id === 'rapid-pressure-rooms');
+  assert.ok(area);
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0]!.stats, 616);
+  const intact = hudSnapshot(world).pressureRescue;
+  assert.ok(intact);
+  assert.equal(intact.exposedSystems, 12);
+  assert.equal(intact.criticalSystems, 0);
+  assert.ok(intact.integrityPct >= 99);
+
+  const arch = world.breakables.find((prop) => prop.kind === 'digi-arch');
+  assert.ok(arch);
+  arch.rawDataBreakage = 0.8;
+  const damaged = hudSnapshot(world).pressureRescue;
+  assert.ok(damaged);
+  assert.equal(damaged.criticalSystems, 1);
+  assert.ok(damaged.integrityPct < intact.integrityPct);
 });
 
 test('a reflective surface redirects a compatible projectile', () => {
@@ -1342,7 +1387,7 @@ test('version 1 and version 2 saves retain progression and initialize the catalo
     };
     const loaded = withStoredMeta(legacySave, loadMeta);
 
-    assert.equal(loaded.version, 17);
+    assert.equal(loaded.version, 18);
     assert.deepEqual(loaded.clearedAreaIds, [AREAS[0]!.id]);
     assert.equal(loaded.totalKills, 17);
     assert.equal(loaded.totalRuns, 3);
@@ -2635,7 +2680,7 @@ function areaWithWave(ratePerSec: number): AreaDef {
   };
 }
 
-test('an unknown activeDirectorPersonalityId falls back to take-two, changing nothing', () => {
+test('an unknown activeDirectorPersonalityId reads as no ambient Director effect', () => {
   const world = createWorld(areaWithWave(45), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
     activeDirectorPersonalityId: 'not-a-real-director',
   });
@@ -2656,22 +2701,33 @@ test("the Cutting Room's spawnBias spawns more, individually squishier enemies",
   assert.ok(biased.enemies[0]!.hp < baseline.enemies[0]!.hp, 'hpMult 0.85 makes each spawn individually squishier');
 });
 
-test('Continuity periodically spawns a bonus enemy from its favored faction once eligible', () => {
-  const world = createWorld(areaWithWave(0), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+function areaWithFactionWave(ratePerSec: number, faction?: string): AreaDef {
+  return {
+    ...testArea({ x: 400, y: 400, w: 10, h: 10, kind: 'cover' }),
+    waves: [{ enemyId: 'nightcrawler', fromSec: 0, toSec: 300, ratePerSec, burst: 1, faction }],
+  };
+}
+
+test("Continuity's factionFavor boosts spawn rate only on a wave labeled with its favored faction", () => {
+  const favoredFactionName = getFaction('afterimage-choir').name;
+
+  const baseline = createWorld(areaWithFactionWave(45, favoredFactionName), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7);
+  stepWorld(baseline, 1 / 30, neutralInput);
+  assert.equal(baseline.enemies.length, 1, 'baseline: one spawn credit crosses 1 this step');
+
+  const boosted = createWorld(areaWithFactionWave(45, favoredFactionName), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
     activeDirectorPersonalityId: 'continuity',
   });
-  world.time = 181; // past triggerAfterSec (180)
-  stepWorld(world, 1 / 30, neutralInput);
-  const favoredRoster = new Set(getFaction('afterimage-choir').roster);
-  assert.ok(world.enemies.some((e) => favoredRoster.has(e.defId)), 'a favored-faction enemy should have spawned');
+  stepWorld(boosted, 1 / 30, neutralInput);
+  assert.equal(boosted.enemies.length, 2, 'spawnRateMult 1.5 on a favored-faction wave crosses a second spawn credit this step');
 });
 
-test("Continuity's faction favor is a no-op before triggerAfterSec", () => {
-  const world = createWorld(areaWithWave(0), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
+test("Continuity's factionFavor does not boost a wave labeled with a different faction", () => {
+  const world = createWorld(areaWithFactionWave(45, 'Some Other Faction'), testCharacter('chain-whip'), CHARACTERS[0]!.stats, 7, [], 1, true, null, {
     activeDirectorPersonalityId: 'continuity',
   });
   stepWorld(world, 1 / 30, neutralInput);
-  assert.equal(world.enemies.length, 0);
+  assert.equal(world.enemies.length, 1, 'a wave not labeled with the favored faction spawns at the normal rate');
 });
 
 test("Static Nomad's pulse-shield fires an all-direction burst the instant the character dashes", () => {
@@ -3446,4 +3502,3 @@ test('crazy internet culture and canvas weapons are defined, fire properly, and 
     assert.ok(fired, `weapon ${id} should spawn projectiles or effects upon firing`);
   }
 });
-

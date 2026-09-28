@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { dismissVisitTheme, useVisitTheme, visitThemeStyle } from '@/lib/gsixVisitTheme';
 
 interface Props {
   title: string;
@@ -16,6 +17,7 @@ interface Props {
 
 export function ScreenLayout({ title, subtitle, onBack, children, action, backdrop, className = '' }: Props) {
   const { meta } = useMeta();
+  const visitTheme = useVisitTheme();
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -25,6 +27,7 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
+      style={visitTheme ? visitThemeStyle(visitTheme) : undefined}
       data-ui-theme={meta.uiTheme}
       data-ui-swatch={activeUiThemeSwatchId(meta)}
       className={`min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden ${className}`}
@@ -66,6 +69,14 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
           )}
           {subtitle && <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">{subtitle}</p>}
           <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">{title}</h1>
+          {visitTheme && (
+            <p className="mt-3 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" data-testid="text-gsix-visit-theme">
+              Wearing your GSix theme ·{' '}
+              <button type="button" onClick={dismissVisitTheme} className="font-bold text-primary underline underline-offset-4 hover:text-foreground" data-testid="button-dismiss-gsix-theme">
+                Use my Survivor theme
+              </button>
+            </p>
+          )}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </header>
