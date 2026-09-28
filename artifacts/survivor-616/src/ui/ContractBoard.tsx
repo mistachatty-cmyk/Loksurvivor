@@ -1,4 +1,4 @@
-import { Check, CircleDot, Coins, Radio, Target } from 'lucide-react';
+import { Check, CircleDot, Coins, KeyRound, Radio, Target } from 'lucide-react';
 
 import { useMeta } from '@/game/state/metaStore';
 import type { DailyContractStatus } from '@/game/types';
@@ -47,6 +47,11 @@ function ContractCard({ contract }: { contract: DailyContractStatus }) {
           <Coins className="h-3 w-3" aria-hidden="true" /> +{contract.rewardTokens} loot token
         </p>
       ) : null}
+      {contract.rewardKeys > 0 && !contract.completed ? (
+        <p className="mt-2 flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-sky-300/80">
+          <KeyRound className="h-3 w-3" aria-hidden="true" /> +{contract.rewardKeys} skeleton key
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -64,7 +69,7 @@ export function ContractBoard({ onHeadOut }: ContractBoardProps) {
           </div>
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.25em] text-cyan-200">The Broadcast Board</p>
-            <h2 className="mt-1 text-2xl font-black uppercase text-white">Three jobs for today</h2>
+            <h2 className="mt-1 text-2xl font-black uppercase text-white">{dailyContracts.length} jobs for today</h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               The city is making requests. Complete runs to turn the work into Cred.
             </p>
@@ -85,7 +90,7 @@ export function ContractBoard({ onHeadOut }: ContractBoardProps) {
           </button>
         </div>
       </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {dailyContracts.map((contract) => <ContractCard key={contract.id} contract={contract} />)}
       </div>
       <p className="mt-3 flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-cyan-100/50">

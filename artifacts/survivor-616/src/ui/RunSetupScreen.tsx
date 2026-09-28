@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Circle, Cpu, Grid3X3, Monitor, PawPrint, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, Circle, Cpu, Grid3X3, Monitor, PawPrint, Pencil, Sparkles } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
 import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
@@ -57,9 +57,12 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     setUiPanelLayout,
     setMinimapVisible,
     equipPalette,
+    renameLokPet,
   } = useMeta();
   const [step, setStep] = useState<SetupStep>('companion');
   const [selectedPetId, setSelectedPetId] = useState<string | null>(meta.selectedLokPetIds[0] ?? null);
+  const [editingPetId, setEditingPetId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
   const [artStyle, setArtStyle] = useState(meta.lokPetArtStyle);
   const [graphicsQuality, setGraphicsQualityChoice] = useState(meta.graphicsQuality);
   const [borderStyle, setBorderStyle] = useState(meta.uiBorderStyle);
@@ -142,22 +145,70 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                 return (
                   <Fragment key={pet.id}>
                   {pet.roll.legendary && pet.id === legendaryReadyPets[0]?.id ? <div className="col-span-full mt-2 border-t border-amber-300/30 pt-3 font-mono text-[10px] font-black uppercase tracking-[.24em] text-amber-200">Legendary companions</div> : null}
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedPetId(pet.id)}
-                    className={`relative min-h-36 border p-4 text-left transition ${selected ? selectClass(true) : selectClass(false)}`}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedPetId(pet.id);
+                      }
+                    }}
+                    className={`relative min-h-36 cursor-pointer border p-4 text-left transition ${selected ? selectClass(true) : selectClass(false)}`}
                     data-testid={`button-run-setup-pet-${pet.id}`}
                   >
                     {selected ? <Check className="absolute right-3 top-3 h-4 w-4 text-pink-100" /> : null}
                     <div className="flex items-center gap-3">
                       <LokPetIcon silhouette={pet.roll.silhouette} palette={pet.roll.palette} size={72} className="bg-black/60" />
                       <div className="min-w-0">
-                        <p className="truncate text-base font-black uppercase">{pet.roll.name}</p>
+                        {editingPetId === pet.id ? (
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editingName}
+                            maxLength={24}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => setEditingName(event.target.value)}
+                            onBlur={() => {
+                              renameLokPet(pet.id, editingName);
+                              setEditingPetId(null);
+                            }}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+                              if (event.key === 'Enter') {
+                                renameLokPet(pet.id, editingName);
+                                setEditingPetId(null);
+                              } else if (event.key === 'Escape') {
+                                setEditingPetId(null);
+                              }
+                            }}
+                            className="w-full truncate border border-pink-300/50 bg-black/60 px-1 text-base font-black uppercase text-white outline-none"
+                            data-testid={`input-rename-pet-${pet.id}`}
+                          />
+                        ) : (
+                          <p className="flex min-w-0 items-center gap-1.5 truncate text-base font-black uppercase">
+                            <span className="truncate">{pet.name ?? pet.roll.name}</span>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingName(pet.name ?? pet.roll.name);
+                                setEditingPetId(pet.id);
+                              }}
+                              className="shrink-0 text-white/40 hover:text-white"
+                              aria-label={`Rename ${pet.name ?? pet.roll.name}`}
+                              data-testid={`button-rename-pet-${pet.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </p>
+                        )}
                         <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-pink-200">{pet.roll.rarityLabel} · {pet.stamina}/3 charge</p>
                         <p className="mt-2 text-xs text-white/55">{pet.roll.traitLabel}</p>
                       </div>
                     </div>
-                  </button>
+                  </div>
                   </Fragment>
                 );
               })}

@@ -217,6 +217,8 @@ export interface SavedLokPet {
   starter?: boolean;
   /** Last hourly free full-health/stamina refresh boundary. */
   lastFreeRefreshAt?: number;
+  /** Player-given nickname; falls back to the rolled variant's name when unset. */
+  name?: string;
 }
 
 /**
@@ -350,6 +352,8 @@ export interface DailyContractDef {
   targetCount: number;
   rewardCred: number;
   rewardTokens: number;
+  /** Rare-currency payout; 0 for the three standard jobs, nonzero for the optional wildcard. */
+  rewardKeys: number;
 }
 
 export interface DailyContractStatus extends DailyContractDef {
@@ -362,6 +366,7 @@ export interface CompletedDailyContract {
   name: string;
   rewardCred: number;
   rewardTokens: number;
+  rewardKeys: number;
 }
 
 export type EpisodeObjectiveKind =
@@ -2254,6 +2259,10 @@ export interface MetaState {
   dailyContractProgressById: Record<string, number>;
   /** Contracts already paid out for today's Broadcast board. */
   completedDailyContractIds: string[];
+  /** Local-date key of the last day a login-streak bonus was claimed. */
+  lastLoginStreakDayKey: string;
+  /** Consecutive days claimed, including today once claimed. Resets to 1 on a missed day. */
+  loginStreakCount: number;
   /** Achievement ids whose one-time currency reward has already been paid out. See `data/achievements.ts`. */
   claimedAchievementIds: string[];
   /** Director ids whose boss has been permanently defeated at least once. See `data/directors.ts`. */

@@ -1052,7 +1052,7 @@ export function LokPetBattleScreen({
                     <div className="h-32 w-32 grid place-items-center rounded-2xl border border-slate-800 bg-slate-950 p-2">
                       {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(leadPet.roll.palette)} size={100} />}
                     </div>
-                    <h4 className="mt-3 font-bold text-lg text-white">{leadPet.roll.name}</h4>
+                    <h4 className="mt-3 font-bold text-lg text-white">{leadPet.name ?? leadPet.roll.name}</h4>
                     <div className="mt-1 flex items-center gap-2">
                       <span className="font-mono text-xs text-cyan-400 font-bold">Lv.{leadPet.level || 1}</span>
                       {renderElementBadge(leadPet.roll.element)}
@@ -1256,7 +1256,7 @@ export function LokPetBattleScreen({
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-white truncate">{pet.roll.name}</span>
+                          <span className="font-bold text-sm text-white truncate">{pet.name ?? pet.roll.name}</span>
                           <span className="font-mono text-xs text-cyan-400 font-bold">Lv.{pet.level || 1}</span>
                         </div>
                         <div className="mt-1 flex items-center gap-1.5">
@@ -1308,7 +1308,7 @@ export function LokPetBattleScreen({
                     <div className="h-28 w-28 grid place-items-center rounded-xl border border-slate-800 bg-slate-950 p-2">
                       {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(pet.roll.palette)} size={90} />}
                     </div>
-                    <h3 className="mt-3 font-bold text-lg text-white">{pet.roll.name}</h3>
+                    <h3 className="mt-3 font-bold text-lg text-white">{pet.name ?? pet.roll.name}</h3>
                     <div className="mt-1 flex items-center gap-2">
                       <span className="font-mono text-xs text-cyan-400 font-bold">Level {level}</span>
                       {renderElementBadge(pet.roll.element)}
