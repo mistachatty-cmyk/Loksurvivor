@@ -1976,7 +1976,8 @@ export type RunAuraStyle =
   | 'ember-orbit'
   | 'rain-signal'
   | 'glitch-echo'
-  | 'mothlight';
+  | 'mothlight'
+  | 'tile-bloom';
 
 export interface RunAuraDef {
   id: string;

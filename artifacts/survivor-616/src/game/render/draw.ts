@@ -4960,6 +4960,20 @@ function drawActors(
         ctx.fillRect(-size, -size, size * 2, size * 2);
         ctx.restore();
       }
+    } else if (w.runAuraStyle === 'tile-bloom') {
+      const tileSize = 12;
+      for (let ix = -1; ix <= 1; ix += 1) {
+        for (let iy = -1; iy <= 1; iy += 1) {
+          const bloom = Math.sin(phase * 2.2 + (ix + iy) * 0.9) * 0.5 + 0.5;
+          ctx.globalAlpha = 0.18 + bloom * 0.32;
+          ctx.fillStyle = (ix + iy) % 2 === 0 ? accent : glow;
+          ctx.shadowColor = glow;
+          ctx.shadowBlur = 6 + bloom * 6;
+          const tx = p.x + ix * tileSize - tileSize / 2;
+          const ty = p.y + 6 + iy * tileSize * 0.5 - tileSize * 0.25;
+          ctx.fillRect(tx, ty, tileSize - 1, tileSize * 0.5 - 1);
+        }
+      }
     }
 
     const paletteEffect = w.paletteEffect;
@@ -5106,6 +5120,12 @@ function drawActors(
         ctx.fillRect(-2, -1, 4, 2);
         ctx.restore();
       }
+    } else if (w.runAuraStyle === 'tile-bloom') {
+      ctx.globalAlpha = 0.5 + Math.sin(phase * 2.2) * 0.18;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.rect(p.x - overheadRadius * 0.5, headY - 4, overheadRadius, 6);
+      ctx.stroke();
     }
     ctx.restore();
 
