@@ -146,7 +146,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 19;
+const META_VERSION = 20;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -275,6 +275,7 @@ export function createInitialMeta(): MetaState {
     sfxEnabled: true,
     hideoutAmbienceEnabled: false,
     hideoutWeatherEnabled: true,
+    attractModeEnabled: true,
     hideoutSectionsCollapsedByDefault: false,
     hideoutPreviewEnabled: true,
     hideoutStickyHeadOutEnabled: true,
@@ -1099,6 +1100,12 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // making noise on its own for a returning save that predates it.
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
+    // Falls back to the pre-existing standalone localStorage toggle
+    // (AttractMode.tsx's old component-local key) so a player who already
+    // turned the background sim off doesn't see it silently re-enabled.
+    attractModeEnabled: typeof parsed.attractModeEnabled === 'boolean'
+      ? parsed.attractModeEnabled
+      : !(typeof window !== 'undefined' && window.localStorage.getItem('survivor616.attractMode') === 'off'),
     hideoutSectionsCollapsedByDefault: parsed.hideoutSectionsCollapsedByDefault === true,
     hideoutPreviewEnabled: parsed.hideoutPreviewEnabled !== false,
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
@@ -1733,6 +1740,7 @@ type Action =
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
   | { type: 'setHideoutAmbience'; enabled: boolean }
+  | { type: 'setAttractMode'; enabled: boolean }
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setHideoutSectionsCollapsedByDefault'; enabled: boolean }
   | { type: 'setHideoutPreview'; enabled: boolean }
@@ -2712,6 +2720,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setHideoutAmbience':
       return { ...state, meta: { ...state.meta, hideoutAmbienceEnabled: action.enabled } };
 
+    case 'setAttractMode':
+      return { ...state, meta: { ...state.meta, attractModeEnabled: action.enabled } };
+
     case 'setHideoutWeather':
       return { ...state, meta: { ...state.meta, hideoutWeatherEnabled: action.enabled } };
 
@@ -3300,6 +3311,7 @@ export interface MetaContextValue {
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
   setHideoutAmbience: (enabled: boolean) => void;
+  setAttractMode: (enabled: boolean) => void;
   setHideoutWeather: (enabled: boolean) => void;
   setHideoutSectionsCollapsedByDefault: (enabled: boolean) => void;
   setHideoutPreview: (enabled: boolean) => void;
@@ -3471,6 +3483,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setHideoutAmbience = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutAmbience', enabled }),
+    [],
+  );
+  const setAttractMode = useCallback(
+    (enabled: boolean) => dispatch({ type: 'setAttractMode', enabled }),
     [],
   );
   const setHideoutWeather = useCallback(
@@ -3716,6 +3732,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setMinimapVisible,
       setMusicReactive,
       setHideoutAmbience,
+      setAttractMode,
       setHideoutWeather,
       setHideoutSectionsCollapsedByDefault,
       setHideoutPreview,
@@ -3844,6 +3861,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setMinimapVisible,
     setMusicReactive,
     setHideoutAmbience,
+    setAttractMode,
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,

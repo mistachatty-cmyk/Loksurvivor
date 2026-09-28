@@ -4,6 +4,24 @@ import test from 'node:test';
 import { createInitialMeta, isUnlocked, normalizeMeta, reducer } from './metaStore';
 import { getCharacter } from '@/game/data/characters';
 
+function withLegacyAttractModeStorage<T>(value: string | null, callback: () => T): T {
+  const hadWindow = 'window' in globalThis;
+  const previousWindow = globalThis.window;
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: { localStorage: { getItem: (key: string) => (key === 'survivor616.attractMode' ? value : null) } },
+  });
+  try {
+    return callback();
+  } finally {
+    if (hadWindow) {
+      Object.defineProperty(globalThis, 'window', { configurable: true, value: previousWindow });
+    } else {
+      delete (globalThis as { window?: unknown }).window;
+    }
+  }
+}
+
 test('intro title physics defaults on, migrates older saves, and can be disabled', () => {
   assert.equal(createInitialMeta().introTitlePhysicsEnabled, true);
   assert.equal(createInitialMeta().introTitleReturnDelaySec, 4);
@@ -33,6 +51,26 @@ test('frame pacing defaults safely and only accepts the supported 60/120 modes',
     { type: 'setFrameRateMode', mode: 120 },
   );
   assert.equal(updated.meta.frameRateMode, 120);
+});
+
+test('the title-screen background sim defaults on, migrates an old localStorage preference, and is toggleable', () => {
+  assert.equal(createInitialMeta().attractModeEnabled, true);
+  // No prior saved MetaState field and no legacy localStorage key -- default on.
+  assert.equal(withLegacyAttractModeStorage(null, () => normalizeMeta({ version: 1 }).attractModeEnabled), true);
+  // A pre-existing save already has the field -- respected as-is, legacy key ignored.
+  assert.equal(
+    withLegacyAttractModeStorage('off', () => normalizeMeta({ version: 1, attractModeEnabled: true }).attractModeEnabled),
+    true,
+  );
+  // An old save with no field, but the player had turned the old on-canvas toggle off.
+  assert.equal(withLegacyAttractModeStorage('off', () => normalizeMeta({ version: 1 }).attractModeEnabled), false);
+  assert.equal(withLegacyAttractModeStorage('on', () => normalizeMeta({ version: 1 }).attractModeEnabled), true);
+
+  const updated = reducer(
+    { meta: createInitialMeta(), lastRun: null },
+    { type: 'setAttractMode', enabled: false },
+  );
+  assert.equal(updated.meta.attractModeEnabled, false);
 });
 
 test('soundtrack objective progress safely defaults for older saves', () => {

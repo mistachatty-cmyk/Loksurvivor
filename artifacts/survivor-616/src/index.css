@@ -705,6 +705,10 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   --intro-splash: #67e8f9;
   --intro-title-shadow: 0 0 1.15rem rgba(255, 255, 255, .16);
   isolation: isolate;
+  /* Keeps the sign-in button, theme cycler and the background sim's own
+     corner buttons clear of a phone's notch/status bar/home indicator. */
+  padding-top: max(1.5rem, env(safe-area-inset-top));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
 }
 .intro-screen__atmosphere {
   z-index: 1;
