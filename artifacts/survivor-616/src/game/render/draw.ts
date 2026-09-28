@@ -1509,6 +1509,88 @@ function drawDistrictIncursion(ctx: CanvasRenderingContext2D, w: World) {
   ctx.restore();
 }
 
+/** Procedural, targetless presentation for the rare Running Man sighting. */
+function drawRunningMan(ctx: CanvasRenderingContext2D, w: World) {
+  const state = w.runningMan;
+  if (state.phase === 'waiting' || state.phase === 'complete') return;
+  const pathX = state.endX - state.startX;
+  const pathY = state.endY - state.startY;
+  const pathLength = Math.hypot(pathX, pathY);
+  if (pathLength < 1) return;
+  const dirX = pathX / pathLength;
+  const dirY = pathY / pathLength;
+  const normalX = -dirY;
+  const normalY = dirX;
+  const warningPulse = 0.45 + Math.sin(w.now / 85) * 0.2;
+
+  ctx.save();
+  ctx.strokeStyle = state.phase === 'warning' ? '#fbbf24' : '#e0f2fe';
+  ctx.fillStyle = '#fbbf24';
+  ctx.globalAlpha = state.phase === 'warning' ? warningPulse : 0.24;
+  ctx.lineWidth = 3;
+  ctx.setLineDash(state.phase === 'warning' ? [18, 12] : [6, 16]);
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(state.startX + normalX * 86 * side, state.startY + normalY * 86 * side);
+    ctx.lineTo(state.endX + normalX * 86 * side, state.endY + normalY * 86 * side);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = state.phase === 'warning' ? 0.9 : 0.48;
+  ctx.fillText('CLEAR THE CROSSING LINE', (state.startX + state.endX) / 2, (state.startY + state.endY) / 2 - 112);
+
+  if (state.phase === 'running') {
+    const progress = clamp((w.now - state.startedAt) / Math.max(1, state.endsAt - state.startedAt), 0, 1);
+    const x = state.startX + pathX * progress;
+    const y = state.startY + pathY * progress;
+    const angle = Math.atan2(pathY, pathX);
+    const stride = Math.sin(w.now / 48);
+
+    // Speed streaks live behind the figure and make the crossing direction
+    // readable even under high enemy density.
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = '#7dd3fc';
+    ctx.lineWidth = 4;
+    for (let i = 1; i <= 4; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(x - dirX * (28 + i * 22) + normalX * i * 6, y - dirY * (28 + i * 22) + normalY * i * 6);
+      ctx.lineTo(x - dirX * (74 + i * 28) + normalX * i * 6, y - dirY * (74 + i * 28) + normalY * i * 6);
+      ctx.stroke();
+    }
+
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#020617';
+    ctx.beginPath();
+    ctx.ellipse(0, 25, 28, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Compact pixel runner: coat, bright head mark, pumping arms, and a
+    // deliberately exaggerated stride. No image/likeness dependency.
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-14, -25, 30, 42);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(-10, -20, 5, 30);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(-8, -39, 17, 15);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(-10, -42, 23, 5);
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(-20, -17 + stride * 5, 8, 26);
+    ctx.fillRect(15, -17 - stride * 5, 8, 26);
+    ctx.fillRect(-11, 14, 8, 26 + stride * 8);
+    ctx.fillRect(7, 14, 8, 26 - stride * 8);
+    ctx.fillStyle = '#e0f2fe';
+    ctx.fillRect(-15, 36 + stride * 8, 15, 6);
+    ctx.fillRect(8, 36 - stride * 8, 16, 6);
+  }
+  ctx.restore();
+}
+
 function inferObstacleKind(obs: { w: number; h: number }): ObstacleDef['kind'] {
   const aspect = obs.w / obs.h;
   if (aspect > 2.5) return 'barrier';
@@ -5478,6 +5560,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawAwarenessArrow(ctx, w);
   drawRoamingDetectors(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
+  drawRunningMan(ctx, w);
   drawPlayerConeMark(ctx, w);
   drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);
