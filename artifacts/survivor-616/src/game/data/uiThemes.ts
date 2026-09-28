@@ -158,6 +158,30 @@ export const UI_THEMES: UIThemeDef[] = [
   { id: 'signal-garden', name: 'Lumen Garden', description: 'Botanical field notes crossed with luminous radio diagrams.', cost: 3600, swatches: [{ id: 'fern-signal', name: 'Fern Glow', primaryHsl: '145 76% 58%' }, { id: 'orchid-band', name: 'Orchid Band', primaryHsl: '292 82% 70%' }, { id: 'pollen-gold', name: 'Pollen Gold', primaryHsl: '46 96% 62%' }] },
   { id: 'night-bus', name: 'Night Bus', description: 'Transit vinyl, dim route displays and rainy-window color.', cost: 4000, swatches: [{ id: 'route-amber', name: 'Route Amber', primaryHsl: '35 100% 60%' }, { id: 'transfer-blue', name: 'Transfer Blue', primaryHsl: '211 92% 68%' }, { id: 'seat-plum', name: 'Seat Plum', primaryHsl: '313 63% 68%' }] },
   { id: 'impossible-manual', name: 'Impossible Manual', description: 'A technical manual for machinery that never existed.', cost: 4400, swatches: [{ id: 'diagram-cyan', name: 'Diagram Cyan', primaryHsl: '188 94% 65%' }, { id: 'warning-rose', name: 'Warning Rose', primaryHsl: '347 92% 68%' }, { id: 'annotation-lime', name: 'Annotation Lime', primaryHsl: '83 88% 62%' }] },
+  {
+    id: 'aurora-transit', name: 'Aurora Transit',
+    description: 'A night-bus window catching the northern lights: slow teal-and-violet curtains drift across every panel.',
+    cost: 4800,
+    swatches: [{ id: 'aurora-teal', name: 'Aurora Teal', primaryHsl: '168 90% 60%' }, { id: 'violet-curtain', name: 'Violet Curtain', primaryHsl: '275 85% 68%' }, { id: 'frost-white', name: 'Frost White', primaryHsl: '190 60% 85%' }],
+  },
+  {
+    id: 'chrome-vespers', name: 'Chrome Vespers',
+    description: 'Rooftop dusk over polished chrome: amber streetlight bleeds into violet sky and the whole hideout breathes with it.',
+    cost: 5200,
+    swatches: [{ id: 'amber-dusk', name: 'Amber Dusk', primaryHsl: '35 90% 62%' }, { id: 'rose-chrome', name: 'Rose Chrome', primaryHsl: '340 85% 68%' }, { id: 'steel-violet', name: 'Steel Violet', primaryHsl: '255 55% 68%' }],
+  },
+  {
+    id: 'neon-foundry', name: 'Neon Foundry',
+    description: 'A working metal shop lit by molten orange and an electric-cyan work lamp that never quite stops flickering.',
+    cost: 5600,
+    swatches: [{ id: 'molten-orange', name: 'Molten Orange', primaryHsl: '16 100% 58%' }, { id: 'foundry-cyan', name: 'Foundry Cyan', primaryHsl: '190 100% 55%' }, { id: 'spark-yellow', name: 'Spark Yellow', primaryHsl: '48 100% 62%' }],
+  },
+  {
+    id: 'paper-lantern', name: 'Paper Lantern',
+    description: 'Warm festival-lantern light through rice paper: a soft, unsteady glow that makes every menu feel handmade.',
+    cost: 6000,
+    swatches: [{ id: 'lantern-orange', name: 'Lantern Orange', primaryHsl: '28 90% 62%' }, { id: 'paper-cream', name: 'Paper Cream', primaryHsl: '42 60% 88%' }, { id: 'ember-red', name: 'Ember Red', primaryHsl: '8 85% 62%' }],
+  },
 ];
 
 export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(
