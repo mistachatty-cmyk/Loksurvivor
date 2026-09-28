@@ -1,6 +1,6 @@
 ---
-name: GRPD Station and the Director Terminal (Stage 1 of a larger roadmap)
-description: A new hub location (GRPD Station off Division), the Director-personality terminal it houses, the SWAT Sauna's unique reward hole, Rapid Guard's K9 counter, and the full deferred roadmap (factions, The Running Man, new weapons, the Artiste) this is Stage 1 of.
+name: GRPD Station and the Director Terminal roadmap
+description: GRPD Station, its Director terminal, SWAT Sauna, K9 counter and vault reward, plus the staged faction, Running Man, weapon, and Artiste roadmap that grew from it.
 ---
 
 Read before touching `data/directors.ts`, the `DirectorPersonalityEffect`
@@ -18,9 +18,10 @@ expansion of the existing single-Director boss system into multiple
 selectable "personalities" reached from a new police-station location, new
 vendor/pet content, two new enemy factions, several new weapons, and a new
 playable character with a novel draw-to-dodge ability. Given the scope,
-this was explicitly staged: **only Stage 1 (this doc) is built**; Stages
-2-7 are recorded below as a roadmap, not built, so the full vision survives
-without needing to be re-derived or re-asked for.
+this was explicitly staged. Stage 1 shipped first; the Director personalities,
+Rapid/Data-Gob rescue thread, Supabuilda, Site Crew, GRPD Vault reward, and
+Running Man slice have since shipped in focused passes. The remaining roadmap
+stays below so the Clock weapon and Artiste are not lost or re-derived.
 
 ## Stage 1, built: GRPD Station + Director Terminal
 
@@ -35,15 +36,12 @@ kinds and existing enemy ids (`nightcrawler`/`bloodhound`/`corner-cutter`/
 `clearArea`.
 
 A second room, **`grpd-vault`** ("The Vault," the user's "locked room with a
-super safe door"), is **deliberately, permanently unreachable**: its
-`unlock` references `discoveryId: 'grpd-vault-code'`, which has **no
-matching `DISCOVERIES` entry and is granted by nothing, anywhere**. This is
-the same shape an existing id (`digital-soul-core`, referenced by the
-Soul Foundry area) already had *by accident* -- this one is intentional and
-documented so a future pass doesn't "fix" it by wiring up a grant path
-nobody asked for. It renders in the hub's locked-rooms list with the same
-generic "Find a hidden location" text every other locked room gets for
-free; no new UI was needed.
+super safe door"), originally shipped as an unreachable future-content
+hook. It now unlocks by clearing `site-crew-active-zone`: the Site Crew cuts
+through the door at the end of its recovery thread. The room directly grants
+the fixed legendary K9 **Blue 616** exactly once through
+`claimLegendaryPoliceDog`; Blue has `weight: 0`, is not sold, and never enters
+the rotating kennel pool.
 
 ### The Director Terminal
 
@@ -158,13 +156,13 @@ capture**: `killEnemy` in `engine/world.ts` has a dedicated branch keyed on
 `SPECIAL_LOKPET_LOADOUTS` legendary, same shape as the three starters) and
 calls the same `spawnLokPet` any other pickup-triggered grant uses.
 
-## Explicitly deferred (Stage 2 onward, not built)
+## Roadmap status after focused follow-up passes
 
-- **Stage 2**: real `DirectorPersonalityEffect` tuning for 2 more
+- **Stage 2 -- built**: real `DirectorPersonalityEffect` tuning for 2 more
   `DirectorDef` entries (new faction rosters + bosses each), and the actual
   "who/what controls the Directors" lore paragraph written into the
   terminal's framing text.
-- **Stage 3**: the Rapid faction (human resistance -- riot team, gardeners,
+- **Stage 3 -- core thread built, broader roster remains expandable**: the Rapid faction (human resistance -- riot team, gardeners,
   fighting dogs/rare cats, firefighters, teachers, bar owners, retired
   people, scared residents, briefcase-throwing management, and military
   veterans in base/Vietnam("tropical")/Iraq("dusty") flavor variants, plus
@@ -174,21 +172,21 @@ calls the same `spawnLokPet` any other pickup-triggered grant uses.
   `AreaDef` arena -- **that whole system is out of scope**, ship the
   faction as ordinary combat content first. The friendly "Digi-Tablet" AI
   companion is lore/flavor only; factions have no non-combat NPC slot today.
-- **Stage 4**: two rival factions -- a bodybuilder faction (proposed name
+- **Stage 4 -- built**: two rival factions -- a bodybuilder faction (proposed name
   **Supabuilda**, gym-culture puns) and a separate construction-worker
   faction ("the real builders," proposed name **The Site Crew** or **Local
   616**) -- plus the **gym membership** and **throwing weight** weapons as
   this faction's signature flavor.
-- **Stage 5**: **The Running Man** -- not an ambient actor (those are
-  combat-inert by construction, per `sky-ambiance.md`) and not a normal
-  `EnemyDef` -- a new rare one-off `World`-level event state machine
-  following the exact `HordeSpin`/district-incursion precedent (a `w.now`
-  phase machine, never entering `w.enemies` so it's inherently
-  untargetable/invincible by construction). Needs genuinely new knockback
-  math: every existing knockback (`kx`/`ky` + `resolveImpactTravel`) is
-  radial-from-a-point or the dash's uniform-direction sweep; pushing
-  things to either side of a straight travel line is new "which side of a
-  line" geometry, not yet written anywhere.
+- **Stage 5 -- built**: **The Running Man** is a rare one-off `World` event,
+  not an ambient actor and never an `EnemyDef`. `World.runningMan` owns the
+  deterministic `waiting -> warning -> running -> complete` phase machine on
+  a separate RNG stream, so it cannot perturb normal gameplay rolls. The
+  runner crosses a player-centered straight line and uses signed
+  perpendicular distance to throw enemies and movable props to opposite
+  sides exactly once. He never enters `w.enemies`, so targeting, damage,
+  capture, kill credit, and Bestiary systems cannot see him. The renderer is
+  procedural Canvas2D with a lane telegraph, speed trails, and a compact
+  pixel runner.
 - **Stage 6**: the **Clock** weapon (data-only).
 - **Stage 7**: the **Artiste** character and its draw-to-dodge weapon --
   the single largest remaining lift, deliberately last. Not data: a new

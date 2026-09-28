@@ -548,6 +548,28 @@ export interface BreakableObstacle extends Aabb {
 }
 
 /**
+ * A one-off, world-level sighting. The Running Man is deliberately not an
+ * EnemyActor: nothing can target, damage, capture, or count him as a kill.
+ */
+export interface RunningManState {
+  phase: 'waiting' | 'warning' | 'running' | 'complete';
+  /** Rare deterministic eligibility time; Infinity means this run has no sighting. */
+  triggerAt: number;
+  warningStartedAt: number;
+  startedAt: number;
+  endsAt: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  directionX: number;
+  directionY: number;
+  lastProgress: number;
+  pushedEnemyUids: Set<number>;
+  pushedPropUids: Set<number>;
+}
+
+/**
  * Storm Chaser's draggable elemental cloud. `x`/`y` is where it's actually
  * drawn and where its effect radius applies; `targetX`/`targetY` is where
  * it's headed -- either a hover offset near the player (default) or wherever
@@ -1118,6 +1140,8 @@ export interface World {
   wheelSpin: WheelSpinState | null;
   /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
   director: DirectorRunState;
+  /** Rare invincible cross-screen runner event; never enters `enemies`. */
+  runningMan: RunningManState;
   /**
    * Which `DirectorDef` actually fires, chosen at the Digital Archive
    * terminal (`MetaState.activeDirectorPersonalityId`). Null/unknown id
@@ -1348,6 +1372,11 @@ export function createWorld(
 
   const rng = createRng(seed);
   const selectedIncursion = chooseDistrictIncursion(area.id, rng, setup.districtIncursionId);
+  // Keep this rare event on its own deterministic stream so adding/tuning its
+  // presentation can never shift normal enemy, loot, or objective rolls.
+  const runningManRng = createRng(seed ^ 0x6164a11);
+  const runningManEligible = runningManRng() < 0.08;
+  const runningManAngle = runningManRng() * Math.PI * 2;
   const evolved = EVOLUTIONS.find((candidate) =>
     candidate.characterId === character.id &&
     candidate.baseWeaponId === character.weapon.id &&
@@ -1596,6 +1625,22 @@ export function createWorld(
       activeDirectorId: null,
       bossUid: null,
       victorious: false,
+    },
+    runningMan: {
+      phase: 'waiting',
+      triggerAt: runningManEligible ? 55_000 + runningManRng() * 45_000 : Number.POSITIVE_INFINITY,
+      warningStartedAt: 0,
+      startedAt: 0,
+      endsAt: 0,
+      startX: 0,
+      startY: 0,
+      endX: 0,
+      endY: 0,
+      directionX: Math.cos(runningManAngle),
+      directionY: Math.sin(runningManAngle),
+      lastProgress: 0,
+      pushedEnemyUids: new Set(),
+      pushedPropUids: new Set(),
     },
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
@@ -8671,6 +8716,111 @@ function updateDirector(w: World) {
   if (state.bossUid === null) state.phase = 'resolved';
 }
 
+/* ------------------------------------------------------------------ */
+/* The Running Man                                                    */
+/* ------------------------------------------------------------------ */
+
+const RUNNING_MAN_WARNING_MS = 1_350;
+const RUNNING_MAN_CROSSING_MS = 1_050;
+const RUNNING_MAN_PATH_HALF_LENGTH = 760;
+const RUNNING_MAN_LANE_HALF_WIDTH = 86;
+
+/**
+ * Push everything near the newly crossed piece of the route away from the
+ * route's center line. The signed perpendicular distance is what guarantees
+ * actors above and below the same line are thrown to opposite sides.
+ */
+function sweepRunningManLane(w: World, state: RunningManState, fromProgress: number, toProgress: number) {
+  const pathX = state.endX - state.startX;
+  const pathY = state.endY - state.startY;
+  const pathLength = Math.hypot(pathX, pathY);
+  if (pathLength < 1) return;
+  const dirX = pathX / pathLength;
+  const dirY = pathY / pathLength;
+  const normalX = -dirY;
+  const normalY = dirX;
+  const fromAlong = Math.min(fromProgress, toProgress) * pathLength - 30;
+  const toAlong = Math.max(fromProgress, toProgress) * pathLength + 30;
+
+  const sideFor = (cross: number, uidValue: number) => Math.abs(cross) > 0.001 ? Math.sign(cross) : (uidValue % 2 === 0 ? 1 : -1);
+
+  for (const enemy of w.enemies) {
+    if (enemy.dying || enemy.commanded || state.pushedEnemyUids.has(enemy.uid)) continue;
+    const relX = enemy.x - state.startX;
+    const relY = enemy.y - state.startY;
+    const along = relX * dirX + relY * dirY;
+    const cross = relX * normalX + relY * normalY;
+    if (along < fromAlong - enemy.radius || along > toAlong + enemy.radius) continue;
+    if (Math.abs(cross) > RUNNING_MAN_LANE_HALF_WIDTH + enemy.radius) continue;
+    const side = sideFor(cross, enemy.uid);
+    const launchSpeed = Math.max(220, resolveImpactTravel(4, enemy.mass, enemyImpactResistance(enemy)));
+    enemy.kx += normalX * side * launchSpeed + dirX * 45;
+    enemy.ky += normalY * side * launchSpeed + dirY * 45;
+    state.pushedEnemyUids.add(enemy.uid);
+    spawnParticles(w, enemy.x, enemy.y, '#f8fafc', 5, 95);
+  }
+
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.movable || state.pushedPropUids.has(prop.uid)) continue;
+    const relX = prop.x - state.startX;
+    const relY = prop.y - state.startY;
+    const along = relX * dirX + relY * dirY;
+    const cross = relX * normalX + relY * normalY;
+    const propRadius = Math.max(prop.w, prop.h) / 2;
+    if (along < fromAlong - propRadius || along > toAlong + propRadius) continue;
+    if (Math.abs(cross) > RUNNING_MAN_LANE_HALF_WIDTH + propRadius) continue;
+    const side = sideFor(cross, prop.uid);
+    const launchSpeed = Math.max(150, resolveImpactTravel(4, prop.mass));
+    prop.vx += normalX * side * launchSpeed + dirX * 35;
+    prop.vy += normalY * side * launchSpeed + dirY * 35;
+    prop.impactIntensity = Math.max(prop.impactIntensity, 3) as ImpactIntensity;
+    state.pushedPropUids.add(prop.uid);
+    spawnParticles(w, prop.x, prop.y, '#fbbf24', 5, 90);
+  }
+}
+
+/** Rare, one-shot phase machine. Exported for focused deterministic tests. */
+export function updateRunningMan(w: World) {
+  const state = w.runningMan;
+  if (state.phase === 'complete') return;
+
+  if (state.phase === 'waiting') {
+    if (w.now < state.triggerAt) return;
+    const centerX = w.player.x;
+    const centerY = w.player.y;
+    state.startX = centerX - state.directionX * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.startY = centerY - state.directionY * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.endX = centerX + state.directionX * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.endY = centerY + state.directionY * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.warningStartedAt = w.now;
+    state.phase = 'warning';
+    pushAlert(w, 'FOOTSTEPS — clear the crossing line');
+    pushSfx(w, 'bossWarning');
+    return;
+  }
+
+  if (state.phase === 'warning') {
+    if (w.now - state.warningStartedAt < RUNNING_MAN_WARNING_MS) return;
+    state.phase = 'running';
+    state.startedAt = w.now;
+    state.endsAt = w.now + RUNNING_MAN_CROSSING_MS;
+    state.lastProgress = 0;
+    pushAlert(w, 'THE RUNNING MAN');
+    w.shake = Math.max(w.shake, 8);
+  }
+
+  if (state.phase !== 'running') return;
+  const progress = clamp((w.now - state.startedAt) / RUNNING_MAN_CROSSING_MS, 0, 1);
+  sweepRunningManLane(w, state, state.lastProgress, progress);
+  state.lastProgress = progress;
+  if (w.now >= state.endsAt) {
+    // Finish the final sliver even when a low frame rate jumps past endsAt.
+    sweepRunningManLane(w, state, progress, 1);
+    state.lastProgress = 1;
+    state.phase = 'complete';
+  }
+}
+
 /** Resolves 'meteor' weapon strikes once their telegraph window elapses. See run-presentation.md. */
 function updateMeteors(w: World) {
   for (let i = w.pendingMeteors.length - 1; i >= 0; i -= 1) {
@@ -10062,6 +10212,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateStormCloud(w, dt);
   updateWheelSpin(w);
   updateDirector(w);
+  updateRunningMan(w);
   updateRawDataBreakage(w, dt);
   updateEnemies(w, dt);
   updateRoamingDetectors(w, dt);

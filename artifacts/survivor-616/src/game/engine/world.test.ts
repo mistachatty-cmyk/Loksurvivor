@@ -54,6 +54,7 @@ import {
   stepWorld,
   isOnBeat,
   musicMultiplier,
+  updateRunningMan,
 } from '@/game/engine/world';
 import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
 import { generateChunk } from '@/game/engine/chunks';
@@ -359,6 +360,61 @@ test('killing the Director boss resolves the encounter and marks the run result 
   const result = buildResult(world);
   assert.equal(result.directorEncounterId, 'take-two');
   assert.equal(result.directorDefeated, true);
+});
+
+test('The Running Man schedule is deterministic and never creates a targetable enemy', () => {
+  const area = testArea({ x: 260, y: 220, w: 20, h: 20, kind: 'barrier' });
+  const first = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616158);
+  const second = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 616158);
+
+  assert.equal(first.runningMan.triggerAt, second.runningMan.triggerAt);
+  assert.equal(first.runningMan.directionX, second.runningMan.directionX);
+  assert.equal(first.runningMan.directionY, second.runningMan.directionY);
+  assert.equal(first.enemies.some((enemy) => enemy.defId === 'running-man'), false);
+});
+
+test('The Running Man throws enemies and movable props to opposite sides of his line exactly once', () => {
+  const world = createWorld(
+    testArea({ x: -35, y: -24, w: 54, h: 44, kind: 'dumpster' }),
+    CHARACTERS[0]!,
+    CHARACTERS[0]!.stats,
+    616159,
+  );
+  const above = addEnemy(world, 'nightcrawler', -45, 24);
+  const below = addEnemy(world, 'nightcrawler', -45, -24);
+  below.uid = 901;
+  const prop = world.breakables[0]!;
+  assert.equal(prop.movable, true);
+  const playerStart = { x: world.player.x, y: world.player.y };
+
+  Object.assign(world.runningMan, {
+    phase: 'running' as const,
+    startedAt: 0,
+    endsAt: 1_050,
+    startX: -100,
+    startY: 0,
+    endX: 100,
+    endY: 0,
+    directionX: 1,
+    directionY: 0,
+    lastProgress: 0,
+  });
+  world.now = 525;
+  updateRunningMan(world);
+
+  assert.ok(above.ky > 0, 'an enemy above the route should be thrown upward');
+  assert.ok(below.ky < 0, 'an enemy below the route should be thrown downward');
+  assert.ok(prop.vy < 0, 'a movable prop below the route should be thrown downward');
+  assert.deepEqual({ x: world.player.x, y: world.player.y }, playerStart, 'the sighting should never shove the player');
+  assert.equal(world.runningMan.pushedEnemyUids.size, 2);
+  assert.equal(world.runningMan.pushedPropUids.size, 1);
+
+  world.now = 1_100;
+  updateRunningMan(world);
+  const settledVelocity = { above: above.ky, below: below.ky, prop: prop.vy };
+  updateRunningMan(world);
+  assert.equal(world.runningMan.phase, 'complete');
+  assert.deepEqual({ above: above.ky, below: below.ky, prop: prop.vy }, settledVelocity);
 });
 
 test('Data-Gobs chew exposed world props and deepen raw data breakage', () => {
