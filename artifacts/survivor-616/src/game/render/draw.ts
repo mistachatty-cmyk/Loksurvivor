@@ -3058,6 +3058,132 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
       }
       case 'nova':
       case 'ring': {
+        const visualRadius = effect.radius * (0.2 + life * 0.9);
+        if (effect.weaponId === 'spray-can') {
+          // Paint ejects in uneven wedges and droplets, not a clean pulse.
+          ctx.strokeStyle = effect.color;
+          ctx.fillStyle = effect.color;
+          ctx.lineWidth = 5 * fade + 2;
+          for (let i = 0; i < 9; i += 1) {
+            const angle = i * 2.39996 + life * 0.4;
+            const length = visualRadius * (0.6 + (i % 3) * 0.18);
+            ctx.beginPath();
+            ctx.moveTo(effect.x + Math.cos(angle) * visualRadius * 0.18, effect.y + Math.sin(angle) * visualRadius * 0.18);
+            ctx.lineTo(effect.x + Math.cos(angle) * length, effect.y + Math.sin(angle) * length);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(effect.x + Math.cos(angle) * length, effect.y + Math.sin(angle) * length, 3 + (i % 3) * 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          break;
+        }
+        if (effect.weaponId === 'cryo-grenade') {
+          // Six brittle ice plates expand, rotate, and separate.
+          ctx.strokeStyle = effect.color;
+          ctx.fillStyle = effect.color;
+          ctx.lineWidth = 3;
+          for (let i = 0; i < 6; i += 1) {
+            const angle = (i / 6) * Math.PI * 2 + life * 0.5;
+            const cx = effect.x + Math.cos(angle) * visualRadius * 0.58;
+            const cy = effect.y + Math.sin(angle) * visualRadius * 0.58;
+            ctx.beginPath();
+            for (let corner = 0; corner < 6; corner += 1) {
+              const a = angle + (corner / 6) * Math.PI * 2;
+              const x = cx + Math.cos(a) * visualRadius * 0.18;
+              const y = cy + Math.sin(a) * visualRadius * 0.18;
+              if (corner === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.globalAlpha = Math.max(0, fade * 0.32);
+            ctx.fill();
+            ctx.globalAlpha = Math.max(0, fade);
+            ctx.stroke();
+          }
+          break;
+        }
+        if (effect.weaponId === 'graviton-repulsor' || effect.weaponId === 'lev-expansion') {
+          // Tilted gravity planes shear away from the center.
+          ctx.strokeStyle = effect.color;
+          ctx.lineWidth = 5 * fade + 1;
+          for (let i = 0; i < 4; i += 1) {
+            ctx.save();
+            ctx.translate(effect.x, effect.y);
+            ctx.rotate(i * Math.PI / 4 + life * (i % 2 === 0 ? 0.7 : -0.7));
+            ctx.scale(1, 0.28 + i * 0.08);
+            ctx.beginPath();
+            ctx.arc(0, 0, visualRadius * (0.65 + i * 0.1), 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+          break;
+        }
+        if (effect.weaponId === 'exposure-flash') {
+          // Offset shutter frames make this read as photography, not a blast.
+          ctx.strokeStyle = effect.color;
+          ctx.lineWidth = 4 * fade + 1;
+          for (let i = 0; i < 3; i += 1) {
+            const size = visualRadius * (0.65 + i * 0.22);
+            ctx.save();
+            ctx.translate(effect.x, effect.y);
+            ctx.rotate((i - 1) * 0.16);
+            ctx.strokeRect(-size, -size * 0.65, size * 2, size * 1.3);
+            ctx.restore();
+          }
+          break;
+        }
+        if (effect.weaponId === 'resonance-bell') {
+          // Bell-mouth arcs stagger downward like visible chimes.
+          ctx.strokeStyle = effect.color;
+          ctx.lineCap = 'round';
+          for (let i = 0; i < 4; i += 1) {
+            ctx.lineWidth = 6 - i;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y - visualRadius * 0.18, visualRadius * (0.4 + i * 0.18), 0.18, Math.PI - 0.18);
+            ctx.stroke();
+          }
+          break;
+        }
+        if (effect.weaponId === 'mask-pulse') {
+          // Two eye-shaped sweeps open from a hollow mask center.
+          ctx.strokeStyle = effect.color;
+          ctx.lineWidth = 5 * fade + 1;
+          for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.ellipse(effect.x + side * visualRadius * 0.28, effect.y, visualRadius * 0.3, visualRadius * 0.14, side * 0.18, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          break;
+        }
+        if (effect.weaponId === 'boombox') {
+          // Square speaker cones thump outward on each damage tick.
+          ctx.strokeStyle = effect.color;
+          ctx.lineWidth = 5 * fade + 1;
+          ctx.save();
+          ctx.translate(effect.x, effect.y);
+          ctx.rotate(Math.PI / 4);
+          ctx.strokeRect(-visualRadius * 0.58, -visualRadius * 0.58, visualRadius * 1.16, visualRadius * 1.16);
+          ctx.restore();
+          break;
+        }
+        if (effect.weaponId === 'lotus-hum') {
+          // Eight petals unfold around the player rather than flashing.
+          ctx.strokeStyle = effect.color;
+          ctx.fillStyle = effect.color;
+          for (let i = 0; i < 8; i += 1) {
+            const angle = (i / 8) * Math.PI * 2;
+            ctx.save();
+            ctx.translate(effect.x + Math.cos(angle) * visualRadius * 0.38, effect.y + Math.sin(angle) * visualRadius * 0.38);
+            ctx.rotate(angle);
+            ctx.globalAlpha = Math.max(0, fade * 0.22);
+            ctx.beginPath();
+            ctx.ellipse(visualRadius * 0.18, 0, visualRadius * 0.32, visualRadius * 0.12, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = Math.max(0, fade * 0.8);
+            ctx.stroke();
+            ctx.restore();
+          }
+          break;
+        }
         const ringCount = effect.kind === 'nova' ? 3 : 1;
         for (let ring = 0; ring < ringCount; ring += 1) {
           const ringLife = clamp(life - ring * 0.14, 0, 1);
@@ -3223,15 +3349,101 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         break;
       }
       case 'hazard': {
+        const phase = w.now / 260;
+        const radius = effect.radius;
         ctx.strokeStyle = effect.color;
         ctx.fillStyle = effect.color;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([7, 5]);
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.radius * (0.92 + Math.sin(w.now / 150) * 0.04), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha *= 0.12;
-        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+
+        if (effect.weaponId === 'emberback') {
+          // An uneven firebreak with independently licking flame points.
+          ctx.beginPath();
+          for (let i = 0; i < 20; i += 1) {
+            const angle = (i / 20) * Math.PI * 2;
+            const lick = i % 2 === 0 ? 0.78 : 0.98 + Math.sin(phase * 2 + i) * 0.08;
+            const x = effect.x + Math.cos(angle) * radius * lick;
+            const y = effect.y + Math.sin(angle) * radius * lick;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+          ctx.globalAlpha *= 0.32;
+          for (let i = 0; i < 8; i += 1) {
+            const angle = (i / 8) * Math.PI * 2 + phase * 0.08;
+            const inner = radius * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(effect.x + Math.cos(angle) * inner, effect.y + Math.sin(angle) * inner);
+            ctx.lineTo(effect.x + Math.cos(angle - 0.08) * radius * 0.92, effect.y + Math.sin(angle - 0.08) * radius * 0.92);
+            ctx.lineTo(effect.x + Math.cos(angle + 0.08) * radius * 0.74, effect.y + Math.sin(angle + 0.08) * radius * 0.74);
+            ctx.closePath();
+            ctx.fill();
+          }
+        } else if (effect.weaponId === 'acid-garden') {
+          // Overlapping chemical blooms read as splatter instead of a ring.
+          ctx.globalAlpha *= 0.42;
+          for (let i = 0; i < 11; i += 1) {
+            const angle = i * 2.39996;
+            const distance = radius * (0.18 + (i % 4) * 0.18);
+            const bubbleRadius = radius * (0.12 + (i % 3) * 0.055) * (1 + Math.sin(phase + i) * 0.08);
+            ctx.beginPath();
+            ctx.arc(effect.x + Math.cos(angle) * distance, effect.y + Math.sin(angle) * distance, bubbleRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        } else if (effect.weaponId === 'infinite-cassette') {
+          // A cassette hub with loose magnetic tape snaking through the field.
+          ctx.globalAlpha *= 0.75;
+          ctx.strokeRect(effect.x - radius * 0.32, effect.y - radius * 0.2, radius * 0.64, radius * 0.4);
+          for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.arc(effect.x + side * radius * 0.16, effect.y, radius * 0.08, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(effect.x - radius * 0.16, effect.y + radius * 0.12);
+          ctx.bezierCurveTo(
+            effect.x - radius * 0.9, effect.y + Math.sin(phase) * radius * 0.25,
+            effect.x + radius * 0.9, effect.y + Math.cos(phase * 0.8) * radius * 0.35,
+            effect.x + radius * 0.18, effect.y - radius * 0.1,
+          );
+          ctx.stroke();
+        } else if (effect.weaponId === 'singularity-core') {
+          // Warped accretion rings collapse toward an opaque gravity well.
+          ctx.globalAlpha *= 0.8;
+          for (let i = 0; i < 3; i += 1) {
+            ctx.save();
+            ctx.translate(effect.x, effect.y);
+            ctx.rotate(phase * (i % 2 === 0 ? 0.15 : -0.12) + i);
+            ctx.scale(1, 0.34 + i * 0.16);
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * (0.48 + i * 0.2), 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
+          ctx.globalAlpha = Math.min(1, ctx.globalAlpha * 1.6);
+          ctx.fillStyle = '#020617';
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, radius * 0.24, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Character-only fields still receive a readable authored sigil,
+          // never the old generic dashed circle.
+          ctx.globalAlpha *= 0.65;
+          ctx.beginPath();
+          for (let i = 0; i < 12; i += 1) {
+            const angle = (i / 12) * Math.PI * 2 + phase * 0.04;
+            const pointRadius = radius * (i % 2 === 0 ? 0.95 : 0.62);
+            const x = effect.x + Math.cos(angle) * pointRadius;
+            const y = effect.y + Math.sin(angle) * pointRadius;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+          ctx.globalAlpha *= 0.18;
+          ctx.fill();
+        }
         break;
       }
       case 'web': {

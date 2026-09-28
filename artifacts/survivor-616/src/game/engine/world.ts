@@ -1096,6 +1096,8 @@ export interface World {
   stealthConfig: StealthAbilityConfig | null;
   /** "Let Me Hold This" owned: hazard weapons never hurt whoever's holding them, native character or not. */
   hazardImmune: boolean;
+  /** Characters reached through progression; gates their associated hazard weapons in normal loot. */
+  unlockedCharacterIds: string[];
   /** "Low-Light Optics" owned: draw.ts cuts the night-time screen tint down instead of applying it in full. */
   nightVisionEnabled: boolean;
   /** Timestamp (w.now) the current cloak activation ends; 0 or in the past when not cloaked. */
@@ -1318,6 +1320,7 @@ export function createWorld(
     sizeMult?: number;
     stealth?: StealthAbilityConfig | null;
     hazardImmune?: boolean;
+    unlockedCharacterIds?: string[];
     nightVisionEnabled?: boolean;
     minimapEnemyRadar?: boolean;
     minimapLootSense?: boolean;
@@ -1574,6 +1577,7 @@ export function createWorld(
     playerSizeMult: sizeMult,
     stealthConfig: setup.stealth ?? null,
     hazardImmune: setup.hazardImmune ?? false,
+    unlockedCharacterIds: [...new Set(setup.unlockedCharacterIds ?? [])],
     nightVisionEnabled: setup.nightVisionEnabled ?? false,
     stealthUntil: 0,
     stealthReadyAt: setup.stealth ? 4000 : Number.POSITIVE_INFINITY,
@@ -4148,6 +4152,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         hitUids: new Set(),
         followPlayer: false,
         evolutionBehavior: behavior,
+        weaponId: weapon.id,
       });
       novaDamage(w, p.x, p.y, reach, damage, weaponImpact(weapon), weapon.statusEffectId);
       if (weapon.id === 'graviton-repulsor') {
@@ -4190,6 +4195,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
         impactIntensity: 0,
         hitUids: new Set(),
         followPlayer: true,
+        weaponId: weapon.id,
       });
       break;
     }
@@ -4260,7 +4266,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
           uid: uid(w), kind: isMatrix ? 'matrix-rain' : isRickroll ? 'rickroll-disco' : 'hazard', x: nx, y: ny, radius: nodeRadius, angle: 0, spread: Math.PI * 2,
           bornAt: w.now, expiresAt: w.now + (weapon.durationMs ?? 5000), color: weapon.color ?? palette.accent,
           damage, impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, nextTickAt: w.now,
-          hurtsPlayer: isRickroll || isMatrix ? false : !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
+          hurtsPlayer: !(w.hazardImmune || weapon.nativeCharacterId === w.character.id),
           statusEffectId: weapon.statusEffectId,
           pullStrength: weapon.id.includes('singularity') ? 160 : undefined,
           evolutionBehavior: behavior,
@@ -4838,8 +4844,9 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   if (w.weapons.length < 6) {
     for (const weapon of Object.values(WEAPONS_BY_ID)) {
       if (w.disabledWeaponIds && w.disabledWeaponIds.includes(weapon.id)) continue;
+      if (!isWeaponUnlockedForLoot(weapon, w.unlockedCharacterIds)) continue;
       if (!w.weapons.some((entry) => entry.def.id === weapon.id)) {
-        pool.push({ id: `weapon-${weapon.id}`, name: weapon.name, description: weapon.description, weight: 5, maxStacks: 1, effects: [], cardKind: 'weapon', weaponId: weapon.id });
+        pool.push({ id: `weapon-${weapon.id}`, name: weapon.name, description: weapon.description, weight: weaponLootWeight(weapon), maxStacks: 1, effects: [], cardKind: 'weapon', weaponId: weapon.id });
       }
     }
   }
@@ -4907,6 +4914,14 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
     available.splice(index, 1);
   }
   return picks;
+}
+
+export function isWeaponUnlockedForLoot(weapon: WeaponDef, unlockedCharacterIds: readonly string[]): boolean {
+  return !weapon.lootUnlockCharacterId || unlockedCharacterIds.includes(weapon.lootUnlockCharacterId);
+}
+
+export function weaponLootWeight(weapon: WeaponDef): number {
+  return weapon.kind === 'hazard' ? 2 : 5;
 }
 
 export function applyUpgrade(w: World, upgrade: UpgradeDef) {
@@ -9112,7 +9127,7 @@ function updateEffects(w: World) {
       damageBreakable(w, effect.x, effect.y, effect.radius, effect.damage, effect.impactIntensity, effect.x, effect.y, effect.impactTrigger);
     }
 
-    if (active && (effect.kind === 'hazard' || effect.kind === 'rickroll-disco') && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
+    if (active && (effect.kind === 'hazard' || effect.kind === 'rickroll-disco' || effect.kind === 'matrix-rain') && effect.damage > 0 && w.now >= (effect.nextTickAt ?? effect.bornAt)) {
       effect.nextTickAt = w.now + 520;
       effect.hitUids.clear();
       forEachNearby(w, effect.x, effect.y, effect.radius + 30, (enemy) => {

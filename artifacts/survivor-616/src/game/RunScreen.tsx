@@ -388,6 +388,7 @@ export function RunScreen({
         sizeMult: giantSizeMult(meta),
         stealth: stealthConfig(meta),
         hazardImmune: hazardImmunityUnlocked(meta),
+        unlockedCharacterIds: meta.unlockedCharacterIds,
         nightVisionEnabled: nightVisionUnlocked(meta),
         extraLifeAvailable: hasExtraLife(meta),
         minimapEnemyRadar: minimapUnlockTiers(meta).enemyRadar,

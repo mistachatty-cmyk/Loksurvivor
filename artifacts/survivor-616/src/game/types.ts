@@ -526,6 +526,9 @@ export interface WeaponDef {
    *  from it, unless the "Let Me Hold This" Quartermaster ability is
    *  unlocked. */
   nativeCharacterId?: string;
+  /** Character progression gate for adding this weapon to normal level-up
+   *  loot. Signature loadouts and authored rewards ignore this gate. */
+  lootUnlockCharacterId?: string;
   /**
    * Elemental synergy: this weapon's slash/wave/laser/impact hits deal
    * `bonusVsStatusMult`x damage against a target that already carries

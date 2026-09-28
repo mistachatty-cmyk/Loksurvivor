@@ -1814,7 +1814,7 @@ export const CHARACTERS: CharacterDef[] = [
       durationMs: 4300,
       effect: { invulnerable: true, damageMult: 1.85, novaDamage: 38, novaRadius: 210 },
     },
-    unlock: { kind: 'kills', count: 616 },
+    unlock: { kind: 'clearArea', areaId: 'neon-overflow' },
     rarity: 'legendary',
     signatureTraits: ['Speaker-wing silhouette', 'Enemy chorus'],
     crew: { id: 'sixth-ward-cypher', name: 'Sixth Ward Cypher', role: 'Hook / Hype' },

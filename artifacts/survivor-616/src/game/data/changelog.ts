@@ -120,6 +120,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Level Vector Lev once to earn the Singularity Defector achievement.',
     ],
   },
+  {
+    version: '0.9.0',
+    date: '2026-09-28',
+    kind: 'update',
+    title: 'Hazards Get Their Own Identity',
+    body: [
+      'Ground hazards, novas, and auras now use weapon-specific shapes instead of sharing the same circle or center flash.',
+      'Hazard weapons appear less often, and—with Emberback as the early exception—join normal level-up loot after their associated character is unlocked.',
+      'Only the associated character ignores a hazard by default. Let Me Hold This still grants universal hazard protection.',
+      'Hook Ghost now unlocks through Neon Overflow, giving the Sixth Ward Cypher a cleaner two-level progression route.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
