@@ -259,6 +259,10 @@ just *what*, so the reasoning doesn't need to be re-derived:
   proven poor fits, see `zero-day-freeze-throw.md`), and reuses concrete
   pieces (the `PointerMode` extension pattern, world-space box selection,
   the DOM marquee overlay) that already exist rather than re-deriving them.
+- `artiste-draw-dodge.md` — read before changing Artiste's Draw control,
+  polyline bounds, or dodge resolution. It records why the live mark is an
+  SVG pointer overlay while the completed route is a short world-space
+  canvas trail, and why cancelled/too-short marks never consume cooldown.
 - `sector-command-design.md` — read before touching Sector Command (the
   dev-gated RTS/campaign mode) or anything it hooks into: why captured units
   are excluded at `damageEnemy()` and not just at targeting, why `commanded`

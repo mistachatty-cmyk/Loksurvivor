@@ -710,6 +710,17 @@ export interface FreezeThrowState {
   selectedUids: number[];
 }
 
+/** Artiste's bounded freeform route. Null for every other character. */
+export interface ArtisteDrawState {
+  armed: boolean;
+  drawing: boolean;
+  points: Array<{ x: number; y: number }>;
+  pathLength: number;
+  nextReadyAt: number;
+  /** Keeps the completed paint trail visible briefly after the dodge resolves. */
+  visibleUntil: number;
+}
+
 /**
  * Ground-hazard liquids. Never solid -- always kept out of `w.obstacles`.
  * `water`/`oil`/`coolant`/`runoff` spawn from breaking certain obstacles
@@ -934,6 +945,8 @@ export interface World {
   stormCloud: StormCloud | null;
   /** Zero Day's freeze-then-throw runtime state; null for every other character. */
   freezeThrow: FreezeThrowState | null;
+  /** Artiste's draw-to-dodge runtime state; null for every other character. */
+  artisteDraw: ArtisteDrawState | null;
   /** Sector Command runtime state; null outside the campaign mode. */
   sectorCommand: SectorCommandState | null;
   /** Tier 2 economy: reinforcement beacons authored onto the mission's map. */
@@ -1420,6 +1433,9 @@ export function createWorld(
       : null,
     freezeThrow: character.freezeThrow
       ? { lastCastAt: Number.NEGATIVE_INFINITY, selecting: false, selectionStart: null, selectionEnd: null, selectedUids: [] }
+      : null,
+    artisteDraw: character.artisteDraw
+      ? { armed: false, drawing: false, points: [], pathLength: 0, nextReadyAt: 0, visibleUntil: 0 }
       : null,
     extraLifeAvailable: setup.extraLifeAvailable ?? false,
     extraLifeUsed: false,
@@ -7918,6 +7934,124 @@ export function throwSelectedFrozenEnemies(w: World, targetX: number, targetY: n
   }
   state.selectedUids = [];
   return thrown;
+}
+
+/* ------------------------------------------------------------------ */
+/* Artiste: freeform draw -> dodge                                    */
+/* ------------------------------------------------------------------ */
+
+/** Arms Artiste's next pointer drag. Returns false while unavailable. */
+export function armArtisteDraw(w: World): boolean {
+  const state = w.artisteDraw;
+  if (!w.character.artisteDraw || !state || w.outcome !== 'running' || state.drawing || w.now < state.nextReadyAt) return false;
+  state.armed = true;
+  state.points = [];
+  state.pathLength = 0;
+  state.visibleUntil = 0;
+  return true;
+}
+
+/** Cancels an armed/in-progress mark without consuming its cooldown. */
+export function cancelArtisteDraw(w: World) {
+  const state = w.artisteDraw;
+  if (!state) return;
+  state.armed = false;
+  state.drawing = false;
+  state.points = [];
+  state.pathLength = 0;
+  state.visibleUntil = 0;
+}
+
+/** Starts a freeform route at the player and samples the pointer-down point. */
+export function beginArtisteDraw(w: World, x: number, y: number): boolean {
+  const state = w.artisteDraw;
+  if (!w.character.artisteDraw || !state?.armed || state.drawing) return false;
+  state.drawing = true;
+  state.points = [{ x: w.player.x, y: w.player.y }];
+  state.pathLength = 0;
+  updateArtisteDraw(w, x, y);
+  return true;
+}
+
+/** Adds one bounded point to Artiste's current world-space polyline. */
+export function updateArtisteDraw(w: World, x: number, y: number): boolean {
+  const config = w.character.artisteDraw;
+  const state = w.artisteDraw;
+  if (!config || !state?.drawing || state.points.length >= config.maxPoints) return false;
+  const last = state.points.at(-1);
+  if (!last) return false;
+  const dx = x - last.x;
+  const dy = y - last.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance < config.minPointDistance) return false;
+  const remaining = config.maxPathLength - state.pathLength;
+  if (remaining <= 0) return false;
+  const accepted = Math.min(distance, remaining);
+  state.points.push({ x: last.x + (dx / distance) * accepted, y: last.y + (dy / distance) * accepted });
+  state.pathLength += accepted;
+  return true;
+}
+
+/**
+ * Resolves the route in one crisp dodge: Artiste lands at the final point,
+ * gains a brief safety window and damages every enemy intersecting any
+ * segment exactly once. Too-short routes cancel for free.
+ */
+export function commitArtisteDraw(w: World): boolean {
+  const config = w.character.artisteDraw;
+  const state = w.artisteDraw;
+  if (!config || !state?.drawing) return false;
+  state.drawing = false;
+  state.armed = false;
+  if (state.points.length < 2 || state.pathLength < config.minPointDistance) {
+    state.points = [];
+    state.pathLength = 0;
+    state.visibleUntil = 0;
+    return false;
+  }
+
+  const hitUids = new Set<number>();
+  for (const enemy of w.enemies) {
+    if (enemy.dying || enemy.commanded) continue;
+    for (let index = 1; index < state.points.length; index += 1) {
+      const from = state.points[index - 1]!;
+      const to = state.points[index]!;
+      if (distToSegment(enemy.x, enemy.y, from.x, from.y, to.x, to.y) > config.trailRadius + enemy.radius) continue;
+      hitUids.add(enemy.uid);
+      damageEnemy(w, enemy, config.damage * damageMult(w), 2, from.x, from.y);
+      break;
+    }
+  }
+
+  const destination = state.points.at(-1)!;
+  w.player.x = destination.x;
+  w.player.y = destination.y;
+  w.player.vx = 0;
+  w.player.vy = 0;
+  w.player.kx = 0;
+  w.player.ky = 0;
+  collideObstacles(w, w.player);
+  clampToArena(w, w.player);
+  w.player.invulnUntil = Math.max(w.player.invulnUntil, w.now + config.invulnerabilityMs);
+  w.player.anim = 'attack';
+  w.player.animStartedAt = w.now;
+  state.nextReadyAt = w.now + config.cooldownMs;
+  state.visibleUntil = w.now + 520;
+  w.shake = Math.max(w.shake, 5);
+  for (let index = 0; index < state.points.length; index += Math.max(1, Math.ceil(state.points.length / 10))) {
+    const point = state.points[index]!;
+    spawnParticles(w, point.x, point.y, index % 2 ? w.character.palette.glow : w.character.palette.accent, 3, 80);
+  }
+  w.popups.push({
+    x: w.player.x,
+    y: w.player.y - 30,
+    text: hitUids.size > 0 ? `FREEHAND ×${hitUids.size}` : 'FREEHAND',
+    color: w.character.palette.accentBright,
+    bornAt: w.now,
+    vy: 32,
+  });
+  pushSfx(w, 'dash');
+  return true;
 }
 
 /* ------------------------------------------------------------------ */

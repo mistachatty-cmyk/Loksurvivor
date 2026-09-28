@@ -5461,6 +5461,33 @@ export function targetViewForWidth(width: number, override?: number): number {
   return Math.max(1, override ?? (width < 620 ? 470 : Math.min(1500, width * 0.78)));
 }
 
+/** Completed Artiste marks linger in world space just long enough to read. */
+function drawArtisteTrail(ctx: CanvasRenderingContext2D, w: World) {
+  const state = w.artisteDraw;
+  if (!state || state.points.length < 2 || w.now >= state.visibleUntil) return;
+  const alpha = Math.max(0, Math.min(1, (state.visibleUntil - w.now) / 520));
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = w.character.palette.glow;
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = w.character.palette.accent;
+  ctx.lineWidth = 12;
+  ctx.beginPath();
+  ctx.moveTo(state.points[0]!.x, state.points[0]!.y);
+  for (let index = 1; index < state.points.length; index += 1) {
+    const point = state.points[index]!;
+    ctx.lineTo(point.x, point.y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = w.character.palette.accentBright;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewport) {
   const { width, height, dpr } = view;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
@@ -5560,6 +5587,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawObstacles(ctx, w, viewBounds);
   drawAwarenessArrow(ctx, w);
   drawRoamingDetectors(ctx, w);
+  drawArtisteTrail(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
   drawRunningMan(ctx, w);
   drawPlayerConeMark(ctx, w);

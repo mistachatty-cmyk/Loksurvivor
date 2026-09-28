@@ -769,6 +769,29 @@ export interface CharacterDef {
    * zero-day-freeze-throw.md.
    */
   freezeThrow?: FreezeThrowConfig;
+  /**
+   * Artiste's freeform draw-to-dodge weapon. The player arms the brush,
+   * draws a bounded polyline, then dodges to its endpoint while the stroke
+   * damages crossed enemies. Optional and inert for every other character.
+   */
+  artisteDraw?: ArtisteDrawConfig;
+}
+
+export interface ArtisteDrawConfig {
+  /** Maximum accumulated route length in world units. */
+  maxPathLength: number;
+  /** Maximum sampled vertices retained for one route. */
+  maxPoints: number;
+  /** Minimum distance between sampled vertices and minimum valid route length. */
+  minPointDistance: number;
+  /** Cooldown consumed only by a successfully committed route. */
+  cooldownMs: number;
+  /** Damage dealt once to each enemy crossed by the polyline. */
+  damage: number;
+  /** Half-width of the damaging painted trail. */
+  trailRadius: number;
+  /** Brief safety window after committing the dodge. */
+  invulnerabilityMs: number;
 }
 
 export interface FreezeThrowConfig {
