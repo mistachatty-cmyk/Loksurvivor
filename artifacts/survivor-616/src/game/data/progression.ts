@@ -184,7 +184,12 @@ export const ALLIES: AllyDef[] = [
     name: 'Denny Locke',
     role: 'Ferry hand',
     blurb: 'Still runs the crossing by hand-crank when the current gets weird, which is most nights now. Keeps a log of who came back and who didn\'t bother waiting for the ferry at all.',
-    room: 'the-storefront',
+    // 'the-storefront' redirects straight to the card-shop screen (see
+    // App.tsx's onChangeRoom special case) and never renders its own room
+    // view, so an ally assigned there is permanently unreachable -- moved
+    // to 'main-floor' instead. See .agents/memory/grpd-station.md's
+    // cautionary section for the sibling bug this matches.
+    room: 'main-floor',
     boost: { crit: 0.05 },
     boostLabel: '+5% crit',
     preferredActivityIds: ['walk-the-block', 'keep-the-lookbook'],
@@ -229,7 +234,7 @@ export const ALLIES: AllyDef[] = [
     name: 'Sister Constance',
     role: 'Courthouse clerk',
     blurb: 'Kept the civic plaza\'s records straight through everything that happened there. Says the fountain remembers more than the ledgers do.',
-    room: 'the-storefront',
+    room: 'main-floor',
     boost: { armor: 0.05 },
     boostLabel: '+5% armor',
     preferredActivityIds: ['file-the-ledgers', 'mind-the-register'],
@@ -528,6 +533,9 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'overflow-manual', name: 'The Overflow Manual', blurb: 'A laminated repair binder for machines that were never supposed to need repairing this often.' },
   { id: 'null-sector-log', name: 'The Null Sector Log', blurb: 'A maintenance log with no author field. Every entry ends the same way: "still running."' },
   { id: 'lev-core-archive', name: 'The Lev Core Archive', blurb: 'A cracked data slate salvaged from the singularity generator, still cycling schematics for a spire that was never finished.' },
+  { id: 'bubble-wash-cleanse', name: 'The Bubble Wash Cleanse', blurb: 'A siren-triggered wall of suds that scours the whole basin clean twice a shift, whether or not anyone is still standing in it.' },
+  { id: 'digital-soul-core', name: 'The Digital Soul Core', blurb: "A crystallized fragment of every human essence The Director's foundry has compiled so far. It hums when it recognizes a name." },
+  { id: 'tree-null-log', name: 'The Tree Null Log', blurb: "A growth ring cut from Yggdrasil Null's trunk, its rings encoded instead of counted -- one bio-digital season per line." },
   { id: 'grpd-station-found', name: 'GRPD Station — Division St.', blurb: 'A precinct nobody decommissioned on paper. The lights are still department-metered.' },
   { id: 'rapid-pressure-rooms-cleared', name: 'Rapid Shelter Reconnected', blurb: 'The Data-Gobs scattered, the pressure doors opened, and one Digi-Arch finally held a route long enough to bring the trapped Rapids through.' },
   { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },
