@@ -17,6 +17,7 @@ export interface DailyContractAdvance {
   completed: DailyContractDef[];
   rewardCred: number;
   rewardTokens: number;
+  rewardKeys: number;
 }
 
 /** Uses the player's local calendar, so the board turns over at local midnight. */
@@ -32,11 +33,12 @@ function dayNumber(dayKey: string): number {
   return [...dayKey].reduce((sum, character, index) => sum + character.charCodeAt(0) * (index + 11), 0);
 }
 
-/** Three deterministic contracts: a clear, a crowd-control quota, and a hold-the-line target. */
+/** Three deterministic contracts (a clear, a crowd-control quota, a hold-the-line target) plus one optional, tougher wildcard job. */
 export function dailyContractDefs(dayKey = contractDayKey()): DailyContractDef[] {
   const roll = dayNumber(dayKey);
   const killTarget = 60 + (roll % 3) * 20;
   const surviveTarget = 75 + (roll % 3) * 15;
+  const wildcardTarget = 150 + (roll % 4) * 25;
   return [
     {
       id: `${dayKey}:street-sweep`,
@@ -46,6 +48,7 @@ export function dailyContractDefs(dayKey = contractDayKey()): DailyContractDef[]
       targetCount: 1,
       rewardCred: 55 + (roll % 2) * 15,
       rewardTokens: 0,
+      rewardKeys: 0,
     },
     {
       id: `${dayKey}:crowd-control`,
@@ -55,6 +58,7 @@ export function dailyContractDefs(dayKey = contractDayKey()): DailyContractDef[]
       targetCount: killTarget,
       rewardCred: 65 + (roll % 3) * 10,
       rewardTokens: roll % 3 === 0 ? 1 : 0,
+      rewardKeys: 0,
     },
     {
       id: `${dayKey}:hold-the-signal`,
@@ -64,6 +68,17 @@ export function dailyContractDefs(dayKey = contractDayKey()): DailyContractDef[]
       targetCount: surviveTarget,
       rewardCred: 75 + (roll % 2) * 20,
       rewardTokens: 1,
+      rewardKeys: 0,
+    },
+    {
+      id: `${dayKey}:open-contract`,
+      name: 'Open Contract',
+      description: `Optional. Defeat ${wildcardTarget} enemies across your runs today for a rare payout.`,
+      kind: 'kill-any',
+      targetCount: wildcardTarget,
+      rewardCred: 40,
+      rewardTokens: 0,
+      rewardKeys: 1,
     },
   ];
 }
@@ -124,5 +139,6 @@ export function advanceDailyContracts(
     completed,
     rewardCred: completed.reduce((sum, contract) => sum + contract.rewardCred, 0),
     rewardTokens: completed.reduce((sum, contract) => sum + contract.rewardTokens, 0),
+    rewardKeys: completed.reduce((sum, contract) => sum + contract.rewardKeys, 0),
   };
 }

@@ -50,6 +50,7 @@ import {
   dailyContractDefs,
   dailyContractStatuses,
 } from '@/game/data/contracts';
+import { advanceLoginStreak } from '@/game/data/loginStreak';
 import {
   DEFAULT_UI_THEME_ID,
   HIDDEN_UI_THEME_IDS,
@@ -145,7 +146,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 18;
+const META_VERSION = 19;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -369,6 +370,9 @@ export function createInitialMeta(): MetaState {
     dailyContractDayKey: contractDayKey(),
     dailyContractProgressById: {},
     completedDailyContractIds: [],
+    // Empty, not today's key, so a brand-new player's first hub visit still claims day 1.
+    lastLoginStreakDayKey: '',
+    loginStreakCount: 0,
     claimedAchievementIds: [],
     defeatedDirectorIds: [],
     directorModeUnlocked: false,
@@ -816,6 +820,9 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
       lastFreeRefreshAt: typeof candidate.lastFreeRefreshAt === 'number' && Number.isFinite(candidate.lastFreeRefreshAt)
         ? Math.max(0, candidate.lastFreeRefreshAt)
         : undefined,
+      name: typeof candidate.name === 'string' && candidate.name.trim().length > 0
+        ? candidate.name.trim().slice(0, 24)
+        : undefined,
     }];
   }).slice(0, 48);
 }
@@ -1014,6 +1021,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const completedDailyContractIds = dailyContractDayKey === savedContractDay && Array.isArray(parsed.completedDailyContractIds)
     ? parsed.completedDailyContractIds.filter((id): id is string => typeof id === 'string' && validContractIds.has(id))
     : [];
+  const lastLoginStreakDayKey = typeof parsed.lastLoginStreakDayKey === 'string' ? parsed.lastLoginStreakDayKey : '';
+  const loginStreakCount = typeof parsed.loginStreakCount === 'number' && Number.isFinite(parsed.loginStreakCount)
+    ? Math.max(0, Math.floor(parsed.loginStreakCount))
+    : 0;
   const explicitEvolutionIds = idList(parsed.unlockedEvolutionIds, evolutionIds, []).filter((evolutionId) => {
     const evolution = EVOLUTIONS_BY_ID[evolutionId];
     return Boolean(evolution?.episodeId && completedEpisodeIds.includes(evolution.episodeId));
@@ -1198,6 +1209,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
+    lastLoginStreakDayKey,
+    loginStreakCount,
     claimedAchievementIds: idList(
       parsed.claimedAchievementIds,
       new Set(ACHIEVEMENTS.map((achievement) => achievement.id)),
@@ -1671,6 +1684,8 @@ type Action =
   | { type: 'feedLokPetTreat'; id: string }
   | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[] }
   | { type: 'toggleFavoriteLokPet'; id: string }
+  | { type: 'renameLokPet'; id: string; name: string }
+  | { type: 'claimDailyLogin'; now: number }
   | { type: 'equipLokPetTrinket'; id: string; trinketId?: string }
   | { type: 'draftStarterLokPets' }
   | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; characterId: string; now: number }
@@ -2019,6 +2034,45 @@ export function reducer(state: StoreState, action: Action): StoreState {
           savedLokPets: state.meta.savedLokPets.map((p) =>
             p.id === action.id ? { ...p, favorite: !p.favorite } : p,
           ),
+        },
+      };
+    }
+
+    case 'renameLokPet': {
+      const trimmed = action.name.trim().slice(0, 24);
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: state.meta.savedLokPets.map((p) =>
+            p.id === action.id ? { ...p, name: trimmed || undefined } : p,
+          ),
+        },
+      };
+    }
+
+    case 'claimDailyLogin': {
+      const advance = advanceLoginStreak(state.meta.lastLoginStreakDayKey, state.meta.loginStreakCount, action.now);
+      if (!advance.reward) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          lastLoginStreakDayKey: advance.dayKey,
+          loginStreakCount: advance.streakCount,
+          cred: state.meta.cred + advance.reward.rewardCred,
+          skeletonKeys: state.meta.skeletonKeys + advance.reward.rewardKeys,
+          pendingNotifications: [
+            ...state.meta.pendingNotifications,
+            {
+              id: `login-streak-${action.now}`,
+              title: `Day ${advance.streakCount} streak`,
+              body: advance.reward.rewardKeys > 0
+                ? `+${advance.reward.rewardCred} cred, +${advance.reward.rewardKeys} skeleton key. Come back tomorrow to keep it going.`
+                : `+${advance.reward.rewardCred} cred. Come back tomorrow to keep it going.`,
+              createdAt: action.now,
+            },
+          ],
         },
       };
     }
@@ -3023,7 +3077,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         cardCollection: (result.cardPacksFound ?? []).reduce((collection, packId, index) => mergeCardPulls(collection, rollCardPack(packId, createRng(((prev.totalRuns + 1) * 616 + result.kills * 17 + index * 97) >>> 0), CARD_MANIFESTS.map((card) => card.id))), prev.cardCollection),
         lokCollectorRuns: prev.lokCollectorRuns + (collectorRun ? 1 : 0),
         lokCollectorPetsFound: prev.lokCollectorPetsFound + collectorPetsFound,
-        skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained,
+        skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained + dailyContracts.rewardKeys,
         // Endless records
         endlessRecordDistancePx: result.endless
           ? Math.max(prev.endlessRecordDistancePx, result.endless.maxDistancePx)
@@ -3194,6 +3248,8 @@ export interface MetaContextValue {
   feedLokPetTreat: (id: string) => void;
   recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[]) => void;
   toggleFavoriteLokPet: (id: string) => void;
+  renameLokPet: (id: string, name: string) => void;
+  claimDailyLogin: () => void;
   equipLokPetTrinket: (id: string, trinketId?: string) => void;
   draftStarterLokPets: () => void;
   completeStarterLokPetOnboarding: (variantId: StarterLokPetId, characterId: string) => void;
@@ -3346,6 +3402,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     [],
   );
   const toggleFavoriteLokPet = useCallback((id: string) => dispatch({ type: 'toggleFavoriteLokPet', id }), []);
+  const renameLokPet = useCallback((id: string, name: string) => dispatch({ type: 'renameLokPet', id, name }), []);
+  const claimDailyLogin = useCallback(() => dispatch({ type: 'claimDailyLogin', now: Date.now() }), []);
   const equipLokPetTrinket = useCallback(
     (id: string, trinketId?: string) => dispatch({ type: 'equipLokPetTrinket', id, trinketId }),
     [],
@@ -3609,6 +3667,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       feedLokPetTreat,
       recordLokPetBattleResult,
       toggleFavoriteLokPet,
+      renameLokPet,
+      claimDailyLogin,
       equipLokPetTrinket,
       draftStarterLokPets,
       completeStarterLokPetOnboarding,
@@ -3735,6 +3795,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     feedLokPetTreat,
     recordLokPetBattleResult,
     toggleFavoriteLokPet,
+    renameLokPet,
+    claimDailyLogin,
     equipLokPetTrinket,
     draftStarterLokPets,
     completeStarterLokPetOnboarding,

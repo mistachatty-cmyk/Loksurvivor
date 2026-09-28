@@ -226,7 +226,9 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
                     <CheckCircle className="h-4 w-4 text-primary" /> {contract.name}
                   </span>
                   <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">
-                    +{contract.rewardCred} cred{contract.rewardTokens > 0 ? ` · +${contract.rewardTokens} token` : ''}
+                    +{contract.rewardCred} cred
+                    {contract.rewardTokens > 0 ? ` · +${contract.rewardTokens} token` : ''}
+                    {contract.rewardKeys > 0 ? ` · +${contract.rewardKeys} key` : ''}
                   </span>
                 </div>
               ))}

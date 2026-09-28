@@ -261,6 +261,7 @@ function Game() {
           name: contract.name,
           rewardCred: contract.rewardCred,
           rewardTokens: contract.rewardTokens,
+          rewardKeys: contract.rewardKeys,
         })),
       };
       completeRun(resultWithFatigue);

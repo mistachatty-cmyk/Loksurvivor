@@ -108,7 +108,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const { session } = useAuth();
   const { balance: lokBalance } = useLokEconomy();
@@ -151,6 +151,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     const timer = window.setInterval(refreshGeneratorIncome, 15_000);
     return () => window.clearInterval(timer);
   }, [refreshGeneratorIncome]);
+
+  // Once per hub mount -- claimDailyLogin itself is a no-op if today's bonus is already claimed.
+  useEffect(() => {
+    claimDailyLogin();
+  }, [claimDailyLogin]);
 
   /**
    * Optional procedural ambience for the room you are standing in. Off unless
@@ -214,7 +219,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
           <LokPetIcon silhouette={companion.roll.silhouette} palette={companion.roll.palette} size={42} />
           <div className="min-w-0">
-            <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.roll.name}</p>
+            <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p>
             <p className="font-mono text-[8px] uppercase tracking-wider text-white/55">
               {companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}
             </p>
@@ -618,6 +623,15 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           testId="section-first-night-contracts"
         >
           <FirstNightBoard compact />
+          {meta.loginStreakCount > 0 ? (
+            <div
+              className="mt-3 flex items-center gap-2 border border-amber-400/40 bg-amber-500/[0.08] px-4 py-2 text-xs font-bold uppercase tracking-widest text-amber-200"
+              data-testid="login-streak-chip"
+            >
+              <Flame className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+              Day {meta.loginStreakCount} streak
+            </div>
+          ) : null}
           <div className="mt-3">
             <ContractBoard onHeadOut={() => onOpen('runs')} />
           </div>
