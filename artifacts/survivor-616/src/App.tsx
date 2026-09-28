@@ -8,6 +8,8 @@ import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { AuthProvider } from '@/state/authStore';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
+import { LokEconomyProvider, useLokEconomy } from '@/state/lokEconomyStore';
+import { getEnemy } from '@/game/data/enemies';
 import {
   FATIGUE_PER_RUN_PCT,
   getLokPetDiscoveries,
@@ -155,12 +157,17 @@ function Game() {
   const [roomId, setRoomId] = useState('main-floor');
   const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
+  const { earn: earnLokTokens } = useLokEconomy();
 
   const goHub = useCallback(() => {
     sfx.play('uiNav');
     enterHideout();
+    // Daily cap of 1 (per lok_earn_rules) makes repeat hub visits the same
+    // day a safe no-op server-side; the date-scoped idemKey below just keeps
+    // the ledger's ref readable, it isn't what prevents double-crediting.
+    earnLokTokens('daily_login', { refType: 'day', refId: new Date().toISOString().slice(0, 10) });
     setScreen({ name: 'hub' });
-  }, [enterHideout, sfx]);
+  }, [enterHideout, sfx, earnLokTokens]);
 
   const prepareRun = useCallback((run: Omit<Extract<Screen, { name: 'run' }>, 'name'>) => {
     // Looks & LokPets is a persistent preference surface, not a mandatory
@@ -260,9 +267,18 @@ function Game() {
       // Campaign credit follows the mission's own objectives, not the run's
       // generic `cleared` -- otherwise idling out the clock banks the mission.
       if (result.missionId && result.missionComplete) completeSectorMission(result.missionId);
+
+      const runRef = { refType: 'run', refId: `${result.areaId}-${Date.now()}` };
+      earnLokTokens('run_complete', runRef);
+      if (result.cleared) earnLokTokens('area_cleared', runRef);
+      const killedBoss = Object.keys(result.killsByEnemy).some(
+        (enemyId) => getEnemy(enemyId).family === 'Boss',
+      );
+      if (killedBoss) earnLokTokens('boss_kill', runRef);
+
       setScreen({ name: 'summary', result: resultWithFatigue });
     },
-    [completeRun, completeSectorMission, meta.fatigueByCharacter, meta.knownRelicIds],
+    [completeRun, completeSectorMission, meta.fatigueByCharacter, meta.knownRelicIds, earnLokTokens],
   );
 
   const lastTravelEncounterAtRef = useRef(0);
@@ -535,11 +551,13 @@ function Providers({ children }: { children: ReactNode }) {
       <AuthProvider>
         <MetaProvider>
           <CloudSyncProvider>
-            <MusicProvider>
-              {children}
-              <MusicNowPlaying />
-              <FocusWidgetMount />
-            </MusicProvider>
+            <LokEconomyProvider>
+              <MusicProvider>
+                {children}
+                <MusicNowPlaying />
+                <FocusWidgetMount />
+              </MusicProvider>
+            </LokEconomyProvider>
           </CloudSyncProvider>
         </MetaProvider>
       </AuthProvider>
