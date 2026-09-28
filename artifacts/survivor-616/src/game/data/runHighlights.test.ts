@@ -12,6 +12,7 @@ function baseWorld(overrides: Partial<RunHighlightObservable> = {}): RunHighligh
     ultActiveUntil: 0,
     rescue: { status: 'pending' },
     player: { hp: 100, maxHp: 100 },
+    audio: { energy: 0, source: 'none' },
     ...overrides,
   };
 }
@@ -128,6 +129,33 @@ test('kill streak has a cooldown so a sustained kill rate does not spam it every
   for (let i = 1; i < streaks.length; i += 1) {
     assert.ok(streaks[i]!.atMs - streaks[i - 1]!.atMs > 12_000);
   }
+});
+
+test('music surge fires on the rising edge past the energy threshold', () => {
+  const recorder = createRunHighlightRecorder();
+  recorder.observe(baseWorld({ now: 0, audio: { energy: 0.4, source: 'detected' } }));
+  recorder.observe(baseWorld({ now: 500, audio: { energy: 0.9, source: 'detected' } }));
+  const surges = recorder.getHighlights().filter((h) => h.kind === 'music-surge');
+  assert.equal(surges.length, 1);
+  assert.equal(surges[0]?.atMs, 500);
+});
+
+test('music surge does not fire while nothing is playing, even at high reported energy', () => {
+  const recorder = createRunHighlightRecorder();
+  recorder.observe(baseWorld({ now: 0, audio: { energy: 0, source: 'none' } }));
+  recorder.observe(baseWorld({ now: 500, audio: { energy: 0.95, source: 'none' } }));
+  const surges = recorder.getHighlights().filter((h) => h.kind === 'music-surge');
+  assert.equal(surges.length, 0);
+});
+
+test('music surge only fires once while energy stays sustained above threshold', () => {
+  const recorder = createRunHighlightRecorder();
+  recorder.observe(baseWorld({ now: 0, audio: { energy: 0.4, source: 'detected' } }));
+  recorder.observe(baseWorld({ now: 500, audio: { energy: 0.9, source: 'detected' } }));
+  recorder.observe(baseWorld({ now: 1000, audio: { energy: 0.92, source: 'detected' } }));
+  recorder.observe(baseWorld({ now: 1500, audio: { energy: 0.88, source: 'detected' } }));
+  const surges = recorder.getHighlights().filter((h) => h.kind === 'music-surge');
+  assert.equal(surges.length, 1);
 });
 
 test('getHighlights returns highlights sorted by time', () => {
