@@ -2096,6 +2096,8 @@ export interface MetaState {
   musicReactiveEnabled: boolean;
   /** Optional procedural room ambience in the hideout (rain, pipe hum, cellar drips). Off by default. */
   hideoutAmbienceEnabled: boolean;
+  /** Shows a brief "arriving outside in the rain, then step inside" scene once per session before the hideout menu. On by default. */
+  hideoutArrivalEnabled: boolean;
   /** Visual hideout weather -- clouds, fliers, and the per-room particle layer. On by default (silent CSS decoration, unlike the audio ambience above). */
   hideoutWeatherEnabled: boolean;
   /** The bot-piloted background simulation on the title screen (see AttractMode.tsx). On by default. */

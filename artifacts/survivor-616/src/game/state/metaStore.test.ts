@@ -73,6 +73,18 @@ test('the title-screen background sim defaults on, migrates an old localStorage 
   assert.equal(updated.meta.attractModeEnabled, false);
 });
 
+test('the hideout arrival scene defaults on, migrates safely, and is toggleable', () => {
+  assert.equal(createInitialMeta().hideoutArrivalEnabled, true);
+  assert.equal(normalizeMeta({ version: 1 }).hideoutArrivalEnabled, true);
+  assert.equal(normalizeMeta({ version: 1, hideoutArrivalEnabled: false }).hideoutArrivalEnabled, false);
+
+  const updated = reducer(
+    { meta: createInitialMeta(), lastRun: null },
+    { type: 'setHideoutArrival', enabled: false },
+  );
+  assert.equal(updated.meta.hideoutArrivalEnabled, false);
+});
+
 test('soundtrack objective progress safely defaults for older saves', () => {
   assert.equal(createInitialMeta().soundtrackObjectiveCompletions, 0);
   assert.equal(normalizeMeta({ version: 1 }).soundtrackObjectiveCompletions, 0);

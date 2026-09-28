@@ -71,6 +71,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setMusicReactive,
     setSfxEnabled,
     setHideoutAmbience,
+    setHideoutArrival,
     setAttractMode,
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
@@ -377,6 +378,30 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     data-testid="button-toggle-hideout-ambience"
                   >
                     {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Hideout arrival scene</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      Once per session, land outside the hideout in the rain before stepping in -- the rain runs loud
+                      out there and settles down once you go inside. Turn it off to skip straight to the menu every time.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setHideoutArrival(!meta.hideoutArrivalEnabled)}
+                    aria-pressed={meta.hideoutArrivalEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.hideoutArrivalEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-hideout-arrival"
+                  >
+                    {meta.hideoutArrivalEnabled ? 'On' : 'Off'}
                   </button>
                 </div>
               </div>
