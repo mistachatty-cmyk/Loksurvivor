@@ -44,6 +44,12 @@ interface HumanoidOptions {
   cloudHair?: boolean;
   /** Replaces the two thin legs with a single wide, stepped base -- flared trousers or a hakama stance. */
   flarePants?: boolean;
+  /** Adds a solid accent-colored band across the face, replacing the default face stripe -- a mask, visor, or bandana silhouette. */
+  visor?: boolean;
+  /** Adds a wide drape behind the torso, from the ground to shoulder height -- a cape or long coat silhouette. */
+  cape?: boolean;
+  /** Adds a small accent-colored square centered on the torso -- a chest logo/emblem silhouette, independent of body/accent color choice. */
+  chestEmblem?: boolean;
 }
 
 export type ExpressiveStyle = 'prism' | 'flame' | 'spiral' | 'river' | 'astral';
@@ -230,6 +236,9 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
     hunched = false,
     cloudHair = false,
     flarePants = false,
+    visor = false,
+    cape = false,
+    chestEmblem = false,
   } = options;
 
   const effectiveWidth = width + (bulk ? 3 : 0) - (hunched ? 2 : 0);
@@ -253,6 +262,11 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
       { key: 'aura', x: -half - 5, y: legH + 2, w: 5, h: torsoH, color: 'glow', z: 0 },
       { key: 'aura', x: half, y: legH + 2, w: 5, h: torsoH, color: 'glow', z: 0 },
     );
+  }
+  if (cape) {
+    // Drawn before the legs/torso so it reads as a drape behind the body,
+    // not a cloak worn over it.
+    parts.push({ key: 'crest', x: -half - 1, y: 0, w: effectiveWidth + 2, h: legH + torsoH - 1, color: 'ink', z: 0 });
   }
 
   if (seated) {
@@ -289,6 +303,14 @@ export function humanoidRig(options: HumanoidOptions = {}): SpriteRig {
   }
   if (hood) {
     parts.push({ key: 'crest', x: -half, y: legH + torsoH + headH - 2, w: effectiveWidth, h: 3, color: 'bodyDark', z: 6 });
+  }
+  if (visor) {
+    // Wider and drawn after 'face' so it fully covers the default face
+    // stripe -- a mask/visor/bandana silhouette instead of a bare face.
+    parts.push({ key: 'crest', x: -half + 1, y: legH + torsoH + Math.floor(headH / 2) - 1, w: effectiveWidth - 2, h: 3, color: 'accent', z: 7 });
+  }
+  if (chestEmblem) {
+    parts.push({ key: 'crest', x: -1, y: legH + Math.floor(torsoH / 2) - 1, w: 2, h: 2, color: 'accentBright', z: 4 });
   }
   if (staff) {
     parts.push(
