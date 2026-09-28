@@ -67,6 +67,7 @@ import { useGyroInput } from '@/game/input/gyro';
 import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld, targetViewForWidth } from '@/game/render/draw';
+import { detectRuntimePerformanceTier } from '@/game/performanceProfile';
 import {
   effectiveStats,
   giantSizeMult,
@@ -187,6 +188,12 @@ function formatClock(seconds: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatPopulation(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 0 : 1)}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
+  return String(value);
 }
 
 export function RunScreen({
@@ -401,6 +408,7 @@ export function RunScreen({
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && pet.stamina > 0).map((pet) => ({ ...pet.roll, level: pet.level ?? 1 })),
         modifiers: meta.runModifiers,
         graphicsQuality: meta.graphicsQuality,
+        runtimePerformanceTier: detectRuntimePerformanceTier(),
         worldColorPalette: activeWorldPalette,
         worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
         activeDirectorPersonalityId: meta.activeDirectorPersonalityId,
@@ -1564,6 +1572,16 @@ export function RunScreen({
           </aside>
         ) : null}
       </div>
+
+      {hud?.millionHorde ? (
+        <div
+          className="pointer-events-none absolute left-1/2 top-[max(4rem,calc(env(safe-area-inset-top)+3.85rem))] z-40 -translate-x-1/2 border border-red-300/35 bg-black/80 px-2.5 py-1 text-center font-mono uppercase shadow-[0_0_18px_rgba(248,113,113,.18)]"
+          data-testid="hud-million-horde"
+        >
+          <span className="block text-[10px] font-black tracking-[.18em] text-red-200">{formatPopulation(hud.millionHorde.population)} horde</span>
+          <span className="block text-[7px] tracking-wider text-white/55">{hud.millionHorde.liveActors} live · {formatPopulation(hud.millionHorde.defeatedPopulation)} broken</span>
+        </div>
+      ) : null}
 
       {area.endless && hud?.endless && meta.minimapVisible ? (
         <Minimap

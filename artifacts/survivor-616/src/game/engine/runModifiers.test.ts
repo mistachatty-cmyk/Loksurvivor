@@ -5,7 +5,7 @@ import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { HORDE_SPIN_TIERS } from '@/game/data/hordeSpin';
 import { DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
-import { createWorld, NORMAL_ENEMY_CAP, stepWorld, UNLEASHED_ENEMY_CAP } from '@/game/engine/world';
+import { createWorld, hudSnapshot, MILLION_HORDE_MAX_POPULATION, NORMAL_ENEMY_CAP, stepWorld, UNLEASHED_ENEMY_CAP } from '@/game/engine/world';
 import { normalizeMeta } from '@/game/state/metaStore';
 import type { AreaDef, WaveDef } from '@/game/types';
 
@@ -88,6 +88,46 @@ test('unleashedMode uses independent 8x pressure and raises only its own live-en
 test('unleashedMode survives save normalization and rejects non-boolean lookalikes', () => {
   assert.equal(normalizeMeta({ version: 15, runModifiers: { unleashedMode: true } }).runModifiers.unleashedMode, true);
   assert.equal(normalizeMeta({ version: 15, runModifiers: { unleashedMode: 'true' } }).runModifiers.unleashedMode, undefined);
+});
+
+test('millionHordeMode represents millions while bounding allocated actors to the device tier', () => {
+  const area = areaWithWave(immediateWave);
+  const character = CHARACTERS[0]!;
+  const world = createWorld(area, character, character.stats, 1, [], 1, true, null, {
+    graphicsQuality: 'performance',
+    runtimePerformanceTier: 'constrained-mobile',
+    modifiers: { millionHordeMode: true, unleashedMode: true, quadSpawnMode: true },
+  });
+  world.player.invulnUntil = Number.POSITIVE_INFINITY;
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < 10; i += 1) stepWorld(world, 1 / 30, neutralInput);
+
+  const horde = hudSnapshot(world).millionHorde;
+  assert.ok(horde, 'Million Horde should publish its represented population');
+  assert.equal(world.enemies.length, 120, 'a compatibility phone must never allocate beyond its actor budget');
+  assert.equal(horde.liveActors, 120);
+  assert.ok(horde.population > 1_000_000, 'the mode should cross a million represented enemies without a million actor objects');
+});
+
+test('millionHordeMode survives save normalization and rejects non-boolean lookalikes', () => {
+  assert.equal(normalizeMeta({ version: 15, runModifiers: { millionHordeMode: true } }).runModifiers.millionHordeMode, true);
+  assert.equal(normalizeMeta({ version: 15, runModifiers: { millionHordeMode: 'true' } }).runModifiers.millionHordeMode, undefined);
+});
+
+test('millionHordeMode collapses extreme custom spawn rates into one bounded aggregate', () => {
+  const area = areaWithWave({ ...immediateWave, ratePerSec: 1_000_000 });
+  const character = CHARACTERS[0]!;
+  const world = createWorld(area, character, character.stats, 1, [], 1, true, null, {
+    graphicsQuality: 'performance',
+    runtimePerformanceTier: 'constrained-mobile',
+    modifiers: { millionHordeMode: true },
+  });
+  world.player.invulnUntil = Number.POSITIVE_INFINITY;
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  stepWorld(world, 1 / 30, neutralInput);
+
+  assert.equal(world.enemies.length, 120);
+  assert.equal(hudSnapshot(world).millionHorde?.population, MILLION_HORDE_MAX_POPULATION);
 });
 
 test('scalerMode raises enemy hp with the player level, capped', () => {

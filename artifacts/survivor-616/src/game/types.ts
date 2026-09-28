@@ -1326,6 +1326,8 @@ export interface RunModifiers {
   quadSpawnMode?: boolean;
   /** Raises the live-enemy cap to 1,000 and uses an optimized 8x spawn cadence. */
   unleashedMode?: boolean;
+  /** Represents millions of enemies through a bounded live simulation plus an aggregated crowd layer. */
+  millionHordeMode?: boolean;
   /** Mirrors the area's obstacle layout left-to-right at run start. */
   invertedMap?: boolean;
   /** Raises player and enemy movement speed. */
@@ -1346,6 +1348,9 @@ export interface RunModifiers {
    */
   directorModeEnabled?: boolean;
 }
+
+export type GraphicsQuality = 'high' | 'balanced' | 'performance';
+export type RuntimePerformanceTier = 'constrained-mobile' | 'standard-mobile' | 'high-mobile' | 'desktop';
 
 /* ------------------------------------------------------------------ */
 /* Director events                                                     */
@@ -2058,7 +2063,7 @@ export interface MetaState {
    * counts, damage popups, enemy outlines/shadows) starting at progressively
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
-  graphicsQuality: 'high' | 'balanced' | 'performance';
+  graphicsQuality: GraphicsQuality;
   /**
    * Render pacing preference. The simulation remains fixed at 60 Hz, while
    * 120 Hz redraws input and presentation between simulation updates on
@@ -2508,6 +2513,8 @@ export interface HudSnapshot {
   elapsedSec: number;
   durationSec: number;
   kills: number;
+  /** Million Horde only: total represented population and its bounded live subset. */
+  millionHorde?: { population: number; peakPopulation: number; defeatedPopulation: number; liveActors: number };
   cred: number;
   ultimateReadyPct: number;
   ultimateActive: boolean;

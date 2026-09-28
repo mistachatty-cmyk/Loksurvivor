@@ -5498,6 +5498,50 @@ function drawActors(
   drawGuests(ctx, w);
 }
 
+/** Constant-cost density proxy for Million Horde. Each mark represents a
+ * crowd cell containing thousands of aggregated enemies; fully interactive
+ * actors are still drawn by drawActors above this layer. */
+function drawMillionHordeDensity(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds) {
+  const horde = w.millionHorde;
+  if (!horde || horde.virtualPopulation < 1_000) return;
+
+  const maxMarks = w.graphicsQuality === 'performance' ? 72 : w.graphicsQuality === 'balanced' ? 128 : 220;
+  const density = clamp(Math.log10(horde.virtualPopulation) / 7, 0.15, 1);
+  const markCount = Math.max(24, Math.round(maxMarks * density));
+  const width = bounds.right - bounds.left;
+  const height = bounds.bottom - bounds.top;
+  const phase = w.now / 900;
+
+  ctx.save();
+  ctx.fillStyle = '#ef4444';
+  ctx.strokeStyle = '#fecaca';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < markCount; i += 1) {
+    // Irrational multipliers form a stable, allocation-free scatter. The
+    // small phase offset makes the mass breathe without changing gameplay.
+    const ux = (i * 0.61803398875 + (w.rngSeed % 97) * 0.013) % 1;
+    const uy = (i * 0.41421356237 + (w.rngSeed % 53) * 0.017) % 1;
+    const x = bounds.left + ux * width + Math.sin(phase + i) * 3;
+    const y = bounds.top + uy * height + Math.cos(phase * 0.8 + i * 0.7) * 2;
+    const dx = x - w.player.x;
+    const dy = y - w.player.y;
+    if (dx * dx + dy * dy < 95 * 95) continue;
+    const size = 2.5 + (i % 4) * 0.8;
+    ctx.globalAlpha = 0.1 + density * 0.16;
+    ctx.beginPath();
+    ctx.moveTo(x, y - size * 1.8);
+    ctx.lineTo(x - size, y + size);
+    ctx.lineTo(x + size, y + size);
+    ctx.closePath();
+    ctx.fill();
+    if (i % 7 === 0) {
+      ctx.globalAlpha = 0.12 + density * 0.12;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 /**
  * LokSurvivorArena: guests get a plain rig draw -- shadow, rig, name/kill
  * tag -- deliberately skipping the host's aura/dash/palette-effect
@@ -5773,6 +5817,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawEndlessRouteEvent(ctx, w);
   drawBuildingInterior(ctx, w);
   drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
+  drawMillionHordeDensity(ctx, w, viewBounds);
   drawLightPool(ctx, w);
   drawLandmark(ctx, w);
   drawDistrictIncursion(ctx, w);

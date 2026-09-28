@@ -225,6 +225,7 @@ function normalizeRunModifiers(value: unknown): RunModifiers {
   if (value.doubleMode === true) modifiers.doubleMode = true;
   if (value.quadSpawnMode === true) modifiers.quadSpawnMode = true;
   if (value.unleashedMode === true) modifiers.unleashedMode = true;
+  if (value.millionHordeMode === true) modifiers.millionHordeMode = true;
   if (value.invertedMap === true) modifiers.invertedMap = true;
   if (value.speedMode === true) modifiers.speedMode = true;
   if (value.scalerMode === true) modifiers.scalerMode = true;

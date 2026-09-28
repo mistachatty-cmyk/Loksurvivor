@@ -70,6 +70,7 @@ test.describe('hideout custom map builder', () => {
       );
     }, initialMeta);
     await page.goto('/?screen=areas');
+    await page.getByTestId('button-area-filter-bonus').click();
 
     const card = page.getByTestId('button-custom-map-custom-empty-route');
     await expect(card).toBeVisible();
@@ -107,6 +108,7 @@ test.describe('hideout custom map builder', () => {
       );
     }, initialMeta);
     await page.goto('/?screen=areas');
+    await page.getByTestId('button-area-filter-bonus').click();
     await page.getByTestId('button-custom-map-custom-playable-route').click();
     await expect(page.getByTestId('screen-run')).toBeVisible();
   });
@@ -160,5 +162,29 @@ test.describe('mobile hideout regression', () => {
     await page.getByTestId('button-hideout-computer').click();
     await expect(page.getByText('616 / map builder')).toBeVisible();
     expect(runtimeErrors).toEqual([]);
+  });
+});
+
+test.describe('mobile map categories', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test('keeps category overflow inside its row and exposes authored bonus maps', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('survivor616.meta.v1', JSON.stringify({
+        version: 15,
+        onboarded: true,
+        devModeAccessUnlocked: true,
+        devModeAllUnlocks: true,
+      }));
+    });
+    await page.goto('/?screen=areas');
+
+    const strip = page.getByTestId('area-category-strip');
+    await expect(strip).toBeVisible();
+    expect(await strip.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    await page.getByTestId('button-area-filter-bonus').click();
+    await expect(page.getByTestId('button-area-mirror-mile')).toBeVisible();
   });
 });
