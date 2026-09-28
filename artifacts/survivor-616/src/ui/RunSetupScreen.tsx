@@ -6,6 +6,7 @@ import type { MetaState } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
 import { RigPortrait } from '@/ui/RigPortrait';
 import { THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
+import { detectRuntimePerformanceTier, RUNTIME_TIER_LABELS } from '@/game/performanceProfile';
 
 type SetupStep = 'companion' | 'look';
 
@@ -27,9 +28,9 @@ const ART_STYLES: Array<{
 ];
 
 const GRAPHICS: Array<{ id: MetaState['graphicsQuality']; label: string; description: string }> = [
-  { id: 'performance', label: 'Potato', description: 'Lowest visual load.' },
-  { id: 'balanced', label: 'Mid', description: 'Balanced for most phones.' },
-  { id: 'high', label: 'High', description: 'Full visual detail.' },
+  { id: 'performance', label: 'Compatibility', description: 'Older phones and long sessions.' },
+  { id: 'balanced', label: 'Balanced', description: 'Stable detail for most phones.' },
+  { id: 'high', label: 'High', description: 'iPhone 17 Pro-class and desktop.' },
 ];
 
 const BORDERS: Array<{ id: MetaState['uiBorderStyle']; label: string; icon: typeof Grid3X3 }> = [
@@ -77,6 +78,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const isLaunch = intent === 'launch';
   const ownedPalettes = meta.ownedPaletteIds.map((id) => THEMED_PALETTES_BY_ID[id]).filter(Boolean);
   const paletteIndex = Math.max(0, ownedPalettes.findIndex((palette) => palette.id === meta.activePaletteId));
+  const runtimeTier = detectRuntimePerformanceTier();
 
   const continueWithCompanion = () => {
     setLokPetLoadout(selectedPetId ? [selectedPetId] : []);
@@ -265,8 +267,9 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
 
               <section className="border border-white/15 bg-white/[.03] p-4">
                 <h3 className="flex items-center gap-2 text-sm font-black uppercase"><Cpu className="h-4 w-4 text-cyan-200" /> Device mode</h3>
-                <p className="mt-1 text-xs text-white/55">Only trims decorative effects—never difficulty or rewards.</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <p className="mt-1 text-xs text-white/55">Detected: <span className="font-bold text-cyan-100">{RUNTIME_TIER_LABELS[runtimeTier]}</span>. Difficulty and rewards stay identical.</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-white/45">Million Horde adapts its fully simulated nearby crowd to this device while the larger population stays aggregated.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   {GRAPHICS.map((option) => (
                     <button key={option.id} type="button" onClick={() => setGraphicsQualityChoice(option.id)} className={`border p-3 text-left transition ${graphicsQuality === option.id ? selectClass(true) : selectClass(false)}`} aria-pressed={graphicsQuality === option.id} data-testid={`button-run-graphics-${option.id}`}>
                       <p className="text-xs font-black uppercase">{option.label}</p>

@@ -6,6 +6,7 @@ import { describeUnlock, useMeta } from '@/game/state/metaStore';
 import { customMapToArea, customMapValidationIssues } from '@/game/data/customMaps';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import { getFirstNightChapter } from '@/game/data/firstNight';
+import { areaCategory, type AreaCategory } from '@/game/data/areaCategories';
 import { ScreenLayout } from './ScreenLayout';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion } from 'framer-motion';
@@ -39,15 +40,9 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const customMaps = meta.customMaps;
   const challenges = availableChallengeContracts(meta);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
-  type MapFilter = 'standard' | 'bonus' | '2x' | 'endless';
-  const [filter, setFilter] = useState<MapFilter>('standard');
+  const [filter, setFilter] = useState<AreaCategory>('standard');
 
-  const inFilter = (area: (typeof unlockedAreas)[number], nextFilter: MapFilter) => {
-    if (nextFilter === 'endless') return Boolean(area.endless);
-    if (nextFilter === '2x') return area.id.endsWith('-2x');
-    if (nextFilter === 'bonus') return false;
-    return !area.endless && !area.id.endsWith('-2x');
-  };
+  const inFilter = (area: (typeof unlockedAreas)[number], nextFilter: AreaCategory) => areaCategory(area) === nextFilter;
 
   const toggleChallenge = (id: string) => {
     setSelectedChallengeIds((current) => {
@@ -64,10 +59,11 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
     return inFilter(a, filter);
   });
 
-  const endlessCount = unlockedAreas.filter((a) => a.endless).length + lockedAreas.filter((a) => a.endless).length;
-  const standardCount = unlockedAreas.filter((a) => !a.endless).length + lockedAreas.filter((a) => !a.endless).length;
-  const twoXCount = [...unlockedAreas, ...lockedAreas].filter((a) => a.id.endsWith('-2x')).length;
-  const bonusCount = customMaps.length;
+  const allAuthoredAreas = [...unlockedAreas, ...lockedAreas];
+  const endlessCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'endless').length;
+  const standardCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'standard').length;
+  const twoXCount = allAuthoredAreas.filter((area) => areaCategory(area) === '2x').length;
+  const bonusCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'bonus').length + customMaps.length;
 
   return (
     <ScreenLayout 
@@ -124,12 +120,13 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
       )}
 
       {/* Mode Filters */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
-        <div className="flex items-center gap-2">
+      <div className="mb-6 min-w-0 border-b border-border/60 pb-4">
+        <div className="flex max-w-full snap-x snap-mandatory items-center gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="area-category-strip">
           <button
             type="button"
             onClick={() => setFilter('endless')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border ${
+            data-testid="button-area-filter-endless"
+            className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border ${
               filter === 'endless'
                 ? 'border-cyan-400 bg-cyan-400 text-black shadow-[0_0_15px_rgba(34,211,238,0.3)]'
                 : 'border-border bg-card text-muted-foreground hover:border-cyan-400/60 hover:text-cyan-300'
@@ -141,25 +138,26 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
           <button
             type="button"
             onClick={() => setFilter('standard')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border ${
+            data-testid="button-area-filter-standard"
+            className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border ${
               filter === 'standard'
                 ? 'border-white bg-white text-black'
                 : 'border-border bg-card text-muted-foreground hover:border-white/60 hover:text-white'
             }`}
           >
             <Clock className="h-3.5 w-3.5" />
-            Standard ({Math.max(0, standardCount - twoXCount)})
+            Standard ({standardCount})
           </button>
-          <button type="button" onClick={() => setFilter('bonus')} className={`flex items-center gap-1.5 border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === 'bonus' ? 'border-violet-300 bg-violet-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-violet-300/60 hover:text-violet-200'}`}>
+          <button type="button" onClick={() => setFilter('bonus')} data-testid="button-area-filter-bonus" className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === 'bonus' ? 'border-violet-300 bg-violet-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-violet-300/60 hover:text-violet-200'}`}>
             <Layers className="h-3.5 w-3.5" /> Bonus Maps ({bonusCount})
           </button>
-          <button type="button" onClick={() => setFilter('2x')} className={`flex items-center gap-1.5 border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === '2x' ? 'border-orange-300 bg-orange-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-orange-300/60 hover:text-orange-200'}`}>
+          <button type="button" onClick={() => setFilter('2x')} data-testid="button-area-filter-2x" className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === '2x' ? 'border-orange-300 bg-orange-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-orange-300/60 hover:text-orange-200'}`}>
             <Maximize2 className="h-3.5 w-3.5" /> 2× Maps ({twoXCount})
           </button>
         </div>
 
         {filter === 'endless' && (
-          <div className="flex items-center gap-2 text-[11px] font-mono text-cyan-200/90">
+          <div className="mt-2 flex min-w-0 items-center gap-2 text-[11px] font-mono text-cyan-200/90">
             <Compass className="h-3.5 w-3.5 text-cyan-400" />
             <span>Unbounded 640px procedural grid · Subterranean vaults & rooftop networks</span>
           </div>

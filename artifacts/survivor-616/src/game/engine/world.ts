@@ -44,6 +44,7 @@ import type { SfxCueId, SfxEvent } from '@/game/audio/sfxCues';
 import { reactionIntensity, reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type { MusicEventEffect } from '@/game/data/musicEvents';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
+import { millionHordeActorCap } from '@/game/performanceProfile';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -92,6 +93,7 @@ import type {
   SectorMissionDef,
   SectorStructureDef,
   ThreatCalibrations,
+  RuntimePerformanceTier,
 } from '@/game/types';
 
 import {
@@ -1156,6 +1158,14 @@ export interface World {
   districtIncursion?: DistrictIncursionState;
   /** Run-wide toggles picked on the Roster screen. See `RunModifiers`. */
   modifiers: RunModifiers;
+  /** Capability tier detected once at launch; only bounds Million Horde's fully simulated near field. */
+  runtimePerformanceTier: RuntimePerformanceTier;
+  /** Aggregated population that replaces millions of individual actor allocations. */
+  millionHorde: {
+    virtualPopulation: number;
+    peakPopulation: number;
+    defeatedPopulation: number;
+  } | null;
   /**
    * Player's persistent graphics preference (Settings), read once at
    * creation. Render-only -- affects decorative density (particles, damage
@@ -1241,6 +1251,8 @@ export interface ElectricChain {
 
 export const NORMAL_ENEMY_CAP = 190;
 export const UNLEASHED_ENEMY_CAP = 1000;
+export const MILLION_HORDE_REPRESENTATION_PER_SPAWN = 2048;
+export const MILLION_HORDE_MAX_POPULATION = 10_000_000;
 const UNLEASHED_PROJECTILE_BUDGET = 260;
 const UNLEASHED_ENEMY_EFFECT_BUDGET = 180;
 /**
@@ -1333,6 +1345,7 @@ export function createWorld(
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
     graphicsQuality?: 'high' | 'balanced' | 'performance';
+    runtimePerformanceTier?: RuntimePerformanceTier;
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
     /** Which Director personality to spawn for the Director encounter -- see `MetaState.activeDirectorPersonalityId`. */
@@ -1637,6 +1650,10 @@ export function createWorld(
         }
       : undefined,
     modifiers,
+    runtimePerformanceTier: setup.runtimePerformanceTier ?? 'high-mobile',
+    millionHorde: modifiers.millionHordeMode
+      ? { virtualPopulation: 0, peakPopulation: 0, defeatedPopulation: 0 }
+      : null,
     graphicsQuality: setup.graphicsQuality ?? 'high',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
@@ -1960,6 +1977,7 @@ function modifierHpMult(w: World): number {
 
 /** Flat spawn-rate multiplier from run modifiers. See `modifierHpMult` for the endless-cap caveat. */
 function modifierSpawnMult(w: World): number {
+  if (w.modifiers.millionHordeMode) return 16;
   if (w.modifiers.unleashedMode) return 8;
   if (w.modifiers.quadSpawnMode) return 4;
   return w.modifiers.doubleMode ? 2 : 1;
@@ -1982,17 +2000,22 @@ function directorWaveSpawnMult(w: World, factionName?: string): number {
 }
 
 function enemyCap(w: World): number {
+  if (w.modifiers.millionHordeMode) {
+    // This is a hardware safety ceiling, so challenge density may fill it
+    // faster but must never expand it.
+    return millionHordeActorCap(w.runtimePerformanceTier, w.graphicsQuality);
+  }
   const base = w.modifiers.unleashedMode ? UNLEASHED_ENEMY_CAP : NORMAL_ENEMY_CAP;
   const densityMult = w.threatCalibrations?.densityMult ?? 1;
   return Math.round(base * densityMult);
 }
 
 function canSpawnEnemyProjectile(w: World): boolean {
-  return !w.modifiers.unleashedMode || w.projectiles.length < UNLEASHED_PROJECTILE_BUDGET;
+  return !(w.modifiers.unleashedMode || w.modifiers.millionHordeMode) || w.projectiles.length < UNLEASHED_PROJECTILE_BUDGET;
 }
 
 function canSpawnEnemyEffect(w: World): boolean {
-  return !w.modifiers.unleashedMode || w.effects.length < UNLEASHED_ENEMY_EFFECT_BUDGET;
+  return !(w.modifiers.unleashedMode || w.modifiers.millionHordeMode) || w.effects.length < UNLEASHED_ENEMY_EFFECT_BUDGET;
 }
 
 /**
@@ -2007,7 +2030,7 @@ function isDenseForQuality(w: World): boolean {
   const count = w.enemies.length;
   if (w.graphicsQuality === 'performance') return count >= 80;
   if (w.graphicsQuality === 'balanced') return count >= 150;
-  return Boolean(w.modifiers.unleashedMode) && count >= 300;
+  return Boolean(w.modifiers.unleashedMode || w.modifiers.millionHordeMode) && count >= 300;
 }
 
 function cooldownMult(w: World): number {
@@ -2118,8 +2141,35 @@ function computeSpawnAngle(w: World): number {
   return w.rng() * Math.PI * 2;
 }
 
-function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: { x: number; y: number }) {
-  if (w.enemies.length >= enemyCap(w)) return;
+function addMillionHordeVirtualPopulation(w: World, amount: number, pendingActors = 0) {
+  if (!w.millionHorde || amount <= 0) return;
+  const maxVirtualPopulation = Math.max(0, MILLION_HORDE_MAX_POPULATION - w.enemies.length - pendingActors);
+  w.millionHorde.virtualPopulation = Math.min(
+    maxVirtualPopulation,
+    w.millionHorde.virtualPopulation + amount,
+  );
+  w.millionHorde.peakPopulation = Math.max(
+    w.millionHorde.peakPopulation,
+    w.millionHorde.virtualPopulation + w.enemies.length,
+  );
+}
+
+function spawnEnemy(
+  w: World,
+  incomingDef: EnemyDef,
+  hpMult: number,
+  position?: { x: number; y: number },
+  representedCount = 1,
+) {
+  const hasActorSlot = w.enemies.length < enemyCap(w);
+  if (w.millionHorde && representedCount > 0) {
+    const virtualAdded = Math.max(0, representedCount - (hasActorSlot ? 1 : 0));
+    addMillionHordeVirtualPopulation(w, virtualAdded, hasActorSlot ? 1 : 0);
+    if (hasActorSlot) {
+      w.millionHorde.peakPopulation = Math.max(w.millionHorde.peakPopulation, w.millionHorde.virtualPopulation + w.enemies.length + 1);
+    }
+  }
+  if (!hasActorSlot) return;
 
   let def = incomingDef;
   if (w.disabledEnemyIds && w.disabledEnemyIds.includes(incomingDef.id)) {
@@ -2367,7 +2417,7 @@ function updateSpawning(w: World, dt: number) {
     const densityMult = w.threatCalibrations?.densityMult ?? 1;
     const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult * directorWaveSpawnMult(w, wave.faction);
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
-    while ((w.spawnCredit[i] ?? 0) >= 1) {
+    while ((w.spawnCredit[i] ?? 0) >= 1 && (!w.millionHorde || w.enemies.length < enemyCap(w))) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
       const def = getEnemy(wave.enemyId);
       const ids = [wave.enemyId, ...(wave.group ?? [])];
@@ -2377,12 +2427,23 @@ function updateSpawning(w: World, dt: number) {
       // modifierHpMult isn't applied here -- spawnEnemy applies it to every
       // caller uniformly (see its own comment for why).
       const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
+      const representedCount = w.millionHorde ? MILLION_HORDE_REPRESENTATION_PER_SPAWN : 1;
       for (let b = 0; b < wave.burst; b += 1) {
-        spawnEnemy(w, def, hpMult, positions[positionIndex++]);
+        spawnEnemy(w, def, hpMult, positions[positionIndex++], representedCount);
         for (const groupEnemyId of wave.group ?? []) {
-          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++]);
+          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++], representedCount);
         }
       }
+    }
+    if (w.millionHorde && (w.spawnCredit[i] ?? 0) >= 1) {
+      // Once the live near field is full, consume all whole spawn cycles in
+      // one operation. Extreme custom rates therefore stay constant-cost.
+      const aggregateCycles = Math.floor(w.spawnCredit[i] ?? 0);
+      w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - aggregateCycles;
+      addMillionHordeVirtualPopulation(
+        w,
+        aggregateCycles * wave.burst * (1 + (wave.group?.length ?? 0)) * MILLION_HORDE_REPRESENTATION_PER_SPAWN,
+      );
     }
   }
 }
@@ -3603,6 +3664,17 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  if (w.millionHorde) {
+    // Each defeated near-field actor breaks a matching aggregate crowd cell.
+    // This lets area damage visibly cut into the represented horde without
+    // creating loot, XP, or achievement rewards for enemies never simulated.
+    const virtualDefeated = Math.min(
+      w.millionHorde.virtualPopulation,
+      MILLION_HORDE_REPRESENTATION_PER_SPAWN - 1,
+    );
+    w.millionHorde.virtualPopulation -= virtualDefeated;
+    w.millionHorde.defeatedPopulation += virtualDefeated + 1;
+  }
   // LokSurvivorArena: a guest kill also counts toward `kills`/`killsByEnemy`
   // above (so campaign-style read models keep working unmodified) *and*
   // toward its own attributed counter for the arena scoreboard.
@@ -10118,7 +10190,7 @@ function updateEndlessSpawning(w: World, dt: number) {
   // uncapped (inside spawnEnemy), and run modifiers are the same kind of
   // player-opted-in multiplier as challenges, not an automatic one. Adding
   // it here would also double-apply it, since spawnEnemy applies it too.
-  const spawnRateCap = w.modifiers.unleashedMode ? 12 : 3.2;
+  const spawnRateCap = w.modifiers.millionHordeMode ? 24 : w.modifiers.unleashedMode ? 12 : 3.2;
   const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
   const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
 
@@ -10131,7 +10203,7 @@ function updateEndlessSpawning(w: World, dt: number) {
   while (e.spawnBudget >= 1) {
     e.spawnBudget -= 1;
     const enemyId = pool[Math.floor(w.rng() * pool.length)]!;
-    spawnEnemy(w, getEnemy(enemyId), hpMult);
+    spawnEnemy(w, getEnemy(enemyId), hpMult, undefined, w.millionHorde ? MILLION_HORDE_REPRESENTATION_PER_SPAWN : 1);
   }
 
   // Periodic multi-enemy surge -- the "wave" endless mode is otherwise
@@ -10536,6 +10608,14 @@ export function hudSnapshot(w: World): HudSnapshot {
     elapsedSec: w.time,
     durationSec: w.area.durationSec,
     kills: w.kills,
+    millionHorde: w.millionHorde
+      ? {
+          population: w.millionHorde.virtualPopulation + w.enemies.filter((enemy) => !enemy.dying).length,
+          peakPopulation: w.millionHorde.peakPopulation,
+          defeatedPopulation: w.millionHorde.defeatedPopulation,
+          liveActors: w.enemies.length,
+        }
+      : undefined,
     cred: w.cred,
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),
     ultimateActive: w.now < w.ultActiveUntil,

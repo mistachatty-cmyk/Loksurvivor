@@ -132,6 +132,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Hook Ghost now unlocks through Neon Overflow, giving the Sixth Ward Cypher a cleaner two-level progression route.',
     ],
   },
+  {
+    version: '0.10.0',
+    date: '2026-09-28',
+    kind: 'update',
+    title: 'The Horde Hits Seven Digits',
+    body: [
+      'Million Horde joins the run modifiers with a crowd that can climb into the millions without allocating millions of individual enemies.',
+      'Nearby enemies stay fully interactive while an adaptive crowd layer scales for compatibility phones, modern phones, and desktop browsers.',
+      'Bonus Maps now includes the authored Odd Routes that were previously hidden from the category.',
+      'Map category tabs now scroll inside their own row on narrow screens instead of stretching the page.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
