@@ -1,11 +1,10 @@
 ---
-name: GRPD Station and the Director Terminal (Stages 1-2 of a larger roadmap)
-description: A new hub location (GRPD Station off Division), the Director-personality terminal it houses (4 personalities, real spawnBias/factionFavor tuning), the SWAT Sauna's unique reward hole, Rapid Guard's K9 counter, and the full deferred roadmap (factions, The Running Man, new weapons, the Artiste) this is Stages 1-2 of.
+name: GRPD Station and the Director Terminal (Stage 1 of a larger roadmap)
+description: A new hub location (GRPD Station off Division), the Director-personality terminal it houses, the SWAT Sauna's unique reward hole, Rapid Guard's K9 counter, and the full deferred roadmap (factions, The Running Man, new weapons, the Artiste) this is Stage 1 of.
 ---
 
 Read before touching `data/directors.ts`, the `DirectorPersonalityEffect`
-union in `types.ts`, `selectedDirector`/`directorHpMult`/`directorWaveSpawnMult`
-in `engine/world.ts`, `HUB_ROOMS`/`ALLIES`/`DISCOVERIES` in
+union in `types.ts`, `HUB_ROOMS`/`ALLIES`/`DISCOVERIES` in
 `data/progression.ts`, `RECOVERY_FACILITIES`/`RECOVERY_HUTS`/
 `SAUNA_HOLE_REWARDS` in `data/recovery.ts`, the `'lokpet'` `VendorItemDef`
 category, or the `k9-hound`/`wolf`/`digi-wolf` LokPet content in
@@ -19,8 +18,8 @@ expansion of the existing single-Director boss system into multiple
 selectable "personalities" reached from a new police-station location, new
 vendor/pet content, two new enemy factions, several new weapons, and a new
 playable character with a novel draw-to-dodge ability. Given the scope,
-this was explicitly staged: **Stages 1-2 (this doc) are built**; Stages
-3-7 are recorded below as a roadmap, not built, so the full vision survives
+this was explicitly staged: **only Stage 1 (this doc) is built**; Stages
+2-7 are recorded below as a roadmap, not built, so the full vision survives
 without needing to be re-derived or re-asked for.
 
 ## Stage 1, built: GRPD Station + Director Terminal
@@ -159,85 +158,12 @@ capture**: `killEnemy` in `engine/world.ts` has a dedicated branch keyed on
 `SPECIAL_LOKPET_LOADOUTS` legendary, same shape as the three starters) and
 calls the same `spawnLokPet` any other pickup-triggered grant uses.
 
-## Stage 2, built: four new Director personalities + AI-hierarchy lore
+## Explicitly deferred (Stage 2 onward, not built)
 
-Shipped as two independent efforts on separate branches that both extended
-the same `DirectorPersonalityEffect` type and landed together: **4 new
-`DirectorDef` entries total**, each with its own `FactionDef`/roster +
-`family: 'Boss'` enemy (two of them reusing an already-registered faction
-instead of a new one), following `reel-syndicate`/`the-director`'s own
-pattern (a faction that only ever spawns from `data/directors.ts`, never
-from an area's authored `waves`, unless noted below):
-
-- **The Warden** (`id: 'the-warden'`, faction `prism-choir`, boss
-  `prism-warden`) -- `effect: { kind: 'spawnBias', spawnRateMult: 1.18,
-  hpMult: 1.1 }`.
-- **The Promoter** (`id: 'the-promoter'`, faction `high-roller-syndicate`,
-  boss `marquee-reaper`) -- `effect: { kind: 'factionFavor',
-  favoredFactionId: 'high-roller-syndicate', spawnRateMult: 1.65 }`.
-- **The Cutting Room** (`id: 'cutting-room'`, faction `cutting-room-crew`,
-  boss `the-splice`) -- `effect: { kind: 'spawnBias', spawnRateMult: 1.35,
-  hpMult: 0.85 }`: more enemies for the rest of the run, each individually
-  squishier.
-- **Continuity** (`id: 'continuity'`, faction `continuity-desk`, boss
-  `the-take`) -- `effect: { kind: 'factionFavor', favoredFactionId:
-  'afterimage-choir', spawnRateMult: 1.5 }`: biases a specific *existing*
-  named faction to show up more throughout the run, on top of its own
-  encounter roster.
-
-**Engine mechanism (the one that survived the merge):** `selectedDirector(w)`
-returns the `DirectorDef` matching `w.activeDirectorPersonalityId` (no
-fallback -- an unset/unknown id reads as no ambient effect). `directorHpMult(w)`
-returns a `spawnBias` director's `hpMult` (else `1`), applied once, uniformly,
-inside `spawnEnemy`'s hp formula alongside `modifierHpMult(w)` -- so it
-affects *every* spawn path (normal waves, bursts, endless mode) with no
-per-call-site duplication. `directorWaveSpawnMult(w, factionName?)` returns
-a `spawnBias` director's `spawnRateMult` unconditionally, or a
-`factionFavor` director's `spawnRateMult` **only when `factionName` matches
-`getFaction(effect.favoredFactionId).name`** -- folded into `updateSpawning`'s
-`spawnMultiplier` via `wave.faction`. This means `factionFavor` biases an
-*area's own authored, faction-labeled waves* (e.g. `back-alley`'s
-corner-cutter wave already carries `faction: 'Afterimage Choir'`, per
-CLAUDE.md) rather than injecting a faction that isn't authored into that
-area at all -- a real design choice, not an oversight. **Endless mode gets
-no director-effect wiring at all** (a known gap, not silently patched over
-during the merge -- a future pass could extend `updateEndlessSpawning` the
-same way `modifierSpawnMult(w)` is already folded into its capped
-`spawnRate`). `updateDirector`'s own encounter-trigger fallback, when no
-personality is selected, picks a **random** registered Director rather than
-always `DIRECTORS[0]` -- keeps every personality discoverable/unlockable
-through ordinary play once there are several.
-
-`DirectorTerminalPanel.tsx` gained an `effectReadout(director)` helper
-(renders what `spawnBias`/`factionFavor` actually does, plus a "Can cut in
-after M:SS" line from `triggerAfterSec`) and an expanded framing paragraph
-that names (without ever fully explaining) an unnamed process a few tiers
-up that greenlights which Director personality runs a scene next -- new
-lore, nothing pre-existing conflicts with it.
-
-**Cautionary note for future merges:** an earlier, parallel implementation
-of this same feature (`activeDirectorEffect(w)` / `applyDirectorFactionFavor(w)`
-/ a `World.nextFactionFavorSpawnAt` field) was built independently on
-another branch before this merge, using a periodic bonus-spawn seam for
-`factionFavor` instead of the wave-faction-label approach above. It was
-**deleted entirely** in favor of the mechanism actually described here --
-git's line-level 3-way merge did *not* flag the resulting double-application
-in `updateSpawning`/`updateEndlessSpawning` as a conflict (the two
-implementations touched different lines within the same functions), so it
-had to be caught and cleaned up by hand. If a future merge touches
-Director-effect code again, grep `engine/world.ts` for
-`activeDirectorEffect|applyDirectorFactionFavor|directorEffect|nextFactionFavorSpawnAt`
-first to confirm neither side is resurrecting the deleted mechanism.
-
-Tests: `directors.test.ts`/`factions.test.ts` cover all 4 new entries
-automatically (both already loop over every registered `DirectorDef`/
-`FactionDef`, no changes needed). `world.test.ts`'s `/* Director
-personality effects */` section covers Cutting Room's spawn-rate/hp bias
-and Continuity's favored-faction wave-rate boost against the mechanism
-above (not the deleted one).
-
-## Explicitly deferred (Stage 3 onward, not built)
-
+- **Stage 2**: real `DirectorPersonalityEffect` tuning for 2 more
+  `DirectorDef` entries (new faction rosters + bosses each), and the actual
+  "who/what controls the Directors" lore paragraph written into the
+  terminal's framing text.
 - **Stage 3**: the Rapid faction (human resistance -- riot team, gardeners,
   fighting dogs/rare cats, firefighters, teachers, bar owners, retired
   people, scared residents, briefcase-throwing management, and military

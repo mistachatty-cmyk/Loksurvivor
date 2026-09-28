@@ -78,6 +78,7 @@ const QUARTERMASTER_QUIPS = [
 export interface VendorPanelProps {
   onBack: () => void;
   onOpenThreatMatrix?: () => void;
+  initialCategory?: VendorItemCategory;
 }
 
 type CategoryConfig = {
@@ -443,11 +444,11 @@ function ItemDetail({
   );
 }
 
-export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
+export function VendorPanel({ onBack, onOpenThreatMatrix, initialCategory = 'stat' }: VendorPanelProps) {
   const { meta, buyVendorItem, refundVendorItem, refundAllVendorItems } = useMeta();
-  const [activeCategory, setActiveCategory] = useState<VendorItemCategory>('stat');
+  const [activeCategory, setActiveCategory] = useState<VendorItemCategory>(initialCategory);
   const [selectedId, setSelectedId] = useState<string>(
-    VENDOR_CATALOG.find((item) => item.category === 'stat')?.id ?? VENDOR_CATALOG[0].id,
+    VENDOR_CATALOG.find((item) => item.category === initialCategory)?.id ?? VENDOR_CATALOG[0].id,
   );
   const [reactAnim, setReactAnim] = useState<AnimName>('idle');
   const [line, setLine] = useState(QUARTERMASTER_QUIPS[0]);
@@ -500,6 +501,18 @@ export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
       onBack={onBack}
       action={
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => selectCategory('lokpet')}
+            className={`flex items-center gap-2 border px-3 py-3 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              activeCategory === 'lokpet'
+                ? 'border-sky-300 bg-sky-400/15 text-sky-200'
+                : 'border-sky-500/50 text-sky-300 hover:bg-sky-500/10'
+            }`}
+            data-testid="button-open-k9-counter"
+          >
+            <Dog className="h-4 w-4" /> K9 counter
+          </button>
           <button
             type="button"
             onClick={refundAllVendorItems}

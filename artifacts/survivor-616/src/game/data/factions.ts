@@ -135,20 +135,6 @@ export const FACTIONS: FactionDef[] = [
     roster: ['the-director', 'boom-mic-runner', 'gaffer-brute', 'strobe-shutter', 'the-foley-artist'],
   },
   {
-    id: 'cutting-room-crew',
-    name: 'Cutting Room Crew',
-    description: "The Cutting Room personality's own crew -- rush hires and PA runners thrown at whatever scene needs padding. An unscripted arrival, never part of an area's authored waves. See data/directors.ts.",
-    accent: '#fb923c',
-    roster: ['clapper-runner', 'gaffer-sprinter', 'continuity-flag', 'the-splice'],
-  },
-  {
-    id: 'continuity-desk',
-    name: 'Continuity Desk',
-    description: "The Continuity personality's own crew -- keeps score on what's supposed to show up again. An unscripted arrival, never part of an area's authored waves. See data/directors.ts.",
-    accent: '#60a5fa',
-    roster: ['script-supervisor', 'take-tally-drone', 'the-take'],
-  },
-  {
     id: 'glitch-breach',
     name: 'Glitch Breach',
     description: 'Anomalous memory leaks and rendering bugs that broke free of the game engine itself. They tear through reality coordinates and ignore normal rules.',

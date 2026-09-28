@@ -71,48 +71,6 @@ export const DIRECTORS: DirectorDef[] = [
     codexLore: 'The Promoter does not want a fair fight. It wants a packed room, a bright marquee, and a survivor desperate enough to become the main event.',
     effect: { kind: 'factionFavor', favoredFactionId: 'high-roller-syndicate', spawnRateMult: 1.65 },
   },
-  {
-    id: 'cutting-room',
-    name: 'The Cutting Room',
-    triggerAfterSec: 180,
-    rerollIntervalSec: 60,
-    chance: 0.12,
-    directorModeChanceMult: 3,
-    factionId: 'cutting-room-crew',
-    bossEnemyId: 'the-splice',
-    hpMult: 1,
-    formation: 'wall',
-    warningText: 'CUT — padding out the runtime',
-    victoryText: "That's a wrap on the Splice",
-    unlockId: 'cutting-room',
-    toggleLabel: 'Director Mode',
-    toggleDescription: 'Raises the odds a Director crashes a run with its crew, once eligible.',
-    codexLore: "Doesn't trust one good take. Sends twice the crowd at half the weight each, on the theory that quantity reads as coverage.",
-    // More, individually squishier, enemies for the rest of the run --
-    // see activeDirectorEffect() in engine/world.ts for where this composes.
-    effect: { kind: 'spawnBias', spawnRateMult: 1.35, hpMult: 0.85 },
-  },
-  {
-    id: 'continuity',
-    name: 'Continuity',
-    triggerAfterSec: 180,
-    rerollIntervalSec: 60,
-    chance: 0.12,
-    directorModeChanceMult: 3,
-    factionId: 'continuity-desk',
-    bossEnemyId: 'the-take',
-    hpMult: 1,
-    formation: 'escort',
-    warningText: 'CUT — checking this against the last one',
-    victoryText: "That's a match, print it",
-    unlockId: 'continuity',
-    toggleLabel: 'Director Mode',
-    toggleDescription: 'Raises the odds a Director crashes a run with its crew, once eligible.',
-    codexLore: "Keeps a shot list of who's supposed to reappear. Once it's watching, the Afterimage Choir keeps making its call sheet.",
-    // Biases a specific *existing* named faction to show up more often
-    // through the rest of the run, on top of its own encounter roster.
-    effect: { kind: 'factionFavor', favoredFactionId: 'afterimage-choir', spawnRateMult: 1.5 },
-  },
 ];
 
 export const DIRECTORS_BY_ID: Record<string, DirectorDef> = Object.fromEntries(

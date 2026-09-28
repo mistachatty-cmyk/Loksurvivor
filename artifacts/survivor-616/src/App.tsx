@@ -32,7 +32,7 @@ import {
   resolveTravelEncounterOpponent,
   type ResolvedTravelEncounterOpponent,
 } from '@/game/travelEncounter';
-import type { AreaDef, RunResult } from '@/game/types';
+import type { AreaDef, RunResult, VendorItemCategory } from '@/game/types';
 import type { ArenaSeat } from '@/game/arena/arenaWorld';
 import { ArchivePanel } from '@/ui/ArchivePanel';
 import { DirectorTerminalPanel } from '@/ui/DirectorTerminalPanel';
@@ -82,7 +82,7 @@ type Screen =
   | { name: 'music' }
   | { name: 'studio' }
   | { name: 'recovery' }
-  | { name: 'vendor' }
+  | { name: 'vendor'; initialCategory?: VendorItemCategory }
   | { name: 'workshop' }
   | { name: 'card-shop' }
   | { name: 'settings' }
@@ -194,6 +194,9 @@ function Game() {
         break;
       case 'vendor':
         setScreen({ name: 'vendor' });
+        break;
+      case 'kennel':
+        setScreen({ name: 'vendor', initialCategory: 'lokpet' });
         break;
       case 'workshop':
         setScreen({ name: 'workshop' });
@@ -423,7 +426,7 @@ function Game() {
       return <RecoveryPanel onBack={goHub} />;
 
     case 'vendor':
-      return <VendorPanel onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />;
+      return <VendorPanel initialCategory={screen.initialCategory} onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />;
 
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
