@@ -120,8 +120,14 @@ export function HideoutPreview({ rig, palette, height = 176, className = '' }: H
       data-testid="hideout-preview"
       aria-hidden="true"
     >
-      <canvas ref={canvasRef} className="block h-full w-full" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background to-transparent" />
+      {/* The canvas below only clears to transparent, so without this the
+          hideout's own weather rain-particle layer (rendered behind the whole
+          screen) shows through raw and unstyled, reading as a visual glitch
+          slicing across the character instead of atmosphere. Same dim
+          treatment AttractMode's own background sim uses. */}
+      <div className="pointer-events-none absolute inset-0 z-0 bg-black/35" />
+      <canvas ref={canvasRef} className="relative z-10 block h-full w-full" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-1/2 bg-gradient-to-t from-background to-transparent" />
     </div>
   );
 }

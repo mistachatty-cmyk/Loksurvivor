@@ -31,6 +31,10 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
+import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
+
+/** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
+let hasShownHideoutArrivalThisSession = false;
 
 export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal';
 
@@ -151,6 +155,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const primePalette = primeTakeoverActive ? getCharacter('artisanvalor').palette : null;
   const [isPageVisible, setIsPageVisible] = useState(true);
   const [showCurrencyGlossary, setShowCurrencyGlossary] = useState(false);
+  const [showArrival, setShowArrival] = useState(
+    () => meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession,
+  );
   const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
   const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
@@ -180,7 +187,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
    */
   const ambienceRef = useRef<AmbienceHandle | null>(null);
   useEffect(() => {
-    if (!meta.hideoutAmbienceEnabled || !isPageVisible) return;
+    // The arrival overlay owns its own (louder) ambience bed for as long as
+    // it's showing -- starting this one too would run two beds at once.
+    if (!meta.hideoutAmbienceEnabled || !isPageVisible || showArrival) return;
     const handle = startHideoutAmbience(ensureAudioContext(), scene, 0.35);
     if (!handle) return;
     ambienceRef.current = handle;
@@ -188,7 +197,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       handle.stop();
       ambienceRef.current = null;
     };
-  }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext]);
+  }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext, showArrival]);
 
   const weatherIcon = WEATHER_ICONS[scene.weather];
   const crewMoment = useMemo(
@@ -197,6 +206,22 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   );
 
   if (!activeRoom) return null;
+
+  if (showArrival) {
+    return (
+      <HideoutArrivalOverlay
+        character={selectedCharacter}
+        palette={selectedCharacterPalette}
+        scene={scene}
+        ambienceEnabled={meta.hideoutAmbienceEnabled}
+        ensureAudioContext={ensureAudioContext}
+        onEnter={() => {
+          hasShownHideoutArrivalThisSession = true;
+          setShowArrival(false);
+        }}
+      />
+    );
+  }
 
   return (
     <motion.div 
