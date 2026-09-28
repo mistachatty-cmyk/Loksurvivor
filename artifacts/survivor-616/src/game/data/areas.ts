@@ -1,6 +1,7 @@
 import type { AreaDef } from '@/game/types';
 import { AREAS_2X } from './areas-2x';
 import { AREAS_4X } from './areas-4x';
+import { AREAS_CLASSIC } from './areas-classic';
 import { AREAS_DISCO } from './areas-disco';
 import { WEIRD_AREAS } from './areas-weird';
 import { AREAS_ENDLESS } from './areas-endless';
@@ -1083,6 +1084,7 @@ export const AREAS: AreaDef[] = [
   ...AREAS_ENDLESS,
   ...AREAS_2X,
   ...AREAS_4X,
+  ...AREAS_CLASSIC,
   ...AREAS_DISCO,
   ...AREAS_NULL_SECTOR,
 ];
