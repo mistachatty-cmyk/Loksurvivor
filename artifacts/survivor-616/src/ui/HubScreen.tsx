@@ -112,7 +112,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const { session } = useAuth();
   const { balance: lokBalance } = useLokEconomy();
-  const selectedCharacterPalette = resolveCharacterCosmeticPalette(selectedCharacter, meta.characterSkinByCharacterId[selectedCharacter.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled);
+  // Memoized so the palette object identity stays stable across re-renders
+  // (HubScreen re-renders on its own 15s generator-income poll, unrelated to
+  // any of these inputs) -- HideoutPreview and RigPortrait both key their
+  // baked-frame cache off this object's identity, so an unmemoized recompute
+  // here silently defeated that cache and tore down HideoutPreview's canvas
+  // effect every poll tick for no reason.
+  const selectedCharacterPalette = useMemo(
+    () => resolveCharacterCosmeticPalette(
+      selectedCharacter,
+      meta.characterSkinByCharacterId[selectedCharacter.id],
+      meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId),
+      meta.worldPaletteBlendEnabled,
+    ),
+    [selectedCharacter, meta.characterSkinByCharacterId, meta.activePaletteId, meta.worldPaletteBlendEnabled],
+  );
   const roomNavRef = useRef<HTMLElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
