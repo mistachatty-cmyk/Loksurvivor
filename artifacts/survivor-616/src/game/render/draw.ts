@@ -1382,6 +1382,19 @@ function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
     ctx.stroke();
     ctx.fillRect(x - 4, y - 80, 8, 28);
     ctx.fillRect(x - 4, y + 52, 8, 28);
+  } else if (landmark.kind === 'pressure-rooms') {
+    ctx.globalAlpha = 0.72;
+    for (const roomX of [-122, 0, 122]) {
+      ctx.fillRect(x + roomX - 48, y - 46, 96, 92);
+      ctx.strokeRect(x + roomX - 48, y - 46, 96, 92);
+      ctx.strokeRect(x + roomX - 18, y - 30, 36, 62);
+    }
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(x, y + 76, 34, Math.PI, 0);
+    ctx.stroke();
+    ctx.fillStyle = landmark.accent;
+    ctx.fillRect(x - 30, y + 76, 60, 5);
   } else {
     // Floodgate: twin buttresses and a central gate face.
     ctx.fillRect(x - 170, y - 38, 340, 76);
@@ -1707,6 +1720,9 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'beacon-tower': { top: '#3b0764', side: '#2e1065', trim: '#ec4899' },
   'security-gate': { top: '#451a03', side: '#291003', trim: '#f97316' },
   'bunker-hatch': { top: '#1c1917', side: '#0c0a09', trim: '#a8a29e' },
+  'data-pipe': { top: '#12372f', side: '#071d19', trim: '#86efac' },
+  'digi-arch': { top: '#12324a', side: '#071923', trim: '#22d3ee' },
+  'pressure-door': { top: '#374151', side: '#171f2b', trim: '#facc15' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -2288,6 +2304,26 @@ function drawObstacles(
     }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+    if (live && live.rawDataBreakage > 0.025) {
+      ctx.save();
+      const severity = live.rawDataBreakage;
+      const blocks = Math.max(1, Math.ceil(severity * 7));
+      ctx.globalAlpha = 0.22 + severity * 0.55;
+      ctx.fillStyle = severity > 0.65 ? '#facc15' : '#86efac';
+      for (let i = 0; i < blocks; i += 1) {
+        const rx = hashCell(live.uid, i * 13) * Math.max(4, obstacle.w - 8);
+        const ry = hashCell(live.uid + 31, i * 17) * Math.max(4, obstacle.h - 8);
+        const size = 3 + Math.floor(hashCell(live.uid + 67, i * 19) * 6);
+        ctx.fillRect(x + 4 + rx, y - height + 4 + ry, size, size);
+      }
+      if (severity > 0.72) {
+        ctx.globalAlpha = 0.8;
+        ctx.font = 'bold 8px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('RAW DATA', obstacle.x, y - height - 5);
+      }
+      ctx.restore();
+    }
     if (live?.chainActive && !live.landedHeatActive) {
       ctx.save();
       const speed = Math.hypot(live.vx, live.vy);

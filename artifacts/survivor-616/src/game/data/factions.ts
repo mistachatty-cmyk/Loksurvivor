@@ -162,6 +162,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#38bdf8',
     roster: ['lev-singularity-colossus', 'lev-nanite-phantom', 'lev-arc-conductor', 'lev-substation-brute', 'lev-drone-interceptor', 'lev-overlord-prime'],
   },
+  {
+    id: 'data-goblins',
+    name: 'Data Goblins',
+    description: 'Data-Gobs roam 616 looking for raw data breakage to chew. They prefer failing pipes, walls, vehicles, watches, and Digi-Arches to a fight—but a survivor is made of data too.',
+    accent: '#86efac',
+    roster: ['data-gob-nibbler', 'data-gob-pipechewer', 'data-gob-brickbiter', 'data-gob-archgnawer'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

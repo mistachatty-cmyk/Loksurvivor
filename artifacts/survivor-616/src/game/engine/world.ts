@@ -520,6 +520,8 @@ export interface BreakableObstacle extends Aabb {
   nextImpactDamageAt: number;
   broken: boolean;
   brokenAt: number;
+  /** 0..1 visible corruption caused by raw-data decay and Data-Gob bites. */
+  rawDataBreakage: number;
   contacts: number;
   /** The most recent direction this prop was hit from by the player. */
   lastPlayerImpactX: number;
@@ -766,9 +768,13 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'server-rack': { variant: 'light-breakable', hp: 110 },
   /** Tree Null map: tough cybernetic digital tree with dense foliage. */
   'tree-digital': { variant: 'heavy-metal', hp: 800 },
+  'data-pipe': { variant: 'light-breakable', hp: 105 },
+  'digi-arch': { variant: 'heavy-metal', hp: 360 },
+  'pressure-door': { variant: 'heavy-metal', hp: 300 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
+  'data-pipe', 'digi-arch', 'pressure-door',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -1112,6 +1118,12 @@ export interface World {
   wheelSpin: WheelSpinState | null;
   /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
   director: DirectorRunState;
+  /**
+   * Which `DirectorDef` actually fires, chosen at the Digital Archive
+   * terminal (`MetaState.activeDirectorPersonalityId`). Null/unknown id
+   * falls back to `DIRECTORS[0]` in `updateDirector`.
+   */
+  activeDirectorPersonalityId: string | null;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -1272,6 +1284,10 @@ export function createWorld(
     graphicsQuality?: 'high' | 'balanced' | 'performance';
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
+    /** Which Director personality to spawn for the Director encounter -- see `MetaState.activeDirectorPersonalityId`. */
+    activeDirectorPersonalityId?: string | null;
+    /** Grants this weapon at run start, once, from the SWAT Sauna's reward hole -- see `MetaState.pendingSaunaReward`. */
+    bonusWeaponId?: string;
     extraLifeAvailable?: boolean;
     /** Sector Command: squad cap for this mission. Presence of this enables the mode. */
     sectorSquadCap?: number;
@@ -1425,6 +1441,7 @@ export function createWorld(
       : null,
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
+    activeDirectorPersonalityId: setup.activeDirectorPersonalityId ?? null,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -1683,6 +1700,14 @@ export function createWorld(
   }
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
   for (const pet of setup.startingLokPets ?? []) spawnLokPet(world, pet, 'loadout');
+  if (setup.bonusWeaponId) {
+    const bonusDef = WEAPONS_BY_ID[setup.bonusWeaponId];
+    if (bonusDef && !world.weapons.some((entry) => entry.def.id === bonusDef.id)) {
+      const bonusWeapon = { def: bonusDef, level: 1, count: bonusDef.count ?? 1, readyAt: 400 };
+      world.weapons.push(bonusWeapon);
+      if (bonusDef.kind === 'orbit') rebuildOrbiters(world, bonusWeapon);
+    }
+  }
   return world;
 }
 
@@ -1752,6 +1777,7 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     nextImpactDamageAt: 0,
     broken: false,
     brokenAt: 0,
+    rawDataBreakage: 0,
     contacts: 0,
     lastPlayerImpactX: 0,
     lastPlayerImpactY: 0,
@@ -1860,6 +1886,22 @@ function modifierSpawnMult(w: World): number {
   if (w.modifiers.unleashedMode) return 8;
   if (w.modifiers.quadSpawnMode) return 4;
   return w.modifiers.doubleMode ? 2 : 1;
+}
+
+function selectedDirector(w: World): (typeof DIRECTORS)[number] | undefined {
+  return DIRECTORS.find((director) => director.id === w.activeDirectorPersonalityId);
+}
+
+function directorHpMult(w: World): number {
+  const effect = selectedDirector(w)?.effect;
+  return effect?.kind === 'spawnBias' ? effect.hpMult : 1;
+}
+
+function directorWaveSpawnMult(w: World, factionName?: string): number {
+  const effect = selectedDirector(w)?.effect;
+  if (!effect || effect.kind === 'none') return 1;
+  if (effect.kind === 'spawnBias') return effect.spawnRateMult;
+  return getFaction(effect.favoredFactionId).name === factionName ? effect.spawnRateMult : 1;
 }
 
 function enemyCap(w: World): number {
@@ -2058,7 +2100,7 @@ function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: 
   // endless mode's own Math.min(1.7, ...) cap uncapped -- see run-modifiers.md.
   const calHpMult = w.threatCalibrations?.hpMult ?? 1;
   const calMassMult = w.threatCalibrations?.massMult ?? 1;
-  const hp = def.hp * hpMult * modifierHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
+  const hp = def.hp * hpMult * modifierHpMult(w) * directorHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -2245,7 +2287,7 @@ function updateSpawning(w: World, dt: number) {
     const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
     const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
     const densityMult = w.threatCalibrations?.densityMult ?? 1;
-    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult;
+    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult * directorWaveSpawnMult(w, wave.faction);
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
@@ -3438,6 +3480,25 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
       pushAlert(w, director.victoryText);
       w.shake = Math.max(w.shake, 14);
     }
+  }
+
+  // Digi-Wolf: "defeat-then-recruit" -- a real chance at the fixed Digi-Wolf
+  // LokPet variant, not a guarantee. No live capture mechanic (see
+  // .agents/memory/grpd-station.md).
+  if (enemy.defId === 'digi-wolf' && w.rng() < 0.7) {
+    const pet = rollLokPet(w.rng, { fixedVariantId: 'digi-wolf' });
+    spawnLokPet(w, pet);
+    pushAlert(w, `${pet.name} follows you home`);
+  }
+
+  // Data-Gobs are feeding, not hunting. Driving one off releases the loose
+  // packets it swallowed and briefly patches nearby exposed world objects.
+  if (enemy.def.faction === 'Data Goblins') {
+    for (const prop of w.breakables) {
+      if (prop.broken || dist2(prop.x, prop.y, enemy.x, enemy.y) > 180 * 180) continue;
+      prop.rawDataBreakage = Math.max(0, prop.rawDataBreakage - 0.14);
+    }
+    w.popups.push({ x: enemy.x, y: enemy.y - 18, text: 'DATA PATCH', color: '#86efac', bornAt: w.now, vy: 26 });
   }
 
   // Loot.
@@ -5176,7 +5237,8 @@ function damageBreakable(
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
-    b.hp -= Math.max(1, amount);
+    const breakageMult = 1 + b.rawDataBreakage * (w.area.rawDataBreakage?.damageVulnerability ?? 0);
+    b.hp -= Math.max(1, amount * breakageMult);
     if (b.hp > 0) {
       if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
       continue;
@@ -5931,6 +5993,29 @@ function updateBreakables(w: World, dt: number) {
   syncObstacleAabbs(w);
 }
 
+function updateRawDataBreakage(w: World, dt: number) {
+  const config = w.area.rawDataBreakage;
+  if (!config) return;
+  for (const prop of w.breakables) {
+    if (prop.broken) continue;
+    const susceptibility = prop.breakable ? 1 : 0.28;
+    prop.rawDataBreakage = clamp(prop.rawDataBreakage + config.ambientPerSec * susceptibility * dt, 0, 1);
+  }
+}
+
+function nearestDataChewTarget(w: World, x: number, y: number, range: number): BreakableObstacle | undefined {
+  let closest: BreakableObstacle | undefined;
+  let closestD2 = range * range;
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.breakable) continue;
+    const d2 = dist2(x, y, prop.x, prop.y);
+    if (d2 >= closestD2) continue;
+    closestD2 = d2;
+    closest = prop;
+  }
+  return closest;
+}
+
 function applyKnockback(actor: Actor, dt: number) {
   actor.x += actor.kx * dt;
   actor.y += actor.ky * dt;
@@ -6349,9 +6434,15 @@ function updateEnemies(w: World, dt: number) {
       spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
     }
 
-    const dx = trackX - enemy.x;
-    const dy = trackY - enemy.y;
+    const chewTarget = traits?.dataChew
+      ? nearestDataChewTarget(w, enemy.x, enemy.y, traits.dataChew.targetRange)
+      : undefined;
+    const targetX = chewTarget?.x ?? trackX;
+    const targetY = chewTarget?.y ?? trackY;
+    const dx = targetX - enemy.x;
+    const dy = targetY - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
+    const playerDistance = Math.hypot(trackX - enemy.x, trackY - enemy.y) || 1;
     const dirX = dx / distance;
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
@@ -6362,6 +6453,18 @@ function updateEnemies(w: World, dt: number) {
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;
       enemy.chargeReadyAt = w.now + 2200;
+    }
+
+    if (chewTarget && traits?.dataChew && distance <= enemy.radius + Math.max(chewTarget.w, chewTarget.h) * 0.52) {
+      speed = 0;
+      if (w.now >= enemy.fireReadyAt) {
+        enemy.fireReadyAt = w.now + traits.dataChew.biteMs;
+        enemy.anim = 'attack';
+        enemy.animStartedAt = w.now;
+        chewTarget.rawDataBreakage = clamp(chewTarget.rawDataBreakage + 0.12, 0, 1);
+        damageBreakable(w, chewTarget.x, chewTarget.y, 2, traits.dataChew.chewDamage, 0, enemy.x, enemy.y, undefined, false);
+        spawnParticles(w, chewTarget.x, chewTarget.y, '#86efac', 4, 42);
+      }
     }
 
     switch (enemy.def.behavior) {
@@ -6993,9 +7096,10 @@ function updateEnemies(w: World, dt: number) {
     // Contact damage.
     const contact = enemy.radius + p.radius;
     const isCutified = enemy.cutifiedUntil && w.now < enemy.cutifiedUntil;
-    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
+    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && playerDistance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
-      damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
+      const contactDamage = traits?.dataChew?.playerDamage ?? enemy.damage;
+      damagePlayer(w, contactDamage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
     }
     const elapsed = w.now - enemy.animStartedAt;
     if (enemy.anim === 'attack' && elapsed < 260) continue;
@@ -8500,7 +8604,7 @@ function spawnDirectorSquad(w: World, def: (typeof DIRECTORS)[number]): number |
 }
 
 /**
- * State machine for the (at most one, currently) Director escalation:
+ * State machine for the (at most one) Director escalation:
  * pending -> active (once triggered, tracked until its boss dies) ->
  * resolved. Follows the same `w.now`-driven re-roll shape as
  * `updateWheelSpin` above. Runs unconditionally -- unlike HordeSpin this is
@@ -8513,7 +8617,11 @@ function updateDirector(w: World) {
   if (state.phase !== 'pending') return;
   if (w.now < state.nextRollAt) return;
 
-  const director = DIRECTORS[0];
+  // A defeated personality selected at the Archive is guaranteed to cut in.
+  // Until one is selected, any Director can invade, making every personality
+  // discoverable and unlockable through ordinary play.
+  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId)
+    ?? DIRECTORS[Math.floor(w.rng() * DIRECTORS.length)];
   if (!director) return;
 
   if (w.time < director.triggerAfterSec) {
@@ -9927,6 +10035,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateStormCloud(w, dt);
   updateWheelSpin(w);
   updateDirector(w);
+  updateRawDataBreakage(w, dt);
   updateEnemies(w, dt);
   updateRoamingDetectors(w, dt);
   updateBreakables(w, dt);
