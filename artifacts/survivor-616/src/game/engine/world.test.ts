@@ -57,7 +57,9 @@ import {
   type Projectile,
   stepWorld,
   isOnBeat,
+  isWeaponUnlockedForLoot,
   musicMultiplier,
+  weaponLootWeight,
   updateRunningMan,
   updateArtisteDraw,
   commitArtisteDraw,
@@ -633,10 +635,19 @@ test('persistent hazard fields tick enemies, apply Burning, and hurt the player'
 });
 
 test('native characters take no self-damage from their own hazard weapon', () => {
-  for (const characterId of ['emberback', 'acid-botanist'] as const) {
+  const nativeHazards = [
+    ['emberback', 'emberback'],
+    ['acid-botanist', 'acid-garden'],
+    ['vinyl-hex', 'infinite-cassette'],
+    ['vector-lev', 'singularity-core'],
+    ['hook-ghost', 'rickroll-resonance'],
+    ['zero-day', 'matrix-digital-rain'],
+  ] as const;
+  for (const [characterId, weaponId] of nativeHazards) {
+    const character = getCharacter(characterId);
     const world = createWorld(
       testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
-      getCharacter(characterId),
+      { ...character, weapon: WEAPONS_BY_ID[weaponId]! },
       CHARACTERS[0]!.stats,
       8,
     );
@@ -646,9 +657,34 @@ test('native characters take no self-damage from their own hazard weapon', () =>
     addEnemy(world, 'nightcrawler', 220, 0);
     world.weapons[0]!.readyAt = 0;
     for (let i = 0; i < 25; i += 1) stepWorld(world, 1 / 30, neutralInput);
-    assert.ok(world.effects.some((effect) => effect.kind === 'hazard'));
+    assert.ok(world.effects.some((effect) => ['hazard', 'rickroll-disco', 'matrix-rain'].includes(effect.kind)));
     assert.equal(world.player.hp, world.player.maxHp);
   }
+});
+
+test('special presentation hazards still damage non-native wielders', () => {
+  for (const weaponId of ['rickroll-resonance', 'matrix-digital-rain'] as const) {
+    const world = createWorld(
+      testArea({ x: 320, y: 200, w: 20, h: 20, kind: 'barrier' }),
+      testCharacter(weaponId),
+      CHARACTERS[0]!.stats,
+      81,
+    );
+    world.weapons[0]!.readyAt = 0;
+    for (let i = 0; i < 25; i += 1) stepWorld(world, 1 / 30, neutralInput);
+    assert.ok(world.player.hp < world.player.maxHp, `${weaponId} should hurt a non-native wielder`);
+  }
+});
+
+test('hazard loot is rarer and waits for its associated character unlock', () => {
+  const acid = WEAPONS_BY_ID['acid-garden']!;
+  const emberback = WEAPONS_BY_ID.emberback!;
+  const projectile = WEAPONS_BY_ID['chain-whip']!;
+
+  assert.equal(isWeaponUnlockedForLoot(acid, []), false);
+  assert.equal(isWeaponUnlockedForLoot(acid, ['acid-botanist']), true);
+  assert.equal(isWeaponUnlockedForLoot(emberback, []), true);
+  assert.ok(weaponLootWeight(acid) < weaponLootWeight(projectile));
 });
 
 test('Let Me Hold This grants universal hazard self-immunity to non-native wielders', () => {

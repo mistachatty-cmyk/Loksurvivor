@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { HUB_ROOMS, nextRescueAllyId } from './progression';
+import { AREAS_BY_ID } from './areas';
+import { CHARACTERS, CHARACTERS_BY_ID } from './characters';
+import { WEAPONS } from './weapons';
 
 test('rescue routes make every new crew member available through normal play', () => {
   assert.equal(nextRescueAllyId('monroe-strip', [], 'vee'), 'vee');
@@ -45,4 +48,23 @@ test('GRPD Vault opens when the Site Crew recovery zone is cleared', () => {
   const vault = HUB_ROOMS.find((room) => room.id === 'grpd-vault');
   assert.ok(vault);
   assert.deepEqual(vault.unlock, { kind: 'clearArea', areaId: 'site-crew-active-zone' });
+});
+
+test('character level unlocks reference real areas and split the Cypher route', () => {
+  for (const character of CHARACTERS) {
+    if (character.unlock.kind === 'clearArea') {
+      assert.ok(AREAS_BY_ID[character.unlock.areaId], `${character.id} references a missing unlock area`);
+    }
+  }
+  assert.deepEqual(CHARACTERS_BY_ID['vinyl-hex']!.unlock, { kind: 'clearArea', areaId: 'neon-arcade' });
+  assert.deepEqual(CHARACTERS_BY_ID['hook-ghost']!.unlock, { kind: 'clearArea', areaId: 'neon-overflow' });
+});
+
+test('every gated hazard has a real character owner and a real character level', () => {
+  for (const weapon of WEAPONS.filter((candidate) => candidate.kind === 'hazard' && candidate.lootUnlockCharacterId)) {
+    const owner = CHARACTERS_BY_ID[weapon.lootUnlockCharacterId!];
+    assert.ok(owner, `${weapon.id} references a missing character`);
+    assert.equal(weapon.nativeCharacterId, owner.id);
+    assert.equal(owner.unlock.kind, 'clearArea', `${owner.id} needs an authored encounter level`);
+  }
 });
