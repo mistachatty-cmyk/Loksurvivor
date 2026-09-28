@@ -48,9 +48,11 @@ import {
   VENDOR_CATALOG,
   VENDOR_CATALOG_BY_ID,
 } from '@/game/data/vendor';
+import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { useMeta } from '@/game/state/metaStore';
 import { humanoidRig } from '@/game/sprites/rigs';
 import type { AnimName, SpritePalette, VendorItemCategory, VendorItemDef } from '@/game/types';
+import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { ScreenLayout } from './ScreenLayout';
 
@@ -73,6 +75,28 @@ const QUARTERMASTER_QUIPS = [
   "Sign here. Kidding -- just go.",
   "Comes off the books the second you walk out.",
   "Use it well. I don't restock favorites.",
+];
+
+/** Rapid Guard's own look, used instead of the Quartermaster's portrait/framing
+ *  whenever the K9 counter is the active category -- this is his special shop, not
+ *  Otis's storefront, so it shouldn't read as a reskinned Quartermaster screen. */
+const RAPID_GUARD_RIG = humanoidRig({ height: 22, width: 12, bulk: true, hood: false, cap: true });
+const RAPID_GUARD_PALETTE: SpritePalette = {
+  ink: '#0a1420',
+  body: '#274b6e',
+  bodyDark: '#152b3f',
+  accent: '#5ec2e0',
+  accentBright: '#a8e6f5',
+  skin: '#b98f68',
+  glow: '#5ec2e0',
+};
+
+const RAPID_GUARD_QUIPS = [
+  "Counter's closed to anyone who can't handle a leash.",
+  "Every dog here already passed selection. You still have to earn theirs.",
+  "Rotation turns over every hour. Don't get attached to the empty slots.",
+  "Whatever's out front is what's out front. The kennels don't negotiate.",
+  "Take one home, feed it right, and it'll take a bullet for you.",
 ];
 
 export interface VendorPanelProps {
@@ -271,9 +295,18 @@ function effectLabel(item: VendorItemDef): string {
 }
 
 function ItemIcon({ item, size = 'md' }: { item: VendorItemDef; size?: 'md' | 'lg' }) {
+  const dims = size === 'lg' ? 'h-14 w-14' : 'h-10 w-10';
+  const px = size === 'lg' ? 56 : 40;
+  const variant = item.grantsLokPetVariantId ? LOKPET_VARIANTS_BY_ID[item.grantsLokPetVariantId] : undefined;
+  if (variant) {
+    return (
+      <div className={`terminal-frame ${dims} shrink-0 overflow-hidden border border-sky-400/40 bg-sky-500/10`}>
+        <LokPetIcon silhouette={variant.silhouette} palette={variant.palette} size={px} />
+      </div>
+    );
+  }
   const Icon = ITEM_ICONS[item.id] ?? Box;
   const tone = item.category === 'challenge' ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-primary/40 bg-primary/10 text-primary';
-  const dims = size === 'lg' ? 'h-14 w-14' : 'h-10 w-10';
   return (
     <div className={`terminal-frame grid ${dims} shrink-0 place-items-center border ${tone}`}>
       <Icon className={size === 'lg' ? 'h-6 w-6' : 'h-5 w-5'} strokeWidth={1.7} />
@@ -454,6 +487,12 @@ export function VendorPanel({ onBack, onOpenThreatMatrix, initialCategory = 'sta
   const [line, setLine] = useState(QUARTERMASTER_QUIPS[0]);
   const resetTimer = useRef<number | undefined>(undefined);
   const [now, setNow] = useState(() => Date.now());
+  const isK9Counter = activeCategory === 'lokpet';
+
+  useEffect(() => {
+    setLine(isK9Counter ? RAPID_GUARD_QUIPS[0]! : QUARTERMASTER_QUIPS[0]!);
+    setReactAnim('idle');
+  }, [isK9Counter]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -487,17 +526,19 @@ export function VendorPanel({ onBack, onOpenThreatMatrix, initialCategory = 'sta
 
   function handleBuy(id: string) {
     buyVendorItem(id);
-    const clip = QUARTERMASTER_RIG.anims.attack;
+    const rig = isK9Counter ? RAPID_GUARD_RIG : QUARTERMASTER_RIG;
+    const quips = isK9Counter ? RAPID_GUARD_QUIPS : QUARTERMASTER_QUIPS;
+    const clip = rig.anims.attack;
     setReactAnim('attack');
-    setLine(QUARTERMASTER_QUIPS[Math.floor(Math.random() * QUARTERMASTER_QUIPS.length)]!);
+    setLine(quips[Math.floor(Math.random() * quips.length)]!);
     window.clearTimeout(resetTimer.current);
     resetTimer.current = window.setTimeout(() => setReactAnim('idle'), clip.frames.length * clip.frameMs);
   }
 
   return (
     <ScreenLayout
-      title="Quartermaster"
-      subtitle="Otis & Rapid Guard / Grand Rapids"
+      title={isK9Counter ? 'Rapid Guard' : 'Quartermaster'}
+      subtitle={isK9Counter ? "GRPD K9 Unit / Special shop" : 'Otis & Rapid Guard / Grand Rapids'}
       onBack={onBack}
       action={
         <div className="flex items-center gap-2">
@@ -546,9 +587,16 @@ export function VendorPanel({ onBack, onOpenThreatMatrix, initialCategory = 'sta
       }
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:flex-row lg:items-start">
-        <div className="flex shrink-0 flex-col items-center gap-3 border border-border bg-card px-6 py-5 lg:w-64">
-          <RigPortrait rig={QUARTERMASTER_RIG} palette={QUARTERMASTER_PALETTE} anim={reactAnim} size={160} />
-          <p className="text-sm font-black uppercase tracking-wide text-white">Quartermaster</p>
+        <div className={`flex shrink-0 flex-col items-center gap-3 border px-6 py-5 lg:w-64 ${isK9Counter ? 'border-sky-500/40 bg-sky-500/[0.06]' : 'border-border bg-card'}`}>
+          <RigPortrait
+            rig={isK9Counter ? RAPID_GUARD_RIG : QUARTERMASTER_RIG}
+            palette={isK9Counter ? RAPID_GUARD_PALETTE : QUARTERMASTER_PALETTE}
+            anim={reactAnim}
+            size={160}
+          />
+          <p className={`text-sm font-black uppercase tracking-wide ${isK9Counter ? 'text-sky-200' : 'text-white'}`}>
+            {isK9Counter ? 'Rapid Guard' : 'Quartermaster'}
+          </p>
           <p className="min-h-[2.5rem] text-center text-xs italic leading-relaxed text-muted-foreground">
             &ldquo;{line}&rdquo;
           </p>
@@ -682,13 +730,15 @@ export function VendorPanel({ onBack, onOpenThreatMatrix, initialCategory = 'sta
             ))}
         </section>
 
-        <div className="flex items-start gap-3 border-l-2 border-primary/45 bg-primary/[0.05] px-4 py-3 text-xs leading-5 text-muted-foreground">
-          <Box className="mt-0.5 h-4 w-4 shrink-0 text-primary/75" />
-          <p>
-            <span className="font-bold uppercase tracking-widest text-primary/80">Quartermaster note:</span> Contracts stay active once
-            bought &mdash; refund the base kit any time your build changes.
-          </p>
-        </div>
+        {!isK9Counter ? (
+          <div className="flex items-start gap-3 border-l-2 border-primary/45 bg-primary/[0.05] px-4 py-3 text-xs leading-5 text-muted-foreground">
+            <Box className="mt-0.5 h-4 w-4 shrink-0 text-primary/75" />
+            <p>
+              <span className="font-bold uppercase tracking-widest text-primary/80">Quartermaster note:</span> Contracts stay active once
+              bought &mdash; refund the base kit any time your build changes.
+            </p>
+          </div>
+        ) : null}
         </div>
       </div>
     </ScreenLayout>
