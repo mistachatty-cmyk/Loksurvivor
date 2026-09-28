@@ -3415,3 +3415,24 @@ test('crazy internet culture and canvas weapons are defined, fire properly, and 
     assert.ok(fired, `weapon ${id} should spawn projectiles or effects upon firing`);
   }
 });
+
+test('Clock fires three staggered hands and slows enemies it strikes', () => {
+  const clock = WEAPONS_BY_ID.clock;
+  assert.ok(clock, 'Clock must be registered in WEAPONS_BY_ID');
+  assert.equal(clock.kind, 'wave');
+  assert.equal(clock.count, 3);
+  assert.equal(clock.statusEffectId, 'slow');
+
+  const area = { ...AREAS[0]!, durationSec: 120, waves: [], obstacles: [] };
+  const world = createWorld(area, testCharacter('clock'), CHARACTERS[0]!.stats, 616);
+  const enemy = addEnemy(world, 'nightcrawler', 80, 0);
+  world.weapons[0]!.readyAt = 0;
+
+  stepWorld(world, 1 / 30, neutralInput);
+
+  const hands = world.effects.filter((effect) => effect.weaponId === 'clock');
+  assert.equal(hands.length, 3);
+  assert.deepEqual(hands.map((hand) => Math.round(hand.bornAt - hands[0]!.bornAt)), [0, 120, 240]);
+  assert.ok(enemy.hp < enemy.maxHp, 'the first active clock hand should damage its target');
+  assert.ok(enemy.activeEffects.some((effect) => effect.id === 'slow'), 'Clock hits should apply slow');
+});

@@ -187,7 +187,11 @@ calls the same `spawnLokPet` any other pickup-triggered grant uses.
   capture, kill credit, and Bestiary systems cannot see him. The renderer is
   procedural Canvas2D with a lane telegraph, speed trails, and a compact
   pixel runner.
-- **Stage 6**: the **Clock** weapon (data-only).
+- **Stage 6 -- built**: **Clock** is a data-only `WeaponDef` using the existing
+  wave system. It releases three lime clock-hand sweeps 120 ms apart and
+  applies the existing bounded slow status on hit. It joins the normal weapon
+  pool and Threat Matrix catalog automatically, without borrowing or changing
+  the Clockwork Beetle's hazard-pause identity.
 - **Stage 7**: the **Artiste** character and its draw-to-dodge weapon --
   the single largest remaining lift, deliberately last. Not data: a new
   `PointerMode: 'draw'`, a new `World.artisteDraw` state capturing an
