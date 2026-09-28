@@ -54,6 +54,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setCompanionRevealStyle,
     setFrameRateMode,
     setWildlifeSheltersInRain,
     setMinimapVisible,
@@ -217,6 +218,28 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     trim decorative density (particles, damage numbers, enemy outlines/
                     shadows) starting at a lower enemy count -- useful on a slower device
                     or a very dense swarm run. Never affects difficulty or rewards.
+                  </p>
+                </div>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Companion reveal</p>
+                  <div className="grid grid-cols-2 gap-1">
+                    {(['ambush', 'classic'] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setCompanionRevealStyle(value)}
+                        aria-pressed={meta.companionRevealStyle === value}
+                        className={`border p-2 uppercase ${meta.companionRevealStyle === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-companion-reveal-${value}`}
+                      >
+                        {value === 'ambush' ? 'Ambush' : 'Classic'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    How your first LokPet reveals itself in the opening encounter.
+                    Ambush has it leap in and strike alongside you. Classic keeps the
+                    original tap-the-bush reveal. Purely cosmetic.
                   </p>
                 </div>
                 <div>

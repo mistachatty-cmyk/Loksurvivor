@@ -1350,6 +1350,7 @@ export interface RunModifiers {
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';
+export type CompanionRevealStyle = 'ambush' | 'classic';
 export type RuntimePerformanceTier = 'constrained-mobile' | 'standard-mobile' | 'high-mobile' | 'desktop';
 
 /* ------------------------------------------------------------------ */
@@ -2064,6 +2065,14 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: GraphicsQuality;
+  /**
+   * How the starter LokPet encounter reveals your first companion.
+   * 'ambush' (default) has the companion leap in and strike alongside you
+   * mid-fight. 'classic' keeps the original tap-the-bush "Digital rustle"
+   * reveal. Purely presentational -- never affects which companion you get
+   * or its stats.
+   */
+  companionRevealStyle: CompanionRevealStyle;
   /**
    * Render pacing preference. The simulation remains fixed at 60 Hz, while
    * 120 Hz redraws input and presentation between simulation updates on

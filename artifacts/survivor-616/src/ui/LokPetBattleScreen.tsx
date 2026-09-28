@@ -1261,6 +1261,11 @@ export function LokPetBattleScreen({
                         </div>
                         <div className="mt-1 flex items-center gap-1.5">
                           {renderElementBadge(pet.roll.element)}
+                          {pet.starter && (
+                            <span className="rounded border border-pink-300/50 bg-pink-300/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-pink-200">
+                              Companion
+                            </span>
+                          )}
                         </div>
                         <div className="mt-2 font-mono text-[10px] text-slate-400">
                           Won: <span className="text-emerald-400">{pet.battlesWon || 0}</span> · Stamina: {pet.stamina}/3

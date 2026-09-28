@@ -640,9 +640,15 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                     <LokPetIcon silhouette={pet.roll.silhouette} palette={pet.roll.palette} size={30} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[10px] font-bold uppercase text-white">{pet.roll.name}</p>
-                      <p className="text-[9px] text-muted-foreground">{pet.roll.rarityLabel} · {pet.stamina}/3 charge</p>
+                      <p className="text-[9px] text-muted-foreground">
+                        {pet.roll.rarityLabel} · {pet.starter ? 'Companion · always fights' : `${pet.stamina}/3 charge`}
+                      </p>
                     </div>
-                    {pet.stamina > 0 ? (
+                    {pet.starter ? (
+                      <button type="button" onClick={() => toggleSavedLokPet(pet.id)} className="border border-pink-300/60 px-2 py-1 font-mono text-[8px] uppercase text-pink-100">
+                        {selected ? 'Packed' : 'Pack'}
+                      </button>
+                    ) : pet.stamina > 0 ? (
                       <button type="button" onClick={() => toggleSavedLokPet(pet.id)} className="border px-2 py-1 font-mono text-[8px] uppercase text-pink-100">
                         {selected ? 'Packed' : 'Pack'}
                       </button>
