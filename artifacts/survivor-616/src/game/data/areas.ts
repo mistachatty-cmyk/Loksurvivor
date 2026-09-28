@@ -606,12 +606,18 @@ export const AREAS: AreaDef[] = [
     waves: [
       { fromSec: 0, toSec: 70, enemyId: 'dust-mite', ratePerSec: 2.5, burst: 4, faction: 'Digitized Damned' },
       { fromSec: 15, toSec: 90, enemyId: 'digitized-phantom', ratePerSec: 1.2, burst: 2, faction: 'Digitized Damned' },
+      { fromSec: 25, toSec: 100, enemyId: 'quantum-weaver', ratePerSec: 0.9, burst: 1, faction: 'Digitized Damned' },
       { fromSec: 40, toSec: 120, enemyId: 'soul-extractor', ratePerSec: 0.8, burst: 1, faction: 'Digitized Damned' },
+      { fromSec: 45, toSec: 130, enemyId: 'unrendered-mesh', ratePerSec: 0.8, burst: 1, faction: 'Glitch Breach' },
+      { fromSec: 55, toSec: 140, enemyId: 'dead-pixel-swarm', ratePerSec: 1.4, burst: 3, faction: 'Glitch Breach' },
       { fromSec: 60, toSec: 150, enemyId: 'bit-rot', ratePerSec: 0.7, burst: 1, faction: 'Digitized Damned' },
+      { fromSec: 75, toSec: 160, enemyId: 'dropped-frame', ratePerSec: 0.7, burst: 1, faction: 'Glitch Breach' },
       { fromSec: 90, toSec: 170, enemyId: 'cursor-hound', ratePerSec: 1.0, burst: 2, faction: 'Glitch Breach' },
       { fromSec: 110, toSec: 200, enemyId: 'director-clapper', ratePerSec: 0.45, burst: 1, hpMult: 1.3, faction: 'Digitized Damned' },
+      { fromSec: 120, toSec: 200, enemyId: 'singularity-core', ratePerSec: 0.3, burst: 1, hpMult: 1.2, faction: 'Glitch Breach' },
       { fromSec: 130, toSec: 200, enemyId: 'heap-colossus', ratePerSec: 0.35, burst: 1, hpMult: 1.4, faction: 'Glitch Breach' },
       { fromSec: 150, toSec: 200, enemyId: 'the-director', ratePerSec: 0.15, burst: 1, hpMult: 1.6, faction: 'Reel Syndicate' },
+      { fromSec: 160, toSec: 200, enemyId: 'stack-overflow', ratePerSec: 0.12, burst: 1, hpMult: 1.5, faction: 'Glitch Breach' },
     ],
   },
 

@@ -1400,7 +1400,12 @@ export const ENEMIES: EnemyDef[] = [
     id: 'dropped-frame',
     name: 'Dropped Frame',
     family: 'Glitch Breach',
-    behavior: 'teleporter',
+    // 'teleporter' has no case in updateEnemyAI's switch and silently falls
+    // through to plain chase (see CLAUDE.md's behavior/traits note) --
+    // 'chase' + traits.teleportMs is the real way to get the teleport this
+    // enemy's own lore describes.
+    behavior: 'chase',
+    traits: { teleportMs: 3200 },
     hp: 40,
     speed: 44,
     damage: 10,

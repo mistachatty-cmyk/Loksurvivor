@@ -193,7 +193,9 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
   },
   {
     id: 'file-the-ledgers',
-    roomId: 'the-storefront',
+    // Matches constance's room (see progression.ts): 'the-storefront' never
+    // renders its own room view (it redirects straight to the card shop).
+    roomId: 'main-floor',
     name: 'File the ledgers',
     description: 'Every name in the neighborhood, cross-referenced against who still needs to be found.',
     benefitLabel: '+10 pickup range',
@@ -202,7 +204,7 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
   },
   {
     id: 'walk-the-block',
-    roomId: 'the-storefront',
+    roomId: 'main-floor',
     name: 'Walk the block',
     description: 'Knowing every storefront by its shutter and every shortcut by its smell.',
     benefitLabel: '+8 move speed',
@@ -211,7 +213,7 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
   },
   {
     id: 'keep-the-lookbook',
-    roomId: 'the-storefront',
+    roomId: 'main-floor',
     name: 'Keep the lookbook',
     description: 'A record of every face that has come through, and exactly what got them out alive.',
     benefitLabel: '+2% crit',
@@ -220,7 +222,7 @@ export const CREW_ACTIVITIES: CrewActivityDef[] = [
   },
   {
     id: 'mind-the-register',
-    roomId: 'the-storefront',
+    roomId: 'main-floor',
     name: 'Mind the register',
     description: 'The old counter still locks. Nobody has tested whether that matters, and nobody wants to.',
     benefitLabel: '+2% armor',
