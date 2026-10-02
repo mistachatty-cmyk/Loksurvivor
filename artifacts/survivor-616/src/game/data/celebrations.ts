@@ -6,6 +6,7 @@ export const CELEBRATIONS: CelebrationDef[] = [
   { id: 'signal-hearts', name: 'Neon Hearts', description: 'Tiny neon hearts confirm a beautiful pull.', cost: 2, tier: 'uncommon', style: 'signal-hearts' },
   { id: 'confetti-rain', name: 'Confetti Rain', description: 'A sharp little shower of color without covering the arena.', cost: 3, tier: 'rare', style: 'confetti-rain' },
   { id: 'moth-swarm', name: 'Moth Swarm', description: 'A drifting constellation of gold-winged static.', cost: 4, tier: 'legendary', style: 'moth-swarm' },
+  { id: 'spark-shower', name: 'Spark Shower', description: 'A short burst of welding sparks for every good pull.', cost: 3, tier: 'rare', style: 'spark-shower' },
 ];
 export const CELEBRATIONS_BY_ID: Record<string, CelebrationDef> = Object.fromEntries(CELEBRATIONS.map((entry) => [entry.id, entry]));
 export const DEFAULT_CELEBRATION_ID = 'paper-stars';

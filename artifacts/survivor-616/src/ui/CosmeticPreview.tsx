@@ -4,7 +4,7 @@ import type { AnimName, CelebrationStyle, HatStyle, PaletteEffectKind, RunAuraSt
 import { RigPortrait } from './RigPortrait';
 
 const HAT_MARK: Record<HatStyle, string> = {
-  none: '', 'top-hat': '▰', halo: '◌', crown: '♛', satellite: '◉', 'rain-cloud': '☁', cone: '▲', 'orbital-eye': '◉', 'moth-cap': '⌁',
+  none: '', 'top-hat': '▰', halo: '◌', crown: '♛', satellite: '◉', 'rain-cloud': '☁', cone: '▲', 'orbital-eye': '◉', 'moth-cap': '⌁', antenna: '📡', 'vinyl-disc': '◎',
 };
 const CELEBRATION_MARKS: Record<CelebrationStyle, string[]> = {
   'paper-stars': ['✦', '✧', '★', '✦', '✧'],
@@ -12,6 +12,7 @@ const CELEBRATION_MARKS: Record<CelebrationStyle, string[]> = {
   'signal-hearts': ['♥', '♡', '♥', '✧', '♡'],
   'confetti-rain': ['▰', '◆', '▴', '●', '✦'],
   'moth-swarm': ['◇', '◈', '✧', '◇', '◈'],
+  'spark-shower': ['╱', '╲', '✦', '╱', '╲'],
 };
 
 export function CosmeticPreview({ rig, palette, aura, hat, celebration, celebrationKey = 0, anim = 'idle', paletteEffect, compact = false }: {
