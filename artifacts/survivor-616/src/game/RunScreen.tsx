@@ -1202,6 +1202,7 @@ export function RunScreen({
       case 'signal-hearts': return ['♥', '♡', '♥', '✧', '♡', '♥', '✧'];
       case 'confetti-rain': return ['▰', '◆', '▴', '●', '✦', '◆', '▰'];
       case 'moth-swarm': return ['◇', '◈', '✧', '◇', '◈', '✧', '◇'];
+      case 'spark-shower': return ['╱', '╲', '✦', '╱', '╲', '✦', '╱'];
       default: return ['✦', '✧', '★', '✦', '✧', '★', '✦'];
     }
   })();

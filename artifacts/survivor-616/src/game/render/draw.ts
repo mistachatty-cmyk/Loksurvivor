@@ -5158,6 +5158,18 @@ function drawActors(
         ctx.beginPath(); ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = w.character.palette.ink; ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
       } else if (w.hatStyle === 'moth-cap') {
         ctx.fillRect(-7, -2, 14, 4); ctx.fillRect(-4, -6, 8, 4); ctx.beginPath(); ctx.arc(-7, -3, 3, 0, Math.PI * 2); ctx.arc(7, -3, 3, 0, Math.PI * 2); ctx.fill();
+      } else if (w.hatStyle === 'antenna') {
+        ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(-3, -9); ctx.moveTo(0, 2); ctx.lineTo(3, -9); ctx.stroke();
+        ctx.globalAlpha = 0.6 + Math.sin(phase * 5) * 0.35;
+        ctx.beginPath(); ctx.arc(-3, -9, 1.8, 0, Math.PI * 2); ctx.arc(3, -9, 1.8, 0, Math.PI * 2); ctx.fill();
+      } else if (w.hatStyle === 'vinyl-disc') {
+        ctx.save();
+        ctx.rotate(phase * 3.4);
+        ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = w.character.palette.ink;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
       }
       ctx.restore();
     }

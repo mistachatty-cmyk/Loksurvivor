@@ -1990,7 +1990,7 @@ export interface RunAuraDef {
 }
 
 /** Floating headwear is deliberately presentation-only and does not change collision. */
-export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap';
+export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap' | 'antenna' | 'vinyl-disc';
 export interface HatDef {
   id: string;
   name: string;
@@ -2001,7 +2001,7 @@ export interface HatDef {
 }
 
 /** A separate, short reward-reveal effect—not an aura. */
-export type CelebrationStyle = 'paper-stars' | 'coin-burst' | 'signal-hearts' | 'confetti-rain' | 'moth-swarm';
+export type CelebrationStyle = 'paper-stars' | 'coin-burst' | 'signal-hearts' | 'confetti-rain' | 'moth-swarm' | 'spark-shower';
 export interface CelebrationDef {
   id: string;
   name: string;
