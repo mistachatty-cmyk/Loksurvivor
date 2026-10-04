@@ -215,6 +215,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'All three new styles adapt to your screen: phones get a stacked layout, bigger screens get stat panels either side and a running battle log.',
     ],
   },
+  {
+    version: '0.10.8',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'The Operator Forge',
+    body: [
+      'A hidden workshop for designing new operators. Tap the Save data label in Settings five times to find it.',
+      'Build one by hand or generate them: ten species from human to dragonkin, nine body builds with height and width sliders, nine color schemes with a wide skin tone range, and around 190 hairstyles, hats, eyes, outfits, accessories and held items, each with its own color.',
+      'Forged operators borrow the stats, weapon and ultimate of any kit you have unlocked and get their own name, bio and look. They are added to your roster alongside everyone else; every existing operator stays exactly as it was.',
+      'Operators can be shared as a short code, and the Forge can make five random ones at a time.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

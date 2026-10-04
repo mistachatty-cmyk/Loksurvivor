@@ -83,6 +83,21 @@ pnpm exec playwright test       # 35 pass, 1 test.fixme (dev-tool HUD stress tes
 - Use `pnpm exec playwright test`, not `npx playwright`.
 - Not verified: the test browser cannot decode `.m4a`, so audible music playback was only checked as far as the start call. Check on a real device.
 
+## Operator Forge (v0.10.8)
+
+The owner said operators were too simple and samey, but explicitly did **not** want existing operators changed ("nothing replaced but expanded", "don't want this to be retroactive") and asked for deeply expanded design options, a generation option, and a hidden customizer. So the Forge is purely additive: new operators only, appended after the 69 authored ones.
+
+- Hidden: tap the "Save data" label in Settings five times.
+- Design: 9 builds with height and width sliders, 9 palette schemes plus 22 skin tones, 10 species presets, 7 wardrobe styles, about 190 features in 15 categories, each with its own color.
+- Generate: seeded, so a seed is a shareable recipe; also batch generation, per-category rerolls and share codes.
+- Kit: a forged operator borrows stats, weapon and ultimate from an unlocked authored operator. `llama-mama`, `llama-overlord`, `cluck-616` and legendary operators cannot be borrowed.
+- Full design and how to add options: `artifacts/survivor-616/docs/operator-forge.md`. Decision record: `.agents/memory/operator-forge.md`.
+- The retroactive approach (a global detailed-mode getter on every existing operator) was built first and deliberately thrown away. Do not reintroduce it.
+
+## LokPet creature range
+
+The owner wants hybrid, fantasy, fictional and sci-fi creatures as uncommon finds and easter eggs, some cute and some terrifying, alongside ordinary animals, and wants a few more added every once in a while. The brief, tiers, cute/dread axes, rules and an added-log are in `artifacts/survivor-616/docs/lokpet-creature-design.md`. No creatures have been added yet; that waits on the body-plan recipes (roadmap item 1).
+
 ## Deployment
 
 Vercel project `survivor-616`; `main` auto-deploys to production. The Vercel status on a PR commit turns `success` when the preview build finishes. GitHub's GraphQL API is blocked in some agent sessions; the REST API (`gh api repos/...`) works.
@@ -93,11 +108,11 @@ The owner's goal is a collect-and-battle loop (Palworld / Pokémon style) with 2
 
 1. **LokPet body-plan recipes**: data recipes plus lazily cached images, so more animals (dog, cat, bird, fish, reptile, insect...) without runtime growth. Today there are 78 variants on about 41 silhouettes.
 2. **Seeded variants and card tie-in**: pattern layers, fighting-style tags, variants becoming their own cards.
-3. **Operator design range**: more slots and shapes in `humanoidRig` (about 19 on/off options today).
+3. **Operator design range**: DONE as the additive Operator Forge (v0.10.8), see below. More features, species and builds can be added as data entries.
 4. **Living hideout strip**: pet follower, visitors, tap-to-fight events using the new fight styles.
 5. **City exploration loop**: wander, find items, LokPets, allies and events, fight data mites and enemies.
 6. **Expansion packs** up to 200 LokPets.
 
-Open questions for the owner: which animals first, how far operator customization should go (colors and outfits only, or whole body shapes), and whether Duo or Arena should become the default for new players.
+Open questions for the owner: which animals first, and whether Duo or Arena should become the default for new players. (Operator customization is answered: it is additive and goes as far as bodies, species, palettes and outfits, and existing operators are never changed.)
 
 Still needing a check on real devices: music starting on first tap, hideout animations with the override, Firefly Hollows Extreme balance, light tiers, veterans, and Classic card foil-frame parity with the new look.

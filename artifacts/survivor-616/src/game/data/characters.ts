@@ -2,6 +2,7 @@ import { arachnidRig, blobRig, eelRig, expressiveRig, giantRig, humanoidRig, qua
 import type { CharacterDef, SpriteRig } from '@/game/types';
 import { palette } from './authoring';
 import { REACTION_PRESETS } from './reactivity';
+import { registerForgedOperators } from '@/game/data/forgedOperators';
 
 /** Static Nomad's rig: a cloud-afro head, metallic arms and a flared trouser stance, plus a floating electrified trail. */
 function staticNomadRig(): SpriteRig {
@@ -2396,6 +2397,11 @@ export const CHARACTERS: CharacterDef[] = [
 export const CHARACTERS_BY_ID: Record<string, CharacterDef> = Object.fromEntries(
   CHARACTERS.map((c) => [c.id, c]),
 );
+
+// Operators the player designed in the (hidden) Operator Forge. Purely additive:
+// this appends new roster entries after every authored operator and never
+// modifies one. With nothing forged it does nothing.
+registerForgedOperators(CHARACTERS, CHARACTERS_BY_ID);
 
 export function getCharacter(id: string): CharacterDef {
   const found = CHARACTERS_BY_ID[id];
