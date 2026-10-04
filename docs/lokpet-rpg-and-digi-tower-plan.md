@@ -1,6 +1,6 @@
 # LokPet RPG, Bonds, Hideout Companions and the DIGI-Tower: plan
 
-Status: **0.11.0 (Bond and Growth) is built; everything after it is plan only.** Written 2026-10-04 against v0.10.9
+Status: **0.11.0 (Bond and Growth) and 0.11.1 (Hideout Companions, 15 events, several from the list below) are built; everything after them is plan only.** Written 2026-10-04 against v0.10.9
 (`META_VERSION` 21). It answers the owner's requests of 16:53, 16:57 and 17:16
 (Limit Break), and every number in it is a starting point to tune in playtests,
 not a decision.

@@ -1,4 +1,4 @@
-# LokPet growth, bond and names (v0.11.0), plus the Masters lore
+# LokPet growth, bond and names (v0.11.0), hideout companions (v0.11.1), plus the Masters lore
 
 **Plan:** `docs/lokpet-rpg-and-digi-tower-plan.md` (phases 0.11.0 to 0.11.8). 0.11.0 shipped Phase 0 plus XP, bond, names, Growth Recap and achievement categories. Everything later (hideout companions, evolutions, handlers, DIGI-Tower, Limit Break) is not built.
 
@@ -12,6 +12,15 @@
 - **Achievement toasts** are derived in a wrapper around the reducer (complete after, not before). `reset` and `replaceMeta` are skipped, or importing a save would toast everything.
 - `META_VERSION` is 22; the new pet fields are optional and `normalizeSavedLokPets` cleans them.
 - The save has no kennel-wide naming UI yet; names are edited in Run Setup (pencil) and the starter encounter.
+
+## Hideout companions (v0.11.1)
+
+- **Everything is data.** `data/hideoutEvents.ts` holds temperaments (5), moves, emotes and 15 events (conditions: bond rank, time of day, weather, music, temperament, local hour; weight, cooldown, once-only, tiny XP/bond reward). Add a row to add content; `hideoutCompanions.test.ts` checks every row and that something always fits.
+- **Pure rules** in `engine/hideoutPets.ts` (operator walk/rest, pet follow/idle/call, scripted moves, poses); drawing is `ui/HideoutPreview.tsx` using the same `drawRig` and `lokPetRig`. The canvas loop is kept alive across renders and reads props through a ref, because HubScreen's palette identity trap tears down the effect otherwise.
+- **Trap: the global stylesheet sets `pointer-events: none` on every `[aria-hidden="true"]` element.** The strip canvas used to be aria-hidden; it now has `role="img"` and a label so it can take taps. Do not put aria-hidden back on it.
+- Operator now pauses between walking legs; that pause is what lets pets idle. Music comes from `beatBus.read()` (no new audio code). Reduced motion: still scene, taps still pet.
+- Petting counts for bond once per local day per pet (`careDay`); events use `hideoutEvents` history on the pet for cooldowns and once-only. Settings `hideoutPets` (all/companion/off) and `hideoutEvents` (on/quiet/off).
+- Dev-only `?screen=hub&fastPetEvents=1` makes the first event fire at 0.6 s for tests; `?screen=run-setup` also exists in dev.
 
 ## Masters lore (lore only, not wired)
 

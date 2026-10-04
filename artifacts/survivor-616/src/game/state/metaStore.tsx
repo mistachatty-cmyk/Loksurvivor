@@ -71,7 +71,8 @@ import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/gene
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
 import { getExpForLevel } from '@/game/engine/petExpCurve';
-import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
+import { HIDEOUT_EVENTS_BY_ID } from '@/game/data/hideoutEvents';
+import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDayKey, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
@@ -288,6 +289,8 @@ export function createInitialMeta(): MetaState {
     hideoutArrivalEnabled: true,
     hideoutSectionsCollapsedByDefault: false,
     hideoutPreviewEnabled: true,
+    hideoutPets: 'all',
+    hideoutEvents: 'on',
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
@@ -888,10 +891,21 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
         : undefined,
       names: normalizePetNames(candidate.names),
       bond: typeof candidate.bond === 'number' && Number.isFinite(candidate.bond) && candidate.bond > 0 ? Math.min(100000, Math.floor(candidate.bond)) : undefined,
+      careDay: typeof candidate.careDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.careDay) ? candidate.careDay : undefined,
+      hideoutEvents: normalizeHideoutEventHistory(candidate.hideoutEvents),
       bondDay: typeof candidate.bondDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.bondDay) ? candidate.bondDay : undefined,
       bondToday: typeof candidate.bondToday === 'number' && Number.isFinite(candidate.bondToday) && candidate.bondToday > 0 ? Math.min(1000, Math.floor(candidate.bondToday)) : undefined,
     }];
   }).slice(0, 48);
+}
+
+function normalizeHideoutEventHistory(value: unknown): SavedLokPet['hideoutEvents'] {
+  if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value)
+    .filter(([id, at]) => id.length > 0 && id.length <= 40 && typeof at === 'number' && Number.isFinite(at) && at > 0)
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
+    .slice(0, 40);
+  return entries.length > 0 ? (Object.fromEntries(entries) as Record<string, number>) : undefined;
 }
 
 function normalizePetNames(value: unknown): SavedLokPet['names'] {
@@ -1199,6 +1213,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       : !(typeof window !== 'undefined' && window.localStorage.getItem('survivor616.attractMode') === 'off'),
     hideoutSectionsCollapsedByDefault: parsed.hideoutSectionsCollapsedByDefault === true,
     hideoutPreviewEnabled: parsed.hideoutPreviewEnabled !== false,
+    hideoutPets: parsed.hideoutPets === 'companion' || parsed.hideoutPets === 'off' ? parsed.hideoutPets : 'all',
+    hideoutEvents: parsed.hideoutEvents === 'quiet' || parsed.hideoutEvents === 'off' ? parsed.hideoutEvents : 'on',
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
@@ -1878,6 +1894,10 @@ type Action =
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setHideoutSectionsCollapsedByDefault'; enabled: boolean }
   | { type: 'setHideoutPreview'; enabled: boolean }
+  | { type: 'setHideoutPets'; mode: MetaState['hideoutPets'] }
+  | { type: 'setHideoutEvents'; mode: MetaState['hideoutEvents'] }
+  | { type: 'careForLokPet'; id: string; now: number }
+  | { type: 'completeHideoutEvent'; petId: string; eventId: string; now: number }
   | { type: 'setHideoutStickyHeadOut'; enabled: boolean }
   | { type: 'setSplashTextEnabled'; enabled: boolean }
   | { type: 'setOneLineTitleEnabled'; enabled: boolean }
@@ -3123,6 +3143,58 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'setHideoutPreview':
       return { ...state, meta: { ...state.meta, hideoutPreviewEnabled: action.enabled } };
 
+    case 'setHideoutPets':
+      return { ...state, meta: { ...state.meta, hideoutPets: action.mode } };
+
+    case 'setHideoutEvents':
+      return { ...state, meta: { ...state.meta, hideoutEvents: action.mode } };
+
+    case 'careForLokPet': {
+      // Petting a companion in the hideout: it always plays, but only the first of the day counts for bond.
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet) return state;
+      const day = bondDayKey(action.now);
+      if (pet.careDay === day) return state;
+      const grown = growPet(pet, { exp: 0, bondSource: 'care', now: action.now });
+      const headlines = growthHeadlines(grown.entry ? [grown.entry] : []);
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.id ? { ...grown.pet, careDay: day } : candidate)),
+          pendingNotifications: headlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-care-${action.id}-${action.now}`, title: 'A good day together', body: headlines.join('. ') + '.', createdAt: action.now }]
+            : state.meta.pendingNotifications,
+        },
+      };
+    }
+
+    case 'completeHideoutEvent': {
+      const def = HIDEOUT_EVENTS_BY_ID[action.eventId];
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.petId);
+      if (!def || !pet) return state;
+      const last = pet.hideoutEvents?.[def.id];
+      if (last !== undefined && (def.once || action.now - last < def.cooldownMs)) return state;
+      const grown = growPet(pet, {
+        exp: scalePetExp(def.reward?.exp ?? 0),
+        bondSource: def.reward?.bond === false ? undefined : 'event',
+        now: action.now,
+      });
+      const seen = { ...(pet.hideoutEvents ?? {}), [def.id]: action.now };
+      const kept = Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, 40);
+      const headlines = growthHeadlines(grown.entry ? [grown.entry] : []);
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.petId ? { ...grown.pet, hideoutEvents: Object.fromEntries(kept) } : candidate)),
+          pendingNotifications: headlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-event-${action.petId}-${action.now}`, title: def.title, body: headlines.join('. ') + '.', createdAt: action.now }]
+            : state.meta.pendingNotifications,
+        },
+      };
+    }
+
     case 'setHideoutStickyHeadOut':
       return { ...state, meta: { ...state.meta, hideoutStickyHeadOutEnabled: action.enabled } };
 
@@ -3761,6 +3833,10 @@ export interface MetaContextValue {
   setHideoutWeather: (enabled: boolean) => void;
   setHideoutSectionsCollapsedByDefault: (enabled: boolean) => void;
   setHideoutPreview: (enabled: boolean) => void;
+  setHideoutPets: (mode: MetaState['hideoutPets']) => void;
+  setHideoutEvents: (mode: MetaState['hideoutEvents']) => void;
+  careForLokPet: (id: string) => void;
+  completeHideoutEvent: (petId: string, eventId: string) => void;
   setHideoutStickyHeadOut: (enabled: boolean) => void;
   setSplashTextEnabled: (enabled: boolean) => void;
   setOneLineTitleEnabled: (enabled: boolean) => void;
@@ -3973,6 +4049,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setHideoutPreview', enabled }),
     [],
   );
+  const setHideoutPets = useCallback((mode: MetaState['hideoutPets']) => dispatch({ type: 'setHideoutPets', mode }), []);
+  const setHideoutEvents = useCallback((mode: MetaState['hideoutEvents']) => dispatch({ type: 'setHideoutEvents', mode }), []);
+  const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
+  const completeHideoutEvent = useCallback((petId: string, eventId: string) => dispatch({ type: 'completeHideoutEvent', petId, eventId, now: Date.now() }), []);
   const setHideoutStickyHeadOut = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutStickyHeadOut', enabled }),
     [],
@@ -4225,6 +4305,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutWeather,
       setHideoutSectionsCollapsedByDefault,
       setHideoutPreview,
+      setHideoutPets,
+      setHideoutEvents,
+      careForLokPet,
+      completeHideoutEvent,
       setHideoutStickyHeadOut,
       setSplashTextEnabled,
       setOneLineTitleEnabled,
@@ -4367,6 +4451,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
+    setHideoutPets,
+    setHideoutEvents,
+    careForLokPet,
+    completeHideoutEvent,
     setHideoutStickyHeadOut,
     setSplashTextEnabled,
     setOneLineTitleEnabled,

@@ -117,6 +117,8 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
+    setHideoutPets,
+    setHideoutEvents,
     setHideoutStickyHeadOut,
     setSplashTextEnabled,
     setOneLineTitleEnabled,
@@ -664,6 +666,46 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
+              {meta.hideoutPreviewEnabled ? (
+                <div className="mt-3 border border-border/70 bg-background/50 p-4" data-testid="settings-hideout-pets">
+                  <h3 className="text-sm font-black uppercase tracking-wide text-white">Pets in the hideout</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Your LokPets walk the strip with you, bounce to the music, nap and play. Tap one to pet it, tap the ground to call it over.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Pets in the hideout">
+                    {([['all', 'All'], ['companion', 'Partner only'], ['off', 'Off']] as const).map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setHideoutPets(mode)}
+                        aria-pressed={meta.hideoutPets === mode}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutPets === mode ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-pets-${mode}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">Hideout events</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    Small scenes now and then, with a one-line note in the corner. Never a pop-up.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Hideout events">
+                    {([['on', 'Normal'], ['quiet', 'Rarely'], ['off', 'Off']] as const).map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setHideoutEvents(mode)}
+                        aria-pressed={meta.hideoutEvents === mode}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutEvents === mode ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-events-${mode}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>

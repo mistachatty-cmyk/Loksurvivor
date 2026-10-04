@@ -235,6 +235,10 @@ export interface SavedLokPet {
   bond?: number;
   /** Local day key (YYYY-MM-DD) that `bondToday` counts for. */
   bondDay?: string;
+  /** Local day key of the last hideout petting that counted (one counts per day). */
+  careDay?: string;
+  /** Hideout events this pet has played: event id -> last time (ms). Drives cooldowns and once-only events. */
+  hideoutEvents?: Record<string, number>;
   /** Bond earned on `bondDay`, against the daily cap. */
   bondToday?: number;
 }
@@ -2216,6 +2220,10 @@ export interface MetaState {
   hideoutSectionsCollapsedByDefault: boolean;
   /** The animated walking-rig hero at the top of the Hideout screen. On by default; off reverts to the classic static layout. */
   hideoutPreviewEnabled: boolean;
+  /** Which pets walk the Hideout strip: all selected pets and the partner, only the partner, or none. */
+  hideoutPets: 'all' | 'companion' | 'off';
+  /** How often small pet events play in the Hideout: normal, rarely, or never. */
+  hideoutEvents: 'on' | 'quiet' | 'off';
   /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */
   hideoutStickyHeadOutEnabled: boolean;
   /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
