@@ -270,3 +270,13 @@ just *what*, so the reasoning doesn't need to be re-derived:
   movement stick and the RTS pointer grammar never share a pointer-down, and
   the Tier 2/3 economies that are typed but deliberately unbuilt.
 - `MEMORY.md` — index/entry point for the above.
+
+## Versioning
+
+Every update bumps the version in `artifacts/survivor-616/src/game/data/changelog.ts`
+(`CHANGELOG`, whose last entry is `CURRENT_VERSION`). Format is `major.middle.patch`:
+- Minor updates and hotfixes bump the **last** number (`0.10.0` -> `0.10.1`).
+- After the last number reaches 9 it rolls over and the **middle** number goes up
+  (`0.10.9` -> `0.11.0`). Rules for the first number are still to be decided.
+- The existing changelog already runs through v0.10.0 — continue from the latest
+  entry rather than restarting at 0.0.0. Never reuse a version (`changelog.test.ts`).
