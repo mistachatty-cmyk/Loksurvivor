@@ -5,7 +5,7 @@ This repository is the shared working space for Loksurvivor. Gemini, Claude, and
 ## Before starting work
 
 1. Read `COLLABORATION.md`.
-2. Read the relevant notes in `.agents/memory/`.
+2. Read the relevant notes in `.agents/memory/`, and the latest handoff in `docs/` (currently `docs/ai-handoff-2026-10-04.md`).
 3. Check open GitHub issues and pull requests before choosing a task.
 4. Claim one issue or create one before making a substantial change.
 
