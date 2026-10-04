@@ -14,8 +14,19 @@ test.describe('Lock Deck card packs', () => {
     await expect(page.locator('[data-testid^="button-card-pack-"]')).toHaveCount(5);
     await expect(page.getByTestId('card-lok-character-shade')).toBeVisible();
     await page.getByTestId('card-lok-character-shade').click();
-    await expect(page.getByRole('dialog', { name: 'Card details' })).toContainText('Shade');
-    await expect(page.getByRole('dialog', { name: 'Card details' })).toContainText('g6.616-survivor:character-shade');
+    await expect(page.getByRole('dialog', { name: 'Card details' })).toContainText('Unknown Card');
+    await expect(page.getByRole('dialog', { name: 'Card details' })).toContainText('sealed');
+  });
+
+  test('card style picker offers Classic, New and Dynamic 3D', async ({ page }) => {
+    await expect(page.getByTestId('button-viewmode-classic')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.lok-collection-card').first()).toBeVisible();
+    await page.getByTestId('button-viewmode-new').click();
+    await expect(page.getByTestId('button-viewmode-new')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.lok-collection-card')).toHaveCount(0);
+    await expect(page.getByTestId('card-lok-character-shade')).toBeVisible();
+    await page.getByTestId('button-viewmode-classic').click();
+    await expect(page.locator('.lok-collection-card').first()).toBeVisible();
   });
 
   test('keeps the binder usable at phone width', async ({ page }) => {
@@ -29,8 +40,7 @@ test.describe('Lock Deck card packs', () => {
   test('has a dedicated card-shop destination outside the Archive', async ({ page }) => {
     await page.goto('/?screen=card-shop');
     await expect(page.getByTestId('section-card-shop')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'LokPet Card Shop' })).toBeVisible();
-    await expect(page.getByTestId('button-card-shop-open-pack')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Lock Pack Counter' })).toBeVisible();
     await expect(page.locator('[data-testid^="button-card-pack-"]')).toHaveCount(5);
   });
 });

@@ -1,7 +1,8 @@
-import { useState, useRef, type MouseEvent } from 'react';
+import { useState, useRef, type CSSProperties, type MouseEvent } from 'react';
 import { Sparkles, Lock, Crown, Info } from 'lucide-react';
 import type { LokAssetManifest } from '@/game/lok/types';
-import { CardArtwork, RARITY_STYLE } from './LockDeckCollection';
+import { CardArtwork, RARITY_STYLE, cardMetadata } from './LockDeckCollection';
+import { cardPackFor } from '@/game/data/cards';
 import {
   getCardVariableProfile,
   ELEMENT_METADATA,
@@ -9,7 +10,8 @@ import {
   FIGHTING_STYLE_METADATA,
 } from '@/game/data/cardVariables';
 
-export type CardViewMode = 'classic' | 'dynamic';
+/** classic = main's original card look; new = AI Studio streamlined look; dynamic = AI Studio tilt + foil. */
+export type CardViewMode = 'classic' | 'new' | 'dynamic';
 
 interface LokDeckCardViewProps {
   card: LokAssetManifest;
@@ -114,6 +116,47 @@ export function LokDeckCardView({
   // 1. CLASSIC MODE (Beloved original streamlined format)
   // -------------------------------------------------------------
   if (mode === 'classic') {
+    // Main's original binder card: rarity-edged foil frame, 5:7 aspect, static art.
+    const info = cardMetadata(card);
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`lok-collection-card group relative aspect-[5/7] w-full overflow-hidden rounded-[14px] border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${owned ? '' : 'is-locked'}`}
+        style={{ '--card-edge': rarity.edge, '--card-glow': rarity.glow } as CSSProperties}
+        data-testid={`card-lok-${card.slug}`}
+        aria-label={`${owned ? card.name : 'Locked card'}, ${card.rarity}`}
+      >
+        <div className="lok-card-foil absolute inset-0" />
+        <div className="absolute inset-[5px] rounded-[10px] border border-white/15 bg-[#09090d]" />
+        <div className="absolute inset-x-3 top-3 z-10 flex items-start justify-between gap-2">
+          <div>
+            <p className="font-display text-[13px] font-black uppercase leading-none tracking-tight text-white">{owned ? card.name : 'Unknown Card'}</p>
+            <p className="mt-1 font-mono text-[7px] uppercase tracking-[.18em] text-white/45">{info?.cardNumber ?? card.slug}</p>
+          </div>
+          <span className={`font-mono text-[7px] font-black uppercase tracking-wider ${rarity.ink}`}>{card.rarity}</span>
+        </div>
+        <div className={`absolute inset-x-3 bottom-[4.3rem] top-12 grid place-items-center overflow-hidden rounded-md border border-white/10 bg-[radial-gradient(circle_at_50%_35%,var(--card-glow),transparent_68%)] ${owned ? '' : 'grayscale'}`}>
+          <CardArtwork card={card} size={142} animated={false} />
+          {!owned && <Lock className="absolute h-6 w-6 text-white/55" />}
+        </div>
+        <div className="absolute inset-x-3 bottom-3 z-10">
+          <p className="line-clamp-2 min-h-7 text-[8px] leading-relaxed text-white/55">
+            {owned ? card.description : 'Find or buy a matching Lock Pack to break the seal.'}
+          </p>
+          <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-1.5 font-mono text-[7px] uppercase tracking-widest text-white/40">
+            <span>{cardPackFor(card).name}</span>
+            {owned ? <span className="text-emerald-300">x{copies} · {variant}</span> : <Lock className="h-3 w-3" />}
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 1b. NEW MODE (AI Studio streamlined format)
+  // -------------------------------------------------------------
+  if (mode === 'new') {
     return (
       <button
         type="button"
@@ -397,3 +440,30 @@ export function LokDeckCardView({
   );
 }
 export default LokDeckCardView;
+
+const STYLE_OPTIONS: { id: CardViewMode; label: string; active: string }[] = [
+  { id: 'classic', label: 'Classic', active: 'bg-primary text-black font-black' },
+  { id: 'new', label: 'New', active: 'bg-cyan-300 text-black font-black' },
+  { id: 'dynamic', label: 'Dynamic 3D', active: 'bg-amber-400 text-black font-black' },
+];
+
+/** Shared Card Style picker: Classic (main) / New (AI Studio) / Dynamic 3D. */
+export function CardStyleToggle({ value, onChange, compact = false }: { value: CardViewMode; onChange: (mode: CardViewMode) => void; compact?: boolean }) {
+  return (
+    <div className="flex items-center rounded border border-white/20 bg-black/40 p-0.5 font-mono text-[8px] uppercase" role="group" aria-label="Card style">
+      {!compact && <span className="hidden px-2 text-white/40 sm:inline">Card Style:</span>}
+      {STYLE_OPTIONS.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          onClick={() => onChange(opt.id)}
+          aria-pressed={value === opt.id}
+          className={`rounded px-2 py-0.5 font-bold transition-colors ${value === opt.id ? opt.active : 'text-white/60 hover:text-white'}`}
+          data-testid={`button-viewmode-${opt.id}`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}

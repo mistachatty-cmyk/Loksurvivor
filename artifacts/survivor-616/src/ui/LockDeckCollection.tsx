@@ -35,7 +35,7 @@ import type { LokAssetManifest } from '@/game/lok/types';
 import type { MetaState } from '@/game/types';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
-import { LokDeckCardView, type CardViewMode } from './LokDeckCardView';
+import { LokDeckCardView, CardStyleToggle, type CardViewMode } from './LokDeckCardView';
 import { CardMatrixChartModal } from './CardMatrixChartModal';
 import {
   getCardVariableProfile,
@@ -65,12 +65,12 @@ const PACK_THEME: Record<LokDeckSetId, { accent: string; glow: string; mark: str
   endless: { accent: '#a3e635', glow: 'rgba(163,230,53,.27)', mark: '∞' },
 };
 
-function metadata(card: LokAssetManifest): LokDeckCardMetadata | undefined {
+export function cardMetadata(card: LokAssetManifest): LokDeckCardMetadata | undefined {
   return card.metadata as LokDeckCardMetadata | undefined;
 }
 
 export function CardArtwork({ card, size = 150, animated = true }: { card: LokAssetManifest; size?: number; animated?: boolean }) {
-  const info = metadata(card);
+  const info = cardMetadata(card);
   if (info?.subjectType === 'character') {
     const character = CHARACTERS.find((entry) => entry.id === info.subjectId);
     if (character) return <RigPortrait rig={character.rig} palette={character.palette} anim="idle" size={size} animated={animated} />;
@@ -122,7 +122,7 @@ function PackTile({ pack, selected, owned, onSelect }: { pack: LokDeckSet; selec
 
 export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; owned: boolean; onClose: () => void }) {
   const rarity = RARITY_STYLE[card.rarity] ?? RARITY_STYLE.common;
-  const info = metadata(card);
+  const info = cardMetadata(card);
   const profile = getCardVariableProfile(card);
   const elemMeta = ELEMENT_METADATA[profile.element];
   const dataMeta = DATA_TYPE_METADATA[profile.dataType];
@@ -162,28 +162,9 @@ export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; o
           style={{ '--card-glow': rarity.glow } as React.CSSProperties}
         >
           <LokDeckCardView card={card} owned={owned} size="standard" mode={previewMode} />
-          <div className="mt-3 flex items-center rounded border border-white/20 bg-black/60 p-0.5 font-mono text-[7.5px] uppercase">
-            <button
-              type="button"
-              onClick={() => setPreviewMode('classic')}
-              className={`rounded px-2 py-0.5 font-bold transition-colors ${
-                previewMode === 'classic' ? 'bg-primary text-black font-black' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Classic
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreviewMode('dynamic')}
-              className={`rounded px-2 py-0.5 font-bold transition-colors ${
-                previewMode === 'dynamic' ? 'bg-amber-400 text-black font-black' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Dynamic 3D
-            </button>
-          </div>
+          <div className="mt-3"><CardStyleToggle value={previewMode} onChange={setPreviewMode} compact /></div>
           <p className="mt-1 text-center font-mono text-[8px] text-white/40 uppercase tracking-widest">
-            {previewMode === 'classic' ? 'Retro Streamlined Base' : 'Tilt & Holographic Foil'}
+            {previewMode === 'classic' ? 'Original Foil Frame' : previewMode === 'new' ? 'Streamlined New Look' : 'Tilt & Holographic Foil'}
           </p>
         </div>
 
@@ -522,34 +503,7 @@ export function LockDeckCollection({
           Multi-Variable
         </button>
 
-        {/* View Mode Toggle: Classic (Default Base) vs Dynamic 3D */}
-        <div className="flex items-center rounded border border-white/20 bg-black/40 p-0.5 font-mono text-[8px] uppercase sm:ml-auto">
-          <span className="px-2 text-white/40 hidden sm:inline">Card Style:</span>
-          <button
-            type="button"
-            onClick={() => setCardViewMode('classic')}
-            className={`rounded px-2.5 py-1 font-bold transition-colors ${
-              cardViewMode === 'classic'
-                ? 'bg-primary text-black font-black shadow-sm'
-                : 'text-white/60 hover:text-white'
-            }`}
-            data-testid="button-viewmode-classic"
-          >
-            Classic View (Base)
-          </button>
-          <button
-            type="button"
-            onClick={() => setCardViewMode('dynamic')}
-            className={`rounded px-2.5 py-1 font-bold transition-colors ${
-              cardViewMode === 'dynamic'
-                ? 'bg-amber-400 text-black font-black shadow-sm'
-                : 'text-white/60 hover:text-white'
-            }`}
-            data-testid="button-viewmode-dynamic"
-          >
-            Dynamic 3D
-          </button>
-        </div>
+        <div className="sm:ml-auto"><CardStyleToggle value={cardViewMode} onChange={setCardViewMode} /></div>
 
         {activeFiltersCount > 0 && (
           <button

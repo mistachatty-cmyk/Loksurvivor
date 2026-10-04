@@ -40,7 +40,7 @@ import type { LokAssetManifest } from '@/game/lok/types';
 import { LockDeckCollection, CardDetail } from './LockDeckCollection';
 import { PackOpeningReveal } from './PackOpeningReveal';
 import { ScreenLayout } from './ScreenLayout';
-import { LokDeckCardView, type CardViewMode } from './LokDeckCardView';
+import { LokDeckCardView, CardStyleToggle, type CardViewMode } from './LokDeckCardView';
 import { CardMatrixChartModal } from './CardMatrixChartModal';
 import { getCollectorMastery } from '@/game/data/collectorMastery';
 import {
@@ -155,32 +155,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Card View Mode Selector */}
-          <div className="flex items-center rounded border border-white/20 bg-black/40 p-0.5 font-mono text-[8px] uppercase">
-            <span className="px-2 text-white/40 hidden sm:inline">Card Style:</span>
-            <button
-              type="button"
-              onClick={() => setSinglesViewMode('classic')}
-              className={`rounded px-2 py-0.5 font-bold transition-colors ${
-                singlesViewMode === 'classic'
-                  ? 'bg-primary text-black font-black'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Classic
-            </button>
-            <button
-              type="button"
-              onClick={() => setSinglesViewMode('dynamic')}
-              className={`rounded px-2 py-0.5 font-bold transition-colors ${
-                singlesViewMode === 'dynamic'
-                  ? 'bg-amber-400 text-black font-black'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Dynamic 3D
-            </button>
-          </div>
+          <CardStyleToggle value={singlesViewMode} onChange={setSinglesViewMode} />
 
           <div className="flex items-center gap-2 border border-amber-300/30 bg-black/40 px-3 py-1 font-mono text-xs text-amber-200">
             <span>BALANCE:</span>

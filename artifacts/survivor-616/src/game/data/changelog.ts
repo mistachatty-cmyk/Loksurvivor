@@ -157,6 +157,15 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Dust Mite Rancher, Sector 616 Chronicles lore popup, 4\u00d7 Extreme map tab and a much larger LokPet roster and battle script round out the update.',
     ],
   },
+  {
+    version: '0.10.2',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Card Style Choice',
+    body: [
+      'Lok Card Shop and Lock Deck cards now have a Card Style picker: Classic keeps the original foil-framed binder look and stays the default, New is the streamlined look from the Underground Update, and Dynamic 3D adds tilt and holographic foil.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
