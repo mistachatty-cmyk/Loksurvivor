@@ -61,6 +61,8 @@ import { DustMiteRancherPanel } from '@/ui/DustMiteRancherPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { TravelEncounterOverlay } from '@/ui/TravelEncounterOverlay';
+import { QuickFightOverlay } from '@/ui/QuickFightOverlay';
+import { getQuickFightEnabled } from '@/game/state/quickFightSetting';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
@@ -111,6 +113,8 @@ interface PendingTravelEncounter {
   opponent: ResolvedTravelEncounterOpponent;
   rng: () => number;
   label: string;
+  /** Read once when the encounter starts, so flipping the setting never swaps a fight mid-round. */
+  quick: boolean;
   /** The navigation that was intercepted; run once the popup resolves (win/lose/flee). */
   onResolved: () => void;
 }
@@ -318,7 +322,7 @@ function Game() {
       lastTravelEncounterAtRef.current = Date.now();
       const rng = createRng(Date.now());
       const opponent = resolveTravelEncounterOpponent(pickTravelEncounterOpponent(rng), rng);
-      setTravelEncounter({ opponent, rng, label: trigger.label, onResolved: proceed });
+      setTravelEncounter({ opponent, rng, label: trigger.label, quick: getQuickFightEnabled(), onResolved: proceed });
     },
     [meta.travelEncountersEnabled, meta.totalRuns],
   );
@@ -554,18 +558,21 @@ function Game() {
   return (
     <>
       {renderScreen()}
-      {travelEncounter && (
-        <TravelEncounterOverlay
-          opponent={travelEncounter.opponent}
-          rng={travelEncounter.rng}
-          label={travelEncounter.label}
-          onClose={() => {
-            const proceed = travelEncounter.onResolved;
-            setTravelEncounter(null);
-            proceed();
-          }}
-        />
-      )}
+      {travelEncounter && (() => {
+        const Overlay = travelEncounter.quick ? QuickFightOverlay : TravelEncounterOverlay;
+        return (
+          <Overlay
+            opponent={travelEncounter.opponent}
+            rng={travelEncounter.rng}
+            label={travelEncounter.label}
+            onClose={() => {
+              const proceed = travelEncounter.onResolved;
+              setTravelEncounter(null);
+              proceed();
+            }}
+          />
+        );
+      })()}
     </>
   );
 }

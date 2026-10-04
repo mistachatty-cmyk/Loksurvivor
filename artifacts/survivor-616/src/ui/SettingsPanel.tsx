@@ -41,11 +41,43 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
+import { getQuickFightEnabled, setQuickFightEnabled } from '@/game/state/quickFightSetting';
 
 export interface SettingsPanelProps {
   onBack: () => void;
   onOpenLooksAndLokPets?: () => void;
 }
+function QuickFightSetting() {
+  const [enabled, setEnabled] = useState(getQuickFightEnabled);
+  return (
+    <div className="mt-3 border border-border/70 bg-background/50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-wide text-white">Quick fights (LokPet)</h3>
+          <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Travel encounters play out with your lead LokPet on the arena engine: three moves, strong and weak
+            matchups shown on every button, and the opponent's next move shown before you choose. Fights last at
+            most eight rounds. Off keeps the classic card-throw popup. This device only.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setQuickFightEnabled(!enabled); setEnabled(!enabled); }}
+          aria-pressed={enabled}
+          className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+            enabled
+              ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+              : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+          }`}
+          data-testid="button-toggle-quick-fights"
+        >
+          {enabled ? 'On' : 'Off'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
   const {
     meta,
@@ -766,6 +798,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
+              <QuickFightSetting />
             </div>
           </div>
         </section>
