@@ -1,8 +1,12 @@
 {
   "dir": "src/locales",
   "source": "en",
-  "engine": "google,argos",
-  "targets": ["es", "fr", "de", "pt-BR", "ja", "ko", "zh-CN"],
+  "engine": "argos",
+  "targets": [
+    "it",
+    "ru",
+    "es"
+  ],
   "glossary": [
     "Survivor616",
     "616 Survivor",
