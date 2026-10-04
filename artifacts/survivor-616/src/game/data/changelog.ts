@@ -227,6 +227,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Operators can be shared as a short code, and the Forge can make five random ones at a time.',
     ],
   },
+  {
+    version: '0.10.9',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'The Crew After Hours',
+    body: [
+      'Eleven new crew jobs widen the hideout rotation. Rapid Shelter now has working assignments of its own, and every rescued ally has more than one reachable job.',
+      'Rescue crew to earn Ember Guard and Moon Runner colors for every fighter, plus three animated hideout scene looks. The original scene and original fighter colors stay available.',
+      'Three new hats join the loot-token shop. Watch for a tiny feudal age, a garlic orbit, and one more run before dawn.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

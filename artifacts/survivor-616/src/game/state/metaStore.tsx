@@ -19,7 +19,7 @@ import {
 import { AREAS, getArea } from '@/game/data/areas';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
-import { getCharacterSkins } from '@/game/data/characterSkins';
+import { getCharacterSkins, isCharacterSkinUnlocked } from '@/game/data/characterSkins';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, CITY_RELICS_BY_ID, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
@@ -1034,7 +1034,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       const requested = parsed.characterSkinByCharacterId[character.id];
       const skin = getCharacterSkins(character).find((entry) => entry.id === requested);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (skin && (!skin.episodeRequired || Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)))) {
+      if (skin && isCharacterSkinUnlocked(skin, rescuedAllyIds.length, Boolean(characterEpisode && completedEpisodeIds.includes(characterEpisode.id)))) {
         characterSkinByCharacterId[character.id] = skin.id;
       }
     }
@@ -1940,7 +1940,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (!character) return state;
       const skin = getCharacterSkins(character).find((entry) => entry.id === action.skinId);
       const characterEpisode = CHARACTER_EPISODES.find((entry) => entry.characterId === character.id);
-      if (!skin || (skin.episodeRequired && (!characterEpisode || !state.meta.completedEpisodeIds.includes(characterEpisode.id)))) return state;
+      if (!skin || !isCharacterSkinUnlocked(skin, state.meta.rescuedAllyIds.length, Boolean(characterEpisode && state.meta.completedEpisodeIds.includes(characterEpisode.id)))) return state;
       return {
         ...state,
         meta: {
