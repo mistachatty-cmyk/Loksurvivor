@@ -1,0 +1,44 @@
+# Auto-translate locale files whenever the English source changes.
+#
+# Drop this file into .github/workflows/ (or run `npx @lok/auto-l10n init`).
+# No API keys or secrets are needed: translation uses the free Google Translate
+# web endpoint through @vitalets/google-translate-api.
+#
+# Edit the paths below if your locale folder is not ./locales.
+name: Auto-translate locales
+
+on:
+  push:
+    paths:
+      - 'locales/en.json'
+  workflow_dispatch:
+
+# One run at a time, so two quick pushes never fight over the same files.
+concurrency:
+  group: auto-l10n
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    # The first run translates everything and is slow on purpose (about a
+    # second per string per language). Later runs only touch new or changed strings.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Translate new and changed strings
+        run: npx --yes @lok/auto-l10n sync
+
+      - name: Commit translated files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore(l10n): auto-translate new strings'
+          file_pattern: 'locales/*.json locales/.l10n-lock.json'

@@ -239,6 +239,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Forge also gained about 30 more looks (antlers, film reels, mining lamps, hi-vis vests and more). The five-tap secret is gone; anyone who found the Forge before keeps it.',
     ],
   },
+  {
+    version: '0.11.0',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Language Support, First Steps',
+    body: [
+      'The title screen, the hideout rooms and part of Settings can now be translated. Translations are made automatically, so some wording will be off, and anything not translated yet stays in English.',
+      'Once translated languages are ready, a Language option appears at the top of Settings. The game stays in English until you pick one, so nothing changes unless you choose it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

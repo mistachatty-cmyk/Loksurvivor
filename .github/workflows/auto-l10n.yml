@@ -1,0 +1,55 @@
+name: Auto-translate locales
+
+# Translates new and changed strings in the game's English file into every
+# language listed in artifacts/survivor-616/l10n.config.json, then commits the
+# result back to the branch. Free: no API keys. The package that does the work
+# lives in packages/auto-l10n (see its README for how it behaves and its limits).
+#
+# Only English is ever edited by hand. A push that changes it, or the config,
+# runs this. The commit this job makes touches neither, so it cannot loop.
+on:
+  push:
+    paths:
+      - 'artifacts/survivor-616/src/locales/en.json'
+      - 'artifacts/survivor-616/l10n.config.json'
+  workflow_dispatch:
+
+concurrency:
+  group: auto-l10n
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    # The first run translates every string at about a second each per language.
+    # After that only new or changed strings are sent, so runs take seconds.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # Only the translator package and its one dependency; skips the rest of the workspace.
+      - run: pnpm install --frozen-lockfile --filter @lok/auto-l10n
+
+      - name: Check the package
+        run: pnpm --filter @lok/auto-l10n test
+
+      - name: Translate new and changed strings
+        run: node packages/auto-l10n/bin/auto-translate.js sync --config artifacts/survivor-616/l10n.config.json
+
+      - name: Commit translated files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore(l10n): auto-translate new strings'
+          file_pattern: 'artifacts/survivor-616/src/locales/*.json artifacts/survivor-616/src/locales/.l10n-lock.json'

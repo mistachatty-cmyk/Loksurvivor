@@ -9,6 +9,7 @@ import {
   Download,
   FlaskConical,
   FlipVertical2,
+  Languages,
   LayoutDashboard,
   LayoutList,
   Lock,
@@ -44,21 +45,72 @@ import { MotionSetting } from './MotionToggle';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
+import {
+  AUTO_LANGUAGE,
+  AVAILABLE_LOCALES,
+  getLanguagePreference,
+  languageName,
+  setLanguagePreference,
+  useT,
+} from '@/lib/i18n';
 
 export interface SettingsPanelProps {
   onBack: () => void;
   onOpenLooksAndLokPets?: () => void;
 }
+/**
+ * Language picker. Hidden until at least one translated file exists, so it
+ * adds nothing to the screen before the Auto-translate action has run.
+ */
+function LanguageSetting() {
+  const t = useT();
+  const [preference, setPreference] = useState(getLanguagePreference);
+  if (AVAILABLE_LOCALES.length < 2) return null;
+  const choose = (next: string) => {
+    setPreference(next);
+    void setLanguagePreference(next);
+  };
+  return (
+    <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-language-settings">
+      <div className="flex items-start gap-4">
+        <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+          <Languages className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-black uppercase text-white">{t('settings.language.title')}</h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.language.description')}</p>
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.language.title')}>
+            {[AUTO_LANGUAGE, ...AVAILABLE_LOCALES].map((code) => (
+              <button
+                key={code}
+                type="button"
+                lang={code === AUTO_LANGUAGE ? undefined : code}
+                onClick={() => choose(code)}
+                aria-pressed={preference === code}
+                className={`border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  preference === code
+                    ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                    : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                }`}
+                data-testid={`button-language-${code}`}
+              >
+                {code === AUTO_LANGUAGE ? t('settings.language.auto') : languageName(code)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function FightStyleSetting() {
+  const t = useT();
   const [style, setStyle] = useState<FightStyle>(getFightStyle);
-  const active = FIGHT_STYLES.find((entry) => entry.id === style)!;
   return (
     <div className="mt-3 border border-border/70 bg-background/50 p-4">
-      <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel fight style</h3>
-      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-        How a travel encounter plays out. Classic is the original card-throw popup. The other three use your lead
-        LokPet on the arena engine, and their layout adapts to your screen. This device only.
-      </p>
+      <h3 className="text-sm font-black uppercase tracking-wide text-white">{t('settings.fightStyle.title')}</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.fightStyle.description')}</p>
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {FIGHT_STYLES.map((entry) => (
           <button
@@ -73,16 +125,17 @@ function FightStyleSetting() {
             }`}
             data-testid={`button-fightstyle-${entry.id}`}
           >
-            {entry.label}
+            {t(`settings.fightStyle.${entry.id}.label`)}
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-muted-foreground" data-testid="text-fightstyle-blurb">{active.blurb}</p>
+      <p className="mt-2 text-xs text-muted-foreground" data-testid="text-fightstyle-blurb">{t(`settings.fightStyle.${style}.blurb`)}</p>
     </div>
   );
 }
 
 export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
+  const t = useT();
   const {
     meta,
     setPhysicsObjectClicks,
@@ -204,9 +257,10 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
   );
 
   return (
-    <ScreenLayout title="Settings" subtitle="Controls & accessibility" onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">Looks &amp; LokPets</button> : undefined}>
+    <ScreenLayout title={t('settings.title')} subtitle={t('settings.subtitle')} onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">{t('common.looksLokpets')}</button> : undefined}>
     <SettingsPager endgame={<EndgameSettings />} standard={
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
+        <LanguageSetting />
         <UiTransparencyControls />
         <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
           <div className="flex items-start gap-4">

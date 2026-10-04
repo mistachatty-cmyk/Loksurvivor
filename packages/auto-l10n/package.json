@@ -1,0 +1,48 @@
+{
+  "name": "@lok/auto-l10n",
+  "version": "0.1.0",
+  "description": "Free, automatic localization for HTML5 and Canvas games: a tiny runtime plus a CLI and GitHub Action that translate new strings for you. No API keys.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./core": "./src/core.js",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "auto-l10n": "./bin/auto-translate.js",
+    "lok-l10n": "./bin/auto-translate.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "action-template.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.3"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "keywords": [
+    "i18n",
+    "l10n",
+    "localization",
+    "translation",
+    "game",
+    "canvas",
+    "github-action"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@vitalets/google-translate-api": "^9.2.1"
+  }
+}

@@ -10,11 +10,13 @@ import { Sparkles } from 'lucide-react';
 import { endgameReached } from '@/game/data/endgameUnlocks';
 import { useMeta } from '@/game/state/metaStore';
 import { earnedEndgameIds } from '@/game/state/operatorForgeStore';
+import { useT } from '@/lib/i18n';
 
 type Page = 'standard' | 'endgame';
 
 export function SettingsPager({ standard, endgame }: { standard: ReactNode; endgame: ReactNode }) {
   const { meta } = useMeta();
+  const t = useT();
   const [page, setPage] = useState<Page>('standard');
   const [direction, setDirection] = useState<'right' | 'left'>('right');
   const accessible = endgameReached(meta) || earnedEndgameIds().length > 0;
@@ -42,9 +44,9 @@ export function SettingsPager({ standard, endgame }: { standard: ReactNode; endg
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div role="tablist" aria-label="Settings pages" className="relative mb-5 flex border border-border bg-card/60" data-testid="settings-tabs">
-        {tab('standard', 'Standard')}
-        {tab('endgame', (<span className="inline-flex items-center justify-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-fuchsia-300" />End game</span>))}
+      <div role="tablist" aria-label={t('settings.tabs.aria')} className="relative mb-5 flex border border-border bg-card/60" data-testid="settings-tabs">
+        {tab('standard', t('settings.tabs.standard'))}
+        {tab('endgame', (<span className="inline-flex items-center justify-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-fuchsia-300" />{t('settings.tabs.endgame')}</span>))}
         <span
           aria-hidden
           className="absolute bottom-0 h-0.5 w-1/2 bg-gradient-to-r from-primary via-fuchsia-300 to-amber-300 transition-transform duration-300 ease-out"

@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
 import { dismissVisitTheme, useVisitTheme, visitThemeStyle } from '@/lib/gsixVisitTheme';
+import { useT } from '@/lib/i18n';
 
 interface Props {
   title: string;
@@ -18,6 +19,7 @@ interface Props {
 export function ScreenLayout({ title, subtitle, onBack, children, action, backdrop, className = '' }: Props) {
   const { meta } = useMeta();
   const visitTheme = useVisitTheme();
+  const t = useT();
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -50,7 +52,7 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
 
       {onBack && (
         <button type="button" onClick={onBack} className="fixed bottom-4 left-4 z-50 flex min-h-11 items-center gap-2 border border-white/25 bg-black/85 px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white shadow-xl backdrop-blur hover:border-primary hover:text-primary sm:hidden" data-testid="button-back-floating">
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4" /> {t('common.back')}
         </button>
       )}
 
@@ -64,7 +66,7 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
               data-testid="button-back"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              Back
+              {t('common.back')}
             </button>
           )}
           {subtitle && <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">{subtitle}</p>}

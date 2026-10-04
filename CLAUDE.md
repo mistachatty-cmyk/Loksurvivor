@@ -54,7 +54,8 @@ Run from the repo root unless noted:
   hand-built fixtures in `world.test.ts`: an enemy literal there must set
   *every* `EnemyActor` field (a missing `invisibleUntil`/`ghostUntil`
   silently disables contact damage, because `w.now >= undefined` is false).
-  No other workspace package has tests — don't add a second runner as a side
+  The only other package with tests is `packages/auto-l10n` (`pnpm --filter
+  @lok/auto-l10n test`, plain `node:test`). Don't add a second runner as a side
   effect of an unrelated task.
 
 For the game itself, run from `artifacts/survivor-616/`:
@@ -270,6 +271,17 @@ just *what*, so the reasoning doesn't need to be re-derived:
   movement stick and the RTS pointer grammar never share a pointer-down, and
   the Tier 2/3 economies that are typed but deliberately unbuilt.
 - `MEMORY.md` — index/entry point for the above.
+
+## Localization
+
+Player-facing text goes in `artifacts/survivor-616/src/locales/en.json` and is
+shown with `t('some.key')` (outside React) or `useT()` (in components) from
+`@/lib/i18n`. Keys are typed, so a typo fails `pnpm typecheck`. **Never edit the
+other language files for new text**: the Auto-translate GitHub Action fills them
+in after you push. Add invented nouns to `glossary` in `l10n.config.json` so they
+are not translated. The game defaults to English; Settings shows a Language
+picker once translated files exist. Details and gotchas (including that Google
+Translate is unreachable from the Claude sandbox): `.agents/memory/localization.md`.
 
 ## Versioning
 
