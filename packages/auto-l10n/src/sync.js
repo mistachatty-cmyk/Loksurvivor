@@ -120,6 +120,38 @@ function isTransient(error) {
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Run an engine call, waiting out rate limits and flaky networks with
+ * exponential backoff. Anything else (an unsupported language, a malformed
+ * request) fails at once.
+ *
+ * @template T
+ * @param {() => Promise<T>} call
+ * @param {{ retries: number, retryDelayMs: number, sleep: (ms: number) => Promise<void> }} options
+ * @returns {Promise<{ ok: true, value: T } | { ok: false, reason: string, rateLimited: boolean }>}
+ */
+async function withRetries(call, { retries, retryDelayMs, sleep }) {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return { ok: true, value: await call() };
+    } catch (error) {
+      lastError = error;
+      if (attempt === retries || !isTransient(error)) break;
+      await sleep(Math.min(retryDelayMs * 2 ** attempt, 60_000));
+    }
+  }
+  return { ok: false, reason: /** @type {Error} */ (lastError)?.message ?? 'unknown error', rateLimited: isRateLimit(lastError) };
+}
+
+/** Marker placed between strings in one request. Letters only, so translators leave it alone. */
+const SEPARATOR = 'ZQSEPZQ';
+const SEPARATOR_PATTERN = /\s*Z\s*Q\s*S\s*E\s*P\s*Z\s*Q\s*/i;
+
+/**
+ * @typedef {{ ok: true, text: string } | { ok: false, reason: string, rateLimited: boolean }} StringResult
+ */
+
+/**
  * Translate one string with masking, validation and backoff.
  *
  * @param {object} input
@@ -131,27 +163,78 @@ const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {number} [input.retries]
  * @param {number} [input.retryDelayMs]
  * @param {(ms: number) => Promise<void>} [input.sleep]
- * @returns {Promise<{ ok: true, text: string } | { ok: false, reason: string, rateLimited: boolean }>}
+ * @returns {Promise<StringResult>}
  */
 export async function translateString({ engine, text, from, to, glossary = [], retries = 3, retryDelayMs = 4000, sleep = defaultSleep }) {
   const { text: masked, tokens } = maskProtected(text, glossary);
   if (!hasTranslatableText(masked)) return { ok: true, text };
 
-  let lastError;
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    try {
-      const output = await engine.translate(masked, { from, to });
-      const restored = unmask(output, tokens);
-      if (restored === null) return { ok: false, reason: 'a placeholder or protected term was lost', rateLimited: false };
-      if (!samePlaceholders(text, restored)) return { ok: false, reason: 'placeholders changed', rateLimited: false };
-      return { ok: true, text: restored };
-    } catch (error) {
-      lastError = error;
-      if (attempt === retries || !isTransient(error)) break;
-      await sleep(Math.min(retryDelayMs * 2 ** attempt, 60_000));
+  const call = await withRetries(() => engine.translate(masked, { from, to }), { retries, retryDelayMs, sleep });
+  if (!call.ok) return call;
+  const restored = unmask(call.value, tokens);
+  if (restored === null) return { ok: false, reason: 'a placeholder or protected term was lost', rateLimited: false };
+  if (!samePlaceholders(text, restored)) return { ok: false, reason: 'placeholders changed', rateLimited: false };
+  return { ok: true, text: restored };
+}
+
+/**
+ * Translate several strings in as few requests as possible. They are joined
+ * with a marker, sent once, and split back apart. If the translator mangles
+ * the marker, or any piece loses a placeholder, only the pieces that did not
+ * come back clean are retried one at a time, so a batch can never ship a
+ * wrong string; it can only cost extra requests.
+ *
+ * @param {object} input
+ * @param {{ translate: (text: string, languages: { from: string, to: string }) => Promise<string> }} input.engine
+ * @param {string[]} input.texts
+ * @param {string} input.from
+ * @param {string} input.to
+ * @param {string[]} [input.glossary]
+ * @param {number} [input.retries]
+ * @param {number} [input.retryDelayMs]
+ * @param {(ms: number) => Promise<void>} [input.sleep]
+ * @returns {Promise<{ results: StringResult[], rateLimited: boolean }>}
+ */
+export async function translateBatch({ engine, texts, from, to, glossary = [], retries = 3, retryDelayMs = 4000, sleep = defaultSleep }) {
+  const prepared = texts.map((original) => ({ original, ...maskProtected(original, glossary) }));
+  /** @type {StringResult[]} */
+  const results = new Array(texts.length);
+  /** @type {number[]} */
+  const live = [];
+  prepared.forEach((item, index) => {
+    if (hasTranslatableText(item.text)) live.push(index);
+    else results[index] = { ok: true, text: item.original };
+  });
+
+  let rateLimited = false;
+  if (live.length > 1) {
+    const joined = live.map((index) => /** @type {{ text: string }} */ (prepared[index]).text).join(`\n${SEPARATOR}\n`);
+    const call = await withRetries(() => engine.translate(joined, { from, to }), { retries, retryDelayMs, sleep });
+    if (call.ok) {
+      const parts = call.value.split(SEPARATOR_PATTERN).map((part) => part.trim());
+      if (parts.length === live.length) {
+        live.forEach((index, position) => {
+          const item = /** @type {{ original: string, tokens: string[] }} */ (prepared[index]);
+          const restored = unmask(/** @type {string} */ (parts[position]), item.tokens);
+          if (restored !== null && restored !== '' && samePlaceholders(item.original, restored)) results[index] = { ok: true, text: restored };
+        });
+      }
+    } else if (call.rateLimited) {
+      rateLimited = true;
     }
   }
-  return { ok: false, reason: /** @type {Error} */ (lastError)?.message ?? 'unknown error', rateLimited: isRateLimit(lastError) };
+
+  for (const index of live) {
+    if (results[index]) continue;
+    if (rateLimited) {
+      results[index] = { ok: false, reason: 'rate limited', rateLimited: true };
+      continue;
+    }
+    const single = await translateString({ engine, text: /** @type {{ original: string }} */ (prepared[index]).original, from, to, glossary, retries, retryDelayMs, sleep });
+    results[index] = single;
+    if (!single.ok && single.rateLimited) rateLimited = true;
+  }
+  return { results, rateLimited };
 }
 
 /**
@@ -164,7 +247,8 @@ export async function translateString({ engine, text, from, to, glossary = [], r
  * @param {Record<string, unknown>} input.sourceData Parsed source file.
  * @param {Record<string, Record<string, string>>} input.lock Whole lock file, mutated in place.
  * @param {{ name: string, translate: (text: string, languages: { from: string, to: string }) => Promise<string> }} input.engine
- * @param {number} input.delayMs
+ * @param {number} [input.batchSize] Strings per request (1 disables batching).
+ * @param {number} [input.batchChars] Soft cap on characters per request.
  * @param {string[]} [input.glossary]
  * @param {string[]} [input.keep]
  * @param {boolean} [input.force]
@@ -183,7 +267,8 @@ export async function syncLocale({
   sourceData,
   lock,
   engine,
-  delayMs,
+  batchSize = 12,
+  batchChars = 3000,
   glossary = [],
   keep = [],
   force = false,
@@ -210,6 +295,7 @@ export async function syncLocale({
     broken: plan.broken,
     orphans: plan.orphans.length,
     rateLimited: false,
+    remaining: 0,
     wrote: false,
   };
 
@@ -226,23 +312,42 @@ export async function syncLocale({
     delete langLock[key];
   }
 
-  for (const [index, key] of plan.todo.entries()) {
-    const text = /** @type {string} */ (source[key]);
-    const outcome = await translateString({ engine, text, from: sourceLocale, to: locale, glossary, retries, retryDelayMs, sleep });
-    if (outcome.ok) {
-      merged[key] = outcome.text;
-      langLock[key] = hashText(text);
-      result.translated += 1;
-      if (verbose) log(`  ${locale} ${key}`);
-    } else {
-      result.failed.push({ key, reason: outcome.reason });
-      if (outcome.rateLimited) {
-        // Keep what we have; the next run picks up the rest.
-        result.rateLimited = true;
-        break;
-      }
+  /** @type {string[][]} */
+  const batches = [];
+  let current = /** @type {string[]} */ ([]);
+  let chars = 0;
+  for (const key of plan.todo) {
+    const length = /** @type {string} */ (source[key]).length;
+    if (current.length > 0 && (current.length >= batchSize || chars + length > batchChars)) {
+      batches.push(current);
+      current = [];
+      chars = 0;
     }
-    if (delayMs > 0 && index < plan.todo.length - 1) await sleep(delayMs * (0.85 + Math.random() * 0.3));
+    current.push(key);
+    chars += length;
+  }
+  if (current.length > 0) batches.push(current);
+
+  for (const keys of batches) {
+    const texts = keys.map((key) => /** @type {string} */ (source[key]));
+    const { results, rateLimited } = await translateBatch({ engine, texts, from: sourceLocale, to: locale, glossary, retries, retryDelayMs, sleep });
+    keys.forEach((key, index) => {
+      const outcome = /** @type {StringResult} */ (results[index]);
+      if (outcome.ok) {
+        merged[key] = outcome.text;
+        langLock[key] = hashText(/** @type {string} */ (source[key]));
+        result.translated += 1;
+        if (verbose) log(`  ${locale} ${key}`);
+      } else if (!outcome.rateLimited) {
+        result.failed.push({ key, reason: outcome.reason });
+      }
+    });
+    if (rateLimited) {
+      // Keep what we have; a later run picks up the rest.
+      result.rateLimited = true;
+      result.remaining = plan.todo.length - result.translated - result.failed.length;
+      break;
+    }
   }
 
   // Write in source order so diffs stay small; keep any orphans at the end unless pruned.
@@ -253,7 +358,9 @@ export async function syncLocale({
 
   const output = isNested(sourceData) ? unflatten(ordered) : ordered;
   const before = await readJson(file, undefined);
-  if (JSON.stringify(before) !== JSON.stringify(output)) {
+  // Never create a locale file with nothing in it: files are what the game lists as languages.
+  const worthWriting = before !== undefined || Object.keys(ordered).length > 0;
+  if (worthWriting && JSON.stringify(before) !== JSON.stringify(output)) {
     await writeJson(file, output);
     result.wrote = true;
   }

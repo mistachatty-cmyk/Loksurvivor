@@ -1,5 +1,4 @@
 {
-  "de": {},
   "es": {
     "common.back": "b52b36b7269f",
     "common.looksLokpets": "abea481fd650",
@@ -68,10 +67,5 @@
     "settings.tabs.endgame": "fc7de771fca0",
     "settings.tabs.standard": "2dfa66079d9b",
     "settings.title": "c7f73bb54d92"
-  },
-  "fr": {},
-  "ja": {},
-  "ko": {},
-  "pt-BR": {},
-  "zh-CN": {}
+  }
 }

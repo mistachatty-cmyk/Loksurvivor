@@ -6,8 +6,8 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-import { pseudoEngine } from '../src/engines.js';
-import { hashText, planSync, syncLocale, translateString } from '../src/sync.js';
+import { paceEngine, pseudoEngine } from '../src/engines.js';
+import { hashText, planSync, syncLocale, translateBatch, translateString } from '../src/sync.js';
 import { run } from '../src/cli.js';
 
 const noSleep = async () => {};
@@ -16,11 +16,19 @@ const noSleep = async () => {};
 function fakeEngine(calls = []) {
   return {
     name: 'fake',
+    // Understands batches: tags every piece between separators, records each piece.
     translate: async (text, { to }) => {
-      calls.push(text);
-      return `${to}:${text}`;
+      const pieces = text.split('\nZQSEPZQ\n');
+      for (const piece of pieces) calls.push(piece);
+      return pieces.map((piece) => `${to}:${piece}`).join('\nZQSEPZQ\n');
     },
   };
+}
+
+function rateLimitError() {
+  const e = new Error('Too Many Requests');
+  e.name = 'TooManyRequestsError';
+  return e;
 }
 
 async function tempDir() {
@@ -90,7 +98,7 @@ test('syncLocale only translates what changed and never overwrites human edits',
   const dir = await tempDir();
   const lock = {};
   const calls = [];
-  const common = { dir, sourceLocale: 'en', locale: 'es', lock, engine: fakeEngine(calls), delayMs: 0, sleep: noSleep };
+  const common = { dir, sourceLocale: 'en', locale: 'es', lock, engine: fakeEngine(calls), sleep: noSleep };
 
   let result = await syncLocale({ ...common, sourceData: { a: 'One', b: 'Two' } });
   assert.equal(result.translated, 2);
@@ -115,7 +123,7 @@ test('syncLocale only translates what changed and never overwrites human edits',
 test('syncLocale keeps nested shape, orders keys like the source, and prunes on request', async () => {
   const dir = await tempDir();
   await fs.writeFile(path.join(dir, 'fr.json'), JSON.stringify({ old: { key: 'ancien' } }));
-  const options = { dir, sourceLocale: 'en', locale: 'fr', lock: {}, engine: fakeEngine(), delayMs: 0, sleep: noSleep };
+  const options = { dir, sourceLocale: 'en', locale: 'fr', lock: {}, engine: fakeEngine(), sleep: noSleep };
 
   await syncLocale({ ...options, sourceData: { menu: { play: 'Play' }, title: 'Title' } });
   let written = JSON.parse(await fs.readFile(path.join(dir, 'fr.json'), 'utf8'));
@@ -134,14 +142,80 @@ test('syncLocale stops a language on a rate limit but keeps what it finished', a
     name: 'flaky',
     translate: async (text) => {
       count += 1;
-      if (count > 1) { const e = new Error('Too Many Requests'); e.name = 'TooManyRequestsError'; throw e; }
+      if (count > 1) throw rateLimitError();
       return `x:${text}`;
     },
   };
-  const result = await syncLocale({ dir, sourceLocale: 'en', locale: 'de', sourceData: { a: 'A', b: 'B', c: 'C' }, lock: {}, engine, delayMs: 0, retries: 0, sleep: noSleep });
+  const result = await syncLocale({ dir, sourceLocale: 'en', locale: 'de', sourceData: { a: 'A', b: 'B', c: 'C' }, lock: {}, engine, batchSize: 1, retries: 0, sleep: noSleep });
   assert.equal(result.translated, 1);
   assert.equal(result.rateLimited, true);
+  assert.equal(result.remaining, 2);
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(dir, 'de.json'), 'utf8')), { a: 'x:A' });
+});
+
+test('syncLocale never creates an empty locale file when nothing could be translated', async () => {
+  const dir = await tempDir();
+  const engine = { name: 'blocked', translate: async () => { throw rateLimitError(); } };
+  const result = await syncLocale({ dir, sourceLocale: 'en', locale: 'ja', sourceData: { a: 'A' }, lock: {}, engine, retries: 0, sleep: noSleep });
+  assert.equal(result.rateLimited, true);
+  assert.equal(result.wrote, false);
+  await assert.rejects(fs.access(path.join(dir, 'ja.json')));
+});
+
+test('syncLocale sends many strings in few requests', async () => {
+  const dir = await tempDir();
+  let requests = 0;
+  const inner = fakeEngine();
+  const engine = { name: 'counting', translate: async (text, languages) => { requests += 1; return inner.translate(text, languages); } };
+  const sourceData = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`k${i}`, `Text ${i}`]));
+  const result = await syncLocale({ dir, sourceLocale: 'en', locale: 'es', sourceData, lock: {}, engine, batchSize: 12, sleep: noSleep });
+  assert.equal(result.translated, 30);
+  assert.equal(requests, 3);
+  const written = JSON.parse(await fs.readFile(path.join(dir, 'es.json'), 'utf8'));
+  assert.equal(written.k29, 'es:Text 29');
+});
+
+test('translateBatch falls back to single requests when the separator is mangled', async () => {
+  let requests = 0;
+  const engine = {
+    translate: async (text) => {
+      requests += 1;
+      // Pretend the translator ate the separator whenever it saw a batch.
+      return text.includes('ZQSEPZQ') ? text.replaceAll('ZQSEPZQ', ' ') : `es:${text}`;
+    },
+  };
+  const { results, rateLimited } = await translateBatch({ engine, texts: ['One', 'Two', 'Three'], from: 'en', to: 'es', sleep: noSleep });
+  assert.equal(rateLimited, false);
+  assert.deepEqual(results.map((r) => r.text), ['es:One', 'es:Two', 'es:Three']);
+  assert.equal(requests, 4);
+});
+
+test('translateBatch rejects only the piece that lost a placeholder', async () => {
+  const engine = {
+    translate: async (text) => text.replace('Hello ZQ0ZQ', 'Hola'),
+  };
+  const { results } = await translateBatch({ engine, texts: ['Hello {{name}}', 'Goodbye'], from: 'en', to: 'es', retries: 0, sleep: noSleep });
+  assert.equal(results[1].ok, true);
+  // The single-string fallback also loses the placeholder, so that key stays English.
+  assert.equal(results[0].ok, false);
+});
+
+test('translateBatch stops at once when the batch itself is rate limited', async () => {
+  let requests = 0;
+  const engine = { translate: async () => { requests += 1; throw rateLimitError(); } };
+  const { results, rateLimited } = await translateBatch({ engine, texts: ['One', 'Two', 'Three'], from: 'en', to: 'es', retries: 0, sleep: noSleep });
+  assert.equal(rateLimited, true);
+  assert.equal(requests, 1);
+  assert.ok(results.every((r) => !r.ok && r.rateLimited));
+});
+
+test('paceEngine spaces calls apart across concurrent callers', async () => {
+  const waits = [];
+  const paced = paceEngine({ name: 'x', translate: async (text) => text }, 1000, async (ms) => { waits.push(ms); });
+  await Promise.all([paced.translate('a', {}), paced.translate('b', {}), paced.translate('c', {})]);
+  assert.equal(waits.length, 2); // the first call goes straight through
+  assert.ok(waits.every((ms) => ms > 0 && ms <= 1150));
+  assert.equal(paceEngine({ translate: async () => '' }, 0).name, undefined);
 });
 
 test('the pseudo engine keeps placeholders intact end to end', async () => {

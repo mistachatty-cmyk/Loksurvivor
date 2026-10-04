@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { flatten } from './core.js';
-import { loadEngine } from './engines.js';
+import { loadEngine, paceEngine } from './engines.js';
 import { scanSource } from './scan.js';
 import { LOCK_FILE, planSync, readJson, syncLocale, writeJson } from './sync.js';
 
@@ -37,6 +37,7 @@ Options
   --engine <name|path>   google (default, free, no key), pseudo (offline test), or a module path
   --delay <ms>           Pause between translation requests (default: 1200 for google)
   --concurrency <n>      Languages translated in parallel (default: 1)
+  --batch <n>            Strings sent per request (default: 12; 1 sends one at a time)
   --retries <n>          Retries per string on rate limit or network error (default: 3)
   --force                Retranslate every string, even unchanged ones
   --prune                Delete keys from targets that no longer exist in the source
@@ -78,6 +79,7 @@ export async function run(argv, env = {}) {
       engine: { type: 'string' },
       delay: { type: 'string' },
       concurrency: { type: 'string' },
+      batch: { type: 'string' },
       retries: { type: 'string' },
       src: { type: 'string' },
       force: { type: 'boolean' },
@@ -122,15 +124,22 @@ export async function run(argv, env = {}) {
 
   if (command === 'check') return check({ config, source, lock, targets, log });
 
-  const engine = await loadEngine(config.engine, cwd);
-  const delayMs = config.delayMs ?? engine.defaultDelayMs ?? 0;
+  const baseEngine = await loadEngine(config.engine, cwd);
+  const delayMs = config.delayMs ?? baseEngine.defaultDelayMs ?? 0;
+  // One pacer for the whole run, so parallel languages still respect one request rate.
+  const engine = paceEngine(baseEngine, delayMs);
   log(`${Object.keys(source).length} source strings in ${config.source}.json; ${targets.length} target language(s) via ${engine.name}${config.dryRun ? ' (dry run)' : ''}.`);
 
   /** @type {Awaited<ReturnType<typeof syncLocale>>[]} */
   const results = [];
   const queue = [...targets];
+  let stopped = false;
   const workers = Array.from({ length: Math.max(1, Math.min(config.concurrency, queue.length)) }, async () => {
     for (let locale = queue.shift(); locale !== undefined; locale = queue.shift()) {
+      if (stopped) {
+        log(`${locale.padEnd(8)} skipped (rate limited earlier; run again later)`);
+        continue;
+      }
       const result = await syncLocale({
         dir: config.dir,
         sourceLocale: config.source,
@@ -138,7 +147,7 @@ export async function run(argv, env = {}) {
         sourceData,
         lock,
         engine,
-        delayMs,
+        batchSize: config.batch,
         glossary: config.glossary,
         keep: config.keep,
         force: config.force,
@@ -149,7 +158,9 @@ export async function run(argv, env = {}) {
         verbose: config.verbose,
       });
       results.push(result);
-      log(`${locale.padEnd(8)} ${result.translated} ${config.dryRun ? 'to translate' : 'translated'}, ${result.upToDate + result.adopted} kept${result.failed.length ? `, ${result.failed.length} failed` : ''}${result.rateLimited ? ' (rate limited, run again later)' : ''}`);
+      // Rate limits are per address, so the other languages would only hit the same wall.
+      if (result.rateLimited) stopped = true;
+      log(`${locale.padEnd(8)} ${result.translated} ${config.dryRun ? 'to translate' : 'translated'}, ${result.upToDate + result.adopted} kept${result.failed.length ? `, ${result.failed.length} failed` : ''}${result.rateLimited ? ` (rate limited, ${result.remaining} left; run again later)` : ''}`);
     }
   });
   await Promise.all(workers);
@@ -233,6 +244,7 @@ async function loadConfig(flags, cwd) {
     engine: String(flags['engine'] ?? file.engine ?? 'google'),
     delayMs: num(flags['delay'], file.delayMs, undefined),
     concurrency: num(flags['concurrency'], file.concurrency, 1) ?? 1,
+    batch: num(flags['batch'], file.batchSize, 12) ?? 12,
     retries: num(flags['retries'], file.retries, 3) ?? 3,
     glossary: /** @type {string[]} */ (file.glossary ?? []),
     keep: /** @type {string[]} */ (file.keep ?? []),

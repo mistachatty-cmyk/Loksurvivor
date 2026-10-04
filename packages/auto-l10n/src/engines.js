@@ -76,6 +76,39 @@ export function pseudoEngine() {
   };
 }
 
+/** @param {number} ms */
+const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Wrap an engine so calls start at least `delayMs` apart (with a little
+ * jitter), however many languages are running at once. One wrapper is shared by
+ * the whole run, so the pacing is global and not per language.
+ *
+ * @template {{ translate: (text: string, languages: { from: string, to: string }) => Promise<string> }} E
+ * @param {E} engine
+ * @param {number} delayMs
+ * @param {(ms: number) => Promise<void>} [sleep]
+ * @returns {E}
+ */
+export function paceEngine(engine, delayMs, sleep = defaultSleep) {
+  if (delayMs <= 0) return engine;
+  let last = 0;
+  let gate = Promise.resolve();
+  return {
+    ...engine,
+    async translate(text, languages) {
+      const turn = gate.then(async () => {
+        const wait = last + delayMs * (0.85 + Math.random() * 0.3) - Date.now();
+        if (wait > 0) await sleep(wait);
+        last = Date.now();
+      });
+      gate = turn.catch(() => {});
+      await turn;
+      return engine.translate(text, languages);
+    },
+  };
+}
+
 /**
  * Resolve `--engine`: "google", "pseudo", or a path to a module whose default
  * export is an engine object or a function returning one.

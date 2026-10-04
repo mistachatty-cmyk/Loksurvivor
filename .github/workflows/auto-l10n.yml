@@ -13,6 +13,10 @@ on:
       - 'artifacts/survivor-616/src/locales/en.json'
       - 'artifacts/survivor-616/l10n.config.json'
   workflow_dispatch:
+  # Google may rate limit a first run part way through. This finishes the job
+  # later; when nothing is missing it does nothing and commits nothing.
+  schedule:
+    - cron: '17 */6 * * *'
 
 concurrency:
   group: auto-l10n
@@ -24,9 +28,9 @@ permissions:
 jobs:
   translate:
     runs-on: ubuntu-latest
-    # The first run translates every string at about a second each per language.
-    # After that only new or changed strings are sent, so runs take seconds.
-    timeout-minutes: 120
+    # Strings are sent in batches, so even a first run takes minutes. After that
+    # only new or changed strings are sent.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

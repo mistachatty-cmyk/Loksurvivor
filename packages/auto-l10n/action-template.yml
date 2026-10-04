@@ -12,6 +12,10 @@ on:
     paths:
       - 'locales/en.json'
   workflow_dispatch:
+  # Google may rate limit a first run part way through. This finishes the job
+  # later; when nothing is missing it does nothing and commits nothing.
+  schedule:
+    - cron: '17 */6 * * *'
 
 # One run at a time, so two quick pushes never fight over the same files.
 concurrency:
@@ -24,9 +28,9 @@ permissions:
 jobs:
   translate:
     runs-on: ubuntu-latest
-    # The first run translates everything and is slow on purpose (about a
-    # second per string per language). Later runs only touch new or changed strings.
-    timeout-minutes: 120
+    # Strings are sent in batches, so even a first run takes minutes. After that
+    # only new or changed strings are sent.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

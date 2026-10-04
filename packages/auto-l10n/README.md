@@ -95,7 +95,7 @@ auto-l10n init     Create config, starter en.json and the workflow
 auto-l10n scan     Estimate how much English is still hard-coded in source files
 ```
 
-Useful options: `--targets es,fr`, `--dir locales`, `--config path/to/l10n.config.json`, `--delay 1500`, `--force`, `--prune`, `--dry-run`, `--strict`, `--engine pseudo`. Run `auto-l10n --help` for all of them.
+Useful options: `--targets es,fr`, `--dir locales`, `--config path/to/l10n.config.json`, `--delay 1500`, `--batch 8`, `--force`, `--prune`, `--dry-run`, `--strict`, `--engine pseudo`. Run `auto-l10n --help` for all of them.
 
 ### Config file
 
@@ -118,12 +118,12 @@ Useful options: `--targets es,fr`, `--dir locales`, `--config path/to/l10n.confi
 
 - **Incremental.** `locales/.l10n-lock.json` records which English text each translation was made from. A string is translated again only when it is missing or its English changed. Commit this file.
 - **Placeholders are protected.** `{{name}}` and glossary terms are swapped for opaque tokens before translation and restored after. A translation that loses one is rejected, and the key stays untranslated (so it falls back to English) instead of shipping broken text.
-- **Rate limits are respected.** Requests are spaced about 1.2 seconds apart, with exponential backoff when Google says "too many requests". If the limit persists the run stops, keeps what it finished, and the next run continues from there.
+- **Rate limits are respected.** Requests are spaced about 1.2 seconds apart (across all languages together), with exponential backoff when Google says "too many requests". If the limit persists, the whole run stops, keeps what it finished, never writes an empty language file, and the next run continues from there. The workflow templates include a scheduled run so this finishes by itself.
 - **Never destructive.** A hand-written translation with no lock entry is adopted, not replaced. Keys you removed from English stay in other languages until you run with `--prune`.
 
 ### Speed
 
-The first run translates everything: roughly one second per string per language. With 300 strings and 7 languages that is about 35 minutes, which is why the workflow allows two hours. After that, a push touching a few strings takes seconds. `--concurrency 2` runs two languages at once, at a higher risk of rate limits.
+About a dozen strings travel in each request (`--batch`, or `batchSize` in the config), joined with a marker the translator leaves alone and split back apart afterwards. If the marker comes back mangled, or a piece loses a placeholder, only that piece is retried on its own, so batching can cost extra requests but never ships a wrong string. With 300 strings and 7 languages that is roughly 180 requests, about four minutes. After that, a push touching a few strings takes seconds. `--concurrency 2` runs two languages at once, at a higher risk of rate limits.
 
 ### Fixing a translation
 
