@@ -38,7 +38,7 @@ import {
   SPARRING_DUMMIES,
 } from '@/game/data/lokPetBattles';
 import { MATCHUP_LABEL, moveMatchup, statusChips } from '@/game/engine/battleClarity';
-import { MATCHUP_STYLE } from '@/ui/QuickFightOverlay';
+import { MATCHUP_STYLE } from '@/ui/EncounterFightOverlay';
 import {
   createBattle,
   executeEnemyAi,

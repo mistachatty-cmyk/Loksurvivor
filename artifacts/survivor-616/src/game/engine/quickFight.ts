@@ -6,6 +6,11 @@
  * a fight never drags. The opponent's next move is shown before you pick, so
  * every choice is readable.
  *
+ * Two depths share this file. `quick` is the trimmed version above. `deep`
+ * is the full arena treatment (all moves including the finisher, trinkets,
+ * Cheer, a 20-round cap) for the Arena fight style. Either depth can also take
+ * an operator assist each round (the Duo style), see `OperatorAssist`.
+ *
  * Pure logic only -- no React, no storage. `stepQuickFight` never mutates the
  * state it is given.
  */
@@ -14,6 +19,7 @@ import {
   assignBattleMoves,
   chooseEnemyMove,
   createBattle,
+  executeCheer,
   executeMove,
   generateOpponentPet,
 } from '@/game/engine/lokPetBattle';
@@ -26,11 +32,34 @@ export const QUICK_TURN_CAP = 8;
 export const QUICK_MAX_MOVES = 3;
 /** Both sides start with enough SP for one skill so the first choice has some bite. */
 export const QUICK_START_ENERGY = 30;
+export const DEEP_TURN_CAP = 20;
+/**
+ * Operator assists were tuned for the classic popup's 50 HP scrap. Pets here
+ * carry a few hundred HP, so assist numbers are scaled up to stay worth a turn.
+ */
+export const ASSIST_SCALE = 3.5;
+
+export type FightDepth = 'quick' | 'deep';
+
+/** What the operator does alongside the pet's move in the Duo style. */
+export interface OperatorAssist {
+  kind: 'punch' | 'card' | 'cover';
+  label: string;
+  /** Classic-popup damage units; scaled by ASSIST_SCALE before it lands. */
+  damage: number;
+  /** Classic-popup heal units for the pet, scaled the same way. */
+  heal?: number;
+}
 
 const RARITY_LEVEL_BUMP: Record<LokPetRarity, number> = { common: -1, charged: 0, rare: 1, mythic: 2 };
 
 export interface QuickFightState {
   battle: BattleState;
+  depth: FightDepth;
+  /** Rounds before the fight is judged on remaining HP. */
+  turnCap: number;
+  /** Cover (the operator's shield) can be called once per fight. */
+  coverUsed: boolean;
   /** The move the opponent will use after the player picks. Null once the fight is over. */
   intent: LokPetBattleMove | null;
   /** What happened in the last round, oldest line first, for the on-screen recap. */
@@ -63,6 +92,7 @@ export function buildQuickOpponent(
   opponent: ResolvedTravelEncounterOpponent,
   playerLevel: number,
   enemyElement: LokPetElement = 'none',
+  depth: FightDepth = 'quick',
 ): BattlePet {
   const isPet = opponent.kind === 'lokpet' && Boolean(opponent.lokPetRoll);
   const roll = opponent.lokPetRoll;
@@ -88,7 +118,7 @@ export function buildQuickOpponent(
     pet.moves = assignBattleMoves('street-enemy', enemyElement, level, 1);
   }
 
-  pet.moves = trimQuickMoves(pet.moves);
+  if (depth === 'quick') pet.moves = trimQuickMoves(pet.moves);
   if (pet.moves.length < 2) {
     const quickClaw = BATTLE_MOVES['quick-claw']!;
     if (!pet.moves.some((move) => move.id === quickClaw.id)) pet.moves.push(quickClaw);
@@ -101,20 +131,25 @@ export function createQuickFight(options: {
   playerPet?: SavedLokPet;
   opponent: ResolvedTravelEncounterOpponent;
   enemyElement?: LokPetElement;
+  depth?: FightDepth;
   rand?: () => number;
 }): QuickFightState {
   const rand = options.rand ?? Math.random;
+  const depth = options.depth ?? 'quick';
   // createBattle supplies the starter companion when the kennel is empty.
   const base = createBattle({
     gameMode: 'quick-fight',
     playerPets: options.playerPet ? [options.playerPet] : [],
   });
   const player = base.playerTeam[0]!;
-  player.moves = trimQuickMoves(player.moves);
   player.energy = Math.max(player.energy, QUICK_START_ENERGY);
-  player.equippedTrinket = undefined;
+  if (depth === 'quick') {
+    player.moves = trimQuickMoves(player.moves);
+    // Trinket stats stay baked into the pet; only the label goes.
+    player.equippedTrinket = undefined;
+  }
 
-  const enemy = buildQuickOpponent(options.opponent, player.level, options.enemyElement);
+  const enemy = buildQuickOpponent(options.opponent, player.level, options.enemyElement, depth);
   const enemyGoesFirst = enemy.speed > player.speed;
 
   let battle: BattleState = {
@@ -126,7 +161,7 @@ export function createQuickFight(options: {
     turn: 1,
     currentTurnActor: 'player',
     phase: 'select-action',
-    cheerAvailable: false,
+    cheerAvailable: depth === 'deep',
     combatLog: [
       {
         id: `log-quick-start-${Date.now()}`,
@@ -152,7 +187,14 @@ export function createQuickFight(options: {
   }
 
   const intent = battle.phase === 'select-action' ? chooseEnemyMove(battle, rand) ?? null : null;
-  return { battle, intent, lastRoundLog: [] };
+  return {
+    battle,
+    depth,
+    turnCap: depth === 'deep' ? DEEP_TURN_CAP : QUICK_TURN_CAP,
+    coverUsed: false,
+    intent,
+    lastRoundLog: [],
+  };
 }
 
 /** Marks a pet that burned or shocked down to 0 HP as out, and ends the fight. */
@@ -191,21 +233,70 @@ function judgeAtCap(state: BattleState): BattleState {
   return { ...state, combatLog: log, phase: won ? 'victory' : 'defeat' };
 }
 
-/** Plays one full round: the chosen player move, then the opponent's telegraphed move. */
-export function stepQuickFight(state: QuickFightState, moveId: string, rand: () => number = Math.random): QuickFightState {
+/** Applies the operator's half of the round to a cloned battle. Returns true when it ended the fight. */
+function applyAssist(battle: BattleState, assist: OperatorAssist): BattleState {
+  const player = battle.playerTeam[battle.activePlayerIndex]!;
+  const enemy = battle.enemyTeam[battle.activeEnemyIndex]!;
+  const log = (text: string) =>
+    battle.combatLog.unshift({ id: `log-assist-${Date.now()}-${Math.random()}`, text, type: 'action', timestamp: Date.now() });
+
+  if (assist.kind === 'cover') {
+    player.statusEffects.push({ type: 'shield', duration: 2, value: player.defense, sourcePetName: 'Operator' });
+    log(`Your operator covers ${player.name}: damage halved for two rounds.`);
+  }
+  if (assist.heal && assist.heal > 0) {
+    const healed = Math.round(assist.heal * ASSIST_SCALE);
+    player.hp = Math.min(player.maxHp, player.hp + healed);
+    log(`Your operator patches ${player.name} up for ${healed} HP.`);
+  }
+  if (assist.damage > 0) {
+    const dealt = Math.max(1, Math.round(assist.damage * ASSIST_SCALE));
+    enemy.hp = Math.max(0, enemy.hp - dealt);
+    log(`${assist.label} hits ${enemy.name} for ${dealt} damage.`);
+  }
+  return settle(battle);
+}
+
+/** Plays one full round: the operator's assist (Duo), the chosen player move, then the opponent's telegraphed move. */
+export function stepQuickFight(
+  state: QuickFightState,
+  moveId: string,
+  rand: () => number = Math.random,
+  assist?: OperatorAssist,
+): QuickFightState {
   if (state.battle.phase !== 'select-action') return state;
+  if (assist?.kind === 'cover' && state.coverUsed) return state;
   const before = state.battle.combatLog.length;
-  let battle = executeMove(structuredClone(state.battle), moveId, 'player');
+  let battle = structuredClone(state.battle);
+  if (assist) battle = applyAssist(battle, assist);
 
   if (battle.phase === 'select-action') {
-    const move = state.intent ?? chooseEnemyMove(battle, rand);
-    if (move) battle = executeMove(battle, move.id, 'enemy');
+    battle = executeMove(battle, moveId, 'player');
+    if (battle.phase === 'select-action') {
+      const move = state.intent ?? chooseEnemyMove(battle, rand);
+      if (move) battle = executeMove(battle, move.id, 'enemy');
+    }
   }
   battle = settle(battle);
-  if (battle.phase === 'select-action' && battle.turn > QUICK_TURN_CAP) battle = judgeAtCap(battle);
+  if (battle.phase === 'select-action' && battle.turn > state.turnCap) battle = judgeAtCap(battle);
 
   const added = battle.combatLog.length - before;
   const lastRoundLog = battle.combatLog.slice(0, Math.max(0, added)).map((entry) => entry.text).reverse();
   const intent = battle.phase === 'select-action' ? chooseEnemyMove(battle, rand) ?? null : null;
-  return { battle, intent, lastRoundLog };
+  return {
+    ...state,
+    battle,
+    intent,
+    lastRoundLog,
+    coverUsed: state.coverUsed || assist?.kind === 'cover',
+  };
+}
+
+/** Arena style only: the handler's once-per-fight Cheer. It is free, so the round does not advance. */
+export function cheerQuickFight(state: QuickFightState): QuickFightState {
+  if (state.battle.phase !== 'select-action' || !state.battle.cheerAvailable) return state;
+  const before = state.battle.combatLog.length;
+  const battle = executeCheer(structuredClone(state.battle));
+  const added = battle.combatLog.length - before;
+  return { ...state, battle, lastRoundLog: battle.combatLog.slice(0, Math.max(0, added)).map((e) => e.text).reverse() };
 }

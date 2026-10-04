@@ -5,7 +5,10 @@ import { rollLokPet } from './data/lokPets';
 import { ENEMIES_BY_ID } from './data/enemies';
 import { moveMatchup, statusChips, describeIntent } from './engine/battleClarity';
 import {
+  ASSIST_SCALE,
+  DEEP_TURN_CAP,
   QUICK_MAX_MOVES,
+  cheerQuickFight,
   QUICK_TURN_CAP,
   createQuickFight,
   quickFightOutcome,
@@ -159,4 +162,67 @@ test('the opponent opener can never end the fight before the player acts', () =>
   } finally {
     Math.random = realRandom;
   }
+});
+
+test('the deep depth keeps finishers, cheer and the longer cap', () => {
+  const qf = createQuickFight({ opponent: petOpponent(), depth: 'deep' });
+  assert.equal(qf.depth, 'deep');
+  assert.equal(qf.turnCap, DEEP_TURN_CAP);
+  assert.equal(qf.battle.cheerAvailable, true);
+  assert.ok(qf.battle.playerTeam[0]!.moves.some((move) => move.kind === 'ultimate'), 'player keeps the finisher');
+  assert.equal(createQuickFight({ opponent: petOpponent() }).turnCap, QUICK_TURN_CAP);
+});
+
+test('cheer is free, heals, and can only be used once', () => {
+  const qf = createQuickFight({ opponent: petOpponent(), depth: 'deep' });
+  const hurt = structuredClone(qf);
+  hurt.battle.playerTeam[0]!.hp = 10;
+  const turnBefore = hurt.battle.turn;
+  const cheered = cheerQuickFight(hurt);
+  assert.ok(cheered.battle.playerTeam[0]!.hp > 10);
+  assert.equal(cheered.battle.turn, turnBefore);
+  assert.equal(cheered.battle.cheerAvailable, false);
+  assert.equal(cheerQuickFight(cheered), cheered);
+  // Quick fights have no cheer.
+  const quick = createQuickFight({ opponent: petOpponent() });
+  assert.equal(cheerQuickFight(quick), quick);
+});
+
+test('an operator punch lands before the pet moves and is scaled', () => {
+  const qf = createQuickFight({ opponent: enemyOpponent(), depth: 'quick' });
+  const start = qf.battle.enemyTeam[0]!.hp;
+  const strike = qf.battle.playerTeam[0]!.moves.find((move) => move.energyCost === 0)!;
+  const next = stepQuickFight(qf, strike.id, Math.random, { kind: 'punch', label: 'Punch', damage: 6 });
+  assert.ok(next.lastRoundLog.some((line) => line.includes('Punch hits')));
+  assert.ok(next.lastRoundLog.findIndex((line) => line.includes('Punch hits')) < next.lastRoundLog.findIndex((line) => line.includes(strike.name)) || !next.lastRoundLog.some((line) => line.includes(strike.name)));
+  assert.ok(next.battle.enemyTeam[0]!.hp <= start - Math.round(6 * ASSIST_SCALE));
+});
+
+test('an assist that finishes the opponent wins the fight before anyone else moves', () => {
+  const qf = createQuickFight({ opponent: enemyOpponent() });
+  const hpBefore = qf.battle.playerTeam[0]!.hp;
+  const strike = qf.battle.playerTeam[0]!.moves.find((move) => move.energyCost === 0)!;
+  const next = stepQuickFight(qf, strike.id, Math.random, { kind: 'card', label: 'Big Card', damage: 100000 });
+  assert.equal(quickFightOutcome(next), 'won');
+  assert.equal(next.battle.playerTeam[0]!.hp, hpBefore, 'the opponent never got its move');
+});
+
+test('cover shields the pet once per fight', () => {
+  const qf = createQuickFight({ opponent: enemyOpponent() });
+  const strike = qf.battle.playerTeam[0]!.moves.find((move) => move.energyCost === 0)!;
+  const cover = { kind: 'cover' as const, label: 'Cover', damage: 0 };
+  const first = stepQuickFight(qf, strike.id, Math.random, cover);
+  assert.equal(first.coverUsed, true);
+  assert.ok(first.battle.playerTeam[0]!.statusEffects.some((effect) => effect.type === 'shield'));
+  if (quickFightOutcome(first) === 'active') {
+    assert.equal(stepQuickFight(first, strike.id, Math.random, cover), first, 'second cover is refused');
+  }
+});
+
+test('a heal assist restores the pet', () => {
+  const qf = createQuickFight({ opponent: enemyOpponent() });
+  qf.battle.playerTeam[0]!.hp = 20;
+  const strike = qf.battle.playerTeam[0]!.moves.find((move) => move.energyCost === 0)!;
+  const next = stepQuickFight(qf, strike.id, Math.random, { kind: 'card', label: 'Ally Card', damage: 0, heal: 6 });
+  assert.ok(next.lastRoundLog.some((line) => line.includes('patches')));
 });

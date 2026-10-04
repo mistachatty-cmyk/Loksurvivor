@@ -204,6 +204,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New optional quick fights: turn on Quick fights in Settings and travel encounters play out with your lead LokPet, three moves, a round limit of eight, and the opponent\'s next move shown before you pick. The classic card-throw popup stays the default.',
     ],
   },
+  {
+    version: '0.10.7',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Travel Fight Styles',
+    body: [
+      'Settings has a new Travel fight style picker. Classic is still the original card-throw popup and is still the default.',
+      'Quick runs the fight on your lead LokPet with three moves. Duo puts your operator beside your LokPet: every round you pick a LokPet move and an operator assist (a punch, a Battle Deck card, or a one-time cover). Arena is the full side-by-side battle with every move, finishers and Cheer.',
+      'All three new styles adapt to your screen: phones get a stacked layout, bigger screens get stat panels either side and a running battle log.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

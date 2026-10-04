@@ -41,39 +41,41 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
-import { getQuickFightEnabled, setQuickFightEnabled } from '@/game/state/quickFightSetting';
+import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 
 export interface SettingsPanelProps {
   onBack: () => void;
   onOpenLooksAndLokPets?: () => void;
 }
-function QuickFightSetting() {
-  const [enabled, setEnabled] = useState(getQuickFightEnabled);
+function FightStyleSetting() {
+  const [style, setStyle] = useState<FightStyle>(getFightStyle);
+  const active = FIGHT_STYLES.find((entry) => entry.id === style)!;
   return (
     <div className="mt-3 border border-border/70 bg-background/50 p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-sm font-black uppercase tracking-wide text-white">Quick fights (LokPet)</h3>
-          <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            Travel encounters play out with your lead LokPet on the arena engine: three moves, strong and weak
-            matchups shown on every button, and the opponent's next move shown before you choose. Fights last at
-            most eight rounds. Off keeps the classic card-throw popup. This device only.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => { setQuickFightEnabled(!enabled); setEnabled(!enabled); }}
-          aria-pressed={enabled}
-          className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-            enabled
-              ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
-              : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
-          }`}
-          data-testid="button-toggle-quick-fights"
-        >
-          {enabled ? 'On' : 'Off'}
-        </button>
+      <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel fight style</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+        How a travel encounter plays out. Classic is the original card-throw popup. The other three use your lead
+        LokPet on the arena engine, and their layout adapts to your screen. This device only.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {FIGHT_STYLES.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            onClick={() => { setFightStyle(entry.id); setStyle(entry.id); }}
+            aria-pressed={style === entry.id}
+            className={`border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+              style === entry.id
+                ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+            }`}
+            data-testid={`button-fightstyle-${entry.id}`}
+          >
+            {entry.label}
+          </button>
+        ))}
       </div>
+      <p className="mt-2 text-xs text-muted-foreground" data-testid="text-fightstyle-blurb">{active.blurb}</p>
     </div>
   );
 }
@@ -798,7 +800,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
-              <QuickFightSetting />
+              <FightStyleSetting />
             </div>
           </div>
         </section>
