@@ -240,6 +240,66 @@ export const HEADWEAR: Record<string, Feature> = {
     part('crest', headRight(g) - 2, g.eyeY, 1, 1, 'skin', 7.5),
     part('crest', headRight(g), g.head.y - 2, 1, 3, c, 7.4),
   ],
+  antlers: (g, c) => [
+    part('crest', g.head.x, topRow(g) + 1, 1, 3, c, 7.5),
+    part('crest', g.head.x - 1, topRow(g) + 3, 1, 2, c, 7.5),
+    part('crest', g.head.x + 1, topRow(g) + 3, 1, 1, c, 7.5),
+    part('crest', headRight(g) - 1, topRow(g) + 1, 1, 3, c, 7.5),
+    part('crest', headRight(g), topRow(g) + 3, 1, 2, c, 7.5),
+    part('crest', headRight(g) - 2, topRow(g) + 3, 1, 1, c, 7.5),
+  ],
+  bubblehelm: (g, c) => [
+    part('crest', g.head.x - 1, topRow(g) + 1, g.head.w + 2, 1, c, 7.5),
+    part('crest', g.head.x - 1, g.head.y - 1, 1, g.head.h + 2, c, 7.5),
+    part('crest', headRight(g), g.head.y - 1, 1, g.head.h + 2, c, 7.5),
+    part('crest', g.head.x - 1, g.head.y - 1, g.head.w + 2, 1, c, 7.5),
+    part('crest', g.head.x, topRow(g), 1, 1, 'accentBright', 7.6),
+  ],
+  cone: (g, c) => [
+    part('crest', g.head.x + 1, topRow(g), g.head.w - 2, 2, c, 7.5),
+    part('crest', g.head.x + 2, topRow(g) + 2, Math.max(1, g.head.w - 4), 1, c, 7.5),
+    part('crest', g.head.x + 1, topRow(g) + 1, g.head.w - 2, 1, 'accentBright', 7.6),
+    part('crest', g.head.x, topRow(g) - 1, g.head.w, 1, c, 7.5),
+  ],
+  crt: (g, c) => [
+    part('crest', g.head.x - 1, topRow(g) - 1, g.head.w + 2, 4, 'ink', 7.5),
+    part('crest', g.head.x, topRow(g), g.head.w, 2, c, 7.6),
+    part('crest', g.head.x + Math.floor(g.head.w / 2), topRow(g) + 3, 1, 2, 'ink', 7.5),
+  ],
+  filmreel: (g, c) => [
+    part('crest', g.head.x - 1, topRow(g) + 1, 3, 3, 'ink', 7.5),
+    part('crest', g.head.x, topRow(g) + 2, 1, 1, c, 7.6),
+    part('crest', headRight(g) - 2, topRow(g) + 1, 3, 3, 'ink', 7.5),
+    part('crest', headRight(g) - 1, topRow(g) + 2, 1, 1, c, 7.6),
+    part('crest', g.head.x, topRow(g), g.head.w, 1, 'ink', 7.5),
+  ],
+  leafcrown: (g, c) => [
+    part('crest', g.head.x, topRow(g), g.head.w, 1, c, 7.5),
+    part('crest', g.head.x + 1, topRow(g) + 1, 1, 2, c, 7.5),
+    part('crest', g.head.x + Math.floor(g.head.w / 2), topRow(g) + 1, 1, 3, c, 7.5),
+    part('crest', headRight(g) - 2, topRow(g) + 1, 1, 2, c, 7.5),
+    part('crest', g.head.x + Math.floor(g.head.w / 2), topRow(g) + 3, 1, 1, 'accentBright', 7.6),
+  ],
+  minerlamp: (g, c) => [
+    part('crest', g.head.x - 1, topRow(g) - 1, g.head.w + 2, 1, c, 7.5),
+    part('crest', g.head.x, topRow(g), g.head.w, 2, c, 7.5),
+    part('crest', g.head.x + Math.floor(g.head.w / 2) - 1, topRow(g), 2, 2, 'glow', 7.6),
+  ],
+  marquee: (g, c) => {
+    const bulbs: SpritePart[] = [];
+    for (let i = 0; i < g.head.w + 2; i += 2) bulbs.push(part('crest', g.head.x - 1 + i, topRow(g) + 2, 1, 1, c, 7.6));
+    return [part('crest', g.head.x - 1, topRow(g) + 1, g.head.w + 2, 1, 'ink', 7.5), ...bulbs];
+  },
+  dish: (g, c) => [
+    part('crest', g.head.x + Math.floor(g.head.w / 2), topRow(g) + 1, 1, 2, 'ink', 7.5),
+    part('crest', g.head.x + Math.floor(g.head.w / 2) - 2, topRow(g) + 3, 5, 1, c, 7.6),
+    part('crest', g.head.x + Math.floor(g.head.w / 2) - 1, topRow(g) + 2, 3, 1, c, 7.6),
+  ],
+  spotlight: (g, c) => [
+    part('crest', g.head.x, topRow(g), g.head.w, 1, 'ink', 7.5),
+    part('crest', g.head.x + 1, topRow(g) + 1, Math.max(1, g.head.w - 2), 2, c, 7.5),
+    part('crest', g.head.x + 2, topRow(g) + 3, Math.max(1, g.head.w - 4), 1, 'glow', 7.6),
+  ],
 };
 
 /* ------------------------------------------------------------------ */
@@ -291,6 +351,14 @@ export const EYES: Record<string, Feature> = {
   ],
   spiral: (g, c) => [...eyePair(g, 2, 2, c), ...eyePair(g, 1, 1, 'ink').map((p) => ({ ...p, z: 6.3 }))],
   hollow: (g) => eyePair(g, 2, 2, 'ink'),
+  triple: (g, c) => [
+    ...eyePair(g, 1, 1, c),
+    part('head', g.head.x + Math.floor(g.head.w / 2), Math.min(g.eyeY + 2, topRow(g)), 1, 1, 'glow', 6.3),
+  ],
+  lens: (g, c) => [
+    part('head', g.head.x + Math.floor(g.head.w / 2) - 1, g.eyeY - 1, 3, 3, 'ink', 6.4),
+    part('head', g.head.x + Math.floor(g.head.w / 2), g.eyeY, 1, 1, c, 6.5),
+  ],
 };
 
 export const BROWS: Record<string, Feature> = {
@@ -389,6 +457,18 @@ export const MARKS: Record<string, Feature> = {
   glitchline: (g, c) => [
     part('head', g.head.x, g.eyeY - 1, 3, 1, c, 6.4),
     part('head', headRight(g) - 3, g.eyeY + 1, 3, 1, c, 6.4),
+  ],
+  static: (g, c) => [
+    part('head', g.head.x + 1, g.eyeY - 1, 1, 1, c, 6.4),
+    part('head', g.head.x + 3, g.eyeY + 1, 1, 1, c, 6.4),
+    part('head', g.head.x + 2, g.head.y, 1, 1, c, 6.4),
+    part('head', headRight(g) - 2, g.eyeY, 1, 1, c, 6.4),
+  ],
+  barcode: (g, c) => [
+    part('head', g.head.x + 1, g.head.y, 1, 2, c, 6.4),
+    part('head', g.head.x + 3, g.head.y, 1, 2, c, 6.4),
+    part('head', g.head.x + 4, g.head.y, 1, 2, c, 6.4),
+    part('head', g.head.x + 6, g.head.y, 1, 2, c, 6.4),
   ],
 };
 
@@ -505,6 +585,31 @@ export const TOPS: Record<string, Feature> = {
     part('torso', g.torso.x + 1, g.torso.y + Math.floor(g.torso.h / 2), g.torso.w - 3, 1, c, 3.3),
     part('torso', g.torso.x + g.torso.w - 2, g.torso.y + 1, 1, Math.floor(g.torso.h / 2), c, 3.3),
   ],
+  tux: (g, c) => [
+    part('torso', g.torso.x, g.torso.y, 2, g.torso.h, 'ink', 3.2),
+    part('torso', g.torso.x + g.torso.w - 2, g.torso.y, 2, g.torso.h, 'ink', 3.2),
+    part('torso', midX(g), g.torso.y, 1, g.torso.h, 'accentBright', 3.3),
+    part('torso', midX(g) - 1, torsoTop(g) - 1, 3, 1, c, 3.4),
+  ],
+  hivis: (g, c) => [
+    part('torso', g.torso.x + 1, g.torso.y, 1, g.torso.h, c, 3.2),
+    part('torso', g.torso.x + g.torso.w - 2, g.torso.y, 1, g.torso.h, c, 3.2),
+    part('torso', g.torso.x, g.torso.y + Math.floor(g.torso.h / 2), g.torso.w, 1, 'accentBright', 3.3),
+  ],
+  foliage: (g, c) => [
+    part('torso', g.torso.x, g.torso.y, 2, 2, c, 3.2),
+    part('torso', g.torso.x + g.torso.w - 3, g.torso.y + 1, 3, 2, c, 3.2),
+    part('torso', g.torso.x + 2, torsoTop(g) - 2, 2, 2, c, 3.3),
+    part('torso', g.torso.x + g.torso.w - 2, torsoTop(g) - 1, 2, 1, 'accentBright', 3.3),
+  ],
+  rackmount: (g, c) => {
+    const rows: SpritePart[] = [part('torso', g.torso.x + 1, g.torso.y + 1, Math.max(1, g.torso.w - 2), Math.max(1, g.torso.h - 2), 'ink', 3.2)];
+    for (let y = g.torso.y + 1; y < torsoTop(g) - 1; y += 2) {
+      rows.push(part('torso', g.torso.x + 2, y, Math.max(1, g.torso.w - 4), 1, 'bodyDark', 3.3));
+      rows.push(part('torso', g.torso.x + 2, y, 1, 1, c, 3.4));
+    }
+    return rows;
+  },
 };
 
 export const SHOULDERS: Record<string, Feature> = {
@@ -530,6 +635,12 @@ export const SHOULDERS: Record<string, Feature> = {
     part('torso', g.torso.x - 2, torsoTop(g) - 2, g.torso.w + 4, 2, c, 4.4),
     part('torso', g.torso.x - 2, torsoTop(g) - 3, 2, 1, c, 4.4),
     part('torso', g.torso.x + g.torso.w, torsoTop(g) - 3, 2, 1, c, 4.4),
+  ],
+  plates: (g, c) => [
+    part('torso', g.torso.x - 2, torsoTop(g) - 3, 2, 3, c, 4.5),
+    part('torso', g.torso.x - 2, torsoTop(g) - 2, 1, 1, 'ink', 4.6),
+    part('torso', g.torso.x + g.torso.w, torsoTop(g) - 3, 2, 3, c, 4.5),
+    part('torso', g.torso.x + g.torso.w + 1, torsoTop(g) - 2, 1, 1, 'ink', 4.6),
   ],
 };
 
@@ -697,6 +808,39 @@ export const BACKS: Record<string, Feature> = {
     part('torso', g.torso.x - 3, torsoTop(g) + 1, 1, 2, 'accentBright', 2.2),
     part('torso', g.torso.x - 1, torsoTop(g) + 1, 1, 2, 'accentBright', 2.2),
   ],
+  reel: (g, c) => [
+    part('torso', g.torso.x - 4, g.torso.y + 1, 4, 4, 'ink', 2.2),
+    part('torso', g.torso.x - 3, g.torso.y + 2, 2, 2, c, 2.3),
+  ],
+  vines: (g, c) => [
+    part('torso', g.torso.x - 2, g.torso.y - 1, 1, g.torso.h + 1, c, 2.2),
+    part('torso', g.torso.x - 3, g.torso.y + 1, 1, 2, c, 2.2),
+    part('torso', g.torso.x + g.torso.w + 1, g.torso.y, 1, g.torso.h - 1, c, 2.2),
+    part('torso', g.torso.x + g.torso.w + 2, g.torso.y + 2, 1, 2, 'accentBright', 2.2),
+  ],
+  bubbles: (g, c) => [
+    part('torso', g.torso.x - 3, torsoTop(g) - 1, 2, 2, c, 2.2),
+    part('torso', g.torso.x - 5, torsoTop(g) + 1, 1, 1, c, 2.2),
+    part('torso', g.torso.x + g.torso.w + 1, torsoTop(g) + 1, 2, 2, c, 2.2),
+    part('torso', g.torso.x + g.torso.w + 3, torsoTop(g) - 1, 1, 1, c, 2.2),
+  ],
+  cables: (g, c) => [
+    part('torso', g.torso.x - 1, g.torso.y, 1, g.torso.h, 'ink', 2.2),
+    part('torso', g.torso.x - 2, g.torso.y - 2, 1, 3, c, 2.2),
+    part('torso', g.torso.x - 3, g.torso.y - 4, 1, 3, 'ink', 2.2),
+  ],
+  antennaarray: (g, c) => [
+    part('torso', g.torso.x - 1, torsoTop(g), 1, 4, 'ink', 2.2),
+    part('torso', g.torso.x - 2, torsoTop(g) + 4, 3, 1, c, 2.3),
+    part('torso', g.torso.x + g.torso.w, torsoTop(g), 1, 3, 'ink', 2.2),
+    part('torso', g.torso.x + g.torso.w, torsoTop(g) + 3, 2, 1, c, 2.3),
+  ],
+  fireflies: (g, c) => [
+    part('torso', g.torso.x - 3, torsoTop(g), 1, 1, 'glow', 8),
+    part('torso', g.torso.x + g.torso.w + 2, torsoTop(g) - 2, 1, 1, 'glow', 8),
+    part('torso', g.torso.x - 2, torsoTop(g) + 3, 1, 1, c, 8),
+    part('torso', g.torso.x + g.torso.w + 1, torsoTop(g) + 2, 1, 1, 'glow', 8),
+  ],
 };
 
 export const HELD: Record<string, Feature> = {
@@ -741,6 +885,30 @@ export const HELD: Record<string, Feature> = {
     part('armR', g.armR.x - 2, g.armR.y - 1, 6, 3, 'ink', 4.6),
     part('armR', g.armR.x - 1, g.armR.y, 2, 1, c, 4.7),
     part('armR', g.armR.x + 2, g.armR.y, 1, 1, c, 4.7),
+  ] : [],
+  jar: (g, c) => g.armR ? [
+    part('armR', g.armR.x, g.armR.y - 1, 2, 3, 'ink', 4.6),
+    part('armR', g.armR.x, g.armR.y, 1, 2, 'glow', 4.7),
+    part('armR', g.armR.x, g.armR.y + 2, 2, 1, c, 4.7),
+  ] : [],
+  clapper: (g, c) => g.armR ? [
+    part('armR', g.armR.x - 1, g.armR.y - 1, 4, 2, 'ink', 4.6),
+    part('armR', g.armR.x - 1, g.armR.y + 1, 4, 1, c, 4.7),
+  ] : [],
+  pickaxe: (g, c) => g.armR ? [
+    part('armR', g.armR.x + 1, g.armR.y - 1, 1, 6, 'ink', 4.6),
+    part('armR', g.armR.x - 1, g.armR.y + 5, 5, 1, c, 4.7),
+    part('armR', g.armR.x - 1, g.armR.y + 4, 1, 1, c, 4.7),
+    part('armR', g.armR.x + 3, g.armR.y + 4, 1, 1, c, 4.7),
+  ] : [],
+  dumbbell: (g, c) => g.armR ? [
+    part('armR', g.armR.x - 2, g.armR.y, 6, 1, 'ink', 4.6),
+    part('armR', g.armR.x - 2, g.armR.y - 1, 1, 3, c, 4.7),
+    part('armR', g.armR.x + 3, g.armR.y - 1, 1, 3, c, 4.7),
+  ] : [],
+  flag: (g, c) => g.armR ? [
+    part('armR', g.armR.x + 1, g.armR.y - 1, 1, 8, 'ink', 4.6),
+    part('armR', g.armR.x + 2, g.armR.y + 5, 4, 3, c, 4.7),
   ] : [],
 };
 

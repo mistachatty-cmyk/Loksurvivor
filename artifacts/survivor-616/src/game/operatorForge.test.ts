@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CHARACTERS, CHARACTERS_BY_ID } from './data/characters';
+import { FACTIONS } from './data/factions';
 import { FORGE_KIT_BLOCKLIST, buildForgedCharacter, isForgeKit, registerForgedOperators } from './data/forgedOperators';
 import {
-  BODY_BUILDS, FORGE_CATEGORIES, FORGE_ID_PREFIX, HEIGHT_RANGE, OPERATOR_FLAVORS_LIST, OPERATOR_LEAN, PALETTE_SCHEMES,
+  BODY_BUILDS, CORE_SPECIES, FACTION_SPECIES, FORGE_CATEGORIES, FORGE_ID_PREFIX, HEIGHT_RANGE, OPERATOR_FLAVORS_LIST, OPERATOR_LEAN, PALETTE_SCHEMES,
   SKIN_TONES, SPECIES, WIDTH_RANGE, bodyFromBuild, buildOperatorRig, exportForgedOperator, generateForgedOperator,
   generateOperatorDesign, generateOperatorIdentity, generatePalette, importForgedOperator, lookDifference,
   normalizeDesign, normalizeForgedOperator, rerollDesign, type ForgedOperator,
@@ -19,7 +20,10 @@ const SEEDS = Array.from({ length: 80 }, (_, i) => `seed-${i}`);
 test('the Forge offers a deep bank of options', () => {
   assert.ok(OPERATOR_FEATURE_COUNT >= 170, `only ${OPERATOR_FEATURE_COUNT} features`);
   assert.ok(BODY_BUILDS.length >= 9);
-  assert.ok(SPECIES.length >= 10);
+  assert.ok(CORE_SPECIES.length >= 10);
+  assert.ok(FACTION_SPECIES.length >= 18);
+  assert.ok(SPECIES.length >= 28);
+  assert.ok(OPERATOR_FEATURE_COUNT >= 200, `only ${OPERATOR_FEATURE_COUNT} features`);
   assert.ok(PALETTE_SCHEMES.length >= 9);
   assert.ok(SKIN_TONES.length >= 20);
   assert.ok(SKIN_TONES.some((s) => s.fantasy));
@@ -232,4 +236,45 @@ test('a forged character copy keeps its own palette and does not share the kit r
   assert.deepEqual(forged.palette, op.design.palette);
   assert.notEqual(forged.palette, kit.palette);
   assert.notEqual(forged.id, kit.id);
+});
+
+test('faction races point at real factions, are unique, and make valid operators', () => {
+  const factionIds = new Set(FACTIONS.map((f) => f.id));
+  const raceIds = new Set<string>();
+  for (const race of SPECIES) {
+    assert.ok(!raceIds.has(race.id), `duplicate race id ${race.id}`);
+    raceIds.add(race.id);
+  }
+  const factions = new Set<string>();
+  for (const race of FACTION_SPECIES) {
+    assert.ok(race.faction && factionIds.has(race.faction), `${race.id} names unknown faction ${race.faction}`);
+    assert.ok(race.lore && race.lore.length > 20, `${race.id} needs a lore line`);
+    assert.ok(!BANNED.test(`${race.label} ${race.blurb} ${race.lore}`));
+    factions.add(race.faction!);
+  }
+  assert.ok(factions.size >= 18, 'faction races should cover many different factions');
+  for (const race of SPECIES) {
+    for (let i = 0; i < 6; i += 1) {
+      const design = generateOperatorDesign(`${race.id}-${i}`, { species: race.id });
+      assert.equal(design.species, race.id);
+      assert.ok(race.builds.includes(design.body.build));
+      assert.ok(readOperatorGeo(buildOperatorRig(design)));
+    }
+  }
+});
+
+test('a faction race leans toward its own look', () => {
+  const lean = (raceId: string, field: 'headwear' | 'back', id: string) => {
+    let hits = 0;
+    for (let i = 0; i < 120; i += 1) if (generateOperatorDesign(`lean-${i}`, { species: raceId }).look[field] === id) hits += 1;
+    return hits;
+  };
+  const baseline = (field: 'headwear' | 'back', id: string) => {
+    let hits = 0;
+    for (let i = 0; i < 120; i += 1) if (generateOperatorDesign(`lean-${i}`, { species: 'human' }).look[field] === id) hits += 1;
+    return hits;
+  };
+  assert.ok(lean('antlerkin', 'headwear', 'antlers') > baseline('headwear', 'antlers') + 10);
+  assert.ok(lean('nullborn', 'back', 'cables') > baseline('back', 'cables') + 10);
+  assert.ok(lean('bubblenaught', 'headwear', 'bubblehelm') > baseline('headwear', 'bubblehelm') + 10);
 });

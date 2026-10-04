@@ -13,7 +13,7 @@
  */
 import type { CharacterDef } from '@/game/types';
 import { buildOperatorRig, FORGE_ID_PREFIX, type ForgedOperator } from '@/game/data/operatorForge';
-import { loadForgedOperators } from '@/game/state/operatorForgeStore';
+import { loadRosterForgedOperators } from '@/game/state/operatorForgeStore';
 
 /**
  * Kits that cannot be borrowed because the engine keys extra behavior on the
@@ -59,7 +59,7 @@ export function buildForgedCharacter(op: ForgedOperator, kit: CharacterDef): Cha
 export function registerForgedOperators(
   characters: CharacterDef[],
   byId: Record<string, CharacterDef>,
-  saved: ForgedOperator[] = loadForgedOperators(),
+  saved: ForgedOperator[] = loadRosterForgedOperators(),
 ): CharacterDef[] {
   const added: CharacterDef[] = [];
   for (const op of saved) {

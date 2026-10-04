@@ -2,8 +2,8 @@
  * Roster / character picker. Owned by the design pass -- keep the export
  * name and props stable.
  */
-import { Fragment, useEffect } from 'react';
-import { BookOpen, HeartPulse, LockKeyhole, Zap } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { BookOpen, HeartPulse, LockKeyhole, Maximize2, Zap } from 'lucide-react';
 
 import {
   characterLevelProgress,
@@ -24,6 +24,7 @@ import { characterMasteryStatBonus, characterRankTitle } from '@/game/data/chara
 import type { CharacterDef, MetaState } from '@/game/types';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
+import { OperatorInspector } from './OperatorInspector';
 import { CharacterAbilityVisualizer } from './CharacterAbilityVisualizer';
 import { LokPetIcon, LokPetVariantSheet } from './LokPetVariantSheet';
 import { WeaponIcon } from './WeaponIcon';
@@ -33,6 +34,7 @@ import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getHatStyle } from '@/game/data/hats';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import type { RunModifiers } from '@/game/types';
+import { isFeatureEnabled } from '@/game/state/operatorForgeStore';
 
 export interface CharacterSelectProps {
   onBack: () => void;
@@ -460,10 +462,17 @@ function CharacterTile({
   palette,
   fatiguePct,
   characterLevel,
+  onInspect,
+  foil,
+  aura,
 }: {
   character: CharacterDef;
   selected: boolean;
   onSelect: () => void;
+  onInspect?: () => void;
+  /** End-game extras (off unless earned and switched on). */
+  foil?: boolean;
+  aura?: boolean;
   palette: CharacterDef['palette'];
   fatiguePct?: number;
   characterLevel?: number;
@@ -472,15 +481,16 @@ function CharacterTile({
   const hasLevel = typeof characterLevel === 'number' && characterLevel > 1;
 
   return (
+    <div className="relative">
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`terminal-frame relative flex flex-col items-center gap-2 border p-3 text-center transition-colors ${
+      className={`terminal-frame relative flex h-full w-full flex-col items-center gap-2 border p-3 text-center transition-colors ${
         selected ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'
-      }`}
+      } ${foil ? 'foil-tile' : ''}`}
       data-testid={`button-character-${character.id}`}
-      style={character.rarity === 'legendary' ? { boxShadow: `0 0 18px ${palette.glow}33` } : undefined}
+      style={character.rarity === 'legendary' ? { boxShadow: `0 0 18px ${palette.glow}33` } : aura ? { boxShadow: `0 0 14px ${palette.glow}40, inset 0 0 10px ${palette.glow}1a` } : undefined}
     >
       <div className="relative grid h-14 w-14 place-items-center border border-border bg-black/40">
         <RigPortrait rig={character.rig} palette={palette} anim="idle" size={48} />
@@ -507,6 +517,19 @@ function CharacterTile({
       <span className="w-full truncate text-[10px] font-black uppercase tracking-wide text-white">{character.name}</span>
       {character.rarity === 'legendary' ? <span className="font-mono text-[7px] font-black uppercase tracking-[0.2em] text-amber-300">Legendary</span> : null}
     </button>
+    {onInspect ? (
+      <button
+        type="button"
+        onClick={onInspect}
+        className="absolute right-1 top-1 z-10 border border-border/80 bg-black/70 p-1 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+        aria-label={`Inspect ${character.name} at full size`}
+        title="Inspect at full size"
+        data-testid={`button-inspect-${character.id}`}
+      >
+        <Maximize2 className="h-3 w-3" />
+      </button>
+    ) : null}
+    </div>
   );
 }
 
@@ -595,6 +618,17 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
   const unlockedOperatives = unlockedCharacters.filter((character) => !character.lokPetCollector);
   const lockedOperatives = lockedCharacters.filter((character) => !character.lokPetCollector);
   const petTeamCapacity = lokPetTeamCapacity(selectedCharacter);
+  const [inspectId, setInspectId] = useState<string | null>(null);
+  // End-game extras: each is off unless earned and switched on in Settings.
+  const fx = useMemo(() => ({
+    inspect: isFeatureEnabled('inspector'),
+    foil: isFeatureEnabled('foil'),
+    aura: isFeatureEnabled('aura'),
+  }), []);
+  const inspectorEntries = [...unlockedOperatives, ...unlockedCollectors].map((character) => ({
+    character,
+    palette: resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled),
+  }));
 
   return (
     <ScreenLayout
@@ -680,6 +714,9 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       character={character}
                       selected={character.id === selectedCharacter.id}
                       onSelect={() => selectCharacter(character.id)}
+                      onInspect={fx.inspect ? () => setInspectId(character.id) : undefined}
+                      foil={fx.foil && character.id === selectedCharacter.id}
+                      aura={fx.aura}
                       palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
                       fatiguePct={currentFatiguePct(meta, character.id)}
                       characterLevel={characterLevelProgress(meta, character.id).level}
@@ -697,6 +734,9 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       character={character}
                       selected={character.id === selectedCharacter.id}
                       onSelect={() => selectCharacter(character.id)}
+                      onInspect={fx.inspect ? () => setInspectId(character.id) : undefined}
+                      foil={fx.foil && character.id === selectedCharacter.id}
+                      aura={fx.aura}
                       palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
                       fatiguePct={currentFatiguePct(meta, character.id)}
                       characterLevel={characterLevelProgress(meta, character.id).level}
@@ -715,6 +755,9 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                   character={character}
                   selected={character.id === selectedCharacter.id}
                   onSelect={() => selectCharacter(character.id)}
+                      onInspect={fx.inspect ? () => setInspectId(character.id) : undefined}
+                      foil={fx.foil && character.id === selectedCharacter.id}
+                      aura={fx.aura}
                   palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
                   fatiguePct={currentFatiguePct(meta, character.id)}
                 />
@@ -737,6 +780,9 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       character={character}
                       selected={character.id === selectedCharacter.id}
                       onSelect={() => selectCharacter(character.id)}
+                      onInspect={fx.inspect ? () => setInspectId(character.id) : undefined}
+                      foil={fx.foil && character.id === selectedCharacter.id}
+                      aura={fx.aura}
                       palette={resolveCharacterCosmeticPalette(character, meta.characterSkinByCharacterId[character.id], meta.activePaletteId === DEFAULT_PALETTE_ID ? undefined : getActivePalette(meta.activePaletteId), meta.worldPaletteBlendEnabled)}
                       fatiguePct={currentFatiguePct(meta, character.id)}
                       characterLevel={characterLevelProgress(meta, character.id).level}
@@ -750,6 +796,15 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
           </div>
         )}
       </div>
+      {inspectId ? (
+        <OperatorInspector
+          entries={inspectorEntries}
+          startId={inspectId}
+          selectedId={selectedCharacter.id}
+          onSelect={selectCharacter}
+          onClose={() => setInspectId(null)}
+        />
+      ) : null}
     </ScreenLayout>
   );
 }

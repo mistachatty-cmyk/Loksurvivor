@@ -227,6 +227,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Operators can be shared as a short code, and the Forge can make five random ones at a time.',
     ],
   },
+  {
+    version: '0.10.9',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'End Game: Victory Lap',
+    body: [
+      'Clear every standard map once and Settings gains a second page, End game, that slides in beside Standard. Before then it does not appear at all.',
+      'Everything extra is optional and starts switched off: the Operator Forge, a zoom viewer that opens any operator at full size, 21 new faction races for the Forge, a holographic foil on your selected operator, and a glow aura on roster tiles.',
+      'Five custom operator slots, each earned a different way: clear every map, defeat 20,000 enemies, rescue 15 allies, find 18 discoveries, win 25 LokPet battles. A custom operator is a modified copy of a premade operator and never replaces one.',
+      'The Forge also gained about 30 more looks (antlers, film reels, mining lamps, hi-vis vests and more). The five-tap secret is gone; anyone who found the Forge before keeps it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -78,6 +78,8 @@ import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/
 import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { earnedEndgame, featureById, slotById } from '@/game/data/endgameUnlocks';
+import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
 import type {
   AllyDef,
@@ -1881,6 +1883,7 @@ type Action =
   | { type: 'setMirrorModeEnabled'; enabled: boolean }
   | { type: 'toggleRunModifier'; key: keyof RunModifiers }
   | { type: 'dismissNotifications'; ids: string[] }
+  | { type: 'announceEndgame'; ids: string[]; now: number }
   | { type: 'acknowledgeChangelog' }
   | { type: 'buyGenerator'; id: string; now: number }
   | { type: 'refreshGeneratorIncome'; now: number }
@@ -3160,6 +3163,30 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'announceEndgame': {
+      const features = action.ids.map((id) => featureById(id)?.label).filter((l): l is string => Boolean(l));
+      const slots = action.ids.map((id) => slotById(id)?.label).filter((l): l is string => Boolean(l));
+      if (features.length === 0 && slots.length === 0) return state;
+      const parts: string[] = [];
+      if (features.length > 0) parts.push(`${features.join(', ')} can now be switched on in Settings, under End game. They are off until you turn them on.`);
+      if (slots.length > 0) parts.push(`Custom operator slot${slots.length > 1 ? 's' : ''} earned: ${slots.join(', ')}.`);
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          pendingNotifications: [
+            ...state.meta.pendingNotifications,
+            {
+              id: `endgame-${action.now}-${action.ids.join('-')}`,
+              title: features.length > 0 ? 'END GAME UNLOCKED' : 'CUSTOM SLOT EARNED',
+              body: parts.join(' '),
+              createdAt: action.now,
+            },
+          ],
+        },
+      };
+    }
+
     case 'dismissNotifications': {
       const ids = new Set(action.ids);
       return {
@@ -3734,6 +3761,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     saveMeta(state.meta);
+  }, [state.meta]);
+
+  // End-game unlocks are earned once and kept. Record anything newly qualified and announce it once.
+  useEffect(() => {
+    const fresh = recordEarnedEndgame(earnedEndgame(state.meta));
+    if (fresh.length > 0) dispatch({ type: 'announceEndgame', ids: fresh, now: Date.now() });
   }, [state.meta]);
 
   // Wholesale-replace, used by a manual save import or (via CloudSyncProvider

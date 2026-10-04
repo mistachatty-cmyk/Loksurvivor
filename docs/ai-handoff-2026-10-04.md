@@ -83,20 +83,25 @@ pnpm exec playwright test       # 35 pass, 1 test.fixme (dev-tool HUD stress tes
 - Use `pnpm exec playwright test`, not `npx playwright`.
 - Not verified: the test browser cannot decode `.m4a`, so audible music playback was only checked as far as the start call. Check on a real device.
 
-## Operator Forge (v0.10.8)
+## Operator Forge (v0.10.8) and End game extras (v0.10.9)
 
-The owner said operators were too simple and samey, but explicitly did **not** want existing operators changed ("nothing replaced but expanded", "don't want this to be retroactive") and asked for deeply expanded design options, a generation option, and a hidden customizer. So the Forge is purely additive: new operators only, appended after the 69 authored ones.
+The owner said operators were too simple and samey, but explicitly did **not** want existing operators changed ("nothing replaced but expanded", "don't want this to be retroactive") and asked for deeply expanded design options, a generation option, and a customizer. So the Forge is purely additive: new operators only, appended after the 69 authored ones.
 
-- Hidden: tap the "Save data" label in Settings five times.
-- Design: 9 builds with height and width sliders, 9 palette schemes plus 22 skin tones, 10 species presets, 7 wardrobe styles, about 190 features in 15 categories, each with its own color.
-- Generate: seeded, so a seed is a shareable recipe; also batch generation, per-category rerolls and share codes.
+In 0.10.9 the owner said the new screen content was "a lot on screen", so everything from the Forge round became an **end-game unlock**, optional and toggleable:
+
+- **Gate:** every standard map cleared once (`STANDARD_MAPS` in `data/endgameUnlocks.ts`: timed maps only, so no endless modes and no extreme 2x/4x versions). Before that, Settings shows no tab and no hint; after it, Settings has two pages, Standard and End game, with a slide animation (`ui/SettingsPager.tsx`, `ui/EndgameSettings.tsx`).
+- **Switches (all off until the player turns them on):** Operator Forge, Zoom viewer (magnifier on roster tiles opening `OperatorInspector`), Faction races (the 21 faction-themed species in the Forge), Champion foil (shimmer on the selected tile), Glow aura (glow on every tile). Turning the Forge off hides custom operators from the roster (they stay saved); that one needs a reload.
+- **Five custom slots:** the Forge holds only as many operators as earned slots. Each slot has its own goal: Full Circuit (the gate itself), Crowd Control (20,000 kills), Roll Call (15 allies rescued), Field Notes (18 discoveries), Beast Master (25 LokPet battle wins). A custom operator is a modified copy of an unlocked premade kit and never overrides a premade operator. Tune the goals in `CUSTOM_SLOTS`.
+- **Persistence:** earned unlocks are sticky and live in the forge store (`survivor616.forge.v1`: `earned`, `toggles`). `MetaProvider` records new unlocks from the save and announces them once. A Forge found by the old five-tap reveal (0.10.8) stays available and switched on; the tap reveal is gone.
+- Design: 9 builds with height and width sliders, 9 palette schemes plus 22 skin tones, 31 species (10 core, 21 faction races), 7 wardrobe styles, 202 features in 15 categories, each with its own color.
+- Generate: seeded, so a seed is a shareable recipe; also fill-the-free-slots generation, per-category rerolls and share codes.
 - Kit: a forged operator borrows stats, weapon and ultimate from an unlocked authored operator. `llama-mama`, `llama-overlord`, `cluck-616` and legendary operators cannot be borrowed.
 - Full design and how to add options: `artifacts/survivor-616/docs/operator-forge.md`. Decision record: `.agents/memory/operator-forge.md`.
 - The retroactive approach (a global detailed-mode getter on every existing operator) was built first and deliberately thrown away. Do not reintroduce it.
 
 ## LokPet creature range
 
-The owner wants hybrid, fantasy, fictional and sci-fi creatures as uncommon finds and easter eggs, some cute and some terrifying, alongside ordinary animals, and wants a few more added every once in a while. The brief, tiers, cute/dread axes, rules and an added-log are in `artifacts/survivor-616/docs/lokpet-creature-design.md`. No creatures have been added yet; that waits on the body-plan recipes (roadmap item 1).
+The owner wants hybrid, fantasy, fictional and sci-fi creatures as uncommon finds and easter eggs, some cute and some terrifying, alongside ordinary animals, and wants a few more added every once in a while. In 0.10.9 they asked for the cute/dread idea to be deeply expanded, more thematic, an eventually infinite roster, user-imported art, and rarity as both findability and tier (like ordinary vs legendary creatures). The brief and its answers are in `artifacts/survivor-616/docs/lokpet-creature-design.md`; the data and seeded generator are in `src/game/data/creatureTraits.ts` (51 axes, 46 quirks, 22 themes, 48 body plans, 7 findability levels, 6 tiers). It is not wired into battles or chests yet, and no creatures have been added; that waits on the body-plan recipes (roadmap item 1). The user-art import is designed, not built.
 
 ## Deployment
 
@@ -108,7 +113,7 @@ The owner's goal is a collect-and-battle loop (Palworld / Pokémon style) with 2
 
 1. **LokPet body-plan recipes**: data recipes plus lazily cached images, so more animals (dog, cat, bird, fish, reptile, insect...) without runtime growth. Today there are 78 variants on about 41 silhouettes.
 2. **Seeded variants and card tie-in**: pattern layers, fighting-style tags, variants becoming their own cards.
-3. **Operator design range**: DONE as the additive Operator Forge (v0.10.8), see below. More features, species and builds can be added as data entries.
+3. **Operator design range**: DONE as the additive Operator Forge (v0.10.8), now an end-game unlock with five custom slots (v0.10.9), see above. More features, species and builds can be added as data entries.
 4. **Living hideout strip**: pet follower, visitors, tap-to-fight events using the new fight styles.
 5. **City exploration loop**: wander, find items, LokPets, allies and events, fight data mites and enemies.
 6. **Expansion packs** up to 200 LokPets.

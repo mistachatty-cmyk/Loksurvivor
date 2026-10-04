@@ -889,3 +889,54 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-testid^='run-hud'], [data-testid='run-intel-drawer'], [data-testid='button-loot-tray'], [data-testid='button-loot-tray-options'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-hud, 1)); }
 [data-testid^='overlay-'], [role='dialog'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-popups, 1)); }
 header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-menus, 1)); }
+
+/* ---- End game extras (optional, earned) ---- */
+.endgame-panel {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box,
+    conic-gradient(from var(--eg-angle, 0deg), #f0abfc, #67e8f9, #fde047, #86efac, #f0abfc) border-box;
+  animation: endgame-spin 7s linear infinite;
+}
+@property --eg-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes endgame-spin { to { --eg-angle: 360deg; } }
+.endgame-title {
+  background: linear-gradient(100deg, #f0abfc 20%, #ffffff 40%, #67e8f9 60%, #fde047 80%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: endgame-shine 4.5s ease-in-out infinite;
+}
+@keyframes endgame-shine { 0%, 100% { background-position: 120% 0; } 50% { background-position: -20% 0; } }
+.endgame-card-on { box-shadow: 0 0 0 1px rgba(240, 171, 252, .55), 0 0 22px rgba(240, 171, 252, .25); }
+.endgame-slot-earned { box-shadow: inset 0 0 18px rgba(253, 224, 71, .12), 0 0 14px rgba(253, 224, 71, .18); }
+.endgame-spark {
+  position: absolute; left: var(--sx); top: 50%; width: 6px; height: 6px; pointer-events: none;
+  background: var(--sc); animation: endgame-spark .9s ease-out forwards;
+}
+@keyframes endgame-spark {
+  from { transform: translate(0, 0) scale(1); opacity: 1; }
+  to { transform: translate(var(--dx), var(--dy)) scale(.2) rotate(180deg); opacity: 0; }
+}
+.foil-tile::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, .28) 45%, rgba(103, 232, 249, .3) 52%, rgba(240, 171, 252, .3) 58%, transparent 70%);
+  background-size: 260% 100%; animation: lok-card-sheen 4.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .endgame-panel, :root:not([data-motion='full']) .endgame-title,
+  :root:not([data-motion='full']) .foil-tile::after { animation: none; }
+  :root:not([data-motion='full']) .endgame-spark { display: none; }
+}
+
+/* Settings page slide (Standard <-> End game) */
+.settings-slide-from-right { animation: settings-slide-right .32s cubic-bezier(.2, .8, .2, 1) both; }
+.settings-slide-from-left { animation: settings-slide-left .32s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes settings-slide-right { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+@keyframes settings-slide-left { from { opacity: 0; transform: translateX(-48px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .settings-slide-from-right, :root:not([data-motion='full']) .settings-slide-from-left { animation: none; }
+}

@@ -1,6 +1,6 @@
 # Operator Forge
 
-The Operator Forge is an optional, hidden workshop for designing and generating
+The Operator Forge is an optional end-game workshop for designing and generating
 **new** operators. It exists because the hand-authored operators are about ten
 flat rectangles each, so a large roster reads as the same figure in different
 colors. The owner wanted far more range in how operators are made and how they
@@ -19,12 +19,27 @@ exist**.
 - With nothing forged, `registerForgedOperators` does nothing and the game is
   byte-for-byte the roster it was before.
 
-## How it is revealed
+## How it is unlocked (0.10.9)
 
-Settings, then tap the **Save data** label five times. The reveal is saved
-(`survivor616.forge.v1`, `unlocked: true`) and a "Hidden workshop / Operator
-Forge" section appears in Settings with an **Open the Forge** button. Nothing in
-the normal UI mentions it before then.
+It used to be hidden behind five taps on the Settings "Save data" label (0.10.8).
+The owner found the new screen content too much, so it is now an **end-game unlock**:
+
+- **Gate:** clear every standard map once (timed maps; not the endless modes and
+  not the extreme 2x/4x versions). Before that, Settings shows no trace of it.
+- **Settings has two pages**, Standard and End game, with a left/right slide
+  between them (`SettingsPager`). The End game page ("Victory Lap") has a switch
+  for each earned extra. All start **off**.
+- **Extras:** Operator Forge, Zoom viewer, Faction races, Champion foil, Glow aura.
+- **Five custom slots**, each earned its own way once the maps are cleared: Full
+  Circuit (the gate), Crowd Control (20,000 kills), Roll Call (15 allies), Field
+  Notes (18 discoveries), Beast Master (25 LokPet battle wins). The Forge keeps one
+  custom operator per earned slot. A custom operator is a modified copy of a premade
+  operator's kit and never replaces a premade operator.
+- A Forge found with the old taps stays available and on. Operators saved beyond
+  the slot count stay on the roster and are listed as "made before slots existed".
+
+Rules and goals are in `data/endgameUnlocks.ts`; state is in
+`state/operatorForgeStore.ts`.
 
 ## What an operator is made of
 
@@ -33,8 +48,8 @@ the normal UI mentions it before then.
 | Body | `BODY_BUILDS` in `data/operatorForge.ts` | 9 builds (average, lean, stocky, broad, tall, small, hunched, flared, giant), plus height 14-28 and width 7-14 sliders. Fed to the existing `humanoidRig`. |
 | Palette | `generatePalette(spec)` | 9 schemes (analogous, complementary, triadic, split, mono, neon, earth, pastel, noir), a hue, a lightness, and a skin tone. Produces the usual 7-color `SpritePalette`. Any single color can then be edited by hand. |
 | Skin tones | `SKIN_TONES` | 10 natural tones and 12 fantasy tones (ash, moss, lavender, ember, frost, gilt, void, bone, rose quartz, teal, chrome...). |
-| Look | `sprites/operatorDetail.ts` | 15 categories, about 190 features, each with its own palette color. See below. |
-| Species | `SPECIES` | 10 presets (human, cyborg, beastkin, spirit, alien, undead, construct, dragonkin, fae, mutant). A species biases skin, color scheme, body build and which features are likely. It is a generation bias, not a stat change. |
+| Look | `sprites/operatorDetail.ts` | 15 categories, 202 features, each with its own palette color. See below. |
+| Species | `SPECIES` | 10 core presets (human, cyborg, beastkin, spirit, alien, undead, construct, dragonkin, fae, mutant) plus 21 faction races (`FACTION_SPECIES`, shown only with the Faction races switch on). A species biases skin, color scheme, body build and which features are likely. It is a generation bias, not a stat change. |
 | Style (flavor) | `OPERATOR_LEAN` | 7 wardrobes (street, tech, mystic, brawler, performer, scout, wild) that bias the clothing. |
 | Identity | `generateOperatorIdentity` | Name, handle, tagline and bio, invented from word pools with a Grand Rapids flavor. All editable. |
 | Kit | `data/forgedOperators.ts` | The stats, weapon and ultimate come from an authored operator the player has already unlocked. |
@@ -108,13 +123,15 @@ This is meant to grow. Everything is a data entry:
 - `src/game/data/operatorForge.ts`: bodies, palettes, species, styles, generation, validation, share codes.
 - `src/game/data/forgedOperators.ts`: turns saved designs into playable `CharacterDef`s and registers them.
 - `src/game/state/operatorForgeStore.ts`: device-local saves (`survivor616.forge.v1`).
-- `src/ui/OperatorForgePanel.tsx`: the hidden screen; `SettingsPanel.tsx` holds the reveal.
-- Tests: `src/game/operatorForge.test.ts`, `e2e/operator-forge.spec.ts`.
+- `src/ui/OperatorForgePanel.tsx`: the Forge screen, with the custom slot grid.
+- `src/game/data/endgameUnlocks.ts`, `src/ui/EndgameSettings.tsx`, `src/ui/SettingsPager.tsx`: the end-game gate, switches and Settings pages.
+- `src/ui/OperatorInspector.tsx`: the zoom viewer, portaled to the body at z-[110] to sit above the floating Back and music buttons; `RigPortrait` has a `pixelScale` prop for crisp whole-number zoom.
+- Tests: `src/game/operatorForge.test.ts`, `src/game/endgameUnlocks.test.ts`, `e2e/operator-forge.spec.ts`, `e2e/endgame.spec.ts`, `e2e/operator-inspector.spec.ts`.
 
 ## Ideas not built
 
 - Letting forged operators wear their own forged look as a skin on an authored operator (kept out so far because it brushes against "nothing replaced").
 - Cosmetic species perks or lore lines in the roster.
 - Using the generator for hideout visitors and rescued allies.
-- Making the Forge a visible feature once the owner decides the hidden reveal has done its job.
+- Player-imported art as custom parts (designed in `docs/lokpet-creature-design.md`, not built).
 - Live registration without a reload.

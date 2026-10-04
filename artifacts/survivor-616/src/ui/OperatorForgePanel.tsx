@@ -5,17 +5,20 @@
  * and `game/data/forgedOperators.ts`). Revealed from Settings.
  */
 import { useCallback, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { CHARACTERS, CHARACTERS_BY_ID } from '@/game/data/characters';
 import { isForgeKit } from '@/game/data/forgedOperators';
 import {
-  BODY_BUILDS, FORGE_CATEGORIES, FORGE_GROUPS, HEIGHT_RANGE, MAX_FORGED_OPERATORS, OPERATOR_FLAVORS_LIST, PALETTE_KEYS,
-  PALETTE_SCHEMES, SKIN_TONES, SPECIES, WIDTH_RANGE, bodyFromBuild, buildOperatorRig, exportForgedOperator, featureLabel,
+  CORE_SPECIES, FACTION_SPECIES,
+  BODY_BUILDS, FORGE_CATEGORIES, FORGE_GROUPS, HEIGHT_RANGE, OPERATOR_FLAVORS_LIST, PALETTE_KEYS,
+  PALETTE_SCHEMES, SKIN_TONES, WIDTH_RANGE, bodyFromBuild, buildOperatorRig, exportForgedOperator, featureLabel,
   generateForgedOperator, generateOperatorDesign, generateOperatorIdentity, generatePalette, importForgedOperator,
   minWidthFor, newForgedId, rerollDesign, speciesById, type FeatureField, type ForgedOperator, type OperatorDesign,
   type OperatorFlavor, type PaletteSpec, type RerollTarget,
 } from '@/game/data/operatorForge';
-import { deleteForgedOperator, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
+import { deleteForgedOperator, earnedEndgameIds, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
+import { CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
 import { useMeta } from '@/game/state/metaStore';
 import type { AnimName } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
@@ -45,6 +48,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     [meta.unlockedCharacterIds, meta.devModeAllUnlocks],
   );
 
+  const factionRaces = useMemo(() => isFeatureEnabled('factionRaces'), []);
   const [seed, setSeed] = useState(() => freshSeed());
   const [genSpecies, setGenSpecies] = useState('');
   const [genFlavor, setGenFlavor] = useState('');
@@ -65,7 +69,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
   const loadSeed = useCallback(
     (nextSeed: string) => {
-      const options = { species: genSpecies || undefined, flavor: (genFlavor || undefined) as OperatorFlavor | undefined };
+      const options = { species: genSpecies || undefined, flavor: (genFlavor || undefined) as OperatorFlavor | undefined, coreOnly: !factionRaces };
       const nextDesign = generateOperatorDesign(nextSeed, options);
       setSeed(nextSeed);
       setDesign(nextDesign);
@@ -73,7 +77,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       setEditingId(null);
       setDirty(true);
     },
-    [genFlavor, genSpecies],
+    [genFlavor, genSpecies, factionRaces],
   );
 
   const reroll = (target: RerollTarget) => {
@@ -139,7 +143,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       createdAt: Date.now(),
     };
     if (!saveForgedOperator(op)) {
-      notify(`Could not save. The Forge holds up to ${MAX_FORGED_OPERATORS} operators, and this device may be out of storage.`);
+      notify('Could not save. Every custom slot you have earned is full (delete one to make room), or this device is out of storage.');
       return;
     }
     setEditingId(id);
@@ -149,7 +153,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   };
 
   const forgeBatch = (count: number) => {
-    if (kits.length === 0) return;
+    if (kits.length === 0 || count <= 0) return;
     const existing = new Set(loadForgedOperators().map((o) => o.id));
     let made = 0;
     for (let i = 0; i < count; i += 1) {
@@ -157,6 +161,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       const pickKit = kits[Math.floor(Math.random() * kits.length)]!;
       const op = generateForgedOperator(batchSeed, pickKit.id, existing, Date.now() + i, {
         species: genSpecies || undefined,
+        coreOnly: !factionRaces,
         flavor: (genFlavor || undefined) as OperatorFlavor | undefined,
       });
       existing.add(op.id);
@@ -218,13 +223,16 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   };
 
   const species = speciesById(design.species);
+  const earnedIds = earnedEndgameIds();
+  const slotsEarned = CUSTOM_SLOTS.filter((slot) => earnedIds.includes(slot.id)).length;
+  const freeSlots = Math.max(0, slotsEarned - saved.length);
 
-  return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-background text-white" data-testid="panel-operator-forge" role="dialog" aria-label="Operator Forge">
+  return createPortal(
+    <div className="fixed inset-0 z-[110] overflow-y-auto bg-background text-white" data-testid="panel-operator-forge" role="dialog" aria-label="Operator Forge">
       <div className="mx-auto max-w-6xl px-4 pb-24 pt-5 sm:px-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Hidden workshop</p>
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">End game workshop</p>
             <h1 className="mt-1 text-2xl font-black uppercase">Operator Forge</h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               Design new operators from scratch or generate them. Forged operators are extra roster entries: your existing
@@ -265,6 +273,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
               <p className="mt-3 text-xs text-muted-foreground" data-testid="text-forge-species">
                 {species.label}. {species.blurb}
+                {species.lore ? <span className="mt-1 block italic">{species.lore}</span> : null}
               </p>
             </section>
 
@@ -333,7 +342,14 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
                   <span className={LABEL}>Species</span>
                   <select className={FIELD} value={genSpecies} onChange={(e) => setGenSpecies(e.target.value)} data-testid="select-forge-species">
                     <option value="">Any</option>
-                    {SPECIES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
+                    <optgroup label="Species">
+                      {CORE_SPECIES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
+                    </optgroup>
+                    {factionRaces ? (
+                      <optgroup label="Faction races">
+                        {FACTION_SPECIES.map((s) => (<option key={s.id} value={s.id}>{s.label}</option>))}
+                      </optgroup>
+                    ) : null}
                   </select>
                 </label>
                 <label className="block">
@@ -351,7 +367,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" className={PRIMARY} onClick={() => loadSeed(freshSeed())} data-testid="button-forge-surprise">Surprise me</button>
                 <button type="button" className={BUTTON} onClick={() => loadSeed(seed.trim() || freshSeed())} data-testid="button-forge-from-seed">Generate from seed</button>
-                <button type="button" className={BUTTON} onClick={() => forgeBatch(5)} disabled={kits.length === 0} data-testid="button-forge-batch">Forge 5 random operators</button>
+                <button type="button" className={BUTTON} onClick={() => forgeBatch(freeSlots)} disabled={kits.length === 0 || freeSlots === 0} data-testid="button-forge-batch">{freeSlots === 0 ? 'No free slots' : `Fill ${freeSlots} free slot${freeSlots === 1 ? '' : 's'} randomly`}</button>
               </div>
             </section>
 
@@ -475,28 +491,70 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
             <section className="border border-border bg-card p-4" data-testid="section-forge-saved">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-black uppercase tracking-wide">Your forged operators ({saved.length}/{MAX_FORGED_OPERATORS})</h2>
+                <h2 className="text-sm font-black uppercase tracking-wide">Custom slots ({Math.min(saved.length, slotsEarned)}/{slotsEarned} used, {CUSTOM_SLOTS.length} total)</h2>
               </div>
-              {saved.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">Nothing forged yet. Save the operator in the preview to start.</p>
-              ) : (
-                <ul className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="list-forge-saved">
-                  {saved.map((op) => (
-                    <li key={op.id} className="flex gap-3 border border-border/70 bg-background/50 p-3" data-testid={`item-forge-${op.id}`}>
-                      <RigPortrait rig={buildOperatorRig(op.design)} palette={op.design.palette} size={72} animated={false} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black uppercase">{op.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{op.handle} - kit: {CHARACTERS_BY_ID[op.kitId]?.name ?? 'missing'}</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <button type="button" className={BUTTON} onClick={() => edit(op)}>Edit</button>
-                          <button type="button" className={BUTTON} onClick={() => void copyCode(op)}>Copy code</button>
-                          <button type="button" className={BUTTON} onClick={() => remove(op)}>Delete</button>
+              <p className="mt-1 text-xs text-muted-foreground">Each slot holds one operator you made, built on a copy of a premade operator&apos;s kit. Your premade operators are never replaced.</p>
+              <ul className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="list-forge-saved">
+                {(() => {
+                  let cursor = 0;
+                  return CUSTOM_SLOTS.map((slot) => {
+                    if (!earnedIds.includes(slot.id)) {
+                      return (
+                        <li key={slot.id} className="border border-dashed border-border/70 bg-background/30 p-3 opacity-80" data-testid={`slot-locked-${slot.id}`}>
+                          <p className="text-sm font-black uppercase">{slot.label} <span className="font-mono text-[10px] tracking-widest text-muted-foreground">locked</span></p>
+                          <p className="text-xs text-muted-foreground">{slot.how}{endgameReached(meta) ? '' : ' Clear every standard map first.'}</p>
+                        </li>
+                      );
+                    }
+                    const op = saved[cursor];
+                    cursor += 1;
+                    if (!op) {
+                      return (
+                        <li key={slot.id} className="border border-dashed border-amber-300/50 bg-amber-300/5 p-3" data-testid={`slot-empty-${slot.id}`}>
+                          <p className="text-sm font-black uppercase">{slot.label} <span className="font-mono text-[10px] tracking-widest text-amber-200">empty</span></p>
+                          <p className="text-xs text-muted-foreground">Save the operator in the preview to fill this slot.</p>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={slot.id} className="flex gap-3 border border-amber-300/40 bg-background/50 p-3" data-testid={`item-forge-${op.id}`}>
+                        <RigPortrait rig={buildOperatorRig(op.design)} palette={op.design.palette} size={72} animated={false} />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-[9px] uppercase tracking-widest text-amber-200">{slot.label}</p>
+                          <p className="truncate text-sm font-black uppercase">{op.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{op.handle} - kit: {CHARACTERS_BY_ID[op.kitId]?.name ?? 'missing'}</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <button type="button" className={BUTTON} onClick={() => edit(op)}>Edit</button>
+                            <button type="button" className={BUTTON} onClick={() => void copyCode(op)}>Copy code</button>
+                            <button type="button" className={BUTTON} onClick={() => remove(op)}>Delete</button>
+                          </div>
                         </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                      </li>
+                    );
+                  });
+                })()}
+              </ul>
+              {saved.length > slotsEarned ? (
+                <div className="mt-4" data-testid="list-forge-extra">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Made before slots existed (kept, not lost)</p>
+                  <ul className="mt-2 grid gap-3 sm:grid-cols-2">
+                    {saved.slice(slotsEarned).map((op) => (
+                      <li key={op.id} className="flex gap-3 border border-border/70 bg-background/50 p-3" data-testid={`item-forge-${op.id}`}>
+                        <RigPortrait rig={buildOperatorRig(op.design)} palette={op.design.palette} size={72} animated={false} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-black uppercase">{op.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{op.handle}</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            <button type="button" className={BUTTON} onClick={() => edit(op)}>Edit</button>
+                            <button type="button" className={BUTTON} onClick={() => void copyCode(op)}>Copy code</button>
+                            <button type="button" className={BUTTON} onClick={() => remove(op)}>Delete</button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <div className="mt-4">
                 <span className={LABEL}>Import a share code</span>
                 <div className="mt-1 flex flex-col gap-2 sm:flex-row">
@@ -508,6 +566,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
