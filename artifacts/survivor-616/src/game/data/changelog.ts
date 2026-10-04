@@ -275,6 +275,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A chosen path shows everywhere the pet appears: the run, the arena, Run Setup and the Hideout strip. Nothing changes for existing pets until you choose, and stats still follow the form, not the path.',
     ],
   },
+  {
+    version: '0.11.3',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Language Support',
+    body: [
+      'The title screen, the hideout rooms and part of Settings can now be translated. Translations are made automatically, so some wording will be off, and anything not translated yet stays in English.',
+      'The game follows your browser or phone language by default, and switches on its own if you change it. A Language option at the top of Settings lets you pin any language, or go back to Match my device.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

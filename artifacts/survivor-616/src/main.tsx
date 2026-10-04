@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import './index.css';
 import { restoreUiTransparency } from '@/ui/UiTransparencyControls';
 import { applyMotionMode } from '@/anim/motion';
+import { initLocalization } from '@/lib/i18n';
 
 function describeUnknown(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -69,13 +70,19 @@ installRuntimeDiagnostics();
 restoreUiTransparency();
 applyMotionMode();
 
-createRoot(document.getElementById('root')!, {
-  // Keeps caught errors off reportError(), which would raise the dev overlay.
-  onCaughtError: (error, errorInfo) => {
-    console.error(error, errorInfo.componentStack);
-  },
-}).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>,
-);
+function mount(): void {
+  createRoot(document.getElementById('root')!, {
+    // Keeps caught errors off reportError(), which would raise the dev overlay.
+    onCaughtError: (error, errorInfo) => {
+      console.error(error, errorInfo.componentStack);
+    },
+  }).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>,
+  );
+}
+
+// English needs no network and mounts immediately. A saved non-English choice
+// loads its file first, so the title screen never flashes English.
+void initLocalization().finally(mount);

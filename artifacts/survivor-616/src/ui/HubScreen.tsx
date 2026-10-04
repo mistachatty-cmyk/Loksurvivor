@@ -34,6 +34,7 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
+import { useT } from '@/lib/i18n';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
@@ -59,27 +60,28 @@ export interface HubScreenProps {
   onBack?: () => void;
 }
 
-const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string; description: string }> = {
-  runs: { label: 'Head out', icon: ArrowRight, testId: 'button-open-runs', description: 'Hit the streets' },
-  roster: { label: 'Roster', icon: Users, testId: 'button-open-roster', description: 'Choose your fighter' },
-  bestiary: { label: 'Bestiary', icon: Skull, testId: 'button-open-bestiary', description: 'Known threats' },
-  unlocks: { label: 'Archive', icon: Unlock, testId: 'button-open-unlocks', description: 'Progress & secrets' },
-  music: { label: 'Soundtrack', icon: Music, testId: 'button-open-music', description: 'Set the mood' },
-  studio: { label: 'Studio', icon: RadioTower, testId: 'button-open-studio', description: 'Remix & record' },
-  recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
-  vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
-  kennel: { label: 'K9 Counter', icon: Dog, testId: 'button-open-kennel', description: 'Rapid Guard’s rotating kennel' },
-  workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
-  'card-shop': { label: 'Lock Pack Counter', icon: CreditCard, testId: 'button-open-card-shop', description: 'Open packs & build your Lock Deck' },
-  'weapon-bans': { label: 'Studio 28', icon: Clapperboard, testId: 'button-open-weapon-bans', description: "Tonight's ban list" },
-  settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
-  'palette-store': { label: 'Customization Shop', icon: Palette, testId: 'button-open-palette-store', description: 'Palettes & run auras' },
-  'sound-booth': { label: 'The Sound Booth', icon: Disc3, testId: 'button-open-sound-booth', description: 'Buy & preview SFX packs' },
-  account: { label: 'Account', icon: Mail, testId: 'button-open-account', description: 'Waitlist & sign in' },
-  feedback: { label: 'Feedback', icon: MessageSquareHeart, testId: 'button-open-feedback', description: 'Ideas & bug reports' },
-  'threat-matrix': { label: 'Threat Matrix', icon: ShieldAlert, testId: 'button-open-threat-matrix', description: 'Override & quarantine enemies' },
-  'dust-mite-rancher': { label: 'Dust Mite Rancher', icon: Bug, testId: 'button-open-dust-mite-rancher', description: 'Barnaby’s pure data-pet ranch · adopt & feed' },
-  'director-terminal': { label: 'Director Terminal', icon: ScanEye, testId: 'button-open-director-terminal', description: 'Read and select Director personalities' },
+// Text for every room lives in locales/en.json under hub.room.<id>.label and .description.
+const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
+  runs: { icon: ArrowRight, testId: 'button-open-runs' },
+  roster: { icon: Users, testId: 'button-open-roster' },
+  bestiary: { icon: Skull, testId: 'button-open-bestiary' },
+  unlocks: { icon: Unlock, testId: 'button-open-unlocks' },
+  music: { icon: Music, testId: 'button-open-music' },
+  studio: { icon: RadioTower, testId: 'button-open-studio' },
+  recovery: { icon: Waves, testId: 'button-open-recovery' },
+  vendor: { icon: Package, testId: 'button-open-vendor' },
+  kennel: { icon: Dog, testId: 'button-open-kennel' },
+  workshop: { icon: Hammer, testId: 'button-open-workshop' },
+  'card-shop': { icon: CreditCard, testId: 'button-open-card-shop' },
+  'weapon-bans': { icon: Clapperboard, testId: 'button-open-weapon-bans' },
+  settings: { icon: Settings2, testId: 'button-open-settings' },
+  'palette-store': { icon: Palette, testId: 'button-open-palette-store' },
+  'sound-booth': { icon: Disc3, testId: 'button-open-sound-booth' },
+  account: { icon: Mail, testId: 'button-open-account' },
+  feedback: { icon: MessageSquareHeart, testId: 'button-open-feedback' },
+  'threat-matrix': { icon: ShieldAlert, testId: 'button-open-threat-matrix' },
+  'dust-mite-rancher': { icon: Bug, testId: 'button-open-dust-mite-rancher' },
+  'director-terminal': { icon: ScanEye, testId: 'button-open-director-terminal' },
 };
 
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
@@ -120,6 +122,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
+  const t = useT();
   const { session } = useAuth();
   const { balance: lokBalance } = useLokEconomy();
   // Memoized so the palette object identity stays stable across re-renders
@@ -268,10 +271,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         onClick={() => setShowLorePopup(true)}
         className="fixed left-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 rounded-sm border border-red-500/80 bg-red-950/90 px-3.5 font-mono text-[10px] font-bold uppercase tracking-wider text-red-200 shadow-[0_0_15px_rgba(239,68,68,0.25)] backdrop-blur transition hover:border-red-400 hover:bg-red-900/90 hover:text-white sm:left-5 sm:top-5"
         data-testid="button-hub-mission-briefing"
-        title="Classified Intel & Digi-Verse Lore"
+        title={t('hub.missionBriefingTitle')}
       >
         <ShieldAlert className="h-4 w-4 text-red-400" />
-        <span>MISSION BRIEFING</span>
+        <span>{t('hub.missionBriefing')}</span>
       </button>
 
       <button
@@ -279,10 +282,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         onClick={onOpenRunSetup}
         className="fixed right-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
         data-testid="button-open-run-setup"
-        title="Change LokPets and looks anytime"
+        title={t('hub.looksLokpetsTitle')}
       >
         <Sparkles className="h-4 w-4 text-cyan-200" />
-        <span>Looks &amp; LokPets</span>
+        <span>{t('common.looksLokpets')}</span>
       </button>
       {/* Mobile-only: the full Head Out tile lives at the bottom of a screen
           that can scroll several pages on a phone -- this keeps the primary
@@ -391,15 +394,15 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   data-testid="button-hub-back-to-intro"
                 >
                   <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                  Back
+                  {t('common.back')}
                 </button>
               )}
-              <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">The Sanctum</p>
-              <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">Hideout</h1>
+              <p className="text-primary text-xs uppercase tracking-[0.3em] font-bold mb-2">{t('hub.kicker')}</p>
+              <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-md">{t('hub.title')}</h1>
             </div>
             <div className="text-left sm:text-right border-l-2 sm:border-l-0 sm:border-r-2 border-primary pl-4 sm:pl-0 sm:pr-4">
               <div className="mb-1 flex items-center gap-1.5 justify-start sm:justify-end">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">Session Stats</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">{t('hub.sessionStats')}</p>
                 <button
                   type="button"
                   onClick={() => setShowCurrencyGlossary((value) => !value)}
@@ -792,9 +795,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   )}
                   <Icon className={`w-8 h-8 ${isPrimary ? 'text-primary-foreground' : 'text-primary group-hover:text-white transition-colors'}`} />
                   <div className="relative z-10">
-                    <h3 className={`text-2xl font-black uppercase tracking-tight ${isPrimary ? 'text-primary-foreground' : 'text-white'}`}>{config.label}</h3>
+                    <h3 className={`text-2xl font-black uppercase tracking-tight ${isPrimary ? 'text-primary-foreground' : 'text-white'}`}>{t(`hub.room.${feature as HubPanel}.label`)}</h3>
                     <p className={`text-xs uppercase tracking-wider mt-1 ${isPrimary ? 'text-primary-foreground/80' : 'text-muted-foreground group-hover:text-gray-300'}`}>
-                      {config.description}
+                      {t(`hub.room.${feature as HubPanel}.description`)}
                     </p>
                   </div>
                 </button>

@@ -48,6 +48,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "@lok/auto-l10n": "workspace:*",
     "@lok/recap": "workspace:*",
     "@workspace/api-client-react": "workspace:*",
     "@workspace/lok-client": "workspace:*",

@@ -15,6 +15,7 @@ import { LorePopup } from '@/ui/LorePopup';
 import { CHANGELOG, CURRENT_VERSION, updateNumber } from '@/game/data/changelog';
 import { pickCreditName } from '@/game/data/creditRotation';
 import { IntroTitle } from '@/ui/IntroTitle';
+import { useT } from '@/lib/i18n';
 import { FireflyEasterEgg } from '@/ui/FireflyEasterEgg';
 import { MotionNotice } from '@/ui/MotionToggle';
 import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset, useIntroPhysicsResetVisible } from '@/ui/introPhysics';
@@ -45,6 +46,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   // Same `available` gate every other account surface in this codebase
   // uses (AccountPanel, AccountNudge) -- stays invisible until auth is
   // actually configured, and never shown to someone already signed in.
+  const t = useT();
   const { available, session } = useAuth();
   const showSignIn = Boolean(onSignIn) && available && !session;
   const { meta, cycleStarterUiLook, checkHiddenThemeReload } = useMeta();
@@ -181,7 +183,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             data-testid="button-begin"
           >
             <div className="absolute inset-0 translate-y-[100%] bg-white transition-transform duration-300 ease-out group-hover:translate-y-[0%]" />
-            <span className="relative z-10 transition-colors duration-300 group-hover:text-black">Enter the hideout</span>
+            <span className="relative z-10 transition-colors duration-300 group-hover:text-black">{t('intro.enterHideout')}</span>
           </motion.button>
 
           {/* Mission Briefing Button (matches theme from screenshot) */}
@@ -242,7 +244,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-black/90 p-4 py-6 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
-            aria-label="Game updates"
+            aria-label={t('intro.updates.aria')}
             data-testid="section-intro-updates-popup"
           >
             <motion.div
@@ -256,7 +258,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
                 type="button"
                 onClick={() => setShowUpdatesModal(false)}
                 className="absolute right-3 top-3 grid h-9 w-9 place-items-center border border-white/20 bg-black/70 text-white transition-all active:scale-[0.97] hover:border-white/50"
-                aria-label="Dismiss update notice"
+                aria-label={t('intro.updates.dismissAria')}
                 data-testid="button-close-intro-updates-popup"
               >
                 <X className="h-4 w-4" />
@@ -268,7 +270,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
                   <p className="font-mono text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
                     A Message From {credit}
                   </p>
-                  <h2 className="text-2xl font-black uppercase text-white">Updates & Patch Notes</h2>
+                  <h2 className="text-2xl font-black uppercase text-white">{t('intro.updates.heading')}</h2>
                 </div>
               </div>
               <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">

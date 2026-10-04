@@ -1,0 +1,23 @@
+{
+  "dir": "src/locales",
+  "source": "en",
+  "engine": "google,argos",
+  "targets": ["es", "fr", "de", "pt-BR", "ja", "ko", "zh-CN"],
+  "glossary": [
+    "Survivor616",
+    "616 Survivor",
+    "LokPet",
+    "LokPets",
+    "LokTokens",
+    "Lok",
+    "Lock Deck",
+    "Studio 28",
+    "K9",
+    "Rapid Guard",
+    "Barnaby",
+    "Digi-Verse",
+    "GSix"
+  ],
+  "keep": [],
+  "delayMs": 1300
+}

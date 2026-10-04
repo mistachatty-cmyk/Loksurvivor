@@ -9,11 +9,12 @@
  */
 export type FightStyle = 'classic' | 'quick' | 'duo' | 'arena';
 
-export const FIGHT_STYLES: Array<{ id: FightStyle; label: string; blurb: string }> = [
-  { id: 'classic', label: 'Classic', blurb: 'The original card-throw popup. Throw a Battle Deck card or a punch.' },
-  { id: 'quick', label: 'Quick', blurb: 'Your lead LokPet, three moves, at most eight rounds, next enemy move shown.' },
-  { id: 'duo', label: 'Duo', blurb: 'Operator and LokPet fight together: pick a LokPet move and an operator assist every round.' },
-  { id: 'arena', label: 'Arena', blurb: 'The full battle: every move including finishers, Cheer, up to twenty rounds.' },
+/** Display text for each style lives in locales/en.json under settings.fightStyle.<id>.label and .blurb. */
+export const FIGHT_STYLES: Array<{ id: FightStyle }> = [
+  { id: 'classic' },
+  { id: 'quick' },
+  { id: 'duo' },
+  { id: 'arena' },
 ];
 
 const KEY = 'survivor616.fightstyle';
