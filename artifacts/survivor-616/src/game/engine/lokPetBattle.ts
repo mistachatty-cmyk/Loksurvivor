@@ -20,12 +20,12 @@ import {
   getLokPetEvolutionTitle,
   rollLokPet,
 } from '@/game/data/lokPets';
+import { applyPetExp, getExpForLevel, scalePetExp } from '@/game/engine/petExpCurve';
+import { evolvedLook, petEvolvedLook } from '@/game/engine/petEvolution';
+import { petBattleName } from '@/game/engine/petGrowth';
 import type { LokPetElement, SavedLokPet } from '@/game/types';
 
-/** Experience required for next level: quadratic curve */
-export function getExpForLevel(level: number): number {
-  return Math.floor(50 * Math.pow(level, 1.4));
-}
+export { getExpForLevel };
 
 /** Assign 4 battle moves based on pet element, variant, level, and evolution stage */
 export function assignBattleMoves(
@@ -163,6 +163,8 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   const expToNext = getExpForLevel(level);
   const stage = getLokPetEvolutionStage(level, savedPet.starter);
   const stageMult = stage === 3 ? 1.3 : stage === 2 ? 1.15 : 1.0;
+  // A chosen branch renames and re-dresses the later forms; stats still follow the stage only.
+  const look = petEvolvedLook(savedPet);
 
   // Scaled stats
   const baseHp = roll.stats?.health || 100;
@@ -200,10 +202,11 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   return {
     id: `battle-${savedPet.id}-${Date.now()}`,
     originalSavedPetId: savedPet.id,
-    name: roll.name,
+    // The battle name (slot 2) when earned, otherwise the call name, otherwise the species.
+    name: petBattleName(savedPet),
     variantId: roll.variantId,
     silhouette: roll.silhouette,
-    palette: roll.palette,
+    palette: look.palette,
     family: roll.family,
     element: roll.element,
     elementLabel: roll.elementLabel,
@@ -227,7 +230,9 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
     equippedTrinket: savedPet.equippedTrinket,
     starter: savedPet.starter,
     evolutionStage: stage,
-    evolutionTitle: getLokPetEvolutionTitle(roll.variantId, stage),
+    evolutionTitle: look.title,
+    ...(look.overlays.length > 0 ? { evolutionOverlays: look.overlays } : {}),
+    ...(savedPet.evolutionPath ? { evolutionBranchId: savedPet.evolutionPath.branchId } : {}),
   };
 }
 
@@ -593,6 +598,7 @@ export function executeMove(
   if (!isPlayer) {
     next.turn += 1;
     applyEndOfTurnEffects(next);
+    resolveStatusFaints(next);
   }
 
   return next;
@@ -744,6 +750,41 @@ function applyEndOfTurnEffects(state: BattleState): void {
 }
 
 /**
+ * Burn, shock and corrupt ticks can drop a pet to 0 HP. Without this, that pet sat at
+ * 0 HP un-fainted and the fight could never end on a status tick. The enemy side is
+ * settled first, so a tick that ends both teams at once is a win for the player.
+ */
+function resolveStatusFaints(state: BattleState): void {
+  const settle = (side: 'enemy' | 'player'): boolean => {
+    const team = side === 'enemy' ? state.enemyTeam : state.playerTeam;
+    const index = side === 'enemy' ? state.activeEnemyIndex : state.activePlayerIndex;
+    const pet = team[index];
+    if (!pet || pet.fainted || pet.hp > 0) return false;
+    pet.fainted = true;
+    state.combatLog.unshift({ id: `log-faint-status-${side}-${Date.now()}`, text: `${pet.name} has collapsed!`, type: 'system', timestamp: Date.now() });
+    if (team.every((p) => p.fainted)) {
+      state.phase = side === 'enemy' ? 'victory' : 'defeat';
+      if (side === 'enemy') state.rewards = calculateBattleRewards(state);
+      return true;
+    }
+    const nextIndex = team.findIndex((p) => !p.fainted);
+    if (nextIndex !== -1) {
+      if (side === 'enemy') state.activeEnemyIndex = nextIndex;
+      else state.activePlayerIndex = nextIndex;
+      state.combatLog.unshift({
+        id: `log-switch-status-${side}-${Date.now()}`,
+        text: side === 'enemy' ? `Opponent sent out ${team[nextIndex]!.name}!` : `Go, ${team[nextIndex]!.name}!`,
+        type: 'switch',
+        timestamp: Date.now(),
+      });
+    }
+    return false;
+  };
+  if (settle('enemy')) return;
+  settle('player');
+}
+
+/**
  * Picks the move the opponent will use this turn. Split out from
  * executeEnemyAi so a quick fight can show the player what is coming (the
  * telegraph) and then play exactly that move. `rand` only decides the
@@ -786,7 +827,7 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
   let baseCred = 150;
   let baseCardCredits = 25;
   let baseTreats = 1;
-  let baseExp = 120;
+  let baseExp = scalePetExp(120);
   let badgeId: string | undefined;
   let badgeName: string | undefined;
 
@@ -798,34 +839,41 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
       baseTreats = tier.rewards.treats;
       badgeId = tier.rewards.badgeId;
       badgeName = tier.rewards.badgeName;
-      baseExp = 150 * tier.tierNumber;
+      baseExp = scalePetExp(150 * tier.tierNumber);
     }
   } else if (state.gameMode === 'endless-gauntlet') {
     baseCred = 300;
     baseCardCredits = 50;
     baseTreats = 2;
-    baseExp = 250;
+    baseExp = scalePetExp(250);
   }
 
   const levelUps: BattleRewards['levelUps'] = [];
+  const petResults: BattleRewards['petResults'] = [];
 
   for (const pet of state.playerTeam) {
     const oldLevel = pet.level;
-    pet.exp += baseExp;
-    let newLevel = oldLevel;
-    const maxLevel = pet.starter ? 99 : 50;
-    while (pet.exp >= pet.expToNext && newLevel < maxLevel) {
-      pet.exp -= pet.expToNext;
-      newLevel += 1;
-      pet.expToNext = getExpForLevel(newLevel);
-    }
+    const grown = applyPetExp({ level: oldLevel, exp: pet.exp, starter: pet.starter }, baseExp);
+    const newLevel = grown.level;
+    pet.exp = grown.exp;
+    pet.expToNext = getExpForLevel(newLevel);
+    petResults.push({ petId: pet.id, level: newLevel, exp: grown.exp });
     if (newLevel > oldLevel) {
       pet.level = newLevel;
       const oldStage = getLokPetEvolutionStage(oldLevel, pet.starter);
       const newStage = getLokPetEvolutionStage(newLevel, pet.starter);
       const evolved = newStage > oldStage;
       pet.evolutionStage = newStage;
-      pet.evolutionTitle = getLokPetEvolutionTitle(pet.variantId, newStage);
+      const grownLook = evolvedLook({
+        variantId: pet.variantId,
+        family: pet.family,
+        name: LOKPET_VARIANTS.find((variant) => variant.id === pet.variantId)?.name ?? pet.name,
+        palette: pet.palette,
+        level: newLevel,
+        starter: pet.starter,
+        branchId: pet.evolutionBranchId,
+      });
+      pet.evolutionTitle = pet.evolutionBranchId ? grownLook.title : getLokPetEvolutionTitle(pet.variantId, newStage);
       pet.moves = assignBattleMoves(pet.variantId, pet.element, newLevel, newStage);
       if (evolved) {
         pet.maxHp = Math.floor(pet.maxHp * 1.15);
@@ -856,5 +904,6 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
     badgeId,
     badgeName,
     levelUps,
+    petResults,
   };
 }

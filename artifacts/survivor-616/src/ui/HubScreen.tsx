@@ -14,7 +14,9 @@ import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { CollapsibleSection } from './CollapsibleSection';
-import { HideoutPreview } from './HideoutPreview';
+import { HideoutPreview, type HideoutPetInfo } from './HideoutPreview';
+import { petEvolvedLook } from '@/game/engine/petEvolution';
+import { bondRankFor, petCallName } from '@/game/engine/petGrowth';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -118,7 +120,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const { session } = useAuth();
@@ -129,6 +131,32 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   // baked-frame cache off this object's identity, so an unmemoized recompute
   // here silently defeated that cache and tore down HideoutPreview's canvas
   // effect every poll tick for no reason.
+  // The pets that walk the strip beside the operator: the starter partner always, then the
+  // selected loadout, capped for readability. Settings can narrow this to the partner or none.
+  const hideoutPets = useMemo<HideoutPetInfo[]>(() => {
+    if (meta.hideoutPets === 'off') return [];
+    const starter = meta.savedLokPets.find((pet) => pet.starter);
+    const loadout = meta.savedLokPets.filter((pet) => !pet.starter && meta.selectedLokPetIds.includes(pet.id));
+    const walkers = meta.hideoutPets === 'companion' ? [starter ?? loadout[0]] : [starter, ...loadout];
+    return walkers
+      .filter((pet): pet is NonNullable<typeof pet> => Boolean(pet))
+      .slice(0, 4)
+      .map((pet) => {
+        // A chosen evolution branch re-dresses the pet on the strip too.
+        const look = petEvolvedLook(pet);
+        return {
+          id: pet.id,
+          name: petCallName(pet),
+          youName: pet.names?.callsYou,
+          silhouette: pet.roll.silhouette,
+          palette: look.palette,
+          overlays: look.overlays,
+          sizeScale: (pet.roll.sizeScale ?? 1) * look.scale,
+          bondRank: bondRankFor(pet.bond).id,
+          history: pet.hideoutEvents,
+        };
+      });
+  }, [meta.savedLokPets, meta.selectedLokPetIds, meta.hideoutPets]);
   const selectedCharacterPalette = useMemo(
     () => resolveCharacterCosmeticPalette(
       selectedCharacter,
@@ -277,7 +305,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       )}
       {companion && (
         <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
-          <LokPetIcon silhouette={companion.roll.silhouette} palette={companion.roll.palette} size={42} />
+          <LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={42} />
           <div className="min-w-0">
             <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p>
             <p className="font-mono text-[8px] uppercase tracking-wider text-white/55">
@@ -347,6 +375,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             rig={selectedCharacter.rig}
             palette={selectedCharacterPalette}
             className="mb-6 -mx-6 w-auto sm:mx-0 sm:w-full"
+            pets={hideoutPets}
+            weather={scene.weather}
+            eventsMode={meta.hideoutEvents}
+            onPetCare={careForLokPet}
+            onPetEvent={completeHideoutEvent}
+            firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
           />
         )}
         <header className="mb-8">

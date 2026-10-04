@@ -132,6 +132,7 @@ function initialScreen(): Screen {
     if (requested === 'summary' && params.get('fixture') === 'lokpet-archive') {
       return { name: 'summary', result: createLokPetArchiveFixtureResult() };
     }
+    if (requested === 'run-setup') return { name: 'run-setup', destination: 'hub' };
     if (requested === 'lokpet-battle') return { name: 'lokpet-battle' };
     if (requested === 'starter-lokpet-encounter') return { name: 'starter-lokpet-encounter' };
     if (

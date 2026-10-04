@@ -1,4 +1,5 @@
 import type {
+  EvolutionOverlayId,
   LokPetElement,
   LokPetFamily,
   LokPetPalette,
@@ -67,6 +68,10 @@ export interface BattlePet {
   starter?: boolean;
   evolutionStage?: 1 | 2 | 3;
   evolutionTitle?: string;
+  /** Overlay parts from a chosen evolution branch (see engine/petEvolution.ts). */
+  evolutionOverlays?: EvolutionOverlayId[];
+  /** Chosen branch id, so a level-up keeps the branch's title and look. */
+  evolutionBranchId?: string;
 }
 
 export interface BattleLogEntry {
@@ -126,6 +131,8 @@ export interface BattleRewards {
   expEarned: number;
   badgeId?: string;
   badgeName?: string;
+  /** Final level and XP remainder for every pet on the team, so the remainder is saved too. */
+  petResults: Array<{ petId: string; level: number; exp: number }>;
   levelUps: Array<{
     petId: string;
     petName: string;

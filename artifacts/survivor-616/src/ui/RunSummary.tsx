@@ -17,6 +17,7 @@ import { WeaponIcon } from './WeaponIcon';
 import { AccountNudge } from './AccountNudge';
 import { AnimatedNumber } from './AnimatedNumber';
 import { ShareRecapButton } from './ShareRecapButton';
+import { PetGrowthRecap } from './PetGrowthRecap';
 import type { GameRunSummaryLike } from '@lok/recap';
 import { loadMediaAssets } from '@/game/audio/localMediaStore';
 import { lazy, Suspense, useEffect, useState } from 'react';
@@ -744,6 +745,8 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
                 <p className="mt-2 text-[11px] text-muted-foreground">Notably rare. Spend them at the hideout Quartermaster.</p>
               </div>
             )}
+
+            <PetGrowthRecap entries={result.petGrowth ?? []} />
 
             {hasLokPetProgress && (
               <div className="border border-pink-400/30 bg-card p-5 md:col-span-2" data-testid="section-lokpets">

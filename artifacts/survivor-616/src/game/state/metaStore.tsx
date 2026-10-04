@@ -70,7 +70,10 @@ import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game
 import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
-import { getExpForLevel } from '@/game/engine/lokPetBattle';
+import { getExpForLevel } from '@/game/engine/petExpCurve';
+import { HIDEOUT_EVENTS_BY_ID } from '@/game/data/hideoutEvents';
+import { chooseBranch, normalizeEvolutionPath, undoBranch } from '@/game/engine/petEvolution';
+import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDayKey, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
@@ -148,7 +151,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 21;
+const META_VERSION = 22;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -287,6 +290,8 @@ export function createInitialMeta(): MetaState {
     hideoutArrivalEnabled: true,
     hideoutSectionsCollapsedByDefault: false,
     hideoutPreviewEnabled: true,
+    hideoutPets: 'all',
+    hideoutEvents: 'on',
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
@@ -868,7 +873,7 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
     const candidate = entry as Partial<SavedLokPet>;
     const roll = candidate.roll;
     if (!roll || typeof roll !== 'object' || typeof candidate.id !== 'string' || typeof roll.variantId !== 'string' || typeof roll.name !== 'string') return [];
-    return [{
+    const pet: SavedLokPet = {
       id: candidate.id,
       roll: roll as SavedLokPet['roll'],
       stamina: Math.max(0, Math.min(PET_STAMINA_MAX, counter(candidate.stamina))),
@@ -883,10 +888,40 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
         ? Math.max(0, candidate.lastFreeRefreshAt)
         : undefined,
       name: typeof candidate.name === 'string' && candidate.name.trim().length > 0
-        ? candidate.name.trim().slice(0, 24)
+        ? sanitizePetName(candidate.name) || undefined
         : undefined,
-    }];
+      names: normalizePetNames(candidate.names),
+      bond: typeof candidate.bond === 'number' && Number.isFinite(candidate.bond) && candidate.bond > 0 ? Math.min(100000, Math.floor(candidate.bond)) : undefined,
+      careDay: typeof candidate.careDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.careDay) ? candidate.careDay : undefined,
+      hideoutEvents: normalizeHideoutEventHistory(candidate.hideoutEvents),
+      bondDay: typeof candidate.bondDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.bondDay) ? candidate.bondDay : undefined,
+      bondToday: typeof candidate.bondToday === 'number' && Number.isFinite(candidate.bondToday) && candidate.bondToday > 0 ? Math.min(1000, Math.floor(candidate.bondToday)) : undefined,
+      evolutionPath: isRecord(candidate.evolutionPath) && typeof candidate.evolutionPath.branchId === 'string' && typeof candidate.evolutionPath.chosenAt === 'number'
+        ? { branchId: candidate.evolutionPath.branchId, chosenAt: candidate.evolutionPath.chosenAt }
+        : undefined,
+    };
+    // Drops a path that is malformed or no longer applies to this pet.
+    return [normalizeEvolutionPath(pet)];
   }).slice(0, 48);
+}
+
+function normalizeHideoutEventHistory(value: unknown): SavedLokPet['hideoutEvents'] {
+  if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value)
+    .filter(([id, at]) => id.length > 0 && id.length <= 40 && typeof at === 'number' && Number.isFinite(at) && at > 0)
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
+    .slice(0, 40);
+  return entries.length > 0 ? (Object.fromEntries(entries) as Record<string, number>) : undefined;
+}
+
+function normalizePetNames(value: unknown): SavedLokPet['names'] {
+  if (!isRecord(value)) return undefined;
+  const out: NonNullable<SavedLokPet['names']> = {};
+  for (const key of ['battle', 'callsYou', 'epithet', 'trueName'] as const) {
+    const clean = typeof value[key] === 'string' ? sanitizePetName(value[key]) : '';
+    if (clean) out[key] = clean;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function refreshStarterLokPets(pets: SavedLokPet[], now: number): SavedLokPet[] {
@@ -1184,6 +1219,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       : !(typeof window !== 'undefined' && window.localStorage.getItem('survivor616.attractMode') === 'off'),
     hideoutSectionsCollapsedByDefault: parsed.hideoutSectionsCollapsedByDefault === true,
     hideoutPreviewEnabled: parsed.hideoutPreviewEnabled !== false,
+    hideoutPets: parsed.hideoutPets === 'companion' || parsed.hideoutPets === 'off' ? parsed.hideoutPets : 'all',
+    hideoutEvents: parsed.hideoutEvents === 'quiet' || parsed.hideoutEvents === 'off' ? parsed.hideoutEvents : 'on',
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
@@ -1805,10 +1842,11 @@ type Action =
   | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[] }
   | { type: 'toggleFavoriteLokPet'; id: string }
   | { type: 'renameLokPet'; id: string; name: string }
+  | { type: 'setLokPetName'; id: string; slot: PetNameSlot; name: string }
   | { type: 'claimDailyLogin'; now: number }
   | { type: 'equipLokPetTrinket'; id: string; trinketId?: string }
   | { type: 'draftStarterLokPets' }
-  | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; characterId: string; now: number }
+  | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; characterId: string; now: number; callName?: string }
   | { type: 'clearLastRun' }
   | { type: 'clearCardPackReveal' }
   | { type: 'markOnboarded' }
@@ -1862,6 +1900,12 @@ type Action =
   | { type: 'setHideoutWeather'; enabled: boolean }
   | { type: 'setHideoutSectionsCollapsedByDefault'; enabled: boolean }
   | { type: 'setHideoutPreview'; enabled: boolean }
+  | { type: 'setHideoutPets'; mode: MetaState['hideoutPets'] }
+  | { type: 'setHideoutEvents'; mode: MetaState['hideoutEvents'] }
+  | { type: 'careForLokPet'; id: string; now: number }
+  | { type: 'chooseLokPetBranch'; id: string; branchId: string; now: number }
+  | { type: 'undoLokPetBranch'; id: string; now: number }
+  | { type: 'completeHideoutEvent'; petId: string; eventId: string; now: number }
   | { type: 'setHideoutStickyHeadOut'; enabled: boolean }
   | { type: 'setSplashTextEnabled'; enabled: boolean }
   | { type: 'setOneLineTitleEnabled'; enabled: boolean }
@@ -1923,7 +1967,42 @@ function addUnique(list: string[], value?: string): string[] {
   return [...list, value];
 }
 
+/**
+ * Achievements are derived (never stored), so a completion toast is derived too: any
+ * achievement that is complete after an action but was not before it. Only that
+ * transition announces, so existing saves never get a flood of old completions.
+ */
+function withAchievementToasts(before: StoreState, after: StoreState): StoreState {
+  if (after.meta === before.meta) return after;
+  const fresh = ACHIEVEMENTS.filter((a) => a.isComplete(after.meta) && !a.isComplete(before.meta)
+    && !after.meta.pendingNotifications.some((n) => n.id === `achievement-${a.id}`));
+  if (fresh.length === 0) return after;
+  const now = Date.now();
+  return {
+    ...after,
+    meta: {
+      ...after.meta,
+      pendingNotifications: [
+        ...after.meta.pendingNotifications,
+        ...fresh.map((a) => ({
+          id: `achievement-${a.id}`,
+          title: `Achievement: ${a.name}`,
+          body: a.reward ? `${a.description} Claim your reward in the Archive.` : a.description,
+          createdAt: now,
+        })),
+      ],
+    },
+  };
+}
+
 export function reducer(state: StoreState, action: Action): StoreState {
+  const next = coreReducer(state, action);
+  // Swapping the whole save (reset, import) is not earning anything, so it never toasts.
+  if (action.type === 'reset' || action.type === 'replaceMeta') return next;
+  return withAchievementToasts(state, next);
+}
+
+function coreReducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
     case 'selectCharacter': {
       const character = CHARACTERS.find((candidate) => candidate.id === action.id);
@@ -2133,6 +2212,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const bestiary = action.result.opponentKind === 'enemy' && action.result.enemyId
         ? { ...state.meta.bestiary, [action.result.enemyId]: (state.meta.bestiary[action.result.enemyId] ?? 0) + 1 }
         : state.meta.bestiary;
+      const travelNow = Date.now();
+      // Only wins pay (by design), and they train the pets that are out, starter first.
+      const travelGrowth = growPartyPets(state.meta.savedLokPets, state.meta.selectedLokPetIds, TRAVEL_WIN_EXP_BASE, 'travel', travelNow);
+      const travelHeadlines = growthHeadlines(travelGrowth.entries);
       return {
         ...state,
         meta: {
@@ -2140,7 +2223,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
           bestiary,
           cred: state.meta.cred + action.result.rewardCred,
           cardCredits: state.meta.cardCredits + action.result.rewardCardCredits,
-          savedLokPets: [...caughtPet, ...state.meta.savedLokPets].slice(0, 48),
+          savedLokPets: [...caughtPet, ...travelGrowth.pets].slice(0, 48),
+          pendingNotifications: travelHeadlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-travel-${travelNow}`, title: 'Your pets grew', body: travelHeadlines.join('. ') + '.', createdAt: travelNow }]
+            : state.meta.pendingNotifications,
         },
       };
     }
@@ -2164,15 +2250,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (state.meta.lokPetTreats < 1) return state;
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
       if (!pet) return state;
-      const curLvl = pet.level || 1;
-      const curExp = (pet.exp || 0) + 75;
-      let newLvl = curLvl;
-      let remExp = curExp;
-      const maxLevel = pet.starter ? 99 : 50;
-      while (remExp >= getExpForLevel(newLvl) && newLvl < maxLevel) {
-        remExp -= getExpForLevel(newLvl);
-        newLvl += 1;
-      }
+      const now = Date.now();
+      const grown = growPet(pet, { exp: scalePetExp(TREAT_EXP_BASE), bondSource: 'treat', now });
+      const headlines = growthHeadlines(grown.entry ? [grown.entry] : []);
       return {
         ...state,
         meta: {
@@ -2180,14 +2260,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
           lokPetTreats: state.meta.lokPetTreats - 1,
           savedLokPets: state.meta.savedLokPets.map((candidate) =>
             candidate.id === action.id
-              ? {
-                  ...candidate,
-                  stamina: Math.min(PET_STAMINA_MAX, candidate.stamina + 1),
-                  level: newLvl,
-                  exp: remExp,
-                }
+              ? { ...grown.pet, stamina: Math.min(PET_STAMINA_MAX, candidate.stamina + 1) }
               : candidate,
           ),
+          pendingNotifications: headlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-treat-${action.id}-${now}`, title: 'Treat time', body: headlines.join('. ') + '.', createdAt: now }]
+            : state.meta.pendingNotifications,
         },
       };
     }
@@ -2248,13 +2326,22 @@ export function reducer(state: StoreState, action: Action): StoreState {
         badges.push(rewards.badgeId);
         leagueTier = Math.max(leagueTier, badges.length);
       }
+      const now = Date.now();
       const updatedSaved = state.meta.savedLokPets.map((candidate) => {
         if (!winningPetIds.includes(candidate.id)) return candidate;
         const levelUp = rewards.levelUps.find((l) => l.petId.includes(candidate.id));
-        const newLevel = levelUp ? levelUp.newLevel : (candidate.level || 1);
+        // The engine reports the final level AND the XP remainder; saving both is what
+        // stops XP from vanishing between battles.
+        const result = rewards.petResults?.find((r) => r.petId.includes(candidate.id));
+        const newLevel = result ? result.level : levelUp ? levelUp.newLevel : (candidate.level || 1);
+        const bond = applyBond(candidate, 'battle', now);
         return {
           ...candidate,
           level: newLevel,
+          ...(result ? { exp: result.exp } : {}),
+          bond: bond.bond,
+          bondDay: bond.bondDay,
+          bondToday: bond.bondToday,
           battlesWon: (candidate.battlesWon || 0) + 1,
           battlesFought: (candidate.battlesFought || 0) + 1,
         };
@@ -2286,17 +2373,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
-    case 'renameLokPet': {
-      const trimmed = action.name.trim().slice(0, 24);
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          savedLokPets: state.meta.savedLokPets.map((p) =>
-            p.id === action.id ? { ...p, name: trimmed || undefined } : p,
-          ),
-        },
-      };
+    case 'renameLokPet':
+    case 'setLokPetName': {
+      // Plain renames are the call name (slot 1). A locked slot leaves the pet unchanged.
+      const slot: PetNameSlot = action.type === 'setLokPetName' ? action.slot : 'call';
+      let changed = false;
+      const savedLokPets = state.meta.savedLokPets.map((p) => {
+        if (p.id !== action.id) return p;
+        const next = setPetName(p, slot, action.name);
+        if (next !== p) changed = true;
+        return next;
+      });
+      return changed ? { ...state, meta: { ...state.meta, savedLokPets } } : state;
     }
 
     case 'claimDailyLogin': {
@@ -2373,6 +2461,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
         favorite: true,
         starter: true,
         lastFreeRefreshAt: action.now,
+        // The partner's call name is the one name that is free from day one (optional).
+        name: sanitizePetName(action.callName) || undefined,
       };
       const pack = CARD_SHOP_PACKS_BY_ID.lokpet;
       const rng = createRng((action.now ^ 0x616) >>> 0);
@@ -3061,6 +3151,80 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setHideoutPreview':
       return { ...state, meta: { ...state.meta, hideoutPreviewEnabled: action.enabled } };
 
+    case 'setHideoutPets':
+      return { ...state, meta: { ...state.meta, hideoutPets: action.mode } };
+
+    case 'setHideoutEvents':
+      return { ...state, meta: { ...state.meta, hideoutEvents: action.mode } };
+
+    case 'chooseLokPetBranch': {
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet) return state;
+      const change = chooseBranch(pet, action.branchId, action.now);
+      if (!change.ok) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.id ? change.pet : candidate)) },
+      };
+    }
+
+    case 'undoLokPetBranch': {
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet) return state;
+      const change = undoBranch(pet, action.now);
+      if (!change.ok) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.id ? change.pet : candidate)) },
+      };
+    }
+
+    case 'careForLokPet': {
+      // Petting a companion in the hideout: it always plays, but only the first of the day counts for bond.
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet) return state;
+      const day = bondDayKey(action.now);
+      if (pet.careDay === day) return state;
+      const grown = growPet(pet, { exp: 0, bondSource: 'care', now: action.now });
+      const headlines = growthHeadlines(grown.entry ? [grown.entry] : []);
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.id ? { ...grown.pet, careDay: day } : candidate)),
+          pendingNotifications: headlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-care-${action.id}-${action.now}`, title: 'A good day together', body: headlines.join('. ') + '.', createdAt: action.now }]
+            : state.meta.pendingNotifications,
+        },
+      };
+    }
+
+    case 'completeHideoutEvent': {
+      const def = HIDEOUT_EVENTS_BY_ID[action.eventId];
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.petId);
+      if (!def || !pet) return state;
+      const last = pet.hideoutEvents?.[def.id];
+      if (last !== undefined && (def.once || action.now - last < def.cooldownMs)) return state;
+      const grown = growPet(pet, {
+        exp: scalePetExp(def.reward?.exp ?? 0),
+        bondSource: def.reward?.bond === false ? undefined : 'event',
+        now: action.now,
+      });
+      const seen = { ...(pet.hideoutEvents ?? {}), [def.id]: action.now };
+      const kept = Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, 40);
+      const headlines = growthHeadlines(grown.entry ? [grown.entry] : []);
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.petId ? { ...grown.pet, hideoutEvents: Object.fromEntries(kept) } : candidate)),
+          pendingNotifications: headlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-event-${action.petId}-${action.now}`, title: def.title, body: headlines.join('. ') + '.', createdAt: action.now }]
+            : state.meta.pendingNotifications,
+        },
+      };
+    }
+
     case 'setHideoutStickyHeadOut':
       return { ...state, meta: { ...state.meta, hideoutStickyHeadOutEnabled: action.enabled } };
 
@@ -3397,11 +3561,15 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
       const recoveredElixirs = replenishPetElixirs(prev);
       const spentPetIds = new Set(prev.selectedLokPetIds);
+      const runNow = Date.now();
+      // Pets that were out earn XP and bond for the run: the starter partner always,
+      // plus the loadout. Growth is applied before the stamina cost below.
+      const runGrowth = growPartyPets(prev.savedLokPets, spentPetIds, runPetExpBase(result), 'run', runNow);
       const savedLokPets = [
         ...result.lokPets
           .filter((pet) => pet.origin === 'chest')
           .map((pet, index) => ({ id: `pet-${Date.now().toString(36)}-${index}-${pet.variantId}`, roll: pet.roll, stamina: PET_STAMINA_MAX })),
-        ...prev.savedLokPets.map((pet) => spentPetIds.has(pet.id) && !pet.starter ? { ...pet, stamina: Math.max(0, pet.stamina - 1) } : pet),
+        ...runGrowth.pets.map((pet) => spentPetIds.has(pet.id) && !pet.starter ? { ...pet, stamina: Math.max(0, pet.stamina - 1) } : pet),
       ].slice(0, 48);
       const selectedLokPetIds = prev.selectedLokPetIds.filter((id) => savedLokPets.some((pet) => pet.id === id && (('starter' in pet && pet.starter) || pet.stamina > 0)));
       const lokPetDiscoveries = getLokPetDiscoveries(prev.lokPetCatalog, result.lokPets);
@@ -3572,6 +3740,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         lastCardPackReveal: state.lastCardPackReveal,
         lastRun: {
           ...result,
+          petGrowth: runGrowth.entries,
           lokPetDiscoveries,
           newlyUnlockedCharacterIds: newlyUnlocked,
           newlyDiscoveredRelicIds: discoveredRelic && !prev.knownRelicIds.includes(discoveredRelic.id)
@@ -3633,10 +3802,11 @@ export interface MetaContextValue {
   recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[]) => void;
   toggleFavoriteLokPet: (id: string) => void;
   renameLokPet: (id: string, name: string) => void;
+  setLokPetName: (id: string, slot: PetNameSlot, name: string) => void;
   claimDailyLogin: () => void;
   equipLokPetTrinket: (id: string, trinketId?: string) => void;
   draftStarterLokPets: () => void;
-  completeStarterLokPetOnboarding: (variantId: StarterLokPetId, characterId: string) => void;
+  completeStarterLokPetOnboarding: (variantId: StarterLokPetId, characterId: string, callName?: string) => void;
   clearLastRun: () => void;
   clearCardPackReveal: () => void;
   markOnboarded: () => void;
@@ -3693,6 +3863,12 @@ export interface MetaContextValue {
   setHideoutWeather: (enabled: boolean) => void;
   setHideoutSectionsCollapsedByDefault: (enabled: boolean) => void;
   setHideoutPreview: (enabled: boolean) => void;
+  setHideoutPets: (mode: MetaState['hideoutPets']) => void;
+  setHideoutEvents: (mode: MetaState['hideoutEvents']) => void;
+  careForLokPet: (id: string) => void;
+  chooseLokPetBranch: (id: string, branchId: string) => void;
+  undoLokPetBranch: (id: string) => void;
+  completeHideoutEvent: (petId: string, eventId: string) => void;
   setHideoutStickyHeadOut: (enabled: boolean) => void;
   setSplashTextEnabled: (enabled: boolean) => void;
   setOneLineTitleEnabled: (enabled: boolean) => void;
@@ -3806,6 +3982,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const toggleFavoriteLokPet = useCallback((id: string) => dispatch({ type: 'toggleFavoriteLokPet', id }), []);
   const renameLokPet = useCallback((id: string, name: string) => dispatch({ type: 'renameLokPet', id, name }), []);
+  const setLokPetName = useCallback((id: string, slot: PetNameSlot, name: string) => dispatch({ type: 'setLokPetName', id, slot, name }), []);
   const claimDailyLogin = useCallback(() => dispatch({ type: 'claimDailyLogin', now: Date.now() }), []);
   const equipLokPetTrinket = useCallback(
     (id: string, trinketId?: string) => dispatch({ type: 'equipLokPetTrinket', id, trinketId }),
@@ -3813,7 +3990,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const draftStarterLokPets = useCallback(() => dispatch({ type: 'draftStarterLokPets' }), []);
   const completeStarterLokPetOnboarding = useCallback(
-    (variantId: StarterLokPetId, characterId: string) => dispatch({ type: 'completeStarterLokPetOnboarding', variantId, characterId, now: Date.now() }),
+    (variantId: StarterLokPetId, characterId: string, callName?: string) => dispatch({ type: 'completeStarterLokPetOnboarding', variantId, characterId, now: Date.now(), callName }),
     [],
   );
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
@@ -3904,6 +4081,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setHideoutPreview', enabled }),
     [],
   );
+  const setHideoutPets = useCallback((mode: MetaState['hideoutPets']) => dispatch({ type: 'setHideoutPets', mode }), []);
+  const setHideoutEvents = useCallback((mode: MetaState['hideoutEvents']) => dispatch({ type: 'setHideoutEvents', mode }), []);
+  const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
+  const chooseLokPetBranch = useCallback((id: string, branchId: string) => dispatch({ type: 'chooseLokPetBranch', id, branchId, now: Date.now() }), []);
+  const undoLokPetBranch = useCallback((id: string) => dispatch({ type: 'undoLokPetBranch', id, now: Date.now() }), []);
+  const completeHideoutEvent = useCallback((petId: string, eventId: string) => dispatch({ type: 'completeHideoutEvent', petId, eventId, now: Date.now() }), []);
   const setHideoutStickyHeadOut = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutStickyHeadOut', enabled }),
     [],
@@ -4098,6 +4281,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       recordLokPetBattleResult,
       toggleFavoriteLokPet,
       renameLokPet,
+      setLokPetName,
       claimDailyLogin,
       equipLokPetTrinket,
       draftStarterLokPets,
@@ -4155,6 +4339,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutWeather,
       setHideoutSectionsCollapsedByDefault,
       setHideoutPreview,
+      setHideoutPets,
+      setHideoutEvents,
+      careForLokPet,
+      chooseLokPetBranch,
+      undoLokPetBranch,
+      completeHideoutEvent,
       setHideoutStickyHeadOut,
       setSplashTextEnabled,
       setOneLineTitleEnabled,
@@ -4239,6 +4429,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     recordLokPetBattleResult,
     toggleFavoriteLokPet,
     renameLokPet,
+    setLokPetName,
     claimDailyLogin,
     equipLokPetTrinket,
     draftStarterLokPets,
@@ -4296,6 +4487,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutWeather,
     setHideoutSectionsCollapsedByDefault,
     setHideoutPreview,
+    setHideoutPets,
+    setHideoutEvents,
+    careForLokPet,
+    chooseLokPetBranch,
+    undoLokPetBranch,
+    completeHideoutEvent,
     setHideoutStickyHeadOut,
     setSplashTextEnabled,
     setOneLineTitleEnabled,
