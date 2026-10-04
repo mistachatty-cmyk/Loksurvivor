@@ -39,3 +39,7 @@ Status: **waiting on the AI Studio push** (not yet in the repo as of 2026-10-04)
 - Veteran system for enemies.
 
 Note: avoid the word "signal" in all new content (see CLAUDE.md).
+
+## Intake status (2026-10-04)
+- User's AI Studio download lives at `C:\Users\glory\Downloads\loksurvivor 1.9` on their own machine — not reachable from this cloud session. Needs to be uploaded (zip) or pushed to a branch.
+- Versioning rule recorded in CLAUDE.md (patch bumps for minor/hotfix, middle rolls at 10).
