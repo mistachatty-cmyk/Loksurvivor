@@ -1,8 +1,9 @@
 # LokPet RPG, Bonds, Hideout Companions and the DIGI-Tower: plan
 
 Status: **plan only, nothing built yet.** Written 2026-10-04 against v0.10.9
-(`META_VERSION` 21). It answers the owner's requests of 16:53 and 16:57, and
-every number in it is a starting point to tune in playtests, not a decision.
+(`META_VERSION` 21). It answers the owner's requests of 16:53, 16:57 and 17:16
+(Limit Break), and every number in it is a starting point to tune in playtests,
+not a decision.
 
 Rules that apply to everything below (from `CLAUDE.md`, the handoff doc and the
 owner's standing instructions):
@@ -33,6 +34,8 @@ owner's standing instructions):
 | Expand operator levels; operators gain LokPet-exclusive stats and levels | 8 Operator levels and Handler track |
 | DIGI-Tower: random, planned and faction enemies, Digi Masters, earnables; practice and pet leveling | 10 DIGI-Tower |
 | Achievements and expansion | 11 Achievements |
+| Limit Break for pets (max trust and max level, with a cost, leveling forever, extra benefits) | 8A Limit Break and the long ladder |
+| More normal names for base levels; after the Limit Break, levels to 1000 with crazier names and badges, continuing forever | 8A Limit Break and the long ladder |
 | Anything else recommended | 12 Recommended extras |
 
 ---
@@ -85,6 +88,13 @@ These are small, and the rest of the plan stands on them.
    `docs/lokpets.md` still describes chest-only temporary pets.
 5. **Run setup picks one pet** even for Collectors with more slots. Make it match
    the roster screen's multi-select.
+6. **Pet XP sources are tiny next to the pet XP curve.** Reaching level 50 needs
+   about 255,000 cumulative XP and level 99 about 1.3 million, but a battle pays 120
+   to 250 and a treat 75. Today levels really come from ranch kibble (+1 level for
+   cred). Before adding more XP sources, run a pacing pass (a small simulation test)
+   and either raise the sources about 10x or flatten the curve, aiming for roughly:
+   level 30 in two weeks of casual play, level 50 in two months, a companion at 99 in
+   about six months. Limit Break (below) depends on this being right.
 
 ---
 
@@ -286,7 +296,9 @@ setting turns them down or off.
 
 ### 8.1 Expand Mastery
 
-- **More ranks past Mythic (35):** Ascendant (50), Paragon (75), Eternal (100).
+- **A fuller, more ordinary rank ladder for levels 1 to 99** (details in 8A). Today there
+  are only five titles over 35 levels and nothing after Mythic. The five existing
+  titles stay exactly where they are; ordinary titles are added between and after them.
 - **Milestone perks every 5 levels:** pick 1 of 2 from a perk list. To avoid authoring
   69 operators x N perks, perks come from a shared pool filtered by the operator's
   crew or kit type, plus one **signature perk** for authored operators over time.
@@ -316,6 +328,134 @@ team-slot bonuses are unchanged and unrelated to this track.
 
 The one engine hook: count each pet's kills and damage during a run (a small field on
 the in-run pet), so the run result can report them. Everything else is data and save.
+
+---
+
+## 8A. Limit Break and the long ladder
+
+The owner wants levels that never really end: operators and pets that reach the cap can
+**Limit Break** and keep leveling, with crazier names and special badges, up to 1000,
+and then continue forever until more is authored.
+
+### 8A.1 Base ladder: ordinary names for levels 1 to 99 (operators)
+
+Today the only titles are Rookie (1), Veteran (5), Elite (10), Legend (20) and Mythic
+(35), then nothing. Those five stay exactly where they are (nothing replaced). Ordinary
+titles fill the gaps and run to 99:
+
+| Level | Title | Level | Title |
+| :--- | :--- | :--- | :--- |
+| 1 | Rookie (existing) | 42 | Champion |
+| 3 | Trainee | 50 | Master |
+| 5 | Veteran (existing) | 58 | Grandmaster |
+| 8 | Regular | 66 | Marshal |
+| 10 | Elite (existing) | 75 | High Marshal |
+| 14 | Specialist | 85 | Sovereign |
+| 17 | Expert | 95 | Apex |
+| 20 | Legend (existing) | 99 | Peak (Limit Break ready) |
+| 26 | Captain | | |
+| 30 | Commander | | |
+| 35 | Mythic (existing) | | |
+
+The title shows on the roster tile, the Archive and the run summary, and a rank-up
+shows the existing notification. Pets keep their evolution titles and get a smaller
+ladder of their own (8A.5).
+
+### 8A.2 The Limit Break (the gate)
+
+**Operators:** Mastery level 99. **Pets:** the pet's level cap (50, or 99 for a
+starter) and a **Soulbound** bond. Each operator and each pet breaks the limit
+separately, as a short ceremony the owner can skip.
+
+| Cost (one time, per operator or pet) | Amount (to tune) |
+| :--- | :--- |
+| Cred | 250,000 for an operator, 150,000 for a pet |
+| Limit Cores | 3 (a new currency from Tower Masters, the Grandmaster and end-game goals) |
+| Pets only | 10 treats and an Evolution Core |
+
+Level-ups an operator earns after 99 and before breaking are **banked**, not wasted,
+and apply the moment it breaks. Nothing is lost by waiting. A pet that is not limit
+broken stays exactly as today.
+
+### 8A.3 Past 99: levels 100 to 1000, then forever
+
+- **The curve is gentle, not the old one.** The old mastery curve would need about 7
+  million in-run level-ups to reach 1000, which no one can do. After the break an
+  operator needs `60 + 0.5 x (level - 99)` level-ups per level: about 14,700 total to
+  reach 250, 64,000 to reach 500 and 257,000 to reach 1000. At about 35 level-ups a run
+  that is about 420 runs to 250, so 250 is a few months of regular play, 500 about a
+  year, and 1000 a long-term aspiration. A pacing simulation sets the real numbers.
+- **Pets** use a flattened XP curve after the break (about 8,000 XP per level rising
+  slowly), fed by the rebalanced XP sources, the Tower and Limit-only activities.
+- **Forever:** at 1000 the level keeps counting. Names and badges past 1000 follow a
+  generated scheme (below) until more are authored, so nobody ever hits a wall.
+- **Display:** the level badge supports four digits. Pets show their cap plus Limit
+  Level, for example "Lv 99 and LB 120", and the total counts toward ranks.
+
+### 8A.4 Names and badges: a name every 25 levels
+
+A named title every 25 levels, so each one is a goal. A **badge** with every title
+(the shape steps up every 100 levels), and a **milestone badge** with unique art every
+100 levels. These 36 names are drafts:
+
+| Level | Name | Level | Name | Level | Name |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| 100 | Limit Breaker | 400 | Fourfold | 700 | Seventh Heaven |
+| 125 | Overdrive | 425 | Voidrunner | 725 | Prismborn |
+| 150 | Redline | 450 | Halo Burn | 750 | Three Quarters Divine |
+| 175 | Surge Walker | 475 | Apex Predator | 775 | Nightlamp |
+| 200 | Double Century | 500 | Halfway to Forever | 800 | Octave |
+| 225 | Stormcaller | 525 | Starforged | 825 | Skybreaker |
+| 250 | Quarter Thousand | 550 | Gridwalker | 850 | Hollowfire |
+| 275 | Riverbreaker | 575 | Tidebinder | 875 | Zero Hour |
+| 300 | Triple Crown | 600 | Sixfold Crown | 900 | Nova |
+| 325 | Firecoil | 625 | Cometbearer | 925 | Eventide |
+| 350 | Neon Sovereign | 650 | Thunderhead | 950 | Last Light |
+| 375 | Skyward | 675 | Deepcache | 975 | Edge of Forever |
+| | | | | 1000 | The Thousand |
+
+Badges are drawn procedurally (rings, wings, crowns, flames, halos in the operator's
+palette), not bitmaps, like everything else. Each shows on the roster tile, nameplate,
+Archive and summary, and the 1000 badge has its own animated frame.
+
+**Past 1000 (until more is authored):** the title stays "The Thousand" with a star
+added every 100 levels, and the badge changes color every 1000 levels. It is data in
+`data/limitLadder.ts`, so adding real names later is adding rows, not changing code.
+
+### 8A.5 Pet Limit Break benefits
+
+Gains are bounded, so a limit-broken pet is better, never unbeatable (design rule 4):
+
+- **Power:** the run scaling from 3.2 gains up to a further +30% that approaches its
+  cap smoothly (`0.30 x (1 - e^(-LB/300))`), so early Limit levels matter most.
+- **Training cap:** each trainable stat's cap rises by 1 per 10 Limit Levels.
+- **Limit skills:** at Limit Level 10, 25, 50, 100, 250, 500 and 1000, pick one of two
+  skills (a stronger special, a second Bond Strike charge, a revive, a trail effect).
+- **Mega stage:** for non-starters, Limit Break is what unlocks a Mega form (starters
+  get it at their own milestone).
+- **Bond rewards:** a Limit Break ceremony hideout event, the true name glowing, and a
+  pet nameplate frame.
+- **Pet ladder:** Limit Ranks for pets, every 50 levels, with their own shorter names
+  and badges (for example Unbound, Overcharged, Ascendant, Radiant, Eternal), then the
+  same generated scheme past 1000.
+
+### 8A.6 Operator Limit Break benefits
+
+- Mastery stat caps rise on a soft curve (an extra +0.5 power and +100 max HP over
+  1000 levels, approaching the cap smoothly), so a level 1000 operator is stronger but
+  not a different game.
+- A **Limit perk** at 100, 250, 500 and 1000 (the same pick-one-of-two system as the
+  milestone perks), and a higher Handler level cap.
+- An aura and nameplate cosmetic tied to the current Limit title.
+- Achievements and a Limit Break entry in the Archive.
+
+### 8A.7 Risks
+
+- Limit Break is a long grind by design, so the pacing simulation and an easy way to
+  see "how far to the next name" (a progress bar on the roster tile) matter more than
+  any single number.
+- Saves: pet level caps and the mastery counter must stay clamped for anyone not
+  limit-broken, and a v21 save must load unchanged (a migration test checks both).
 
 ---
 
@@ -465,6 +605,10 @@ Today: 39 achievements, tiers only, manual claim, no completion toast. Plan:
 
 - **Saved pet** gains optional fields: bond, names (slots 2 to 5), `evolutionPath`,
   trained stat points, hideout events seen. All optional, so old saves load as before.
+- **Limit Break** adds: a limit-broken flag per operator and per pet, banked level-ups
+  for operators who pass 99 before breaking, Limit Cores as a currency, and pet level
+  caps that lift only for a limit-broken pet (so every existing save still clamps at
+  50 and 99 exactly as today).
 - **Meta** gains: tower progress and its three currencies, Handler data per operator,
   owned pet cosmetics. This is a `META_VERSION` bump (22) with `normalizeMeta` coverage
   and a migration test that loads a v21 save and checks nothing changed.
@@ -483,11 +627,12 @@ Today: 39 achievements, tiers only, manual claim, no completion toast. Plan:
 | 0.11.0 | Bond and Growth | Phase 0 fixes; pet XP from runs and travel; bond ranks; the five name slots and the companion naming prompt; Growth Recap; achievement categories and completion toast | Medium |
 | 0.11.1 | Hideout Companions | Pets in the walking strip, idle behaviors, personality, first 8 events, settings | Medium |
 | 0.11.2 | Evolutions | `LOKPET_EVOLUTIONS`, starter branches, evolution cinematic, undo | Medium to large |
-| 0.11.3 | Handlers | Mastery ranks past Mythic and milestone perks; Handler track and specialties; run pet scaling | Medium |
+| 0.11.3 | Handlers and Ranks | The 1 to 99 rank ladder with ordinary names; milestone perks; Handler track and specialties; run pet scaling | Medium |
 | 0.11.4 | DIGI-Tower I | Tower tab, floors 1 to 30, random, planned and faction floors, 3 Masters, practice, Training Data and stat training | Large |
-| 0.11.5 | DIGI-Tower II | Sectors 4 to 10, Tower Tokens shop and earnables, Watch mode, Companion Trials | Large |
-| 0.11.6 | Spectacle | Level-up Roulette, grant-cosmetic system, pet cosmetics, remaining hideout events | Medium |
-| 0.11.7 | Spire and Achievements II | Endless Spire, daily floor, the remaining achievements, Duo floors | Medium to large |
+| 0.11.5 | Limit Break | Limit Break for operators and pets, Limit Cores, the 100 to 1000 ladder and beyond, names, badges, limit skills (needs the first Masters for Cores) | Large |
+| 0.11.6 | DIGI-Tower II | Sectors 4 to 10, Tower Tokens shop and earnables, Watch mode, Companion Trials | Large |
+| 0.11.7 | Spectacle | Level-up Roulette, grant-cosmetic system, pet cosmetics, Limit Break cinematic, remaining hideout events | Medium |
+| 0.11.8 | Spire and Achievements II | Endless Spire, daily floor, the remaining achievements (including the Limit Break ones), Duo floors | Medium to large |
 
 Each phase is testable on its own and nothing in a later phase is needed to enjoy an
 earlier one. 0.11.0 comes first because every other phase reads bond, XP and names.
@@ -504,5 +649,8 @@ earlier one. 0.11.0 comes first because every other phase reads bond, XP and nam
 4. **Tower unlock.** Default: after the starter and a first win, with later sectors
    gated by league badges and sector 10 by the end game.
 5. **Master names and the sector list** are placeholders.
+6. **Limit Break.** Default: the same break for operators and pets (cap, max rank, a
+   one-time cost), levels to 1000, then endless; the 1 to 99 names, 36 Limit names and
+   badges in 8A are drafts to approve or rewrite.
 6. **Which animals first** and **Duo versus Arena as the default fight** are still
    open from before and still affect the LokPet roster work.
