@@ -18,6 +18,7 @@ import { UPGRADES, ALLIES_BY_ID } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, getLokPetEvolutionStage, rollLokPet } from '@/game/data/lokPets';
+import { evolvedLook } from '@/game/engine/petEvolution';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { SECTOR_STRUCTURES_BY_ID } from '@/game/data/sectorStructures';
@@ -3015,9 +3016,21 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
   const starterPartner = roll.specialAbility === 'cutify-getaway' || roll.specialAbility === 'null-consume' || roll.specialAbility === 'buzbee-pollen';
   // One rule for every caller: the same stage the arena and kennel show.
   const evolutionStage = getLokPetEvolutionStage(roll.level ?? 1, starterPartner);
+  // A chosen evolution branch (stage 2 and up) re-dresses the pet; no branch means the natural look.
+  const look = evolvedLook({
+    variantId: roll.variantId,
+    family: roll.family,
+    name: roll.name,
+    palette: roll.palette,
+    level: roll.level,
+    starter: starterPartner,
+    branchId: roll.evolutionBranchId,
+  });
   const pet: LokPetInstance = {
     ...roll,
-    sizeScale: (roll.sizeScale ?? 1) * (1 + (evolutionStage - 1) * 0.18),
+    palette: look.palette,
+    ...(look.overlays.length > 0 ? { evolutionOverlays: look.overlays } : {}),
+    sizeScale: (roll.sizeScale ?? 1) * (1 + (evolutionStage - 1) * 0.18) * look.scale,
     origin,
     uid: uid(w),
     x: w.player.x + Math.cos(orbitAngle) * (40 + index * 6),

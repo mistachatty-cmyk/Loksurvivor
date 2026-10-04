@@ -21,6 +21,7 @@ import {
   rollLokPet,
 } from '@/game/data/lokPets';
 import { applyPetExp, getExpForLevel, scalePetExp } from '@/game/engine/petExpCurve';
+import { evolvedLook, petEvolvedLook } from '@/game/engine/petEvolution';
 import { petBattleName } from '@/game/engine/petGrowth';
 import type { LokPetElement, SavedLokPet } from '@/game/types';
 
@@ -162,6 +163,8 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   const expToNext = getExpForLevel(level);
   const stage = getLokPetEvolutionStage(level, savedPet.starter);
   const stageMult = stage === 3 ? 1.3 : stage === 2 ? 1.15 : 1.0;
+  // A chosen branch renames and re-dresses the later forms; stats still follow the stage only.
+  const look = petEvolvedLook(savedPet);
 
   // Scaled stats
   const baseHp = roll.stats?.health || 100;
@@ -203,7 +206,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
     name: petBattleName(savedPet),
     variantId: roll.variantId,
     silhouette: roll.silhouette,
-    palette: roll.palette,
+    palette: look.palette,
     family: roll.family,
     element: roll.element,
     elementLabel: roll.elementLabel,
@@ -227,7 +230,9 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
     equippedTrinket: savedPet.equippedTrinket,
     starter: savedPet.starter,
     evolutionStage: stage,
-    evolutionTitle: getLokPetEvolutionTitle(roll.variantId, stage),
+    evolutionTitle: look.title,
+    ...(look.overlays.length > 0 ? { evolutionOverlays: look.overlays } : {}),
+    ...(savedPet.evolutionPath ? { evolutionBranchId: savedPet.evolutionPath.branchId } : {}),
   };
 }
 
@@ -859,7 +864,16 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
       const newStage = getLokPetEvolutionStage(newLevel, pet.starter);
       const evolved = newStage > oldStage;
       pet.evolutionStage = newStage;
-      pet.evolutionTitle = getLokPetEvolutionTitle(pet.variantId, newStage);
+      const grownLook = evolvedLook({
+        variantId: pet.variantId,
+        family: pet.family,
+        name: LOKPET_VARIANTS.find((variant) => variant.id === pet.variantId)?.name ?? pet.name,
+        palette: pet.palette,
+        level: newLevel,
+        starter: pet.starter,
+        branchId: pet.evolutionBranchId,
+      });
+      pet.evolutionTitle = pet.evolutionBranchId ? grownLook.title : getLokPetEvolutionTitle(pet.variantId, newStage);
       pet.moves = assignBattleMoves(pet.variantId, pet.element, newLevel, newStage);
       if (evolved) {
         pet.maxHp = Math.floor(pet.maxHp * 1.15);

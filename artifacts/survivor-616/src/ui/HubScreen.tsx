@@ -15,6 +15,7 @@ import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { CollapsibleSection } from './CollapsibleSection';
 import { HideoutPreview, type HideoutPetInfo } from './HideoutPreview';
+import { petEvolvedLook } from '@/game/engine/petEvolution';
 import { bondRankFor, petCallName } from '@/game/engine/petGrowth';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -137,16 +138,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     return walkers
       .filter((pet): pet is NonNullable<typeof pet> => Boolean(pet))
       .slice(0, 4)
-      .map((pet) => ({
-        id: pet.id,
-        name: petCallName(pet),
-        youName: pet.names?.callsYou,
-        silhouette: pet.roll.silhouette,
-        palette: pet.roll.palette,
-        sizeScale: pet.roll.sizeScale,
-        bondRank: bondRankFor(pet.bond).id,
-        history: pet.hideoutEvents,
-      }));
+      .map((pet) => {
+        // A chosen evolution branch re-dresses the pet on the strip too.
+        const look = petEvolvedLook(pet);
+        return {
+          id: pet.id,
+          name: petCallName(pet),
+          youName: pet.names?.callsYou,
+          silhouette: pet.roll.silhouette,
+          palette: look.palette,
+          overlays: look.overlays,
+          sizeScale: (pet.roll.sizeScale ?? 1) * look.scale,
+          bondRank: bondRankFor(pet.bond).id,
+          history: pet.hideoutEvents,
+        };
+      });
   }, [meta.savedLokPets, meta.selectedLokPetIds, meta.hideoutPets]);
   const selectedCharacterPalette = useMemo(
     () => resolveCharacterCosmeticPalette(
@@ -296,7 +302,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       )}
       {companion && (
         <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
-          <LokPetIcon silhouette={companion.roll.silhouette} palette={companion.roll.palette} size={42} />
+          <LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={42} />
           <div className="min-w-0">
             <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p>
             <p className="font-mono text-[8px] uppercase tracking-wider text-white/55">

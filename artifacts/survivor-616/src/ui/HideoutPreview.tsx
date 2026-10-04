@@ -24,7 +24,8 @@ import {
   temperamentFor,
   type HideoutEmote,
 } from '@/game/data/hideoutEvents';
-import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
+import { lokPetSpritePalette } from '@/game/data/lokPets';
+import { evolvedRig } from '@/game/engine/petEvolution';
 import {
   callPets,
   createHideoutPetState,
@@ -39,7 +40,7 @@ import {
 } from '@/game/engine/hideoutPets';
 import type { BondRankId } from '@/game/engine/petGrowth';
 import { drawRig } from '@/game/render/sprite';
-import type { HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
+import type { EvolutionOverlayId, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 /** What the strip needs to know about each pet that walks it. */
@@ -51,6 +52,8 @@ export interface HideoutPetInfo {
   youName?: string;
   silhouette: LokPetSilhouette;
   palette: LokPetPalette;
+  /** Overlay parts from a chosen evolution branch. */
+  overlays?: EvolutionOverlayId[];
   sizeScale?: number;
   bondRank: BondRankId;
   /** Events this pet already played: id -> last time (ms). */
@@ -182,12 +185,14 @@ export function HideoutPreview({
     };
 
     const petLook = (info: HideoutPetInfo) => {
-      let look = looks.get(info.id);
+      // Keyed by the look too, so choosing an evolution branch updates the strip without a remount.
+      const lookKey = `${info.id}|${info.overlays?.join(',') ?? ''}|${info.palette.accent}|${info.palette.glow}|${info.sizeScale ?? 1}`;
+      let look = looks.get(lookKey);
       if (!look) {
-        const petRig = lokPetRig(info.silhouette);
+        const petRig = evolvedRig(info.silhouette, info.overlays);
         const petScale = (cssH * 0.7 * 0.4 / petRig.pixelHeight) * Math.max(0.8, Math.min(1.35, info.sizeScale ?? 1));
         look = { rig: petRig, pal: lokPetSpritePalette(info.palette), scale: petScale, height: petRig.pixelHeight * petScale };
-        looks.set(info.id, look);
+        looks.set(lookKey, look);
       }
       return look;
     };
@@ -202,7 +207,7 @@ export function HideoutPreview({
         }
       }
       for (const id of [...states.keys()]) {
-        if (!wanted.some((info) => info.id === id)) { states.delete(id); looks.delete(id); }
+        if (!wanted.some((info) => info.id === id)) { states.delete(id); for (const key of [...looks.keys()]) if (key.startsWith(`${id}|`)) looks.delete(key); }
       }
       return wanted;
     };

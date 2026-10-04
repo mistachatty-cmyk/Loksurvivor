@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
+import { hasBranchToChoose, petEvolvedLook } from '@/game/engine/petEvolution';
 import { PetBondBadge, PetNamesPanel } from '@/ui/PetNamesPanel';
 import { petNameplate } from '@/game/engine/petGrowth';
 import { RigPortrait } from '@/ui/RigPortrait';
@@ -173,7 +174,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                   >
                     {selected ? <Check className="absolute right-3 top-3 h-4 w-4 text-pink-100" /> : null}
                     <div className="flex items-center gap-3">
-                      <LokPetIcon silhouette={pet.roll.silhouette} palette={pet.roll.palette} size={72} className="bg-black/60" />
+                      <LokPetIcon silhouette={pet.roll.silhouette} palette={petEvolvedLook(pet).palette} overlays={petEvolvedLook(pet).overlays} size={72} className="bg-black/60" />
                       <div className="min-w-0">
                         <p className="flex min-w-0 items-center gap-1.5 truncate text-base font-black uppercase">
                           <span className="truncate" data-testid={`run-setup-pet-name-${pet.id}`}>{petNameplate(pet)}</span>
@@ -193,6 +194,9 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                         </p>
                         <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-pink-200">{pet.roll.rarityLabel} · Lv {pet.level ?? 1} · {pet.stamina}/3 charge</p>
                         <PetBondBadge pet={pet} className="mt-1" />
+                        {hasBranchToChoose(pet) ? (
+                          <p className="mt-1 font-mono text-[9px] font-bold uppercase tracking-widest text-cyan-200" data-testid={`run-setup-path-ready-${pet.id}`}>Evolution path ready · Kennel</p>
+                        ) : null}
                         <p className="mt-2 text-xs text-white/55">{pet.roll.traitLabel}</p>
                       </div>
                     </div>

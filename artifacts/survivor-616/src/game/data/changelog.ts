@@ -264,6 +264,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings: choose which pets walk the strip (all, partner only, off) and how often events play (normal, rarely, off). Reduced motion keeps a still scene.',
     ],
   },
+  {
+    version: '0.11.2',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Evolution Paths',
+    body: [
+      'Once a LokPet reaches its second form you can pick an evolution path for it, from the new Evolution section of its profile in the Companion Kennel (it starts collapsed, and a small dot says a path is ready). Each starter has two paths with their own names and looks, such as Lil Llamà\'s Heart path (halo, softer glow) or Street path (armor plates, horns). Every other LokPet gets a path for its family, so the whole roster has a second way to grow.',
+      'Paths are optional. Skip them and your pet evolves exactly as before. Some paths ask for a bond rank or a few battle wins, and the panel shows what is missing. Picking plays a short charge-up and reveal that shows what changed (it skips straight to the result with reduced motion), and you can undo a pick for free for 24 hours.',
+      'A chosen path shows everywhere the pet appears: the run, the arena, Run Setup and the Hideout strip. Nothing changes for existing pets until you choose, and stats still follow the form, not the path.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
