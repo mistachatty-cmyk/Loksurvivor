@@ -185,6 +185,15 @@ export const CHANGELOG: ChangelogEntry[] = [
       'When a phone or computer asks apps to reduce motion, the title live feed, hideout rain and parallax, the walking operative and random visitors now stay still. The title screen shows a tap-to-fix notice, and Settings has an Always animate switch that keeps everything moving.',
     ],
   },
+  {
+    version: '0.10.5',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Studio 28 Filters',
+    body: [
+      'Studio 28 can now filter the weapon list by weapon type, by active or banned status, and by search, with Activate shown and Ban shown buttons that always leave at least one weapon lit.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

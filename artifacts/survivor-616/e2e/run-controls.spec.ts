@@ -9,6 +9,7 @@ test.describe('interactive run controls', () => {
         JSON.stringify({
           version: 8,
           onboarded: true,
+          hideoutArrivalEnabled: false,
           levelUpPausesEnabled: true,
           minimapVisible: true,
           minimapExpanded: true,
@@ -50,10 +51,10 @@ test.describe('interactive run controls', () => {
       'aria-pressed',
       'true',
     );
-    await expect(page.locator('[data-ui-theme="house"]')).toHaveAttribute('data-ui-swatch', 'lake-blue');
+    await expect(page.locator('[data-ui-theme="house"]').first()).toHaveAttribute('data-ui-swatch', 'lake-blue');
 
     await page.reload();
-    await expect(page.locator('[data-ui-theme="house"]')).toHaveAttribute('data-ui-swatch', 'lake-blue');
+    await expect(page.locator('[data-ui-theme="house"]').first()).toHaveAttribute('data-ui-swatch', 'lake-blue');
   });
 
   test('returns to the paused run after viewing settings', async ({ page }) => {
