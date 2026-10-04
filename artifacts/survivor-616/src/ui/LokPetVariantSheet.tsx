@@ -1,5 +1,6 @@
-import { LOKPET_VARIANTS, lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
-import type { LokPetPalette, LokPetSilhouette } from '@/game/types';
+import { LOKPET_VARIANTS, lokPetSpritePalette } from '@/game/data/lokPets';
+import { evolvedRig } from '@/game/engine/petEvolution';
+import type { EvolutionOverlayId, LokPetPalette, LokPetSilhouette } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
 
 export function LokPetIcon({
@@ -7,11 +8,14 @@ export function LokPetIcon({
   palette,
   size = 36,
   className = '',
+  overlays,
 }: {
   silhouette: LokPetSilhouette;
   palette: LokPetPalette;
   size?: number;
   className?: string;
+  /** Overlay parts from an evolution branch; omit for the natural look. */
+  overlays?: readonly EvolutionOverlayId[];
 }) {
   return (
     <div
@@ -25,7 +29,7 @@ export function LokPetIcon({
       }}
       aria-hidden="true"
     >
-      <RigPortrait rig={lokPetRig(silhouette)} palette={lokPetSpritePalette(palette)} anim="idle" size={size} />
+      <RigPortrait rig={evolvedRig(silhouette, overlays)} palette={lokPetSpritePalette(palette)} anim="idle" size={size} />
     </div>
   );
 }

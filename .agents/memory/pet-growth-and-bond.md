@@ -25,3 +25,11 @@
 ## Masters lore (lore only, not wired)
 
 `src/game/data/masterLore.ts` and `docs/LORE-masters.md`. Six ranks (Master, Sector Lead, Sector Mage, Sector Master, Master Divine, Digi-Master) crossed with nine callings (war, survival, civic, spiritual, commerce, invention, genius, culture, garden) and two realms (city, digi). The owner asked for leaders who are not about war: politicians, spiritual leaders, business people, inventors, geniuses, digi-realm versions of each, and digibeings who water and spread digiflowers ("Digiflowers bloom!"). All names are provisional placeholders and all fictional. One Digi-Master per Tower sector 1 to 10 is checked by a test. Add people as rows.
+
+## Evolution paths (v0.11.2)
+
+- **Additive by construction.** No path means the natural level-based form, bit for bit (a test checks every variant at several levels). A path only renames and re-dresses stage 2 and 3; battle stats still follow the stage, not the path.
+- **Data:** `data/lokPetEvolutions.ts`. A variant with its own branch rows uses only those; otherwise it gets its family's one generic branch (titles use `{name}`, filled with the variant's species name, not the rolled `roll.name`, which looks like "Pip · Moss Pouncer"). Add a legendary branch by adding a row with `appliesTo.variantIds`.
+- **Overlays** are `SpritePart` sets using the existing `crest` and `aura` keys, positioned from the rig's `pixelHeight`, built by `evolvedRig()` and cached by silhouette + overlay list. The sprite baker caches by rig identity, so never build a fresh rig object per frame.
+- **Undo:** free for 24 hours (not "the calendar day", so a late-night pick is not punished), then the path stays. Re-picking later is planned as an Evolution Core cost with the Tower. `normalizeEvolutionPath` drops a stale or malformed saved path on load.
+- **Trap:** a CSS grid with `auto` columns grew past its panel because of `truncate` text; the picker uses `grid-cols-[minmax(0,1fr)]`.

@@ -25,6 +25,8 @@ import {
 
 import { HANDHELD_DIGISCOPE_COST, useMeta } from '@/game/state/metaStore';
 import { RigPortrait } from '@/ui/RigPortrait';
+import { PetEvolutionPanel } from '@/ui/PetEvolutionPanel';
+import { evolvedRig, petEvolvedLook } from '@/game/engine/petEvolution';
 import {
   lokPetRig,
   lokPetSpritePalette,
@@ -348,9 +350,9 @@ export function LokPetBattleScreen({
     const activeEnemyPet = battleState.enemyTeam[battleState.activeEnemyIndex];
     const isPlayerTurn = battleState.currentTurnActor === 'player' && battleState.phase === 'select-action';
 
-    const playerRig = lokPetRig(activePlayerPet.silhouette);
+    const playerRig = evolvedRig(activePlayerPet.silhouette, activePlayerPet.evolutionOverlays);
 
-    const enemyRig = lokPetRig(activeEnemyPet.silhouette);
+    const enemyRig = evolvedRig(activeEnemyPet.silhouette, activeEnemyPet.evolutionOverlays);
 
     const isVictory = battleState.phase === 'victory';
     const isDefeat = battleState.phase === 'defeat';
@@ -1294,7 +1296,8 @@ export function LokPetBattleScreen({
             <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {meta.savedLokPets.map((pet) => {
                 const isSelected = selectedKennelPetId === pet.id;
-                const rig = lokPetRig(pet.roll.silhouette);
+                const look = petEvolvedLook(pet);
+                const rig = evolvedRig(pet.roll.silhouette, look.overlays);
 
                 return (
                   <div
@@ -1308,7 +1311,7 @@ export function LokPetBattleScreen({
                   >
                     <div className="flex items-center gap-3">
                       <div className="h-16 w-16 shrink-0 grid place-items-center rounded-lg border border-slate-800 bg-slate-950">
-                        {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(pet.roll.palette)} size={50} />}
+                        {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(look.palette)} size={50} />}
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -1343,7 +1346,8 @@ export function LokPetBattleScreen({
                 return <div className="text-center text-slate-400">No companion selected.</div>;
               }
 
-              const rig = lokPetRig(pet.roll.silhouette);
+              const look = petEvolvedLook(pet);
+              const rig = evolvedRig(pet.roll.silhouette, look.overlays);
               const level = pet.level || 1;
               const exp = pet.exp || 0;
               const expNext = getExpForLevel(level);
@@ -1368,7 +1372,7 @@ export function LokPetBattleScreen({
 
                   <div className="mt-4 flex flex-col items-center text-center">
                     <div className="h-28 w-28 grid place-items-center rounded-xl border border-slate-800 bg-slate-950 p-2">
-                      {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(pet.roll.palette)} size={90} />}
+                      {rig && <RigPortrait rig={rig} palette={lokPetSpritePalette(look.palette)} size={90} />}
                     </div>
                     <h3 className="mt-3 font-bold text-lg text-white">{pet.name ?? pet.roll.name}</h3>
                     <div className="mt-1 flex items-center gap-2">
@@ -1390,6 +1394,8 @@ export function LokPetBattleScreen({
                       />
                     </div>
                   </div>
+
+                  <PetEvolutionPanel pet={pet} />
 
                   {/* Feed Treat Button */}
                   <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950/60 p-3">

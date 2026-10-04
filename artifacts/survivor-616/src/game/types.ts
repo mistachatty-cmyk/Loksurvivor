@@ -43,6 +43,10 @@ export type PartKey =
   | 'crest'
   | 'aura';
 
+/** Small part sets an evolved LokPet can wear on top of its base rig (see data/lokPetEvolutions.ts). */
+export type EvolutionOverlayId =
+  | 'halo' | 'horns' | 'wings' | 'plates' | 'mane' | 'crown' | 'antennae' | 'spikes' | 'visor' | 'tail-flame';
+
 /** A rectangle in the sprite's local pixel grid (origin = feet center). */
 export interface SpritePart {
   key: PartKey;
@@ -203,6 +207,8 @@ export interface LokPetRoll {
   specialAbility?: LokPetSpecialAbility;
   /** Persistent companion level copied into a run for scaled starter behavior. */
   level?: number;
+  /** Evolution branch the player chose, copied into a run from the saved pet (see data/lokPetEvolutions.ts). */
+  evolutionBranchId?: string;
 }
 
 /** A captured, repeatable LokPet blueprint stored in the player's kennel. */
@@ -241,6 +247,12 @@ export interface SavedLokPet {
   hideoutEvents?: Record<string, number>;
   /** Bond earned on `bondDay`, against the daily cap. */
   bondToday?: number;
+  /**
+   * The evolution branch the player picked for this pet, and when. Absent means the pet
+   * follows its natural level-based form exactly as before. Everything else about its
+   * evolution is derived from this plus level, so old saves keep working.
+   */
+  evolutionPath?: { branchId: string; chosenAt: number };
 }
 
 /** One pet's line in the Growth Recap shown after a run (not persisted). */
@@ -341,6 +353,8 @@ export interface LokPetInstance extends LokPetRoll {
   specialActiveUntil: number;
   hp: number;
   maxHp: number;
+  /** Overlay parts an evolved companion wears (set at spawn from its chosen branch). */
+  evolutionOverlays?: EvolutionOverlayId[];
 }
 
 export type ObjectiveKind = 'kill-any' | 'kill-enemy' | 'survive-sec' | 'walk-blocks';

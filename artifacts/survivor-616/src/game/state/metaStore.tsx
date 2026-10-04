@@ -72,6 +72,7 @@ import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
 import { getExpForLevel } from '@/game/engine/petExpCurve';
 import { HIDEOUT_EVENTS_BY_ID } from '@/game/data/hideoutEvents';
+import { chooseBranch, normalizeEvolutionPath, undoBranch } from '@/game/engine/petEvolution';
 import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDayKey, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
@@ -872,7 +873,7 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
     const candidate = entry as Partial<SavedLokPet>;
     const roll = candidate.roll;
     if (!roll || typeof roll !== 'object' || typeof candidate.id !== 'string' || typeof roll.variantId !== 'string' || typeof roll.name !== 'string') return [];
-    return [{
+    const pet: SavedLokPet = {
       id: candidate.id,
       roll: roll as SavedLokPet['roll'],
       stamina: Math.max(0, Math.min(PET_STAMINA_MAX, counter(candidate.stamina))),
@@ -895,7 +896,12 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
       hideoutEvents: normalizeHideoutEventHistory(candidate.hideoutEvents),
       bondDay: typeof candidate.bondDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.bondDay) ? candidate.bondDay : undefined,
       bondToday: typeof candidate.bondToday === 'number' && Number.isFinite(candidate.bondToday) && candidate.bondToday > 0 ? Math.min(1000, Math.floor(candidate.bondToday)) : undefined,
-    }];
+      evolutionPath: isRecord(candidate.evolutionPath) && typeof candidate.evolutionPath.branchId === 'string' && typeof candidate.evolutionPath.chosenAt === 'number'
+        ? { branchId: candidate.evolutionPath.branchId, chosenAt: candidate.evolutionPath.chosenAt }
+        : undefined,
+    };
+    // Drops a path that is malformed or no longer applies to this pet.
+    return [normalizeEvolutionPath(pet)];
   }).slice(0, 48);
 }
 
@@ -1897,6 +1903,8 @@ type Action =
   | { type: 'setHideoutPets'; mode: MetaState['hideoutPets'] }
   | { type: 'setHideoutEvents'; mode: MetaState['hideoutEvents'] }
   | { type: 'careForLokPet'; id: string; now: number }
+  | { type: 'chooseLokPetBranch'; id: string; branchId: string; now: number }
+  | { type: 'undoLokPetBranch'; id: string; now: number }
   | { type: 'completeHideoutEvent'; petId: string; eventId: string; now: number }
   | { type: 'setHideoutStickyHeadOut'; enabled: boolean }
   | { type: 'setSplashTextEnabled'; enabled: boolean }
@@ -3149,6 +3157,28 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'setHideoutEvents':
       return { ...state, meta: { ...state.meta, hideoutEvents: action.mode } };
 
+    case 'chooseLokPetBranch': {
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet) return state;
+      const change = chooseBranch(pet, action.branchId, action.now);
+      if (!change.ok) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.id ? change.pet : candidate)) },
+      };
+    }
+
+    case 'undoLokPetBranch': {
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet) return state;
+      const change = undoBranch(pet, action.now);
+      if (!change.ok) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.id ? change.pet : candidate)) },
+      };
+    }
+
     case 'careForLokPet': {
       // Petting a companion in the hideout: it always plays, but only the first of the day counts for bond.
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
@@ -3836,6 +3866,8 @@ export interface MetaContextValue {
   setHideoutPets: (mode: MetaState['hideoutPets']) => void;
   setHideoutEvents: (mode: MetaState['hideoutEvents']) => void;
   careForLokPet: (id: string) => void;
+  chooseLokPetBranch: (id: string, branchId: string) => void;
+  undoLokPetBranch: (id: string) => void;
   completeHideoutEvent: (petId: string, eventId: string) => void;
   setHideoutStickyHeadOut: (enabled: boolean) => void;
   setSplashTextEnabled: (enabled: boolean) => void;
@@ -4052,6 +4084,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setHideoutPets = useCallback((mode: MetaState['hideoutPets']) => dispatch({ type: 'setHideoutPets', mode }), []);
   const setHideoutEvents = useCallback((mode: MetaState['hideoutEvents']) => dispatch({ type: 'setHideoutEvents', mode }), []);
   const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
+  const chooseLokPetBranch = useCallback((id: string, branchId: string) => dispatch({ type: 'chooseLokPetBranch', id, branchId, now: Date.now() }), []);
+  const undoLokPetBranch = useCallback((id: string) => dispatch({ type: 'undoLokPetBranch', id, now: Date.now() }), []);
   const completeHideoutEvent = useCallback((petId: string, eventId: string) => dispatch({ type: 'completeHideoutEvent', petId, eventId, now: Date.now() }), []);
   const setHideoutStickyHeadOut = useCallback(
     (enabled: boolean) => dispatch({ type: 'setHideoutStickyHeadOut', enabled }),
@@ -4308,6 +4342,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutPets,
       setHideoutEvents,
       careForLokPet,
+      chooseLokPetBranch,
+      undoLokPetBranch,
       completeHideoutEvent,
       setHideoutStickyHeadOut,
       setSplashTextEnabled,
@@ -4454,6 +4490,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutPets,
     setHideoutEvents,
     careForLokPet,
+    chooseLokPetBranch,
+    undoLokPetBranch,
     completeHideoutEvent,
     setHideoutStickyHeadOut,
     setSplashTextEnabled,

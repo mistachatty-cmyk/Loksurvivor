@@ -1,4 +1,5 @@
 import type {
+  EvolutionOverlayId,
   LokPetElement,
   LokPetFamily,
   LokPetPalette,
@@ -67,6 +68,10 @@ export interface BattlePet {
   starter?: boolean;
   evolutionStage?: 1 | 2 | 3;
   evolutionTitle?: string;
+  /** Overlay parts from a chosen evolution branch (see engine/petEvolution.ts). */
+  evolutionOverlays?: EvolutionOverlayId[];
+  /** Chosen branch id, so a level-up keeps the branch's title and look. */
+  evolutionBranchId?: string;
 }
 
 export interface BattleLogEntry {

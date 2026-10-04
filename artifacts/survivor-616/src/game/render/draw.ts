@@ -11,7 +11,8 @@ import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
-import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
+import { lokPetSpritePalette } from '@/game/data/lokPets';
+import { evolvedRig } from '@/game/engine/petEvolution';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
 import { getBuildingPrefab } from '@/game/engine/chunks';
@@ -4981,7 +4982,7 @@ function drawActors(
     const pulse = 0.86 + Math.sin(w.now / 115 + pet.uid) * 0.14;
     const alpha = pet.ghost ? 0.3 + pulse * 0.08 : pulse;
     const facing: 1 | -1 = pet.vx < -4 ? -1 : 1;
-    const rig = lokPetRig(pet.silhouette);
+    const rig = evolvedRig(pet.silhouette, pet.evolutionOverlays);
     const palette = lokPetSpritePalette(pet.palette);
     const petScale = LOKPET_SPRITE_SCALE * (pet.sizeScale ?? 1) * (0.9 + pulse * 0.1);
     ctx.save();
