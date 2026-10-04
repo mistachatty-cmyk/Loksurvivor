@@ -14,7 +14,8 @@ import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { CollapsibleSection } from './CollapsibleSection';
-import { HideoutPreview } from './HideoutPreview';
+import { HideoutPreview, type HideoutPetInfo } from './HideoutPreview';
+import { bondRankFor, petCallName } from '@/game/engine/petGrowth';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -116,7 +117,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const { session } = useAuth();
   const { balance: lokBalance } = useLokEconomy();
@@ -126,6 +127,27 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   // baked-frame cache off this object's identity, so an unmemoized recompute
   // here silently defeated that cache and tore down HideoutPreview's canvas
   // effect every poll tick for no reason.
+  // The pets that walk the strip beside the operator: the starter partner always, then the
+  // selected loadout, capped for readability. Settings can narrow this to the partner or none.
+  const hideoutPets = useMemo<HideoutPetInfo[]>(() => {
+    if (meta.hideoutPets === 'off') return [];
+    const starter = meta.savedLokPets.find((pet) => pet.starter);
+    const loadout = meta.savedLokPets.filter((pet) => !pet.starter && meta.selectedLokPetIds.includes(pet.id));
+    const walkers = meta.hideoutPets === 'companion' ? [starter ?? loadout[0]] : [starter, ...loadout];
+    return walkers
+      .filter((pet): pet is NonNullable<typeof pet> => Boolean(pet))
+      .slice(0, 4)
+      .map((pet) => ({
+        id: pet.id,
+        name: petCallName(pet),
+        youName: pet.names?.callsYou,
+        silhouette: pet.roll.silhouette,
+        palette: pet.roll.palette,
+        sizeScale: pet.roll.sizeScale,
+        bondRank: bondRankFor(pet.bond).id,
+        history: pet.hideoutEvents,
+      }));
+  }, [meta.savedLokPets, meta.selectedLokPetIds, meta.hideoutPets]);
   const selectedCharacterPalette = useMemo(
     () => resolveCharacterCosmeticPalette(
       selectedCharacter,
@@ -344,6 +366,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             rig={selectedCharacter.rig}
             palette={selectedCharacterPalette}
             className="mb-6 -mx-6 w-auto sm:mx-0 sm:w-full"
+            pets={hideoutPets}
+            weather={scene.weather}
+            eventsMode={meta.hideoutEvents}
+            onPetCare={careForLokPet}
+            onPetEvent={completeHideoutEvent}
+            firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
           />
         )}
         <header className="mb-8">

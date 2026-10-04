@@ -107,6 +107,10 @@ The owner wants hybrid, fantasy, fictional and sci-fi creatures as uncommon find
 
 Built from `docs/lokpet-rpg-and-digi-tower-plan.md`. Shipped: pet XP from runs, travel wins, treats and battles (sources x10, thresholds unchanged, nothing retroactive); bond ranks with a daily cap; five bond-gated name slots with the starter's call name free; Growth Recap on the run summary; achievement categories, six LokPet achievements and derived completion toasts; Run Setup multi-select up to team capacity. Fixed: battle XP remainder was lost, arena status ticks could leave a pet at 0 HP, the run sprite used a different evolution rule than the arena, stale "5 tiers" text, stale `docs/lokpets.md`. New code: `engine/petExpCurve.ts`, `engine/petGrowth.ts`, `ui/PetNamesPanel.tsx`, `ui/PetGrowthRecap.tsx`; tests in `src/game/petGrowth.test.ts`. Decision record: `.agents/memory/pet-growth-and-bond.md`. Lore only: the Masters ladder (`docs/LORE-masters.md`, `data/masterLore.ts`). Next in the plan: 0.11.1 Hideout Companions.
 
+## v0.11.1 Hideout Companions
+
+Pets walk the hideout strip: trail the operator, idle (sit, sniff, nap, wander) when the operator rests, bounce to the music via `beatBus`, splash in rain, come when the ground is tapped, get petted on tap (bond once a day, double tap = spin). 15 data-driven events (`data/hideoutEvents.ts`) with a one-line corner prompt and a tiny XP/bond reward; settings for which pets walk and how often events play. Pure rules in `engine/hideoutPets.ts`, tests in `src/game/hideoutCompanions.test.ts`, e2e in `e2e/hideout-companions.spec.ts`. Decision record: `.agents/memory/pet-growth-and-bond.md`. Still to do from the plan: more events (anniversary, lost-and-found visitor, practice cameo, ally crossover, evolution eve, companion callback), pet cosmetics, personality from the creature trait model. Next: 0.11.2 Evolutions.
+
 ## Deployment
 
 Vercel project `survivor-616`; `main` auto-deploys to production. The Vercel status on a PR commit turns `success` when the preview build finishes. GitHub's GraphQL API is blocked in some agent sessions; the REST API (`gh api repos/...`) works.

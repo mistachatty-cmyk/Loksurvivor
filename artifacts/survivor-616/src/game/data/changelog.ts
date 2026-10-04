@@ -252,6 +252,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Fixes: a status effect that dropped a pet to 0 HP could stall a fight; pets now use one evolution rule everywhere; the league blurb counts all eight tiers.',
     ],
   },
+  {
+    version: '0.11.1',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Hideout Companions',
+    body: [
+      'Your LokPets now walk the Hideout strip with your operator. Your starter partner is always there, and the pets you picked for a run can tag along. They trail behind, sit, sniff or nap when the operator stops, and splash in the puddles when it rains.',
+      'They vibe to music: play a track and they bounce on the beat and throw sparks on the downbeat. Tap a pet to pet it (the first pet each day builds bond), tap twice for a spin trick, or tap the ground and they trot over.',
+      'Every so often a small event plays: a morning stretch, a dance break, a puddle stomp, a nap in the heat, a shy peek, and a very odd visitor around 3 a.m. Each event shows one line in the corner and gives a little XP and bond. Some only happen at higher bond ranks.',
+      'Settings: choose which pets walk the strip (all, partner only, off) and how often events play (normal, rarely, off). Reduced motion keeps a still scene.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
