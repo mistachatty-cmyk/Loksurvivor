@@ -3,7 +3,20 @@ import { expect, test, type Page } from '@playwright/test';
 const META_KEY = 'survivor616.meta.v1';
 const FORGE_KEY = 'survivor616.forge.v1';
 
-async function seed(page: Page) {
+const ALL_EARNED = ['forge', 'inspector', 'factionRaces', 'foil', 'aura', 'slot-circuit', 'slot-crowd', 'slot-roll-call', 'slot-field-notes', 'slot-beast-master'];
+
+/** Seeds an end-game save: everything earned and switched on (the real earning path is covered in endgame.spec.ts). */
+async function seed(page: Page, earned = true) {
+  if (earned) {
+    await page.addInitScript(([forgeKey, ids]) => {
+      if (!localStorage.getItem(forgeKey!)) {
+        localStorage.setItem(forgeKey!, JSON.stringify({
+          unlocked: false, operators: [], earned: ids,
+          toggles: { forge: true, inspector: true, factionRaces: true, foil: true, aura: true },
+        }));
+      }
+    }, [FORGE_KEY, ALL_EARNED] as [string, string[]]);
+  }
   await page.addInitScript(([metaKey]) => {
     // Only seed once so a reload keeps whatever the test saved.
     if (!localStorage.getItem(metaKey!)) {
@@ -15,27 +28,33 @@ async function seed(page: Page) {
   }, [META_KEY]);
 }
 
-async function revealForge(page: Page) {
+async function openEndgame(page: Page) {
   await page.goto('/?screen=settings');
-  await expect(page.getByTestId('forge-section')).toHaveCount(0);
-  for (let i = 0; i < 5; i += 1) await page.getByTestId('text-save-data-label').click();
-  await expect(page.getByTestId('forge-section')).toBeVisible();
+  await page.getByTestId('tab-settings-endgame').click();
+  await expect(page.getByTestId('endgame-section')).toBeVisible();
 }
 
 test.describe('operator forge', () => {
-  test('is hidden until revealed, then designs, saves and plays a new operator', async ({ page }) => {
+  test('is behind the end game until earned, then designs, saves and plays a new operator', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     // Blocked outside resources (fonts, CDNs) in a sandboxed browser are noise; real script errors are not.
     const network = /net::ERR_|without an exception object/;
     page.on('console', (msg) => { if (msg.type() === 'error' && !network.test(msg.text())) errors.push(msg.text()); });
 
-    await seed(page);
-    await revealForge(page);
+    // Nothing about the end game is on screen before it is earned.
+    await seed(page, false);
+    await page.goto('/?screen=settings');
+    await expect(page.getByTestId('settings-tabs')).toHaveCount(0);
+    await expect(page.getByTestId('endgame-section')).toHaveCount(0);
+    await expect(page.getByTestId('button-open-forge')).toHaveCount(0);
+    await page.evaluate(([forgeKey, ids]) => {
+      localStorage.setItem(forgeKey!, JSON.stringify({ unlocked: false, operators: [], earned: ids, toggles: { forge: true } }));
+    }, [FORGE_KEY, ALL_EARNED] as [string, string[]]);
 
-    // The reveal sticks across reloads.
+    await openEndgame(page);
     await page.reload();
-    await expect(page.getByTestId('forge-section')).toBeVisible();
+    await page.getByTestId('tab-settings-endgame').click();
 
     await page.getByTestId('button-open-forge').click();
     await expect(page.getByTestId('panel-operator-forge')).toBeVisible();
@@ -86,7 +105,7 @@ test.describe('operator forge', () => {
 
   test('generation, rolling and share codes work', async ({ page }) => {
     await seed(page);
-    await revealForge(page);
+    await openEndgame(page);
     await page.getByTestId('button-open-forge').click();
 
     // The same seed always gives the same operator.
@@ -115,6 +134,7 @@ test.describe('operator forge', () => {
     // Batch forge, then export and re-import a share code.
     await page.getByTestId('button-forge-batch').click();
     await expect(page.getByTestId('list-forge-saved').locator('li')).toHaveCount(5);
+    await expect(page.getByTestId('button-forge-batch')).toContainText('No free slots');
     const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), FORGE_KEY) as {
       operators: Array<{ id: string }>;
     };

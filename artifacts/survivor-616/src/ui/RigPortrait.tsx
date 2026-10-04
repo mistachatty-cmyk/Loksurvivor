@@ -18,6 +18,12 @@ export interface RigPortraitProps {
   className?: string;
   /** Disable frame animation for compact/static contexts; reduced-motion also disables it automatically. */
   animated?: boolean;
+  /**
+   * Fixed pixels per sprite pixel, overriding the fit-to-canvas scale. Multiples of 4
+   * keep every sprite pixel the same size (the baked frames are 4x), which is what the
+   * operator inspector uses for a crisp full-resolution view.
+   */
+  pixelScale?: number;
 }
 
 export function RigPortrait({
@@ -27,6 +33,7 @@ export function RigPortrait({
   size = 96,
   className = '',
   animated = true,
+  pixelScale,
 }: RigPortraitProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -42,7 +49,7 @@ export function RigPortrait({
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;
 
-    const scale = (cssH * 0.82) / rig.pixelHeight;
+    const scale = pixelScale && pixelScale > 0 ? pixelScale : (cssH * 0.82) / rig.pixelHeight;
     const start = performance.now();
     let raf = 0;
 
@@ -70,7 +77,7 @@ export function RigPortrait({
     if (shouldAnimate) raf = requestAnimationFrame(frame);
     else frame(start);
     return () => cancelAnimationFrame(raf);
-  }, [rig, palette, anim, size, animated]);
+  }, [rig, palette, anim, size, animated, pixelScale]);
 
   return (
     <canvas

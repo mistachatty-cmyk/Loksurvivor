@@ -301,9 +301,13 @@ export interface SpeciesDef {
   lean: Partial<Record<FeatureField, string[]>>;
   /** Body builds it tends to have. */
   builds: string[];
+  /** For faction races: the `FactionDef.id` (data/factions.ts) this race is drawn from. */
+  faction?: string;
+  /** One line of in-world lore, shown under the race picker. */
+  lore?: string;
 }
 
-export const SPECIES: SpeciesDef[] = [
+export const CORE_SPECIES: SpeciesDef[] = [
   {
     id: 'human', label: 'Human', blurb: 'A regular 616 resident.', skins: NATURAL_SKIN,
     schemes: ['analogous', 'complementary', 'earth', 'mono', 'noir', 'split'], lean: {},
@@ -364,6 +368,169 @@ export const SPECIES: SpeciesDef[] = [
     builds: ['hunched', 'giant', 'small', 'stocky', 'lean'],
   },
 ];
+
+const tone = (...ids: string[]) => ids.map((id) => SKIN_TONES.find((t) => t.id === id)!.hex);
+
+/**
+ * Races drawn from the game's factions and districts. Each one points at a real
+ * faction id (checked against `data/factions.ts` by the tests) and leans toward
+ * the look of that crew, so a forged operator can be "from" the Null Sector or
+ * the River Antler Court. Like the core species these only bias generation; they
+ * never change stats. Add another by adding a row here.
+ */
+export const FACTION_SPECIES: SpeciesDef[] = [
+  {
+    id: 'watchborn', label: 'Watchborn', faction: 'the-watch', blurb: 'Raised under the floodlights.',
+    lore: 'Sentries who learned to read a street by what moves in it. Nothing gets past, and nothing gets forgotten.',
+    skins: tone('chrome', 'bone', 'ash', 'fair'), schemes: ['noir', 'mono', 'complementary'],
+    lean: { eyes: ['cyclops', 'visor', 'lens'], headwear: ['spotlight', 'helmet', 'hardhat'], top: ['armor', 'hazard'], mark: ['barcode', 'neckband'], held: ['torch', 'lantern'], shoulders: ['pads'] },
+    builds: ['tall', 'broad', 'average'],
+  },
+  {
+    id: 'lockjaw', label: 'Lockjaw', faction: 'lockstep', blurb: 'Stares until you flinch.',
+    lore: 'Descendants of the cones that lock on and narrow to a line. Patient, unblinking, and very hard to shake.',
+    skins: tone('ember', 'ash', 'umber', 'bronze'), schemes: ['complementary', 'neon', 'noir'],
+    lean: { eyes: ['narrow', 'glow', 'visor'], headwear: ['cone', 'helmet'], mouth: ['fangs', 'frown'], brows: ['angry'], mark: ['glitchline', 'warpaint'] },
+    builds: ['stocky', 'broad', 'average'],
+  },
+  {
+    id: 'relaykin', label: 'Relaykin', faction: 'relay-corps', blurb: 'Never closes the distance. Never has to.',
+    lore: 'Commanders who run the block from a safe corner, with a dish on the roof and a headset that never comes off.',
+    skins: tone('chrome', 'frost', 'fair', 'sand'), schemes: ['mono', 'neon', 'complementary'],
+    lean: { headwear: ['dish', 'antenna', 'headphones'], accessory: ['headset', 'lanyard', 'watch'], back: ['antennaarray'], top: ['labcoat', 'harness'], eyes: ['visor', 'shades'] },
+    builds: ['lean', 'tall', 'average'],
+  },
+  {
+    id: 'prismfolk', label: 'Prismfolk', faction: 'prism-choir', blurb: 'Every color at once, mostly on purpose.',
+    lore: 'Beacon-singers whose light pulls, slows or burns depending on the hue. Their moods have a color code.',
+    skins: tone('frost', 'lavender', 'rose', 'bone'), schemes: ['triadic', 'split', 'neon', 'pastel'],
+    lean: { eyes: ['lens', 'glow', 'wide'], headwear: ['crown', 'tiara', 'spotlight'], mark: ['stripe', 'static'], hair: ['sweep', 'twists'] },
+    builds: ['lean', 'small', 'flared'],
+  },
+  {
+    id: 'afterimage', label: 'Afterimage', faction: 'afterimage-choir', blurb: 'Seen from the corner of the eye.',
+    lore: 'Shadow-born flankers that never approach in a straight line. You remember them a second after they have gone.',
+    skins: tone('ash', 'void', 'bone'), schemes: ['noir', 'mono'],
+    lean: { eyes: ['hollow', 'glow', 'sleepy'], hair: ['widows', 'longhair'], back: ['tattered', 'cape'], mark: ['static', 'glitchline', 'tearline'], top: ['poncho', 'trench'], boots: ['hover'] },
+    builds: ['lean', 'tall', 'hunched'],
+  },
+  {
+    id: 'cinderfolk', label: 'Cinderfolk', faction: 'cinder-procession', blurb: 'Built from a fire that never went out.',
+    lore: 'Armored chargers from the east side, still warm to the touch. They walk in procession and do not stop for traffic.',
+    skins: tone('ember', 'bronze', 'umber', 'ash'), schemes: ['complementary', 'earth', 'analogous'],
+    lean: { headwear: ['horns', 'helmet'], top: ['armor'], shoulders: ['spikes', 'pads'], boots: ['heavy', 'greaves'], mark: ['scar', 'warpaint'], held: ['torch'] },
+    builds: ['broad', 'stocky', 'giant'],
+  },
+  {
+    id: 'antlerkin', label: 'Antlerkin', faction: 'river-antler-court', blurb: 'The floodwall court, antlers and all.',
+    lore: 'Wildlife that learned the street grid sideways. They keep court by the river and bow to nobody on the bank.',
+    skins: tone('moss', 'lichen', 'olive', 'tan'), schemes: ['earth', 'analogous'],
+    lean: { headwear: ['antlers', 'leafcrown'], back: ['tail', 'cape'], top: ['poncho'], eyes: ['narrow', 'big'], hair: ['shaggy', 'longhair'] },
+    builds: ['lean', 'tall', 'hunched'],
+  },
+  {
+    id: 'bubblenaught', label: 'Bubblenaut', faction: 'bubblenaught-tide', blurb: 'Deep blue and well pressurized.',
+    lore: 'Natives of Haven of the Bubs, generations deep. Dense fluid shields, calm manners, and a helmet for every occasion.',
+    skins: tone('frost', 'teal', 'chrome'), schemes: ['mono', 'analogous', 'pastel'],
+    lean: { headwear: ['bubblehelm'], back: ['bubbles'], eyes: ['big', 'wide'], mouth: ['smile'], sleeves: ['gloves'], shoulders: ['mantle', 'pads'] },
+    builds: ['broad', 'stocky', 'average'],
+  },
+  {
+    id: 'bubbleteer', label: 'Bubbleteer', faction: 'bubbleteer-parade', blurb: 'Pink foam with a parade permit.',
+    lore: 'Pressurized foam entities that pop into split swarms. Cheerful until startled, and then there are several of them.',
+    skins: tone('rose', 'lavender', 'frost'), schemes: ['pastel', 'analogous', 'split'],
+    lean: { headwear: ['bubblehelm', 'flowers', 'tiara'], back: ['bubbles'], eyes: ['big', 'lashes'], mark: ['blush', 'freckles'], mouth: ['smile'], hair: ['pigtails', 'bun'] },
+    builds: ['small', 'flared', 'lean'],
+  },
+  {
+    id: 'cabinetkin', label: 'Cabinetkin', faction: 'cabinet-rot', blurb: 'Glitching back to life, nothing plugged in.',
+    lore: 'Neon Arcade cabinets that woke up with a head full of attract-mode. They insist the high score is theirs.',
+    skins: tone('chrome', 'teal', 'ash', 'lavender'), schemes: ['neon', 'triadic', 'split'],
+    lean: { headwear: ['crt', 'antenna'], eyes: ['lens', 'spiral', 'dots'], mark: ['glitchline', 'static'], top: ['core', 'circuitry'], held: ['boombox', 'phone'] },
+    builds: ['average', 'stocky', 'tall'],
+  },
+  {
+    id: 'highrollers', label: 'High Roller', faction: 'high-roller-syndicate', blurb: 'One name, spelled out in bulbs.',
+    lore: 'The Neon Overflow stock room, dressed for the occasion. Gold teeth, marquee hats and a pocket watch that is always right.',
+    skins: tone('gilt', 'honey', 'bone', 'sand', 'ebony'), schemes: ['complementary', 'noir', 'triadic'],
+    lean: { headwear: ['marquee', 'fedora', 'crown'], top: ['tux', 'jacket'], accessory: ['chain', 'medal', 'pocketwatch'], mouth: ['goldteeth', 'mustache'], eyes: ['shades'], back: ['cape'] },
+    builds: ['average', 'tall', 'broad'],
+  },
+  {
+    id: 'nullborn', label: 'Nullborn', faction: 'null-sector', blurb: 'Nothing plugged in, everything running.',
+    lore: 'Born in a decommissioned data-center basement under a rogue broadcast. Rack-mount chests, cable hair, no idle state.',
+    skins: tone('void', 'ash', 'chrome', 'bone'), schemes: ['noir', 'neon', 'mono'],
+    lean: { top: ['rackmount', 'circuitry'], back: ['cables'], eyes: ['hollow', 'cyclops', 'lens'], mark: ['barcode', 'glitchline', 'static'], headwear: ['antenna', 'dish'] },
+    builds: ['tall', 'broad', 'lean'],
+  },
+  {
+    id: 'reelfolk', label: 'Reelfolk', faction: 'reel-syndicate', blurb: 'Always one take away from a wrap.',
+    lore: "The Director's crew, the cutting room runners and the continuity desk: people who think in shots and notice when something doesn't match.",
+    skins: tone('fair', 'sand', 'honey', 'bone', 'ash'), schemes: ['noir', 'complementary', 'mono'],
+    lean: { headwear: ['filmreel', 'fedora', 'headphones'], held: ['clapper', 'baton', 'mic'], back: ['reel'], top: ['jacket', 'trench'], accessory: ['lanyard', 'watch'] },
+    builds: ['average', 'lean', 'tall'],
+  },
+  {
+    id: 'glitchlings', label: 'Glitchling', faction: 'glitch-breach', blurb: 'A rendering bug with opinions.',
+    lore: 'Memory leaks that broke free of the engine. They tear through coordinates and keep rules only as a suggestion.',
+    skins: tone('teal', 'lavender', 'ember', 'moss', 'rose', 'chrome'), schemes: ['neon', 'triadic', 'split'],
+    lean: { eyes: ['mismatch', 'triple', 'spiral'], mark: ['glitchline', 'static', 'stripe'], hair: ['spikes', 'mohawk'], back: ['tattered', 'wings'], boots: ['hover'] },
+    builds: ['hunched', 'small', 'giant', 'lean'],
+  },
+  {
+    id: 'digitized', label: 'Digitized', faction: 'digitized-damned', blurb: 'A person, mostly. Plus addresses.',
+    lore: 'Survivors the Director harvested, their souls fragmented into data. Some remember their names; all remember the way home.',
+    skins: tone('bone', 'frost', 'ash', 'fair'), schemes: ['mono', 'neon', 'pastel'],
+    lean: { eyes: ['hollow', 'sleepy', 'glow'], mark: ['barcode', 'static', 'tearline'], top: ['circuitry', 'hoodie'], back: ['cables', 'tattered'], hair: ['shaggy', 'longhair'] },
+    builds: ['lean', 'average', 'small'],
+  },
+  {
+    id: 'arborkin', label: 'Arborkin', faction: 'arbor-collective', blurb: 'Canopy flora with a firewall.',
+    lore: 'Bio-digital canopy growth that crept down the decommissioned corridors. Soft to look at, razor in the brambles.',
+    skins: tone('moss', 'lichen', 'teal', 'olive'), schemes: ['analogous', 'earth', 'triadic'],
+    lean: { hair: ['longhair', 'shaggy', 'twists'], headwear: ['leafcrown', 'flowers'], top: ['foliage', 'poncho'], back: ['vines'], mark: ['circuit', 'stripe'] },
+    builds: ['tall', 'lean', 'flared'],
+  },
+  {
+    id: 'levkin', label: 'Levkin', faction: 'lev-syndicate', blurb: 'High altitude, higher prices.',
+    lore: 'The skyway cartel: gravity engineers, phase-shifting operatives and field technicians who rarely touch the ground.',
+    skins: tone('chrome', 'frost', 'void', 'ash'), schemes: ['complementary', 'neon', 'mono'],
+    lean: { eyes: ['visor', 'glow', 'cyclops'], sleeves: ['cyber'], back: ['jetpack'], boots: ['hover'], top: ['armor', 'circuitry'], accessory: ['drone'] },
+    builds: ['tall', 'lean', 'broad'],
+  },
+  {
+    id: 'gobkin', label: 'Gobkin', faction: 'data-goblins', blurb: 'Chews what is already broken.',
+    lore: 'Data-Gobs roam 616 looking for raw data breakage to chew. They would rather snack than fight, but you are made of data too.',
+    skins: tone('moss', 'lichen', 'teal'), schemes: ['neon', 'earth', 'analogous'],
+    lean: { headwear: ['catears', 'hardhat'], eyes: ['wide', 'big', 'mismatch'], mouth: ['fangs', 'goldteeth'], hair: ['spikes', 'shaggy'], accessory: ['satchel', 'bandolier', 'tag'], back: ['backpack'], mark: ['scar', 'bandage'] },
+    builds: ['small', 'hunched'],
+  },
+  {
+    id: 'ironheads', label: 'Ironhead', faction: 'supabuilda', blurb: 'Membership, spotting and raw momentum.',
+    lore: 'A gym faction that turned iron plates and grapples into a street-combat doctrine. Everything is a rep if you commit.',
+    skins: tone('sand', 'honey', 'tan', 'bronze', 'umber', 'espresso'), schemes: ['complementary', 'noir', 'earth'],
+    lean: { top: ['tank', 'hivis'], shoulders: ['plates', 'pads'], sleeves: ['gloves', 'bracers'], belt: ['chainbelt', 'belt'], held: ['dumbbell', 'sign'], headwear: ['bandana', 'visorcap'], mouth: ['beard', 'stubble'] },
+    builds: ['broad', 'giant', 'stocky'],
+  },
+  {
+    id: 'crewhands', label: 'Crewhand', faction: 'the-site-crew', blurb: 'Hard hat, harder schedule.',
+    lore: 'Actual builders who run the street as a work zone. Barriers, nailers and crane hooks are just how they say hello.',
+    skins: tone('fair', 'sand', 'honey', 'olive', 'umber'), schemes: ['complementary', 'earth', 'analogous'],
+    lean: { headwear: ['hardhat', 'cone'], top: ['hivis', 'overalls', 'hazard'], belt: ['utility', 'belt'], held: ['wrench', 'sign', 'flag'], boots: ['heavy', 'boots'], legwear: ['cargo', 'kneepads'] },
+    builds: ['average', 'stocky', 'broad'],
+  },
+  {
+    id: 'gloamfolk', label: 'Gloamfolk', faction: 'firefly-wranglers', blurb: 'Light in a jar, pick in hand.',
+    lore: 'Underground prospectors who wrangle incandescent fireflies with pickaxes and resonant staves. They know every shortcut in the dark.',
+    skins: tone('ash', 'bone', 'honey', 'olive'), schemes: ['earth', 'noir', 'analogous'],
+    lean: { headwear: ['minerlamp', 'hardhat'], held: ['jar', 'pickaxe', 'lantern'], back: ['fireflies', 'backpack'], top: ['overalls', 'harness'], boots: ['heavy', 'boots'], eyes: ['glow', 'big'] },
+    builds: ['stocky', 'small', 'average'],
+  },
+];
+
+/** Every race the Forge offers: the core species first, then the faction races. */
+export const SPECIES: SpeciesDef[] = [...CORE_SPECIES, ...FACTION_SPECIES];
+
 
 export function speciesById(id: string): SpeciesDef {
   return SPECIES.find((s) => s.id === id) ?? SPECIES[0]!;
@@ -457,7 +624,7 @@ export function buildOperatorRig(design: OperatorDesign): SpriteRig {
 /* ------------------------------------------------------------------ */
 
 function pickWeighted(rand: () => number, all: string[], lean: string[] | undefined, boost: string[] | undefined): string {
-  const weights = all.map((id) => (lean?.includes(id) ? 5 : 1) + (boost?.includes(id) ? 8 : 0));
+  const weights = all.map((id) => (lean?.includes(id) ? 5 : 1) + (boost?.includes(id) ? 14 : 0));
   const total = weights.reduce((a, b) => a + b, 0);
   let roll = rand() * total;
   for (let i = 0; i < all.length; i += 1) {
@@ -494,7 +661,9 @@ function colorAgainst(rand: () => number, palette: SpritePalette, cat: ForgeCate
 const OPTIONAL_CHANCE = 0.55;
 
 function pickFeature(rand: () => number, cat: ForgeCategory, flavor: OperatorFlavor, species: SpeciesDef): string {
-  if (cat.none && rand() > OPTIONAL_CHANCE) return cat.none;
+  // A race that has opinions about a slot fills it far more often than a plain one.
+  const chance = species.lean[cat.field] ? 0.85 : OPTIONAL_CHANCE;
+  if (cat.none && rand() > chance) return cat.none;
   const candidates = cat.none ? cat.ids.filter((id) => id !== cat.none) : cat.ids;
   return pickWeighted(rand, candidates, OPERATOR_LEAN[flavor][cat.field], species.lean[cat.field]);
 }
@@ -522,12 +691,14 @@ export interface GenerateOptions {
   species?: string;
   flavor?: OperatorFlavor;
   build?: string;
+  /** When no species is given, draw from the core races only (the faction races stay out of the pool). */
+  coreOnly?: boolean;
 }
 
 /** A complete random design. The same seed and options always give the same design. */
 export function generateOperatorDesign(seed: string, options: GenerateOptions = {}): OperatorDesign {
   const rand = mulberry32(hashString(`forge:${seed}`));
-  const species = options.species ? speciesById(options.species) : pickOne(rand, SPECIES);
+  const species = options.species ? speciesById(options.species) : pickOne(rand, options.coreOnly ? CORE_SPECIES : SPECIES);
   const flavor = options.flavor ?? pickOne(rand, OPERATOR_FLAVORS_LIST);
   const build = options.build ?? pickOne(rand, species.builds);
   const body = bodyFromBuild(build);
