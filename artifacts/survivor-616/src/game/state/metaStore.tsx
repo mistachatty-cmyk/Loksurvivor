@@ -70,7 +70,8 @@ import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game
 import { RENTABLE_GENERATORS, RENTABLE_GENERATORS_BY_ID } from '@/game/data/generators';
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
-import { getExpForLevel } from '@/game/engine/lokPetBattle';
+import { getExpForLevel } from '@/game/engine/petExpCurve';
+import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
@@ -148,7 +149,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 21;
+const META_VERSION = 22;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -883,10 +884,24 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
         ? Math.max(0, candidate.lastFreeRefreshAt)
         : undefined,
       name: typeof candidate.name === 'string' && candidate.name.trim().length > 0
-        ? candidate.name.trim().slice(0, 24)
+        ? sanitizePetName(candidate.name) || undefined
         : undefined,
+      names: normalizePetNames(candidate.names),
+      bond: typeof candidate.bond === 'number' && Number.isFinite(candidate.bond) && candidate.bond > 0 ? Math.min(100000, Math.floor(candidate.bond)) : undefined,
+      bondDay: typeof candidate.bondDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.bondDay) ? candidate.bondDay : undefined,
+      bondToday: typeof candidate.bondToday === 'number' && Number.isFinite(candidate.bondToday) && candidate.bondToday > 0 ? Math.min(1000, Math.floor(candidate.bondToday)) : undefined,
     }];
   }).slice(0, 48);
+}
+
+function normalizePetNames(value: unknown): SavedLokPet['names'] {
+  if (!isRecord(value)) return undefined;
+  const out: NonNullable<SavedLokPet['names']> = {};
+  for (const key of ['battle', 'callsYou', 'epithet', 'trueName'] as const) {
+    const clean = typeof value[key] === 'string' ? sanitizePetName(value[key]) : '';
+    if (clean) out[key] = clean;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function refreshStarterLokPets(pets: SavedLokPet[], now: number): SavedLokPet[] {
@@ -1805,10 +1820,11 @@ type Action =
   | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[] }
   | { type: 'toggleFavoriteLokPet'; id: string }
   | { type: 'renameLokPet'; id: string; name: string }
+  | { type: 'setLokPetName'; id: string; slot: PetNameSlot; name: string }
   | { type: 'claimDailyLogin'; now: number }
   | { type: 'equipLokPetTrinket'; id: string; trinketId?: string }
   | { type: 'draftStarterLokPets' }
-  | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; characterId: string; now: number }
+  | { type: 'completeStarterLokPetOnboarding'; variantId: StarterLokPetId; characterId: string; now: number; callName?: string }
   | { type: 'clearLastRun' }
   | { type: 'clearCardPackReveal' }
   | { type: 'markOnboarded' }
@@ -1923,7 +1939,42 @@ function addUnique(list: string[], value?: string): string[] {
   return [...list, value];
 }
 
+/**
+ * Achievements are derived (never stored), so a completion toast is derived too: any
+ * achievement that is complete after an action but was not before it. Only that
+ * transition announces, so existing saves never get a flood of old completions.
+ */
+function withAchievementToasts(before: StoreState, after: StoreState): StoreState {
+  if (after.meta === before.meta) return after;
+  const fresh = ACHIEVEMENTS.filter((a) => a.isComplete(after.meta) && !a.isComplete(before.meta)
+    && !after.meta.pendingNotifications.some((n) => n.id === `achievement-${a.id}`));
+  if (fresh.length === 0) return after;
+  const now = Date.now();
+  return {
+    ...after,
+    meta: {
+      ...after.meta,
+      pendingNotifications: [
+        ...after.meta.pendingNotifications,
+        ...fresh.map((a) => ({
+          id: `achievement-${a.id}`,
+          title: `Achievement: ${a.name}`,
+          body: a.reward ? `${a.description} Claim your reward in the Archive.` : a.description,
+          createdAt: now,
+        })),
+      ],
+    },
+  };
+}
+
 export function reducer(state: StoreState, action: Action): StoreState {
+  const next = coreReducer(state, action);
+  // Swapping the whole save (reset, import) is not earning anything, so it never toasts.
+  if (action.type === 'reset' || action.type === 'replaceMeta') return next;
+  return withAchievementToasts(state, next);
+}
+
+function coreReducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
     case 'selectCharacter': {
       const character = CHARACTERS.find((candidate) => candidate.id === action.id);
@@ -2133,6 +2184,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const bestiary = action.result.opponentKind === 'enemy' && action.result.enemyId
         ? { ...state.meta.bestiary, [action.result.enemyId]: (state.meta.bestiary[action.result.enemyId] ?? 0) + 1 }
         : state.meta.bestiary;
+      const travelNow = Date.now();
+      // Only wins pay (by design), and they train the pets that are out, starter first.
+      const travelGrowth = growPartyPets(state.meta.savedLokPets, state.meta.selectedLokPetIds, TRAVEL_WIN_EXP_BASE, 'travel', travelNow);
+      const travelHeadlines = growthHeadlines(travelGrowth.entries);
       return {
         ...state,
         meta: {
@@ -2140,7 +2195,10 @@ export function reducer(state: StoreState, action: Action): StoreState {
           bestiary,
           cred: state.meta.cred + action.result.rewardCred,
           cardCredits: state.meta.cardCredits + action.result.rewardCardCredits,
-          savedLokPets: [...caughtPet, ...state.meta.savedLokPets].slice(0, 48),
+          savedLokPets: [...caughtPet, ...travelGrowth.pets].slice(0, 48),
+          pendingNotifications: travelHeadlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-travel-${travelNow}`, title: 'Your pets grew', body: travelHeadlines.join('. ') + '.', createdAt: travelNow }]
+            : state.meta.pendingNotifications,
         },
       };
     }
@@ -2164,15 +2222,9 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (state.meta.lokPetTreats < 1) return state;
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
       if (!pet) return state;
-      const curLvl = pet.level || 1;
-      const curExp = (pet.exp || 0) + 75;
-      let newLvl = curLvl;
-      let remExp = curExp;
-      const maxLevel = pet.starter ? 99 : 50;
-      while (remExp >= getExpForLevel(newLvl) && newLvl < maxLevel) {
-        remExp -= getExpForLevel(newLvl);
-        newLvl += 1;
-      }
+      const now = Date.now();
+      const grown = growPet(pet, { exp: scalePetExp(TREAT_EXP_BASE), bondSource: 'treat', now });
+      const headlines = growthHeadlines(grown.entry ? [grown.entry] : []);
       return {
         ...state,
         meta: {
@@ -2180,14 +2232,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
           lokPetTreats: state.meta.lokPetTreats - 1,
           savedLokPets: state.meta.savedLokPets.map((candidate) =>
             candidate.id === action.id
-              ? {
-                  ...candidate,
-                  stamina: Math.min(PET_STAMINA_MAX, candidate.stamina + 1),
-                  level: newLvl,
-                  exp: remExp,
-                }
+              ? { ...grown.pet, stamina: Math.min(PET_STAMINA_MAX, candidate.stamina + 1) }
               : candidate,
           ),
+          pendingNotifications: headlines.length > 0
+            ? [...state.meta.pendingNotifications, { id: `pet-treat-${action.id}-${now}`, title: 'Treat time', body: headlines.join('. ') + '.', createdAt: now }]
+            : state.meta.pendingNotifications,
         },
       };
     }
@@ -2248,13 +2298,22 @@ export function reducer(state: StoreState, action: Action): StoreState {
         badges.push(rewards.badgeId);
         leagueTier = Math.max(leagueTier, badges.length);
       }
+      const now = Date.now();
       const updatedSaved = state.meta.savedLokPets.map((candidate) => {
         if (!winningPetIds.includes(candidate.id)) return candidate;
         const levelUp = rewards.levelUps.find((l) => l.petId.includes(candidate.id));
-        const newLevel = levelUp ? levelUp.newLevel : (candidate.level || 1);
+        // The engine reports the final level AND the XP remainder; saving both is what
+        // stops XP from vanishing between battles.
+        const result = rewards.petResults?.find((r) => r.petId.includes(candidate.id));
+        const newLevel = result ? result.level : levelUp ? levelUp.newLevel : (candidate.level || 1);
+        const bond = applyBond(candidate, 'battle', now);
         return {
           ...candidate,
           level: newLevel,
+          ...(result ? { exp: result.exp } : {}),
+          bond: bond.bond,
+          bondDay: bond.bondDay,
+          bondToday: bond.bondToday,
           battlesWon: (candidate.battlesWon || 0) + 1,
           battlesFought: (candidate.battlesFought || 0) + 1,
         };
@@ -2286,17 +2345,18 @@ export function reducer(state: StoreState, action: Action): StoreState {
       };
     }
 
-    case 'renameLokPet': {
-      const trimmed = action.name.trim().slice(0, 24);
-      return {
-        ...state,
-        meta: {
-          ...state.meta,
-          savedLokPets: state.meta.savedLokPets.map((p) =>
-            p.id === action.id ? { ...p, name: trimmed || undefined } : p,
-          ),
-        },
-      };
+    case 'renameLokPet':
+    case 'setLokPetName': {
+      // Plain renames are the call name (slot 1). A locked slot leaves the pet unchanged.
+      const slot: PetNameSlot = action.type === 'setLokPetName' ? action.slot : 'call';
+      let changed = false;
+      const savedLokPets = state.meta.savedLokPets.map((p) => {
+        if (p.id !== action.id) return p;
+        const next = setPetName(p, slot, action.name);
+        if (next !== p) changed = true;
+        return next;
+      });
+      return changed ? { ...state, meta: { ...state.meta, savedLokPets } } : state;
     }
 
     case 'claimDailyLogin': {
@@ -2373,6 +2433,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
         favorite: true,
         starter: true,
         lastFreeRefreshAt: action.now,
+        // The partner's call name is the one name that is free from day one (optional).
+        name: sanitizePetName(action.callName) || undefined,
       };
       const pack = CARD_SHOP_PACKS_BY_ID.lokpet;
       const rng = createRng((action.now ^ 0x616) >>> 0);
@@ -3397,11 +3459,15 @@ export function reducer(state: StoreState, action: Action): StoreState {
       const lokPetCatalog = recordLokPetCatalog(prev.lokPetCatalog, result.lokPets);
       const recoveredElixirs = replenishPetElixirs(prev);
       const spentPetIds = new Set(prev.selectedLokPetIds);
+      const runNow = Date.now();
+      // Pets that were out earn XP and bond for the run: the starter partner always,
+      // plus the loadout. Growth is applied before the stamina cost below.
+      const runGrowth = growPartyPets(prev.savedLokPets, spentPetIds, runPetExpBase(result), 'run', runNow);
       const savedLokPets = [
         ...result.lokPets
           .filter((pet) => pet.origin === 'chest')
           .map((pet, index) => ({ id: `pet-${Date.now().toString(36)}-${index}-${pet.variantId}`, roll: pet.roll, stamina: PET_STAMINA_MAX })),
-        ...prev.savedLokPets.map((pet) => spentPetIds.has(pet.id) && !pet.starter ? { ...pet, stamina: Math.max(0, pet.stamina - 1) } : pet),
+        ...runGrowth.pets.map((pet) => spentPetIds.has(pet.id) && !pet.starter ? { ...pet, stamina: Math.max(0, pet.stamina - 1) } : pet),
       ].slice(0, 48);
       const selectedLokPetIds = prev.selectedLokPetIds.filter((id) => savedLokPets.some((pet) => pet.id === id && (('starter' in pet && pet.starter) || pet.stamina > 0)));
       const lokPetDiscoveries = getLokPetDiscoveries(prev.lokPetCatalog, result.lokPets);
@@ -3572,6 +3638,7 @@ export function reducer(state: StoreState, action: Action): StoreState {
         lastCardPackReveal: state.lastCardPackReveal,
         lastRun: {
           ...result,
+          petGrowth: runGrowth.entries,
           lokPetDiscoveries,
           newlyUnlockedCharacterIds: newlyUnlocked,
           newlyDiscoveredRelicIds: discoveredRelic && !prev.knownRelicIds.includes(discoveredRelic.id)
@@ -3633,10 +3700,11 @@ export interface MetaContextValue {
   recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[]) => void;
   toggleFavoriteLokPet: (id: string) => void;
   renameLokPet: (id: string, name: string) => void;
+  setLokPetName: (id: string, slot: PetNameSlot, name: string) => void;
   claimDailyLogin: () => void;
   equipLokPetTrinket: (id: string, trinketId?: string) => void;
   draftStarterLokPets: () => void;
-  completeStarterLokPetOnboarding: (variantId: StarterLokPetId, characterId: string) => void;
+  completeStarterLokPetOnboarding: (variantId: StarterLokPetId, characterId: string, callName?: string) => void;
   clearLastRun: () => void;
   clearCardPackReveal: () => void;
   markOnboarded: () => void;
@@ -3806,6 +3874,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const toggleFavoriteLokPet = useCallback((id: string) => dispatch({ type: 'toggleFavoriteLokPet', id }), []);
   const renameLokPet = useCallback((id: string, name: string) => dispatch({ type: 'renameLokPet', id, name }), []);
+  const setLokPetName = useCallback((id: string, slot: PetNameSlot, name: string) => dispatch({ type: 'setLokPetName', id, slot, name }), []);
   const claimDailyLogin = useCallback(() => dispatch({ type: 'claimDailyLogin', now: Date.now() }), []);
   const equipLokPetTrinket = useCallback(
     (id: string, trinketId?: string) => dispatch({ type: 'equipLokPetTrinket', id, trinketId }),
@@ -3813,7 +3882,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const draftStarterLokPets = useCallback(() => dispatch({ type: 'draftStarterLokPets' }), []);
   const completeStarterLokPetOnboarding = useCallback(
-    (variantId: StarterLokPetId, characterId: string) => dispatch({ type: 'completeStarterLokPetOnboarding', variantId, characterId, now: Date.now() }),
+    (variantId: StarterLokPetId, characterId: string, callName?: string) => dispatch({ type: 'completeStarterLokPetOnboarding', variantId, characterId, now: Date.now(), callName }),
     [],
   );
   const clearLastRun = useCallback(() => dispatch({ type: 'clearLastRun' }), []);
@@ -4098,6 +4167,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       recordLokPetBattleResult,
       toggleFavoriteLokPet,
       renameLokPet,
+      setLokPetName,
       claimDailyLogin,
       equipLokPetTrinket,
       draftStarterLokPets,
@@ -4239,6 +4309,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     recordLokPetBattleResult,
     toggleFavoriteLokPet,
     renameLokPet,
+    setLokPetName,
     claimDailyLogin,
     equipLokPetTrinket,
     draftStarterLokPets,

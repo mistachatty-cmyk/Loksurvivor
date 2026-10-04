@@ -72,6 +72,7 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
   const [inspected, setInspected] = useState<StarterLokPetId | null>(null);
   const [chosen, setChosen] = useState<StarterLokPetId | null>(null);
   const [hits, setHits] = useState(0);
+  const [partnerName, setPartnerName] = useState('');
   const chosenVariant = chosen ? LOKPET_VARIANTS_BY_ID[chosen] : null;
   const classicReveal = meta.companionRevealStyle === 'classic';
   const phaseCopy = useMemo(() => {
@@ -100,7 +101,7 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
     const next = Math.max(0, enemyHp - 24);
     setEnemyHp(next);
     if (next === 0 && chosen) {
-      completeStarterLokPetOnboarding(chosen, starterCharacter.id);
+      completeStarterLokPetOnboarding(chosen, starterCharacter.id, partnerName);
       setPhase('victory');
     }
   };
@@ -257,6 +258,22 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
         )}
 
         {phase === 'partner' && (
+          <div className="mx-auto mb-3 w-full max-w-md" data-testid="partner-name-field">
+            <label htmlFor="input-partner-name" className="block font-mono text-[10px] font-black uppercase tracking-[.2em] text-pink-200">Name your partner (optional)</label>
+            <input
+              id="input-partner-name"
+              type="text"
+              value={partnerName}
+              maxLength={24}
+              placeholder={chosenVariant?.name ?? 'Partner'}
+              onChange={(event) => setPartnerName(event.target.value)}
+              className="mt-1 w-full border border-pink-300/40 bg-black/60 px-2 py-2 text-base font-bold text-white outline-none placeholder:font-normal placeholder:text-white/30"
+              data-testid="input-partner-name"
+            />
+            <p className="mt-1 text-[11px] text-white/45">Its other four names are earned as your bond grows. You can change this name any time.</p>
+          </div>
+        )}
+        {phase === 'partner' && (
           <button type="button" onClick={partnerStrike} className="mx-auto flex min-h-16 w-full max-w-md items-center justify-center gap-3 bg-cyan-100 px-6 py-4 text-sm font-black uppercase tracking-[.16em] text-slate-950 shadow-[0_12px_45px_rgba(34,211,238,.14)] active:scale-[.98]" data-testid="button-partner-strike">
             <Zap className="h-5 w-5" /> Fight together
           </button>
@@ -265,7 +282,7 @@ export function StarterLokPetEncounter({ onEnterHideout }: { onEnterHideout: () 
         {phase === 'victory' && (
           <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="border border-emerald-300/40 bg-emerald-950/30 p-5 text-center shadow-[0_0_50px_rgba(16,185,129,.08)]" data-testid="starter-rewards">
             <p className="font-mono text-[10px] font-black uppercase tracking-[.28em] text-emerald-200">Partner bonded · rewards secured</p>
-            <h2 className="mt-2 text-2xl font-black uppercase">{starterCharacter.name} + {chosenVariant?.name}</h2>
+            <h2 className="mt-2 text-2xl font-black uppercase">{starterCharacter.name} + {partnerName.trim() || chosenVariant?.name}</h2>
             <p className="mt-1 text-sm text-white/55">Your first field team is ready for the hideout.</p>
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-bold uppercase tracking-wide sm:flex sm:flex-wrap sm:justify-center">
               <span className="border border-pink-300/40 bg-pink-300/10 px-3 py-2 text-pink-100">Companion · never benched</span>

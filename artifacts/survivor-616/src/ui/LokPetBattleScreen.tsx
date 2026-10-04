@@ -1156,7 +1156,7 @@ export function LokPetBattleScreen({
               <Trophy className="h-5 w-5 text-cyan-400" /> Sanctum League Circuit Championship
             </h2>
             <p className="mt-1 text-xs text-cyan-200/80">
-              Climb the 5 authored tiers of the 616 Sanctum League. Defeat each syndicate trainer to earn rare badges, card credits, and title recognition!
+              Climb the {LEAGUE_TIERS.length} authored tiers of the 616 Sanctum League. Defeat each syndicate trainer to earn rare badges, card credits, and title recognition!
             </p>
           </div>
 

@@ -4,6 +4,8 @@ import { Fragment, useState } from 'react';
 import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
+import { PetBondBadge, PetNamesPanel } from '@/ui/PetNamesPanel';
+import { petNameplate } from '@/game/engine/petGrowth';
 import { RigPortrait } from '@/ui/RigPortrait';
 import { THEMED_PALETTES_BY_ID } from '@/game/data/themedPalettes';
 import { detectRuntimePerformanceTier, RUNTIME_TIER_LABELS } from '@/game/performanceProfile';
@@ -58,12 +60,10 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     setUiPanelLayout,
     setMinimapVisible,
     equipPalette,
-    renameLokPet,
   } = useMeta();
   const [step, setStep] = useState<SetupStep>('companion');
-  const [selectedPetId, setSelectedPetId] = useState<string | null>(meta.selectedLokPetIds[0] ?? null);
-  const [editingPetId, setEditingPetId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
+  const [selectedPetIds, setSelectedPetIds] = useState<string[]>(meta.selectedLokPetIds);
+  const [namesOpenId, setNamesOpenId] = useState<string | null>(null);
   const [artStyle, setArtStyle] = useState(meta.lokPetArtStyle);
   const [graphicsQuality, setGraphicsQualityChoice] = useState(meta.graphicsQuality);
   const [borderStyle, setBorderStyle] = useState(meta.uiBorderStyle);
@@ -80,8 +80,17 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const paletteIndex = Math.max(0, ownedPalettes.findIndex((palette) => palette.id === meta.activePaletteId));
   const runtimeTier = detectRuntimePerformanceTier();
 
+  // One slot behaves like a radio button, as before; Collector characters can take a full team.
+  const togglePet = (id: string) => {
+    setSelectedPetIds((current) => {
+      if (capacity <= 1) return [id];
+      if (current.includes(id)) return current.filter((x) => x !== id);
+      return current.length >= capacity ? current : [...current, id];
+    });
+  };
+
   const continueWithCompanion = () => {
-    setLokPetLoadout(selectedPetId ? [selectedPetId] : []);
+    setLokPetLoadout(selectedPetIds);
     setStep('look');
   };
 
@@ -128,14 +137,16 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                 <p className="font-mono text-[10px] font-black uppercase tracking-[.22em] text-pink-200">1 · Pick a LokPet</p>
                 <h2 className="mt-1 text-xl font-black uppercase">Your run companion</h2>
               </div>
-              <p className="text-xs text-white/50">Pick one now · {capacity} slots unlock with Collector characters</p>
+              <p className="text-xs text-white/50" data-testid="run-setup-slot-hint">
+                {capacity > 1 ? `Pick up to ${capacity} · ${selectedPetIds.length}/${capacity} chosen` : 'Pick one now · more slots unlock with Collector characters'}
+              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <button
                 type="button"
-                onClick={() => setSelectedPetId(null)}
-                className={`min-h-36 border p-4 text-left transition ${selectedPetId === null ? selectClass(true) : selectClass(false)}`}
+                onClick={() => setSelectedPetIds([])}
+                className={`min-h-36 border p-4 text-left transition ${selectedPetIds.length === 0 ? selectClass(true) : selectClass(false)}`}
                 data-testid="button-run-setup-no-pet"
               >
                 <span className="grid h-14 w-14 place-items-center border border-white/20 bg-black/40 text-white/55"><PawPrint className="h-7 w-7" /></span>
@@ -143,18 +154,18 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                 <p className="mt-1 text-xs leading-relaxed text-white/50">No companion this run.</p>
               </button>
               {[...regularReadyPets, ...legendaryReadyPets].map((pet) => {
-                const selected = pet.id === selectedPetId;
+                const selected = selectedPetIds.includes(pet.id);
                 return (
                   <Fragment key={pet.id}>
                   {pet.roll.legendary && pet.id === legendaryReadyPets[0]?.id ? <div className="col-span-full mt-2 border-t border-amber-300/30 pt-3 font-mono text-[10px] font-black uppercase tracking-[.24em] text-amber-200">Legendary companions</div> : null}
                   <div
                     role="button"
                     tabIndex={0}
-                    onClick={() => setSelectedPetId(pet.id)}
+                    onClick={() => togglePet(pet.id)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
-                        setSelectedPetId(pet.id);
+                        togglePet(pet.id);
                       }
                     }}
                     className={`relative min-h-36 cursor-pointer border p-4 text-left transition ${selected ? selectClass(true) : selectClass(false)}`}
@@ -164,52 +175,28 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                     <div className="flex items-center gap-3">
                       <LokPetIcon silhouette={pet.roll.silhouette} palette={pet.roll.palette} size={72} className="bg-black/60" />
                       <div className="min-w-0">
-                        {editingPetId === pet.id ? (
-                          <input
-                            autoFocus
-                            type="text"
-                            value={editingName}
-                            maxLength={24}
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(event) => setEditingName(event.target.value)}
-                            onBlur={() => {
-                              renameLokPet(pet.id, editingName);
-                              setEditingPetId(null);
-                            }}
-                            onKeyDown={(event) => {
+                        <p className="flex min-w-0 items-center gap-1.5 truncate text-base font-black uppercase">
+                          <span className="truncate" data-testid={`run-setup-pet-name-${pet.id}`}>{petNameplate(pet)}</span>
+                          <button
+                            type="button"
+                            onClick={(event) => {
                               event.stopPropagation();
-                              if (event.key === 'Enter') {
-                                renameLokPet(pet.id, editingName);
-                                setEditingPetId(null);
-                              } else if (event.key === 'Escape') {
-                                setEditingPetId(null);
-                              }
+                              setNamesOpenId((open) => (open === pet.id ? null : pet.id));
                             }}
-                            className="w-full truncate border border-pink-300/50 bg-black/60 px-1 text-base font-black uppercase text-white outline-none"
-                            data-testid={`input-rename-pet-${pet.id}`}
-                          />
-                        ) : (
-                          <p className="flex min-w-0 items-center gap-1.5 truncate text-base font-black uppercase">
-                            <span className="truncate">{pet.name ?? pet.roll.name}</span>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setEditingName(pet.name ?? pet.roll.name);
-                                setEditingPetId(pet.id);
-                              }}
-                              className="shrink-0 text-white/40 hover:text-white"
-                              aria-label={`Rename ${pet.name ?? pet.roll.name}`}
-                              data-testid={`button-rename-pet-${pet.id}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                          </p>
-                        )}
-                        <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-pink-200">{pet.roll.rarityLabel} · {pet.stamina}/3 charge</p>
+                            className="shrink-0 text-white/40 hover:text-white"
+                            aria-label={`Names for ${petNameplate(pet)}`}
+                            aria-expanded={namesOpenId === pet.id}
+                            data-testid={`button-rename-pet-${pet.id}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </p>
+                        <p className="mt-1 font-mono text-[9px] uppercase tracking-widest text-pink-200">{pet.roll.rarityLabel} · Lv {pet.level ?? 1} · {pet.stamina}/3 charge</p>
+                        <PetBondBadge pet={pet} className="mt-1" />
                         <p className="mt-2 text-xs text-white/55">{pet.roll.traitLabel}</p>
                       </div>
                     </div>
+                    {namesOpenId === pet.id ? <PetNamesPanel pet={pet} /> : null}
                   </div>
                   </Fragment>
                 );

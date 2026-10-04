@@ -103,6 +103,10 @@ In 0.10.9 the owner said the new screen content was "a lot on screen", so everyt
 
 The owner wants hybrid, fantasy, fictional and sci-fi creatures as uncommon finds and easter eggs, some cute and some terrifying, alongside ordinary animals, and wants a few more added every once in a while. In 0.10.9 they asked for the cute/dread idea to be deeply expanded, more thematic, an eventually infinite roster, user-imported art, and rarity as both findability and tier (like ordinary vs legendary creatures). The brief and its answers are in `artifacts/survivor-616/docs/lokpet-creature-design.md`; the data and seeded generator are in `src/game/data/creatureTraits.ts` (51 axes, 46 quirks, 22 themes, 48 body plans, 7 findability levels, 6 tiers). It is not wired into battles or chests yet, and no creatures have been added; that waits on the body-plan recipes (roadmap item 1). The user-art import is designed, not built.
 
+## v0.11.0 Bond and Growth (LokPet RPG, phase 1)
+
+Built from `docs/lokpet-rpg-and-digi-tower-plan.md`. Shipped: pet XP from runs, travel wins, treats and battles (sources x10, thresholds unchanged, nothing retroactive); bond ranks with a daily cap; five bond-gated name slots with the starter's call name free; Growth Recap on the run summary; achievement categories, six LokPet achievements and derived completion toasts; Run Setup multi-select up to team capacity. Fixed: battle XP remainder was lost, arena status ticks could leave a pet at 0 HP, the run sprite used a different evolution rule than the arena, stale "5 tiers" text, stale `docs/lokpets.md`. New code: `engine/petExpCurve.ts`, `engine/petGrowth.ts`, `ui/PetNamesPanel.tsx`, `ui/PetGrowthRecap.tsx`; tests in `src/game/petGrowth.test.ts`. Decision record: `.agents/memory/pet-growth-and-bond.md`. Lore only: the Masters ladder (`docs/LORE-masters.md`, `data/masterLore.ts`). Next in the plan: 0.11.1 Hideout Companions.
+
 ## Deployment
 
 Vercel project `survivor-616`; `main` auto-deploys to production. The Vercel status on a PR commit turns `success` when the preview build finishes. GitHub's GraphQL API is blocked in some agent sessions; the REST API (`gh api repos/...`) works.
