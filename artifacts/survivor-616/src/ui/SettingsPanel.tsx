@@ -41,6 +41,8 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
+import { OperatorForgePanel } from './OperatorForgePanel';
+import { isForgeUnlocked, unlockForge } from '@/game/state/operatorForgeStore';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 
 export interface SettingsPanelProps {
@@ -139,6 +141,9 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
 
   const [gyroDenied, setGyroDenied] = useState(false);
   const [devTapCount, setDevTapCount] = useState(0);
+  const [forgeUnlocked, setForgeUnlocked] = useState(isForgeUnlocked);
+  const [forgeOpen, setForgeOpen] = useState(false);
+  const [forgeTaps, setForgeTaps] = useState(0);
   const tiltAvailable = gyroSupported();
 
   /**
@@ -166,6 +171,20 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
       return next.taps;
     });
   }, [unlockDevModeAccess]);
+
+  // The Operator Forge is a hidden extra: five taps on the "Save data" label reveal it for good.
+  const handleForgeTap = useCallback(() => {
+    if (forgeUnlocked) return;
+    const next = forgeTaps + 1;
+    if (next >= 5) {
+      unlockForge();
+      setForgeUnlocked(true);
+      setForgeTaps(0);
+      toast({ title: 'Operator Forge found', description: 'A hidden workshop for designing new operators is now in Settings.' });
+      return;
+    }
+    setForgeTaps(next);
+  }, [forgeTaps, forgeUnlocked]);
 
   const handleExportSave = useCallback(() => {
     const blob = new Blob([serializeMeta(meta)], { type: 'application/json' });
@@ -1403,7 +1422,13 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
               <Save className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Save data</p>
+              <p
+                className="text-xs font-bold uppercase tracking-[0.25em] text-primary"
+                onClick={handleForgeTap}
+                data-testid="text-save-data-label"
+              >
+                Save data
+              </p>
               <h2 className="mt-1 text-xl font-black uppercase text-white">Back up or transfer your progress</h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
                 Export a save file to keep as a backup or move to another browser or device. Signing in
@@ -1429,6 +1454,25 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             </div>
           </div>
         </section>
+
+        {forgeUnlocked ? (
+          <section className="border border-dashed border-fuchsia-300/50 bg-fuchsia-400/5 p-5 sm:p-6 lg:col-span-2" data-testid="forge-section">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-200">Hidden workshop</p>
+            <h2 className="mt-1 text-xl font-black uppercase text-white">Operator Forge</h2>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              Design or generate brand-new operators: hundreds of looks, builds, species and palettes. Nothing here changes
+              the operators you already have; forged ones are added alongside them.
+            </p>
+            <button
+              type="button"
+              onClick={() => setForgeOpen(true)}
+              className="mt-4 border border-fuchsia-300/60 bg-fuchsia-400/15 px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-fuchsia-100 hover:bg-fuchsia-400/25"
+              data-testid="button-open-forge"
+            >
+              Open the Forge
+            </button>
+          </section>
+        ) : null}
 
         {meta.devModeAccessUnlocked ? (
           <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
@@ -1494,6 +1538,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </section>
         )}
       </div>
+      {forgeOpen ? <OperatorForgePanel onClose={() => setForgeOpen(false)} /> : null}
     </ScreenLayout>
   );
 }
