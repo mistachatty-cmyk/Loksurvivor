@@ -28,7 +28,7 @@
     "node": ">=18.3"
   },
   "scripts": {
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "i18n",
