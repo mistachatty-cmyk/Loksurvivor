@@ -4,12 +4,16 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Palette } from 'lucide-react';
+import { Palette, X, ShieldAlert, Sparkles, Megaphone, Wrench } from 'lucide-react';
 
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { pickSplashText } from '@/game/data/splashText';
+import { LORE_CHRONICLES } from '@/game/data/lore';
+import { LorePopup } from '@/ui/LorePopup';
+import { CHANGELOG, CURRENT_VERSION, updateNumber } from '@/game/data/changelog';
+import { pickCreditName } from '@/game/data/creditRotation';
 import { IntroTitle } from '@/ui/IntroTitle';
 import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset, useIntroPhysicsResetVisible } from '@/ui/introPhysics';
 import { introPhysicsForTheme, resolveIntroEvent } from '@/ui/introPresentation';
@@ -50,6 +54,10 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   const physicsProfile = useMemo(() => introPhysicsForTheme(meta.uiTheme, introEvent), [introEvent, meta.uiTheme]);
 
   const [showAltLocationTag, setShowAltLocationTag] = useState(false);
+  const [showLoreModal, setShowLoreModal] = useState(false);
+  const [showUpdatesModal, setShowUpdatesModal] = useState(false);
+  const credit = useMemo(() => pickCreditName(), []);
+
   useEffect(() => {
     let revertTimer: ReturnType<typeof setTimeout> | undefined;
     const cycleTimer = setInterval(() => {
@@ -174,14 +182,37 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
             <span className="relative z-10 transition-colors duration-300 group-hover:text-black">Enter the hideout</span>
           </motion.button>
 
+          {/* Mission Briefing Button (matches theme from screenshot) */}
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowLoreModal(true)}
+            className="mt-3.5 flex w-full max-w-sm sm:max-w-md items-center justify-center gap-2 rounded-sm border border-red-500/80 bg-red-950/70 px-4 py-2 font-mono text-[10px] sm:text-xs font-bold uppercase tracking-wider text-red-300 shadow-[0_0_15px_rgba(239,68,68,0.25)] transition-all hover:border-red-400 hover:bg-red-900/80 hover:text-red-100"
+            data-testid="button-mission-briefing"
+          >
+            <ShieldAlert className="h-3.5 w-3.5 text-red-400 shrink-0" />
+            <span>MISSION BRIEFING: THE AI TRAP & SOUL SIPHON</span>
+          </motion.button>
+
+          {/* Updates & Patch Notes Link */}
+          <button
+            type="button"
+            onClick={() => setShowUpdatesModal(true)}
+            className="mt-2.5 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-400 transition-colors hover:text-cyan-300 hover:underline"
+            data-testid="button-intro-updates"
+          >
+            UPDATES & PATCH NOTES (V{CURRENT_VERSION})
+          </button>
+
           <a
             href="https://gsix.online"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 self-center text-center font-mono text-[8px] uppercase tracking-[0.1em] text-white/20 transition-colors hover:text-white/50"
+            className="mt-2 self-center text-center font-mono text-[8px] uppercase tracking-[0.1em] text-white/20 transition-colors hover:text-white/50"
             data-testid="link-intro-credit"
           >
-            Powered by LokServices · Designed by GSixDesigns
+            POWERED BY LOKSERVICES · DESIGNED BY GSIXDESIGNS
           </a>
         </motion.div>
         {/* Both of these use `position: fixed`, which must escape to the
@@ -194,6 +225,94 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
+
+      {/* Mission Briefing / Lore Screen Modal (Setup like UpdatePopup with button theme) */}
+      <AnimatePresence>
+        {showLoreModal && <LorePopup onClose={() => setShowLoreModal(false)} />}
+      </AnimatePresence>
+
+      {/* Updates Modal from Intro Screen */}
+      <AnimatePresence>
+        {showUpdatesModal && (
+          <div
+            className="fixed inset-0 z-[150] grid place-items-center overflow-y-auto bg-black/90 p-4 py-6 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Game updates"
+            data-testid="section-intro-updates-popup"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
+              className="relative w-full max-w-lg border-2 border-cyan-300/50 bg-gradient-to-b from-cyan-950/40 to-black p-5 shadow-[0_0_60px_rgba(103,232,249,0.15)] text-left"
+            >
+              <button
+                type="button"
+                onClick={() => setShowUpdatesModal(false)}
+                className="absolute right-3 top-3 grid h-9 w-9 place-items-center border border-white/20 bg-black/70 text-white transition-all active:scale-[0.97] hover:border-white/50"
+                aria-label="Dismiss update notice"
+                data-testid="button-close-intro-updates-popup"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-6 w-6 shrink-0 text-cyan-300" />
+                <div>
+                  <p className="font-mono text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300">
+                    A Message From {credit}
+                  </p>
+                  <h2 className="text-2xl font-black uppercase text-white">Updates & Patch Notes</h2>
+                </div>
+              </div>
+              <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                Current Version v{CURRENT_VERSION} · Total Updates: {CHANGELOG.length}
+              </p>
+
+              <div className="mt-4 max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+                {[...CHANGELOG].reverse().map((entry) => (
+                  <div
+                    key={entry.version}
+                    className={`border p-3 ${entry.kind === 'hotfix' ? 'border-amber-400/40 bg-amber-400/5' : 'border-cyan-300/25 bg-cyan-300/5'}`}
+                    data-testid={`intro-update-entry-${entry.version}`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest ${
+                          entry.kind === 'hotfix'
+                            ? 'border-amber-400/60 bg-amber-400/15 text-amber-300'
+                            : 'border-cyan-300/60 bg-cyan-300/15 text-cyan-200'
+                        }`}
+                      >
+                        {entry.kind === 'hotfix' ? <Wrench className="h-2.5 w-2.5" /> : <Megaphone className="h-2.5 w-2.5" />}
+                        {entry.kind === 'hotfix' ? 'Hotfix' : 'Update'} #{updateNumber(entry)}
+                      </span>
+                      <span className="font-mono text-[9px] text-muted-foreground">v{entry.version} · {entry.date}</span>
+                    </div>
+                    <h3 className="mt-1.5 text-sm font-black uppercase text-white">{entry.title}</h3>
+                    <ul className="mt-1.5 space-y-1">
+                      {entry.body.map((line) => (
+                        <li key={line} className="text-xs leading-snug text-muted-foreground">{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowUpdatesModal(false)}
+                className="mt-4 w-full border border-cyan-300/60 bg-cyan-300/15 py-3 text-sm font-black uppercase tracking-widest text-cyan-100 transition-colors hover:bg-cyan-300/25"
+                data-testid="button-acknowledge-intro-updates"
+              >
+                Let's Go
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

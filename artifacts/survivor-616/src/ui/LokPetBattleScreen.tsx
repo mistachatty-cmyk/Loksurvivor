@@ -275,31 +275,67 @@ export function LokPetBattleScreen({
     setBattleState(null);
   };
 
-  // Renders Elemental Badge
+  // Renders Elemental Badge with Digi-Thematic styling
   const renderElementBadge = (element: LokPetElement) => {
     switch (element) {
       case 'fire':
         return (
           <span className="inline-flex items-center gap-1 rounded border border-orange-500/50 bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
-            <Flame className="h-3 w-3" /> Fire
+            <Flame className="h-3 w-3" /> Pyro-Bit
           </span>
         );
       case 'freeze':
         return (
           <span className="inline-flex items-center gap-1 rounded border border-cyan-500/50 bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan-300">
-            <Snowflake className="h-3 w-3" /> Freeze
+            <Snowflake className="h-3 w-3" /> Cryo-Byte
           </span>
         );
       case 'slow':
         return (
+          <span className="inline-flex items-center gap-1 rounded border border-purple-500/50 bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-300">
+            <Clock className="h-3 w-3" /> Chrono-Lag
+          </span>
+        );
+      case 'volt':
+        return (
           <span className="inline-flex items-center gap-1 rounded border border-amber-500/50 bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
-            <Clock className="h-3 w-3" /> Chrono
+            <Zap className="h-3 w-3" /> Volt-Surge
+          </span>
+        );
+      case 'glitch':
+        return (
+          <span className="inline-flex items-center gap-1 rounded border border-pink-500/50 bg-pink-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-pink-300">
+            <Bot className="h-3 w-3" /> Null-Glitch
+          </span>
+        );
+      case 'terra':
+        return (
+          <span className="inline-flex items-center gap-1 rounded border border-yellow-600/50 bg-yellow-600/20 px-2 py-0.5 text-[10px] font-bold uppercase text-yellow-300">
+            <Shield className="h-3 w-3" /> Solid-Core
+          </span>
+        );
+      case 'aero':
+        return (
+          <span className="inline-flex items-center gap-1 rounded border border-teal-500/50 bg-teal-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-teal-300">
+            <FastForward className="h-3 w-3" /> Gale-Packet
+          </span>
+        );
+      case 'light':
+        return (
+          <span className="inline-flex items-center gap-1 rounded border border-yellow-300/50 bg-yellow-300/20 px-2 py-0.5 text-[10px] font-bold uppercase text-yellow-200">
+            <Sparkles className="h-3 w-3" /> Photon-Array
+          </span>
+        );
+      case 'dark':
+        return (
+          <span className="inline-flex items-center gap-1 rounded border border-indigo-500/50 bg-indigo-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-300">
+            <Activity className="h-3 w-3" /> Void-Sector
           </span>
         );
       default:
         return (
           <span className="inline-flex items-center gap-1 rounded border border-slate-500/50 bg-slate-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
-            <CircleDot className="h-3 w-3" /> Kinetic
+            <CircleDot className="h-3 w-3" /> Raw Kinetic
           </span>
         );
     }
@@ -671,9 +707,11 @@ export function LokPetBattleScreen({
 
                       <div className="mt-2 flex items-center justify-between border-t border-slate-800/80 pt-1.5 font-mono text-[9px]">
                         <span className="text-slate-400">Pwr: {move.power * 100}</span>
-                        {elemMult.multiplier > 1.2 && (
+                        {elemMult.multiplier > 1.2 ? (
                           <span className="text-orange-400 font-bold">Effective!</span>
-                        )}
+                        ) : elemMult.multiplier < 0.9 ? (
+                          <span className="text-slate-500 font-semibold">Resisted</span>
+                        ) : null}
                         <span className="text-slate-500">Acc: {move.accuracy * 100}%</span>
                       </div>
                     </button>
@@ -802,13 +840,20 @@ export function LokPetBattleScreen({
                         </div>
                       </div>
 
-                      {/* Level Ups */}
+                      {/* Level Ups & Digi Evolutions */}
                       {battleState.rewards.levelUps.length > 0 && (
-                        <div className="mt-3 border-t border-slate-800 pt-2">
+                        <div className="mt-3 border-t border-slate-800 pt-2 space-y-1.5">
                           {battleState.rewards.levelUps.map((lvl, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-xs text-emerald-400 font-semibold">
-                              <span>🎉 {lvl.petName} Leveled Up!</span>
-                              <span>Lv.{lvl.oldLevel} → Lv.{lvl.newLevel}</span>
+                            <div key={idx} className="flex flex-col gap-0.5 text-xs text-emerald-400 font-semibold">
+                              <div className="flex items-center justify-between">
+                                <span>🎉 {lvl.petName} Leveled Up!</span>
+                                <span className="font-mono text-emerald-300">Lv.{lvl.oldLevel} → Lv.{lvl.newLevel}</span>
+                              </div>
+                              {lvl.evolved && (
+                                <div className="mt-1 rounded border border-cyan-400/60 bg-cyan-950/60 p-1.5 text-[11px] text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.2)]">
+                                  <span className="font-bold text-cyan-300">✨ DIGI-EVOLUTION!</span> Evolved into <strong className="text-white">{lvl.newTitle}</strong> (Stage {lvl.newStage})!
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

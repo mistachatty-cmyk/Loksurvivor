@@ -3,6 +3,7 @@
  * and props stable.
  */
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { WEIRD_AREAS, BONUS_DIGIVERSE_AREAS } from '@/game/data/areas-weird';
 import { customMapToArea, customMapValidationIssues } from '@/game/data/customMaps';
 import { availableChallengeContracts } from '@/game/data/vendor';
 import { getFirstNightChapter } from '@/game/data/firstNight';
@@ -10,7 +11,7 @@ import { areaCategory, type AreaCategory } from '@/game/data/areaCategories';
 import { ScreenLayout } from './ScreenLayout';
 import { FirstNightBoard } from './FirstNightBoard';
 import { motion } from 'framer-motion';
-import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy, Maximize2, Compass, Layers } from 'lucide-react';
+import { MapPin, Lock, Clock, AlertTriangle, CheckCircle2, Infinity, Skull, PencilRuler, Copy, Maximize2, Compass, Layers, Sparkles, Eye } from 'lucide-react';
 import { useState } from 'react';
 
 export interface AreaSelectProps {
@@ -63,6 +64,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const endlessCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'endless').length;
   const standardCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'standard').length;
   const twoXCount = allAuthoredAreas.filter((area) => areaCategory(area) === '2x').length;
+  const fourXCount = allAuthoredAreas.filter((area) => areaCategory(area) === '4x').length;
   const bonusCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'bonus').length + customMaps.length;
 
   return (
@@ -153,6 +155,9 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
           </button>
           <button type="button" onClick={() => setFilter('2x')} data-testid="button-area-filter-2x" className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === '2x' ? 'border-orange-300 bg-orange-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-orange-300/60 hover:text-orange-200'}`}>
             <Maximize2 className="h-3.5 w-3.5" /> 2× Maps ({twoXCount})
+          </button>
+          <button type="button" onClick={() => setFilter('4x')} data-testid="button-area-filter-4x" className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === '4x' ? 'border-amber-400 bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.35)]' : 'border-border bg-card text-muted-foreground hover:border-amber-400/60 hover:text-amber-200'}`}>
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" /> 4× Extreme ({fourXCount})
           </button>
         </div>
 
@@ -300,6 +305,18 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                     <div className="flex items-center gap-1.5 border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-cyan-100">
                       <Maximize2 className="h-3 w-3" />
                       <span className="text-[10px] font-bold uppercase tracking-widest">XL Route</span>
+                    </div>
+                  ) : null}
+                  {area.id.endsWith('-4x') ? (
+                    <div className="flex items-center gap-1.5 border border-amber-400/50 bg-amber-400/15 px-2 py-1 text-amber-200">
+                      <Sparkles className="h-3 w-3 text-amber-300" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">4× Extreme</span>
+                    </div>
+                  ) : null}
+                  {area.sky === 'fog' || area.sky === 'roofed' || area.district.toLowerCase().includes('sub-basement') || area.district.toLowerCase().includes('catacombs') ? (
+                    <div className="flex items-center gap-1.5 border border-cyan-400/40 bg-cyan-950/40 px-2 py-1 text-cyan-200">
+                      <Eye className="h-3 w-3 text-cyan-300" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Atmospheric Fog</span>
                     </div>
                   ) : null}
                 </div>

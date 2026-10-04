@@ -243,6 +243,17 @@ export interface EnemyActor extends Actor {
   /** Llamá Máma: mesmerized with heart eyes and bubbles, trailing baby llamas */
   cutifiedUntil?: number;
   cutifiedTargetUid?: number;
+  /** Veteran enemy system: higher tier variant with special affix badge, amplified stats and unique drops */
+  isVeteran?: boolean;
+  veteranAffix?: 'armored' | 'overclocked' | 'incendiary' | 'vampiric' | 'magnetic';
+  veteranTitle?: string;
+  veteranColor?: string;
+  /** Firefly spiker pulse sequence tracking */
+  spikerPulseCount?: number;
+  spikerPulseCooldown?: number;
+  /** Firefly cannon heavy shot timer */
+  cannonCooldownUntil?: number;
+  cannonTelegraphUntil?: number;
 }
 
 /** A free-roaming detection circle released by a 'commander' enemy. See `updateRoamingDetectors`. */
@@ -299,7 +310,7 @@ export interface Projectile {
   /** Zero Day: when set, this projectile IS a thrown frozen enemy (that uid), resolved by resolveThrownEnemyImpact instead of the normal hit path. */
   carriedEnemyUid?: number;
   /** Custom projectile kind, such as the retro DVD bouncing screensaver icon, cascading solitaire windows, nyan cat, popup ad, dom tag, byte block, golden cookie. */
-  customKind?: 'dvd-logo' | 'solitaire' | 'baby-llama' | 'elemental-llama' | 'nyan-cat' | 'popup-window' | 'dom-tag' | 'byte-block' | 'golden-cookie';
+  customKind?: 'dvd-logo' | 'solitaire' | 'baby-llama' | 'elemental-llama' | 'nyan-cat' | 'popup-window' | 'dom-tag' | 'byte-block' | 'golden-cookie' | 'firefly' | 'firefly-cannon-ball' | 'pyro-firefly-shot';
   weaponId?: string;
   bounceCount?: number;
   trampleNextAt?: number;
@@ -420,7 +431,23 @@ function createDashSkillRuntime(def: DashSkillDef | undefined): DashSkillRuntime
   return { def, slotReadyAt: [0], wallReadyAt: 0, pendingLandings: [] };
 }
 
-export type PickupKind = 'xp' | 'health' | 'cred' | 'sweep' | 'loot-box' | 'card-pack' | 'coin';
+export type PickupKind =
+  | 'xp'
+  | 'health'
+  | 'cred'
+  | 'sweep'
+  | 'loot-box'
+  | 'card-pack'
+  | 'coin'
+  | 'glitch-cache'
+  | 'relic-vault-chest'
+  | 'firefly-amber-chest'
+  | 'mimic-chest'
+  | 'phosphor-ore'
+  | 'silicon-alloy'
+  | 'cyber-resin'
+  | 'prism-quartz'
+  | 'water-flask';
 
 export interface Pickup {
   uid: number;
@@ -1235,6 +1262,14 @@ export interface World {
   dvdEasterEggUnlocked?: boolean;
   bubbleWash?: BubbleWashState;
   electricChains?: ElectricChain[];
+  /** Full-screen chromatic/flash effect (e.g. from Firefly Cannon impact) */
+  screenFlash?: { color: string; maxAlpha: number; startedAt: number; until: number; durationMs: number };
+  /** Relic crafting materials collected during this run */
+  craftingMaterialsCollected: Record<string, number>;
+  /** Key items in inventory active during this run */
+  ownedKeyItemIds?: string[];
+  /** Real crafted relics active during this run */
+  craftedRelicIds?: string[];
 }
 
 export interface BubbleWashState {
@@ -1375,6 +1410,8 @@ export function createWorld(
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
     dvdEasterEggUnlocked?: boolean;
+    ownedKeyItemIds?: string[];
+    craftedRelicIds?: string[];
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1733,6 +1770,9 @@ export function createWorld(
     electricChains: [],
     objectives: rollStartingObjectives(rng, !!area.endless),
     completedObjectives: [],
+    craftingMaterialsCollected: {},
+    ownedKeyItemIds: setup.ownedKeyItemIds ? [...setup.ownedKeyItemIds] : [],
+    craftedRelicIds: setup.craftedRelicIds ? [...setup.craftedRelicIds] : [],
     episode: setup.episode && setup.episode.characterId === character.id && setup.episode.areaId === area.id
       ? {
           def: setup.episode,
@@ -2258,7 +2298,18 @@ function spawnEnemy(
   // endless mode's own Math.min(1.7, ...) cap uncapped -- see run-modifiers.md.
   const calHpMult = w.threatCalibrations?.hpMult ?? 1;
   const calMassMult = w.threatCalibrations?.massMult ?? 1;
-  const hp = def.hp * hpMult * modifierHpMult(w) * directorHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
+  const baseHp = def.hp * hpMult * modifierHpMult(w) * directorHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
+
+  // Veteran enemy system: chance to promote standard enemies into formidable veteran variants
+  const isVeteranCandidate = def.family !== 'Boss' && def.sizeClass !== 'giant' && (w.now > 25000 || w.area.threat === 'severe');
+  const isVeteran = isVeteranCandidate && w.rng() < 0.12;
+  const affixes: Array<'armored' | 'overclocked' | 'incendiary' | 'vampiric' | 'magnetic'> = ['armored', 'overclocked', 'incendiary', 'vampiric', 'magnetic'];
+  const affix = isVeteran ? affixes[Math.floor(w.rng() * affixes.length)] : undefined;
+  const hp = isVeteran ? Math.round(baseHp * (affix === 'armored' ? 2.0 : 1.6)) : baseHp;
+  const finalSpeed = isVeteran ? def.speed * (w.modifiers.speedMode ? 1.25 : 1) * (affix === 'overclocked' ? 1.35 : 1.12) : def.speed * (w.modifiers.speedMode ? 1.25 : 1);
+  const finalDamage = isVeteran ? Math.round(def.damage * 1.3) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1) : def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1);
+  const finalXp = isVeteran ? Math.round(def.xp * 2.5) : def.xp;
+
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -2269,17 +2320,19 @@ function spawnEnemy(
     vy: 0,
     kx: 0,
     ky: 0,
-    radius: def.radius,
+    radius: isVeteran ? def.radius * 1.12 : def.radius,
     hp,
     maxHp: hp,
     facing: 1,
     anim: 'walk',
     animStartedAt: w.now,
     hitFlashUntil: 0,
-    speed: def.speed * (w.modifiers.speedMode ? 1.25 : 1),
-    damage: def.damage * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyDamageMultiplier, 1),
-    xp: def.xp,
-    mass: def.mass * calMassMult,
+    speed: finalSpeed,
+    damage: finalDamage,
+    xp: finalXp,
+    mass: (isVeteran ? def.mass * 1.4 : def.mass) * calMassMult,
+    isVeteran,
+    veteranAffix: affix,
     contactReadyAt: 0,
     chargeReadyAt: w.now + randRange(w.rng, 800, 2600),
     chargeUntil: 0,
@@ -2871,6 +2924,8 @@ function lokPetStatusId(pet: LokPetInstance, w?: World): string | undefined {
   if (pet.element === 'fire') return 'burning';
   if (pet.element === 'freeze') return 'freeze';
   if (pet.element === 'slow') return 'slow';
+  if (pet.element === 'volt') return 'chilled';
+  if (pet.element === 'glitch') return 'corrupted';
   return undefined;
 }
 
@@ -3759,6 +3814,22 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
     bornAt: w.now,
   });
 
+  // Bionic Cluck Protocol: Digital Russel's mutiny transmutes fallen bots into restorative kinetic eggs
+  if ((w.modifiers.bionicCluckProtocol || w.character.id === 'cluck-616') && w.rng() < 0.28) {
+    w.pickups.push({
+      uid: uid(w),
+      kind: 'health',
+      x: enemy.x + randRange(w.rng, -15, 15),
+      y: enemy.y + randRange(w.rng, -15, 15),
+      vx: randRange(w.rng, -25, 25),
+      vy: randRange(w.rng, -25, 25),
+      value: 28,
+      bornAt: w.now,
+    });
+    spawnParticles(w, enemy.x, enemy.y, '#facc15', 6, 90);
+    w.popups.push({ x: enemy.x, y: enemy.y - 14, text: 'CLUCK EGG', color: '#facc15', bornAt: w.now, vy: 28 });
+  }
+
   const roll = w.rng();
   if (roll < 0.045) {
     w.pickups.push({
@@ -3784,6 +3855,102 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   if (enemy.def.family !== 'Boss' && w.rng() < packChance) {
     w.pickups.push({ uid: uid(w), kind: 'card-pack', x: enemy.x, y: enemy.y, vx: randRange(w.rng, -24, 24), vy: randRange(w.rng, -24, 24), value: 1, bornAt: w.now });
     pushAlert(w, collector ? `${collector.rank} found a floor Lock Pack` : 'Lock Pack dropped');
+  }
+
+  // Veteran enemy system drop rewards
+  if (enemy.isVeteran) {
+    const vMaterials: Array<'silicon-alloy' | 'phosphor-ore' | 'cyber-resin' | 'prism-quartz'> = [
+      'silicon-alloy',
+      'phosphor-ore',
+      'cyber-resin',
+      w.rng() < 0.25 ? 'prism-quartz' : 'silicon-alloy',
+    ];
+    const mat = vMaterials[Math.floor(w.rng() * vMaterials.length)]!;
+    w.pickups.push({
+      uid: uid(w),
+      kind: mat,
+      x: enemy.x + randRange(w.rng, -15, 15),
+      y: enemy.y + randRange(w.rng, -15, 15),
+      vx: randRange(w.rng, -20, 20),
+      vy: randRange(w.rng, -20, 20),
+      value: 1,
+      bornAt: w.now,
+    });
+    w.popups.push({
+      x: enemy.x,
+      y: enemy.y - 25,
+      text: `VETERAN SLAIN! +${enemy.veteranAffix?.toUpperCase() ?? 'ELITE'}`,
+      color: '#fbbf24',
+      bornAt: w.now,
+      vy: 35,
+    });
+    // Chance for specialized chest
+    if (w.rng() < 0.3) {
+      const chestKinds: Array<'glitch-cache' | 'relic-vault-chest' | 'firefly-amber-chest'> = [
+        'glitch-cache',
+        'relic-vault-chest',
+        'firefly-amber-chest',
+      ];
+      w.pickups.push({
+        uid: uid(w),
+        kind: chestKinds[Math.floor(w.rng() * chestKinds.length)]!,
+        x: enemy.x,
+        y: enemy.y,
+        vx: 0,
+        vy: 0,
+        value: 1,
+        bornAt: w.now,
+      });
+    }
+  }
+
+  // Firefly Wranglers and Firefly Miners drop Phosphor Ore
+  if ((enemy.defId === 'firefly-miner' || enemy.def.faction === 'Firefly Wranglers') && w.rng() < 0.65) {
+    w.pickups.push({
+      uid: uid(w),
+      kind: 'phosphor-ore',
+      x: enemy.x,
+      y: enemy.y,
+      vx: randRange(w.rng, -25, 25),
+      vy: randRange(w.rng, -25, 25),
+      value: 1,
+      bornAt: w.now,
+    });
+  }
+
+  // Firefly Pyro Duelist drops rich rewards
+  if (enemy.defId === 'firefly-pyro-duelist') {
+    w.pickups.push({
+      uid: uid(w),
+      kind: 'firefly-amber-chest',
+      x: enemy.x - 20,
+      y: enemy.y,
+      vx: 0,
+      vy: 0,
+      value: 1,
+      bornAt: w.now,
+    });
+    w.pickups.push({
+      uid: uid(w),
+      kind: 'prism-quartz',
+      x: enemy.x + 20,
+      y: enemy.y,
+      vx: 0,
+      vy: 0,
+      value: 1,
+      bornAt: w.now,
+    });
+    w.pickups.push({
+      uid: uid(w),
+      kind: 'water-flask',
+      x: enemy.x,
+      y: enemy.y + 20,
+      vx: 0,
+      vy: 0,
+      value: 1,
+      bornAt: w.now,
+    });
+    pushAlert(w, 'PYRO-DUELIST DOWN — AMBER CHEST SECURED');
   }
 
   if (enemy.def.family === 'Boss') {
@@ -5678,7 +5845,17 @@ function updateFluids(w: World) {
     const playerInside = dist2(p.x, p.y, tile.x, tile.y) <= (tile.radius + p.radius) ** 2;
     if (playerInside && !dashing) {
       if (tile.kind === 'runoff') damagePlayer(w, 5, tile.x, tile.y);
-      else if (tile.kind === 'burning-oil') damagePlayer(w, 6, tile.x, tile.y);
+      else if (tile.kind === 'burning-oil') {
+        const hasWaterBag = w.ownedKeyItemIds?.includes('bag-of-water');
+        if (hasWaterBag) {
+          spawnFluidTile(w, p.x, p.y, 'water');
+          w.popups.push({ x: p.x, y: p.y - 18, text: "BAG O' WATER DOUSE", color: '#38bdf8', bornAt: w.now, vy: 25 });
+          spawnParticles(w, p.x, p.y, '#38bdf8', 8, 80);
+          tile.expiresAt = w.now; // Extinguished immediately
+        } else {
+          damagePlayer(w, 6, tile.x, tile.y);
+        }
+      }
       else if (tile.kind === 'fire-storm') damagePlayer(w, 6, tile.x, tile.y);
       else if (tile.kind === 'acid-storm') damagePlayer(w, 4, tile.x, tile.y);
     }
@@ -7338,6 +7515,153 @@ function updateEnemies(w: World, dt: number) {
         }
         break;
       }
+      case 'firefly-spiker': {
+        // Subterranean spiker: halts and launches sequential underground pulses towards the player.
+        // User spec: 9 sequential ground pulses (higher reach for veteran), popping up one after another.
+        if (distance < 380) {
+          speed *= 0.35;
+          if (w.now >= enemy.fireReadyAt) {
+            const maxPulses = enemy.isVeteran ? 13 : 9;
+            enemy.fireReadyAt = w.now + (enemy.isVeteran ? 2600 : 3400);
+            enemy.anim = 'attack';
+            enemy.animStartedAt = w.now;
+            spawnParticles(w, enemy.x, enemy.y, '#ea580c', 10, 80);
+            pushAlert(w, 'GROUND SPIKE WAVE!');
+            pushSfx(w, 'stomp');
+            const pulseAngle = Math.atan2(dirY, dirX);
+            const stepDist = 34;
+            for (let step = 1; step <= maxPulses; step += 1) {
+              const px = enemy.x + Math.cos(pulseAngle) * (step * stepDist);
+              const py = enemy.y + Math.sin(pulseAngle) * (step * stepDist);
+              const delay = step * 115;
+              if (canSpawnEnemyEffect(w)) {
+                w.effects.push({
+                  uid: uid(w),
+                  kind: 'ring',
+                  x: px,
+                  y: py,
+                  radius: 26,
+                  angle: 0,
+                  spread: Math.PI * 2,
+                  bornAt: w.now + delay,
+                  expiresAt: w.now + delay + 280,
+                  color: step % 2 === 0 ? '#f59e0b' : '#ea580c',
+                  damage: 14 * statusDamageMultiplier(enemy),
+                  impactIntensity: 2,
+                  hitUids: new Set(),
+                  followPlayer: false,
+                });
+              }
+            }
+          }
+        }
+        break;
+      }
+      case 'firefly-cannon': {
+        // Heavy siege mortar: charges a glowing firefly sphere, then fires an explosive mortar ball
+        // that detonates in a blinding screen flash and scatters fireflies everywhere.
+        speed = 0;
+        if (enemy.telegraphUntil === 0 && w.now >= enemy.fireReadyAt && distance < 650) {
+          enemy.telegraphUntil = w.now + 1200;
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+          spawnParticles(w, enemy.x, enemy.y, '#fbbf24', 8, 50);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: 46, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now, expiresAt: w.now + 1200, color: '#fbbf24', damage: 0, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        if (enemy.telegraphUntil > 0 && w.now >= enemy.telegraphUntil) {
+          enemy.telegraphUntil = 0;
+          enemy.fireReadyAt = w.now + randRange(w.rng, 4200, 5800);
+          const cannonAngle = Math.atan2(dirY, dirX);
+          spawnParticles(w, enemy.x, enemy.y, '#fbbf24', 16, 120);
+          pushAlert(w, 'FIREFLY CANNON INCOMING!');
+          if (canSpawnEnemyProjectile(w)) {
+            w.projectiles.push({
+              uid: uid(w),
+              customKind: 'firefly-cannon-ball',
+              x: enemy.x,
+              y: enemy.y,
+              vx: Math.cos(cannonAngle) * 310,
+              vy: Math.sin(cannonAngle) * 310,
+              radius: 16,
+              damage: 30,
+              impactIntensity: 5,
+              fromPlayer: false,
+              expiresAt: w.now + 2400,
+              targetUid: null,
+              turnRate: 0,
+              color: '#fbbf24',
+              trail: [],
+              pierce: 0,
+              hitUids: new Set(),
+            });
+          }
+        }
+        break;
+      }
+      case 'firefly-pyro-duelist': {
+        // High-tier boss wielding red fireflies, dual cannons firing simultaneously and laying molten trails.
+        if (distance > 240) {
+          speed = enemy.speed * 1.1;
+        } else if (distance < 140) {
+          speed = -enemy.speed * 0.7;
+        } else {
+          speed = enemy.speed * 0.4;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + (enemy.isVeteran ? 1900 : 2500);
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+          const baseAngle = Math.atan2(dirY, dirX);
+          const angles = [baseAngle - 0.22, baseAngle + 0.22];
+          pushAlert(w, 'DUAL FIREFLY FLAME STREAM!');
+          for (const a of angles) {
+            if (canSpawnEnemyProjectile(w)) {
+              w.projectiles.push({
+                uid: uid(w),
+                customKind: 'pyro-firefly-shot',
+                x: enemy.x + Math.cos(a + Math.PI / 2) * 12,
+                y: enemy.y + Math.sin(a + Math.PI / 2) * 12,
+                vx: Math.cos(a) * 380,
+                vy: Math.sin(a) * 380,
+                radius: 10,
+                damage: 18,
+                impactIntensity: 2,
+                fromPlayer: false,
+                expiresAt: w.now + 1800,
+                targetUid: null,
+                turnRate: 0,
+                color: '#ef4444',
+                trail: [],
+                pierce: 1,
+                hitUids: new Set(),
+              });
+            }
+            // Leaves molten hot floor tiles along the firing path
+            spawnFluidTile(w, enemy.x + Math.cos(a) * 45, enemy.y + Math.sin(a) * 45, 'burning-oil');
+          }
+        }
+        break;
+      }
+      case 'mimic-chest': {
+        if (enemy.hp === enemy.maxHp && distance > 90 && !enemy.chargeUntil) {
+          speed = 0; // Masquerading as chest
+        } else {
+          if (!enemy.chargeUntil) {
+            enemy.chargeUntil = w.now + 8000;
+            pushAlert(w, 'MIMIC CHEST AWAKENED!');
+            w.shake = Math.max(w.shake, 6);
+            spawnParticles(w, enemy.x, enemy.y, '#dc2626', 14, 110);
+          }
+          speed = enemy.speed * 1.5;
+        }
+        break;
+      }
       case 'chase':
       default:
         break;
@@ -7913,6 +8237,39 @@ function updateProjectiles(w: World, dt: number) {
     }
 
     if (remove) {
+      if (proj.customKind === 'firefly-cannon-ball') {
+        w.screenFlash = { color: '#fbbf24', maxAlpha: 0.8, startedAt: w.now, until: w.now + 480, durationMs: 480 };
+        w.shake = Math.max(w.shake, 14);
+        novaDamage(w, proj.x, proj.y, 110, 24, 4);
+        pushAlert(w, 'CANNON DETONATION!');
+        pushSfx(w, 'stomp');
+        for (let fi = 0; fi < 20; fi += 1) {
+          const fa = (fi * Math.PI * 2) / 20 + randRange(w.rng, -0.2, 0.2);
+          const fspeed = randRange(w.rng, 180, 360);
+          w.projectiles.push({
+            uid: uid(w),
+            customKind: 'firefly',
+            x: proj.x,
+            y: proj.y,
+            vx: Math.cos(fa) * fspeed,
+            vy: Math.sin(fa) * fspeed,
+            radius: 4,
+            damage: 6,
+            impactIntensity: 1,
+            fromPlayer: false,
+            expiresAt: w.now + 1600,
+            targetUid: null,
+            turnRate: 0,
+            color: '#fbbf24',
+            trail: [],
+            pierce: 1,
+            hitUids: new Set(),
+          });
+        }
+      }
+      if (proj.customKind === 'pyro-firefly-shot') {
+        spawnFluidTile(w, proj.x, proj.y, 'burning-oil');
+      }
       if (proj.customKind === 'popup-window') {
         novaDamage(w, proj.x, proj.y, 90, proj.damage * 1.4, 3);
         damageBreakable(w, proj.x, proj.y, 90, proj.damage * 1.4, 3, proj.x, proj.y);
@@ -9521,6 +9878,111 @@ function updatePickups(w: World, dt: number) {
           pushAlert(w, 'Street sweep');
           break;
         }
+        case 'glitch-cache': {
+          w.craftingMaterialsCollected['cyber-resin'] = (w.craftingMaterialsCollected['cyber-resin'] ?? 0) + 2;
+          w.cardPacksFound.push('scenario');
+          w.popups.push({ x: p.x, y: p.y - 20, text: 'GLITCH CACHE CRACKED', color: '#22d3ee', bornAt: w.now, vy: 30 });
+          spawnParticles(w, p.x, p.y, '#22d3ee', 16, 120);
+          w.shake = Math.max(w.shake, 8);
+          pushAlert(w, 'Glitch Cache cracked: +2 Cyber Resin & Scenario Pack');
+          pushSfx(w, 'lootBox');
+          break;
+        }
+        case 'relic-vault-chest': {
+          const hasKey = w.skeletonKeysGained > 0 || w.craftedRelicIds?.includes('overflow-service-key');
+          if (!hasKey) {
+            w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCKED (NEED SKELETON KEY)', color: '#f59e0b', bornAt: w.now, vy: 20 });
+            continue;
+          }
+          if (w.skeletonKeysGained > 0 && !w.craftedRelicIds?.includes('overflow-service-key')) {
+            w.skeletonKeysGained -= 1;
+          }
+          w.craftingMaterialsCollected['prism-quartz'] = (w.craftingMaterialsCollected['prism-quartz'] ?? 0) + 2;
+          w.cred += 250;
+          w.popups.push({ x: p.x, y: p.y - 20, text: 'VAULT UNLOCKED! +2 PRISM QUARTZ', color: '#fbbf24', bornAt: w.now, vy: 35 });
+          spawnParticles(w, p.x, p.y, '#fbbf24', 20, 140);
+          w.shake = Math.max(w.shake, 10);
+          pushAlert(w, 'Relic Vault Opened — 2 Prism Quartz & 250 Cred');
+          pushSfx(w, 'pickupKey');
+          break;
+        }
+        case 'firefly-amber-chest': {
+          w.craftingMaterialsCollected['phosphor-ore'] = (w.craftingMaterialsCollected['phosphor-ore'] ?? 0) + 3;
+          w.popups.push({ x: p.x, y: p.y - 20, text: 'AMBER CHEST! +3 PHOSPHOR ORE', color: '#fbbf24', bornAt: w.now, vy: 32 });
+          spawnParticles(w, p.x, p.y, '#f59e0b', 18, 130);
+          w.shake = Math.max(w.shake, 8);
+          pushAlert(w, 'Amber Chest cracked: +3 Phosphor Ore & Firefly Swarm');
+          pushSfx(w, 'lootBox');
+          // Releases 12 protective bioluminescent fireflies
+          for (let fi = 0; fi < 12; fi += 1) {
+            const fAngle = (fi * Math.PI * 2) / 12;
+            w.projectiles.push({
+              uid: uid(w),
+              customKind: 'firefly',
+              x: p.x,
+              y: p.y,
+              vx: Math.cos(fAngle) * 220,
+              vy: Math.sin(fAngle) * 220,
+              radius: 5,
+              damage: 15,
+              impactIntensity: 2,
+              fromPlayer: true,
+              expiresAt: w.now + 3800,
+              targetUid: null,
+              turnRate: 3.5,
+              color: '#fbbf24',
+              trail: [],
+              pierce: 2,
+              hitUids: new Set(),
+            });
+          }
+          break;
+        }
+        case 'mimic-chest': {
+          pushAlert(w, 'MIMIC AMBUSH!');
+          spawnParticles(w, p.x, p.y, '#dc2626', 16, 120);
+          w.shake = Math.max(w.shake, 8);
+          const mimicDef = getEnemy('mimic-chest');
+          spawnEnemy(w, mimicDef, 1, { x: p.x + 30, y: p.y + 10 });
+          break;
+        }
+        case 'phosphor-ore': {
+          w.craftingMaterialsCollected['phosphor-ore'] = (w.craftingMaterialsCollected['phosphor-ore'] ?? 0) + 1;
+          w.popups.push({ x: p.x, y: p.y - 18, text: '+1 PHOSPHOR ORE', color: '#fbbf24', bornAt: w.now, vy: 26 });
+          spawnParticles(w, p.x, p.y, '#fbbf24', 6, 60);
+          pushSfx(w, 'gemPickup');
+          break;
+        }
+        case 'silicon-alloy': {
+          w.craftingMaterialsCollected['silicon-alloy'] = (w.craftingMaterialsCollected['silicon-alloy'] ?? 0) + 1;
+          w.popups.push({ x: p.x, y: p.y - 18, text: '+1 SILICON ALLOY', color: '#38bdf8', bornAt: w.now, vy: 26 });
+          spawnParticles(w, p.x, p.y, '#38bdf8', 6, 60);
+          pushSfx(w, 'gemPickup');
+          break;
+        }
+        case 'cyber-resin': {
+          w.craftingMaterialsCollected['cyber-resin'] = (w.craftingMaterialsCollected['cyber-resin'] ?? 0) + 1;
+          w.popups.push({ x: p.x, y: p.y - 18, text: '+1 CYBER RESIN', color: '#c084fc', bornAt: w.now, vy: 26 });
+          spawnParticles(w, p.x, p.y, '#c084fc', 6, 60);
+          pushSfx(w, 'gemPickup');
+          break;
+        }
+        case 'prism-quartz': {
+          w.craftingMaterialsCollected['prism-quartz'] = (w.craftingMaterialsCollected['prism-quartz'] ?? 0) + 1;
+          w.popups.push({ x: p.x, y: p.y - 20, text: '+1 PRISM QUARTZ 💎', color: '#f43f5e', bornAt: w.now, vy: 30 });
+          spawnParticles(w, p.x, p.y, '#f43f5e', 10, 90);
+          pushSfx(w, 'pickupKey');
+          break;
+        }
+        case 'water-flask': {
+          p.hp = Math.min(p.maxHp, p.hp + 25);
+          spawnFluidTile(w, p.x, p.y, 'water');
+          w.popups.push({ x: p.x, y: p.y - 18, text: '+25 HP (QUENCHED)', color: '#38bdf8', bornAt: w.now, vy: 25 });
+          spawnParticles(w, p.x, p.y, '#38bdf8', 8, 80);
+          pushAlert(w, 'Water Flask used — flames quenched & health restored');
+          pushSfx(w, 'heal');
+          break;
+        }
       }
       w.pickups.splice(i, 1);
     }
@@ -10944,6 +11406,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     lokPetDiscoveries: [],
     lootTokensGained: w.lootTokensGained,
     skeletonKeysGained: w.skeletonKeysGained,
+    craftingMaterialsCollected: { ...w.craftingMaterialsCollected },
     completedObjectives: [...w.completedObjectives],
     episode: (() => {
       const snapshot = episodeSnapshot(w);

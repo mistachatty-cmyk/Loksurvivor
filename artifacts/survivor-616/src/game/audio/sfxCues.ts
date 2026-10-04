@@ -17,6 +17,11 @@
 
 export type SfxCueId =
   | 'hit'
+  | 'stomp'
+  | 'gemPickup'
+  | 'heal'
+  | 'speedTally'
+  | 'meow'
   | 'critHit'
   | 'kill'
   | 'bossKill'
@@ -63,6 +68,11 @@ export interface SfxCueBaseParams {
 
 export const SFX_CUE_BASE: Record<SfxCueId, SfxCueBaseParams> = {
   hit: { wave: 'square', freqStart: 220, freqEnd: 140, durationMs: 55, gain: 0.16, noiseMix: 0.25 },
+  stomp: { wave: 'sawtooth', freqStart: 120, freqEnd: 45, durationMs: 220, gain: 0.26, noiseMix: 0.4 },
+  gemPickup: { wave: 'sine', freqStart: 740, freqEnd: 1100, durationMs: 90, gain: 0.14 },
+  heal: { wave: 'sine', freqStart: 392, freqEnd: 659, durationMs: 180, gain: 0.16 },
+  speedTally: { wave: 'sine', freqStart: 700, freqEnd: 980, durationMs: 60, gain: 0.1 },
+  meow: { wave: 'triangle', freqStart: 520, freqEnd: 330, durationMs: 260, gain: 0.18 },
   critHit: { wave: 'square', freqStart: 340, freqEnd: 160, durationMs: 80, gain: 0.22, noiseMix: 0.35 },
   kill: { wave: 'sawtooth', freqStart: 260, freqEnd: 60, durationMs: 140, gain: 0.2, noiseMix: 0.2 },
   bossKill: { wave: 'sawtooth', freqStart: 180, freqEnd: 40, durationMs: 520, gain: 0.3, noiseMix: 0.3 },
@@ -100,6 +110,8 @@ export interface SfxStyleDef {
   noiseMult: number;
   /** Multiplies every cue's duration. */
   decayMult: number;
+  /** Renders every cue as a synthesized meow (Cat-pack easter egg). */
+  meowMode?: boolean;
 }
 
 /** The neutral style: every purchasable pack is authored as a variation on this. */

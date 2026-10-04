@@ -3,7 +3,7 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
-import { ChevronDown, ChevronUp, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
@@ -70,6 +70,9 @@ import { REEL_FACES, prizeToFaceIndex } from '@/game/data/prizes';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { renderWorld, targetViewForWidth } from '@/game/render/draw';
 import { detectRuntimePerformanceTier } from '@/game/performanceProfile';
+import { TacticalCamera } from '@/systems/TacticalCamera';
+import { FogRenderer, type Entity } from '@/systems/FogRenderer';
+import { InputHandler } from '@/systems/InputHandler';
 import {
   effectiveStats,
   giantSizeMult,
@@ -255,6 +258,12 @@ export function RunScreen({
   const renderTargetViewRef = useRef<number | undefined>(undefined);
   const commandOriginRef = useRef<{ worldX: number; worldY: number; clientX: number; clientY: number } | null>(null);
 
+  // Tactical Camera & Fog of War System
+  const tacticalCameraRef = useRef(new TacticalCamera(0, 0));
+  const fogRendererRef = useRef(new FogRenderer());
+  const [tacticalViewActive, setTacticalViewActive] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
   const [choices, setChoices] = useState<UpgradeDef[]>([]);
@@ -390,6 +399,8 @@ export function RunScreen({
       {
         unlockedEvolutionIds: meta.unlockedEvolutionIds,
         knownRelicIds: meta.knownRelicIds,
+        ownedKeyItemIds: meta.ownedKeyItemIds,
+        craftedRelicIds: meta.craftedRelicIds,
         episode,
         episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
         wildlifeSheltersInRain: meta.wildlifeSheltersInRain,
@@ -443,6 +454,16 @@ export function RunScreen({
       }
       keysRef.current.add(key);
       if (key === ' ') ultRequestRef.current = true;
+      if (key === 'tab') {
+        event.preventDefault();
+        tacticalCameraRef.current.toggleTacticalView();
+        setTacticalViewActive(tacticalCameraRef.current.isTactical());
+      }
+      if (key === 'z') {
+        event.preventDefault();
+        const nextZoom = tacticalCameraRef.current.cycleManualZoom();
+        setZoomLevel(nextZoom);
+      }
       if (key === 'escape' || key === 'p') {
         if (phaseRef.current === 'playing' && meta.liveModeEnabled) setLiveDashboardOpen((open) => !open);
         else if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
@@ -778,6 +799,17 @@ export function RunScreen({
     }
   }, []);
 
+  const handleCanvasWheel = useCallback((event: React.WheelEvent<HTMLCanvasElement>) => {
+    // Zoom in or out with mouse wheel / trackpad pinch
+    const delta = event.deltaY;
+    const current = tacticalCameraRef.current.getManualZoom();
+    // delta > 0 is scroll down (zoom out), delta < 0 is scroll up (zoom in)
+    const step = delta > 0 ? -0.1 : 0.1;
+    const next = Math.max(0.45, Math.min(1.35, Number((current + step).toFixed(2))));
+    tacticalCameraRef.current.setManualZoom(next);
+    setZoomLevel(next);
+  }, []);
+
   /* -------------------------------------------------------------- */
   /* Loop                                                            */
   /* -------------------------------------------------------------- */
@@ -942,10 +974,35 @@ export function RunScreen({
         }
       }
 
-      // Commander view: same player-locked camera, pulled back to squad scale.
-      const commanderTargetView = commanderViewRef.current
-        ? (view.width < 620 ? 900 : Math.min(1700, view.width * 1.4))
-        : undefined;
+      // Update tactical camera position and zoom
+      const tacticalCam = tacticalCameraRef.current;
+      const baseView = view.width < 620 ? 470 : Math.min(1500, view.width * 0.78);
+      const commanderBaseView = view.width < 620 ? 900 : Math.min(1700, view.width * 1.4);
+
+      // Automatic crowd dynamic zoom-out when swarm is heavy on screen
+      if (meta.crowdAutoZoomEnabled) {
+        const enemyCount = world.enemies.length;
+        if (enemyCount > 25) {
+          const crowdFactor = Math.max(0.72, 1.0 - (enemyCount - 25) * 0.005);
+          tacticalCam.setCrowdScale(crowdFactor);
+        } else {
+          tacticalCam.setCrowdScale(1.0);
+        }
+      } else {
+        tacticalCam.setCrowdScale(1.0);
+      }
+
+      tacticalCam.setTargetView(view.width, commanderViewRef.current ? commanderBaseView : baseView);
+      tacticalCam.update(world.player.x, world.player.y, dt);
+
+      // Commander view / Tactical view / Manual zoom: pulls back camera smoothly
+      const currentCamZoom = Math.max(0.001, tacticalCam.getZoom());
+      const tacticalTargetView = tacticalCam.isTactical() || tacticalCam.getManualZoom() < 0.99
+        ? view.width / currentCamZoom
+        : commanderViewRef.current
+          ? commanderBaseView
+          : undefined;
+      const commanderTargetView = tacticalTargetView;
       renderTargetViewRef.current = commanderTargetView;
 
       const requestedRate = frameRateModeRef.current;
@@ -975,6 +1032,102 @@ export function RunScreen({
             ? { ...view, targetViewOverride: commanderTargetView, visualBudget }
             : { ...view, visualBudget },
         );
+
+        // Environmental Fog & Glowing Eyes Overlay
+        const isDarkOrUndergroundMap =
+          world.area.sky === 'fog' ||
+          world.area.sky === 'roofed' ||
+          world.area.id.includes('night') ||
+          world.area.id.includes('dark') ||
+          world.area.id.includes('abyssal') ||
+          world.area.id.includes('obsidian') ||
+          world.area.id.includes('blackout') ||
+          world.area.id.includes('-4x') ||
+          world.area.district.toLowerCase().includes('underground') ||
+          world.area.district.toLowerCase().includes('catacombs') ||
+          world.area.district.toLowerCase().includes('sub-basement');
+
+        const isFullFogMode = meta.fogAmbianceMode === 'always';
+        const isAutoDarkFog = meta.fogAmbianceMode !== 'off' && isDarkOrUndergroundMap;
+        const shouldRenderFog = tacticalCam.isTactical() || isFullFogMode || isAutoDarkFog;
+
+        if (shouldRenderFog) {
+          const fog = fogRendererRef.current;
+          // Build entities list from world enemies
+          const entities: Entity[] = world.enemies.map((e) => ({
+            id: String(e.uid),
+            x: e.x,
+            y: e.y,
+            type: e.def.family === 'Boss' ? 'boss' : e.def.sizeClass === 'elite' ? 'elite' : 'enemy',
+          }));
+
+          const isExtremeDark = Boolean(world.area.extremeDark || world.area.id === 'firefly-hollows-extreme');
+          const hasPhosphorCrown = meta.craftedRelicIds.includes('phosphor-crown') || meta.ownedKeyItemIds.includes('phosphor-crown');
+          const hasFireflyJar = meta.ownedKeyItemIds.includes('firefly-lantern');
+          const hasMiningHelmet = meta.ownedKeyItemIds.includes('mining-helmet');
+
+          let visionBonus = 0;
+          if (hasMiningHelmet) visionBonus += 0.3;
+          if (hasFireflyJar) visionBonus += 0.6;
+          if (hasPhosphorCrown) visionBonus += 1.1;
+
+          let baseVision = tacticalCam.isTactical() ? 320 : 420;
+          if (isExtremeDark) {
+            // Pitch-black without proper light gear:
+            baseVision = hasMiningHelmet || hasFireflyJar || hasPhosphorCrown ? 240 : 110;
+          }
+          const visionRadius = Math.round(baseVision * (1 + visionBonus));
+
+          // Collect active dynamic light sources (fireflies, glowing enemies, firefly projectiles, fluids)
+          const lightSources: import('@/systems/FogRenderer').LightSource[] = [];
+          for (const e of world.enemies) {
+            if (e.dying) continue;
+            if (e.def.glowRadius) {
+              lightSources.push({ x: e.x, y: e.y, radius: e.def.glowRadius, intensity: 0.9 });
+            } else if (hasPhosphorCrown || (isExtremeDark && (hasMiningHelmet || hasFireflyJar))) {
+              // Apex Phosphor Crown illuminates enemy halos in the dark!
+              lightSources.push({ x: e.x, y: e.y, radius: hasPhosphorCrown ? 70 : 45, intensity: 0.75 });
+            }
+          }
+          for (const pr of world.projectiles) {
+            if (pr.customKind === 'firefly' || pr.customKind === 'firefly-cannon-ball' || pr.color === '#fbbf24' || pr.color === '#f59e0b') {
+              lightSources.push({ x: pr.x, y: pr.y, radius: pr.radius * 4.5, intensity: 0.85 });
+            }
+          }
+          for (const fl of world.fluids) {
+            if (fl.kind === 'burning-oil') {
+              lightSources.push({ x: fl.x, y: fl.y, radius: fl.radius * 1.2, intensity: 0.75 });
+            }
+          }
+
+          const fogColor = isExtremeDark
+            ? 'rgba(2, 4, 10, 0.96)'
+            : world.area.id.includes('null')
+            ? 'rgba(4, 18, 28, 0.84)'
+            : world.area.sky === 'roofed' || world.area.district.toLowerCase().includes('sub-basement')
+            ? 'rgba(10, 10, 16, 0.88)'
+            : 'rgba(12, 14, 22, 0.82)';
+
+          // Render fog overlay with cutout around player and dynamic light sources
+          fog.renderFog(ctx, tacticalCam, view.width, view.height, view.dpr, fogColor, visionRadius, lightSources);
+
+          // Render glowing eyes in the fog for distant enemies
+          fog.renderDistantEyes(
+            ctx,
+            tacticalCam,
+            entities,
+            view.width,
+            view.height,
+            dt,
+            view.dpr,
+            meta.glowingEyesIntensity,
+          );
+
+          // Render tactical vignette when in explicit tactical mode
+          if (tacticalCam.isTactical()) {
+            fog.renderTacticalVignette(ctx, view.width, view.height, view.dpr);
+          }
+        }
         const renderCost = performance.now() - renderStartedAt;
         totalRenderCost += renderCost;
         renderSamples += 1;
@@ -1251,7 +1404,7 @@ export function RunScreen({
     >
       {/* 666 HordeSpin tier only -- pure screen-space decoration, never touches the simulation. */}
       <style>{`@keyframes hordespin-hue { from { filter: hue-rotate(0deg) saturate(1.4); } to { filter: hue-rotate(360deg) saturate(1.4); } }`}</style>
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      <canvas ref={canvasRef} onWheel={handleCanvasWheel} className="absolute inset-0 h-full w-full" />
 
       {/* Fires on level change only, never on mount -- loading a run mid-level stays quiet. The one full-screen effect in the game. */}
       <LevelUpFlash level={hud?.level ?? 1} />
@@ -1363,6 +1516,44 @@ export function RunScreen({
             <button type="button" onClick={() => setHudIntelOpen((open) => !open)} className="pointer-events-auto flex h-6 items-center gap-1 border border-cyan-200/25 bg-black/75 px-1.5 font-mono text-[8px] uppercase tracking-wider text-cyan-100" aria-expanded={hudIntelOpen} data-testid="button-run-intel">
               Intel {hudIntelItems}{hudIntelOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
             </button>
+            {phase === 'playing' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  tacticalCameraRef.current.toggleTacticalView();
+                  setTacticalViewActive(tacticalCameraRef.current.isTactical());
+                }}
+                className={`pointer-events-auto flex h-6 items-center gap-1 border px-1.5 font-mono text-[8px] uppercase tracking-wider transition-colors ${
+                  tacticalViewActive
+                    ? 'border-cyan-300 bg-cyan-400/25 text-cyan-100 shadow-[0_0_8px_rgba(6,182,212,0.4)]'
+                    : 'border-white/20 bg-black/75 text-white/80 hover:border-cyan-300/60'
+                }`}
+                data-testid="button-tactical-view"
+                title="Toggle Tactical Fog & Vision View (Tab)"
+              >
+                <Eye size={10} className={tacticalViewActive ? 'text-cyan-300' : 'text-white/60'} />
+                {tacticalViewActive ? 'Tac View' : 'Tac'}
+              </button>
+            ) : null}
+            {phase === 'playing' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const nextZoom = tacticalCameraRef.current.cycleManualZoom();
+                  setZoomLevel(nextZoom);
+                }}
+                className={`pointer-events-auto flex h-6 items-center gap-1 border px-1.5 font-mono text-[8px] uppercase tracking-wider transition-colors ${
+                  zoomLevel < 0.95
+                    ? 'border-amber-400 bg-amber-400/25 text-amber-200 shadow-[0_0_8px_rgba(251,191,36,0.4)]'
+                    : 'border-white/20 bg-black/75 text-white/80 hover:border-amber-300/60'
+                }`}
+                data-testid="button-hud-zoom"
+                title="Cycle Camera Zoom (Z / Mouse Wheel / Pinch): 1.0× Normal -> 0.75× Wide -> 0.58× Panoramic"
+              >
+                <ZoomOut size={10} className={zoomLevel < 0.95 ? 'text-amber-300' : 'text-white/60'} />
+                {zoomLevel > 0.85 ? '1.0×' : zoomLevel > 0.65 ? '0.75×' : '0.58×'}
+              </button>
+            ) : null}
             {phase === 'playing' || phase === 'paused' ? (
               <button
                 type="button"

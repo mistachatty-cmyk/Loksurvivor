@@ -18,7 +18,8 @@ import { HideoutPreview } from './HideoutPreview';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle, Clapperboard } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle, Clapperboard, Bug } from 'lucide-react';
+import { LorePopup } from './LorePopup';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -36,7 +37,7 @@ import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -75,6 +76,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   account: { label: 'Account', icon: Mail, testId: 'button-open-account', description: 'Waitlist & sign in' },
   feedback: { label: 'Feedback', icon: MessageSquareHeart, testId: 'button-open-feedback', description: 'Ideas & bug reports' },
   'threat-matrix': { label: 'Threat Matrix', icon: ShieldAlert, testId: 'button-open-threat-matrix', description: 'Override & quarantine enemies' },
+  'dust-mite-rancher': { label: 'Dust Mite Rancher', icon: Bug, testId: 'button-open-dust-mite-rancher', description: 'Barnaby’s pure data-pet ranch · adopt & feed' },
   'director-terminal': { label: 'Director Terminal', icon: ScanEye, testId: 'button-open-director-terminal', description: 'Read and select Director personalities' },
 };
 
@@ -159,6 +161,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const [showArrival, setShowArrival] = useState(
     () => meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession,
   );
+  const [showLorePopup, setShowLorePopup] = useState(false);
   const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
   const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
@@ -231,6 +234,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
+      {/* Mission Briefing / Lore Dossier Button */}
+      <button
+        type="button"
+        onClick={() => setShowLorePopup(true)}
+        className="fixed left-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 rounded-sm border border-red-500/80 bg-red-950/90 px-3.5 font-mono text-[10px] font-bold uppercase tracking-wider text-red-200 shadow-[0_0_15px_rgba(239,68,68,0.25)] backdrop-blur transition hover:border-red-400 hover:bg-red-900/90 hover:text-white sm:left-5 sm:top-5"
+        data-testid="button-hub-mission-briefing"
+        title="Classified Intel & Digi-Verse Lore"
+      >
+        <ShieldAlert className="h-4 w-4 text-red-400" />
+        <span>MISSION BRIEFING</span>
+      </button>
+
       <button
         type="button"
         onClick={onOpenRunSetup}
@@ -570,6 +585,21 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                 {activeRoom.id === 'main-floor' && (
                   <button
                     type="button"
+                    onClick={() => onOpen('dust-mite-rancher')}
+                    data-testid="button-hideout-dust-mite-rancher"
+                    className="group flex items-center gap-3 border border-amber-400/40 bg-amber-950/40 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-amber-950/70"
+                  >
+                    <Bug className="h-5 w-5 text-amber-400 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-200">Dust Mite Rancher</span>
+                      <span className="block text-[10px] text-amber-200/70">Barnaby’s pure data-pet ranch · adopt & feed</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
                     onClick={onOpenArena}
                     data-testid="button-hideout-arena"
                     className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
@@ -885,6 +915,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           </button>
         )}
       </div>
+
+      <AnimatePresence>
+        {showLorePopup && <LorePopup onClose={() => setShowLorePopup(false)} />}
+      </AnimatePresence>
     </motion.div>
   );
 }

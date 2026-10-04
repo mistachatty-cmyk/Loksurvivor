@@ -144,6 +144,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Map category tabs now scroll inside their own row on narrow screens instead of stretching the page.',
     ],
   },
+  {
+    version: '0.10.1',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'The Underground Update',
+    body: [
+      'Digital Russel (Cluck-616) and Barnaby Bit-Herder join the roster, with the Bionic Cluck Protocol run modifier turning fallen hostiles into egg-laying allies.',
+      'Firefly Hollows Extreme arrives with Firefly Miners, Evokers, Spikers, Cannons and the dual-cannon Red Firefly duelist, plus veteran enemy variants and mimic chests.',
+      'The Workshop gains a Relic Forge, light-source key items (miner helmet, firefly jar, phosphor crown) and the Bag o\u2019 Water.',
+      'The Card Shop returns with sealed pack storage, single-card purchases, duplicate recycling and a card matrix chart; the Lock Deck binder shows card classes and combat variables.',
+      'Dust Mite Rancher, Sector 616 Chronicles lore popup, 4\u00d7 Extreme map tab and a much larger LokPet roster and battle script round out the update.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

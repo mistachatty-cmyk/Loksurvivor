@@ -57,6 +57,7 @@ import { CardShopPanel } from '@/ui/CardShopPanel';
 import { WeaponBansScreen } from '@/ui/WeaponBansScreen';
 import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
+import { DustMiteRancherPanel } from '@/ui/DustMiteRancherPanel';
 import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { TravelEncounterOverlay } from '@/ui/TravelEncounterOverlay';
@@ -96,6 +97,7 @@ type Screen =
   | { name: 'feedback' }
   | { name: 'threat-matrix' }
   | { name: 'director-terminal' }
+  | { name: 'dust-mite-rancher' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
@@ -235,6 +237,9 @@ function Game() {
       case 'threat-matrix':
         setScreen({ name: 'threat-matrix' });
         break;
+      case 'dust-mite-rancher':
+        setScreen({ name: 'dust-mite-rancher' });
+        break;
       case 'director-terminal':
         setScreen({ name: 'director-terminal' });
         break;
@@ -354,8 +359,10 @@ function Game() {
           roomId={roomId}
           onChangeRoom={(nextRoomId) => {
             if (nextRoomId === 'the-storefront') {
-              sfx.play('uiNav');
-              setScreen({ name: 'card-shop' });
+              attemptTravelEncounter('hub-room', nextRoomId, () => {
+                sfx.play('uiNav');
+                setScreen({ name: 'card-shop' });
+              });
               return;
             }
             if (nextRoomId === 'studio-28') {
@@ -482,6 +489,9 @@ function Game() {
 
     case 'threat-matrix':
       return <ThreatMatrixScreen onBack={goHub} />;
+
+    case 'dust-mite-rancher':
+      return <DustMiteRancherPanel onBack={goHub} onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })} />;
 
     case 'director-terminal':
       return <DirectorTerminalPanel onBack={goHub} />;

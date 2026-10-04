@@ -30,6 +30,7 @@ import {
 } from '@/game/state/metaStore';
 import { characterRankTitle } from '@/game/data/characterMastery';
 import { CHANGELOG, updateNumber } from '@/game/data/changelog';
+import { LORE_CHRONICLES } from '@/game/data/lore';
 import { pickCreditName } from '@/game/data/creditRotation';
 import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
@@ -44,7 +45,7 @@ import {
   VISITING_CARD_SILHOUETTE,
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Wrench, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Wrench, Scroll, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export interface ArchivePanelProps {
@@ -249,6 +250,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
 
   const chapters: { key: string; label: string; icon: LucideIcon; count?: number; total?: number }[] = [
     { key: 'workshop', label: 'Workshop', icon: Hammer },
+    { key: 'chronicles', label: 'Chronicles', icon: Scroll, count: LORE_CHRONICLES.length, total: LORE_CHRONICLES.length },
     { key: 'achievements', label: 'Achievements', icon: Trophy, count: completedAchievementCount, total: ACHIEVEMENTS.length },
     { key: 'cards', label: 'Cards', icon: CreditCard, count: ownedCardCount, total: CARD_MANIFESTS.length },
     { key: 'lokpets', label: 'LokPets', icon: Sparkles, count: catalogByVariant.size, total: LOKPET_VARIANTS.length },
@@ -310,6 +312,73 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           data-testid="section-archive-workshop"
         >
           <WorkshopOverview compact />
+        </motion.section>
+      )}
+
+      {activeChapter === 'chronicles' && (
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="section-archive-chronicles"
+        >
+          <div className="mb-6 flex items-center gap-3 border-b border-border pb-2">
+            <Scroll className="h-5 w-5 text-primary" />
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-white">Chronicles of Sector 616</h2>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">ARCHON-616 Intel, Soul Siphon Protocols & The Incursion Resistance</p>
+            </div>
+            <span className="ml-auto font-mono text-sm font-bold text-muted-foreground">
+              {LORE_CHRONICLES.length} Chapters
+            </span>
+          </div>
+
+          <div className="space-y-6">
+            {LORE_CHRONICLES.map((entry) => (
+              <article
+                key={entry.id}
+                className="border border-primary/30 bg-card p-6 relative overflow-hidden"
+                data-testid={`archive-lore-${entry.id}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+                    <span className="font-mono text-[9px] font-black uppercase tracking-[0.2em] text-primary">
+                      Chapter {entry.chapterNumber} // {entry.codename}
+                    </span>
+                    <span className="border border-white/20 bg-black/40 px-2 py-0.5 font-mono text-[8px] uppercase tracking-widest text-amber-300">
+                      {entry.classifiedLevel}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[9px] text-muted-foreground">{entry.timestamp}</span>
+                </div>
+
+                <div className="mt-3">
+                  <h3 className="text-lg font-black uppercase text-white">{entry.title}</h3>
+                  <p className="font-mono text-xs text-primary/80 uppercase tracking-wide mt-0.5">{entry.subtitle}</p>
+                  <p className="mt-2 text-xs italic text-gray-300/80">{entry.summary}</p>
+                </div>
+
+                <div className="mt-4 space-y-2.5 text-xs leading-relaxed text-muted-foreground border-t border-white/5 pt-3">
+                  {entry.content.map((p, idx) => (
+                    <p key={idx}>{p}</p>
+                  ))}
+                </div>
+
+                {entry.keyIntel && entry.keyIntel.length > 0 && (
+                  <div className="mt-4 border border-primary/20 bg-primary/5 p-3.5">
+                    <span className="font-mono text-[9px] font-black uppercase tracking-widest text-primary flex items-center gap-1.5 mb-1.5">
+                      <Sparkles className="h-3 w-3" /> Declassified Key Intel
+                    </span>
+                    <ul className="space-y-1 list-disc list-inside text-[11px] text-muted-foreground/90">
+                      {entry.keyIntel.map((intel, idx) => (
+                        <li key={idx}>{intel}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
         </motion.section>
       )}
 

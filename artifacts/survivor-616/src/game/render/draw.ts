@@ -36,6 +36,7 @@ const SIZE_CLASS_SCALE: Record<NonNullable<import('@/game/types').EnemyDef['size
   standard: 1,
   elite: 1.2,
   giant: 1.55,
+  boss: 1.8,
 };
 function sizeClassScale(def: import('@/game/types').EnemyDef): number {
   if (def.sizeClass) return SIZE_CLASS_SCALE[def.sizeClass];
@@ -2975,6 +2976,150 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
         ctx.fillStyle = '#e8d48a'; ctx.shadowColor = '#fde68a'; ctx.shadowBlur = 12; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#7c5f18'; ctx.stroke();
         break;
       }
+      case 'glitch-cache': {
+        const pulse = 0.8 + Math.sin((w.now - pickup.bornAt) / 120) * 0.2;
+        const glitchShift = (Math.floor(w.now / 150) % 3 === 0) ? 2 : 0;
+        ctx.shadowColor = '#22d3ee';
+        ctx.shadowBlur = 16 * pulse;
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fillRect(x - 10 + glitchShift, y - 9, 20, 18);
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x - 10, y - 9, 20, 18);
+        ctx.fillStyle = '#a855f7';
+        ctx.fillRect(x - 6, y - 5, 12, 10);
+        ctx.fillStyle = '#67e8f9';
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('0x', x + glitchShift, y + 3);
+        break;
+      }
+      case 'relic-vault-chest': {
+        const pulse = 0.85 + Math.sin((w.now - pickup.bornAt) / 160) * 0.15;
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = 22 * pulse;
+        ctx.fillStyle = '#1c1917';
+        ctx.fillRect(x - 12, y - 10, 24, 20);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x - 12, y - 10, 24, 20);
+        ctx.fillStyle = '#d97706';
+        ctx.fillRect(x - 10, y - 8, 20, 6);
+        // Golden Keyhole
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(x, y + 2, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(x - 1.5, y + 2, 3, 5);
+        break;
+      }
+      case 'firefly-amber-chest': {
+        const pulse = 0.8 + Math.sin((w.now - pickup.bornAt) / 140) * 0.2;
+        ctx.shadowColor = '#fbbf24';
+        ctx.shadowBlur = 24 * pulse;
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(x - 11, y - 9, 22, 18);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(x - 9, y - 7, 18, 14);
+        // Orbiting glowing fireflies
+        for (let fi = 0; fi < 3; fi += 1) {
+          const fAngle = (w.now / 350) + (fi * Math.PI * 2) / 3;
+          const fx = x + Math.cos(fAngle) * 14;
+          const fy = y + Math.sin(fAngle) * 8;
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(fx - 1.5, fy - 1.5, 3, 3);
+        }
+        break;
+      }
+      case 'mimic-chest': {
+        ctx.shadowColor = '#dc2626';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#451a03';
+        ctx.fillRect(x - 9, y - 8, 18, 16);
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(x - 9, y - 8, 18, 5);
+        // Twitching ominous lock
+        const twitch = Math.sin(w.now / 100) > 0.8 ? 1 : 0;
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(x - 2, y + 1 + twitch, 4, 3);
+        break;
+      }
+      case 'phosphor-ore': {
+        const pulse = 0.75 + Math.sin((w.now - pickup.bornAt) / 130) * 0.25;
+        ctx.shadowColor = '#fbbf24';
+        ctx.shadowBlur = 16 * pulse;
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7);
+        ctx.lineTo(x + 6, y - 1);
+        ctx.lineTo(x + 4, y + 6);
+        ctx.lineTo(x - 4, y + 6);
+        ctx.lineTo(x - 6, y - 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'silicon-alloy': {
+        const pulse = 0.8 + Math.sin((w.now - pickup.bornAt) / 160) * 0.2;
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 14 * pulse;
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(x - 6, y - 5, 12, 10);
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fillRect(x - 4, y - 3, 8, 6);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x - 2, y - 1, 4, 2);
+        break;
+      }
+      case 'cyber-resin': {
+        const pulse = 0.8 + Math.sin((w.now - pickup.bornAt) / 150) * 0.2;
+        ctx.shadowColor = '#c084fc';
+        ctx.shadowBlur = 15 * pulse;
+        ctx.fillStyle = '#7c3aed';
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#d8b4fe';
+        ctx.beginPath();
+        ctx.arc(x - 1.5, y - 1.5, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      case 'prism-quartz': {
+        const pulse = 0.85 + Math.sin((w.now - pickup.bornAt) / 120) * 0.15;
+        ctx.shadowColor = '#f43f5e';
+        ctx.shadowBlur = 20 * pulse;
+        ctx.fillStyle = '#ec4899';
+        ctx.beginPath();
+        ctx.moveTo(x, y - 8);
+        ctx.lineTo(x + 6, y);
+        ctx.lineTo(x, y + 8);
+        ctx.lineTo(x - 6, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x - 1, y - 3, 2, 6);
+        break;
+      }
+      case 'water-flask': {
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.arc(x, y + 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e0f2fe';
+        ctx.fillRect(x - 2, y - 6, 4, 4);
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(x - 1, y + 1, 2, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
     }
     ctx.restore();
   }
@@ -5466,6 +5611,33 @@ function drawActors(
       ctx.fill();
       ctx.restore();
     }
+    if (enemy.isVeteran && !enemy.dying) {
+      const affixColors: Record<string, string> = {
+        armored: '#38bdf8',
+        overclocked: '#facc15',
+        incendiary: '#ef4444',
+        vampiric: '#e11d48',
+        magnetic: '#a855f7',
+      };
+      const vColor = affixColors[enemy.veteranAffix ?? 'armored'] ?? '#fbbf24';
+      ctx.save();
+      const vPulse = 0.65 + Math.sin(w.now / 110) * 0.25;
+      ctx.globalAlpha = vPulse;
+      ctx.strokeStyle = vColor;
+      ctx.shadowColor = vColor;
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 8, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Veteran Crown / Star insignia above head
+      ctx.fillStyle = vColor;
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`★ ${enemy.veteranAffix?.toUpperCase() ?? 'VETERAN'}`, enemy.x, enemy.y - enemy.radius - 8);
+      ctx.restore();
+    }
     if (freeze && !enemy.dying) {
       const freezeDef = STATUS_EFFECTS_BY_ID.freeze!;
       ctx.save();
@@ -6006,6 +6178,16 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   if (sinceHit < 260) {
     ctx.globalAlpha = (1 - sinceHit / 260) * 0.3;
     ctx.fillStyle = '#ff2d55';
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1;
+  }
+
+  // Full-screen impact flash (Firefly Cannon, special explosions)
+  if (w.screenFlash && w.now < w.screenFlash.until) {
+    const elapsed = w.now - w.screenFlash.startedAt;
+    const progress = Math.min(1, Math.max(0, elapsed / Math.max(1, w.screenFlash.durationMs)));
+    ctx.globalAlpha = (1 - progress) * w.screenFlash.maxAlpha;
+    ctx.fillStyle = w.screenFlash.color;
     ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1;
   }

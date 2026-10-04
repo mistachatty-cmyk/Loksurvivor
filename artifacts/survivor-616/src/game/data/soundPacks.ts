@@ -64,6 +64,14 @@ export const SOUND_PACKS: SoundPackDef[] = [
     tier: 'legendary',
     style: { waveOverride: 'triangle', pitchMult: 0.95, brightnessMult: 0.95, noiseMult: 1.8, decayMult: 1.4 },
   },
+  {
+    id: 'meow-pack',
+    name: 'Feline Meow-Mix',
+    description: 'Purrs, mews, and yowls! Turns every hit, explosion, pickup, level-up, and click into an adorable synth meow.',
+    cost: 3,
+    tier: 'rare',
+    style: { waveOverride: 'triangle', pitchMult: 1.25, brightnessMult: 1.2, noiseMult: 0.2, decayMult: 1.1, meowMode: true },
+  },
 ];
 
 export const SOUND_PACKS_BY_ID: Record<string, SoundPackDef> = Object.fromEntries(

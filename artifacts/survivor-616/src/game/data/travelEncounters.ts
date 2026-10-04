@@ -35,8 +35,12 @@ export interface TravelEncounterTrigger {
  * hideout room.
  */
 export const TRAVEL_ENCOUNTER_TRIGGERS: TravelEncounterTrigger[] = [
-  { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.2, label: 'Someone by the Neon Sleeve wants a piece of your deck.' },
-  { id: 'head-out', source: 'run-launch', chance: 0.2, label: 'Something crosses your path on the way out.' },
+  { id: 'storefront-entry', source: 'hub-room', roomId: 'the-storefront', chance: 0.25, label: 'Someone by the Neon Sleeve wants a piece of your deck.' },
+  { id: 'perch-entry', source: 'hub-room', roomId: 'rooftop-perch', chance: 0.25, label: 'Wind drafts swirl across the antennas as an aerial Digi-Pet swoops down.' },
+  { id: 'cellar-entry', source: 'hub-room', roomId: 'the-cellar', chance: 0.25, label: 'A strange data frequency resonates near the mining rigs in the dark cellar.' },
+  { id: 'alley-entry', source: 'hub-room', roomId: 'the-alley', chance: 0.25, label: 'Someone lurking by the fire escape steps forward to test your companion.' },
+  { id: 'grpd-entry', source: 'hub-room', roomId: 'grpd-station', chance: 0.25, label: 'A Division St. K9 patrol unit approaches for a sudden field duel.' },
+  { id: 'head-out', source: 'run-launch', chance: 0.25, label: 'Something crosses your path on the way out into the city.' },
 ];
 
 export type TravelEncounterOpponent =
@@ -56,14 +60,14 @@ export interface TravelEncounterOpponentEntry {
  * zero new authoring.
  */
 export const TRAVEL_ENCOUNTER_OPPONENTS: TravelEncounterOpponentEntry[] = [
-  { opponent: { kind: 'enemy', enemyId: 'nightcrawler' }, weight: 3 },
+  { opponent: { kind: 'enemy', enemyId: 'nightcrawler' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'watchlight' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'sodium-lamp' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'corner-cutter' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'marquee-static' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'neon-leech' }, weight: 2 },
   { opponent: { kind: 'enemy', enemyId: 'pallet-wraith' }, weight: 2 },
-  { opponent: { kind: 'lokpet' }, weight: 15 },
+  { opponent: { kind: 'lokpet' }, weight: 25 },
 ];
 
 export const TRAVEL_ENCOUNTER_REWARD = { cred: 6, cardCredits: 1, catchChance: 0.35 };

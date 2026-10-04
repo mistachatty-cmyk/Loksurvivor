@@ -56,6 +56,9 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setGraphicsQuality,
     setCompanionRevealStyle,
     setFrameRateMode,
+    setFogAmbianceMode,
+    setGlowingEyesIntensity,
+    setCrowdAutoZoomEnabled,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMinimapExpanded,
@@ -261,6 +264,101 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
                     60 FPS saves battery and holds the simulation steady. 120 FPS uses a compatible high-refresh display;
                     visual resolution and nonessential effects scale back automatically during a heavy swarm.
+                  </p>
+                </div>
+
+                {/* Fog Ambiance Mode */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="font-mono uppercase tracking-widest text-white/70">Atmospheric Fog</p>
+                    <span className="font-mono text-[10px] text-cyan-400">
+                      {meta.fogAmbianceMode === 'auto' ? 'Auto (Dark & Underground)' : meta.fogAmbianceMode === 'always' ? 'Always Active' : meta.fogAmbianceMode === 'dark-maps' ? 'Dark Maps Only' : 'Disabled'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                    {(
+                      [
+                        { id: 'auto', label: 'Auto (Dark/4X)' },
+                        { id: 'dark-maps', label: 'Dark Maps' },
+                        { id: 'always', label: 'Full Fog' },
+                        { id: 'off', label: 'Off' },
+                      ] as const
+                    ).map(({ id, label }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setFogAmbianceMode(id)}
+                        aria-pressed={meta.fogAmbianceMode === id}
+                        className={`border p-2 text-[11px] uppercase transition-colors ${
+                          meta.fogAmbianceMode === id
+                            ? 'border-cyan-400 bg-cyan-400/15 text-cyan-200'
+                            : 'border-border text-muted-foreground hover:border-white/40'
+                        }`}
+                        data-testid={`button-fog-ambiance-${id}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    Volumetric perimeter fog rolls across dark night maps, subterranean catacombs, and 4X colosseums with circular player vision cutout.
+                  </p>
+                </div>
+
+                {/* Distant Glowing Eyes in Fog */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="font-mono uppercase tracking-widest text-white/70">Fog Glowing Eyes</p>
+                    <span className="font-mono text-[10px] text-amber-400">
+                      {meta.glowingEyesIntensity === 'off' ? 'Off' : meta.glowingEyesIntensity === 'lil' ? 'A Lil' : meta.glowingEyesIntensity === 'mid' ? 'Mid (Standard)' : 'A Lot (Dense)'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">
+                    {(
+                      [
+                        { id: 'off', label: 'Off' },
+                        { id: 'lil', label: 'A Lil' },
+                        { id: 'mid', label: 'Mid' },
+                        { id: 'lot', label: 'A Lot' },
+                      ] as const
+                    ).map(({ id, label }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setGlowingEyesIntensity(id)}
+                        aria-pressed={meta.glowingEyesIntensity === id}
+                        className={`border p-2 text-[11px] uppercase transition-colors ${
+                          meta.glowingEyesIntensity === id
+                            ? 'border-amber-400 bg-amber-400/15 text-amber-200'
+                            : 'border-border text-muted-foreground hover:border-white/40'
+                        }`}
+                        data-testid={`button-glowing-eyes-${id}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    Eyes of distant threats glow and pulse through the fog darkness beyond vision range. Choose density: A Lil (faint scouts), Mid (balanced radar), or A Lot (nightmarish swarm).
+                  </p>
+                </div>
+
+                {/* Swarm Dynamic Crowd Zoom */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setCrowdAutoZoomEnabled(!meta.crowdAutoZoomEnabled)}
+                    aria-pressed={meta.crowdAutoZoomEnabled}
+                    className="flex w-full items-center justify-between border border-border p-3 transition-colors hover:border-white/40"
+                    data-testid="button-crowd-auto-zoom"
+                  >
+                    <span className="font-medium text-white">Dynamic swarm zoom-out</span>
+                    <span className={meta.crowdAutoZoomEnabled ? 'font-mono text-cyan-300' : 'font-mono text-muted-foreground'}>
+                      {meta.crowdAutoZoomEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </button>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                    Automatically pulls back camera perspective when more than 25 enemies are on screen. Manual zoom can also be cycled anytime during run with the Z key, mouse wheel scroll, or HUD Zoom button.
                   </p>
                 </div>
               </div>

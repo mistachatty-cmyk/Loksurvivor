@@ -555,6 +555,10 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },
   { id: 'site-crew-permit', name: 'Site Crew Work Permit', blurb: 'A stamped permit recovered from the moving pour. Every inspection box is checked except “leave the block alive.”' },
   { id: 'mirrorball-frequency', name: 'The Mirrorball Frequency', blurb: 'A pulse of broadcast noise looping under the parquet, still keeping time for a dance floor nobody unplugged.' },
+  { id: 'firefly-crown-shard', name: 'Firefly Crown Shard', blurb: 'A dazzling subterranean shard pulsing with trapped bio-phosphor light salvaged from the Firefly Hollows.' },
+  // 'grpd-vault-code' is deliberately absent -- the vault room references it
+  // and is intentionally never unlockable yet. See grpd-vault in HUB_ROOMS
+  // below and .agents/memory/grpd-station.md.
 ];
 
 export const DISCOVERIES_BY_ID: Record<string, DiscoveryDef> = Object.fromEntries(

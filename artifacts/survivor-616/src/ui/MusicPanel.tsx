@@ -705,6 +705,27 @@ export function MusicPanel({ onBack }: MusicPanelProps) {
                     />
                   </div>
                 </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-border/20 pt-3">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Speed</span>
+                  <div className="flex items-center gap-1">
+                    {[0.75, 1.0, 1.25, 1.5].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => player.setPlaybackRate(rate)}
+                        className={`px-2 py-0.5 font-mono text-[10px] uppercase border transition-colors ${
+                          Math.abs(player.playbackRate - rate) < 0.01
+                            ? 'border-primary bg-primary/20 text-primary font-bold'
+                            : 'border-border/60 text-muted-foreground hover:border-primary hover:text-white'
+                        }`}
+                        data-testid={`button-speed-${rate}`}
+                      >
+                        {rate}x
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </details>
             </div>
           </div>

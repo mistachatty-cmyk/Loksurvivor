@@ -133,6 +133,8 @@ export interface MusicPlayerValue {
   muted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
+  playbackRate: number;
+  setPlaybackRate: (rate: number) => void;
   progressSec: number;
   durationSec: number;
   error: string | null;
@@ -477,6 +479,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [muted, setMuted] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>('all');
+  const [playbackRate, setPlaybackRateState] = useState(1.0);
   const [progressSec, setProgressSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -723,7 +726,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (!audio) return;
     audio.volume = volume;
     audio.muted = muted;
-  }, [volume, muted]);
+    audio.playbackRate = playbackRate;
+  }, [volume, muted, playbackRate]);
 
   // Restore only files the player has already chosen to keep on this device.
   // The game never uploads these bytes or attempts to sync them elsewhere.
@@ -1381,6 +1385,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (clamped > 0) setMuted(false);
   }, []);
 
+  const setPlaybackRate = useCallback((rate: number) => {
+    const clamped = Math.max(0.5, Math.min(2.0, rate));
+    setPlaybackRateState(clamped);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = clamped;
+    }
+  }, []);
+
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
   const cycleRepeat = useCallback(() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')), []);
@@ -1397,6 +1409,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       muted,
       shuffle,
       repeat,
+      playbackRate,
+      setPlaybackRate,
       progressSec,
       durationSec,
       error,
@@ -1453,6 +1467,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       muted,
       shuffle,
       repeat,
+      playbackRate,
+      setPlaybackRate,
       progressSec,
       durationSec,
       error,

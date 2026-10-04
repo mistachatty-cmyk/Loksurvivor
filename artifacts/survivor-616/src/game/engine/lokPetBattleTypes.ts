@@ -7,7 +7,7 @@ import type {
   SavedLokPet,
 } from '@/game/types';
 
-export type BattleStatusEffectType = 'burn' | 'freeze' | 'slow' | 'stun' | 'empower' | 'shield' | 'leech';
+export type BattleStatusEffectType = 'burn' | 'freeze' | 'slow' | 'stun' | 'empower' | 'shield' | 'leech' | 'shock' | 'corrupt';
 
 export interface BattleStatusEffect {
   type: BattleStatusEffectType;
@@ -65,6 +65,8 @@ export interface BattlePet {
   battlesWon: number;
   equippedTrinket?: string;
   starter?: boolean;
+  evolutionStage?: 1 | 2 | 3;
+  evolutionTitle?: string;
 }
 
 export interface BattleLogEntry {
@@ -129,6 +131,10 @@ export interface BattleRewards {
     petName: string;
     oldLevel: number;
     newLevel: number;
+    evolved?: boolean;
+    oldStage?: 1 | 2 | 3;
+    newStage?: 1 | 2 | 3;
+    newTitle?: string;
   }>;
 }
 

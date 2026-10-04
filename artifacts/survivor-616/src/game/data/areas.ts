@@ -3,7 +3,7 @@ import { AREAS_2X } from './areas-2x';
 import { AREAS_4X } from './areas-4x';
 import { AREAS_CLASSIC } from './areas-classic';
 import { AREAS_DISCO } from './areas-disco';
-import { WEIRD_AREAS } from './areas-weird';
+import { WEIRD_AREAS, BONUS_DIGIVERSE_AREAS } from './areas-weird';
 import { AREAS_ENDLESS } from './areas-endless';
 import { AREAS_NULL_SECTOR } from './areas-null-sector';
 import { squadWave } from './authoring';
@@ -1079,6 +1079,7 @@ export const AREAS: AreaDef[] = [
   },
 
   ...WEIRD_AREAS,
+  ...BONUS_DIGIVERSE_AREAS,
 
   // Endless mode maps -- no time limit, no walls, procedurally generated infinite worlds.
   ...AREAS_ENDLESS,
@@ -1096,7 +1097,8 @@ export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(
 export function getArea(id: string): AreaDef {
   const found = AREAS_BY_ID[id];
   if (!found) {
-    throw new Error(`Unknown area id: ${id}`);
+    console.warn(`[getArea] Unknown area id "${id}", falling back to safe default area.`);
+    return AREAS[0];
   }
   return found;
 }

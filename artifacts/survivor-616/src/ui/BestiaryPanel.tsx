@@ -10,10 +10,10 @@ import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
 import { motion } from 'framer-motion';
-import { Skull, Ghost, LockKeyhole, Sparkles, Users } from 'lucide-react';
+import { Skull, Ghost, LockKeyhole, Sparkles, Users, X, Info, ShieldAlert, Zap, Search, Volume2, Target } from 'lucide-react';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 export interface BestiaryPanelProps {
   onBack: () => void;
@@ -29,10 +29,365 @@ function EnemyPreview({ enemy }: { enemy: (typeof ENEMIES)[number] }) {
   );
 }
 
+const BEHAVIOR_GUIDES: Record<
+  string,
+  { desc: string; tip: string; threatTier: string; weakVs: string; soundSignature: string; dropProfile: string }
+> = {
+  charger: {
+    desc: 'Rapid linear acceleration bull-rush when target enters line-of-sight.',
+    tip: 'Sidestep perpendicular as charge begins; punish sluggish turn recovery.',
+    threatTier: 'Heavy Striker',
+    weakVs: 'Cryo-Byte Freeze & Kinetic Stun',
+    soundSignature: '120Hz Pneumatic Servo Whine',
+    dropProfile: 'High Density Scrap & Kinetic Shards',
+  },
+  spitter: {
+    desc: 'Maintains standoff perimeter while launching concentrated ballistic volleys.',
+    tip: 'Close distance using dash-cancels or deploy forward shield covers.',
+    threatTier: 'Artillery Gunner',
+    weakVs: 'Volt Discharge & Swift Melee',
+    soundSignature: 'High-Pitch Compression Pop',
+    dropProfile: 'Chemical Acid Vials & Corrupted Logic Chips',
+  },
+  shockwave: {
+    desc: 'Discharges expanding concussive kinetic pulses across a wide blast radius.',
+    tip: 'Time invulnerability dash through pulse wave or maintain extreme standoff range.',
+    threatTier: 'Area Denial Unit',
+    weakVs: 'High-Caliber Penetrator',
+    soundSignature: 'Sub-Bass 40Hz Seismic Rumble',
+    dropProfile: 'Piezoelectric Cores & Kinetic Powder',
+  },
+  swarmer: {
+    desc: 'Hunts in dense cohorts with erratic zig-zag paths to overwhelm survivor flanks.',
+    tip: 'Deploy continuous beam sweeps, persistent hazard pools, or radial shotguns.',
+    threatTier: 'Pack Swarmer',
+    weakVs: 'Pyro-Bit Fire & Area-of-Effect',
+    soundSignature: 'Chattering Chitinous Drone',
+    dropProfile: 'Micro-Nanite Cells & Common Bio-Gems',
+  },
+  exploder: {
+    desc: 'Unstable internal reactor initiates terminal self-destruction upon close proximity.',
+    tip: 'Engage strictly from max range; clear blast perimeter before detonation.',
+    threatTier: 'Volatile Demolition',
+    weakVs: 'Long-Range Sniping',
+    soundSignature: 'Accelerating Tachyon Siren',
+    dropProfile: 'Volatile Fusion Fuel & Explosive Residue',
+  },
+  'vortex-crusher': {
+    desc: 'Generates gravitational suction singularity pulling operative toward crushing radius.',
+    tip: 'Sprint outwards using speed boots or dash skill immediately when accretion begins.',
+    threatTier: 'Gravimetric Apex',
+    weakVs: 'Overclocked Lasers & Phase Shifts',
+    soundSignature: 'Infrasonic Singularity Hum',
+    dropProfile: 'Graviton Condensers & Rare Void Cores',
+  },
+  'nanite-swarm': {
+    desc: 'Self-replicating cloud of micro-drones that phases through obstacles and drains health.',
+    tip: 'Use continuous AoE fire or electric arcs that jump across dense clusters.',
+    threatTier: 'Dispersal Swarm',
+    weakVs: 'Volt EMP & Flamethrowers',
+    soundSignature: 'High-Frequency Static Buzz',
+    dropProfile: 'Refined Nanite Paste & Silicon Dust',
+  },
+  'arc-conductor': {
+    desc: 'Chains lethal electrical current across all nearby allies and targets.',
+    tip: 'Isolate conductor from other enemies to suppress lethal chain-lightning bridges.',
+    threatTier: 'Chain Specialist',
+    weakVs: 'Ground Shock & Cryo Glassing',
+    soundSignature: 'Ionized Ozone Crackle',
+    dropProfile: 'Copper Field Coils & Overcharged Batteries',
+  },
+  teleporter: {
+    desc: 'Blinks instantly into blindspots or perimeter flanks when aimed at.',
+    tip: 'Anticipate reappearance delay; drop proximity mines or radial pulses at feet.',
+    threatTier: 'Phase Infiltrator',
+    weakVs: 'Homing Micro-Missiles',
+    soundSignature: 'Phase-Displacement Pop',
+    dropProfile: 'Warp Drives & Entangled Photons',
+  },
+  wraith: {
+    desc: 'Invisible while stalking; phases into reality right before delivering lethal scythe strike.',
+    tip: 'Listen for audio distortion and dash when the translucent shimmer appears.',
+    threatTier: 'Phantom Assassin',
+    weakVs: 'Thermal Sensor Scans & Wide Flame Sprays',
+    soundSignature: 'Ethereal Spectral Murmur',
+    dropProfile: 'Dark Matter Essence & Ghost Shards',
+  },
+  ringer: {
+    desc: 'Orbits operative at precise fixed radius, waiting for defensive lapses.',
+    tip: 'Break orbit geometry by running perpendicular or setting directional ambush.',
+    threatTier: 'Orbital Skirmisher',
+    weakVs: 'Long-Reach Sweepers',
+    soundSignature: 'Doppler Ring Whistle',
+    dropProfile: 'Gyro Stabilizers & Precision Bearings',
+  },
+  sentry: {
+    desc: 'Fixed or slow turret anchor establishing lethal interlocking fields of fire.',
+    tip: 'Use environmental cover and high-impact burst damage to decommission quickly.',
+    threatTier: 'Bastion Fortification',
+    weakVs: 'Armor-Piercing Slugs',
+    soundSignature: 'Hydraulic Locking Clank',
+    dropProfile: 'Reinforced Armor Plates & Heavy Shells',
+  },
+  flanker: {
+    desc: 'Circumvents frontal defenses to target the operative from rear and side arcs.',
+    tip: 'Maintain back to barriers or periodically reverse sweep to clear trail.',
+    threatTier: 'Tactical Flanker',
+    weakVs: 'Rear-Firing Drones & Radial Blasts',
+    soundSignature: 'Muffled Tread Whine',
+    dropProfile: 'Agility Actuators & Recon Microchips',
+  },
+  pincer: {
+    desc: 'Coordinates dual-pronged pincers with sister units to box in target trajectory.',
+    tip: 'Break through the weaker flank before both prongs close the encirclement.',
+    threatTier: 'Encirclement Unit',
+    weakVs: 'Cryo Freeze to disrupt pincer synchronization',
+    soundSignature: 'Dual-Tone Mechanical Chime',
+    dropProfile: 'Hydraulic Pincer Blades & Alloy Joints',
+  },
+  prism: {
+    desc: 'Refracts colored beams of varying elemental states: pull, slow, and elemental damage.',
+    tip: 'Identify beam color frequency: red is burn, blue is cryo, violet is gravity drag.',
+    threatTier: 'Prismatic Controller',
+    weakVs: 'Kinetic Disruptors',
+    soundSignature: 'Resonant Crystal Oscillation',
+    dropProfile: 'Optical Prisms & Refractive Crystals',
+  },
+  beacon: {
+    desc: 'Projects roaming tracking circles that call down artillery strikes if stepped into.',
+    tip: 'Stay outside tracking perimeter rings and eliminate beacon commander swiftly.',
+    threatTier: 'Targeting Coordinator',
+    weakVs: 'High-Speed Interceptors',
+    soundSignature: 'Sonar Ping Echo',
+    dropProfile: 'Targeting HUDs & Laser Modules',
+  },
+  commander: {
+    desc: 'Directs frontline units with morale boosts and defensive formation buffs.',
+    tip: 'Priority focus fire: eliminating commander immediately weakens surrounding cohort.',
+    threatTier: 'Squad Officer',
+    weakVs: 'High-Burst Assassination Weapons',
+    soundSignature: 'Encrypted Radio Broadcast',
+    dropProfile: 'Command Encryption Keys & Gold Credits',
+  },
+};
+
+function EnemyIntelModal({
+  enemy,
+  kills,
+  onClose,
+}: {
+  enemy: (typeof ENEMIES)[number];
+  kills: number;
+  onClose: () => void;
+}) {
+  const known = kills > 0;
+  const faction = FACTIONS.find((f) => f.roster.includes(enemy.id));
+  const [anim, setAnim] = useState<'idle' | 'walk' | 'attack'>('walk');
+
+  const guide = BEHAVIOR_GUIDES[enemy.behavior] ?? {
+    desc: 'Standard offensive threat doctrine. Advances toward nearest operational survivor.',
+    tip: 'Maintain perimeter spacing and eliminate with high-damage sustained fire.',
+    threatTier: enemy.hp > 300 ? 'Apex Vanguard' : enemy.hp > 100 ? 'Elite Combatant' : 'Standard Recon',
+    weakVs: 'Focused Fire',
+  };
+
+  const dangerRating =
+    enemy.hp >= 500
+      ? 'CRITICAL / APEX BOSS'
+      : enemy.hp >= 150
+      ? 'HIGH THREAT / ELITE'
+      : enemy.hp >= 60
+      ? 'MODERATE THREAT'
+      : 'STANDARD OPERATIVE';
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-3 sm:p-5 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden border border-white/20 bg-[#0d0e16] shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[.02] p-4">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="grid h-8 w-8 place-items-center border border-rose-400/40 bg-rose-500/10 text-rose-300"
+              style={{ borderColor: faction?.accent ? `${faction.accent}66` : undefined }}
+            >
+              <ShieldAlert className="h-4 w-4" style={{ color: faction?.accent }} />
+            </span>
+            <div>
+              <p className="font-mono text-[8px] uppercase tracking-widest text-white/40">
+                Threat Dossier · {faction ? faction.name : 'Independent Entity'}
+              </p>
+              <h3 className="font-display text-lg font-black uppercase text-white">
+                {known ? enemy.name : 'Unidentified Specimen'}
+              </h3>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-8 w-8 place-items-center border border-white/20 text-white/70 hover:border-white/50 hover:text-white"
+            aria-label="Close dossier"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto p-4 sm:p-5 space-y-3.5">
+          <div className="flex flex-col sm:flex-row items-center gap-4 border border-white/10 bg-black/40 p-3.5">
+            {/* Live Rig Model with Animation Control */}
+            <div className="flex flex-col items-center">
+              <div className="relative grid h-28 w-28 place-items-center overflow-hidden border border-white/15 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.1),transparent_65%)]">
+                {known ? (
+                  <RigPortrait rig={enemy.rig} palette={enemy.palette} anim={anim} size={90} />
+                ) : (
+                  <Ghost className="h-10 w-10 text-white/25" />
+                )}
+              </div>
+              {known && (
+                <div className="mt-1.5 flex gap-1 font-mono text-[7px] uppercase">
+                  {(['walk', 'attack', 'idle'] as const).map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setAnim(a)}
+                      className={`border px-1.5 py-0.5 font-bold transition-colors ${
+                        anim === a
+                          ? 'border-primary bg-primary text-black'
+                          : 'border-white/20 bg-black/50 text-white/60 hover:text-white'
+                      }`}
+                    >
+                      {a}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 text-center sm:text-left space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1 font-mono text-[8px] uppercase">
+                <span className="border border-white/20 px-2 py-0.5 text-white/80">
+                  Family: {known ? enemy.family : 'Unknown'}
+                </span>
+                <span className="border border-amber-300/40 bg-amber-400/10 px-2 py-0.5 text-amber-200">
+                  {guide.threatTier}
+                </span>
+              </div>
+
+              <p className="font-display text-base font-black uppercase text-white pt-0.5 truncate">
+                {known ? enemy.name : 'Unknown Threat'}
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 font-mono text-[8.5px] text-white/50">
+                <span className="flex items-center gap-1">
+                  <Skull className="h-3 w-3 text-rose-400" />
+                  Kills: <strong className="text-white">{kills}x</strong>
+                </span>
+                <span className="font-bold text-amber-300">
+                  Tier: {dangerRating}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Combat Statistics Grid */}
+          <div className="grid grid-cols-4 gap-2 font-mono text-[9px] uppercase border border-white/10 bg-black/30 p-2.5">
+            <div className="text-center">
+              <span className="text-white/40 block text-[8px]">Health</span>
+              <span className="text-sm font-bold text-rose-300">{known ? enemy.hp : '???'}</span>
+            </div>
+            <div className="text-center">
+              <span className="text-white/40 block text-[8px]">Damage</span>
+              <span className="text-sm font-bold text-amber-300">{known ? enemy.damage : '???'}</span>
+            </div>
+            <div className="text-center">
+              <span className="text-white/40 block text-[8px]">Speed</span>
+              <span className="text-sm font-bold text-sky-300">{known ? enemy.speed : '???'}</span>
+            </div>
+            <div className="text-center">
+              <span className="text-white/40 block text-[8px]">XP Yield</span>
+              <span className="text-sm font-bold text-emerald-300">{known ? enemy.xp : '???'}</span>
+            </div>
+          </div>
+
+          {/* Tactical Behavior & Survival Tips */}
+          <div className="border border-white/10 bg-white/[.02] p-3 text-xs leading-relaxed space-y-2">
+            <div>
+              <p className="font-mono text-[8px] font-black uppercase tracking-widest text-primary mb-0.5">
+                Attack Doctrine & Behavior ({known ? enemy.behavior : 'Classified'}):
+              </p>
+              <p className="text-white/80 text-[11px]">{guide.desc}</p>
+            </div>
+            <div className="border-t border-white/10 pt-2">
+              <p className="font-mono text-[8px] font-black uppercase tracking-widest text-amber-300 mb-0.5">
+                Survival Tactical Countermeasure:
+              </p>
+              <p className="text-white/70 text-[11px]">{guide.tip}</p>
+            </div>
+            <div className="border-t border-white/10 pt-2 flex items-center justify-between font-mono text-[8.5px] uppercase">
+              <span className="text-white/40">Tactical Weakness:</span>
+              <strong className="text-emerald-300">{guide.weakVs}</strong>
+            </div>
+
+            {/* Acoustic Audio Signature */}
+            {guide.soundSignature && (
+              <div className="border-t border-white/10 pt-2 flex items-center justify-between font-mono text-[8.5px] uppercase">
+                <span className="text-white/40 flex items-center gap-1.5">
+                  <Volume2 className="h-3 w-3 text-sky-400" /> Acoustic Profile:
+                </span>
+                <span className="text-sky-200">{guide.soundSignature}</span>
+              </div>
+            )}
+
+            {/* Salvage Drop Profile */}
+            {guide.dropProfile && (
+              <div className="border-t border-white/10 pt-2 flex items-center justify-between font-mono text-[8.5px] uppercase">
+                <span className="text-white/40 flex items-center gap-1.5">
+                  <Target className="h-3 w-3 text-amber-400" /> Field Salvage:
+                </span>
+                <span className="text-amber-200">{guide.dropProfile}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Lore Briefing */}
+          <div className="border border-white/10 bg-black/20 p-3 text-xs leading-relaxed text-white/65">
+            <p className="font-mono text-[8px] font-bold uppercase tracking-widest text-white/40 mb-1">
+              Field Intelligence Lore:
+            </p>
+            {known ? (
+              <p className="italic">"{enemy.lore}"</p>
+            ) : (
+              <p className="text-white/40 italic">
+                No verified operational sighting recorded. Defeat this enemy in district runs or sector encounters to decrypt intelligence.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
   const isListView = meta.uiDensity === 'list';
   const [view, setView] = useState<'threats' | 'factions'>('threats');
+  const [selectedEnemy, setSelectedEnemy] = useState<(typeof ENEMIES)[number] | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [threatFilter, setThreatFilter] = useState<'all' | 'discovered' | 'apex'>('all');
+
   // Enemies excluded from the ratio (e.g. Choir Wraith's HP is intentionally
   // beyond a run's reach) so 100% stays a reachable goal.
   const catalogueEnemies = ENEMIES.filter((e) => !e.excludeFromBestiary);
@@ -41,6 +396,34 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const discoveredFactionCount = FACTIONS.filter((faction) =>
     faction.roster.some((enemyId) => (meta.bestiary[enemyId] ?? 0) > 0),
   ).length;
+
+  const filteredEnemies = useMemo(() => {
+    return ENEMIES.filter((enemy) => {
+      const kills = meta.bestiary[enemy.id] ?? 0;
+      if (threatFilter === 'discovered' && kills === 0) return false;
+      if (threatFilter === 'apex' && enemy.hp < 150) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        enemy.name.toLowerCase().includes(q) ||
+        enemy.family.toLowerCase().includes(q) ||
+        enemy.behavior.toLowerCase().includes(q) ||
+        enemy.lore.toLowerCase().includes(q)
+      );
+    });
+  }, [meta.bestiary, threatFilter, searchQuery]);
+
+  const filteredFactions = useMemo(() => {
+    if (!searchQuery.trim()) return FACTIONS;
+    const q = searchQuery.toLowerCase().trim();
+    return FACTIONS.filter((faction) => {
+      if (faction.name.toLowerCase().includes(q) || faction.description.toLowerCase().includes(q)) return true;
+      return faction.roster.some((enemyId) => {
+        const e = ENEMIES.find((enemy) => enemy.id === enemyId);
+        return e && (e.name.toLowerCase().includes(q) || e.family.toLowerCase().includes(q));
+      });
+    });
+  }, [searchQuery]);
 
   return (
     <ScreenLayout 
@@ -173,9 +556,82 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         </div>
       </div>
 
+      {/* Search and Filters Bar */}
+      <div className="mb-5 flex flex-wrap items-center gap-2.5 border-b border-border/60 pb-3">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={view === 'threats' ? 'Filter threats by name, family, behavior...' : 'Search factions & operative dossiers...'}
+            className="w-full bg-black/50 border border-border pl-8 pr-7 py-1.5 text-xs text-white placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary font-mono rounded"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white text-xs font-mono px-1"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {view === 'threats' && (
+          <div className="flex items-center gap-1 font-mono text-[9px] uppercase">
+            <button
+              type="button"
+              onClick={() => setThreatFilter('all')}
+              className={`border px-2.5 py-1.5 font-bold transition-colors ${
+                threatFilter === 'all'
+                  ? 'border-primary bg-primary text-black'
+                  : 'border-border bg-card text-muted-foreground hover:text-white'
+              }`}
+            >
+              All ({ENEMIES.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setThreatFilter('discovered')}
+              className={`border px-2.5 py-1.5 font-bold transition-colors ${
+                threatFilter === 'discovered'
+                  ? 'border-emerald-400 bg-emerald-400 text-black'
+                  : 'border-border bg-card text-muted-foreground hover:text-white'
+              }`}
+            >
+              Discovered ({discovered})
+            </button>
+            <button
+              type="button"
+              onClick={() => setThreatFilter('apex')}
+              className={`border px-2.5 py-1.5 font-bold transition-colors ${
+                threatFilter === 'apex'
+                  ? 'border-amber-400 bg-amber-400 text-black'
+                  : 'border-border bg-card text-muted-foreground hover:text-white'
+              }`}
+            >
+              Apex / Elites
+            </button>
+          </div>
+        )}
+      </div>
+
       {view === 'factions' ? (
+        filteredFactions.length === 0 ? (
+          <div className="border border-border/60 bg-card/40 p-8 text-center font-mono">
+            <p className="text-sm uppercase tracking-wider text-muted-foreground">No factions match current search criteria</p>
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="mt-3 border border-primary/50 bg-primary/10 px-3 py-1 text-xs uppercase font-bold text-primary hover:bg-primary/20"
+            >
+              Clear Search
+            </button>
+          </div>
+        ) : (
         <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2'}`} data-testid="section-bestiary-factions">
-          {FACTIONS.map((faction) => {
+          {filteredFactions.map((faction) => {
             const roster = faction.roster
               .map((enemyId) => ENEMIES.find((enemy) => enemy.id === enemyId))
               .filter((enemy): enemy is (typeof ENEMIES)[number] => Boolean(enemy));
@@ -194,27 +650,37 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
                     </span>
                   </div>
                   <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{faction.description}</p>
+                  <p className="mt-2 text-[8.5px] font-mono uppercase tracking-wider text-primary/80 flex items-center gap-1.5">
+                    <Info className="h-3 w-3" /> Click any operative to decrypt intelligence dossier
+                  </p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 border-t border-border/60 p-4 sm:grid-cols-4">
                   {roster.map((enemy) => {
                     const known = (meta.bestiary[enemy.id] ?? 0) > 0;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={enemy.id}
-                        className="flex flex-col items-center gap-1.5 text-center"
+                        onClick={() => setSelectedEnemy(enemy)}
+                        className="flex flex-col items-center gap-1.5 text-center group cursor-pointer transition-all hover:-translate-y-0.5 hover:scale-105 active:scale-95 focus:outline-none p-1.5 rounded border border-transparent hover:border-white/20 hover:bg-white/[.04]"
                         data-testid={`faction-roster-${faction.id}-${enemy.id}`}
+                        aria-label={`Inspect ${known ? enemy.name : 'Unidentified threat'}`}
+                        title={`Click to inspect ${known ? enemy.name : 'Unidentified threat'} dossier`}
                       >
-                        <div className="grid h-16 w-16 place-items-center overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.08),transparent_62%)]">
+                        <div className="relative grid h-16 w-16 place-items-center overflow-hidden border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.08),transparent_62%)] group-hover:border-primary/50 transition-colors">
                           {known ? (
                             <RigPortrait rig={enemy.rig} palette={enemy.palette} anim="idle" size={56} />
                           ) : (
                             <Ghost className="h-6 w-6 text-muted-foreground/30" />
                           )}
+                          <span className="pointer-events-none absolute bottom-0 inset-x-0 bg-black/75 py-0.2 text-[6.5px] font-mono uppercase tracking-wider text-white/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                            Inspect
+                          </span>
                         </div>
-                        <span className={`text-[9px] font-bold uppercase tracking-widest ${known ? 'text-white' : 'text-muted-foreground/50'}`}>
+                        <span className={`text-[9px] font-bold uppercase tracking-widest ${known ? 'text-white group-hover:text-primary' : 'text-muted-foreground/50'}`}>
                           {known ? enemy.name : 'Unidentified'}
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -222,9 +688,24 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
             );
           })}
         </div>
+        )
+      ) : filteredEnemies.length === 0 ? (
+        <div className="border border-border/60 bg-card/40 p-8 text-center font-mono">
+          <p className="text-sm uppercase tracking-wider text-muted-foreground">No threats match current filter criteria</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              setThreatFilter('all');
+            }}
+            className="mt-3 border border-primary/50 bg-primary/10 px-3 py-1 text-xs uppercase font-bold text-primary hover:bg-primary/20"
+          >
+            Clear Filters
+          </button>
+        </div>
       ) : (
       <div className={`grid gap-4 ${isListView ? 'grid-cols-1' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
-        {ENEMIES.map((enemy, i) => {
+        {filteredEnemies.map((enemy, i) => {
           const kills = meta.bestiary[enemy.id] ?? 0;
           const known = kills > 0;
           
@@ -234,7 +715,8 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className={`relative border flex flex-col overflow-hidden ${
+              onClick={() => setSelectedEnemy(enemy)}
+              className={`relative border flex flex-col overflow-hidden cursor-pointer transition-all hover:border-primary/50 hover:shadow-lg active:scale-[0.99] ${
                 known ? 'border-border bg-card' : 'border-border/50 bg-card/30'
               }`}
               data-testid={`card-enemy-${enemy.id}`}
@@ -296,6 +778,14 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
           );
         })}
       </div>
+      )}
+
+      {selectedEnemy && (
+        <EnemyIntelModal
+          enemy={selectedEnemy}
+          kills={meta.bestiary[selectedEnemy.id] ?? 0}
+          onClose={() => setSelectedEnemy(null)}
+        />
       )}
     </ScreenLayout>
   );
