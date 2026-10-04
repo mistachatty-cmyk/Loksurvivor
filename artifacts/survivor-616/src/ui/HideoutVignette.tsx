@@ -20,6 +20,12 @@ export interface VignetteActor {
 export interface HideoutVignetteProps {
   left: VignetteActor;
   right: VignetteActor;
+  /**
+   * Optional third actor standing behind the left one, facing the right one
+   * (the operator next to their LokPet in a Duo fight). Plays idle only unless
+   * a controlledGesture targets side 'support'.
+   */
+  support?: VignetteActor;
   /** Canvas height in CSS pixels; width is derived from it. */
   size?: number;
   className?: string;
@@ -32,12 +38,12 @@ export interface HideoutVignetteProps {
    * re-renders don't restart the clip. Omit the prop entirely for the
    * original ambient random-gesture behavior.
    */
-  controlledGesture?: { side: 'left' | 'right'; anim: GestureAnim; nonce: number } | null;
+  controlledGesture?: { side: 'left' | 'right' | 'support'; anim: GestureAnim; nonce: number } | null;
 }
 
 export type GestureAnim = Extract<AnimName, 'attack' | 'hurt'>;
 
-export function HideoutVignette({ left, right, size = 110, className = '', controlledGesture }: HideoutVignetteProps) {
+export function HideoutVignette({ left, right, support, size = 110, className = '', controlledGesture }: HideoutVignetteProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -55,12 +61,14 @@ export function HideoutVignette({ left, right, size = 110, className = '', contr
     const leftScale = (cssH * 0.72) / left.rig.pixelHeight;
     const rightScale = (cssH * 0.72) / right.rig.pixelHeight;
     const groundY = cssH * 0.86;
-    const leftX = cssW * 0.32;
-    const rightX = cssW * 0.68;
+    const leftX = cssW * (support ? 0.42 : 0.32);
+    const rightX = cssW * (support ? 0.75 : 0.68);
+    const supportScale = support ? (cssH * 0.72) / support.rig.pixelHeight : 1;
+    const supportX = cssW * 0.17;
 
     const start = performance.now();
     let raf = 0;
-    let activeGesture: { side: 'left' | 'right'; anim: GestureAnim; since: number } | null =
+    let activeGesture: { side: 'left' | 'right' | 'support'; anim: GestureAnim; since: number } | null =
       controlledGesture ? { side: controlledGesture.side, anim: controlledGesture.anim, since: start } : null;
     let nextGestureAt = controlledGesture !== undefined ? Infinity : start + 2200 + Math.random() * 2400;
 
@@ -85,7 +93,7 @@ export function HideoutVignette({ left, right, size = 110, className = '', contr
         activeGesture = { side, anim, since: time };
       }
       if (activeGesture) {
-        const actor = activeGesture.side === 'left' ? left : right;
+        const actor = activeGesture.side === 'left' ? left : activeGesture.side === 'support' && support ? support : right;
         const clip = actor.rig.anims[activeGesture.anim];
         const duration = clip.frames.length * clip.frameMs;
         if (time - activeGesture.since > duration) {
@@ -99,6 +107,12 @@ export function HideoutVignette({ left, right, size = 110, className = '', contr
       const leftSince = activeGesture?.side === 'left' ? activeGesture.since : start;
       const rightSince = activeGesture?.side === 'right' ? activeGesture.since : start;
 
+      if (support) {
+        const supportAnim: AnimName = activeGesture?.side === 'support' ? activeGesture.anim : 'idle';
+        const supportSince = activeGesture?.side === 'support' ? activeGesture.since : start;
+        drawGroundShadow(supportX, support.rig.pixelHeight, supportScale);
+        drawRig(ctx, support.rig, support.palette, supportAnim, time - supportSince, supportX, groundY, 1, supportScale, { outline: true });
+      }
       drawGroundShadow(leftX, left.rig.pixelHeight, leftScale);
       drawGroundShadow(rightX, right.rig.pixelHeight, rightScale);
 
@@ -109,7 +123,7 @@ export function HideoutVignette({ left, right, size = 110, className = '', contr
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [left, right, size, controlledGesture]);
+  }, [left, right, support, size, controlledGesture]);
 
   return (
     <canvas
