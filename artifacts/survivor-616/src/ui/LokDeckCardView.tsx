@@ -123,7 +123,7 @@ export function LokDeckCardView({
           borderColor: customFrame ? undefined : rarity.edge,
           boxShadow: customFrame ? undefined : (owned ? `0 0 12px ${rarity.glow}` : undefined),
         }}
-        data-testid={`card-classic-${card.id}`}
+        data-testid={`card-lok-${card.slug}`}
         aria-label={`${owned ? card.name : 'Unknown Card'} (${card.rarity}) - click for details`}
       >
         {/* Custom Overlay Effects (Glitter, Firefly, Matrix) */}
@@ -282,6 +282,7 @@ export function LokDeckCardView({
           ? 'bg-gradient-to-br from-sky-400 via-blue-700 to-slate-900 shadow-[0_0_8px_rgba(56,189,248,0.25)]'
           : 'bg-gradient-to-br from-slate-600 via-slate-800 to-stone-900'
       }`}
+      data-testid={`card-lok-${card.slug}`}
       aria-label={`${owned ? card.name : 'Unknown Card'} (${card.rarity}) - click for details`}
     >
       {/* Specular glare overlay */}
