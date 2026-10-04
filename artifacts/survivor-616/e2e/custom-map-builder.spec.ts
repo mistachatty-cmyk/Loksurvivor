@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 const initialMeta = {
   version: 8,
   onboarded: true,
+  hideoutArrivalEnabled: false,
   levelUpPausesEnabled: true,
   minimapVisible: true,
   minimapExpanded: true,
@@ -132,6 +133,7 @@ test.describe('mobile hideout regression', () => {
           ...JSON.parse(localStorage.getItem('survivor616.meta.v1') ?? '{}'),
           version: 8,
           onboarded: true,
+          hideoutArrivalEnabled: false,
           discoveryIds: ['alley-hatch', 'lantern-shard'],
         }),
       );
@@ -142,7 +144,10 @@ test.describe('mobile hideout regression', () => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
     page.on('console', (message) => {
-      if (message.type() === 'error') runtimeErrors.push(message.text());
+      // Offline sandboxes block external fonts and images; that is not an app error.
+      if (message.type() === 'error' && !/Failed to load resource|Browser error without an exception object/.test(message.text())) {
+        runtimeErrors.push(message.text());
+      }
     });
 
     await page.goto('/?screen=hub');
@@ -173,6 +178,7 @@ test.describe('mobile map categories', () => {
       localStorage.setItem('survivor616.meta.v1', JSON.stringify({
         version: 15,
         onboarded: true,
+        hideoutArrivalEnabled: false,
         devModeAccessUnlocked: true,
         devModeAllUnlocks: true,
       }));

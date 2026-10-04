@@ -2568,8 +2568,10 @@ test('market bell completion pays once and remains safe after the encounter ends
   assert.equal(world.lootTokensGained, def.rewardTokens);
   const paidTokens = world.lootTokensGained;
   for (let elapsed = 0; elapsed < 4; elapsed += 1 / 30) stepWorld(world, 1 / 30, neutralInput);
-  assert.equal(world.cred, def.rewardCred);
-  assert.ok(world.lootTokensGained >= paidTokens);
+  // Ordinary kill drops can still land while the player idles, so assert the
+  // incursion reward was not paid a second time rather than that cred is frozen.
+  assert.ok(world.cred >= def.rewardCred && world.cred < def.rewardCred * 2);
+  assert.equal(world.lootTokensGained, paidTokens);
 });
 
 test('floodwall failure recovers without ending the normal run', () => {

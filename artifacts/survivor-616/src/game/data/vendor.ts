@@ -585,6 +585,47 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     maxStacks: 1,
     grantsLokPetVariantId: 'velvet-saluki',
   },
+  {
+    id: 'bag-of-water',
+    name: "Bag o' Water",
+    description: "A pressurized hydraulic extinguisher flask. Automatically douses fire on contact, washes molten floor hazards, and extinguishes burning status!",
+    category: 'utility',
+    cost: 110,
+    maxStacks: 3,
+    effects: [{ kind: 'stat', stat: 'armor', add: 0.02, cap: 0.6 }],
+  },
+  {
+    id: 'mining-helmet',
+    name: "Sub-Level Carbide Miner's Helmet",
+    description: "Heavy halogen headlamp that pierces subterranean pitch darkness and expands vision radius by 260 world units.",
+    category: 'utility',
+    cost: 160,
+    maxStacks: 1,
+  },
+  {
+    id: 'firefly-lantern',
+    name: 'Bioluminescent Firefly Jar',
+    description: 'A cage of wrangled bioluminescent fireflies. Emits glowing ambient light, reveals hidden pickups in fog, and expands vision by 160 units.',
+    category: 'utility',
+    cost: 210,
+    maxStacks: 1,
+  },
+  {
+    id: 'subterra-spike-thrower-item',
+    name: 'Seismic Spiker Blueprint',
+    description: 'Unlocks the Seismic Spiker wave weapon for all future level-up armory rotations.',
+    category: 'ability',
+    cost: 240,
+    maxStacks: 1,
+  },
+  {
+    id: 'firefly-cannon-item',
+    name: 'Firefly Mortar Blueprint',
+    description: 'Unlocks the Firefly Mortar siege weapon for all future level-up armory rotations.',
+    category: 'ability',
+    cost: 260,
+    maxStacks: 1,
+  },
 ];
 
 /**

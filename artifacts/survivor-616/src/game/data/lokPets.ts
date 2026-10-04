@@ -78,6 +78,39 @@ export const LOKPET_VARIANTS: LokPetVariantDef[] = [
   { id: 'palace-borzoi', name: 'Palace Borzoi', family: 'animal', silhouette: 'wolf', palette: { body: '#f5f5f4', bodyDark: '#a8a29e', accent: '#d4af37', glow: '#fef3c7', eye: '#44403c' }, description: 'Ran with royalty once, or its owner says so. Carries itself like the claim is true.', weight: 1 },
   { id: 'imperial-akita', name: 'Imperial Akita', family: 'animal', silhouette: 'k9-hound', palette: { body: '#ea9c3d', bodyDark: '#78430f', accent: '#fef3c7', glow: '#fde68a', eye: '#1c1917' }, description: 'Composed, watchful, and unmistakably certain that it, personally, is the reason nothing bad has happened yet.', weight: 1 },
   { id: 'velvet-saluki', name: 'Velvet Saluki', family: 'animal', silhouette: 'wolf', palette: { body: '#3f3245', bodyDark: '#1a1423', accent: '#c084fc', glow: '#e9d5ff', eye: '#faf5ff' }, description: 'Feathered, silent, and faster than anything this build implies. A hunting line with nothing left to hunt but time.', weight: 1 },
+  // Digi-Thematic Elemental Variations
+  { id: 'terra-gargoyle', name: 'Terra Gargoyle', family: 'mechanical', silhouette: 'terra-gargoyle', palette: { body: '#78716c', bodyDark: '#292524', accent: '#f59e0b', glow: '#fbbf24', eye: '#fef08a' }, description: 'A gargoyle sculpted from hardened silicon server chassis that shields comrades behind stone firewalls.', sizeScale: 1.15, legendary: true, specialAbility: 'silicon-shield', weight: 1 },
+  { id: 'aero-raptor', name: 'Aero Raptor', family: 'bat', silhouette: 'aero-raptor', palette: { body: '#0d9488', bodyDark: '#134e4a', accent: '#2dd4bf', glow: '#99f6e4', eye: '#f0fdfa' }, description: 'A high-frequency vector raptor slicing through sonic barrier lines.', sizeScale: 0.95, legendary: true, specialAbility: 'vector-slice', weight: 1 },
+  { id: 'photon-lynx', name: 'Photon Lynx', family: 'animal', silhouette: 'photon-lynx', palette: { body: '#eab308', bodyDark: '#713f12', accent: '#facc15', glow: '#fef08a', eye: '#ffffff' }, description: 'A shimmering feline woven from optical fiber light channels.', sizeScale: 0.92, legendary: true, specialAbility: 'refract-beam', weight: 1 },
+  { id: 'null-abyss', name: 'Null Abyss', family: 'mote', silhouette: 'null-abyss', palette: { body: '#312e81', bodyDark: '#0f172a', accent: '#818cf8', glow: '#c7d2fe', eye: '#ede9fe' }, description: 'A collapsed void anomaly that generates localized black holes.', sizeScale: 0.96, legendary: true, specialAbility: 'singularity-drain', weight: 1 },
+  { id: 'cyber-pangolin', name: 'Cyber Pangolin', family: 'animal', silhouette: 'cyber-pangolin', palette: { body: '#854d0e', bodyDark: '#451a03', accent: '#ca8a04', glow: '#fde047', eye: '#fef9c3' }, description: 'An armored cyber-pangolin with plated firewall scales.', sizeScale: 0.88, legendary: true, specialAbility: 'firewall-curl', weight: 1 },
+  { id: 'ion-pegasus', name: 'Ion Pegasus', family: 'bat', silhouette: 'ion-pegasus', palette: { body: '#0284c7', bodyDark: '#075985', accent: '#38bdf8', glow: '#7dd3fc', eye: '#f0f9ff' }, description: 'A soaring cyber-steed powered by ion propulsion wings.', sizeScale: 1.12, legendary: true, specialAbility: 'sonic-boom', weight: 1 },
+  { id: 'glitch-dragon', name: 'Glitch Dragon', family: 'blob', silhouette: 'glitch-dragon', palette: { body: '#831843', bodyDark: '#500724', accent: '#f43f5e', glow: '#fda4af', eye: '#fff1f2' }, description: 'A mythic dragon entity forged from unstable quantum data streams.', sizeScale: 1.25, legendary: true, specialAbility: 'byte-breath', weight: 1 },
+  { id: 'apex-chimera', name: 'Apex Chimera', family: 'animal', silhouette: 'apex-chimera', palette: { body: '#701a75', bodyDark: '#2e1065', accent: '#f59e0b', glow: '#38bdf8', eye: '#fef08a' }, description: 'A supreme multi-affinity chimera carrying draconian crests and tri-elemental fury.', sizeScale: 1.30, legendary: true, specialAbility: 'chimera-fusion', weight: 1 },
+  { id: 'cyber-leviathan', name: 'Cyber Leviathan', family: 'blob', silhouette: 'cyber-leviathan', palette: { body: '#0f766e', bodyDark: '#042f2e', accent: '#06b6d4', glow: '#67e8f9', eye: '#ecfeff' }, description: 'A colossal cybernetic sea dragon commanding frozen sub-zero tides.', sizeScale: 1.35, legendary: true, specialAbility: 'leviathan-surge', weight: 1 },
+  { id: 'solar-seraph', name: 'Solar Seraph', family: 'bat', silhouette: 'solar-seraph', palette: { body: '#f59e0b', bodyDark: '#78350f', accent: '#fde047', glow: '#ffffff', eye: '#fffbeb' }, description: 'A six-winged angelic light avatar that cleanses darkness with radiant dawn bursts.', sizeScale: 1.22, legendary: true, specialAbility: 'seraph-radiance', weight: 1 },
+  { id: 'chrono-valkyrie', name: 'Chrono Valkyrie', family: 'mechanical', silhouette: 'chrono-valkyrie', palette: { body: '#6366f1', bodyDark: '#1e1b4b', accent: '#a855f7', glow: '#c084fc', eye: '#fdf4ff' }, description: 'A tachyon-powered mechanized valkyrie piercing temporal horizons with chrono lances.', sizeScale: 1.18, legendary: true, specialAbility: 'valkyrie-lance', weight: 1 },
+  { id: 'abyss-behemoth', name: 'Abyss Behemoth', family: 'mechanical', silhouette: 'abyss-behemoth', palette: { body: '#18181b', bodyDark: '#020617', accent: '#7c3aed', glow: '#a855f7', eye: '#ede9fe' }, description: 'An obsidian armored behemoth housing an active gravitational singularity.', sizeScale: 1.40, legendary: true, specialAbility: 'abyss-crush', weight: 1 },
+  { id: 'quantum-kirin', name: 'Quantum Kirin', family: 'animal', silhouette: 'quantum-kirin', palette: { body: '#0284c7', bodyDark: '#082f49', accent: '#eab308', glow: '#fde047', eye: '#fefce8' }, description: 'A celestial thunder kirin stepping through quantum phase barriers with spark hooves.', sizeScale: 1.16, legendary: true, specialAbility: 'kirin-thunder', weight: 1 },
+
+  // Pure Synthetic Data-Pets compiled post-Eclipse (Dust Mites, Sloths, Frogs, Birds)
+  // 100% Synthetic Data Animals -- Zero Organic Tissue
+  { id: 'byte-dust-mite', name: 'Byte Dust-Mite', family: 'mechanical', silhouette: 'dust-mite', palette: { body: '#38bdf8', bodyDark: '#082f49', accent: '#a855f7', glow: '#67e8f9', eye: '#f0f9ff' }, description: 'A scurrying synthetic data mite compiled from loose cache packets after the Great Eclipse. Zero organic tissue; purely executable bytecode.', sizeScale: 0.72, legendary: false, specialAbility: 'mite-swarm', weight: 4 },
+  { id: 'neon-dust-roller', name: 'Neon Dust-Roller', family: 'mechanical', silhouette: 'dust-mite', palette: { body: '#f59e0b', bodyDark: '#451a03', accent: '#fbbf24', glow: '#fde047', eye: '#ffffff' }, description: 'A high-friction synthetic mite that compresses into a kinetic spinning orb to crush incoming malicious loops.', sizeScale: 0.75, legendary: false, specialAbility: 'mite-swarm', weight: 3 },
+  { id: 'amber-dust-mite', name: 'Amber Dust-Mite', family: 'mechanical', silhouette: 'dust-mite', palette: { body: '#d97706', bodyDark: '#78350f', accent: '#fbbf24', glow: '#f59e0b', eye: '#fffbeb' }, description: 'Encapsulated in crystallized firewall resin, this data mite projects impenetrable defensive shields for its handler.', sizeScale: 0.74, legendary: true, specialAbility: 'silicon-shield', weight: 2 },
+  { id: 'void-dust-mite', name: 'Void Dust-Mite', family: 'mote', silhouette: 'dust-mite', palette: { body: '#1e1b4b', bodyDark: '#020617', accent: '#7c3aed', glow: '#a855f7', eye: '#ede9fe' }, description: 'A deep-cache vacuum anomaly that swallows orphaned heap memory and hostile projectiles.', sizeScale: 0.78, legendary: true, specialAbility: 'null-consume', weight: 2 },
+
+  { id: 'chrono-sloth', name: 'Chrono Sloth', family: 'animal', silhouette: 'data-sloth', palette: { body: '#6366f1', bodyDark: '#1e1b4b', accent: '#818cf8', glow: '#c7d2fe', eye: '#ede9fe' }, description: 'A wonderfully calm data sloth constructed from suspended animation subroutines. Radiates a local spacetime lag field.', sizeScale: 0.88, legendary: false, specialAbility: 'sloth-dilation', weight: 3 },
+  { id: 'chill-byte-sloth', name: 'Chill-Byte Sloth', family: 'animal', silhouette: 'data-sloth', palette: { body: '#0284c7', bodyDark: '#0c4a6e', accent: '#38bdf8', glow: '#7dd3fc', eye: '#f0f9ff' }, description: 'Perched in memory rafters, this sub-zero synthetic sloth pulses waves of cryo-compression across the arena.', sizeScale: 0.85, legendary: false, specialAbility: 'clock-pause', weight: 3 },
+  { id: 'quantum-sloth', name: 'Quantum Sloth', family: 'animal', silhouette: 'data-sloth', palette: { body: '#7e22ce', bodyDark: '#2e1065', accent: '#c084fc', glow: '#f472b6', eye: '#faf5ff' }, description: 'Appears sluggish until threatened, at which point it phases across multiple quantum states simultaneously.', sizeScale: 0.90, legendary: true, specialAbility: 'time-warp', weight: 2 },
+
+  { id: 'circuit-frog', name: 'Circuit Frog', family: 'animal', silhouette: 'circuit-frog', palette: { body: '#10b981', bodyDark: '#064e3b', accent: '#34d399', glow: '#6ee7b7', eye: '#fef08a' }, description: 'An agile cybernetic amphibian with gold-plated conductive legs that discharge electric thunder-croaks.', sizeScale: 0.82, legendary: false, specialAbility: 'frog-shockwave', weight: 4 },
+  { id: 'toxic-data-toad', name: 'Toxic Data-Toad', family: 'blob', silhouette: 'circuit-frog', palette: { body: '#84cc16', bodyDark: '#365314', accent: '#a3e635', glow: '#bef264', eye: '#ffffff' }, description: 'Secretes corrupted memory pointers that dissolve hostile armor and poison digital cores.', sizeScale: 0.86, legendary: false, specialAbility: 'glitch-strike', weight: 3 },
+  { id: 'neon-bullfrog', name: 'Neon Bullfrog', family: 'animal', silhouette: 'circuit-frog', palette: { body: '#06b6d4', bodyDark: '#164e63', accent: '#22d3ee', glow: '#67e8f9', eye: '#fff1f2' }, description: 'Possesses an amplified sub-woofer throat pouch that produces concussive shockwaves flattening swarms.', sizeScale: 0.92, legendary: true, specialAbility: 'seismic-slam', weight: 2 },
+
+  { id: 'bit-raven', name: 'Bit-Raven', family: 'bat', silhouette: 'pixel-bird', palette: { body: '#1e293b', bodyDark: '#020617', accent: '#38bdf8', glow: '#94a3b8', eye: '#f8fafc' }, description: 'A sharp vector-winged scavenger that patrols the digital thermals, diving with talon micro-missiles.', sizeScale: 0.84, legendary: false, specialAbility: 'bird-talon', weight: 4 },
+  { id: 'cyber-falcon', name: 'Cyber-Falcon', family: 'bat', silhouette: 'pixel-bird', palette: { body: '#0284c7', bodyDark: '#082f49', accent: '#f59e0b', glow: '#fde047', eye: '#ffffff' }, description: 'An ultra-fast pursuit drone bird that accelerates past Mach 2 vectors to cleave targets with hardlight wingtips.', sizeScale: 0.88, legendary: true, specialAbility: 'vector-slice', weight: 2 },
+  { id: 'pixel-sparrow', name: 'Pixel-Sparrow', family: 'bat', silhouette: 'pixel-bird', palette: { body: '#f43f5e', bodyDark: '#4c0519', accent: '#fb7185', glow: '#fda4af', eye: '#fff1f2' }, description: 'A swift, sociable flock sprite that flits around its partner operative, leaving trails of static fireworks.', sizeScale: 0.78, legendary: false, specialAbility: 'thunder-claw', weight: 4 },
 ];
 
 export const LOKPET_STAT_SHEETS: LokPetStatSheet[] = [
@@ -101,10 +134,16 @@ const PET_NAMES = [
 ];
 
 const ELEMENTS: Array<{ element: LokPetElement; label: string }> = [
-  { element: 'none', label: 'kinetic' },
-  { element: 'fire', label: 'fire' },
-  { element: 'freeze', label: 'freeze' },
-  { element: 'slow', label: 'slow' },
+  { element: 'none', label: 'raw kinetic' },
+  { element: 'fire', label: 'pyro-bit fire' },
+  { element: 'freeze', label: 'cryo-byte freeze' },
+  { element: 'slow', label: 'chrono-lag slow' },
+  { element: 'volt', label: 'volt-surge electric' },
+  { element: 'glitch', label: 'null-glitch corrupted' },
+  { element: 'terra', label: 'solid-core terra' },
+  { element: 'aero', label: 'gale-packet aero' },
+  { element: 'light', label: 'photon-array light' },
+  { element: 'dark', label: 'void-sector dark' },
 ];
 
 function pick<T>(rng: () => number, values: T[]): T {
@@ -159,15 +198,27 @@ const SPECIAL_LOKPET_LOADOUTS: Record<string, {
   'storm-griffin': { attackKind: 'heavy-shot', element: 'none', elementLabel: 'volt storm', traitLabel: 'Tempest Arc · thunder talon', stats: { health: 125, moveSpeed: 185, damage: 29, cooldownMs: 700, range: 340, projectileSpeed: 460, explosionRadius: 65, pulseRadius: 0, lifetimeMs: 115000 } },
   'digi-wolf': { attackKind: 'rapid-shot', element: 'freeze', elementLabel: 'corrupted frost', traitLabel: 'Digi-Fang · packet bite', stats: { health: 118, moveSpeed: 190, damage: 25, cooldownMs: 560, range: 320, projectileSpeed: 440, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 115000 } },
   'blue-616': { attackKind: 'heavy-shot', element: 'freeze', elementLabel: 'blue-line frost', traitLabel: 'Last Watch · vault guardian', stats: { health: 150, moveSpeed: 160, damage: 29, cooldownMs: 680, range: 340, projectileSpeed: 440, explosionRadius: 58, pulseRadius: 100, lifetimeMs: 120000 } },
+  'terra-gargoyle': { attackKind: 'heavy-shot', element: 'terra', elementLabel: 'solid-core terra', traitLabel: 'Silicon Fortress · seismic firewall', stats: { health: 155, moveSpeed: 120, damage: 28, cooldownMs: 850, range: 300, projectileSpeed: 340, explosionRadius: 75, pulseRadius: 90, lifetimeMs: 120000 } },
+  'aero-raptor': { attackKind: 'rapid-shot', element: 'aero', elementLabel: 'gale-packet aero', traitLabel: 'Sonic Vector · tempest slice', stats: { health: 95, moveSpeed: 215, damage: 22, cooldownMs: 480, range: 340, projectileSpeed: 520, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 110000 } },
+  'photon-lynx': { attackKind: 'pulse', element: 'light', elementLabel: 'photon-array light', traitLabel: 'Optic Flash · radiant sweep', stats: { health: 105, moveSpeed: 180, damage: 24, cooldownMs: 640, range: 320, projectileSpeed: 420, explosionRadius: 0, pulseRadius: 135, lifetimeMs: 115000 } },
+  'null-abyss': { attackKind: 'explosion', element: 'dark', elementLabel: 'void-sector dark', traitLabel: 'Singularity Well · event horizon', stats: { health: 135, moveSpeed: 135, damage: 30, cooldownMs: 820, range: 330, projectileSpeed: 370, explosionRadius: 88, pulseRadius: 95, lifetimeMs: 120000 } },
+  'cyber-pangolin': { attackKind: 'pulse', element: 'terra', elementLabel: 'solid-core terra', traitLabel: 'Firewall Curl · iron deflection', stats: { health: 160, moveSpeed: 125, damage: 25, cooldownMs: 750, range: 270, projectileSpeed: 320, explosionRadius: 0, pulseRadius: 125, lifetimeMs: 120000 } },
+  'ion-pegasus': { attackKind: 'heavy-shot', element: 'aero', elementLabel: 'gale-packet aero', traitLabel: 'Ion Slipstream · thunder galewing', stats: { health: 115, moveSpeed: 195, damage: 27, cooldownMs: 680, range: 360, projectileSpeed: 460, explosionRadius: 60, pulseRadius: 0, lifetimeMs: 115000 } },
+  'glitch-dragon': { attackKind: 'explosion', element: 'glitch', elementLabel: 'null-glitch corrupt', traitLabel: 'Matrix Breath · quantum rupture', stats: { health: 145, moveSpeed: 170, damage: 33, cooldownMs: 780, range: 350, projectileSpeed: 450, explosionRadius: 90, pulseRadius: 105, lifetimeMs: 125000 } },
+  'apex-chimera': { attackKind: 'explosion', element: 'glitch', elementLabel: 'null-glitch corrupt', traitLabel: 'Chimera Quantum Core · tri-elemental fury', stats: { health: 170, moveSpeed: 180, damage: 35, cooldownMs: 720, range: 360, projectileSpeed: 480, explosionRadius: 95, pulseRadius: 110, lifetimeMs: 130000 } },
+  'cyber-leviathan': { attackKind: 'pulse', element: 'freeze', elementLabel: 'cryo-byte freeze', traitLabel: 'Sub-Zero Tidal Surge · absolute zero pulse', stats: { health: 185, moveSpeed: 150, damage: 32, cooldownMs: 800, range: 370, projectileSpeed: 400, explosionRadius: 0, pulseRadius: 140, lifetimeMs: 135000 } },
+  'solar-seraph': { attackKind: 'heavy-shot', element: 'light', elementLabel: 'photon-array light', traitLabel: 'Radiant Dawn Sunburst · six-wing flare', stats: { health: 140, moveSpeed: 190, damage: 36, cooldownMs: 650, range: 380, projectileSpeed: 520, explosionRadius: 75, pulseRadius: 0, lifetimeMs: 125000 } },
+  'chrono-valkyrie': { attackKind: 'rapid-shot', element: 'slow', elementLabel: 'chrono-lag slow', traitLabel: 'Tachyon Lance · stasis horizon pierce', stats: { health: 145, moveSpeed: 210, damage: 30, cooldownMs: 440, range: 350, projectileSpeed: 540, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 120000 } },
+  'abyss-behemoth': { attackKind: 'explosion', element: 'dark', elementLabel: 'void-sector dark', traitLabel: 'Event Horizon Collapse · dark matter crush', stats: { health: 210, moveSpeed: 115, damage: 38, cooldownMs: 900, range: 320, projectileSpeed: 340, explosionRadius: 105, pulseRadius: 120, lifetimeMs: 140000 } },
+  'quantum-kirin': { attackKind: 'rapid-shot', element: 'volt', elementLabel: 'volt-surge electric', traitLabel: 'Quantum Arc Discharge · phase thunder', stats: { health: 135, moveSpeed: 225, damage: 31, cooldownMs: 460, range: 360, projectileSpeed: 550, explosionRadius: 0, pulseRadius: 0, lifetimeMs: 120000 } },
 };
 
 function pickElement(rng: () => number, attackKind: LokPetAttackKind): { element: LokPetElement; label: string } {
-  // Keep combinations readable: pulses prefer control, while explosions
-  // prefer fire. The generator still exposes every elemental behavior.
+  // Balanced elemental weighting across attack kinds
   const options = attackKind === 'pulse'
     ? ELEMENTS.filter((entry) => entry.element !== 'none')
     : attackKind === 'explosion'
-      ? ELEMENTS.filter((entry) => entry.element === 'none' || entry.element === 'fire' || entry.element === 'slow')
+      ? ELEMENTS.filter((entry) => entry.element === 'none' || entry.element === 'fire' || entry.element === 'terra' || entry.element === 'dark' || entry.element === 'slow')
       : ELEMENTS;
   return pick(rng, options);
 }
@@ -180,7 +231,7 @@ export function rollLokPet(
   const variant = options?.fixedVariantId
     ? LOKPET_VARIANTS.find((v) => v.id === options.fixedVariantId) ?? pickWeightedVariant(rng)
     : pickWeightedVariant(rng);
-  const special = SPECIAL_LOKPET_LOADOUTS[variant.id];
+  const special = options?.fixedVariantId ? SPECIAL_LOKPET_LOADOUTS[variant.id] : undefined;
   if (special) {
     return {
       name: variant.name,
@@ -253,6 +304,55 @@ export function starterLokPetEvolutionStage(level = 1): 1 | 2 | 3 {
   return level >= 66 ? 3 : level >= 33 ? 2 : 1;
 }
 
+/** Evolution stage for any companion based on level */
+export function getLokPetEvolutionStage(level = 1, isStarter = false): 1 | 2 | 3 {
+  if (isStarter) {
+    return starterLokPetEvolutionStage(level);
+  }
+  // Standard companions cap at 50; evolve at 15 and 30
+  return level >= 30 ? 3 : level >= 15 ? 2 : 1;
+}
+
+/** Digi-thematic evolution title for companion variants */
+export function getLokPetEvolutionTitle(variantId: string, stage: 1 | 2 | 3): string {
+  const TITLES: Record<string, [string, string, string]> = {
+    'lil-llama': ['Cria Llama', 'Street Llama', 'Heartguard Llama'],
+    'static-null': ['Data Mote', 'Null Familiar', 'Nomad-Eater Echo'],
+    'lil-buzbee': ['Runt Bee', 'Courier Bee', 'Royal Buzbèè'],
+    'cinder-pouncer': ['Cinder Pup', 'Flame Pouncer', 'Ignis Apex Pouncer'],
+    'moss-pouncer': ['Moss Kit', 'Bramble Stalker', 'Primeval Overgrowth'],
+    'volt-wing': ['Spark Wing', 'Volt Bat', 'Ion Tempest Wyvern'],
+    'byte-serpent': ['Bit Viper', 'Byte Serpent', 'Overclocked Megabyte Drake'],
+    'cyber-hydra': ['Data Python', 'Dual-Laser Hydra', 'Tri-Core Apex Dragon'],
+    'plasma-kitsune': ['Plasma Kit', 'Six-Tail Spark', 'Nine-Tail Sun Fox'],
+    'titan-colossus': ['Steel Construct', 'Rampart Colossus', 'Aegis Dreadnought'],
+    'chrono-hare': ['Swift Runner', 'Chrono Jumper', 'Infinite Tachyon Hare'],
+    'storm-griffin': ['Volt Chick', 'Thunder Talon', 'Tempest Storm Sovereign'],
+    'digi-wolf': ['Code Pup', 'Digi-Wolf', 'Cyberfenrir Alpha'],
+    'glitch-fox': ['Phase Vixen', 'Glitch Fox', 'Quantum Warp Fox'],
+    'terra-gargoyle': ['Silicon Imp', 'Granite Sentinel', 'Obsidian Bastion Titan'],
+    'aero-raptor': ['Vector Chick', 'Aero Raptor', 'Sonic Tempest Falcon'],
+    'photon-lynx': ['Fiber Kit', 'Photon Lynx', 'Radiant Prism Panther'],
+    'null-abyss': ['Void Fragment', 'Null Abyss', 'Singularity Devourer'],
+    'cyber-pangolin': ['Iron Armadillo', 'Cyber Pangolin', 'Aegis Dread-Scale'],
+    'ion-pegasus': ['Electro Foal', 'Ion Pegasus', 'Superluminal Sky Sovereign'],
+    'glitch-dragon': ['Data Wyrm', 'Glitch Dragon', 'Zero-Day Void Emperor'],
+    'apex-chimera': ['Quantum Manticore', 'Apex Chimera', 'Omni-Genesis Celestial Sovereign'],
+    'cyber-leviathan': ['Abyssal Serpent', 'Cyber Leviathan', 'Tidal World-Eater Drake'],
+    'solar-seraph': ['Aura Cherub', 'Solar Seraph', 'Archangel of the Pure Light'],
+    'chrono-valkyrie': ['Gear Maiden', 'Chrono Valkyrie', 'Eternal Paradox Valkyrie'],
+    'abyss-behemoth': ['Void Golem', 'Abyss Behemoth', 'Singularity World-Crusher Titan'],
+    'quantum-kirin': ['Thunder Colt', 'Quantum Kirin', 'Superposition Lightning Sovereign'],
+    'k9-shepherd': ['Patrol Pup', 'Precinct K9', 'Chief Sentinel Dog'],
+    'frostline-husky': ['Snow Pup', 'Frostline Husky', 'Boreal Blizzard Howler'],
+  };
+  const list = TITLES[variantId];
+  if (list) return list[stage - 1];
+  if (stage === 3) return 'Omega Digiform';
+  if (stage === 2) return 'Overclocked Form';
+  return 'Base Form';
+}
+
 export const LOKPET_RARITY_COLORS: Record<LokPetRarity, string> = {
   common: '#94a3b8',
   charged: '#6ee7ff',
@@ -262,9 +362,15 @@ export const LOKPET_RARITY_COLORS: Record<LokPetRarity, string> = {
 
 export const LOKPET_ELEMENT_COLORS: Record<LokPetElement, string> = {
   none: '#e2e8f0',
-  fire: '#ff6b35',
-  freeze: '#8be9ff',
-  slow: '#a78bfa',
+  fire: '#ff5533',
+  freeze: '#38bdf8',
+  slow: '#c084fc',
+  volt: '#facc15',
+  glitch: '#ff2fd0',
+  terra: '#ca8a04',
+  aero: '#14b8a6',
+  light: '#fef08a',
+  dark: '#818cf8',
 };
 
 export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
@@ -293,6 +399,23 @@ export const LOKPET_SILHOUETTE_LABELS: Record<LokPetSilhouette, string> = {
   'k9-hound': 'K9 Hound',
   wolf: 'Wolf',
   'digi-wolf': 'Digi-Wolf',
+  'terra-gargoyle': 'Terra Gargoyle',
+  'aero-raptor': 'Aero Raptor',
+  'photon-lynx': 'Photon Lynx',
+  'null-abyss': 'Null Abyss',
+  'cyber-pangolin': 'Cyber Pangolin',
+  'ion-pegasus': 'Ion Pegasus',
+  'glitch-dragon': 'Glitch Dragon',
+  'apex-chimera': 'Apex Chimera',
+  'cyber-leviathan': 'Cyber Leviathan',
+  'solar-seraph': 'Solar Seraph',
+  'chrono-valkyrie': 'Chrono Valkyrie',
+  'abyss-behemoth': 'Abyss Behemoth',
+  'quantum-kirin': 'Quantum Kirin',
+  'dust-mite': 'Dust Mite',
+  'data-sloth': 'Data Sloth',
+  'circuit-frog': 'Circuit Frog',
+  'pixel-bird': 'Pixel Bird',
 };
 
 /**
@@ -507,6 +630,202 @@ function digiWolfRig(): SpriteRig {
   return rig;
 }
 
+function terraGargoyleRig(): SpriteRig {
+  const rig = blobRig({ height: 16, width: 15, wings: true, spikes: true });
+  rig.parts.push(
+    { key: 'torso', x: -8, y: 3, w: 16, h: 10, color: 'bodyDark', z: 5 },
+    { key: 'crest', x: -5, y: 14, w: 10, h: 5, color: 'accentBright', z: 8 },
+    { key: 'aura', x: -10, y: 1, w: 20, h: 4, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 21;
+  return rig;
+}
+
+function aeroRaptorRig(): SpriteRig {
+  const rig = blobRig({ height: 14, width: 17, wings: true, spikes: true });
+  rig.parts.push(
+    { key: 'crest', x: 3, y: 13, w: 7, h: 5, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -15, y: 3, w: 30, h: 5, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 19;
+  return rig;
+}
+
+function photonLynxRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 14, length: 17, ears: true });
+  rig.parts.push(
+    { key: 'crest', x: 5, y: 12, w: 4, h: 4, color: 'accentBright', z: 8 },
+    { key: 'aura', x: -10, y: 2, w: 20, h: 6, color: 'glow', z: 0 },
+    { key: 'aura', x: -4, y: 6, w: 8, h: 8, color: 'accent', z: 0 },
+  );
+  rig.pixelHeight = 18;
+  return rig;
+}
+
+function nullAbyssRig(): SpriteRig {
+  const rig = blobRig({ height: 16, width: 16, tendrils: true });
+  rig.parts.push(
+    { key: 'torso', x: -6, y: 4, w: 12, h: 10, color: 'bodyDark', z: 4 },
+    { key: 'aura', x: -12, y: 2, w: 24, h: 8, color: 'glow', z: 0 },
+    { key: 'crest', x: -3, y: 12, w: 6, h: 6, color: 'accentBright', z: 8 },
+  );
+  rig.pixelHeight = 20;
+  return rig;
+}
+
+function cyberPangolinRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 13, length: 18 });
+  rig.parts.push(
+    { key: 'torso', x: -8, y: 4, w: 16, h: 9, color: 'accent', z: 6 },
+    { key: 'crest', x: -6, y: 11, w: 12, h: 4, color: 'accentBright', z: 8 },
+    { key: 'aura', x: -8, y: 1, w: 16, h: 3, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 17;
+  return rig;
+}
+
+function ionPegasusRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 16, length: 19, ears: true });
+  rig.parts.push(
+    { key: 'aura', x: -12, y: 6, w: 12, h: 12, color: 'glow', z: 0 },
+    { key: 'crest', x: 2, y: 12, w: 6, h: 8, color: 'accentBright', z: 8 },
+    { key: 'aura', x: -14, y: 2, w: 28, h: 4, color: 'accent', z: 0 },
+  );
+  rig.pixelHeight = 22;
+  return rig;
+}
+
+function glitchDragonRig(): SpriteRig {
+  const rig = serpentRig({ segments: 6, thickness: 13 });
+  rig.parts.push(
+    { key: 'crest', x: 5, y: 13, w: 6, h: 6, color: 'accentBright', z: 9 },
+    { key: 'crest', x: -4, y: 12, w: 4, h: 5, color: 'accent', z: 9 },
+    { key: 'aura', x: -14, y: 2, w: 28, h: 6, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 22;
+  return rig;
+}
+
+function apexChimeraRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 18, length: 22, ears: true });
+  rig.parts.push(
+    { key: 'crest', x: -2, y: 15, w: 6, h: 7, color: 'accentBright', z: 9 },
+    { key: 'crest', x: 4, y: 13, w: 5, h: 5, color: 'accent', z: 8 },
+    { key: 'aura', x: -16, y: 4, w: 12, h: 14, color: 'glow', z: 0 },
+    { key: 'aura', x: 4, y: 4, w: 12, h: 14, color: 'accentBright', z: 0 },
+  );
+  rig.pixelHeight = 24;
+  return rig;
+}
+
+function cyberLeviathanRig(): SpriteRig {
+  const rig = serpentRig({ segments: 8, thickness: 15 });
+  rig.parts.push(
+    { key: 'crest', x: 6, y: 14, w: 8, h: 7, color: 'accentBright', z: 9 },
+    { key: 'crest', x: -6, y: 11, w: 7, h: 5, color: 'accent', z: 8 },
+    { key: 'aura', x: -18, y: 2, w: 36, h: 8, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 25;
+  return rig;
+}
+
+function solarSeraphRig(): SpriteRig {
+  const rig = blobRig({ height: 16, width: 14, wings: true, spikes: true });
+  rig.parts.push(
+    { key: 'crest', x: -4, y: 16, w: 8, h: 6, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -18, y: 4, w: 36, h: 12, color: 'glow', z: 0 },
+    { key: 'aura', x: -10, y: 8, w: 20, h: 8, color: 'accent', z: 1 },
+  );
+  rig.pixelHeight = 24;
+  return rig;
+}
+
+function chronoValkyrieRig(): SpriteRig {
+  const rig = blobRig({ height: 17, width: 13, wings: true, spikes: true });
+  rig.parts.push(
+    { key: 'crest', x: -2, y: 15, w: 4, h: 8, color: 'accentBright', z: 9 },
+    { key: 'torso', x: -7, y: 4, w: 14, h: 11, color: 'bodyDark', z: 5 },
+    { key: 'aura', x: -12, y: 2, w: 24, h: 6, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 23;
+  return rig;
+}
+
+function abyssBehemothRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 20, length: 24, ears: true });
+  rig.parts.push(
+    { key: 'torso', x: -10, y: 5, w: 20, h: 14, color: 'bodyDark', z: 5 },
+    { key: 'crest', x: -6, y: 16, w: 12, h: 6, color: 'accentBright', z: 8 },
+    { key: 'aura', x: -14, y: 2, w: 28, h: 10, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 26;
+  return rig;
+}
+
+function quantumKirinRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 17, length: 20, ears: true });
+  rig.parts.push(
+    { key: 'crest', x: 2, y: 16, w: 4, h: 9, color: 'accentBright', z: 9 },
+    { key: 'aura', x: -14, y: 3, w: 28, h: 8, color: 'glow', z: 0 },
+    { key: 'crest', x: -10, y: 6, w: 6, h: 8, color: 'accent', z: 7 },
+  );
+  rig.pixelHeight = 23;
+  return rig;
+}
+
+function dustMiteRig(): SpriteRig {
+  const rig = blobRig({ height: 11, width: 13, tendrils: true });
+  rig.parts.push(
+    { key: 'legL', x: -8, y: 1, w: 3, h: 2, color: 'accent', z: 0 },
+    { key: 'legL', x: -7, y: 5, w: 3, h: 2, color: 'accent', z: 0 },
+    { key: 'legL', x: -6, y: 9, w: 3, h: 2, color: 'accent', z: 0 },
+    { key: 'legR', x: 5, y: 1, w: 3, h: 2, color: 'accent', z: 0 },
+    { key: 'legR', x: 4, y: 5, w: 3, h: 2, color: 'accent', z: 0 },
+    { key: 'legR', x: 3, y: 9, w: 3, h: 2, color: 'accent', z: 0 },
+    { key: 'crest', x: -3, y: 12, w: 6, h: 3, color: 'accentBright', z: 8 },
+    { key: 'aura', x: -4, y: 3, w: 8, h: 6, color: 'glow', z: 1 },
+  );
+  rig.pixelHeight = 16;
+  return rig;
+}
+
+function dataSlothRig(): SpriteRig {
+  const rig = quadrupedRig({ height: 14, length: 18, ears: true });
+  rig.parts.push(
+    { key: 'crest', x: -8, y: 12, w: 4, h: 6, color: 'accent', z: 8 },
+    { key: 'armL', x: -10, y: 2, w: 5, h: 3, color: 'accentBright', z: 7 },
+    { key: 'armR', x: 5, y: 2, w: 5, h: 3, color: 'accentBright', z: 7 },
+    { key: 'aura', x: -6, y: 4, w: 12, h: 4, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 18;
+  return rig;
+}
+
+function circuitFrogRig(): SpriteRig {
+  const rig = blobRig({ height: 13, width: 15, spikes: false });
+  rig.parts.push(
+    { key: 'legL', x: -10, y: 1, w: 4, h: 4, color: 'accent', z: 0 },
+    { key: 'legR', x: 6, y: 1, w: 4, h: 4, color: 'accent', z: 0 },
+    { key: 'crest', x: -5, y: 11, w: 3, h: 3, color: 'glow', z: 9 },
+    { key: 'crest', x: 2, y: 11, w: 3, h: 3, color: 'glow', z: 9 },
+    { key: 'aura', x: -3, y: 4, w: 6, h: 5, color: 'accentBright', z: 8 },
+  );
+  rig.pixelHeight = 16;
+  return rig;
+}
+
+function pixelBirdRig(): SpriteRig {
+  const rig = blobRig({ height: 13, width: 14, wings: true });
+  rig.parts.push(
+    { key: 'crest', x: -2, y: 13, w: 4, h: 3, color: 'accentBright', z: 9 },
+    { key: 'armL', x: -12, y: 4, w: 7, h: 4, color: 'accent', z: 7 },
+    { key: 'armR', x: 5, y: 4, w: 7, h: 4, color: 'accent', z: 7 },
+    { key: 'aura', x: -4, y: -2, w: 8, h: 4, color: 'glow', z: 0 },
+  );
+  rig.pixelHeight = 18;
+  return rig;
+}
+
 const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   pouncer: blobRig({ height: 15, width: 12, tendrils: true }),
   skull: blobRig({ height: 14, width: 11, spikes: true }),
@@ -533,6 +852,23 @@ const LOKPET_RIGS: Record<LokPetSilhouette, SpriteRig> = {
   'k9-hound': k9HoundRig(),
   wolf: wolfRig(),
   'digi-wolf': digiWolfRig(),
+  'terra-gargoyle': terraGargoyleRig(),
+  'aero-raptor': aeroRaptorRig(),
+  'photon-lynx': photonLynxRig(),
+  'null-abyss': nullAbyssRig(),
+  'cyber-pangolin': cyberPangolinRig(),
+  'ion-pegasus': ionPegasusRig(),
+  'glitch-dragon': glitchDragonRig(),
+  'apex-chimera': apexChimeraRig(),
+  'cyber-leviathan': cyberLeviathanRig(),
+  'solar-seraph': solarSeraphRig(),
+  'chrono-valkyrie': chronoValkyrieRig(),
+  'abyss-behemoth': abyssBehemothRig(),
+  'quantum-kirin': quantumKirinRig(),
+  'dust-mite': dustMiteRig(),
+  'data-sloth': dataSlothRig(),
+  'circuit-frog': circuitFrogRig(),
+  'pixel-bird': pixelBirdRig(),
 };
 
 export function lokPetRig(silhouette: LokPetSilhouette): SpriteRig {

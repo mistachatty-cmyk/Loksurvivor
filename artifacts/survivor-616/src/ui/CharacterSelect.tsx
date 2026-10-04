@@ -538,6 +538,7 @@ const RUN_MODIFIER_OPTIONS: Array<{ key: keyof RunModifiers; name: string; descr
   { key: 'discoMode', name: 'Disco Mode', description: 'Cycles the whole map through a shifting disco palette for the run. Pure visuals -- no change to spawns or hp.' },
   // Only shown once meta.directorModeUnlocked -- see RunModifiersChecklist below.
   { key: 'directorModeEnabled', name: 'Director Mode', description: 'Raises the odds the Director crashes the run with its crew, once eligible.' },
+  { key: 'bionicCluckProtocol', name: 'Bionic Cluck Protocol', description: 'Digital Russel mutiny: Hostile bots transmute into friendly clucking Chicken-Bots that lay restorative & explosive eggs.' },
 ];
 
 function RunModifiersChecklist({ modifiers, directorModeUnlocked, onToggle }: { modifiers: RunModifiers; directorModeUnlocked: boolean; onToggle: (key: keyof RunModifiers) => void }) {

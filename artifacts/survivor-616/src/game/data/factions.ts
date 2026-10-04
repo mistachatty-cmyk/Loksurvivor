@@ -204,6 +204,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#f472b6',
     roster: ['discoball-marshal', 'strobe-fault', 'parquet-warden', 'chromatic-hustler', 'kaleidoscope-fault', 'mirrorball-sovereign'],
   },
+  {
+    id: 'firefly-wranglers',
+    name: 'Firefly Wranglers',
+    description: 'Underground prospectors and evocators who wrangle volatile incandescent fireflies with pickaxes, resonant staves, and subterranean spike drills.',
+    accent: '#f59e0b',
+    roster: ['firefly-miner', 'firefly-evoker', 'firefly-spiker', 'firefly-cannon', 'firefly-pyro-duelist'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

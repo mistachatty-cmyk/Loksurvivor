@@ -6,7 +6,8 @@ test.describe('Sixth Ward Cypher and LokPet Collectors', () => {
       localStorage.setItem('survivor616.meta.v1', JSON.stringify({
         version: 16,
         onboarded: true,
-        cardCredits: 12,
+        hideoutArrivalEnabled: false,
+        cardCredits: 14,
       }));
     });
   });
@@ -22,7 +23,7 @@ test.describe('Sixth Ward Cypher and LokPet Collectors', () => {
   test('opens a Card Credit Cipher Pack in the Archive shop', async ({ page }) => {
     await page.goto('/?screen=archive');
     await page.getByTestId('button-archive-tab-cards').click();
-    await expect(page.getByTestId('section-lokpet-card-shop')).toContainText('12 CC');
+    await expect(page.getByTestId('section-lokpet-card-shop')).toContainText('14 CC');
     await page.getByTestId('button-buy-lokpet-card-pack').click();
     await expect(page.getByTestId('section-lokpet-card-shop')).toContainText('0 CC');
   });

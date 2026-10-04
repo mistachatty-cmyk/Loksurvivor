@@ -8,6 +8,7 @@ test.describe('crew rumor presentation', () => {
         JSON.stringify({
           version: 5,
           onboarded: true,
+          hideoutArrivalEnabled: false,
           rescuedAllyIds: ['vee'],
           crewActivityByAlly: { vee: 'fortify-doors' },
           crewActivitySeed: 4,

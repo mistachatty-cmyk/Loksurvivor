@@ -21,7 +21,7 @@ import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getCharacterSkins } from '@/game/data/characterSkins';
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
-import { CITY_RELICS, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
+import { CITY_RELICS, CITY_RELICS_BY_ID, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
 import { isStarterLokPetId, LOKPET_VARIANTS_BY_ID, rollLokPet, type StarterLokPetId } from '@/game/data/lokPets';
 import { createRng } from '@/game/engine/math';
@@ -232,6 +232,7 @@ function normalizeRunModifiers(value: unknown): RunModifiers {
   if (value.infiniteMode === true) modifiers.infiniteMode = true;
   if (value.hordeSpinEnabled === true) modifiers.hordeSpinEnabled = true;
   if (value.directorModeEnabled === true) modifiers.directorModeEnabled = true;
+  if (value.bionicCluckProtocol === true) modifiers.bionicCluckProtocol = true;
   return modifiers;
 }
 
@@ -261,6 +262,9 @@ export function createInitialMeta(): MetaState {
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
     soundtrackObjectiveCompletions: 0,
+    fogAmbianceMode: 'auto',
+    glowingEyesIntensity: 'mid',
+    crowdAutoZoomEnabled: true,
     wildlifeSheltersInRain: true,
     minimapVisible: true,
     minimapExpanded: true,
@@ -317,10 +321,17 @@ export function createInitialMeta(): MetaState {
     lootTokens: 0,
     cardCredits: 0,
     cardCollection: [],
+    unopenedCardPacks: {},
+    autoOpenPacksEnabled: true,
     activePassiveCardIds: [],
     battleDeckCardIds: [],
     cardSalvageUnlocked: false,
     handheldDigiScopeOwned: false,
+    miningHelmetOwned: false,
+    rancherWhistleOwned: false,
+    eclipseMonocleOwned: false,
+    cardFrameSleeves: ['frame-classic'],
+    selectedCardFrame: 'frame-classic',
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     lokPetLeagueTier: 0,
@@ -391,6 +402,11 @@ export function createInitialMeta(): MetaState {
     dvdEasterEggUnlocked: false,
     pendingNotifications: [],
     lastSeenChangelogVersion: CURRENT_VERSION,
+    relicMaterials: { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
+    craftedRelicIds: [],
+    ownedKeyItemIds: ['digiscope'],
+    unlockedCardCustomizations: ['frame-standard'],
+    cardCustomizationsByCardId: {},
   };
 }
 
@@ -437,6 +453,29 @@ function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
     return [{ cardId: entry.cardId, copies, variants, bestVariant, totalValue: Math.max(copies, counter(entry.totalValue, copies)) }];
   }).slice(0, 500);
 }
+
+function rollPackForReveal(meta: MetaState, packId: CardPackId, seed: number): { pulls: CardPull[]; newFlags: boolean[] } {
+  const pulls = rollCardPack(packId, createRng(seed), CARD_MANIFESTS.map((card) => card.id));
+  const ownedBeforeIds = new Set(meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
+  const seenThisPack = new Set<string>();
+  const newFlags = pulls.map((pull) => {
+    const isNew = !ownedBeforeIds.has(pull.cardId) && !seenThisPack.has(pull.cardId);
+    seenThisPack.add(pull.cardId);
+    return isNew;
+  });
+  return { pulls, newFlags };
+}
+
+function normalizeUnopenedCardPacks(value: unknown): MetaState['unopenedCardPacks'] {
+  if (!isRecord(value)) return {};
+  const result: Partial<Record<CardPackId, number>> = {};
+  for (const packId of Object.keys(CARD_SHOP_PACKS_BY_ID) as CardPackId[]) {
+    const count = counter(value[packId]);
+    if (count > 0) result[packId] = count;
+  }
+  return result;
+}
+
 
 /** Removes one copy of a record's own `bestVariant` (the one a throw would have used) and recomputes `bestVariant`/`totalValue`. Returns null once copies reach 0, so the caller drops the record entirely -- mirrors normalizeCardCollection's own "a 0-copy record doesn't exist" rule. */
 function removeThrownCardCopy(record: OwnedCardRecord): OwnedCardRecord | null {
@@ -551,7 +590,18 @@ function normalizeOwnedCosmeticId(value: unknown, ownedIds: string[], defaultId:
 
 const LOKPET_RARITIES: LokPetRarity[] = ['common', 'charged', 'rare', 'mythic'];
 const LOKPET_ATTACK_KINDS: LokPetAttackKind[] = ['shot', 'rapid-shot', 'heavy-shot', 'pulse', 'explosion'];
-const LOKPET_ELEMENTS: LokPetElement[] = ['none', 'fire', 'freeze', 'slow'];
+const LOKPET_ELEMENTS: LokPetElement[] = [
+  'none',
+  'fire',
+  'freeze',
+  'slow',
+  'volt',
+  'glitch',
+  'terra',
+  'aero',
+  'light',
+  'dark',
+];
 const LOKPET_ATTACK_LABELS: Record<LokPetAttackKind, string> = {
   shot: 'single shot',
   'rapid-shot': 'rapid fire',
@@ -560,10 +610,16 @@ const LOKPET_ATTACK_LABELS: Record<LokPetAttackKind, string> = {
   explosion: 'burst explosion',
 };
 const LOKPET_ELEMENT_LABELS: Record<LokPetElement, string> = {
-  none: 'kinetic',
+  none: 'none',
   fire: 'fire',
   freeze: 'freeze',
   slow: 'slow',
+  volt: 'volt',
+  glitch: 'glitch',
+  terra: 'terra',
+  aero: 'aero',
+  light: 'light',
+  dark: 'dark',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1074,6 +1130,19 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     companionRevealStyle: parsed.companionRevealStyle === 'classic' ? 'classic' : 'ambush',
     frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
     soundtrackObjectiveCompletions: counter(parsed.soundtrackObjectiveCompletions),
+    fogAmbianceMode:
+      parsed.fogAmbianceMode === 'dark-maps' ||
+      parsed.fogAmbianceMode === 'always' ||
+      parsed.fogAmbianceMode === 'off'
+        ? parsed.fogAmbianceMode
+        : 'auto',
+    glowingEyesIntensity:
+      parsed.glowingEyesIntensity === 'lil' ||
+      parsed.glowingEyesIntensity === 'lot' ||
+      parsed.glowingEyesIntensity === 'off'
+        ? parsed.glowingEyesIntensity
+        : 'mid',
+    crowdAutoZoomEnabled: parsed.crowdAutoZoomEnabled !== false,
     wildlifeSheltersInRain: parsed.wildlifeSheltersInRain !== false,
     minimapVisible: parsed.minimapVisible !== false,
     minimapExpanded: parsed.minimapExpanded !== false,
@@ -1158,10 +1227,17 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
     cardCollection,
+    unopenedCardPacks: normalizeUnopenedCardPacks(parsed.unopenedCardPacks),
+    autoOpenPacksEnabled: parsed.autoOpenPacksEnabled !== false,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
     battleDeckCardIds: Array.isArray(parsed.battleDeckCardIds) ? [...new Set(parsed.battleDeckCardIds.filter((id): id is string => typeof id === 'string' && ownedCardIds.has(id)))].slice(0, BATTLE_DECK_SLOTS) : [],
     cardSalvageUnlocked: parsed.cardSalvageUnlocked === true,
     handheldDigiScopeOwned: parsed.handheldDigiScopeOwned === true || parsed.cardSalvageUnlocked === true,
+    miningHelmetOwned: parsed.miningHelmetOwned === true,
+    rancherWhistleOwned: parsed.rancherWhistleOwned === true,
+    eclipseMonocleOwned: parsed.eclipseMonocleOwned === true,
+    cardFrameSleeves: Array.isArray(parsed.cardFrameSleeves) && parsed.cardFrameSleeves.length > 0 ? (parsed.cardFrameSleeves as string[]) : ['frame-classic'],
+    selectedCardFrame: typeof parsed.selectedCardFrame === 'string' ? parsed.selectedCardFrame : 'frame-classic',
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     lokPetLeagueTier: counter(parsed.lokPetLeagueTier),
@@ -1267,6 +1343,21 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // "older than every real version," so those players see the update
     // popup summarizing everything they missed, once.
     lastSeenChangelogVersion: typeof parsed.lastSeenChangelogVersion === 'string' ? parsed.lastSeenChangelogVersion : '0.0.0',
+    relicMaterials: typeof parsed.relicMaterials === 'object' && parsed.relicMaterials !== null
+      ? (parsed.relicMaterials as Record<string, number>)
+      : { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
+    craftedRelicIds: Array.isArray(parsed.craftedRelicIds)
+      ? parsed.craftedRelicIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    ownedKeyItemIds: Array.isArray(parsed.ownedKeyItemIds)
+      ? [...new Set([...parsed.ownedKeyItemIds.filter((id): id is string => typeof id === 'string'), 'digiscope'])]
+      : ['digiscope'],
+    unlockedCardCustomizations: Array.isArray(parsed.unlockedCardCustomizations)
+      ? [...new Set([...parsed.unlockedCardCustomizations.filter((id): id is string => typeof id === 'string'), 'frame-standard'])]
+      : ['frame-standard'],
+    cardCustomizationsByCardId: typeof parsed.cardCustomizationsByCardId === 'object' && parsed.cardCustomizationsByCardId !== null
+      ? (parsed.cardCustomizationsByCardId as Record<string, { frame?: string; overlay?: string; companionSeal?: string }>)
+      : {},
   };
 }
 
@@ -1683,17 +1774,32 @@ type Action =
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
+  | { type: 'buySingleCard'; cardId: string; cost: number; variant?: CardVariant }
+  | { type: 'recycleCard'; cardId: string; rewardCC: number }
+  | { type: 'recycleAllDuplicates' }
+  | { type: 'openStoredCardPack'; packId: CardPackId; now: number }
+  | { type: 'setAutoOpenPacksEnabled'; enabled: boolean }
   | { type: 'togglePassiveCard'; cardId: string }
   | { type: 'toggleBattleDeckCard'; cardId: string }
   | { type: 'consumeThrownCard'; cardId: string }
   | { type: 'buyCardSalvageProtocol' }
   | { type: 'buyHandheldDigiScope' }
+  | { type: 'buyCardFrameSleeve'; frameId: string; cardCreditsCost: number }
+  | { type: 'equipCardFrameSleeve'; frameId: string }
+  | { type: 'buyKeyItem'; itemId: 'miningHelmet' | 'rancherWhistle' | 'eclipseMonocle'; credCost: number }
+  | { type: 'craftRelic'; relicId: string }
+  | { type: 'buyKeyItemAction'; keyItemId: string; credCost: number }
+  | { type: 'unlockCardCustomization'; customizationId: string; costCC: number }
+  | { type: 'setCardCustomization'; cardId: string; customization: { frame?: string; overlay?: string; companionSeal?: string } }
+  | { type: 'openAllStoredCardPacks' }
   | { type: 'completeTravelEncounter'; result: TravelEncounterResult }
   | { type: 'toggleSavedLokPet'; id: string }
   | { type: 'setLokPetLoadout'; ids: string[] }
   | { type: 'restoreSavedLokPet'; id: string; now: number }
   | { type: 'refreshPetElixirs'; now: number }
   | { type: 'feedLokPetTreat'; id: string }
+  | { type: 'adoptRancherPet'; variantId: string; credCost: number }
+  | { type: 'feedRanchKibble'; petId: string; credCost: number }
   | { type: 'recordLokPetBattleResult'; rewards: BattleRewards; winningPetIds: string[] }
   | { type: 'toggleFavoriteLokPet'; id: string }
   | { type: 'renameLokPet'; id: string; name: string }
@@ -1742,6 +1848,9 @@ type Action =
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
   | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
+  | { type: 'setFogAmbianceMode'; mode: MetaState['fogAmbianceMode'] }
+  | { type: 'setGlowingEyesIntensity'; intensity: MetaState['glowingEyesIntensity'] }
+  | { type: 'setCrowdAutoZoomEnabled'; enabled: boolean }
   | { type: 'setWildlifeSheltersInRain'; enabled: boolean }
   | { type: 'setMinimapVisible'; enabled: boolean }
   | { type: 'setMusicReactive'; enabled: boolean }
@@ -1861,15 +1970,89 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'buyCardPack': {
       const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
       if (!pack || state.meta.cardCredits < pack.cost) return state;
+      const meta = { ...state.meta, cardCredits: state.meta.cardCredits - pack.cost };
+      if (!state.meta.autoOpenPacksEnabled) {
+        return {
+          ...state,
+          meta: {
+            ...meta,
+            unopenedCardPacks: { ...meta.unopenedCardPacks, [pack.id]: (meta.unopenedCardPacks[pack.id] ?? 0) + 1 },
+          },
+        };
+      }
       const seed = (action.now ^ state.meta.totalRuns ^ state.meta.cardCredits ^ state.meta.cardCollection.length) >>> 0;
-      const pulls = rollCardPack(pack.id, createRng(seed), CARD_MANIFESTS.map((card) => card.id));
-      const ownedBeforeIds = new Set(state.meta.cardCollection.filter((record) => record.copies > 0).map((record) => record.cardId));
-      const seenThisPack = new Set<string>();
-      const newFlags = pulls.map((pull) => {
-        const isNew = !ownedBeforeIds.has(pull.cardId) && !seenThisPack.has(pull.cardId);
-        seenThisPack.add(pull.cardId);
-        return isNew;
+      const { pulls, newFlags } = rollPackForReveal(meta, pack.id, seed);
+      return {
+        ...state,
+        meta: { ...meta, cardCollection: mergeCardPulls(meta.cardCollection, pulls) },
+        lastCardPackReveal: { packId: pack.id, pulls, newFlags },
+      };
+    }
+
+    case 'buySingleCard': {
+      if (state.meta.cardCredits < action.cost) return state;
+      const variant = action.variant || 'foil';
+      const pulls: CardPull[] = [{ cardId: action.cardId, variant, value: CARD_VARIANT_VALUE[variant] || 2 }];
+      const meta = {
+        ...state.meta,
+        cardCredits: state.meta.cardCredits - action.cost,
+        cardCollection: mergeCardPulls(state.meta.cardCollection, pulls),
+      };
+      return { ...state, meta };
+    }
+
+    case 'recycleCard': {
+      const record = state.meta.cardCollection.find((r) => r.cardId === action.cardId);
+      if (!record || record.copies <= 1) return state;
+      const nextCollection = state.meta.cardCollection.map((r) => {
+        if (r.cardId === action.cardId) {
+          return { ...r, copies: r.copies - 1 };
+        }
+        return r;
       });
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cardCredits: state.meta.cardCredits + action.rewardCC,
+          cardCollection: nextCollection,
+        },
+      };
+    }
+
+    case 'recycleAllDuplicates': {
+      let earnedCC = 0;
+      const nextCollection = state.meta.cardCollection.map((r) => {
+        if (r.copies > 1) {
+          const excess = r.copies - 1;
+          const card = CARD_MANIFESTS.find((c) => c.id === r.cardId);
+          const rMult = card?.rarity === 'mythic' ? 32 : card?.rarity === 'legendary' ? 24 : card?.rarity === 'epic' ? 12 : card?.rarity === 'rare' ? 6 : card?.rarity === 'uncommon' ? 3 : 2;
+          earnedCC += excess * rMult;
+          return { ...r, copies: 1 };
+        }
+        return r;
+      });
+      if (earnedCC === 0) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cardCredits: state.meta.cardCredits + earnedCC,
+          cardCollection: nextCollection,
+        },
+      };
+    }
+
+    case 'openStoredCardPack': {
+      const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
+      const owned = state.meta.unopenedCardPacks[action.packId] ?? 0;
+      if (!pack || owned <= 0) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ owned ^ state.meta.cardCollection.length) >>> 0;
+      const { pulls, newFlags } = rollPackForReveal(state.meta, pack.id, seed);
+      const remaining = owned - 1;
+      const unopenedCardPacks = { ...state.meta.unopenedCardPacks };
+      if (remaining > 0) unopenedCardPacks[pack.id] = remaining;
+      else delete unopenedCardPacks[pack.id];
       return {
         ...state,
         meta: {
@@ -1999,6 +2182,53 @@ export function reducer(state: StoreState, action: Action): StoreState {
                   stamina: Math.min(PET_STAMINA_MAX, candidate.stamina + 1),
                   level: newLvl,
                   exp: remExp,
+                }
+              : candidate,
+          ),
+        },
+      };
+    }
+
+    case 'adoptRancherPet': {
+      if (state.meta.cred < action.credCost) return state;
+      const roll = rollLokPet(() => Math.random(), { fixedVariantId: action.variantId });
+      const newPet: SavedLokPet = {
+        id: `ranch-${Date.now().toString(36)}-${action.variantId}`,
+        roll,
+        stamina: PET_STAMINA_MAX,
+        level: 3,
+        exp: 0,
+        battlesWon: 0,
+        battlesFought: 0,
+      };
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - action.credCost,
+          savedLokPets: [newPet, ...state.meta.savedLokPets].slice(0, 48),
+          lokPetCatalog: recordLokPetCatalog(state.meta.lokPetCatalog, [roll]),
+        },
+      };
+    }
+
+    case 'feedRanchKibble': {
+      if (state.meta.cred < action.credCost) return state;
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.petId);
+      if (!pet) return state;
+      const newLvl = (pet.level || 1) + 1;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - action.credCost,
+          savedLokPets: state.meta.savedLokPets.map((candidate) =>
+            candidate.id === action.petId
+              ? {
+                  ...candidate,
+                  stamina: PET_STAMINA_MAX,
+                  level: newLvl,
+                  exp: 0,
                 }
               : candidate,
           ),
@@ -2257,9 +2487,84 @@ export function reducer(state: StoreState, action: Action): StoreState {
       if (['universal-incursion', 'corner-magnet', 'tidal-anchor', 'static-inverter'].includes(item.id)) {
         nextMeta.threatUpgrades = { ...(nextMeta.threatUpgrades ?? {}), [item.id]: true };
       }
+      if (['mining-helmet', 'bag-of-water', 'firefly-lantern'].includes(item.id)) {
+        nextMeta.ownedKeyItemIds = addUnique(nextMeta.ownedKeyItemIds, item.id);
+      }
       return {
         ...state,
         meta: nextMeta,
+      };
+    }
+
+    case 'craftRelic': {
+      const relic = CITY_RELICS_BY_ID[action.relicId];
+      if (!relic || !relic.craftRecipe) return state;
+      const currentCrafted = new Set(state.meta.craftedRelicIds ?? []);
+      if (currentCrafted.has(relic.id)) return state;
+      const materials = { ...(state.meta.relicMaterials ?? {}) };
+      for (const [matId, req] of Object.entries(relic.craftRecipe.materials)) {
+        if ((materials[matId] ?? 0) < req) return state;
+      }
+      for (const [matId, req] of Object.entries(relic.craftRecipe.materials)) {
+        materials[matId] = (materials[matId] ?? 0) - req;
+      }
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          relicMaterials: materials,
+          craftedRelicIds: [...currentCrafted, relic.id],
+          knownRelicIds: addUnique(state.meta.knownRelicIds, relic.id),
+          pendingNotifications: [
+            ...state.meta.pendingNotifications,
+            {
+              id: `craft-${Date.now()}`,
+              title: `Relic Forged: ${relic.name}`,
+              body: relic.craftRecipe.perkLabel,
+              createdAt: Date.now(),
+            },
+          ],
+        },
+      };
+    }
+
+    case 'buyKeyItemAction': {
+      if (state.meta.cred < action.credCost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cred: state.meta.cred - action.credCost,
+          ownedKeyItemIds: addUnique(state.meta.ownedKeyItemIds, action.keyItemId),
+        },
+      };
+    }
+
+    case 'unlockCardCustomization': {
+      if (state.meta.cardCredits < action.costCC) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cardCredits: state.meta.cardCredits - action.costCC,
+          unlockedCardCustomizations: addUnique(state.meta.unlockedCardCustomizations, action.customizationId),
+        },
+      };
+    }
+
+    case 'setCardCustomization': {
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          cardCustomizationsByCardId: {
+            ...state.meta.cardCustomizationsByCardId,
+            [action.cardId]: {
+              ...(state.meta.cardCustomizationsByCardId[action.cardId] ?? {}),
+              ...action.customization,
+            },
+          },
+        },
       };
     }
 
@@ -2717,6 +3022,15 @@ export function reducer(state: StoreState, action: Action): StoreState {
     case 'setFrameRateMode':
       return { ...state, meta: { ...state.meta, frameRateMode: action.mode } };
 
+    case 'setFogAmbianceMode':
+      return { ...state, meta: { ...state.meta, fogAmbianceMode: action.mode } };
+
+    case 'setGlowingEyesIntensity':
+      return { ...state, meta: { ...state.meta, glowingEyesIntensity: action.intensity } };
+
+    case 'setCrowdAutoZoomEnabled':
+      return { ...state, meta: { ...state.meta, crowdAutoZoomEnabled: action.enabled } };
+
     case 'setWildlifeSheltersInRain':
       return {
         ...state,
@@ -3097,7 +3411,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
         cred: prev.cred + result.cred + dailyContracts.rewardCred,
         lootTokens: prev.lootTokens + result.lootTokensGained + dailyContracts.rewardTokens,
         cardCredits: prev.cardCredits + cardCreditsForRun(runCharacter, result.lootBoxesOpened),
-        cardCollection: (result.cardPacksFound ?? []).reduce((collection, packId, index) => mergeCardPulls(collection, rollCardPack(packId, createRng(((prev.totalRuns + 1) * 616 + result.kills * 17 + index * 97) >>> 0), CARD_MANIFESTS.map((card) => card.id))), prev.cardCollection),
+        cardCollection: prev.autoOpenPacksEnabled
+          ? (result.cardPacksFound ?? []).reduce((collection, packId, index) => mergeCardPulls(collection, rollCardPack(packId, createRng(((prev.totalRuns + 1) * 616 + result.kills * 17 + index * 97) >>> 0), CARD_MANIFESTS.map((card) => card.id))), prev.cardCollection)
+          : prev.cardCollection,
+        unopenedCardPacks: prev.autoOpenPacksEnabled
+          ? prev.unopenedCardPacks
+          : (result.cardPacksFound ?? []).reduce((packs, packId) => ({ ...packs, [packId]: (packs[packId] ?? 0) + 1 }), prev.unopenedCardPacks),
         lokCollectorRuns: prev.lokCollectorRuns + (collectorRun ? 1 : 0),
         lokCollectorPetsFound: prev.lokCollectorPetsFound + collectorPetsFound,
         skeletonKeys: prev.skeletonKeys + result.skeletonKeysGained + dailyContracts.rewardKeys,
@@ -3130,6 +3449,12 @@ export function reducer(state: StoreState, action: Action): StoreState {
         unlockedEvolutionIds: [...prev.unlockedEvolutionIds],
         episodeProgressById: { ...prev.episodeProgressById },
         knownRelicIds,
+        relicMaterials: result.craftingMaterialsCollected
+          ? Object.entries(result.craftingMaterialsCollected).reduce(
+              (acc, [matId, count]) => ({ ...acc, [matId]: (acc[matId] ?? 0) + count }),
+              { ...(prev.relicMaterials ?? {}) },
+            )
+          : prev.relicMaterials,
         dailyContractDayKey: dailyContracts.dayKey,
         dailyContractProgressById: dailyContracts.progressById,
         completedDailyContractIds: dailyContracts.completedIds,
@@ -3258,6 +3583,13 @@ export interface MetaContextValue {
   completeRun: (result: RunResult) => void;
   resolveTravelEncounter: (result: TravelEncounterResult) => void;
   buyCardPack: (packId: CardPackId) => void;
+  craftRelic: (relicId: string) => void;
+  buyKeyItemAction: (keyItemId: string, credCost: number) => void;
+  buySingleCard: (cardId: string, cost: number, variant?: CardVariant) => void;
+  recycleCard: (cardId: string, rewardCC: number) => void;
+  recycleAllDuplicates: () => void;
+  openStoredCardPack: (packId: CardPackId) => void;
+  setAutoOpenPacksEnabled: (enabled: boolean) => void;
   buyLokPetCardPack: () => void;
   togglePassiveCard: (cardId: string) => void;
   toggleBattleDeckCard: (cardId: string) => void;
@@ -3269,6 +3601,8 @@ export interface MetaContextValue {
   restoreSavedLokPet: (id: string) => void;
   refreshPetElixirs: () => void;
   feedLokPetTreat: (id: string) => void;
+  adoptRancherPet: (variantId: string, credCost: number) => void;
+  feedRanchKibble: (petId: string, credCost: number) => void;
   recordLokPetBattleResult: (rewards: BattleRewards, winningPetIds: string[]) => void;
   toggleFavoriteLokPet: (id: string) => void;
   renameLokPet: (id: string, name: string) => void;
@@ -3320,6 +3654,9 @@ export interface MetaContextValue {
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
   setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
+  setFogAmbianceMode: (mode: MetaState['fogAmbianceMode']) => void;
+  setGlowingEyesIntensity: (intensity: MetaState['glowingEyesIntensity']) => void;
+  setCrowdAutoZoomEnabled: (enabled: boolean) => void;
   setWildlifeSheltersInRain: (enabled: boolean) => void;
   setMinimapVisible: (enabled: boolean) => void;
   setMusicReactive: (enabled: boolean) => void;
@@ -3410,6 +3747,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
+  const buySingleCard = useCallback((cardId: string, cost: number, variant?: CardVariant) => dispatch({ type: 'buySingleCard', cardId, cost, variant }), []);
+  const recycleCard = useCallback((cardId: string, rewardCC: number) => dispatch({ type: 'recycleCard', cardId, rewardCC }), []);
+  const recycleAllDuplicates = useCallback(() => dispatch({ type: 'recycleAllDuplicates' }), []);
+  const openStoredCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'openStoredCardPack', packId, now: Date.now() }), []);
+  const setAutoOpenPacksEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setAutoOpenPacksEnabled', enabled }), []);
   const buyLokPetCardPack = useCallback(() => dispatch({ type: 'buyCardPack', packId: 'lokpet', now: Date.now() }), []);
   const togglePassiveCard = useCallback((cardId: string) => dispatch({ type: 'togglePassiveCard', cardId }), []);
   const toggleBattleDeckCard = useCallback((cardId: string) => dispatch({ type: 'toggleBattleDeckCard', cardId }), []);
@@ -3422,6 +3764,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const restoreSavedLokPet = useCallback((id: string) => dispatch({ type: 'restoreSavedLokPet', id, now: Date.now() }), []);
   const refreshPetElixirs = useCallback(() => dispatch({ type: 'refreshPetElixirs', now: Date.now() }), []);
   const feedLokPetTreat = useCallback((id: string) => dispatch({ type: 'feedLokPetTreat', id }), []);
+  const adoptRancherPet = useCallback((variantId: string, credCost: number) => dispatch({ type: 'adoptRancherPet', variantId, credCost }), []);
+  const feedRanchKibble = useCallback((petId: string, credCost: number) => dispatch({ type: 'feedRanchKibble', petId, credCost }), []);
   const recordLokPetBattleResult = useCallback(
     (rewards: BattleRewards, winningPetIds: string[]) =>
       dispatch({ type: 'recordLokPetBattleResult', rewards, winningPetIds }),
@@ -3443,6 +3787,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const clearCardPackReveal = useCallback(() => dispatch({ type: 'clearCardPackReveal' }), []);
   const markOnboarded = useCallback(() => dispatch({ type: 'markOnboarded' }), []);
   const spendTokens = useCallback((amount: number) => dispatch({ type: 'spendTokens', amount }), []);
+  const craftRelic = useCallback((relicId: string) => dispatch({ type: 'craftRelic', relicId }), []);
+  const buyKeyItemAction = useCallback((keyItemId: string, credCost: number) => dispatch({ type: 'buyKeyItemAction', keyItemId, credCost }), []);
+  const unlockCardCustomization = useCallback((customizationId: string, costCC: number) => dispatch({ type: 'unlockCardCustomization', customizationId, costCC }), []);
+  const setCardCustomization = useCallback((cardId: string, customization: { frame?: string; overlay?: string; companionSeal?: string }) => dispatch({ type: 'setCardCustomization', cardId, customization }), []);
   const buyVendorItem = useCallback((id: string) => dispatch({ type: 'buyVendorItem', id }), []);
   const refundVendorItem = useCallback((id: string) => dispatch({ type: 'refundVendorItem', id }), []);
   const refundAllVendorItems = useCallback(() => dispatch({ type: 'refundAllVendorItems' }), []);
@@ -3492,6 +3840,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setCompanionRevealStyle = useCallback((style: MetaState['companionRevealStyle']) => dispatch({ type: 'setCompanionRevealStyle', style }), []);
   const setFrameRateMode = useCallback((mode: MetaState['frameRateMode']) => dispatch({ type: 'setFrameRateMode', mode }), []);
+  const setFogAmbianceMode = useCallback((mode: MetaState['fogAmbianceMode']) => dispatch({ type: 'setFogAmbianceMode', mode }), []);
+  const setGlowingEyesIntensity = useCallback((intensity: MetaState['glowingEyesIntensity']) => dispatch({ type: 'setGlowingEyesIntensity', intensity }), []);
+  const setCrowdAutoZoomEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setCrowdAutoZoomEnabled', enabled }), []);
   const setWildlifeSheltersInRain = useCallback(
     (enabled: boolean) => dispatch({ type: 'setWildlifeSheltersInRain', enabled }),
     [],
@@ -3689,17 +4040,28 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       completeRun,
       resolveTravelEncounter,
       buyCardPack,
+      buySingleCard,
+      recycleCard,
+      recycleAllDuplicates,
+      openStoredCardPack,
+      setAutoOpenPacksEnabled,
       buyLokPetCardPack,
       togglePassiveCard,
       toggleBattleDeckCard,
       consumeThrownCard,
       buyCardSalvageProtocol,
       buyHandheldDigiScope,
+      craftRelic,
+      buyKeyItemAction,
+      unlockCardCustomization,
+      setCardCustomization,
       toggleSavedLokPet,
       setLokPetLoadout,
       restoreSavedLokPet,
       refreshPetElixirs,
       feedLokPetTreat,
+      adoptRancherPet,
+      feedRanchKibble,
       recordLokPetBattleResult,
       toggleFavoriteLokPet,
       renameLokPet,
@@ -3748,6 +4110,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setGraphicsQuality,
       setCompanionRevealStyle,
       setFrameRateMode,
+      setFogAmbianceMode,
+      setGlowingEyesIntensity,
+      setCrowdAutoZoomEnabled,
       setWildlifeSheltersInRain,
       setMinimapVisible,
       setMusicReactive,
@@ -3820,6 +4185,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     completeRun,
     resolveTravelEncounter,
     buyCardPack,
+    buySingleCard,
+    recycleCard,
+    recycleAllDuplicates,
+    openStoredCardPack,
+    setAutoOpenPacksEnabled,
     buyLokPetCardPack,
     togglePassiveCard,
     toggleBattleDeckCard,
@@ -3831,6 +4201,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     restoreSavedLokPet,
     refreshPetElixirs,
     feedLokPetTreat,
+    adoptRancherPet,
+    feedRanchKibble,
     recordLokPetBattleResult,
     toggleFavoriteLokPet,
     renameLokPet,
@@ -3879,6 +4251,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setGraphicsQuality,
     setCompanionRevealStyle,
     setFrameRateMode,
+    setFogAmbianceMode,
+    setGlowingEyesIntensity,
+    setCrowdAutoZoomEnabled,
     setWildlifeSheltersInRain,
     setMinimapVisible,
     setMusicReactive,

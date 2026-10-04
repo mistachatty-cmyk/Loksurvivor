@@ -167,9 +167,9 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lok-card-foil { animation: none; }
-  .lok-card-pack, .lok-collection-card { transition: none; }
-  .lok-collection-card:hover { transform: none; }
+  :root:not([data-motion='full']) .lok-card-foil { animation: none; }
+  :root:not([data-motion='full']) .lok-card-pack, :root:not([data-motion='full']) .lok-collection-card { transition: none; }
+  :root:not([data-motion='full']) .lok-collection-card:hover { transform: none; }
 }
 
 .cosmetic-aura { border-radius: 999px; opacity: .8; pointer-events: none; }
@@ -612,18 +612,14 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .palette-preview-wave { animation: palette-preview-wave 1.3s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .palette-preview-glow,
-  .palette-preview-pulse,
-  .palette-preview-prism,
-  .palette-preview-flicker,
-  .palette-preview-wave { animation: none; }
+  :root:not([data-motion='full']) .palette-preview-glow, :root:not([data-motion='full']) .palette-preview-pulse, :root:not([data-motion='full']) .palette-preview-prism, :root:not([data-motion='full']) .palette-preview-flicker, :root:not([data-motion='full']) .palette-preview-wave { animation: none; }
 }
 
 /* Hideout credits chip: a small pulse while at least one passive generator is owned. */
 @keyframes hub-cred-pulse { 50% { transform: scale(1.22); filter: brightness(1.5); } }
 .hub-cred-pulse { animation: hub-cred-pulse 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .hub-cred-pulse { animation: none; }
+  :root:not([data-motion='full']) .hub-cred-pulse { animation: none; }
 }
 
 /* Arcade Cabinet's CRT flourishes: chrome frame, phosphor glow, scanlines. Inert under every other theme. */
@@ -885,10 +881,10 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro-title__number, .intro-title__word { animation: none !important; }
-  .hideout-ambient *, .hideout-ambient { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
-  .music-reactive-root::before { opacity: 0 !important; }
-  .intro-screen *, .intro-screen { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+  :root:not([data-motion='full']) .intro-title__number, :root:not([data-motion='full']) .intro-title__word { animation: none !important; }
+  :root:not([data-motion='full']) .hideout-ambient *, :root:not([data-motion='full']) .hideout-ambient { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+  :root:not([data-motion='full']) .music-reactive-root::before { opacity: 0 !important; }
+  :root:not([data-motion='full']) .intro-screen *, :root:not([data-motion='full']) .intro-screen { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }
 [data-testid^='run-hud'], [data-testid='run-intel-drawer'], [data-testid='button-loot-tray'], [data-testid='button-loot-tray-options'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-hud, 1)); }
 [data-testid^='overlay-'], [role='dialog'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-popups, 1)); }

@@ -62,6 +62,10 @@ export const CARD_SHOP_PACKS: PurchasableCardPack[] = [
   { id: 'prism-lokpack', name: 'Prism LokPack', description: 'Three LokPet cards with boosted mythic & holo odds.', cost: 26, cards: 3, pool: 'lokpet', rarityBoost: 0.12 },
   { id: 'cipher', name: 'Neon Cipher', description: 'Three passive cards with high rare and Holo odds.', cost: 30, cards: 3, pool: 'all', rarityBoost: 0.16 },
   { id: 'apex-binder', name: 'Apex Vault Pack', description: 'Five premium cards with maximum variant & holo rates.', cost: 42, cards: 5, pool: 'all', rarityBoost: 0.22 },
+  { id: 'quantum-vault', name: 'Quantum Singularity Booster', description: 'Five high-energy cards with extreme mythic and secret-rare odds.', cost: 48, cards: 5, pool: 'all', rarityBoost: 0.25 },
+  { id: 'shinies-cache', name: 'Prismatic Shiny Cache', description: 'Three cards with guaranteed Foil, Holo, or Glitch variant finishes.', cost: 36, cards: 3, pool: 'all', rarityBoost: 0.35 },
+  { id: 'apex-dominion', name: 'Apex Dominion Booster', description: 'Five premier LokPet cards featuring ultra-rare apex bodies and signatures.', cost: 54, cards: 5, pool: 'lokpet', rarityBoost: 0.28 },
+  { id: 'mega-vault', name: 'Mega Vault Pack', description: 'Seven premium cards -- the deepest pull in the Bar, with the highest holo rate around.', cost: 64, cards: 7, pool: 'all', rarityBoost: 0.3 },
 ];
 export const CARD_SHOP_PACKS_BY_ID = Object.fromEntries(CARD_SHOP_PACKS.map((pack) => [pack.id, pack])) as Record<CardPackId, PurchasableCardPack>;
 const VARIANT_VALUE: Record<CardVariant, number> = { standard: 1, foil: 2, neon: 4, glitch: 7, holo: 12 };
@@ -70,10 +74,19 @@ export interface CardPull { cardId: string; variant: CardVariant; value: number 
 export function rollCardPack(packId: CardPackId, rng: () => number, extraCardIds: string[] = []): CardPull[] {
   const pack = CARD_SHOP_PACKS_BY_ID[packId] ?? CARD_SHOP_PACKS_BY_ID.street;
   let pool = pack.pool === 'operative' ? extraCardIds.filter((id) => id.includes(':character-')) : PASSIVE_CARDS.filter((card) => pack.pool === 'all' || card.type === pack.pool).map((card) => card.id);
-  if (pack.id === 'street' || pack.id === 'collector' || pack.id === 'apex-binder') pool = [...pool, ...extraCardIds];
-  if (pack.id === 'lokpet' || pack.id === 'prism-lokpack' || pack.id === 'elemental-pack') pool = [...pool, ...extraCardIds.filter((id) => id.includes(':pet-'))];
+  if (pack.id === 'street' || pack.id === 'collector' || pack.id === 'apex-binder' || pack.id === 'quantum-vault' || pack.id === 'shinies-cache') pool = [...pool, ...extraCardIds];
+  if (pack.id === 'lokpet' || pack.id === 'prism-lokpack' || pack.id === 'elemental-pack' || pack.id === 'apex-dominion') pool = [...pool, ...extraCardIds.filter((id) => id.includes(':pet-'))];
   if (!pool.length) return [];
-  return Array.from({ length: pack.cards }, () => { const cardId = pool[Math.floor(rng() * pool.length)]!; const roll = rng() - pack.rarityBoost; const variant: CardVariant = roll < 0.025 ? 'holo' : roll < 0.075 ? 'glitch' : roll < 0.17 ? 'neon' : roll < 0.34 ? 'foil' : 'standard'; return { cardId, variant, value: VARIANT_VALUE[variant] }; });
+  const isGuaranteedShiny = pack.id === 'shinies-cache';
+  return Array.from({ length: pack.cards }, () => {
+    const cardId = pool[Math.floor(rng() * pool.length)]!;
+    const roll = rng() - pack.rarityBoost;
+    let variant: CardVariant = roll < 0.025 ? 'holo' : roll < 0.075 ? 'glitch' : roll < 0.17 ? 'neon' : roll < 0.34 ? 'foil' : 'standard';
+    if (isGuaranteedShiny && variant === 'standard') {
+      variant = rng() < 0.35 ? 'holo' : rng() < 0.65 ? 'glitch' : 'foil';
+    }
+    return { cardId, variant, value: VARIANT_VALUE[variant] };
+  });
 }
 export function mergeCardPulls(collection: OwnedCardRecord[], pulls: CardPull[]): OwnedCardRecord[] {
   const byId = new Map(collection.map((record) => [record.cardId, { ...record, variants: { ...record.variants } }]));

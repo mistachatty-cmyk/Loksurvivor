@@ -144,6 +144,56 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Map category tabs now scroll inside their own row on narrow screens instead of stretching the page.',
     ],
   },
+  {
+    version: '0.10.1',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'The Underground Update',
+    body: [
+      'Digital Russel (Cluck-616) and Barnaby Bit-Herder join the roster, with the Bionic Cluck Protocol run modifier turning fallen hostiles into egg-laying allies.',
+      'Firefly Hollows Extreme arrives with Firefly Miners, Evokers, Spikers, Cannons and the dual-cannon Red Firefly duelist, plus veteran enemy variants and mimic chests.',
+      'The Workshop gains a Relic Forge, light-source key items (miner helmet, firefly jar, phosphor crown) and the Bag o\u2019 Water.',
+      'The Card Shop returns with sealed pack storage, single-card purchases, duplicate recycling and a card matrix chart; the Lock Deck binder shows card classes and combat variables.',
+      'Dust Mite Rancher, Sector 616 Chronicles lore popup, 4\u00d7 Extreme map tab and a much larger LokPet roster and battle script round out the update.',
+    ],
+  },
+  {
+    version: '0.10.2',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Card Style Choice',
+    body: [
+      'Lok Card Shop and Lock Deck cards now have a Card Style picker: Classic keeps the original foil-framed binder look and stays the default, New is the streamlined look from the Underground Update, and Dynamic 3D adds tilt and holographic foil.',
+    ],
+  },
+  {
+    version: '0.10.3',
+    date: '2026-10-04',
+    kind: 'hotfix',
+    title: 'Soundtrack Wake-Up',
+    body: [
+      'The title-screen soundtrack now starts on your first tap or key press, including on phones and tablets where the old retry could not satisfy the browser. A new Start on first tap switch in the Music panel turns it off.',
+      'Six new hideout one-liners and a hidden title-screen surprise for anyone who remembers the old code.',
+    ],
+  },
+  {
+    version: '0.10.4',
+    date: '2026-10-04',
+    kind: 'hotfix',
+    title: 'Motion Override',
+    body: [
+      'When a phone or computer asks apps to reduce motion, the title live feed, hideout rain and parallax, the walking operative and random visitors now stay still. The title screen shows a tap-to-fix notice, and Settings has an Always animate switch that keeps everything moving.',
+    ],
+  },
+  {
+    version: '0.10.5',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Studio 28 Filters',
+    body: [
+      'Studio 28 can now filter the weapon list by weapon type, by active or banned status, and by search, with Activate shown and Ban shown buttons that always leave at least one weapon lit.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

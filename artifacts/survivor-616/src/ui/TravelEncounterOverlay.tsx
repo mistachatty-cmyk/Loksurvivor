@@ -7,12 +7,19 @@
  * formula (cardThrowOutcome in data/travelEncounters.ts).
  */
 import { useEffect, useRef, useState } from 'react';
-import { LogOut, PawPrint, Swords } from 'lucide-react';
+import { LogOut, PawPrint, Sparkles, Swords, Zap } from 'lucide-react';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { effectiveStats, useMeta } from '@/game/state/metaStore';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
+import {
+  getCardVariableProfile,
+  ELEMENT_METADATA,
+  calculateDeckSynergies,
+  type CardElement,
+} from '@/game/data/cardVariables';
 import {
   PET_ASSIST_DAMAGE_MULT,
   PLAYER_TRAVEL_HP,
@@ -92,6 +99,18 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
     .map((cardId) => meta.cardCollection.find((record) => record.cardId === cardId && record.copies > 0))
     .filter((record): record is NonNullable<typeof record> => Boolean(record));
 
+  // Determine opponent element alignment
+  const opponentElement: CardElement =
+    (opponent.lokPetRoll?.element as CardElement | undefined) ??
+    (opponent.kind === 'enemy'
+      ? getCardVariableProfile(
+          CARD_MANIFESTS_BY_ID[`lok.survivor-616.card.threat-${opponent.enemyId}`] ||
+            ({ id: opponent.enemyId, name: opponent.name } as any),
+        ).element
+      : 'none');
+  const opponentElemMeta = opponentElement !== 'none' ? ELEMENT_METADATA[opponentElement] : null;
+  const battleSynergies = calculateDeckSynergies(meta.battleDeckCardIds).filter((s) => s.active);
+
   const handleAttack = (damage: number, actionLabel?: string, heal = 0) => {
     if (busy || combat.status !== 'active') return;
     setBusy(true);
@@ -167,6 +186,25 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
           </div>
         </div>
 
+        <div className="mt-2 flex items-center justify-center gap-2 font-mono text-[9px] uppercase tracking-wider text-white/50">
+          {opponent.lokPetRoll ? (
+            <>
+              <span className="text-cyan-300 font-semibold">{opponent.lokPetRoll.elementLabel}</span>
+              <span>·</span>
+              <span className="text-amber-300">{opponent.lokPetRoll.rarityLabel}</span>
+              <span>·</span>
+              <span className="truncate">{opponent.lokPetRoll.traitLabel}</span>
+            </>
+          ) : opponentElemMeta ? (
+            <span
+              className="rounded px-1.5 py-0.2 font-mono text-[8px] font-bold"
+              style={{ backgroundColor: opponentElemMeta.color, color: '#000' }}
+            >
+              {opponentElemMeta.icon} {opponentElemMeta.label}
+            </span>
+          ) : null}
+        </div>
+
         {lastLog && (
           <p className="mt-3 text-center font-mono text-[10px] text-white/45" data-testid="text-travel-encounter-log">
             {lastLog.actor === 'player'
@@ -176,14 +214,38 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
         )}
 
         {combat.status === 'active' ? (
-          <div className="mt-5">
+          <div className="mt-4">
+            {/* Active Battle Deck Synergies */}
+            {battleSynergies.length > 0 && (
+              <div className="mb-2.5 flex flex-wrap items-center gap-1.5 border border-fuchsia-300/30 bg-fuchsia-950/40 px-2 py-1 font-mono text-[7.5px] uppercase">
+                <Zap className="h-3 w-3 text-fuchsia-300 shrink-0" />
+                <span className="text-white/50">Deck Resonance:</span>
+                {battleSynergies.map((syn) => (
+                  <span
+                    key={syn.id}
+                    className="rounded bg-fuchsia-400/20 px-1 py-0.2 font-bold text-fuchsia-200"
+                    title={syn.description}
+                  >
+                    {syn.badge}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {battleDeck.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
                 {battleDeck.map((record) => {
                   const info = describeOwnedCard(record.cardId);
                   const outcome = cardThrowOutcome(record, opponent.kind);
-                  const damage = Math.round(outcome.damage * powerMult);
+                  const manifest = CARD_MANIFESTS_BY_ID[record.cardId];
+                  const profile = manifest ? getCardVariableProfile(manifest) : null;
+                  const elemMeta = profile ? ELEMENT_METADATA[profile.element] : null;
+                  const hasAdvantage = Boolean(
+                    elemMeta && opponentElement !== 'none' && elemMeta.strongVs.includes(opponentElement),
+                  );
+                  const damage = Math.round(outcome.damage * powerMult * (hasAdvantage ? 1.25 : 1));
                   const lastCopy = !meta.handheldDigiScopeOwned && record.copies <= 1;
+
                   return (
                     <button
                       key={record.cardId}
@@ -191,17 +253,48 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
                       disabled={busy}
                       onClick={() => {
                         consumeThrownCard(record.cardId);
-                        handleAttack(damage, info?.name ?? 'Threw a card', outcome.heal);
+                        handleAttack(
+                          damage,
+                          `${info?.name ?? 'Card'}${hasAdvantage ? ' (Super Effective!)' : ''}`,
+                          outcome.heal,
+                        );
                       }}
-                      className="border border-white/15 bg-white/[.03] p-2 text-left transition-all active:scale-[0.97] disabled:opacity-40"
+                      className={`relative border p-2 text-left transition-all active:scale-[0.97] disabled:opacity-40 ${
+                        hasAdvantage
+                          ? 'border-amber-400/60 bg-amber-400/[.07]'
+                          : 'border-white/15 bg-white/[.03]'
+                      }`}
                       data-testid={`button-throw-card-${record.cardId}`}
                     >
-                      <span className="block font-display text-xs font-black uppercase text-white">{info?.name ?? 'Unknown card'}</span>
-                      <span className="mt-0.5 block text-[9px] text-white/50">
-                        Throw · {damage} dmg{outcome.heal > 0 ? ` · +${outcome.heal} hp` : ''}
-                      </span>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="block truncate font-display text-xs font-black uppercase text-white">
+                          {info?.name ?? 'Unknown card'}
+                        </span>
+                        {elemMeta && (
+                          <span
+                            className="grid h-3.5 w-3.5 place-items-center rounded-full text-[7px] font-bold shrink-0"
+                            style={{ backgroundColor: elemMeta.color, color: '#000' }}
+                            title={elemMeta.label}
+                          >
+                            {elemMeta.icon}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-0.5 flex items-center justify-between text-[8.5px]">
+                        <span className="text-white/60">
+                          Throw · <strong className={hasAdvantage ? 'text-amber-300 font-bold' : 'text-white'}>{damage} dmg</strong>
+                          {outcome.heal > 0 ? ` · +${outcome.heal} hp` : ''}
+                        </span>
+                        {hasAdvantage && (
+                          <span className="rounded bg-amber-400 px-1 py-0.2 font-mono text-[6.5px] font-black uppercase text-black">
+                            Advantage +25%
+                          </span>
+                        )}
+                      </div>
+
                       {!meta.handheldDigiScopeOwned && (
-                        <span className={`mt-0.5 block text-[8px] uppercase tracking-wide ${lastCopy ? 'text-rose-300' : 'text-white/30'}`}>
+                        <span className={`mt-0.5 block text-[7.5px] uppercase tracking-wide ${lastCopy ? 'text-rose-300' : 'text-white/30'}`}>
                           {lastCopy ? 'Last one -- gone after this' : `${record.copies} left before it's gone`}
                         </span>
                       )}
@@ -232,6 +325,19 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
                 data-testid="button-send-lokpet"
               >
                 <PawPrint className="mr-2 inline h-4 w-4" />Send {assistPet.roll.name} · {Math.round(assistPet.roll.stats.damage * PET_ASSIST_DAMAGE_MULT * powerMult)} dmg (once)
+              </button>
+            )}
+            {opponent.kind === 'lokpet' && meta.lokPetTreats >= 1 && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  handleAttack(combat.opponent.hp, 'Offered a Digi-Treat (Tamed!)');
+                }}
+                className="mt-2 w-full border border-pink-400/40 bg-pink-500/10 p-2.5 font-mono text-xs font-black uppercase text-pink-200 transition-all hover:bg-pink-500/20 active:scale-[0.97] disabled:opacity-40"
+                data-testid="button-offer-treat"
+              >
+                <Sparkles className="mr-2 inline h-4 w-4 text-pink-300" />Offer Digi-Treat · Befriend ({meta.lokPetTreats} in pouch)
               </button>
             )}
             <button

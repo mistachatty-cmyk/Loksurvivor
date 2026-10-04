@@ -16,6 +16,8 @@ import {
 } from '@/game/data/lokPetBattles';
 import {
   LOKPET_VARIANTS,
+  getLokPetEvolutionStage,
+  getLokPetEvolutionTitle,
   rollLokPet,
 } from '@/game/data/lokPets';
 import type { LokPetElement, SavedLokPet } from '@/game/types';
@@ -25,23 +27,43 @@ export function getExpForLevel(level: number): number {
   return Math.floor(50 * Math.pow(level, 1.4));
 }
 
-/** Assign 4 battle moves based on pet element and variant */
+/** Assign 4 battle moves based on pet element, variant, level, and evolution stage */
 export function assignBattleMoves(
   variantId: string,
   element: LokPetElement,
+  level = 1,
+  _stage: 1 | 2 | 3 = 1,
 ): LokPetBattleMove[] {
   const moves: LokPetBattleMove[] = [];
 
-  // 1. Basic Strike
-  moves.push(element === 'slow' ? BATTLE_MOVES['quick-claw'] : BATTLE_MOVES['tackle']);
+  // 1. Basic Strike (Fast elements prefer Quick Claw)
+  if (level >= 10 && (element === 'volt' || element === 'aero' || element === 'glitch')) {
+    moves.push(BATTLE_MOVES['quick-claw'] || BATTLE_MOVES['tackle']);
+  } else if (element === 'slow' || element === 'volt' || element === 'aero') {
+    moves.push(BATTLE_MOVES['quick-claw']);
+  } else {
+    moves.push(BATTLE_MOVES['tackle']);
+  }
 
-  // 2. Elemental Skill
+  // 2. Elemental Skill (Evolves into Advanced Skill at Lv 15+)
   if (element === 'fire') {
-    moves.push(BATTLE_MOVES['ember-spit']);
+    moves.push(level >= 15 ? BATTLE_MOVES['pyro-burst'] : BATTLE_MOVES['ember-spit']);
   } else if (element === 'freeze') {
-    moves.push(BATTLE_MOVES['frost-shard']);
+    moves.push(level >= 15 ? BATTLE_MOVES['frost-lock'] : BATTLE_MOVES['frost-shard']);
   } else if (element === 'slow') {
-    moves.push(BATTLE_MOVES['chrono-dampener']);
+    moves.push(level >= 15 ? BATTLE_MOVES['chrono-stasis'] : BATTLE_MOVES['chrono-dampener']);
+  } else if (element === 'volt') {
+    moves.push(level >= 15 ? BATTLE_MOVES['volt-overdrive'] : BATTLE_MOVES['volt-arc']);
+  } else if (element === 'glitch') {
+    moves.push(level >= 15 ? BATTLE_MOVES['zero-day-worm'] : BATTLE_MOVES['glitch-spike']);
+  } else if (element === 'terra') {
+    moves.push(BATTLE_MOVES['silicon-shard']);
+  } else if (element === 'aero') {
+    moves.push(BATTLE_MOVES['vector-cutter']);
+  } else if (element === 'light') {
+    moves.push(BATTLE_MOVES['photon-beam']);
+  } else if (element === 'dark') {
+    moves.push(BATTLE_MOVES['void-entropy']);
   } else {
     moves.push(BATTLE_MOVES['kinetic-cannon']);
   }
@@ -49,12 +71,36 @@ export function assignBattleMoves(
   // 3. Tactical / Support Move
   if (variantId === 'cosmic-axolotl' || variantId === 'rain-jelly') {
     moves.push(BATTLE_MOVES['starlight-remedy']);
+  } else if (variantId === 'byte-dust-mite' || variantId === 'neon-dust-roller' || variantId === 'amber-dust-mite' || variantId === 'void-dust-mite') {
+    moves.push(BATTLE_MOVES['mite-swarm-shield']);
+  } else if (variantId === 'chrono-sloth' || variantId === 'chill-byte-sloth' || variantId === 'quantum-sloth') {
+    moves.push(BATTLE_MOVES['sloth-dilation-wave']);
+  } else if (variantId === 'circuit-frog' || variantId === 'toxic-data-toad' || variantId === 'neon-bullfrog') {
+    moves.push(BATTLE_MOVES['concussive-croak']);
+  } else if (variantId === 'bit-raven' || variantId === 'cyber-falcon' || variantId === 'pixel-sparrow') {
+    moves.push(BATTLE_MOVES['dive-talon-strike']);
+  } else if (variantId === 'photon-lynx' || element === 'light') {
+    moves.push(BATTLE_MOVES['radiant-refract']);
+  } else if (variantId === 'null-abyss' || element === 'dark') {
+    moves.push(BATTLE_MOVES['singularity-drain']);
+  } else if (variantId === 'terra-gargoyle' || variantId === 'cyber-pangolin' || element === 'terra') {
+    moves.push(BATTLE_MOVES['tectonic-firewall']);
+  } else if (variantId === 'aero-raptor' || variantId === 'ion-pegasus' || element === 'aero') {
+    moves.push(BATTLE_MOVES['sonic-slipstream']);
   } else {
     moves.push(BATTLE_MOVES['barrier-shield']);
   }
 
   // 4. Apex Ultimate Finisher
-  if (variantId === 'cyber-hydra') {
+  if (variantId === 'byte-dust-mite' || variantId === 'neon-dust-roller' || variantId === 'amber-dust-mite' || variantId === 'void-dust-mite') {
+    moves.push(BATTLE_MOVES['byte-mite-avalanche']);
+  } else if (variantId === 'chrono-sloth' || variantId === 'chill-byte-sloth' || variantId === 'quantum-sloth') {
+    moves.push(BATTLE_MOVES['absolute-lag-stasis']);
+  } else if (variantId === 'circuit-frog' || variantId === 'toxic-data-toad' || variantId === 'neon-bullfrog') {
+    moves.push(BATTLE_MOVES['seismic-bass-shockwave']);
+  } else if (variantId === 'bit-raven' || variantId === 'cyber-falcon' || variantId === 'pixel-sparrow') {
+    moves.push(BATTLE_MOVES['mach-vector-cyclone']);
+  } else if (variantId === 'cyber-hydra') {
     moves.push(BATTLE_MOVES['tri-laser-salvo']);
   } else if (variantId === 'plasma-kitsune') {
     moves.push(BATTLE_MOVES['plasma-foxfire']);
@@ -68,12 +114,40 @@ export function assignBattleMoves(
     moves.push(BATTLE_MOVES['thunder-dive']);
   } else if (variantId === 'chrono-hare') {
     moves.push(BATTLE_MOVES['time-dilation']);
+  } else if (variantId === 'terra-gargoyle') {
+    moves.push(BATTLE_MOVES['granite-avalanche']);
+  } else if (variantId === 'aero-raptor') {
+    moves.push(BATTLE_MOVES['aero-razor-storm']);
+  } else if (variantId === 'photon-lynx') {
+    moves.push(BATTLE_MOVES['optics-purification']);
+  } else if (variantId === 'null-abyss') {
+    moves.push(BATTLE_MOVES['singularity-collapse']);
+  } else if (variantId === 'cyber-pangolin') {
+    moves.push(BATTLE_MOVES['firewall-fortress']);
+  } else if (variantId === 'ion-pegasus') {
+    moves.push(BATTLE_MOVES['sonic-hyperdrive']);
+  } else if (variantId === 'glitch-dragon') {
+    moves.push(BATTLE_MOVES['matrix-overload-breath']);
+  } else if (variantId === 'digi-wolf') {
+    moves.push(BATTLE_MOVES['pack-hunting-frenzy']);
   } else if (element === 'fire') {
     moves.push(BATTLE_MOVES['inferno-pillar']);
   } else if (element === 'freeze') {
     moves.push(BATTLE_MOVES['blizzard-burst']);
   } else if (element === 'slow') {
     moves.push(BATTLE_MOVES['time-dilation']);
+  } else if (element === 'volt') {
+    moves.push(BATTLE_MOVES['ion-overload']);
+  } else if (element === 'glitch') {
+    moves.push(BATTLE_MOVES['null-overflow']);
+  } else if (element === 'terra') {
+    moves.push(BATTLE_MOVES['terra-monolith-crush']);
+  } else if (element === 'aero') {
+    moves.push(BATTLE_MOVES['aero-tempest-dive']);
+  } else if (element === 'light') {
+    moves.push(BATTLE_MOVES['prism-supernova']);
+  } else if (element === 'dark') {
+    moves.push(BATTLE_MOVES['dark-singularity-rift']);
   } else {
     moves.push(BATTLE_MOVES['hyper-beam']);
   }
@@ -87,15 +161,17 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   const level = savedPet.level && savedPet.level >= 1 ? savedPet.level : 1;
   const exp = savedPet.exp || 0;
   const expToNext = getExpForLevel(level);
+  const stage = getLokPetEvolutionStage(level, savedPet.starter);
+  const stageMult = stage === 3 ? 1.3 : stage === 2 ? 1.15 : 1.0;
 
   // Scaled stats
   const baseHp = roll.stats?.health || 100;
   const baseDmg = roll.stats?.damage || 20;
   const baseSpd = roll.stats?.moveSpeed || 150;
 
-  const maxHp = Math.floor((baseHp + 60) * (1 + level * 0.08));
-  const attack = Math.floor((baseDmg + 12) * (1 + level * 0.07));
-  const defense = Math.floor(12 + level * 1.6);
+  const maxHp = Math.floor((baseHp + 60) * (1 + level * 0.08) * stageMult);
+  const attack = Math.floor((baseDmg + 12) * (1 + level * 0.07) * stageMult);
+  const defense = Math.floor((12 + level * 1.6) * stageMult);
   const speed = Math.floor(baseSpd * 0.1 + level * 0.9);
 
   // Trinket stat adjustments
@@ -119,7 +195,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   }
 
   const finalMaxHp = maxHp + trinketBonusHp;
-  const moves = assignBattleMoves(roll.variantId, roll.element);
+  const moves = assignBattleMoves(roll.variantId, roll.element, level, stage);
 
   return {
     id: `battle-${savedPet.id}-${Date.now()}`,
@@ -150,6 +226,8 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
     battlesWon: savedPet.battlesWon || 0,
     equippedTrinket: savedPet.equippedTrinket,
     starter: savedPet.starter,
+    evolutionStage: stage,
+    evolutionTitle: getLokPetEvolutionTitle(roll.variantId, stage),
   };
 }
 
@@ -161,17 +239,19 @@ export function generateOpponentPet(
 ): BattlePet {
   const roll = rollLokPet(() => 0.5, { fixedVariantId: variantId });
   const expToNext = getExpForLevel(level);
+  const stage = getLokPetEvolutionStage(level, false);
+  const stageMult = stage === 3 ? 1.3 : stage === 2 ? 1.15 : 1.0;
 
   const baseHp = roll.stats?.health || 100;
   const baseDmg = roll.stats?.damage || 20;
   const baseSpd = roll.stats?.moveSpeed || 150;
 
-  const maxHp = Math.floor((baseHp + 60) * (1 + level * 0.08));
-  const attack = Math.floor((baseDmg + 12) * (1 + level * 0.07));
-  const defense = Math.floor(12 + level * 1.6);
+  const maxHp = Math.floor((baseHp + 60) * (1 + level * 0.08) * stageMult);
+  const attack = Math.floor((baseDmg + 12) * (1 + level * 0.07) * stageMult);
+  const defense = Math.floor((12 + level * 1.6) * stageMult);
   const speed = Math.floor(baseSpd * 0.1 + level * 0.9);
 
-  const moves = assignBattleMoves(roll.variantId, roll.element);
+  const moves = assignBattleMoves(roll.variantId, roll.element, level, stage);
 
   return {
     id: `enemy-${variantId}-${level}-${Math.random().toString(36).substring(2, 7)}`,
@@ -199,6 +279,8 @@ export function generateOpponentPet(
     isGuarding: false,
     fainted: false,
     battlesWon: 0,
+    evolutionStage: getLokPetEvolutionStage(level, false),
+    evolutionTitle: getLokPetEvolutionTitle(roll.variantId, getLokPetEvolutionStage(level, false)),
   };
 }
 
@@ -631,6 +713,25 @@ function applyEndOfTurnEffects(state: BattleState): void {
           type: 'damage',
           timestamp: Date.now(),
         });
+      } else if (effect.type === 'shock') {
+        const shockDmg = Math.max(4, Math.floor(pet.maxHp * 0.08));
+        pet.hp = Math.max(0, pet.hp - shockDmg);
+        pet.energy = Math.max(0, pet.energy - 10);
+        state.combatLog.unshift({
+          id: `log-shock-${Date.now()}-${Math.random()}`,
+          text: `${pet.name} was jolted by static shock for ${shockDmg} damage and lost 10 SP!`,
+          type: 'damage',
+          timestamp: Date.now(),
+        });
+      } else if (effect.type === 'corrupt') {
+        const corruptDmg = Math.max(4, Math.floor(pet.maxHp * 0.09));
+        pet.hp = Math.max(0, pet.hp - corruptDmg);
+        state.combatLog.unshift({
+          id: `log-corrupt-${Date.now()}-${Math.random()}`,
+          text: `${pet.name}'s data packet glitch dealt ${corruptDmg} corrupted damage!`,
+          type: 'damage',
+          timestamp: Date.now(),
+        });
       }
 
       effect.duration -= 1;
@@ -716,11 +817,28 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
     }
     if (newLevel > oldLevel) {
       pet.level = newLevel;
+      const oldStage = getLokPetEvolutionStage(oldLevel, pet.starter);
+      const newStage = getLokPetEvolutionStage(newLevel, pet.starter);
+      const evolved = newStage > oldStage;
+      pet.evolutionStage = newStage;
+      pet.evolutionTitle = getLokPetEvolutionTitle(pet.variantId, newStage);
+      pet.moves = assignBattleMoves(pet.variantId, pet.element, newLevel, newStage);
+      if (evolved) {
+        pet.maxHp = Math.floor(pet.maxHp * 1.15);
+        pet.hp = pet.maxHp;
+        pet.attack = Math.floor(pet.attack * 1.15);
+        pet.defense = Math.floor(pet.defense * 1.15);
+      }
+
       levelUps.push({
         petId: pet.id,
         petName: pet.name,
         oldLevel,
         newLevel,
+        evolved,
+        oldStage,
+        newStage,
+        newTitle: evolved ? pet.evolutionTitle : undefined,
       });
     }
     pet.battlesWon += 1;

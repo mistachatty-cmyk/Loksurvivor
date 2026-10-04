@@ -133,6 +133,11 @@ export interface MusicPlayerValue {
   muted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
+  playbackRate: number;
+  /** Start the title-screen track on the player's first click or tap (browsers block sound before a gesture). */
+  autoStart: boolean;
+  setAutoStart: (enabled: boolean) => void;
+  setPlaybackRate: (rate: number) => void;
   progressSec: number;
   durationSec: number;
   error: string | null;
@@ -241,6 +246,7 @@ const FAVORITE_FINGERPRINTS_STORAGE_KEY = 'survivor616.favorite-track-fingerprin
 const TRACK_CREDITS_STORAGE_KEY = 'survivor616.track-credit-links.v1';
 const ALBUM_CREDITS_STORAGE_KEY = 'survivor616.album-credit-links.v1';
 
+const AUTO_START_STORAGE_KEY = 'survivor616.music.autostart';
 const LOKIFED_TAKE_ONE = 'Lokifed — Take 1';
 
 const BUNDLED_TRACKS: Track[] = (
@@ -477,6 +483,14 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   const [muted, setMuted] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>('all');
+  const [playbackRate, setPlaybackRateState] = useState(1.0);
+  const [autoStart, setAutoStartState] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(AUTO_START_STORAGE_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
   const [progressSec, setProgressSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -723,7 +737,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (!audio) return;
     audio.volume = volume;
     audio.muted = muted;
-  }, [volume, muted]);
+    audio.playbackRate = playbackRate;
+  }, [volume, muted, playbackRate]);
 
   // Restore only files the player has already chosen to keep on this device.
   // The game never uploads these bytes or attempts to sync them elsewhere.
@@ -1381,6 +1396,51 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     if (clamped > 0) setMuted(false);
   }, []);
 
+  const setAutoStart = useCallback((enabled: boolean) => {
+    setAutoStartState(enabled);
+    try {
+      window.localStorage.setItem(AUTO_START_STORAGE_KEY, enabled ? '1' : '0');
+    } catch {
+      // Storage may be unavailable -- the choice just will not persist.
+    }
+  }, []);
+
+  // Browsers refuse to start sound on page load, so the soundtrack waits for
+  // the first completed click, tap or key press, then begins the title-screen
+  // track. The intro screen also retries on pointerdown, but touch and pen
+  // pointerdown does not count as a user activation, so that retry silently
+  // fails on phones and tablets -- a completed click does count. The listener
+  // runs in the bubble phase so a click on the player's own play or pause
+  // button settles first and is never undone.
+  useEffect(() => {
+    if (!autoStart) return;
+    const stop = () => {
+      window.removeEventListener('click', onFirstGesture);
+      window.removeEventListener('keydown', onFirstGesture);
+    };
+    const onFirstGesture = () => {
+      stop();
+      const audio = audioRef.current;
+      // Only act if nothing has played yet; a track the player started and
+      // paused keeps its position and is left alone.
+      if (!audio || !audio.paused || audio.currentTime > 0) return;
+      const first = tracksRef.current[0];
+      if (!first || first.locked || !first.url) return;
+      playIndex(0);
+    };
+    window.addEventListener('click', onFirstGesture);
+    window.addEventListener('keydown', onFirstGesture);
+    return stop;
+  }, [autoStart, playIndex]);
+
+  const setPlaybackRate = useCallback((rate: number) => {
+    const clamped = Math.max(0.5, Math.min(2.0, rate));
+    setPlaybackRateState(clamped);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = clamped;
+    }
+  }, []);
+
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const toggleShuffle = useCallback(() => setShuffle((s) => !s), []);
   const cycleRepeat = useCallback(() => setRepeat((r) => (r === 'off' ? 'all' : r === 'all' ? 'one' : 'off')), []);
@@ -1397,6 +1457,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       muted,
       shuffle,
       repeat,
+      playbackRate,
+      setPlaybackRate,
+      autoStart,
+      setAutoStart,
       progressSec,
       durationSec,
       error,
@@ -1453,6 +1517,10 @@ export function MusicProvider({ children }: { children: ReactNode }) {
       muted,
       shuffle,
       repeat,
+      playbackRate,
+      setPlaybackRate,
+      autoStart,
+      setAutoStart,
       progressSec,
       durationSec,
       error,

@@ -100,7 +100,7 @@ export interface LootPrizeDef {
   cardPackId?: CardPackId;
 }
 
-export type CardPackId = 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher' | 'prism-lokpack' | 'elemental-pack' | 'apex-binder';
+export type CardPackId = 'penny-sleeve' | 'street' | 'operative' | 'scenario' | 'lokpet' | 'collector' | 'cipher' | 'prism-lokpack' | 'elemental-pack' | 'operative-elite' | 'apex-binder' | 'mega-vault' | 'quantum-vault' | 'shinies-cache' | 'apex-dominion';
 export type CardVariant = 'standard' | 'foil' | 'neon' | 'glitch' | 'holo';
 export interface OwnedCardRecord {
   cardId: string;
@@ -116,15 +116,25 @@ export type LokPetSilhouette = 'pouncer' | 'skull' | 'winglet' | 'spark' | 'jell
   | 'solar-owl' | 'shadow-mantis' | 'glitch-fox' | 'magnet-ursa'
   | 'cyber-hydra' | 'plasma-kitsune' | 'nano-phoenix' | 'titan-colossus'
   | 'chrono-hare' | 'byte-serpent' | 'cosmic-axolotl' | 'storm-griffin'
-  | 'k9-hound' | 'wolf' | 'digi-wolf';
+  | 'k9-hound' | 'wolf' | 'digi-wolf'
+  | 'terra-gargoyle' | 'aero-raptor' | 'photon-lynx' | 'null-abyss'
+  | 'cyber-pangolin' | 'ion-pegasus' | 'glitch-dragon'
+  | 'apex-chimera' | 'cyber-leviathan' | 'solar-seraph' | 'chrono-valkyrie'
+  | 'abyss-behemoth' | 'quantum-kirin'
+  | 'dust-mite' | 'data-sloth' | 'circuit-frog' | 'pixel-bird';
 export type LokPetAttackKind = 'shot' | 'rapid-shot' | 'heavy-shot' | 'pulse' | 'explosion';
-export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow';
+export type LokPetElement = 'none' | 'fire' | 'freeze' | 'slow' | 'volt' | 'glitch' | 'terra' | 'aero' | 'light' | 'dark';
 export type LokPetRarity = 'common' | 'charged' | 'rare' | 'mythic';
 export type LokPetSpecialAbility = 'prism-collect' | 'void-fetch' | 'ember-rescue' | 'clock-pause'
   | 'solar-flare' | 'mantis-slice' | 'phase-dash' | 'polar-pull'
   | 'tri-laser' | 'plasma-orbit' | 'rebirth-burst' | 'seismic-slam'
   | 'time-warp' | 'glitch-strike' | 'starlight-heal' | 'thunder-claw'
-  | 'cutify-getaway' | 'null-consume' | 'buzbee-pollen' | 'digi-fang';
+  | 'cutify-getaway' | 'null-consume' | 'buzbee-pollen' | 'digi-fang'
+  | 'silicon-shield' | 'vector-slice' | 'refract-beam' | 'singularity-drain'
+  | 'firewall-curl' | 'sonic-boom' | 'byte-breath'
+  | 'chimera-fusion' | 'leviathan-surge' | 'seraph-radiance' | 'valkyrie-lance'
+  | 'abyss-crush' | 'kirin-thunder'
+  | 'mite-swarm' | 'sloth-dilation' | 'frog-shockwave' | 'bird-talon';
 
 /** Compact palette for original, vector-drawn companion variants. */
 export interface LokPetPalette {
@@ -405,6 +415,12 @@ export interface CharacterEpisodeDef {
 
 export type RelicRecipeTrigger = 'level-up';
 
+export interface RelicCraftRecipe {
+  materials: Record<string, number>;
+  description: string;
+  perkLabel: string;
+}
+
 export interface CityRelicDef {
   id: string;
   name: string;
@@ -413,6 +429,8 @@ export interface CityRelicDef {
   sourceDiscoveryId: string;
   sourceLabel: string;
   color: string;
+  craftRecipe?: RelicCraftRecipe;
+  activePerk?: string;
 }
 
 export type EvolutionBehaviorKind =
@@ -913,7 +931,15 @@ export type EnemyBehavior =
   /** Lev Syndicate: agile flanker that periodically phase-blinks to a flanking angle behind the player. */
   | 'nanite-swarm'
   /** Lev Syndicate: mobile high-voltage station that bridges a directional electric arc at range. */
-  | 'arc-conductor';
+  | 'arc-conductor'
+  /** Firefly Wranglers: subterranean spiker that launches sequential underground pulses. */
+  | 'firefly-spiker'
+  /** Firefly Wranglers: heavy siege mortar shooting charged firefly balls with screen flash. */
+  | 'firefly-cannon'
+  /** Firefly Wranglers: dual-wielding boss firing twin incendiary streams that leave fire trails. */
+  | 'firefly-pyro-duelist'
+  /** Sub-Terra / Digiverse: disguised mimic chest that attacks when approached. */
+  | 'mimic-chest';
 
 export interface EnemyDef {
   id: string;
@@ -938,7 +964,7 @@ export interface EnemyDef {
   /** Spitter-only tuning. */
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
   faction?: string;
-  role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor';
+  role?: 'anchor' | 'flanker' | 'sniper' | 'carrier' | 'swarm' | 'disruptor' | 'skirmisher' | 'spitter' | 'heavy' | 'boss';
   /**
    * Visual scale tier, independent of `radius` (which still drives collision).
    * Feeds a render-time size multiplier -- see `SIZE_CLASS_SCALE` in draw.ts.
@@ -946,7 +972,9 @@ export interface EnemyDef {
    * still gets the old giant bump for pre-existing content that never set
    * this. See run-presentation.md.
    */
-  sizeClass?: 'mini' | 'standard' | 'elite' | 'giant';
+  sizeClass?: 'mini' | 'standard' | 'elite' | 'giant' | 'boss';
+  /** Ambient bioluminescent light radius in darkness or fog. */
+  glowRadius?: number;
   traits?: {
     teleportMs?: number;
     ghostMs?: number;
@@ -1197,6 +1225,8 @@ export interface AreaDef {
     ambientPerSec: number;
     damageVulnerability: number;
   };
+  /** Whether the map is in extreme pitch-black darkness requiring light sources. */
+  extremeDark?: boolean;
   /** Seconds the player must survive to clear the area. */
   durationSec: number;
   waves: WaveDef[];
@@ -1384,6 +1414,8 @@ export interface RunModifiers {
    * any area like `invertedMap`/`speedMode`.
    */
   discoMode?: boolean;
+  /** Bionic Cluck Protocol: Transmutes fallen enemies into friendly Chicken-Bots that lay restorative eggs. */
+  bionicCluckProtocol?: boolean;
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';
@@ -2120,6 +2152,12 @@ export interface MetaState {
   frameRateMode: 60 | 120;
   /** Lifetime objective completions, used to reveal the ordered game soundtrack. */
   soundtrackObjectiveCompletions: number;
+  /** Environmental atmospheric fog ambiance mode. */
+  fogAmbianceMode: 'auto' | 'dark-maps' | 'always' | 'off';
+  /** Glowing eyes in distant fog: 'lil', 'mid', 'lot', or 'off'. */
+  glowingEyesIntensity: 'lil' | 'mid' | 'lot' | 'off';
+  /** Automatic camera zoom-out when the screen has many enemies/action. */
+  crowdAutoZoomEnabled: boolean;
   /** When true, birds and fireflies hide during rain/fog instead of staying visible. */
   wildlifeSheltersInRain: boolean;
   /** Whether the endless minimap is rendered during a run. */
@@ -2230,6 +2268,10 @@ export interface MetaState {
   /** Currency earned from blue loot boxes and spent at the LokPet card shop. */
   cardCredits: number;
   cardCollection: OwnedCardRecord[];
+  /** Purchased or found packs not yet opened, keyed by pack id. Opened via `openStoredCardPack`. */
+  unopenedCardPacks: Partial<Record<CardPackId, number>>;
+  /** When true (default), buying or finding a pack opens it immediately. When false, packs are stored sealed in `unopenedCardPacks` for the player to open later. */
+  autoOpenPacksEnabled: boolean;
   activePassiveCardIds: string[];
   /** Up to BATTLE_DECK_SLOTS owned card ids equipped for the travel-encounter minigame's Attack action. Empty deck falls back to an unarmed punch -- never blocks the player. See data/travelEncounters.ts. */
   battleDeckCardIds: string[];
@@ -2237,6 +2279,16 @@ export interface MetaState {
   cardSalvageUnlocked: boolean;
   /** Permanent companion-shop device. It keeps thrown cards in the binder and records companion details in Archives. */
   handheldDigiScopeOwned: boolean;
+  /** Heavy-duty mining headlamp. Pierces dark underground maps and illuminates shadowed areas. */
+  miningHelmetOwned: boolean;
+  /** Ultrasonic Digi-Rangler whistle. Enhances minion command and swarm radius. */
+  rancherWhistleOwned: boolean;
+  /** Eclipse Solar Monocle. Reveals hidden byte-cache rifts and solar flare events. */
+  eclipseMonocleOwned: boolean;
+  /** Purchased and unlocked custom card frames / sleeves. */
+  cardFrameSleeves: string[];
+  /** Currently equipped card frame style. */
+  selectedCardFrame: string;
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */
@@ -2383,6 +2435,16 @@ export interface MetaState {
   pendingNotifications: PendingNotification[];
   /** Highest changelog version (see `data/changelog.ts`) the player has acknowledged via the update popup. */
   lastSeenChangelogVersion: string;
+  /** Relic crafting materials gathered from runs, chests, and deep mines. */
+  relicMaterials: Record<string, number>;
+  /** Real relics crafted at the Workshop Forge that grant permanent/toggled run perks. */
+  craftedRelicIds: string[];
+  /** Key items in inventory (e.g. mining-helmet, firefly-lantern, phosphor-crown, bag-of-water, digiscope). */
+  ownedKeyItemIds: string[];
+  /** Card customization frames and foil overlays unlocked. */
+  unlockedCardCustomizations: string[];
+  /** Card-specific customizations applied (frame, overlay, companion seal). */
+  cardCustomizationsByCardId: Record<string, { frame?: string; overlay?: string; companionSeal?: string }>;
 }
 
 export type ThreatAngleMode = 'standard' | 'pincer' | 'cardinal' | 'spiral' | 'corners';
@@ -2463,6 +2525,8 @@ export interface RunResult {
   lootTokensGained: number;
   /** Rare currency (skeleton keys) earned this run. */
   skeletonKeysGained: number;
+  /** Relic crafting materials collected during this run. */
+  craftingMaterialsCollected?: Record<string, number>;
   /** Fatigue applied to the operative after this run. */
   fatigueAddedPct?: number;
   /** Operative's fatigue after this run, before recovery begins. */

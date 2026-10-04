@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
 import { restoreUiTransparency } from '@/ui/UiTransparencyControls';
+import { applyMotionMode } from '@/anim/motion';
 
 function describeUnknown(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -66,6 +67,7 @@ function installRuntimeDiagnostics(): void {
 
 installRuntimeDiagnostics();
 restoreUiTransparency();
+applyMotionMode();
 
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.

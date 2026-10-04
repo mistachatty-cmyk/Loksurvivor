@@ -27,6 +27,7 @@ import { characterLevelProgress, playerLevelProgress, useMeta } from '@/game/sta
 import { characterRankTitle } from '@/game/data/characterMastery';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
+import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 const RunRecapPlayer = lazy(() => import('@lok/recap/player').then((module) => ({ default: module.RunRecapPlayer })));
 
@@ -117,8 +118,7 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
       for (const url of createdUrls) URL.revokeObjectURL(url);
     };
   }, [result.highlights]);
-  const prefersReducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = prefersReducedMotionNow();
   const area = areaOverride ?? getArea(result.areaId);
   const character = getCharacter(result.characterId);
   const characterPalette = resolveCharacterCosmeticPalette(

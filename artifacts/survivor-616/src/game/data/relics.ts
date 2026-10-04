@@ -1,9 +1,56 @@
 import type { CityRelicDef, EvolutionBehavior, RelicRecipeDef } from '@/game/types';
 
+export interface CraftingMaterialDef {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  source: string;
+  icon: string;
+}
+
+export const CRAFTING_MATERIALS: CraftingMaterialDef[] = [
+  {
+    id: 'phosphor-ore',
+    name: 'Phosphor Ore',
+    description: 'Bioluminescent crystalline ore harvested from Firefly Hollows and Firefly Miners.',
+    color: '#f59e0b',
+    source: 'Firefly Hollows & Firefly Miners',
+    icon: '⚡',
+  },
+  {
+    id: 'silicon-alloy',
+    name: 'Silicon Alloy',
+    description: 'Refined conductive metallurgy mined from Silicon Deep-Mines and robotic veterans.',
+    color: '#38bdf8',
+    source: 'Silicon Deep-Mines & Veteran Enemies',
+    icon: '⚙️',
+  },
+  {
+    id: 'cyber-resin',
+    name: 'Cyber Resin',
+    description: 'Dense translucent resin salvaged from Glitch Caches and Data Goblins.',
+    color: '#a855f7',
+    source: 'Glitch Caches & Data Goblins',
+    icon: '🧪',
+  },
+  {
+    id: 'prism-quartz',
+    name: 'Prism Quartz',
+    description: 'Ultra-rare refractive diamond quartz harvested from Relic Vaults and Veteran Bosses.',
+    color: '#f43f5e',
+    source: 'Relic Vaults & Veteran Bosses',
+    icon: '💎',
+  },
+];
+
+export const CRAFTING_MATERIALS_BY_ID: Record<string, CraftingMaterialDef> = Object.fromEntries(
+  CRAFTING_MATERIALS.map((m) => [m.id, m]),
+);
+
 /**
- * Permanent recipe knowledge is deliberately a short list. Finding a relic
- * teaches the recipe forever; the recipe itself still has to be earned during
- * a run through a normal level-up card.
+ * Permanent recipe knowledge and forgeable physical relics.
+ * Crafting a relic permanently activates its in-run perk!
  */
 export const CITY_RELICS: CityRelicDef[] = [
   {
@@ -14,6 +61,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'strip-mural',
     sourceLabel: 'Clear Monroe Strip and recover the Monroe Mural.',
     color: '#ff4fa3',
+    craftRecipe: {
+      materials: { 'silicon-alloy': 3, 'cyber-resin': 2 },
+      description: 'Forge the Monroe Mural Pigment at the Workshop Forge.',
+      perkLabel: '+15% elemental status duration and freeze/burn effects spread to an extra nearby target.',
+    },
+    activePerk: '+15% elemental status duration and status spread.',
   },
   {
     id: 'cellar-signal-crystal',
@@ -23,6 +76,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'lantern-shard',
     sourceLabel: 'Clear Crystal Cellar and recover the Lantern Shard.',
     color: '#7ef0bd',
+    craftRecipe: {
+      materials: { 'phosphor-ore': 3, 'prism-quartz': 1 },
+      description: 'Forge the Cellar Pulse Crystal at the Workshop Forge.',
+      perkLabel: 'Standing still emits a harmonic resonance field that damages nearby hostiles.',
+    },
+    activePerk: 'Standing harmonic pulse field.',
   },
   {
     id: 'market-bell-clapper',
@@ -32,6 +91,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'market-bell',
     sourceLabel: 'Clear Old Market Hall and recover the Market Bell.',
     color: '#f4b942',
+    craftRecipe: {
+      materials: { 'silicon-alloy': 4, 'phosphor-ore': 2 },
+      description: 'Forge the Market Bell Clapper at the Workshop Forge.',
+      perkLabel: '+25% chest spawn chance and +35% pickup magnet range across all runs.',
+    },
+    activePerk: '+25% chest spawn rate & +35% pickup magnet range.',
   },
   {
     id: 'floodwall-gauge',
@@ -41,6 +106,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'floodwall-mark',
     sourceLabel: 'Clear Grand River Floodwall and recover the Floodwall Mark.',
     color: '#35d0bb',
+    craftRecipe: {
+      materials: { 'silicon-alloy': 3, 'cyber-resin': 3 },
+      description: 'Forge the Floodwall Gauge at the Workshop Forge.',
+      perkLabel: 'Continuous movement leaves a streaming water trail that extinguishes flames and slows chasers.',
+    },
+    activePerk: 'Water wake extinguishes fires & slows chasers.',
   },
   {
     id: 'northline-rail-switch',
@@ -50,6 +121,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'northline-switch',
     sourceLabel: 'Clear Northline Rail Yard and recover the Northline Switch.',
     color: '#f26b5e',
+    craftRecipe: {
+      materials: { 'silicon-alloy': 5, 'phosphor-ore': 2 },
+      description: 'Forge the Northline Rail Switch at the Workshop Forge.',
+      perkLabel: 'Kinetic knockback on enemies and props is amplified by +30%.',
+    },
+    activePerk: '+30% kinetic knockback force.',
   },
   {
     id: 'cabinet-coil',
@@ -59,6 +136,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'arcade-high-score',
     sourceLabel: 'Clear Neon Arcade and recover the High Score.',
     color: '#ff2ec4',
+    craftRecipe: {
+      materials: { 'cyber-resin': 4, 'silicon-alloy': 2 },
+      description: 'Forge the Cabinet Coil at the Workshop Forge.',
+      perkLabel: '+1 Extra Life per run and +20% cred reward bonus.',
+    },
+    activePerk: '+1 Extra Life & +20% cred rewards.',
   },
   {
     id: 'alley-echo-plate',
@@ -68,6 +151,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'alley-hatch',
     sourceLabel: 'Clear Back Alley and recover the Alley Hatch.',
     color: '#94a3b8',
+    craftRecipe: {
+      materials: { 'silicon-alloy': 4, 'cyber-resin': 3 },
+      description: 'Forge the Alley Echo Plate at the Workshop Forge.',
+      perkLabel: 'Melee swings and close-range weapons repeat a phantom after-echo at 40% damage.',
+    },
+    activePerk: 'Melee attacks trigger a phantom echo.',
   },
   {
     id: 'skyline-luminous-tag',
@@ -77,6 +166,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'skyline-tag',
     sourceLabel: 'Clear Rooftops and recover the Skyline Tag.',
     color: '#67e8f9',
+    craftRecipe: {
+      materials: { 'phosphor-ore': 4, 'cyber-resin': 3 },
+      description: 'Forge the Skyline Luminous Tag at the Workshop Forge.',
+      perkLabel: 'Projectiles have a 25% chance to fork into a second beam on contact.',
+    },
+    activePerk: '25% projectile fork chance.',
   },
   {
     id: 'overflow-service-key',
@@ -86,6 +181,12 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'overflow-manual',
     sourceLabel: 'Clear Neon Overflow and recover the Overflow Manual.',
     color: '#fde047',
+    craftRecipe: {
+      materials: { 'silicon-alloy': 4, 'prism-quartz': 1 },
+      description: 'Forge the Overflow Service Key at the Workshop Forge.',
+      perkLabel: 'Can open sealed Relic Vault Chests and Glitched Caches without keys.',
+    },
+    activePerk: 'Directly opens locked Relic Vaults & Glitch Caches.',
   },
   {
     id: 'null-maintenance-log',
@@ -95,6 +196,27 @@ export const CITY_RELICS: CityRelicDef[] = [
     sourceDiscoveryId: 'null-sector-log',
     sourceLabel: 'Clear Null Sector and recover its maintenance log.',
     color: '#22d3ee',
+    craftRecipe: {
+      materials: { 'cyber-resin': 5, 'prism-quartz': 2 },
+      description: 'Forge the Null Maintenance Log at the Workshop Forge.',
+      perkLabel: 'Glitch and corruption weapons deal +35% damage and chain to adjacent hostiles.',
+    },
+    activePerk: '+35% corruption damage & contagion chaining.',
+  },
+  {
+    id: 'phosphor-crown',
+    name: 'Apex Phosphor Crown',
+    description: 'A radiant crown of hardlight and living fireflies. Pierces all darkness and forces nearby enemies to glow.',
+    sourceAreaId: 'firefly-hollows-extreme',
+    sourceDiscoveryId: 'firefly-crown-shard',
+    sourceLabel: 'Defeat the Firefly Pyro-Duelist in the Firefly Hollows.',
+    color: '#fbbf24',
+    craftRecipe: {
+      materials: { 'phosphor-ore': 8, 'prism-quartz': 3 },
+      description: 'Forge the Apex Phosphor Crown at the Workshop Forge.',
+      perkLabel: '+110% vision radius, radiates enemy halos in the dark, and boosts firefly damage by 40%.',
+    },
+    activePerk: '+110% vision, glowing enemy halos, +40% firefly damage.',
   },
 ];
 
@@ -371,6 +493,32 @@ export const RELIC_RECIPES: RelicRecipeDef[] = [
       impactIntensity: 2,
       color: '#22d3ee',
       statusEffectId: 'corrupted',
+    },
+  },
+  {
+    id: 'phosphor-nova-crown',
+    name: 'Phosphor Nova Crown',
+    description: 'The staff detonates in an incandescent cascade of fireflies that blinds and illuminates enemies in a wide radius.',
+    identity: 'Bioluminescent illumination',
+    relicId: 'phosphor-crown',
+    baseWeaponId: 'phosphor-evoker-staff',
+    minWeaponLevel: 3,
+    trigger: 'level-up',
+    triggerLabel: 'Own Phosphor Evoker Staff at Lv 3+; choose this card when it appears.',
+    color: '#fbbf24',
+    behavior: behavior({ kind: 'status-spread', radius: 110, count: 4, statusEffectId: 'burning' }),
+    result: {
+      id: 'phosphor-nova-crown',
+      name: 'Phosphor Nova Crown',
+      kind: 'nova',
+      description: 'A blinding radiant firefly burst that scorches and reveals all surrounding enemies.',
+      damage: 32,
+      cooldownMs: 980,
+      range: 220,
+      levelDamageScale: 0.3,
+      impactIntensity: 4,
+      color: '#fbbf24',
+      statusEffectId: 'burning',
     },
   },
 ];

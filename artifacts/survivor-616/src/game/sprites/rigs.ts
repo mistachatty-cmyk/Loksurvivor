@@ -578,3 +578,44 @@ export function giantRig(height = 28): SpriteRig {
   };
   return rig;
 }
+
+/** Digital Russel / Cluck-616: a cybernetic battle rooster with transmutative spurs and comb. */
+export function roosterRig(): SpriteRig {
+  const parts: SpritePart[] = [
+    { key: 'shadow', x: -6, y: 0, w: 12, h: 2, color: 'ink', z: 0 },
+    // Chrome mechanical talons / spurs
+    { key: 'legL', x: -4, y: 1, w: 3, h: 5, color: 'accentBright', z: 2 },
+    { key: 'legR', x: 2, y: 1, w: 3, h: 5, color: 'accentBright', z: 2 },
+    // Plump cyber body & feathered chassis
+    { key: 'torso', x: -6, y: 5, w: 12, h: 10, color: 'body', z: 3 },
+    // Mechanical wings
+    { key: 'armL', x: -8, y: 7, w: 4, h: 7, color: 'bodyDark', z: 4 },
+    { key: 'armR', x: 4, y: 7, w: 4, h: 7, color: 'bodyDark', z: 4 },
+    // Cyber rooster head & glowing visor
+    { key: 'head', x: 1, y: 13, w: 7, h: 6, color: 'body', z: 5 },
+    { key: 'face', x: 5, y: 15, w: 4, h: 2, color: 'glow', z: 7 }, // visor
+    { key: 'crest', x: 1, y: 19, w: 6, h: 4, color: 'accent', z: 8 }, // glowing red comb
+    // Tail plumes with energy conduit
+    { key: 'aura', x: -11, y: 10, w: 6, h: 8, color: 'accent', z: 1 },
+  ];
+
+  const anims = baseAnims(false, 1.1);
+  anims.idle = bobClip(1, 160);
+  anims.walk = {
+    frameMs: 75,
+    loop: true,
+    frames: [
+      { legL: { dy: 2 }, legR: { dy: -1 }, head: { dx: 1 }, crest: { dy: 1 } },
+      { legL: { dy: -1 }, legR: { dy: 2 }, head: { dx: -1 }, crest: { dy: -1 } },
+    ],
+  };
+  anims.attack = {
+    frameMs: 60,
+    loop: false,
+    frames: [
+      { head: { dx: 3, dy: -2 }, crest: { dy: -2 }, armR: { dx: 3 } },
+      { head: { dx: -1, dy: 1 }, armL: { dy: 2 }, armR: { dy: -1 } },
+    ],
+  };
+  return { pixelHeight: 23, parts, anims };
+}

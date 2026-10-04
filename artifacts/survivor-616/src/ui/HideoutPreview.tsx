@@ -15,6 +15,7 @@ import { useEffect, useRef } from 'react';
 
 import { drawRig } from '@/game/render/sprite';
 import type { SpritePalette, SpriteRig } from '@/game/types';
+import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 export interface HideoutPreviewProps {
   rig: SpriteRig;
@@ -37,7 +38,7 @@ export function HideoutPreview({ rig, palette, height = 176, className = '' }: H
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduceMotion = prefersReducedMotionNow();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let cssW = root.clientWidth;
     const cssH = height;
