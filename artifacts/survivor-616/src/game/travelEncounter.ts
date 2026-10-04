@@ -127,6 +127,15 @@ export function buildTravelEncounterResult(
   rng: () => number,
 ): TravelEncounterResult {
   const outcome = state.status === 'won' ? 'won' : state.status === 'lost' ? 'lost' : 'fled';
+  return buildTravelEncounterResultFromOutcome(outcome, opponent, rng);
+}
+
+/** Same reward rules, for fights that settle without a TravelEncounterState (the quick fight). */
+export function buildTravelEncounterResultFromOutcome(
+  outcome: TravelEncounterResult['outcome'],
+  opponent: ResolvedTravelEncounterOpponent,
+  rng: () => number,
+): TravelEncounterResult {
   const caughtLokPet = outcome === 'won' && opponent.kind === 'lokpet' && rng() < TRAVEL_ENCOUNTER_REWARD.catchChance;
   return {
     outcome,

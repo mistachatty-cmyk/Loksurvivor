@@ -95,7 +95,7 @@ export interface BattleAnimationState {
   durationMs: number;
 }
 
-export type BattleGameMode = 'test-sparring' | 'league' | 'endless-gauntlet';
+export type BattleGameMode = 'test-sparring' | 'league' | 'endless-gauntlet' | 'quick-fight';
 
 export interface LeagueTierDef {
   id: string;

@@ -743,38 +743,42 @@ function applyEndOfTurnEffects(state: BattleState): void {
   }
 }
 
-/** AI Opponent Turn decision */
-export function executeEnemyAi(state: BattleState): BattleState {
+/**
+ * Picks the move the opponent will use this turn. Split out from
+ * executeEnemyAi so a quick fight can show the player what is coming (the
+ * telegraph) and then play exactly that move. `rand` only decides the
+ * low-HP guard roll.
+ */
+export function chooseEnemyMove(state: BattleState, rand: () => number = Math.random): LokPetBattleMove | undefined {
   const enemy = state.enemyTeam[state.activeEnemyIndex];
   const player = state.playerTeam[state.activePlayerIndex];
-  if (!enemy || enemy.fainted || !player || player.fainted) {
-    return state;
-  }
+  if (!enemy || enemy.fainted || !player || player.fainted) return undefined;
 
   // Check if enemy has enough energy for ultimate finisher!
   const ultimateMove = enemy.moves.find((m) => m.kind === 'ultimate' && enemy.energy >= m.energyCost);
-  if (ultimateMove) {
-    return executeMove(state, ultimateMove.id, 'enemy');
-  }
+  if (ultimateMove) return ultimateMove;
 
   // If low HP and has guard/heal move
   if (enemy.hp < enemy.maxHp * 0.35) {
     const healMove = enemy.moves.find((m) => m.id === 'starlight-remedy' && enemy.energy >= m.energyCost);
-    if (healMove) return executeMove(state, healMove.id, 'enemy');
+    if (healMove) return healMove;
 
     const guardMove = enemy.moves.find((m) => m.kind === 'guard' && enemy.energy >= m.energyCost);
-    if (guardMove && Math.random() < 0.6) return executeMove(state, guardMove.id, 'enemy');
+    if (guardMove && rand() < 0.6) return guardMove;
   }
 
-  // Check elemental advantage move
   const skillMove = enemy.moves.find((m) => m.kind === 'skill' && enemy.energy >= m.energyCost);
-  if (skillMove) {
-    return executeMove(state, skillMove.id, 'enemy');
-  }
+  if (skillMove) return skillMove;
 
   // Default to strike (builds SP)
-  const strikeMove = enemy.moves.find((m) => m.energyCost === 0) || enemy.moves[0];
-  return executeMove(state, strikeMove.id, 'enemy');
+  return enemy.moves.find((m) => m.energyCost === 0) || enemy.moves[0];
+}
+
+/** AI Opponent Turn decision */
+export function executeEnemyAi(state: BattleState): BattleState {
+  const move = chooseEnemyMove(state);
+  if (!move) return state;
+  return executeMove(state, move.id, 'enemy');
 }
 
 /** Calculate EXP and item rewards upon victory */

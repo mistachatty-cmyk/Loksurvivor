@@ -36,8 +36,9 @@ import {
   BATTLE_TRINKETS,
   LEAGUE_TIERS,
   SPARRING_DUMMIES,
-  getElementalMultiplier,
 } from '@/game/data/lokPetBattles';
+import { MATCHUP_LABEL, moveMatchup, statusChips } from '@/game/engine/battleClarity';
+import { MATCHUP_STYLE } from '@/ui/QuickFightOverlay';
 import {
   createBattle,
   executeEnemyAi,
@@ -512,12 +513,17 @@ export function LokPetBattleScreen({
               {/* Active Status Effects */}
               {activePlayerPet.statusEffects.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {activePlayerPet.statusEffects.map((e, idx) => (
+                  {statusChips(activePlayerPet).map((chip) => (
                     <span
-                      key={idx}
-                      className="rounded bg-slate-800/90 px-1.5 py-0.5 text-[9px] font-mono uppercase text-cyan-300 border border-cyan-500/40"
+                      key={chip.type}
+                      title={`${chip.label}: ${chip.hint}`}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-mono uppercase border ${
+                        chip.tone === 'bad'
+                          ? 'bg-rose-950/70 text-rose-200 border-rose-500/50'
+                          : 'bg-emerald-950/70 text-emerald-200 border-emerald-500/50'
+                      }`}
                     >
-                      {e.type} ({e.duration}r)
+                      {chip.label} · {chip.turns} {chip.turns === 1 ? 'turn' : 'turns'}
                     </span>
                   ))}
                 </div>
@@ -613,12 +619,17 @@ export function LokPetBattleScreen({
               {/* Active Enemy Status Effects */}
               {activeEnemyPet.statusEffects.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {activeEnemyPet.statusEffects.map((e, idx) => (
+                  {statusChips(activeEnemyPet).map((chip) => (
                     <span
-                      key={idx}
-                      className="rounded bg-slate-800/90 px-1.5 py-0.5 text-[9px] font-mono uppercase text-red-300 border border-red-500/40"
+                      key={chip.type}
+                      title={`${chip.label}: ${chip.hint}`}
+                      className={`rounded px-1.5 py-0.5 text-[9px] font-mono uppercase border ${
+                        chip.tone === 'bad'
+                          ? 'bg-rose-950/70 text-rose-200 border-rose-500/50'
+                          : 'bg-emerald-950/70 text-emerald-200 border-emerald-500/50'
+                      }`}
                     >
-                      {e.type} ({e.duration}r)
+                      {chip.label} · {chip.turns} {chip.turns === 1 ? 'turn' : 'turns'}
                     </span>
                   ))}
                 </div>
@@ -671,7 +682,7 @@ export function LokPetBattleScreen({
                 {activePlayerPet.moves.map((move) => {
                   const canAfford = activePlayerPet.energy >= move.energyCost;
                   const isUltimate = move.kind === 'ultimate';
-                  const elemMult = getElementalMultiplier(move.element, activeEnemyPet.element);
+                  const matchup = moveMatchup(move, activeEnemyPet.element);
 
                   return (
                     <button
@@ -707,11 +718,12 @@ export function LokPetBattleScreen({
 
                       <div className="mt-2 flex items-center justify-between border-t border-slate-800/80 pt-1.5 font-mono text-[9px]">
                         <span className="text-slate-400">Pwr: {move.power * 100}</span>
-                        {elemMult.multiplier > 1.2 ? (
-                          <span className="text-orange-400 font-bold">Effective!</span>
-                        ) : elemMult.multiplier < 0.9 ? (
-                          <span className="text-slate-500 font-semibold">Resisted</span>
-                        ) : null}
+                        <span
+                          className={`rounded border px-1 py-px font-bold uppercase ${MATCHUP_STYLE[matchup]}`}
+                          data-testid={`label-arena-matchup-${move.id}`}
+                        >
+                          {MATCHUP_LABEL[matchup]}
+                        </span>
                         <span className="text-slate-500">Acc: {move.accuracy * 100}%</span>
                       </div>
                     </button>

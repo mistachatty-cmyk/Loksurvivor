@@ -194,6 +194,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Studio 28 can now filter the weapon list by weapon type, by active or banned status, and by search, with Activate shown and Ban shown buttons that always leave at least one weapon lit.',
     ],
   },
+  {
+    version: '0.10.6',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Clearer Fights',
+    body: [
+      'Every move in the LokPet arena now says Strong, Normal, Weak or Support against the opponent in front of you, and status effects show whether they help or hurt and how many turns are left.',
+      'New optional quick fights: turn on Quick fights in Settings and travel encounters play out with your lead LokPet, three moves, a round limit of eight, and the opponent\'s next move shown before you pick. The classic card-throw popup stays the default.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
