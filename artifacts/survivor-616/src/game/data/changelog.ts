@@ -166,6 +166,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Lok Card Shop and Lock Deck cards now have a Card Style picker: Classic keeps the original foil-framed binder look and stays the default, New is the streamlined look from the Underground Update, and Dynamic 3D adds tilt and holographic foil.',
     ],
   },
+  {
+    version: '0.10.3',
+    date: '2026-10-04',
+    kind: 'hotfix',
+    title: 'Soundtrack Wake-Up',
+    body: [
+      'The title-screen soundtrack now starts on your first tap or key press, including on phones and tablets where the old retry could not satisfy the browser. A new Start on first tap switch in the Music panel turns it off.',
+      'Six new hideout one-liners and a hidden title-screen surprise for anyone who remembers the old code.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

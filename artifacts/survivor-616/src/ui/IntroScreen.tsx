@@ -15,6 +15,7 @@ import { LorePopup } from '@/ui/LorePopup';
 import { CHANGELOG, CURRENT_VERSION, updateNumber } from '@/game/data/changelog';
 import { pickCreditName } from '@/game/data/creditRotation';
 import { IntroTitle } from '@/ui/IntroTitle';
+import { FireflyEasterEgg } from '@/ui/FireflyEasterEgg';
 import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset, useIntroPhysicsResetVisible } from '@/ui/introPhysics';
 import { introPhysicsForTheme, resolveIntroEvent } from '@/ui/introPresentation';
 
@@ -225,6 +226,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
+      <FireflyEasterEgg />
 
       {/* Mission Briefing / Lore Screen Modal (Setup like UpdatePopup with button theme) */}
       <AnimatePresence>

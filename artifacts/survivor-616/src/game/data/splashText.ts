@@ -25,6 +25,12 @@ export const SPLASH_TEXT: string[] = [
   'It runs in Canvas2D out of spite.',
   "We fixed the bug. Don't ask which one.",
   'Cred is temporary. Mastery is forever.',
+  'Firefly Hollows: bring a lantern, or a very brave friend.',
+  'The Spikers can only reach nine pulses. Run ten.',
+  'Bag o\u2019 Water: the only relic that puts people out.',
+  'Veteran enemies remember your last run. Rude.',
+  'Dust Mites are not a pet. Dust Mites are a lifestyle.',
+  'Try the old Konami code. Something is glowing.',
 ];
 
 export function pickSplashText(): string {
