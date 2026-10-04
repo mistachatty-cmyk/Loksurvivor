@@ -15,6 +15,7 @@ import { Megaphone, Wrench, X } from 'lucide-react';
 import { useMeta } from '@/game/state/metaStore';
 import { CHANGELOG, CURRENT_VERSION, changelogEntriesSince, updateNumber } from '@/game/data/changelog';
 import { pickCreditName } from '@/game/data/creditRotation';
+import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 export function UpdatePopup() {
   const { meta, acknowledgeChangelog } = useMeta();
@@ -24,8 +25,7 @@ export function UpdatePopup() {
 
   if (unseen.length === 0) return null;
 
-  const prefersReducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = prefersReducedMotionNow();
 
   return (
     <div

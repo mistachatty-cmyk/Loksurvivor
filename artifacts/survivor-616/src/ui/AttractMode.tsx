@@ -43,6 +43,7 @@ import {
 import { renderWorld, type Viewport } from '@/game/render/draw';
 import { useMeta } from '@/game/state/metaStore';
 import { createShowcaseScene, drawShowcaseScene, stepShowcaseScene, type ShowcaseScene } from './attractShowcase';
+import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 6;
@@ -164,8 +165,7 @@ export function AttractMode({ className }: AttractModeProps) {
   const { meta, setAttractMode } = useMeta();
   const enabled = meta.attractModeEnabled;
 
-  const reducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = prefersReducedMotionNow();
 
   useEffect(() => {
     if (!enabled || reducedMotion) return;

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldAlert, X, Sparkles, BookOpen, Bug, Flame, Cpu, Compass } from 'lucide-react';
 import { LORE_CHRONICLES, type LoreEntry } from '@/game/data/lore';
+import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 export interface LorePopupProps {
   onClose: () => void;
@@ -20,8 +21,7 @@ export function LorePopup({ onClose, initialChapterId }: LorePopupProps) {
     return true;
   });
 
-  const prefersReducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = prefersReducedMotionNow();
 
   return (
     <div

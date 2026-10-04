@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 
 import { drawRig } from '@/game/render/sprite';
 import type { AnimName, SpritePalette, SpriteRig } from '@/game/types';
+import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 export interface RigPortraitProps {
   rig: SpriteRig;
@@ -45,7 +46,7 @@ export function RigPortrait({
     const start = performance.now();
     let raf = 0;
 
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduceMotion = prefersReducedMotionNow();
     const shouldAnimate = animated && !reduceMotion;
     const frame = (time: number) => {
       if (shouldAnimate) raf = requestAnimationFrame(frame);

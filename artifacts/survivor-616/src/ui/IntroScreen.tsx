@@ -16,6 +16,7 @@ import { CHANGELOG, CURRENT_VERSION, updateNumber } from '@/game/data/changelog'
 import { pickCreditName } from '@/game/data/creditRotation';
 import { IntroTitle } from '@/ui/IntroTitle';
 import { FireflyEasterEgg } from '@/ui/FireflyEasterEgg';
+import { MotionNotice } from '@/ui/MotionToggle';
 import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset, useIntroPhysicsResetVisible } from '@/ui/introPhysics';
 import { introPhysicsForTheme, resolveIntroEvent } from '@/ui/introPresentation';
 
@@ -215,6 +216,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
           >
             POWERED BY LOKSERVICES · DESIGNED BY GSIXDESIGNS
           </a>
+          <MotionNotice />
         </motion.div>
         {/* Both of these use `position: fixed`, which must escape to the
             viewport -- kept as siblings of motion.div, not nested inside it,

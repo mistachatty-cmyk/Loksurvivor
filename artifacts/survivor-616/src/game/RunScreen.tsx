@@ -96,6 +96,7 @@ import { LevelUpAnnouncement, LevelUpFlash } from '@/anim/components/LevelUpFlas
 import { LootFeed, type LootPickup } from '@/anim/components/LootPop';
 import { SettingsPanel } from '@/ui/SettingsPanel';
 import { WeaponIcon } from '@/ui/WeaponIcon';
+import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 /**
  * Screen point -> world point, using the same camera math `renderWorld` uses.
@@ -368,8 +369,7 @@ export function RunScreen({
   const challenges = availableChallengeContracts(meta).filter((challenge) => challengeIds.includes(challenge.id));
   const initialWeaponLevel = startingWeaponLevelProp ?? startingWeaponLevel(meta);
   const finalRewardMultiplier = utilityRewardMultiplierProp ?? rewardCredMultiplier(meta);
-  const prefersReducedMotion = typeof window !== 'undefined'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const prefersReducedMotion = prefersReducedMotionNow();
 
   // The command hint is a nudge, not a state: it clears itself.
   useEffect(() => {

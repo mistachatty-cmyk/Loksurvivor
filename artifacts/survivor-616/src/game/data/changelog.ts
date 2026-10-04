@@ -176,6 +176,15 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Six new hideout one-liners and a hidden title-screen surprise for anyone who remembers the old code.',
     ],
   },
+  {
+    version: '0.10.4',
+    date: '2026-10-04',
+    kind: 'hotfix',
+    title: 'Motion Override',
+    body: [
+      'When a phone or computer asks apps to reduce motion, the title live feed, hideout rain and parallax, the walking operative and random visitors now stay still. The title screen shows a tap-to-fix notice, and Settings has an Always animate switch that keeps everything moving.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

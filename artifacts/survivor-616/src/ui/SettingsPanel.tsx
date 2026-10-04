@@ -40,6 +40,7 @@ import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
+import { MotionSetting } from './MotionToggle';
 
 export interface SettingsPanelProps {
   onBack: () => void;
@@ -526,6 +527,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
+              <MotionSetting />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
