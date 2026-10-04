@@ -1,6 +1,7 @@
 {
   "dir": "src/locales",
   "source": "en",
+  "engine": "google,argos",
   "targets": ["es", "fr", "de", "pt-BR", "ja", "ko", "zh-CN"],
   "glossary": [
     "Survivor616",

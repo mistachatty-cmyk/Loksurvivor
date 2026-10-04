@@ -28,15 +28,33 @@ permissions:
 jobs:
   translate:
     runs-on: ubuntu-latest
-    # Strings are sent in batches, so even a first run takes minutes. After that
-    # only new or changed strings are sent.
-    timeout-minutes: 60
+    # Google first (best wording); when it rate limits the runner, Argos takes over
+    # so a first run finishes in one go. Later runs only send new or changed strings.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      # Argos Translate: the unlimited fallback engine. Free, runs on the runner, no key.
+      # CPU-only torch keeps the install small; models (~100 MB per language) are cached.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/argos-translate
+            ~/.cache/pip
+          key: argos-${{ runner.os }}-v1
+
+      - name: Install Argos Translate
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install argostranslate
 
       - name: Translate new and changed strings
         run: npx --yes @lok/auto-l10n sync

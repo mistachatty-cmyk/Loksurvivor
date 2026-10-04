@@ -246,7 +246,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Language Support, First Steps',
     body: [
       'The title screen, the hideout rooms and part of Settings can now be translated. Translations are made automatically, so some wording will be off, and anything not translated yet stays in English.',
-      'Once translated languages are ready, a Language option appears at the top of Settings. The game stays in English until you pick one, so nothing changes unless you choose it.',
+      'The game follows your browser or phone language by default, and switches on its own if you change it. A Language option at the top of Settings lets you pin any language, or go back to Match my device.',
     ],
   },
 ];

@@ -48,6 +48,7 @@ import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/g
 import {
   AUTO_LANGUAGE,
   AVAILABLE_LOCALES,
+  detectDeviceLanguage,
   getLanguagePreference,
   languageName,
   setLanguagePreference,
@@ -94,7 +95,7 @@ function LanguageSetting() {
                 }`}
                 data-testid={`button-language-${code}`}
               >
-                {code === AUTO_LANGUAGE ? t('settings.language.auto') : languageName(code)}
+                {code === AUTO_LANGUAGE ? `${t('settings.language.auto')} (${languageName(detectDeviceLanguage())})` : languageName(code)}
               </button>
             ))}
           </div>

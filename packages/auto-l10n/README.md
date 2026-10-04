@@ -95,7 +95,7 @@ auto-l10n init     Create config, starter en.json and the workflow
 auto-l10n scan     Estimate how much English is still hard-coded in source files
 ```
 
-Useful options: `--targets es,fr`, `--dir locales`, `--config path/to/l10n.config.json`, `--delay 1500`, `--batch 8`, `--force`, `--prune`, `--dry-run`, `--strict`, `--engine pseudo`. Run `auto-l10n --help` for all of them.
+Useful options: `--targets es,fr`, `--dir locales`, `--config path/to/l10n.config.json`, `--delay 1500`, `--batch 8`, `--force`, `--prune`, `--dry-run`, `--strict`, `--engine google,argos`, `--engine pseudo`. Run `auto-l10n --help` for all of them.
 
 ### Config file
 
@@ -118,7 +118,7 @@ Useful options: `--targets es,fr`, `--dir locales`, `--config path/to/l10n.confi
 
 - **Incremental.** `locales/.l10n-lock.json` records which English text each translation was made from. A string is translated again only when it is missing or its English changed. Commit this file.
 - **Placeholders are protected.** `{{name}}` and glossary terms are swapped for opaque tokens before translation and restored after. A translation that loses one is rejected, and the key stays untranslated (so it falls back to English) instead of shipping broken text.
-- **Rate limits are respected.** Requests are spaced about 1.2 seconds apart (across all languages together), with exponential backoff when Google says "too many requests". If the limit persists, the whole run stops, keeps what it finished, never writes an empty language file, and the next run continues from there. The workflow templates include a scheduled run so this finishes by itself.
+- **Two engines, so there is no wall.** The default is `google,argos`: Google's free web endpoint first (best wording), spaced about 1.2 seconds apart across all languages. If Google rate limits the machine, the rest of the run switches to [Argos Translate](https://github.com/argosopentech/argostranslate), open-source models that run on the runner itself with no key, no quota and no rate limit. A first run therefore always finishes. If both engines fail, the run stops, keeps what it finished, never writes an empty language file, and the next run (the templates include a scheduled one) continues from there.
 - **Never destructive.** A hand-written translation with no lock entry is adopted, not replaced. Keys you removed from English stay in other languages until you run with `--prune`.
 
 ### Speed
@@ -134,7 +134,8 @@ Open `locales/es.json`, edit the string, commit. The lock file sees that the Eng
 Worth knowing before you rely on it:
 
 - **Machine quality.** Short UI labels come out fine. Jokes, slang, lore and anything with wordplay will not. Review the languages you care about most.
-- **The free engine is unofficial.** It uses the public Google Translate web endpoint through [`@vitalets/google-translate-api`](https://github.com/vitalets/google-translate-api). Its author recommends the official paid API for anything beyond hobby and prototype use. It has no uptime promise and can be rate limited or change without notice. If it breaks, the game keeps working in English. You can plug in a different service with `--engine ./my-engine.js` (default-export `{ translate(text, { from, to }) }`).
+- **Argos quality.** It is a step below Google, most noticeably for Japanese and Korean, and it needs Python 3 plus `pip install argostranslate` (the workflow templates do this, with CPU-only torch and a model cache) and about 100 MB of model per language on first use. Locally, set `AUTO_L10N_PYTHON` to pick the Python binary. Use `--engine argos` to force it everywhere, or `--engine google` to never use it. Strings it translates are normal files: fix any you dislike by hand and the edit is kept.
+- **The Google engine is unofficial.** It uses the public Google Translate web endpoint through [`@vitalets/google-translate-api`](https://github.com/vitalets/google-translate-api). Its author recommends the official paid API for anything beyond hobby and prototype use. It has no uptime promise and can be rate limited or change without notice. If it breaks, the game keeps working in English. You can plug in a different service with `--engine ./my-engine.js` (default-export `{ translate(text, { from, to }) }`).
 - **Plurals are basic.** `key_one` and `key_other` work. Languages that need `few` or `many` (Russian, Polish, Arabic) fall back to `key_other` unless you add those keys by hand.
 - **Right-to-left languages** translate fine, but your layout is your own responsibility. `directionOf()` tells you when to flip it.
 - **It translates strings, not images.** Text drawn into artwork needs its own versions.

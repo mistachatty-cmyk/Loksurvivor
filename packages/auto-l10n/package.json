@@ -21,6 +21,7 @@
   "files": [
     "bin",
     "src",
+    "python",
     "action-template.yml",
     "README.md"
   ],

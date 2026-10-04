@@ -144,7 +144,7 @@ async function withRetries(call, { retries, retryDelayMs, sleep }) {
 }
 
 /** Marker placed between strings in one request. Letters only, so translators leave it alone. */
-const SEPARATOR = 'ZQSEPZQ';
+export const SEPARATOR = 'ZQSEPZQ';
 const SEPARATOR_PATTERN = /\s*Z\s*Q\s*S\s*E\s*P\s*Z\s*Q\s*/i;
 
 /**

@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { flatten } from './core.js';
-import { loadEngine, paceEngine } from './engines.js';
+import { buildEngine } from './engines.js';
 import { scanSource } from './scan.js';
 import { LOCK_FILE, planSync, readJson, syncLocale, writeJson } from './sync.js';
 
@@ -34,7 +34,8 @@ Options
   --dir <path>           Locale directory (default: locales)
   --source <code>        Source language (default: en)
   --targets <a,b,c>      Languages to produce (default: existing files, else from config)
-  --engine <name|path>   google (default, free, no key), pseudo (offline test), or a module path
+  --engine <name|path>   google, argos (offline, unlimited), pseudo (offline test), or a module path.
+                         Comma-separate to chain: "google,argos" (default) falls back to argos on a rate limit
   --delay <ms>           Pause between translation requests (default: 1200 for google)
   --concurrency <n>      Languages translated in parallel (default: 1)
   --batch <n>            Strings sent per request (default: 12; 1 sends one at a time)
@@ -124,10 +125,12 @@ export async function run(argv, env = {}) {
 
   if (command === 'check') return check({ config, source, lock, targets, log });
 
-  const baseEngine = await loadEngine(config.engine, cwd);
-  const delayMs = config.delayMs ?? baseEngine.defaultDelayMs ?? 0;
-  // One pacer for the whole run, so parallel languages still respect one request rate.
-  const engine = paceEngine(baseEngine, delayMs);
+  // One engine for the whole run, so parallel languages still share one request rate,
+  // and a rate limit on one engine moves every language on to the next.
+  const engine = await buildEngine(config.engine, cwd, {
+    delayMs: config.delayMs,
+    onSwitch: (from, to) => log(`${from} is rate limiting this machine; continuing with ${to}.`),
+  });
   log(`${Object.keys(source).length} source strings in ${config.source}.json; ${targets.length} target language(s) via ${engine.name}${config.dryRun ? ' (dry run)' : ''}.`);
 
   /** @type {Awaited<ReturnType<typeof syncLocale>>[]} */
@@ -163,7 +166,11 @@ export async function run(argv, env = {}) {
       log(`${locale.padEnd(8)} ${result.translated} ${config.dryRun ? 'to translate' : 'translated'}, ${result.upToDate + result.adopted} kept${result.failed.length ? `, ${result.failed.length} failed` : ''}${result.rateLimited ? ` (rate limited, ${result.remaining} left; run again later)` : ''}`);
     }
   });
-  await Promise.all(workers);
+  try {
+    await Promise.all(workers);
+  } finally {
+    engine.close?.();
+  }
 
   if (!config.dryRun) {
     // Drop lock data for languages that are no longer targets only when pruning.
@@ -241,7 +248,7 @@ async function loadConfig(flags, cwd) {
     dir: flags['dir'] ? path.resolve(cwd, String(flags['dir'])) : path.resolve(base, file.dir ?? 'locales'),
     source: String(flags['source'] ?? file.source ?? 'en'),
     targets: flags['targets'] ? String(flags['targets']).split(',').map((s) => s.trim()).filter(Boolean) : /** @type {string[] | undefined} */ (file.targets),
-    engine: String(flags['engine'] ?? file.engine ?? 'google'),
+    engine: String(flags['engine'] ?? file.engine ?? 'google,argos'),
     delayMs: num(flags['delay'], file.delayMs, undefined),
     concurrency: num(flags['concurrency'], file.concurrency, 1) ?? 1,
     batch: num(flags['batch'], file.batchSize, 12) ?? 12,

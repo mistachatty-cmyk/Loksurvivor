@@ -279,8 +279,8 @@ shown with `t('some.key')` (outside React) or `useT()` (in components) from
 `@/lib/i18n`. Keys are typed, so a typo fails `pnpm typecheck`. **Never edit the
 other language files for new text**: the Auto-translate GitHub Action fills them
 in after you push. Add invented nouns to `glossary` in `l10n.config.json` so they
-are not translated. The game defaults to English; Settings shows a Language
-picker once translated files exist. Details and gotchas (including that Google
+are not translated. The game defaults to "Match my device" (browser/phone language,
+followed live); Settings has a Language picker to pin another. Details and gotchas (including that Google
 Translate is unreachable from the Claude sandbox): `.agents/memory/localization.md`.
 
 ## Versioning

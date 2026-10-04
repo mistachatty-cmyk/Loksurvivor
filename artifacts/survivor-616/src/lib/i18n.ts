@@ -8,8 +8,10 @@
  *   `.github/workflows/auto-l10n.yml`); nobody edits them for new text.
  * - `t('some.key')` is typed against `en.json`, so a misspelled key fails
  *   `pnpm typecheck` instead of showing a raw key in game.
- * - The language choice is device-local and defaults to English. "auto" follows
- *   the browser, but is opt-in so no one gets a half-translated game by surprise.
+ * - The language choice is device-local and defaults to "auto": the game follows
+ *   the browser or phone language list (`navigator.languages`) and switches live
+ *   if the device language changes. Picking a language in Settings pins it.
+ *   Strings with no translation yet fall back to English one by one.
  *
  * Adding text: add the key to `en.json`, use `t('key')` or `useT()`. Never edit
  * another language file for a new string; the Action fills it in after you push.
@@ -81,19 +83,27 @@ function getLocale(): string {
   return l10n.locale;
 }
 
-/** The saved choice: `"auto"` or a locale code. Defaults to English. */
+/** The saved choice: `"auto"` or a locale code. Defaults to automatic. */
 export function getLanguagePreference(): string {
   try {
-    return window.localStorage.getItem(LANGUAGE_KEY) ?? 'en';
+    return window.localStorage.getItem(LANGUAGE_KEY) ?? AUTO_LANGUAGE;
   } catch {
-    return 'en';
+    return AUTO_LANGUAGE;
   }
 }
 
+function deviceLanguages(): readonly string[] {
+  const list = typeof navigator === 'undefined' ? [] : navigator.languages?.length ? navigator.languages : [navigator.language];
+  return list.filter(Boolean);
+}
+
+/** The supported language that "automatic" picks on this device right now. */
+export function detectDeviceLanguage(): string {
+  return detectLocale({ supported: AVAILABLE_LOCALES, languages: deviceLanguages(), fallback: 'en' });
+}
+
 function targetFor(preference: string): string {
-  if (preference === AUTO_LANGUAGE) {
-    return detectLocale({ supported: AVAILABLE_LOCALES, languages: navigator.languages ?? [navigator.language], fallback: 'en' });
-  }
+  if (preference === AUTO_LANGUAGE) return detectDeviceLanguage();
   return resolveLocale(preference, AVAILABLE_LOCALES, 'en');
 }
 
@@ -119,6 +129,19 @@ export async function setLanguagePreference(preference: string): Promise<void> {
 export async function initLocalization(): Promise<void> {
   await l10n.setLocale(targetFor(getLanguagePreference()));
   reflectOnDocument();
+  followDeviceLanguage();
+}
+
+let following = false;
+
+/** While the choice is automatic, track the device: the browser fires this when its language list changes. */
+function followDeviceLanguage(): void {
+  if (following || typeof window === 'undefined') return;
+  following = true;
+  window.addEventListener('languagechange', () => {
+    if (getLanguagePreference() !== AUTO_LANGUAGE) return;
+    void l10n.setLocale(detectDeviceLanguage()).then(reflectOnDocument);
+  });
 }
 
 /** A language's name written in that language, e.g. "Español" for `es`. */

@@ -13,6 +13,11 @@ on:
       - 'artifacts/survivor-616/src/locales/en.json'
       - 'artifacts/survivor-616/l10n.config.json'
   workflow_dispatch:
+    inputs:
+      engine:
+        description: 'Override the engine: google, argos or google,argos (blank = use the config)'
+        required: false
+        default: ''
   # Google may rate limit a first run part way through. This finishes the job
   # later; when nothing is missing it does nothing and commits nothing.
   schedule:
@@ -28,9 +33,9 @@ permissions:
 jobs:
   translate:
     runs-on: ubuntu-latest
-    # Strings are sent in batches, so even a first run takes minutes. After that
-    # only new or changed strings are sent.
-    timeout-minutes: 60
+    # Google first (best wording); when it rate limits the runner, Argos takes over
+    # so a first run finishes in one go. Later runs only send new or changed strings.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -46,11 +51,31 @@ jobs:
       # Only the translator package and its one dependency; skips the rest of the workspace.
       - run: pnpm install --frozen-lockfile --filter @lok/auto-l10n
 
+      # Argos Translate: the unlimited fallback engine. Free, runs on the runner, no key.
+      # CPU-only torch keeps the install small; models (~100 MB per language) are cached.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/argos-translate
+            ~/.cache/pip
+          key: argos-${{ runner.os }}-v1
+
+      - name: Install Argos Translate
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install argostranslate
+
       - name: Check the package
         run: pnpm --filter @lok/auto-l10n test
 
       - name: Translate new and changed strings
-        run: node packages/auto-l10n/bin/auto-translate.js sync --config artifacts/survivor-616/l10n.config.json
+        env:
+          ENGINE: ${{ inputs.engine }}
+        run: node packages/auto-l10n/bin/auto-translate.js sync --config artifacts/survivor-616/l10n.config.json ${ENGINE:+--engine "$ENGINE"}
 
       - name: Commit translated files
         uses: stefanzweifel/git-auto-commit-action@v5

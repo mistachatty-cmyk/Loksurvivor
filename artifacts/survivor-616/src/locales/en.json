@@ -62,8 +62,8 @@
   "settings.tabs.endgame": "End game",
 
   "settings.language.title": "Language",
-  "settings.language.description": "Choose the language for the parts of the game that have been translated. Translations are made automatically, so some wording may be off, and anything not translated yet stays in English. This device only.",
-  "settings.language.auto": "Match my browser",
+  "settings.language.description": "Pick a language, or leave this on Match my device to follow your browser or phone language, including when you change it. Translations are made automatically, so some wording may be off, and anything not translated yet stays in English. This device only.",
+  "settings.language.auto": "Match my device",
 
   "settings.fightStyle.title": "Travel fight style",
   "settings.fightStyle.description": "How a travel encounter plays out. Classic is the original card-throw popup. The other three use your lead LokPet on the arena engine, and their layout adapts to your screen. This device only.",
