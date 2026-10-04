@@ -239,6 +239,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Forge also gained about 30 more looks (antlers, film reels, mining lamps, hi-vis vests and more). The five-tap secret is gone; anyone who found the Forge before keeps it.',
     ],
   },
+  {
+    version: '0.11.0',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Bond and Growth',
+    body: [
+      'LokPets now grow from everything you do: finishing runs, winning travel fights, treats and arena battles all earn XP, and your starter partner always takes the biggest share. XP now adds up between battles instead of being lost.',
+      'Pets also build a bond with you: Stranger, Familiar, Friend, Partner, Soulbound. It only goes up, with a daily limit so it rewards coming back. Each rank opens a name slot, and your starter partner gets its call name from the very first night (naming it is optional).',
+      'Open the pencil on a pet in Run Setup to see all five names: call name, battle name (used in the arena), what it calls you, an epithet and a true name. Run Setup also lets Collector characters bring a full team.',
+      'After a run a small Growth Recap shows each pet\'s XP, level and bond. Achievements can be filtered by category, there are six new LokPet achievements, and you get a toast when you earn one.',
+      'Fixes: a status effect that dropped a pet to 0 HP could stall a fight; pets now use one evolution rule everywhere; the league blurb counts all eight tiers.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

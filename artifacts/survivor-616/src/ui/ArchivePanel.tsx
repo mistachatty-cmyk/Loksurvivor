@@ -2,7 +2,7 @@
  * Archive: rescued crew, discovered locations, and everything still locked.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { ACHIEVEMENTS } from '@/game/data/achievements';
+import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, type AchievementCategory } from '@/game/data/achievements';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
@@ -64,6 +64,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   const { meta, resetProgress, claimAchievement, importVisitingLokCard, buyLokPetCardPack } = useMeta();
   const isListView = meta.uiDensity === 'list';
   const [showHistory, setShowHistory] = useState(false);
+  const [achievementFilter, setAchievementFilter] = useState<AchievementCategory | 'all'>('all');
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
   const [exchangePetId, setExchangePetId] = useState('');
   const [exchangeOutput, setExchangeOutput] = useState('');
@@ -398,8 +399,22 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               {completedAchievementCount} / {ACHIEVEMENTS.length}
             </span>
           </div>
+          <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Achievement category" data-testid="achievement-filters">
+            {([{ id: 'all', label: 'All' }, ...ACHIEVEMENT_CATEGORIES] as Array<{ id: AchievementCategory | 'all'; label: string }>).map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setAchievementFilter(cat.id)}
+                aria-pressed={achievementFilter === cat.id}
+                className={`border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${achievementFilter === cat.id ? 'border-yellow-300/70 bg-yellow-300/10 text-yellow-100' : 'border-white/15 text-white/55 hover:border-white/40 hover:text-white'}`}
+                data-testid={`button-achievement-filter-${cat.id}`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
           <div className={`grid gap-3 ${isListView ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
-            {ACHIEVEMENTS.map((achievement) => {
+            {ACHIEVEMENTS.filter((achievement) => achievementFilter === 'all' || achievement.category === achievementFilter).map((achievement) => {
               const complete = achievement.isComplete(meta);
               const progress = complete ? 1 : Math.max(0, Math.min(1, achievement.progress?.(meta) ?? 0));
               const claimed = meta.claimedAchievementIds.includes(achievement.id);

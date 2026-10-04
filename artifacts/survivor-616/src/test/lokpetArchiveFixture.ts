@@ -72,6 +72,7 @@ export function createLokPetArchiveFixtureResult(): RunResult {
     },
     lootBoxesOpened: 3,
     openedPrizes: ['Moss Pouncer', 'Cinder Pouncer', 'Chalk Grin'],
+    petGrowth: [{ petId: 'fixture-starter', name: 'Biscuit', expGained: 1240, oldLevel: 4, newLevel: 5, bondGained: 3, oldBondRank: 'familiar', newBondRank: 'familiar' }],
     lokPets: [
       fixturePet('moss-pouncer', 'Pip · Moss Pouncer', 'common', 'shot', 'none'),
       fixturePet('cinder-pouncer', 'Glim · Cinder Pouncer', 'rare', 'rapid-shot', 'fire'),

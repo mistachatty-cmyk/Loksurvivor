@@ -1,5 +1,13 @@
 # LokPets
 
+> **Update (v0.11.0).** This file describes the original *run* behavior of chest
+> LokPets. Since then LokPets became a collectible kennel: pets you catch are
+> saved (`SavedLokPet`), level up (cap 50, or 99 for your starter partner), evolve,
+> fight in the arena and the Sanctum League (8 tiers), and build **bond** with you,
+> which unlocks five name slots. The starter partner is always with you. See
+> `docs/lokpet-creature-design.md` and `docs/lokpet-rpg-and-digi-tower-plan.md`.
+> The temporary-lifecycle section below still describes how a pet behaves inside a run.
+
 LokPets are deterministic, temporary chest companions. A chest rolls one
 visual variant and one combat stat sheet independently, so the same silhouette
 can appear with different combat traits from run to run.
@@ -12,7 +20,7 @@ supplied character art:
 - **Pouncer** — animal-like ears and a springing tail
 - **Ghoul** — rounded skull and hollow eyes
 - **Winglet** — small bat-like spread wings
-- **Mote** — floating eight-point signal spark
+- **Mote** — floating eight-point pulse spark
 - **Blob** — soft jelly profile
 - **Clockwork** — faceted little machine
 

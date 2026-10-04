@@ -126,6 +126,8 @@ export interface BattleRewards {
   expEarned: number;
   badgeId?: string;
   badgeName?: string;
+  /** Final level and XP remainder for every pet on the team, so the remainder is saved too. */
+  petResults: Array<{ petId: string; level: number; exp: number }>;
   levelUps: Array<{
     petId: string;
     petName: string;

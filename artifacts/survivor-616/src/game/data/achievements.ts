@@ -6,6 +6,7 @@ import { CHARACTERS } from './characters';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
 import { LOKPET_VARIANTS } from './lokPets';
+import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
 import { RENTABLE_GENERATORS } from './generators';
 
 export interface AchievementReward {
@@ -20,8 +21,23 @@ export interface AchievementReward {
  * claiming one is tracked separately in `meta.claimedAchievementIds`
  * (see `claimAchievement` in `state/metaStore.tsx`) rather than here.
  */
+export type AchievementCategory = 'combat' | 'survival' | 'world' | 'crew' | 'bestiary' | 'lokpet' | 'cards' | 'economy';
+
+export const ACHIEVEMENT_CATEGORIES: Array<{ id: AchievementCategory; label: string }> = [
+  { id: 'combat', label: 'Combat' },
+  { id: 'survival', label: 'Survival' },
+  { id: 'world', label: 'World' },
+  { id: 'crew', label: 'Crew' },
+  { id: 'bestiary', label: 'Bestiary' },
+  { id: 'lokpet', label: 'LokPets' },
+  { id: 'cards', label: 'Cards' },
+  { id: 'economy', label: 'Economy' },
+];
+
 export interface AchievementDef {
   id: string;
+  /** Filter group in the Archive. Filled in below for every entry. */
+  category: AchievementCategory;
   name: string;
   description: string;
   tier: 'bronze' | 'silver' | 'gold' | 'legendary';
@@ -33,7 +49,9 @@ export interface AchievementDef {
 
 const ratio = (value: number, total: number) => (total <= 0 ? 0 : Math.min(1, value / total));
 
-export const ACHIEVEMENTS: AchievementDef[] = [
+type RawAchievement = Omit<AchievementDef, 'category'>;
+
+const RAW_ACHIEVEMENTS: RawAchievement[] = [
   {
     id: 'first-blood',
     name: 'First Blood',
@@ -375,7 +393,78 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     progress: (meta) => ratio(meta.characterLevelUps['vector-lev'] ?? 0, 1),
     reward: { kind: 'cred', amount: 150 },
   },
+  {
+    id: 'familiar-face',
+    name: 'Familiar Face',
+    description: 'Bond with any LokPet until it is Familiar.',
+    tier: 'bronze',
+    isComplete: (meta) => meta.savedLokPets.some((pet) => bondRankFor(pet.bond).order >= BOND_RANK_BY_ID.familiar.order),
+    reward: { kind: 'cred', amount: 50 },
+  },
+  {
+    id: 'friend-for-life',
+    name: 'Friend for Life',
+    description: 'Bond with any LokPet until it is a Friend.',
+    tier: 'silver',
+    isComplete: (meta) => meta.savedLokPets.some((pet) => bondRankFor(pet.bond).order >= BOND_RANK_BY_ID.friend.order),
+    reward: { kind: 'cred', amount: 150 },
+  },
+  {
+    id: 'soulbound',
+    name: 'Soulbound',
+    description: 'Bond with any LokPet until it is Soulbound.',
+    tier: 'gold',
+    isComplete: (meta) => meta.savedLokPets.some((pet) => bondRankFor(pet.bond).order >= BOND_RANK_BY_ID.soulbound.order),
+    reward: { kind: 'cardCredits', amount: 100 },
+  },
+  {
+    id: 'five-names',
+    name: 'Five Names',
+    description: 'Fill all five name slots on one LokPet.',
+    tier: 'gold',
+    isComplete: (meta) => meta.savedLokPets.some((pet) => PET_NAME_SLOTS.every((slot) => Boolean(getPetNameValue(pet, slot.id)))),
+    reward: { kind: 'cardCredits', amount: 75 },
+  },
+  {
+    id: 'pet-level-20',
+    name: 'Getting Somewhere',
+    description: 'Raise any LokPet to level 20.',
+    tier: 'bronze',
+    isComplete: (meta) => meta.savedLokPets.some((pet) => (pet.level ?? 1) >= 20),
+    progress: (meta) => ratio(Math.max(0, ...meta.savedLokPets.map((pet) => pet.level ?? 1)), 20),
+    reward: { kind: 'cred', amount: 75 },
+  },
+  {
+    id: 'pet-level-50',
+    name: 'Fully Grown',
+    description: 'Raise any LokPet to level 50.',
+    tier: 'silver',
+    isComplete: (meta) => meta.savedLokPets.some((pet) => (pet.level ?? 1) >= 50),
+    progress: (meta) => ratio(Math.max(0, ...meta.savedLokPets.map((pet) => pet.level ?? 1)), 50),
+    reward: { kind: 'cred', amount: 250 },
+  },
 ];
+
+const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
+  'first-blood': 'combat', 'body-count-1000': 'combat', 'body-count-10000': 'combat', 'fourth-wall-breaker': 'combat',
+  'glitch-hunter': 'combat', 'stack-smasher': 'combat', 'null-terminator': 'combat',
+  'survivor-20': 'survival', 'marathoner-45': 'survival', 'veteran-100-runs': 'survival', 'grand-survivor': 'survival',
+  'into-the-dark': 'survival', 'bottomless': 'survival', 'mission-operative': 'survival',
+  'district-tourist': 'world', 'know-the-city': 'world', 'relic-hunter': 'world', 'city-archivist': 'world',
+  'lev-spire-conqueror': 'world', 'skeleton-hoarder': 'world',
+  'full-roster': 'crew', 'ride-or-die': 'crew', 'whole-crew': 'crew', 'something-new': 'crew', 'singularity-defector': 'crew',
+  'field-researcher': 'bestiary', 'apex-predator': 'bestiary', 'bestiary-scholar': 'bestiary', 'bestiary-master': 'bestiary',
+  'lokpet-collector': 'lokpet', 'lokpet-zoologist': 'lokpet', 'familiar-face': 'lokpet', 'friend-for-life': 'lokpet',
+  'soulbound': 'lokpet', 'five-names': 'lokpet', 'pet-level-20': 'lokpet', 'pet-level-50': 'lokpet',
+  'sealed-no-more': 'cards', 'triple-stamped': 'cards', 'first-holo': 'cards', 'passive-powerhouse': 'cards',
+  'half-the-deck': 'cards', 'complete-collector': 'cards', 'director-cut': 'combat',
+  'passive-income': 'economy',
+};
+
+export const ACHIEVEMENTS: AchievementDef[] = RAW_ACHIEVEMENTS.map((achievement) => ({
+  ...achievement,
+  category: CATEGORY_BY_ID[achievement.id] ?? 'world',
+}));
 
 export const ACHIEVEMENTS_BY_ID: Record<string, AchievementDef> = Object.fromEntries(
   ACHIEVEMENTS.map((achievement) => [achievement.id, achievement]),

@@ -227,8 +227,28 @@ export interface SavedLokPet {
   starter?: boolean;
   /** Last hourly free full-health/stamina refresh boundary. */
   lastFreeRefreshAt?: number;
-  /** Player-given nickname; falls back to the rolled variant's name when unset. */
+  /** Player-given call name (name slot 1); falls back to the rolled variant's name when unset. */
   name?: string;
+  /** Name slots 2 to 5, each unlocked by bond rank (see engine/petGrowth.ts). */
+  names?: { battle?: string; callsYou?: string; epithet?: string; trueName?: string };
+  /** Bond points. Never decreases; earned from runs, travel wins, treats and battles with a daily cap. */
+  bond?: number;
+  /** Local day key (YYYY-MM-DD) that `bondToday` counts for. */
+  bondDay?: string;
+  /** Bond earned on `bondDay`, against the daily cap. */
+  bondToday?: number;
+}
+
+/** One pet's line in the Growth Recap shown after a run (not persisted). */
+export interface PetGrowthEntry {
+  petId: string;
+  name: string;
+  expGained: number;
+  oldLevel: number;
+  newLevel: number;
+  bondGained: number;
+  oldBondRank: 'stranger' | 'familiar' | 'friend' | 'partner' | 'soulbound';
+  newBondRank: 'stranger' | 'familiar' | 'friend' | 'partner' | 'soulbound';
 }
 
 /**
@@ -2486,6 +2506,8 @@ export interface RunResult {
   level: number;
   cred: number;
   killsByEnemy: Record<string, number>;
+  /** Growth Recap: XP, level and bond changes for pets that were out. Filled when the run is recorded. */
+  petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;
   discoveryId?: string;
   newlyUnlockedCharacterIds: string[];

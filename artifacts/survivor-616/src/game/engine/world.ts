@@ -17,7 +17,7 @@ import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
 import { UPGRADES, ALLIES_BY_ID } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { rollPrize } from '@/game/data/prizes';
-import { LOKPET_ELEMENT_COLORS, rollLokPet } from '@/game/data/lokPets';
+import { LOKPET_ELEMENT_COLORS, getLokPetEvolutionStage, rollLokPet } from '@/game/data/lokPets';
 import { OBJECTIVES } from '@/game/data/objectives';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { SECTOR_STRUCTURES_BY_ID } from '@/game/data/sectorStructures';
@@ -3013,7 +3013,8 @@ export function spawnLokPet(w: World, roll: LokPetRoll, origin: LokPetInstance['
   const index = w.lokPets.length;
   const orbitAngle = (Math.PI * 2 * index) / w.maxLokPets + w.rng() * 0.2;
   const starterPartner = roll.specialAbility === 'cutify-getaway' || roll.specialAbility === 'null-consume' || roll.specialAbility === 'buzbee-pollen';
-  const evolutionStage = (roll.level ?? 1) >= 66 ? 3 : (roll.level ?? 1) >= 33 ? 2 : 1;
+  // One rule for every caller: the same stage the arena and kennel show.
+  const evolutionStage = getLokPetEvolutionStage(roll.level ?? 1, starterPartner);
   const pet: LokPetInstance = {
     ...roll,
     sizeScale: (roll.sizeScale ?? 1) * (1 + (evolutionStage - 1) * 0.18),
