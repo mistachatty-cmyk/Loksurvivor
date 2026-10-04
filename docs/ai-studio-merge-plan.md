@@ -1,6 +1,6 @@
 # Google AI Studio build — merge plan & audit scaffold
 
-Status: **waiting on the AI Studio push** (not yet in the repo as of 2026-10-04).
+Status: **done.** The AI Studio 1.9 build is merged (v0.10.1) and follow-up work shipped through v0.10.7. This file is the original scaffold, kept for history. For the current state read `docs/ai-handoff-2026-10-04.md`.
 
 ## Safety net
 - `main` was at `b68dbde` (#183 cosmetic shop hats) when this plan was written.
