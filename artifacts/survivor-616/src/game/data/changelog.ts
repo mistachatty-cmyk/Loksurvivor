@@ -358,33 +358,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.10.10',
-    date: '2026-10-04',
-    kind: 'hotfix',
-    title: 'Live Feed Gets Its First Look',
-    body: [
-      'The title live feed gets one preview on this device. From the second load onward, it pauses when the device asks for reduced motion, unless Always animate is on.',
-      'A small glowing notice now explains when the device has paused the feed and lets you turn it back on.',
-    ],
-  },
-  {
-    version: '0.10.11',
-    date: '2026-10-04',
-    kind: 'update',
-    title: 'Supplies Inside the Block',
-    body: [
-      'One walk-in building per Endless block now has a marked supply find. The street fight keeps running while you step inside to collect it.',
-      'What you find fits the place: clinics and homes offer healing, work sites hold alloy, digital rooms hold resin, and other stops can offer water, ore, or cred. Each supply pays once per run.',
-    ],
-  },
-  {
-    version: '0.10.12',
+    version: '0.12.1',
     date: '2026-10-05',
     kind: 'update',
-    title: 'A Different Floor in Every Stop',
+    title: 'The Block Stays Alive',
     body: [
-      'Walk-in Endless buildings now show floors and soft lighting that fit the place: boards in homes, tile in service rooms, grates in workshops, and circuitry in digital sites.',
-      'A short lit strip just inside the doorway helps you find the way back out while the street fight continues.',
+      'Endless buildings now let you walk in without resetting the street fight. Choose Classic in Settings if you prefer the separate prefab rooms.',
+      'One building per block has a marked, one-time supply find. Floors and soft lighting fit the place, and a lit strip helps you find the doorway.',
+      'The title live feed gets a first-load preview. On later loads, a device request for reduced motion pauses it and shows a small glowing notice. Always animate overrides the pause.',
     ],
   },
 ];
