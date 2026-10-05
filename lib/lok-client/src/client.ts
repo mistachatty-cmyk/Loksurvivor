@@ -4,6 +4,7 @@ import {
   type SupabaseClient,
   type User,
 } from "@supabase/supabase-js";
+import { LokSessionAdapter } from "./session";
 
 export interface LokClientConfig {
   url: string;
@@ -11,7 +12,13 @@ export interface LokClientConfig {
 }
 
 export function createLokClient(config: LokClientConfig): SupabaseClient {
-  return createClient(config.url, config.anonKey);
+  return createClient(config.url, config.anonKey, {
+    auth: {
+      storage: new LokSessionAdapter(),
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
 }
 
 export type { Session, SupabaseClient, User };
