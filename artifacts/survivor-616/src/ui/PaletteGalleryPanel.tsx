@@ -102,7 +102,10 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
-  const paletteLokOnly = LOKTOKEN_ONLY_KINDS.has('palette');
+  // LokToken-only applies per palette, and only once the live catalog actually lists it. Until then
+  // (no client, offline, catalog not seeded) the original loot-token purchase keeps working.
+  const isLokOnly = (palette: (typeof THEMED_PALETTES)[number]) =>
+    LOKTOKEN_ONLY_KINDS.has('palette') && priceOf(catalogSku('palette', palette.id)) !== undefined;
   const lokPriceOf = (palette: (typeof THEMED_PALETTES)[number]) =>
     priceOf(catalogSku('palette', palette.id)) ?? LOKTOKEN_PRICE_BY_TIER[palette.tier ?? 'standard'] ?? LOKTOKEN_PRICE_BY_TIER.standard!;
   const [category, setCategory] = useState<ShopCategory>('palettes');
@@ -153,7 +156,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const handleBuyPalette = (paletteId: string) => {
     const palette = THEMED_PALETTES.find((entry) => entry.id === paletteId);
     if (!palette || meta.ownedPaletteIds.includes(palette.id)) return;
-    if (paletteLokOnly) {
+    if (isLokOnly(palette)) {
       if (!signedIn) {
         setNotice('Palettes are sold for LokTokens. Sign in from the Account room to earn and spend them.');
         return;
@@ -243,7 +246,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
               <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Run auras' : category === 'hats' ? 'Hover hats' : 'Celebrations'}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                 {category === 'palettes'
-                  ? 'Recolor your fighter, weapon effects, and world accents. Palettes are sold for LokTokens (earned by playing, shared across every LOK game). Nothing here changes combat power.'
+                  ? 'Recolor your fighter, weapon effects, and world accents. Palettes are sold for LokTokens where the store is open (earned by playing, shared across every LOK game). Nothing here changes combat power.'
                   : category === 'auras' ? 'Add a lightweight Canvas2D effect around your fighter. Auras use your active palette and never alter hitboxes or stats.' : category === 'hats' ? 'Equip a hovering cosmetic above your fighter. It stays visual-only and never blocks the arena.' : 'Choose the burst that plays when you open a reward. Tap a card to play it on Valor before equipping it.'}
               </p>
 
@@ -253,7 +256,8 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                     const owned = hasCatalogItem(meta, 'palettes', palette.id, meta.ownedPaletteIds);
                     const equipped = meta.activePaletteId === palette.id;
                     const lokPrice = lokPriceOf(palette);
-                    const affordable = paletteLokOnly ? signedIn && (lokBalance ?? 0) >= lokPrice : meta.lootTokens >= palette.cost;
+                    const lokOnly = isLokOnly(palette);
+                    const affordable = lokOnly ? signedIn && (lokBalance ?? 0) >= lokPrice : meta.lootTokens >= palette.cost;
                     return (
                       <article key={palette.id} className={`border p-2.5 sm:p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`} data-testid={`card-palette-${palette.id}`}>
                         <div className="flex items-start justify-between gap-2">
@@ -272,9 +276,9 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                         {owned ? (
                           <button type="button" onClick={() => { equipPalette(palette.id); setNotice(`${palette.name} equipped.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-palette-${palette.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
                         ) : (
-                          <button type="button" onClick={() => handleBuyPalette(palette.id)} disabled={paletteLokOnly ? signedIn && !affordable : !affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable || (paletteLokOnly && !signedIn) ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-palette-${palette.id}`}>
+                          <button type="button" onClick={() => handleBuyPalette(palette.id)} disabled={lokOnly ? signedIn && !affordable : !affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable || (lokOnly && !signedIn) ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-palette-${palette.id}`}>
                             {!affordable ? <Lock className="h-3 w-3" /> : null}
-                            {paletteLokOnly
+                            {lokOnly
                               ? !signedIn ? `${lokPrice} LokTokens · sign in` : affordable ? `Buy · ${lokPrice} LokTokens` : `Need ${lokPrice} LokTokens`
                               : affordable ? `Buy · ${palette.cost} token${palette.cost === 1 ? '' : 's'}` : `Need ${palette.cost} tokens`}
                           </button>
