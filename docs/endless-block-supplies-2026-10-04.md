@@ -10,9 +10,13 @@ One building per generated Endless block carries a visible supply marker. The ma
 - A claimed building ID stays in the run's `claimedBuildingSupplies` set after its chunk unloads. Revisiting cannot pay again.
 - The supply spot sits in the cleared door lane, inside the physical footprint. Generation tests check that it is clear of solid props across sample seeds.
 
+## Interior readability pass
+
+Walk-in floors now reflect building use: board seams for homes and social spaces, small tile for clinics and laundromats, heavy bars for industrial sites, branching traces for digital facilities, and broad stone blocks for the crypt. A low-contrast radial wash uses the prefab accent without bleaching actors or projectiles. A short strip inside each doorway marks the return route. Classic room entry retains its existing presentation.
+
 ## Next design checks
 
 1. Measure supplies collected per 10 minutes in ordinary Endless runs before changing material values.
 2. Add service interactions and authored mini encounters only where the prefab and district support them.
-3. Give prefab families distinct floor and lighting treatments while keeping doors readable during dense combat.
+3. Check the floor and doorway contrast during dense combat on a real device, especially with reduced motion enabled.
 4. Test all four door orientations with large enemies, movable cover, and projectiles.

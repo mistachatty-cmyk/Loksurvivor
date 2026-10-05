@@ -1110,6 +1110,93 @@ function drawChunkLandmark(
   ctx.restore();
 }
 
+type EndlessBuilding = NonNullable<World['endless']>['buildings'][number];
+
+function drawWalkInFloor(ctx: CanvasRenderingContext2D, building: EndlessBuilding) {
+  const left = building.x - building.w / 2 + 10;
+  const top = building.y - building.h / 2 + 10;
+  const width = building.w - 20;
+  const height = building.h - 20;
+  const id = building.prefabId;
+  const domestic = id === 'duplex' || id === 'apartment' || id === 'penthouse';
+  const tiled = id === 'clinic' || id === 'laundromat' || id === 'harbor-office';
+  const industrial = id === 'warehouse' || id === 'auto-shop' || id === 'toll-plaza' || id === 'lev-substation';
+  const digital = id === 'antenna-hub' || id === 'server-cluster' || id === 'skyline-spire' || id === 'nanite-foundry';
+  const crypt = id === 'catacomb-crypt';
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(left, top, width, height);
+  ctx.clip();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = domestic ? '#182923' : tiled ? '#132631' : industrial ? '#24252b' : digital ? '#111d2b' : crypt ? '#28232b' : '#2a2028';
+  ctx.fillRect(left, top, width, height);
+
+  ctx.strokeStyle = building.accent;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.19;
+  if (domestic || id === 'corner-store' || id === 'bar') {
+    // Floorboards and alternating short seams keep homes distinct from work sites.
+    for (let y = top + 14, row = 0; y < top + height; y += 15, row += 1) {
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + width, y);
+      ctx.stroke();
+      for (let x = left + (row % 2 ? 28 : 56); x < left + width; x += 56) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 15);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      }
+    }
+  } else if (tiled || crypt) {
+    const tile = crypt ? 29 : 22;
+    for (let x = left + tile; x < left + width; x += tile) {
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + height); ctx.stroke();
+    }
+    for (let y = top + tile; y < top + height; y += tile) {
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke();
+    }
+  } else if (industrial) {
+    for (let y = top + 16; y < top + height; y += 18) {
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.11;
+    for (let x = left + 16; x < left + width; x += 36) {
+      ctx.fillRect(x, top, 8, height);
+    }
+  } else if (digital) {
+    for (let x = left + 22; x < left + width; x += 42) {
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, building.y - 8);
+      ctx.lineTo(x + 18, building.y - 8);
+      ctx.stroke();
+      ctx.fillRect(x + 16, building.y - 10, 4, 4);
+    }
+  }
+
+  // The light is localized, keeping actors and the door lane clear in dense fights.
+  const light = ctx.createRadialGradient(building.x, building.y, 8, building.x, building.y, Math.max(width, height) * 0.6);
+  light.addColorStop(0, `${building.accent}30`);
+  light.addColorStop(1, `${building.accent}00`);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = light;
+  ctx.fillRect(left, top, width, height);
+  ctx.restore();
+
+  const door = buildingSupplyPoint(building);
+  ctx.save();
+  ctx.globalAlpha = 0.68;
+  ctx.fillStyle = building.accent;
+  if (building.doorSide === 'north' || building.doorSide === 'south') {
+    ctx.fillRect(door.x - 13, door.y - 3, 26, 6);
+  } else {
+    ctx.fillRect(door.x - 3, door.y - 13, 6, 26);
+  }
+  ctx.restore();
+}
+
 function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
   const e = w.endless;
   if (!e || e.inDungeon || e.inBuilding) return;
@@ -1210,15 +1297,7 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     ctx.strokeRect(left + 7, top + 7, building.w - 14, building.h - 14);
     ctx.setLineDash([]);
     if (walkedInside) {
-      ctx.globalAlpha = 0.28;
-      ctx.strokeStyle = building.accent;
-      ctx.lineWidth = 1;
-      for (let x = left + 32; x < left + building.w - 20; x += 32) {
-        ctx.beginPath();
-        ctx.moveTo(x, top + 12);
-        ctx.lineTo(x, top + building.h - 12);
-        ctx.stroke();
-      }
+      drawWalkInFloor(ctx, building);
       ctx.fillStyle = '#fff';
       ctx.globalAlpha = 0.86;
       ctx.font = 'bold 9px monospace';

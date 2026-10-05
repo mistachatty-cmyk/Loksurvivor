@@ -377,6 +377,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'What you find fits the place: clinics and homes offer healing, work sites hold alloy, digital rooms hold resin, and other stops can offer water, ore, or cred. Each supply pays once per run.',
     ],
   },
+  {
+    version: '0.10.12',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'A Different Floor in Every Stop',
+    body: [
+      'Walk-in Endless buildings now show floors and soft lighting that fit the place: boards in homes, tile in service rooms, grates in workshops, and circuitry in digital sites.',
+      'A short lit strip just inside the doorway helps you find the way back out while the street fight continues.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
