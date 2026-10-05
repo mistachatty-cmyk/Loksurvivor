@@ -1650,6 +1650,10 @@ export interface EndlessState {
   inDungeon: boolean;
   /** Whether the player is exploring an enterable city building. */
   inBuilding: boolean;
+  /** The original room transition remains available as a device setting. */
+  buildingEntryStyle: 'seamless' | 'classic';
+  /** Building occupied in walk-in mode; the street simulation continues. */
+  walkInBuildingId: string | null;
   buildingLabel: string;
   buildingPrefabId: string | null;
   buildingCenterX: number;

@@ -1413,6 +1413,7 @@ export function createWorld(
     dvdEasterEggUnlocked?: boolean;
     ownedKeyItemIds?: string[];
     craftedRelicIds?: string[];
+    buildingEntryStyle?: 'seamless' | 'classic';
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1804,6 +1805,8 @@ export function createWorld(
       dungeonDepth: 0,
       inDungeon: false,
       inBuilding: false,
+      buildingEntryStyle: setup.buildingEntryStyle ?? 'seamless',
+      walkInBuildingId: null,
       buildingLabel: '',
       buildingPrefabId: null,
       buildingCenterX: 0,
@@ -10513,6 +10516,8 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
 
 function enterDungeon(w: World) {
   const e = w.endless!;
+  e.walkInBuildingId = null;
+  e.buildingLabel = '';
   e.streetReturnX = w.player.x;
   e.streetReturnY = w.player.y;
   e.dungeonDepth += 1;
@@ -10646,13 +10651,23 @@ function updateEndlessDungeon(w: World) {
   const p = w.player;
 
   if (!e.inDungeon && !e.inBuilding) {
-    for (const door of e.buildingEntrances) {
-      if (
-        Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
-        Math.abs(p.y - door.y) < door.h / 2 + p.radius
-      ) {
-        enterBuilding(w, door);
-        return;
+    if (e.buildingEntryStyle === 'seamless') {
+      const occupied = e.buildings.find((building) =>
+        Math.abs(p.x - building.x) < building.w / 2 - p.radius &&
+        Math.abs(p.y - building.y) < building.h / 2 - p.radius,
+      );
+      e.walkInBuildingId = occupied?.id ?? null;
+      e.buildingLabel = occupied?.name ?? '';
+      if (occupied) return;
+    } else {
+      for (const door of e.buildingEntrances) {
+        if (
+          Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
+          Math.abs(p.y - door.y) < door.h / 2 + p.radius
+        ) {
+          enterBuilding(w, door);
+          return;
+        }
       }
     }
     for (const entrance of e.dungeonEntrances) {
@@ -11330,7 +11345,7 @@ export function hudSnapshot(w: World): HudSnapshot {
             worldToChunkCoords(w.player.x, w.player.y).cx,
             worldToChunkCoords(w.player.x, w.player.y).cy,
           ))?.district ?? 'Unmapped district',
-          inBuilding: e.inBuilding,
+          inBuilding: e.inBuilding || Boolean(e.walkInBuildingId),
           buildingLabel: e.buildingLabel,
           playerX: w.player.x,
           playerY: w.player.y,

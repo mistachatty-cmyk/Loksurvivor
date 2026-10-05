@@ -2368,7 +2368,7 @@ test('endless snapshot exposes loaded blocks, river crossings, and doors', () =>
 
 test('endless buildings expose distinct facades and enterable prefab interiors', () => {
   const area = AREAS.find((entry) => entry.endless)!;
-  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616, [], 1, true, null, { buildingEntryStyle: 'classic' });
   stepWorld(world, 1 / 60, neutralInput);
 
   const endless = world.endless!;
@@ -2387,6 +2387,61 @@ test('endless buildings expose distinct facades and enterable prefab interiors',
   endless.exitZone = { x: world.player.x, y: world.player.y, w: 52, h: 42 };
   stepWorld(world, 1 / 60, neutralInput);
   assert.equal(endless.inBuilding, false);
+});
+
+test('endless walk-in buildings keep the street and combat state in place', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  stepWorld(world, 1 / 60, neutralInput);
+
+  const endless = world.endless!;
+  assert.equal(endless.buildingEntryStyle, 'seamless');
+  const building = endless.buildings.find((candidate) => candidate.id.startsWith('0,0:') && candidate.x > 0 && candidate.y > 0)!;
+  const enemy = addEnemy(world, 'nightcrawler', building.x + 55, building.y);
+  const enemies = world.enemies;
+  const pickups = world.pickups;
+  const projectiles = world.projectiles;
+  const obstacleCount = world.obstacles.length;
+  world.player.x = building.x;
+  world.player.y = building.y;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(endless.inBuilding, false);
+  assert.equal(endless.walkInBuildingId, building.id);
+  assert.equal(endless.buildingLabel, building.name);
+  assert.equal(endless.pendingTransition, null);
+  assert.equal(world.player.x, building.x);
+  assert.equal(world.player.y, building.y);
+  assert.equal(world.enemies, enemies);
+  assert.ok(world.enemies.some((candidate) => candidate.uid === enemy.uid));
+  assert.equal(world.pickups, pickups);
+  assert.equal(world.projectiles, projectiles);
+  assert.equal(world.obstacles.length, obstacleCount);
+
+  world.player.x = 0;
+  world.player.y = 0;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(endless.walkInBuildingId, null);
+  assert.equal(world.obstacles.length, obstacleCount);
+});
+
+test('endless walk-in door can be crossed through its wall opening', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  stepWorld(world, 1 / 60, neutralInput);
+  const door = world.endless!.buildingEntrances.find((candidate) => candidate.buildingId.startsWith('0,0:'))!;
+  const building = world.endless!.buildings.find((candidate) => candidate.id === door.buildingId)!;
+  const dx = door.doorSide === 'west' ? 1 : door.doorSide === 'east' ? -1 : 0;
+  const dy = door.doorSide === 'north' ? 1 : door.doorSide === 'south' ? -1 : 0;
+  world.player.x = door.x - dx * 20;
+  world.player.y = door.y - dy * 20;
+
+  for (let frame = 0; frame < 40 && world.endless!.walkInBuildingId !== building.id; frame += 1) {
+    stepWorld(world, 1 / 60, { ...neutralInput, moveX: dx, moveY: dy });
+  }
+
+  assert.equal(world.endless!.walkInBuildingId, building.id);
+  assert.equal(world.endless!.inBuilding, false);
 });
 
 test('entering a landmark block adds a non-blocking navigation cue', () => {

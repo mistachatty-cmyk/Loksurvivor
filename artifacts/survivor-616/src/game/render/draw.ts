@@ -1194,11 +1194,12 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
   for (const building of e.buildings) {
     const left = building.x - building.w / 2;
     const top = building.y - building.h / 2;
+    const walkedInside = e.buildingEntryStyle === 'seamless' && e.walkInBuildingId === building.id;
     ctx.save();
-    ctx.fillStyle = '#131a25';
+    ctx.fillStyle = walkedInside ? '#0a1118' : '#131a25';
     ctx.globalAlpha = 0.96;
     ctx.fillRect(left, top, building.w, building.h);
-    ctx.fillStyle = `${building.accent}18`;
+    ctx.fillStyle = `${building.accent}${walkedInside ? '28' : '18'}`;
     ctx.fillRect(left + 8, top + 8, building.w - 16, building.h - 16);
     ctx.strokeStyle = building.accent;
     ctx.lineWidth = 3;
@@ -1208,43 +1209,60 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     ctx.lineWidth = 1;
     ctx.strokeRect(left + 7, top + 7, building.w - 14, building.h - 14);
     ctx.setLineDash([]);
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = '#dbeafe';
-    const windowCount = Math.max(2, Math.floor((building.w - 36) / 34));
-    for (let index = 0; index < windowCount; index += 1) {
-      const wx = left + 18 + index * ((building.w - 36) / Math.max(1, windowCount - 1));
-      ctx.fillRect(wx - 5, top + 18, 10, 5);
-      ctx.fillRect(wx - 5, top + building.h - 23, 10, 5);
-    }
-    const isVerticalDoor = building.doorSide === 'east' || building.doorSide === 'west';
-    ctx.fillStyle = '#fff3b0';
-    if (isVerticalDoor) {
-      const dx = building.doorSide === 'west' ? left - 3 : left + building.w - 3;
-      ctx.fillRect(dx, building.y - 10, 6, 20);
+    if (walkedInside) {
+      ctx.globalAlpha = 0.28;
+      ctx.strokeStyle = building.accent;
+      ctx.lineWidth = 1;
+      for (let x = left + 32; x < left + building.w - 20; x += 32) {
+        ctx.beginPath();
+        ctx.moveTo(x, top + 12);
+        ctx.lineTo(x, top + building.h - 12);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#fff';
+      ctx.globalAlpha = 0.86;
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(building.name.toUpperCase(), building.x, top + 28);
     } else {
-      const dy = building.doorSide === 'north' ? top - 3 : top + building.h - 3;
-      ctx.fillRect(building.x - 10, dy, 20, 6);
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = '#dbeafe';
+      const windowCount = Math.max(2, Math.floor((building.w - 36) / 34));
+      for (let index = 0; index < windowCount; index += 1) {
+        const wx = left + 18 + index * ((building.w - 36) / Math.max(1, windowCount - 1));
+        ctx.fillRect(wx - 5, top + 18, 10, 5);
+        ctx.fillRect(wx - 5, top + building.h - 23, 10, 5);
+      }
+      const isVerticalDoor = building.doorSide === 'east' || building.doorSide === 'west';
+      ctx.fillStyle = '#fff3b0';
+      if (isVerticalDoor) {
+        const dx = building.doorSide === 'west' ? left - 3 : left + building.w - 3;
+        ctx.fillRect(dx, building.y - 10, 6, 20);
+      } else {
+        const dy = building.doorSide === 'north' ? top - 3 : top + building.h - 3;
+        ctx.fillRect(building.x - 10, dy, 20, 6);
+      }
+      ctx.fillStyle = building.accent;
+      ctx.globalAlpha = 0.95;
+      ctx.fillRect(building.x - Math.min(58, building.sign.length * 4), building.y - 5, Math.min(116, building.sign.length * 8), 15);
+      ctx.fillStyle = '#08111a';
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(building.sign, building.x, building.y + 5);
     }
-    ctx.fillStyle = building.accent;
-    ctx.globalAlpha = 0.95;
-    ctx.fillRect(building.x - Math.min(58, building.sign.length * 4), building.y - 5, Math.min(116, building.sign.length * 8), 15);
-    ctx.fillStyle = '#08111a';
-    ctx.font = 'bold 7px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(building.sign, building.x, building.y + 5);
     ctx.textAlign = 'left';
     ctx.restore();
   }
 
   for (const door of e.buildingEntrances) {
     ctx.save();
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = e.buildingEntryStyle === 'seamless' ? 0.42 : 0.85;
     ctx.fillStyle = '#f6c453';
     ctx.fillRect(door.x - door.w / 2, door.y - door.h / 2, door.w, door.h);
     ctx.fillStyle = '#fff3b0';
     ctx.fillRect(door.x - 5, door.y - 8, 10, 16);
     ctx.font = '9px monospace';
-    ctx.fillText('ENTER', door.x - 18, door.y - 20);
+    ctx.fillText(e.buildingEntryStyle === 'seamless' ? 'OPEN' : 'ENTER', door.x - 18, door.y - 20);
     ctx.restore();
   }
 }
@@ -2007,10 +2025,23 @@ function drawObstacles(
   // endless mode can have a full 5x5 chunk window's worth of breakables
   // loaded at once, and this ran unfiltered every frame before.
   const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> = [];
+  const closedBuildings = w.endless?.buildingEntryStyle === 'seamless' && !w.endless.inDungeon
+    ? w.endless.buildings.filter((building) =>
+        building.id !== w.endless!.walkInBuildingId &&
+        building.x + building.w / 2 >= viewBounds.left - margin &&
+        building.x - building.w / 2 <= viewBounds.right + margin &&
+        building.y + building.h / 2 >= viewBounds.top - margin &&
+        building.y - building.h / 2 <= viewBounds.bottom + margin,
+      )
+    : [];
   for (const o of w.breakables) {
     if (o.broken) continue;
     if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
       || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
+    if (closedBuildings.some((building) =>
+        Math.abs(o.x - building.x) < building.w / 2 - 12 &&
+        Math.abs(o.y - building.y) < building.h / 2 - 12,
+      )) continue;
     obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind });
   }
 

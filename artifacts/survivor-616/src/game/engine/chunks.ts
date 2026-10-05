@@ -624,6 +624,20 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
       };
       buildings.push(building);
       obstacles.push(...buildingWallObstacles(building));
+      // Bring each prefab's real cover into the street footprint. Keep the
+      // doorway lane free so entering never depends on a lucky prop layout.
+      const scaleX = (building.w - 42) / prefab.interiorBounds.w;
+      const scaleY = (building.h - 42) / prefab.interiorBounds.h;
+      for (const prop of prefab.interiorProps) {
+        const x = building.x + prop.x * scaleX;
+        const y = building.y + prop.y * scaleY;
+        const w = Math.max(14, prop.w * scaleX);
+        const h = Math.max(14, prop.h * scaleY);
+        const inDoorLane = (building.doorSide === 'north' || building.doorSide === 'south')
+          ? Math.abs(x - building.x) < 27 + w / 2 && (building.doorSide === 'north' ? y < building.y : y > building.y)
+          : Math.abs(y - building.y) < 27 + h / 2 && (building.doorSide === 'west' ? x < building.x : x > building.x);
+        if (!inDoorLane) obstacles.push({ x, y, w, h, kind: prop.kind, propVariant: prop.propVariant });
+      }
     });
   }
 
@@ -815,16 +829,22 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
     let attempts = 0;
     let x = 0;
     let y = 0;
+    const overlapsBuilding = () => buildings.some((building) =>
+      Math.abs(x - building.x) < (w + building.w) / 2 + 40 &&
+      Math.abs(y - building.y) < (h + building.h) / 2 + 40,
+    );
     do {
       x = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - margin);
       y = (rng() * 2 - 1) * (CHUNK_SIZE / 2 - margin);
       attempts += 1;
-    } while (attempts < 8 && (
+    } while (attempts < 16 && (
       (spine === 0 && Math.abs(y) < 48) ||
       (spine === 1 && Math.abs(x) < 48) ||
       (variant === 'rail' && Math.abs(y) > 78 && Math.abs(y) < 154) ||
-      (band.id === 'outer-threshold' && Math.abs(x) < 96 && Math.abs(y) < 96)
+      (band.id === 'outer-threshold' && Math.abs(x) < 96 && Math.abs(y) < 96) ||
+      overlapsBuilding()
     ));
+    if (overlapsBuilding()) continue;
 
     const propVariant = kind === 'metal-box'
       ? 'heavy-metal'
