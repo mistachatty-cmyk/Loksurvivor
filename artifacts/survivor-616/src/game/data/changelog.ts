@@ -327,6 +327,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The player costs nothing to load: it stays closed and downloads no music until someone presses play. Files you add from your own device never leave that device.',
     ],
   },
+  {
+    version: '0.11.8',
+    date: '2026-10-05',
+    kind: 'hotfix',
+    title: 'Sign In Inside The Arcade',
+    body: [
+      'Continue with Google and Continue with Apple now work when you play on the GSix website. The website\u2019s game player is a window inside a page, and Google refuses to show its sign-in there \u2014 the error you saw. The game now opens sign-in on the full page instead, then brings you back signed in.',
+      'Sign-in also returns you to the exact address you started from, rather than the site\u2019s default page.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
