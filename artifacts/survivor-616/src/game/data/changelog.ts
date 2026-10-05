@@ -285,6 +285,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The game follows your browser or phone language by default, and switches on its own if you change it. A Language option at the top of Settings lets you pin any language, or go back to Match my device.',
     ],
   },
+  {
+    version: '0.11.4',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Universe Hookups',
+    body: [
+      'The Universe chapter now shows your LokTokens, cloud save state and collection side by side.',
+      'Claiming an achievement or trading a card with another LOK game can now earn LokTokens when you are signed in.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

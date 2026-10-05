@@ -106,3 +106,16 @@ long before it) returns `500` on every signup, including real ones
 unrelated to this change (confirmed in `function_edge_logs`, e.g. a real
 2026-09-26 signup). Worth a follow-up look by whoever owns that flow —
 it isn't something `lok-earn`/this integration touches or caused.
+
+## 0.11.4 follow-up: new earn events (client wired, server rules NOT yet added)
+
+`ArchivePanel.tsx` now calls `earn()` for `achievement_claimed` (ref =
+achievement id), `card_exchange_sent` (ref = kennel pet id) and
+`card_exchange_received` (ref = visiting card `instanceId`). The idemKey is
+derived from those refs, so each thing pays at most once. **These event keys
+have no `lok_earn_rules` rows yet** -- until someone inserts them for app
+`8999aa42-ca18-4af3-85ee-5e88e20b688a`, `lok-earn` answers `unknown_event`
+and nothing is granted (harmless, gameplay never blocks). Suggested values:
+achievement_claimed 10 (daily cap 50), card_exchange_sent 15 (cap 30),
+card_exchange_received 15 (cap 30). Applying them touches the shared
+production project, so it was deliberately left for the owner to approve.
