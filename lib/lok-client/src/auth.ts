@@ -16,24 +16,49 @@ export async function signInWithEmail(
   return client.auth.signInWithPassword({ email, password });
 }
 
-export async function signInWithGoogle(
+type OAuthProvider = "google" | "apple";
+
+/**
+ * Providers (Google especially) refuse to render their sign-in page inside an
+ * iframe, which is how the GSix hub's game player embeds the game. When
+ * framed, ask Supabase for the provider URL instead of redirecting the frame,
+ * and send the top window there. Returning lands on the game's own origin,
+ * which is same-site with the hub, so the session is visible to the embed too.
+ * The embedding page must allow it (sandbox allow-top-navigation-by-user-activation).
+ */
+async function signInWithProvider(
   client: SupabaseClient,
+  provider: OAuthProvider,
   redirectTo?: string,
 ) {
-  return client.auth.signInWithOAuth({
-    provider: "google",
-    options: redirectTo ? { redirectTo } : undefined,
+  const framed = typeof window !== "undefined" && window.self !== window.top;
+  const target =
+    redirectTo ?? (typeof window !== "undefined" ? window.location.origin : undefined);
+  const result = await client.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo: target, skipBrowserRedirect: framed },
   });
+  if (framed && result.data?.url && !result.error) {
+    try {
+      window.top!.location.href = result.data.url;
+    } catch {
+      return {
+        data: result.data,
+        error: new Error(
+          "Sign-in can't open inside this embedded player. Use \"Open standalone window\" and sign in there.",
+        ),
+      };
+    }
+  }
+  return result;
 }
 
-export async function signInWithApple(
-  client: SupabaseClient,
-  redirectTo?: string,
-) {
-  return client.auth.signInWithOAuth({
-    provider: "apple",
-    options: redirectTo ? { redirectTo } : undefined,
-  });
+export function signInWithGoogle(client: SupabaseClient, redirectTo?: string) {
+  return signInWithProvider(client, "google", redirectTo);
+}
+
+export function signInWithApple(client: SupabaseClient, redirectTo?: string) {
+  return signInWithProvider(client, "apple", redirectTo);
 }
 
 export async function signOut(client: SupabaseClient) {
