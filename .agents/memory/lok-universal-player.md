@@ -44,8 +44,13 @@ Read before moving or renaming anything under `public/music/` or editing
   `saveMusicProgress` in `authStore.tsx`, sent when the number rises. The hub's
   two tables are created by a hub migration (`20261005000200_lok_music_unlocks.sql`);
   without it the write fails quietly and the retry waits for the next change.
-- No artist is named in the catalog on purpose (the standard supports `artist` per track or per playlist; set it only when it is true) (see
-  `survivor-616-art-assets.md`): nothing is claimed that the project cannot show.
+- The album's artist is `Cante-Digital`, set once at the top of
+  `public/lok-soundtrack.json` (`"artist"`), because the owner said so on
+  2026-10-05 ("for now"). Never invent or change an artist on your own; to
+  change or remove the credit, edit that one field. The in-game player does not
+  show it. The catalog's `source` carries the game name and link
+  (`https://survivor.gsix.online`) and each gate's `unit` is `run objective`;
+  the website player uses these to say where songs came from and how to unlock them.
 - The album is AAC/M4A as delivered. The standard's MP3 baseline applies to
   what apps import/export; `convertToMp3` here is the reference converter.
   The album files themselves were not re-encoded (lossy to lossy).
