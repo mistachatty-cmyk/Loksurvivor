@@ -357,6 +357,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A new bar on that page jumps straight to the Archives, the Updates and each lore chapter. The Updates list there is the same patch notes you see in the game, in blue, and it keeps itself current.',
     ],
   },
+  {
+    version: '0.10.10',
+    date: '2026-10-04',
+    kind: 'hotfix',
+    title: 'Live Feed Gets Its First Look',
+    body: [
+      'The title live feed gets one preview on this device. From the second load onward, it pauses when the device asks for reduced motion, unless Always animate is on.',
+      'A small glowing notice now explains when the device has paused the feed and lets you turn it back on.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

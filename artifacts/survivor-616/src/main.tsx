@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
 import { restoreUiTransparency } from '@/ui/UiTransparencyControls';
-import { applyMotionMode } from '@/anim/motion';
+import { applyMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
 
 function describeUnknown(value: unknown): string {
@@ -69,6 +69,7 @@ function installRuntimeDiagnostics(): void {
 installRuntimeDiagnostics();
 restoreUiTransparency();
 applyMotionMode();
+registerLiveFeedLoad();
 
 function mount(): void {
   createRoot(document.getElementById('root')!, {

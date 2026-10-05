@@ -43,7 +43,7 @@ import {
 import { renderWorld, type Viewport } from '@/game/render/draw';
 import { useMeta } from '@/game/state/metaStore';
 import { createShowcaseScene, drawShowcaseScene, stepShowcaseScene, type ShowcaseScene } from './attractShowcase';
-import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
+import { liveFeedPausedByDevice, setMotionMode } from '@/anim/motion';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 6;
@@ -165,7 +165,9 @@ export function AttractMode({ className }: AttractModeProps) {
   const { meta, setAttractMode } = useMeta();
   const enabled = meta.attractModeEnabled;
 
-  const reducedMotion = prefersReducedMotionNow();
+  const reducedMotion = liveFeedPausedByDevice();
+  const pausedByDevice = enabled && reducedMotion;
+  const playing = enabled && !reducedMotion;
 
   useEffect(() => {
     if (!enabled || reducedMotion) return;
@@ -315,7 +317,7 @@ export function AttractMode({ className }: AttractModeProps) {
   return (
     <div className={`absolute inset-0 overflow-hidden ${className ?? ''}`}>
       <AnimatePresence>
-        {enabled && !reducedMotion && (
+        {playing && (
           <motion.canvas
             key="attract-canvas"
             ref={canvasRef}
@@ -334,14 +336,21 @@ export function AttractMode({ className }: AttractModeProps) {
 
       <button
         type="button"
-        onClick={() => setAttractMode(!enabled)}
-        aria-pressed={enabled}
-        aria-label={enabled ? 'Turn off background gameplay' : 'Turn on background gameplay'}
+        onClick={() => {
+          if (pausedByDevice) {
+            setMotionMode('full');
+            window.location.reload();
+          } else {
+            setAttractMode(!enabled);
+          }
+        }}
+        aria-pressed={playing}
+        aria-label={pausedByDevice ? 'Turn on live feed paused by device setting' : enabled ? 'Turn off background gameplay' : 'Turn on background gameplay'}
         data-testid="button-attract-mode-toggle"
         className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-3 py-1.5 text-[10px] uppercase tracking-widest text-white/60 hover:text-white/90 hover:border-white/30 transition-colors"
       >
-        {enabled ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-        {enabled ? 'Live feed' : 'Feed off'}
+        {playing ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+        {pausedByDevice ? 'Feed paused' : enabled ? 'Live feed' : 'Feed off'}
       </button>
     </div>
   );

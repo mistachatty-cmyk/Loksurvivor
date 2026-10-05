@@ -33,6 +33,20 @@ export const DUR = {
 export type MotionMode = 'system' | 'full';
 const MOTION_STORAGE_KEY = 'survivor616.motion';
 const MOTION_EVENT = 'survivor616:motion-change';
+const LIVE_FEED_SEEN_KEY = 'survivor616.live-feed-seen';
+let liveFeedMayFollowDevice = true;
+
+/** Give a new device one title-screen preview before its motion preference can pause the feed. */
+export function registerLiveFeedLoad(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    liveFeedMayFollowDevice = window.localStorage.getItem(LIVE_FEED_SEEN_KEY) === '1';
+    window.localStorage.setItem(LIVE_FEED_SEEN_KEY, '1');
+  } catch {
+    // With no persistent storage, honor the device's accessibility preference.
+    liveFeedMayFollowDevice = true;
+  }
+}
 
 export function getMotionMode(): MotionMode {
   try {
@@ -71,3 +85,6 @@ export const deviceWantsReducedMotion = (): boolean =>
  * value would strand them until reload.
  */
 export const prefersReducedMotion = (): boolean => getMotionMode() !== 'full' && deviceWantsReducedMotion();
+
+/** The first app load shows the live feed; later loads can honor a device pause request. */
+export const liveFeedPausedByDevice = (): boolean => liveFeedMayFollowDevice && prefersReducedMotion();
