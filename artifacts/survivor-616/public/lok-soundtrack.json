@@ -1,0 +1,143 @@
+{
+  "schema": "lok.playlist/v1",
+  "id": "g6.616-survivor.lokifed-take-1",
+  "title": "Lokifed — Take 1",
+  "source": {
+    "app": "survivor616",
+    "name": "616 Survivor"
+  },
+  "tracks": [
+    {
+      "id": "lokifed-00-data-spark",
+      "title": "Data Spark — Hidden Track 0",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/00-data-spark-hidden.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 0
+      }
+    },
+    {
+      "id": "lokifed-01-save-my-grace",
+      "title": "Save My Grace",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/01-save-my-grace.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 1
+      }
+    },
+    {
+      "id": "lokifed-02-bonus-map",
+      "title": "Bonus Map — Should We Survive?",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/02-bonus-map-should-we-survive.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 2
+      }
+    },
+    {
+      "id": "lokifed-03-merci-mi",
+      "title": "Merci Mi — Shall We Survive",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/03-merci-mi-shall-we-survive.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 3
+      }
+    },
+    {
+      "id": "lokifed-04-i-want-you",
+      "title": "I Want You, Don't You Want It",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/04-i-want-you-dont-you-want-it.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 4
+      }
+    },
+    {
+      "id": "lokifed-05-retrieve-to-keep",
+      "title": "Retrieve to Keep",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/05-retrieve-to-keep.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 5
+      }
+    },
+    {
+      "id": "lokifed-06-idk-do-you",
+      "title": "IDK, Do You?",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/06-idk-do-you.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 6
+      }
+    },
+    {
+      "id": "lokifed-07-blanks-march",
+      "title": "Blank's March — Marche à blanc",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/07-blanks-march.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 7
+      }
+    },
+    {
+      "id": "lokifed-08-hideout-under-siege",
+      "title": "Hideout Under Siege — IDC, Do You?",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/08-hideout-under-siege.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 8
+      }
+    },
+    {
+      "id": "lokifed-09-unraveled",
+      "title": "Unraveled",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/09-unraveled.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 9
+      }
+    },
+    {
+      "id": "lokifed-10-null-void",
+      "title": "Null Void",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/10-null-void.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 10
+      }
+    },
+    {
+      "id": "lokifed-11-exo-bite",
+      "title": "Exo Bite — Brkn",
+      "album": "Lokifed — Take 1",
+      "url": "https://survivor.gsix.online/music/lokifed-take-1/11-exo-bite-brkn.m4a",
+      "mime": "audio/mp4",
+      "gate": {
+        "app": "survivor616",
+        "objectives": 11
+      }
+    }
+  ]
+}

@@ -295,6 +295,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Only a short summary is shared: which cards you own and each LokPet\'s name, level and rarity. Your save and run progress are not part of it. You can hide your LokDex from your public profile any time from the Profile page on the site.',
     ],
   },
+  {
+    version: '0.11.5',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Lokifed Everywhere',
+    body: [
+      'The Lokifed \u2014 Take 1 soundtrack is now a built-in part of the Lok network. The same album can be played from the GSix site and any other Lok app with the new Lok Music player: play, pause, skip, seek, shuffle, repeat, volume, and pick any song from the list.',
+      'The player costs nothing to load: it stays closed and downloads nothing until someone opens it. Files you add from your own device never leave that device.',
+      'In the game, nothing changes. Tracks still unlock as you complete run objectives. On the website the album is open to everyone to listen to.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

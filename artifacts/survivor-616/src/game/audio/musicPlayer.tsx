@@ -32,18 +32,25 @@ import {
   saveLocalTrack,
   type LocalLibrarySummary,
 } from './localTrackLibrary';
-import dataSpark from '@/assets/lokifed-take-1/00-data-spark-hidden.m4a?url';
-import saveMyGrace from '@/assets/lokifed-take-1/01-save-my-grace.m4a?url';
-import bonusMap from '@/assets/lokifed-take-1/02-bonus-map-should-we-survive.m4a?url';
-import merciMi from '@/assets/lokifed-take-1/03-merci-mi-shall-we-survive.m4a?url';
-import wantYou from '@/assets/lokifed-take-1/04-i-want-you-dont-you-want-it.m4a?url';
-import retrieveToKeep from '@/assets/lokifed-take-1/05-retrieve-to-keep.m4a?url';
-import idkDoYou from '@/assets/lokifed-take-1/06-idk-do-you.m4a?url';
-import blanksMarch from '@/assets/lokifed-take-1/07-blanks-march.m4a?url';
-import hideoutUnderSiege from '@/assets/lokifed-take-1/08-hideout-under-siege.m4a?url';
-import unraveled from '@/assets/lokifed-take-1/09-unraveled.m4a?url';
-import nullVoid from '@/assets/lokifed-take-1/10-null-void.m4a?url';
-import exoBite from '@/assets/lokifed-take-1/11-exo-bite-brkn.m4a?url';
+
+/**
+ * The album lives in `public/music/` rather than the bundle so it has stable,
+ * public URLs: `public/lok-soundtrack.json` lists them for every other Lok app
+ * and site (see the Lok playlist standard in the GSix hub's @lok/music).
+ */
+const ALBUM_BASE = `${import.meta.env.BASE_URL}music/lokifed-take-1/`;
+const dataSpark = `${ALBUM_BASE}00-data-spark-hidden.m4a`;
+const saveMyGrace = `${ALBUM_BASE}01-save-my-grace.m4a`;
+const bonusMap = `${ALBUM_BASE}02-bonus-map-should-we-survive.m4a`;
+const merciMi = `${ALBUM_BASE}03-merci-mi-shall-we-survive.m4a`;
+const wantYou = `${ALBUM_BASE}04-i-want-you-dont-you-want-it.m4a`;
+const retrieveToKeep = `${ALBUM_BASE}05-retrieve-to-keep.m4a`;
+const idkDoYou = `${ALBUM_BASE}06-idk-do-you.m4a`;
+const blanksMarch = `${ALBUM_BASE}07-blanks-march.m4a`;
+const hideoutUnderSiege = `${ALBUM_BASE}08-hideout-under-siege.m4a`;
+const unraveled = `${ALBUM_BASE}09-unraveled.m4a`;
+const nullVoid = `${ALBUM_BASE}10-null-void.m4a`;
+const exoBite = `${ALBUM_BASE}11-exo-bite-brkn.m4a`;
 
 export interface Track {
   id: string;
