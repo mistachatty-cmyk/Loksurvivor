@@ -139,3 +139,17 @@ registry over local cards. Every card is drawn from a portable art recipe
 their real model; recipes are procedural JSON, never bitmaps, which keeps the
 `survivor-616-art-assets.md` rule intact. Republish after card/palette content
 changes: `pnpm exec tsx scripts/export-lok-registry.ts <outDir>`.
+
+## 0.11.5 follow-up: universal SDK, Eclipse canon, hub lore (2026-10-05)
+
+- Shared code moved out of this repo: `Lok-EcoSystsem/universe-sdk` is the source
+  of truth; `lib/lok-universe` is a **vendored** copy (never edit; re-sync).
+  `lib/lok-client/src/cards.ts` just re-exports it. Publishers now only map this
+  game's content onto `PublishCard`/`PublishItem`; asset ids were unchanged.
+- **The Eclipse is canon from `lore.ts` Chapter 6** (`SOLAR_ECLIPSE_ZERO`): the
+  Great Eclipse digitized the world and is the gateway that connects every LOK
+  app. It is modeled as data (`lok_eclipse_crossings`), not hardcoded.
+- Lore is exported for the hub (`scripts/export-public-lore.ts`) so
+  survivor.gsix.online / gsix.online/games/survivor616 shows the same chapters in
+  this game's palette. Re-export whenever `lore.ts` changes. See CLAUDE.md
+  "LOK universe, store and gsix.online sync".

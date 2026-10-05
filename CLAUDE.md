@@ -272,6 +272,30 @@ just *what*, so the reasoning doesn't need to be re-derived:
   the Tier 2/3 economies that are typed but deliberately unbuilt.
 - `MEMORY.md` — index/entry point for the above.
 
+## LOK universe, store and gsix.online sync
+
+616 Survivor is the reference implementation of the shared LOK platform
+contract. The full guide is `Lok-EcoSystsem/LokToken EcoSystem/LOK_PLATFORMS.md`
+(source of truth); this section is the 616-side checklist. **When you change
+content or lore here, do the matching sync as part of the same update.**
+
+- **Cards / palettes / auras / hats / celebrations changed** -> from
+  `artifacts/survivor-616/`: `pnpm exec tsx scripts/export-lok-registry.ts <outDir>`
+  and apply the SQL to the shared project (prices only seed new items; live
+  `lok_catalog` prices win). Palettes are LokToken-only (`LOKTOKEN_ONLY_KINDS`
+  in `src/lib/lokStoreCatalog.ts`).
+- **Lore changed** (`src/game/data/lore.ts`) -> run
+  `pnpm exec tsx scripts/export-public-lore.ts <outDir>` and copy
+  `survivor616.lore.json` to `Gsixhub/apps/hub/content/lore/` so
+  survivor.gsix.online's lore (gsix.online/games/survivor616) stays the same lore.
+  `--check <file>` tells you whether the hub copy is stale. The hub page uses
+  this game's own palette (read from `src/index.css`), so a theme change
+  carries over on the next export.
+- **SDK** lives in `lib/lok-universe` and is **vendored: never edit it here**.
+  Change `Lok-EcoSystsem/universe-sdk` and run its `sync-sdk.sh`.
+- Platform manifest: `artifacts/survivor-616/lok.universe.json`.
+- Future games follow the same pattern (manifest, publisher, public lore).
+
 ## Localization
 
 Player-facing text goes in `artifacts/survivor-616/src/locales/en.json` and is
