@@ -9,7 +9,7 @@
  * Everything here is pure -- no mutable state, no world imports.
  */
 
-import type { ObstacleDef } from '@/game/types';
+import type { BuildingSupplyKind, ObstacleDef } from '@/game/types';
 import { endlessBandForChunk } from '@/game/data/endlessBands';
 import { createRng } from './math';
 
@@ -46,6 +46,15 @@ export type BuildingPrefabId =
   | 'nanite-foundry'
   | (string & {});
 
+function supplyKindForPrefab(id: BuildingPrefabId): BuildingSupplyKind {
+  if (id === 'clinic' || id === 'duplex' || id === 'apartment') return 'health';
+  if (id === 'laundromat') return 'water-flask';
+  if (id === 'catacomb-crypt') return 'phosphor-ore';
+  if (id === 'warehouse' || id === 'auto-shop' || id === 'harbor-office' || id === 'lev-substation') return 'silicon-alloy';
+  if (id === 'antenna-hub' || id === 'server-cluster' || id === 'nanite-foundry') return 'cyber-resin';
+  return 'cred';
+}
+
 export interface BuildingPrefab {
   id: BuildingPrefabId;
   name: string;
@@ -69,6 +78,16 @@ export interface ChunkBuilding {
   doorX: number;
   doorY: number;
   doorSide: 'north' | 'south' | 'east' | 'west';
+  supplyKind: BuildingSupplyKind | null;
+}
+
+/** A reachable supply spot just inside the door, clear of prefab cover. */
+export function buildingSupplyPoint(building: Pick<ChunkBuilding, 'x' | 'y' | 'w' | 'h' | 'doorSide'>): { x: number; y: number } {
+  const inset = 34;
+  return {
+    x: building.x + (building.doorSide === 'west' ? -building.w / 2 + inset : building.doorSide === 'east' ? building.w / 2 - inset : 0),
+    y: building.y + (building.doorSide === 'north' ? -building.h / 2 + inset : building.doorSide === 'south' ? building.h / 2 - inset : 0),
+  };
 }
 
 export interface ChunkLandmark {
@@ -597,6 +616,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
         { x: 196, y: 198, side: 'west' as const },
       ];
   if (blockKind !== 'river-edge' && prefabPool.length > 0) {
+    const supplyIndex = (((cx * 73856093) ^ (cy * 19349663) ^ runSeed) >>> 0) % anchors.length;
     anchors.forEach((anchor, index) => {
       const prefabId = prefabPool[(index + Math.abs(cx) + Math.abs(cy)) % prefabPool.length]!;
       const prefab = getBuildingPrefab(prefabId);
@@ -621,6 +641,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
             ? anchor.y + prefab.footprint.h / 2 + 18
             : anchor.y,
         doorSide: anchor.side,
+        supplyKind: index === supplyIndex ? supplyKindForPrefab(prefabId) : null,
       };
       buildings.push(building);
       obstacles.push(...buildingWallObstacles(building));

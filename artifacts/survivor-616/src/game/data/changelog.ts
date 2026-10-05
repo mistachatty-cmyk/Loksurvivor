@@ -367,6 +367,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A small glowing notice now explains when the device has paused the feed and lets you turn it back on.',
     ],
   },
+  {
+    version: '0.10.11',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'Supplies Inside the Block',
+    body: [
+      'One walk-in building per Endless block now has a marked supply find. The street fight keeps running while you step inside to collect it.',
+      'What you find fits the place: clinics and homes offer healing, work sites hold alloy, digital rooms hold resin, and other stops can offer water, ore, or cred. Each supply pays once per run.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

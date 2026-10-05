@@ -108,6 +108,7 @@ import {
 import {
   BUILDING_PREFABS,
   CHUNK_SIZE,
+  buildingSupplyPoint,
   buildingWallObstacles,
   chunkKey,
   chunkOrigin,
@@ -1807,6 +1808,7 @@ export function createWorld(
       inBuilding: false,
       buildingEntryStyle: setup.buildingEntryStyle ?? 'seamless',
       walkInBuildingId: null,
+      claimedBuildingSupplies: new Set(),
       buildingLabel: '',
       buildingPrefabId: null,
       buildingCenterX: 0,
@@ -10377,6 +10379,7 @@ function updateEndlessChunks(w: World) {
         w: building.w,
         h: building.h,
         doorSide: building.doorSide,
+        supplyKind: building.supplyKind,
       });
     }
     if (chunk.hasRiver) {
@@ -10658,7 +10661,27 @@ function updateEndlessDungeon(w: World) {
       );
       e.walkInBuildingId = occupied?.id ?? null;
       e.buildingLabel = occupied?.name ?? '';
-      if (occupied) return;
+      if (occupied) {
+        if (occupied.supplyKind && !e.claimedBuildingSupplies.has(occupied.id) &&
+          (occupied.supplyKind !== 'health' || p.hp < p.maxHp)) {
+          const supply = buildingSupplyPoint(occupied);
+          if (Math.hypot(p.x - supply.x, p.y - supply.y) < p.radius + 18) {
+            e.claimedBuildingSupplies.add(occupied.id);
+            w.pickups.push({
+              uid: uid(w),
+              kind: occupied.supplyKind,
+              x: supply.x,
+              y: supply.y,
+              vx: 0,
+              vy: 0,
+              value: occupied.supplyKind === 'health' ? 16 : occupied.supplyKind === 'cred' ? 12 : 1,
+              bornAt: w.now,
+            });
+            pushAlert(w, `${occupied.name} supply found`);
+          }
+        }
+        return;
+      }
     } else {
       for (const door of e.buildingEntrances) {
         if (

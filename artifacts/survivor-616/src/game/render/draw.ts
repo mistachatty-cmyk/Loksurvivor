@@ -15,7 +15,7 @@ import { lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
-import { getBuildingPrefab } from '@/game/engine/chunks';
+import { buildingSupplyPoint, getBuildingPrefab } from '@/game/engine/chunks';
 import { blendSpritePalettes } from '@/game/data/characterSkins';
 
 import { drawRig, drawShadow } from './sprite';
@@ -1249,6 +1249,37 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
       ctx.font = 'bold 7px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(building.sign, building.x, building.y + 5);
+    }
+    if (e.buildingEntryStyle === 'seamless' && building.supplyKind && !e.claimedBuildingSupplies.has(building.id)) {
+      const supplyColor = building.supplyKind === 'health' ? '#7dffb2'
+        : building.supplyKind === 'water-flask' ? '#38bdf8'
+        : building.supplyKind === 'cred' ? '#fbbf24'
+        : '#c084fc';
+      const supplyLabel = building.supplyKind === 'health' ? 'HEAL'
+        : building.supplyKind === 'water-flask' ? 'WATER'
+        : building.supplyKind === 'cred' ? 'CRED'
+        : 'SALVAGE';
+      ctx.fillStyle = supplyColor;
+      ctx.strokeStyle = supplyColor;
+      if (walkedInside) {
+        const supply = buildingSupplyPoint(building);
+        ctx.globalAlpha = 0.85;
+        ctx.shadowColor = supplyColor;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(supply.x, supply.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(supplyLabel, supply.x, supply.y - 13);
+      } else {
+        ctx.globalAlpha = 0.75;
+        ctx.fillRect(left + 13, top + 35, 6, 6);
+        ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(supplyLabel, left + 24, top + 41);
+      }
     }
     ctx.textAlign = 'left';
     ctx.restore();
