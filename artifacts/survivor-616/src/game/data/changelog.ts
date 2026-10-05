@@ -285,6 +285,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The game follows your browser or phone language by default, and switches on its own if you change it. A Language option at the top of Settings lets you pin any language, or go back to Match my device.',
     ],
   },
+  {
+    version: '0.11.4',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Your LokDex Follows You',
+    body: [
+      'Sign in and your cards and LokPets now show up in the LokDex on the GSix website, next to the ones from Spend It All. It is the same account, so signing in on the site or in either game is enough.',
+      'Only a short summary is shared: which cards you own and each LokPet\'s name, level and rarity. Your save and run progress are not part of it. You can hide your LokDex from your public profile any time from the Profile page on the site.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
