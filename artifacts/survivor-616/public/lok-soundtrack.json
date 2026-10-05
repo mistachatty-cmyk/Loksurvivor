@@ -2,9 +2,11 @@
   "schema": "lok.playlist/v1",
   "id": "g6.616-survivor.lokifed-take-1",
   "title": "Lokifed — Take 1",
+  "artist": "Cante-Digital",
   "source": {
     "app": "survivor616",
-    "name": "616 Survivor"
+    "name": "616 Survivor",
+    "url": "https://survivor.gsix.online"
   },
   "tracks": [
     {
@@ -15,7 +17,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 0
+        "objectives": 0,
+        "unit": "run objective"
       }
     },
     {
@@ -26,7 +29,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 1
+        "objectives": 1,
+        "unit": "run objective"
       }
     },
     {
@@ -37,7 +41,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 2
+        "objectives": 2,
+        "unit": "run objective"
       }
     },
     {
@@ -48,7 +53,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 3
+        "objectives": 3,
+        "unit": "run objective"
       }
     },
     {
@@ -59,7 +65,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 4
+        "objectives": 4,
+        "unit": "run objective"
       }
     },
     {
@@ -70,7 +77,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 5
+        "objectives": 5,
+        "unit": "run objective"
       }
     },
     {
@@ -81,7 +89,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 6
+        "objectives": 6,
+        "unit": "run objective"
       }
     },
     {
@@ -92,7 +101,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 7
+        "objectives": 7,
+        "unit": "run objective"
       }
     },
     {
@@ -103,7 +113,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 8
+        "objectives": 8,
+        "unit": "run objective"
       }
     },
     {
@@ -114,7 +125,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 9
+        "objectives": 9,
+        "unit": "run objective"
       }
     },
     {
@@ -125,7 +137,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 10
+        "objectives": 10,
+        "unit": "run objective"
       }
     },
     {
@@ -136,7 +149,8 @@
       "mime": "audio/mp4",
       "gate": {
         "app": "survivor616",
-        "objectives": 11
+        "objectives": 11,
+        "unit": "run objective"
       }
     }
   ]

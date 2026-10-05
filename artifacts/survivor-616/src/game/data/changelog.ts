@@ -330,6 +330,16 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.8',
     date: '2026-10-05',
+    kind: 'update',
+    title: 'Where the Songs Come From',
+    body: [
+      'On the GSix website, the music player now says which game each song is from, with a link to play it, and under every locked song it tells you exactly how to unlock it, such as completing a number of run objectives in 616 Survivor.',
+      'The Lokifed \u2014 Take 1 songs are now credited to Cante-Digital.',
+    ],
+  },
+  {
+    version: '0.11.9',
+    date: '2026-10-05',
     kind: 'hotfix',
     title: 'Sign In Inside The Arcade',
     body: [

@@ -21,6 +21,12 @@ test('catalog declares the Lok playlist standard', () => {
   assert.ok(catalog.tracks.length >= 1);
 });
 
+test('catalog says which game the songs are from and where to play it', () => {
+  assert.equal(catalog.source.name, '616 Survivor');
+  assert.match(catalog.source.url, /^https:\/\//);
+  for (const track of catalog.tracks) assert.ok(track.gate.unit, `${track.id} should say what its objectives are called`);
+});
+
 test('every catalog track has a unique id and an https URL to a file that exists', () => {
   const ids = new Set<string>();
   for (const track of catalog.tracks) {
