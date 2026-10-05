@@ -1859,6 +1859,7 @@ type Action =
   | { type: 'equipUiTheme'; id: string }
   | { type: 'selectUiThemeSwatch'; themeId: string; swatchId: string }
   | { type: 'buyPalette'; id: string }
+  | { type: 'grantPalette'; id: string }
   | { type: 'equipPalette'; id: string }
   | { type: 'equipDirectorPersonality'; id: string | null }
   | { type: 'claimSaunaHoleReward' }
@@ -2888,6 +2889,13 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    // Unlocks a palette that was paid for elsewhere (LokTokens, server-verified),
+    // so no local currency moves. Idempotent.
+    case 'grantPalette': {
+      if (!THEMED_PALETTES_BY_ID[action.id] || state.meta.ownedPaletteIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, ownedPaletteIds: [...state.meta.ownedPaletteIds, action.id] } };
+    }
+
     case 'equipPalette':
       if (!hasCatalogItem(state.meta, 'palettes', action.id, state.meta.ownedPaletteIds)) return state;
       return { ...state, meta: { ...state.meta, activePaletteId: action.id } };
@@ -3819,6 +3827,7 @@ export interface MetaContextValue {
   equipUiTheme: (id: string) => void;
   selectUiThemeSwatch: (themeId: string, swatchId: string) => void;
   buyPalette: (id: string) => void;
+  grantPalette: (id: string) => void;
   equipPalette: (id: string) => void;
   /** Digital Archive terminal: select which Director personality spawns for the encounter. Pass null to clear. */
   equipDirectorPersonality: (id: string | null) => void;
@@ -4012,6 +4021,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     [],
   );
   const buyPalette = useCallback((id: string) => dispatch({ type: 'buyPalette', id }), []);
+  const grantPalette = useCallback((id: string) => dispatch({ type: 'grantPalette', id }), []);
   const equipPalette = useCallback((id: string) => dispatch({ type: 'equipPalette', id }), []);
   const equipDirectorPersonality = useCallback((id: string | null) => dispatch({ type: 'equipDirectorPersonality', id }), []);
   const claimSaunaHoleReward = useCallback(() => dispatch({ type: 'claimSaunaHoleReward' }), []);
@@ -4298,6 +4308,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       equipUiTheme,
       selectUiThemeSwatch,
       buyPalette,
+      grantPalette,
       equipPalette,
       equipDirectorPersonality,
       claimSaunaHoleReward,
@@ -4446,6 +4457,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     equipUiTheme,
     selectUiThemeSwatch,
     buyPalette,
+    grantPalette,
     equipPalette,
     equipDirectorPersonality,
     claimSaunaHoleReward,

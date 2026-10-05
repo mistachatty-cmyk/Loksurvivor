@@ -295,6 +295,26 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Only a short summary is shared: which cards you own and each LokPet\'s name, level and rarity. Your save and run progress are not part of it. You can hide your LokDex from your public profile any time from the Profile page on the site.',
     ],
   },
+  {
+    version: '0.11.5',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Universe Hookups',
+    body: [
+      'The Universe chapter now shows your LokTokens, cloud save state and collection side by side.',
+      'Claiming an achievement or trading a card with another LOK game can now earn LokTokens when you are signed in.',
+    ],
+  },
+  {
+    version: '0.11.6',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Universe Binder',
+    body: [
+      'The Universe chapter now holds a binder of every card from every LOK game. Browse them all together or one game at a time, and build decks that follow your account.',
+      'Cards from other games are drawn from their own models. Palettes in the Paint Gallery are now bought with LokTokens, so you need to sign in to buy new ones. Palettes you already own stay yours.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

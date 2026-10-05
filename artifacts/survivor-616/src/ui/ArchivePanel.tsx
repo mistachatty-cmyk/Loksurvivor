@@ -2,6 +2,8 @@
  * Archive: rescued crew, discovered locations, and everything still locked.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { useLokEconomy } from '@/state/lokEconomyStore';
+import { useCloudSyncStatus } from '@/state/cloudSyncStore';
 import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, type AchievementCategory } from '@/game/data/achievements';
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { AREAS } from '@/game/data/areas';
@@ -36,6 +38,7 @@ import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { LockDeckCollection } from './LockDeckCollection';
+import { UniverseBinder } from './UniverseBinder';
 import { ScreenLayout } from './ScreenLayout';
 import {
   exportLokPetAsPortableCard,
@@ -60,9 +63,18 @@ const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }>
   legendary: { border: 'border-l-pink-300', label: 'text-pink-300' },
 };
 
+const CLOUD_LABEL: Record<ReturnType<typeof useCloudSyncStatus>, string> = {
+  off: 'Local only',
+  syncing: 'Syncing…',
+  synced: 'Synced',
+  error: 'Offline',
+};
+
 export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   const { meta, resetProgress, claimAchievement, importVisitingLokCard, buyLokPetCardPack } = useMeta();
   const isListView = meta.uiDensity === 'list';
+  const { earn: earnLokTokens, balance: lokBalance, rank: lokRank } = useLokEconomy();
+  const cloudSyncStatus = useCloudSyncStatus();
   const [showHistory, setShowHistory] = useState(false);
   const [achievementFilter, setAchievementFilter] = useState<AchievementCategory | 'all'>('all');
   const catalogByVariant = new Map(meta.lokPetCatalog.map((entry) => [entry.variantId, entry]));
@@ -86,6 +98,8 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
       description: pet.roll.description,
     });
     setExchangeOutput(serializeLokCardExport(payload));
+    // One reward per companion ever sent out (idemKey is derived from the pet id).
+    earnLokTokens('card_exchange_sent', { refType: 'lokpet', refId: pet.id });
     setExchangeMessage(`${pet.roll.name} is ready to hand to another LOK game.`);
   };
 
@@ -106,6 +120,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
       return;
     }
     importVisitingLokCard(result.card);
+    earnLokTokens('card_exchange_received', { refType: 'visiting-card', refId: result.card.instanceId });
     setImportInput('');
     setExchangeMessage(`${result.card.name} arrived from ${result.card.sourceGame}.`);
   };
@@ -452,7 +467,10 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
                       {claimable && (
                         <button
                           type="button"
-                          onClick={() => claimAchievement(achievement.id)}
+                          onClick={() => {
+                            claimAchievement(achievement.id);
+                            earnLokTokens('achievement_claimed', { refType: 'achievement', refId: achievement.id });
+                          }}
                           className="inline-flex shrink-0 items-center gap-1 border border-yellow-300/50 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-yellow-200 transition-colors hover:border-yellow-200 hover:bg-yellow-300/10"
                           data-testid={`button-claim-achievement-${achievement.id}`}
                         >
@@ -732,6 +750,28 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
             over -- name, family, and rarity label. An imported card never joins the kennel and never fights in a run.
           </p>
 
+          <div className="mb-4 grid gap-2 sm:grid-cols-3" data-testid="strip-universe-status">
+            <div className="border border-violet-400/30 bg-violet-950/20 p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-violet-300">LokTokens</p>
+              <p className="mt-1 font-mono text-sm font-bold text-white">
+                {lokBalance === null ? 'Sign in to earn' : `${lokBalance}${lokRank?.label ? ` · ${lokRank.label}` : ''}`}
+              </p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Exchanging cards and claiming achievements earns them.</p>
+            </div>
+            <div className="border border-border bg-card p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-sky-300">Cloud save</p>
+              <p className="mt-1 font-mono text-sm font-bold text-white">{CLOUD_LABEL[cloudSyncStatus]}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Visiting cards travel with your save across devices.</p>
+            </div>
+            <div className="border border-border bg-card p-3">
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">Collection</p>
+              <p className="mt-1 font-mono text-sm font-bold text-white">
+                {meta.savedLokPets.length} kennel · {meta.visitingLokCards.length} visiting
+              </p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Only flavor crosses over; combat stats never leave.</p>
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="border border-border bg-card p-4">
               <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white">Send a companion out</p>
@@ -740,6 +780,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               ) : (
                 <>
                   <select
+                    data-testid="select-exchange-pet"
                     value={exchangePetId}
                     onChange={(event) => { setExchangePetId(event.target.value); setExchangeOutput(''); }}
                     className="w-full border border-border bg-black/30 px-2 py-2 text-xs text-white"
@@ -821,6 +862,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               </div>
             )}
           </div>
+          <UniverseBinder meta={meta} />
         </motion.section>
       )}
 

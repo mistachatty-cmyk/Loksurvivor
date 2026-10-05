@@ -135,3 +135,73 @@ export async function getLokProfile(
       : undefined,
   };
 }
+
+export interface SpendResult {
+  ok: boolean;
+  replay?: boolean;
+  sku?: string;
+  name?: string;
+  price?: number;
+  balance?: number;
+  /** unknown_item | already_owned | sold_out | rank_locked | insufficient | no_account | not_signed_in */
+  error?: string;
+  need?: number;
+  requires?: string;
+}
+
+/**
+ * Buy one catalog item with LokTokens. Goes through the `lok-spend` edge
+ * function for the same reason earning does: `lok_spend` is locked to
+ * service_role. The server checks price, rank and ownership atomically; the
+ * client only ever names a SKU, never a price.
+ */
+export async function spendLokTokens(client: SupabaseClient, input: { appKey: string; sku: string; idemKey: string }): Promise<SpendResult> {
+  const { data: sessionData } = await client.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) return { ok: false, error: "not_signed_in" };
+  const { data, error } = await client.functions.invoke<SpendResult>("lok-spend", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: input,
+  });
+  if (error) return { ok: false, error: error.message };
+  return data ?? { ok: false, error: "empty_response" };
+}
+
+/** SKUs this account owns. `lok_inventory` is readable by its owner via RLS. */
+export async function fetchOwnedSkus(client: SupabaseClient): Promise<{ ok: boolean; skus: string[]; error?: string }> {
+  const { data, error } = await client.from("lok_inventory").select("lok_catalog(sku)");
+  if (error) return { ok: false, skus: [], error: error.message };
+  const skus = (data ?? []).flatMap((row) => {
+    const joined = (row as unknown as { lok_catalog: { sku: string } | { sku: string }[] | null }).lok_catalog;
+    return Array.isArray(joined) ? joined.map((item) => item.sku) : joined ? [joined.sku] : [];
+  });
+  return { ok: true, skus };
+}
+
+export interface CatalogEntry {
+  sku: string;
+  name: string;
+  price: number;
+  rarity: string | null;
+  requiresRank: string | null;
+}
+
+/** Live prices for an app's catalog (`lok_catalog` is public-read), so repricing never needs a client release. */
+export async function fetchCatalog(client: SupabaseClient, appKey: string): Promise<{ ok: boolean; items: CatalogEntry[]; error?: string }> {
+  const { data, error } = await client
+    .from("lok_catalog")
+    .select("sku,name,price,rarity,requires_rank,app_scope")
+    .contains("app_scope", [appKey])
+    .range(0, 999);
+  if (error) return { ok: false, items: [], error: error.message };
+  return {
+    ok: true,
+    items: (data ?? []).map((row) => ({
+      sku: row.sku as string,
+      name: row.name as string,
+      price: Number(row.price),
+      rarity: (row.rarity as string | null) ?? null,
+      requiresRank: (row.requires_rank as string | null) ?? null,
+    })),
+  };
+}

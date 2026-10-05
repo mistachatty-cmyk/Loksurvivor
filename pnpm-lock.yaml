@@ -513,8 +513,17 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.58.0
         version: 2.116.0
+      '@workspace/lok-universe':
+        specifier: workspace:*
+        version: link:../lok-universe
 
   lib/lok-focus-widget:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.58.0
+        version: 2.116.0
+
+  lib/lok-universe:
     dependencies:
       '@supabase/supabase-js':
         specifier: ^2.58.0

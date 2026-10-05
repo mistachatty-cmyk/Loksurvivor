@@ -1,0 +1,21 @@
+{
+  "schema": "lok.universe.platform",
+  "schemaVersion": 1,
+  "appKey": "survivor616",
+  "namespace": "g6.616-survivor",
+  "label": "616 Survivor",
+  "draws": [
+    "sprite-rig",
+    "lokpet-silhouette",
+    "pixel-grid"
+  ],
+  "publishes": [
+    "sprite-rig",
+    "lokpet-silhouette"
+  ],
+  "publicLore": {
+    "script": "scripts/export-public-lore.ts",
+    "hubKey": "survivor616"
+  },
+  "sdkVersion": "1.0.0"
+}
