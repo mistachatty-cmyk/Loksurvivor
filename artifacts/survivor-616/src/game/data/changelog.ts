@@ -327,6 +327,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The player costs nothing to load: it stays closed and downloads no music until someone presses play. Files you add from your own device never leave that device.',
     ],
   },
+  {
+    version: '0.11.8',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Where the Songs Come From',
+    body: [
+      'On the GSix website, the music player now says which game each song is from, with a link to play it, and under every locked song it tells you exactly how to unlock it, such as completing a number of run objectives in 616 Survivor.',
+      'The Lokifed \u2014 Take 1 songs are now credited to Cante-Digital.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
