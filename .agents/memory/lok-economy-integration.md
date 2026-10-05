@@ -120,7 +120,7 @@ achievement_claimed 10 (daily cap 50), card_exchange_sent 15 (cap 30),
 card_exchange_received 15 (cap 30). Applying them touches the shared
 production project, so it was deliberately left for the owner to approve.
 
-## 0.11.5: LokToken store + card universe (2026-10-05)
+## 0.11.6: LokToken store + card universe (2026-10-05)
 
 Palettes are now LokToken-only (`LOKTOKEN_ONLY_KINDS` in
 `src/lib/lokStoreCatalog.ts`); purchase goes `PaletteGalleryPanel` ->
@@ -140,7 +140,7 @@ their real model; recipes are procedural JSON, never bitmaps, which keeps the
 `survivor-616-art-assets.md` rule intact. Republish after card/palette content
 changes: `pnpm exec tsx scripts/export-lok-registry.ts <outDir>`.
 
-## 0.11.5 follow-up: universal SDK, Eclipse canon, hub lore (2026-10-05)
+## 0.11.6 follow-up: universal SDK, Eclipse canon, hub lore (2026-10-05)
 
 - Shared code moved out of this repo: `Lok-EcoSystsem/universe-sdk` is the source
   of truth; `lib/lok-universe` is a **vendored** copy (never edit; re-sync).

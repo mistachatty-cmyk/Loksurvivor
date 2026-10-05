@@ -289,6 +289,16 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '0.11.4',
     date: '2026-10-05',
     kind: 'update',
+    title: 'Your LokDex Follows You',
+    body: [
+      'Sign in and your cards and LokPets now show up in the LokDex on the GSix website, next to the ones from Spend It All. It is the same account, so signing in on the site or in either game is enough.',
+      'Only a short summary is shared: which cards you own and each LokPet\'s name, level and rarity. Your save and run progress are not part of it. You can hide your LokDex from your public profile any time from the Profile page on the site.',
+    ],
+  },
+  {
+    version: '0.11.5',
+    date: '2026-10-05',
+    kind: 'update',
     title: 'Universe Hookups',
     body: [
       'The Universe chapter now shows your LokTokens, cloud save state and collection side by side.',
@@ -296,7 +306,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.11.5',
+    version: '0.11.6',
     date: '2026-10-05',
     kind: 'update',
     title: 'Universe Binder',
