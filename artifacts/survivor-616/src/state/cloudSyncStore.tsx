@@ -21,6 +21,7 @@ import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
 import { buildLokDexSnapshot, lokDexSnapshotFingerprint } from '@/lib/lokDexSnapshot';
+import { musicObjectives } from '@/lib/lokMusicProgress';
 
 /** Bookkeeping only -- not part of MetaState/normalizeMeta -- when this device's save was last known to match the cloud. */
 const SYNCED_AT_KEY = 'survivor616.meta.v1.syncedAt';
@@ -48,7 +49,7 @@ function writeSyncedAt(ms: number) {
 const CloudSyncContext = createContext<CloudSyncStatus>('off');
 
 export function CloudSyncProvider({ children }: { children: ReactNode }) {
-  const { session, loadCloudSave, saveCloudSave, saveLokDex } = useAuth();
+  const { session, loadCloudSave, saveCloudSave, saveLokDex, saveMusicProgress } = useAuth();
   const { meta, importMeta } = useMeta();
   const [status, setStatus] = useState<CloudSyncStatus>('off');
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +62,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   const [syncSettled, setSyncSettled] = useState(false);
   const dexTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastDexFingerprint = useRef<string | null>(null);
+  const lastMusicObjectives = useRef<number | null>(null);
 
   // Runs once per sign-in: cloud wins only if it's strictly newer than this
   // device's last known-synced timestamp, otherwise this device's current
@@ -72,6 +74,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       syncedUserId.current = null;
       syncReady.current = false;
       lastDexFingerprint.current = null;
+      lastMusicObjectives.current = null;
       setSyncSettled(false);
       return;
     }
@@ -151,6 +154,19 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       if (dexTimer.current) clearTimeout(dexTimer.current);
     };
   }, [meta, session, syncSettled, saveLokDex]);
+
+  // Publishes soundtrack progress so the GSix site's player opens the same
+  // songs. One small number; sent only when it goes up.
+  useEffect(() => {
+    if (!session || !syncSettled) return;
+    const objectives = musicObjectives(meta);
+    if (objectives === 0 && lastMusicObjectives.current === null) return; // nothing earned yet, nothing to publish
+    if (lastMusicObjectives.current !== null && objectives <= lastMusicObjectives.current) return;
+    void saveMusicProgress(objectives).then(({ error }) => {
+      // On failure leave it unset so the next change retries.
+      if (!error) lastMusicObjectives.current = objectives;
+    });
+  }, [meta.soundtrackObjectiveCompletions, session, syncSettled, saveMusicProgress]);
 
   return <CloudSyncContext.Provider value={status}>{children}</CloudSyncContext.Provider>;
 }

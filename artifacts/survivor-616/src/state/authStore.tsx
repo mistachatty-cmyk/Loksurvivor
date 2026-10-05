@@ -6,6 +6,7 @@ import {
   onAuthStateChange,
   saveCloudSave,
   saveLokDexSnapshot,
+  saveMusicProgress,
   signInWithApple,
   signInWithEmail,
   signInWithGoogle,
@@ -23,6 +24,7 @@ import {
 
 import { lokClient } from '@/lib/lokClient';
 import { LOKDEX_APP_KEY, type LokDexSnapshot } from '@/lib/lokDexSnapshot';
+import { MUSIC_APP_KEY } from '@/lib/lokMusicProgress';
 
 /** Product identifier passed to shared cross-product tables (founder_signups, product_feedback). */
 const SOURCE = '616_survivor';
@@ -45,6 +47,8 @@ interface AuthContextValue {
   saveCloudSave: (data: unknown) => Promise<{ error: string | null }>;
   /** Publishes the compact LokDex snapshot the GSix hub reads (lokdex_collections). */
   saveLokDex: (snapshot: LokDexSnapshot) => Promise<{ error: string | null }>;
+  /** Publishes soundtrack objective progress so the GSix site's player can open the same songs. */
+  saveMusicProgress: (objectives: number) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -130,6 +134,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
+  const doSaveMusicProgress = useCallback(
+    async (objectives: number) => {
+      if (!lokClient || !session) return { error: 'Not signed in.' };
+      return saveMusicProgress(lokClient, session.user.id, MUSIC_APP_KEY, objectives);
+    },
+    [session],
+  );
+
   const doSaveLokDex = useCallback(
     async (snapshot: LokDexSnapshot) => {
       if (!lokClient || !session) return { error: 'Not signed in.' };
@@ -153,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadCloudSave: doLoadCloudSave,
     saveCloudSave: doSaveCloudSave,
     saveLokDex: doSaveLokDex,
+    saveMusicProgress: doSaveMusicProgress,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
