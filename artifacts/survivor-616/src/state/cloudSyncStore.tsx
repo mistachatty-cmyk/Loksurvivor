@@ -20,10 +20,13 @@ import {
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
 import type { MetaState } from '@/game/types';
+import { buildLokDexSnapshot, lokDexSnapshotFingerprint } from '@/lib/lokDexSnapshot';
 
 /** Bookkeeping only -- not part of MetaState/normalizeMeta -- when this device's save was last known to match the cloud. */
 const SYNCED_AT_KEY = 'survivor616.meta.v1.syncedAt';
 const CLOUD_SYNC_DEBOUNCE_MS = 2000;
+/** Longer than the save debounce: the hub's LokDex does not need second-by-second freshness. */
+const LOKDEX_SYNC_DEBOUNCE_MS = 5000;
 
 export type CloudSyncStatus = 'off' | 'syncing' | 'synced' | 'error';
 
@@ -45,7 +48,7 @@ function writeSyncedAt(ms: number) {
 const CloudSyncContext = createContext<CloudSyncStatus>('off');
 
 export function CloudSyncProvider({ children }: { children: ReactNode }) {
-  const { session, loadCloudSave, saveCloudSave } = useAuth();
+  const { session, loadCloudSave, saveCloudSave, saveLokDex } = useAuth();
   const { meta, importMeta } = useMeta();
   const [status, setStatus] = useState<CloudSyncStatus>('off');
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,6 +57,10 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
   // this sign-in has resolved, so a stale local save can never race ahead of
   // (and overwrite) a richer save the pull is about to bring down.
   const syncReady = useRef(false);
+  // Same gate as `syncReady`, but as state so the LokDex effect re-runs once the initial pull settles.
+  const [syncSettled, setSyncSettled] = useState(false);
+  const dexTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastDexFingerprint = useRef<string | null>(null);
 
   // Runs once per sign-in: cloud wins only if it's strictly newer than this
   // device's last known-synced timestamp, otherwise this device's current
@@ -64,6 +71,8 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       setStatus('off');
       syncedUserId.current = null;
       syncReady.current = false;
+      lastDexFingerprint.current = null;
+      setSyncSettled(false);
       return;
     }
     if (syncedUserId.current === session.user.id) return;
@@ -89,7 +98,10 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
           setStatus('synced');
         }
       }
-      if (!cancelled) syncReady.current = true;
+      if (!cancelled) {
+        syncReady.current = true;
+        setSyncSettled(true);
+      }
     })();
     return () => {
       cancelled = true;
@@ -119,6 +131,26 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       if (pushTimer.current) clearTimeout(pushTimer.current);
     };
   }, [meta, session, saveCloudSave]);
+
+  // Publishes the compact LokDex snapshot to the account so the GSix hub can
+  // show this player's cards and LokPets. Skipped when nothing the hub shows
+  // has changed, so gold/XP-only saves cost no extra request.
+  useEffect(() => {
+    if (!session || !syncSettled) return;
+    if (dexTimer.current) clearTimeout(dexTimer.current);
+    dexTimer.current = setTimeout(() => {
+      const snapshot = buildLokDexSnapshot(meta);
+      const fingerprint = lokDexSnapshotFingerprint(snapshot);
+      if (fingerprint === lastDexFingerprint.current) return;
+      void saveLokDex(snapshot).then(({ error }) => {
+        // On failure leave the fingerprint unset so the next change retries.
+        if (!error) lastDexFingerprint.current = fingerprint;
+      });
+    }, LOKDEX_SYNC_DEBOUNCE_MS);
+    return () => {
+      if (dexTimer.current) clearTimeout(dexTimer.current);
+    };
+  }, [meta, session, syncSettled, saveLokDex]);
 
   return <CloudSyncContext.Provider value={status}>{children}</CloudSyncContext.Provider>;
 }

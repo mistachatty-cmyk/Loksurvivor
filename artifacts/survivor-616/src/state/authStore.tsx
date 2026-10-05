@@ -5,6 +5,7 @@ import {
   loadCloudSave,
   onAuthStateChange,
   saveCloudSave,
+  saveLokDexSnapshot,
   signInWithApple,
   signInWithEmail,
   signInWithGoogle,
@@ -21,6 +22,7 @@ import {
 } from '@workspace/lok-client';
 
 import { lokClient } from '@/lib/lokClient';
+import { LOKDEX_APP_KEY, type LokDexSnapshot } from '@/lib/lokDexSnapshot';
 
 /** Product identifier passed to shared cross-product tables (founder_signups, product_feedback). */
 const SOURCE = '616_survivor';
@@ -41,6 +43,8 @@ interface AuthContextValue {
   /** Cloud save (auth_saves), namespaced under SOURCE. null user/lokClient => no-ops. */
   loadCloudSave: () => Promise<CloudSaveResult | null>;
   saveCloudSave: (data: unknown) => Promise<{ error: string | null }>;
+  /** Publishes the compact LokDex snapshot the GSix hub reads (lokdex_collections). */
+  saveLokDex: (snapshot: LokDexSnapshot) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -126,6 +130,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
+  const doSaveLokDex = useCallback(
+    async (snapshot: LokDexSnapshot) => {
+      if (!lokClient || !session) return { error: 'Not signed in.' };
+      return saveLokDexSnapshot(lokClient, session.user.id, LOKDEX_APP_KEY, snapshot);
+    },
+    [session],
+  );
+
   const value: AuthContextValue = {
     available: Boolean(lokClient),
     session,
@@ -140,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     submitFeedback: doSubmitFeedback,
     loadCloudSave: doLoadCloudSave,
     saveCloudSave: doSaveCloudSave,
+    saveLokDex: doSaveLokDex,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
