@@ -299,6 +299,26 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '0.11.5',
     date: '2026-10-05',
     kind: 'update',
+    title: 'Universe Hookups',
+    body: [
+      'The Universe chapter now shows your LokTokens, cloud save state and collection side by side.',
+      'Claiming an achievement or trading a card with another LOK game can now earn LokTokens when you are signed in.',
+    ],
+  },
+  {
+    version: '0.11.6',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Universe Binder',
+    body: [
+      'The Universe chapter now holds a binder of every card from every LOK game. Browse them all together or one game at a time, and build decks that follow your account.',
+      'Cards from other games are drawn from their own models. Palettes in the Paint Gallery are now bought with LokTokens, so you need to sign in to buy new ones. Palettes you already own stay yours.',
+    ],
+  },
+  {
+    version: '0.11.7',
+    date: '2026-10-05',
+    kind: 'update',
     title: 'Lokifed Everywhere',
     body: [
       'The Lokifed \u2014 Take 1 soundtrack is now a built-in part of the Lok network. The same album can be played from the GSix site and any other Lok app with the new Lok Music player: play, pause, skip, seek, shuffle, repeat, volume, and pick any song from the list.',

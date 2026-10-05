@@ -1,0 +1,13 @@
+{
+  "name": "@workspace/lok-universe",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared LOK Card Universe SDK: types, registry client, canvas renderer, publisher helpers. Vendored into each platform with sync-sdk.sh.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.58.0"
+  }
+}

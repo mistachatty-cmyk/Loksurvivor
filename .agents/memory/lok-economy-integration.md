@@ -106,3 +106,50 @@ long before it) returns `500` on every signup, including real ones
 unrelated to this change (confirmed in `function_edge_logs`, e.g. a real
 2026-09-26 signup). Worth a follow-up look by whoever owns that flow —
 it isn't something `lok-earn`/this integration touches or caused.
+
+## 0.11.4 follow-up: new earn events (client wired, server rules NOT yet added)
+
+`ArchivePanel.tsx` now calls `earn()` for `achievement_claimed` (ref =
+achievement id), `card_exchange_sent` (ref = kennel pet id) and
+`card_exchange_received` (ref = visiting card `instanceId`). The idemKey is
+derived from those refs, so each thing pays at most once. **These event keys
+have no `lok_earn_rules` rows yet** -- until someone inserts them for app
+`8999aa42-ca18-4af3-85ee-5e88e20b688a`, `lok-earn` answers `unknown_event`
+and nothing is granted (harmless, gameplay never blocks). Suggested values:
+achievement_claimed 10 (daily cap 50), card_exchange_sent 15 (cap 30),
+card_exchange_received 15 (cap 30). Applying them touches the shared
+production project, so it was deliberately left for the owner to approve.
+
+## 0.11.6: LokToken store + card universe (2026-10-05)
+
+Palettes are now LokToken-only (`LOKTOKEN_ONLY_KINDS` in
+`src/lib/lokStoreCatalog.ts`); purchase goes `PaletteGalleryPanel` ->
+`useLokEconomy().spend()` -> `lok-spend` edge fn -> `lok_spend()`. `grantPalette`
+(metaStore) unlocks locally after the server confirms, and re-syncs from
+`lok_inventory` so a purchase follows the account. Existing owned palettes are
+grandfathered. **`lok-spend`, the catalog rows and the registry tables are
+written but not applied to production** -- the full go-live list and the
+design are in `Lok-EcoSystsem/LokToken EcoSystem/LOKTOKEN_STORE.md` and
+`LOK_CARD_UNIVERSE.md`. Until applied, buying a palette says "not on sale yet".
+The `cosmetic` value of `lok_item_type` is already live.
+
+The Universe Binder (`ui/UniverseBinder.tsx`) merges the live `lok_cards`
+registry over local cards. Every card is drawn from a portable art recipe
+(`game/data/cardArt.ts`, `ui/RegistryCardArt.tsx`) so foreign cards look like
+their real model; recipes are procedural JSON, never bitmaps, which keeps the
+`survivor-616-art-assets.md` rule intact. Republish after card/palette content
+changes: `pnpm exec tsx scripts/export-lok-registry.ts <outDir>`.
+
+## 0.11.6 follow-up: universal SDK, Eclipse canon, hub lore (2026-10-05)
+
+- Shared code moved out of this repo: `Lok-EcoSystsem/universe-sdk` is the source
+  of truth; `lib/lok-universe` is a **vendored** copy (never edit; re-sync).
+  `lib/lok-client/src/cards.ts` just re-exports it. Publishers now only map this
+  game's content onto `PublishCard`/`PublishItem`; asset ids were unchanged.
+- **The Eclipse is canon from `lore.ts` Chapter 6** (`SOLAR_ECLIPSE_ZERO`): the
+  Great Eclipse digitized the world and is the gateway that connects every LOK
+  app. It is modeled as data (`lok_eclipse_crossings`), not hardcoded.
+- Lore is exported for the hub (`scripts/export-public-lore.ts`) so
+  survivor.gsix.online / gsix.online/games/survivor616 shows the same chapters in
+  this game's palette. Re-export whenever `lore.ts` changes. See CLAUDE.md
+  "LOK universe, store and gsix.online sync".
