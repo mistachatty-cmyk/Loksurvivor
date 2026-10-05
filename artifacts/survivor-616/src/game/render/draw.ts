@@ -1382,6 +1382,19 @@ function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
     ctx.stroke();
     ctx.fillRect(x - 4, y - 80, 8, 28);
     ctx.fillRect(x - 4, y + 52, 8, 28);
+  } else if (landmark.kind === 'pressure-rooms') {
+    ctx.globalAlpha = 0.72;
+    for (const roomX of [-122, 0, 122]) {
+      ctx.fillRect(x + roomX - 48, y - 46, 96, 92);
+      ctx.strokeRect(x + roomX - 48, y - 46, 96, 92);
+      ctx.strokeRect(x + roomX - 18, y - 30, 36, 62);
+    }
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(x, y + 76, 34, Math.PI, 0);
+    ctx.stroke();
+    ctx.fillStyle = landmark.accent;
+    ctx.fillRect(x - 30, y + 76, 60, 5);
   } else {
     // Floodgate: twin buttresses and a central gate face.
     ctx.fillRect(x - 170, y - 38, 340, 76);
@@ -1492,6 +1505,88 @@ function drawDistrictIncursion(ctx: CanvasRenderingContext2D, w: World) {
     ctx.font = 'bold 11px ui-monospace, monospace';
     ctx.textAlign = 'center';
     ctx.fillText('SAFE QUARTER', x, y - 272);
+  }
+  ctx.restore();
+}
+
+/** Procedural, targetless presentation for the rare Running Man sighting. */
+function drawRunningMan(ctx: CanvasRenderingContext2D, w: World) {
+  const state = w.runningMan;
+  if (state.phase === 'waiting' || state.phase === 'complete') return;
+  const pathX = state.endX - state.startX;
+  const pathY = state.endY - state.startY;
+  const pathLength = Math.hypot(pathX, pathY);
+  if (pathLength < 1) return;
+  const dirX = pathX / pathLength;
+  const dirY = pathY / pathLength;
+  const normalX = -dirY;
+  const normalY = dirX;
+  const warningPulse = 0.45 + Math.sin(w.now / 85) * 0.2;
+
+  ctx.save();
+  ctx.strokeStyle = state.phase === 'warning' ? '#fbbf24' : '#e0f2fe';
+  ctx.fillStyle = '#fbbf24';
+  ctx.globalAlpha = state.phase === 'warning' ? warningPulse : 0.24;
+  ctx.lineWidth = 3;
+  ctx.setLineDash(state.phase === 'warning' ? [18, 12] : [6, 16]);
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(state.startX + normalX * 86 * side, state.startY + normalY * 86 * side);
+    ctx.lineTo(state.endX + normalX * 86 * side, state.endY + normalY * 86 * side);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.globalAlpha = state.phase === 'warning' ? 0.9 : 0.48;
+  ctx.fillText('CLEAR THE CROSSING LINE', (state.startX + state.endX) / 2, (state.startY + state.endY) / 2 - 112);
+
+  if (state.phase === 'running') {
+    const progress = clamp((w.now - state.startedAt) / Math.max(1, state.endsAt - state.startedAt), 0, 1);
+    const x = state.startX + pathX * progress;
+    const y = state.startY + pathY * progress;
+    const angle = Math.atan2(pathY, pathX);
+    const stride = Math.sin(w.now / 48);
+
+    // Speed streaks live behind the figure and make the crossing direction
+    // readable even under high enemy density.
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = '#7dd3fc';
+    ctx.lineWidth = 4;
+    for (let i = 1; i <= 4; i += 1) {
+      ctx.beginPath();
+      ctx.moveTo(x - dirX * (28 + i * 22) + normalX * i * 6, y - dirY * (28 + i * 22) + normalY * i * 6);
+      ctx.lineTo(x - dirX * (74 + i * 28) + normalX * i * 6, y - dirY * (74 + i * 28) + normalY * i * 6);
+      ctx.stroke();
+    }
+
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#020617';
+    ctx.beginPath();
+    ctx.ellipse(0, 25, 28, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Compact pixel runner: coat, bright head mark, pumping arms, and a
+    // deliberately exaggerated stride. No image/likeness dependency.
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-14, -25, 30, 42);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(-10, -20, 5, 30);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(-8, -39, 17, 15);
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(-10, -42, 23, 5);
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(-20, -17 + stride * 5, 8, 26);
+    ctx.fillRect(15, -17 - stride * 5, 8, 26);
+    ctx.fillRect(-11, 14, 8, 26 + stride * 8);
+    ctx.fillRect(7, 14, 8, 26 - stride * 8);
+    ctx.fillStyle = '#e0f2fe';
+    ctx.fillRect(-15, 36 + stride * 8, 15, 6);
+    ctx.fillRect(8, 36 - stride * 8, 16, 6);
   }
   ctx.restore();
 }
@@ -1707,6 +1802,9 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'beacon-tower': { top: '#3b0764', side: '#2e1065', trim: '#ec4899' },
   'security-gate': { top: '#451a03', side: '#291003', trim: '#f97316' },
   'bunker-hatch': { top: '#1c1917', side: '#0c0a09', trim: '#a8a29e' },
+  'data-pipe': { top: '#12372f', side: '#071d19', trim: '#86efac' },
+  'digi-arch': { top: '#12324a', side: '#071923', trim: '#22d3ee' },
+  'pressure-door': { top: '#374151', side: '#171f2b', trim: '#facc15' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -2288,6 +2386,26 @@ function drawObstacles(
     }
 
     const live = w.breakables.find((b) => Math.abs(b.x - obstacle.x) < 1 && Math.abs(b.y - obstacle.y) < 1);
+    if (live && live.rawDataBreakage > 0.025) {
+      ctx.save();
+      const severity = live.rawDataBreakage;
+      const blocks = Math.max(1, Math.ceil(severity * 7));
+      ctx.globalAlpha = 0.22 + severity * 0.55;
+      ctx.fillStyle = severity > 0.65 ? '#facc15' : '#86efac';
+      for (let i = 0; i < blocks; i += 1) {
+        const rx = hashCell(live.uid, i * 13) * Math.max(4, obstacle.w - 8);
+        const ry = hashCell(live.uid + 31, i * 17) * Math.max(4, obstacle.h - 8);
+        const size = 3 + Math.floor(hashCell(live.uid + 67, i * 19) * 6);
+        ctx.fillRect(x + 4 + rx, y - height + 4 + ry, size, size);
+      }
+      if (severity > 0.72) {
+        ctx.globalAlpha = 0.8;
+        ctx.font = 'bold 8px ui-monospace, SFMono-Regular, Menlo, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('RAW DATA', obstacle.x, y - height - 5);
+      }
+      ctx.restore();
+    }
     if (live?.chainActive && !live.landedHeatActive) {
       ctx.save();
       const speed = Math.hypot(live.vx, live.vy);
@@ -5067,6 +5185,66 @@ function drawActors(
     );
     ctx.restore();
 
+    if (!hidden && !enemy.dying && enemy.def.faction === 'Data Goblins') {
+      const fleeing = w.area.id === 'rapid-pressure-rooms'
+        && w.rescue.status === 'freed'
+        && enemy.def.id !== 'data-gob-archgnawer';
+      let nearbyData: (typeof w.breakables)[number] | undefined;
+      let nearbyDistance = Number.POSITIVE_INFINITY;
+      for (const prop of w.breakables) {
+        if (prop.broken || !prop.breakable) continue;
+        const candidateDistance = Math.hypot(enemy.x - prop.x, enemy.y - prop.y);
+        if (candidateDistance >= nearbyDistance) continue;
+        nearbyData = prop;
+        nearbyDistance = candidateDistance;
+      }
+      const chewing = !fleeing && enemy.anim === 'attack' && nearbyData
+        && nearbyDistance < 150;
+      ctx.save();
+      if (fleeing) {
+        ctx.strokeStyle = '#86efac';
+        ctx.globalAlpha = 0.7;
+        ctx.lineWidth = 2;
+        for (let trail = 0; trail < 3; trail += 1) {
+          const offset = 12 + trail * 8;
+          ctx.beginPath();
+          ctx.moveTo(enemy.x - enemy.facing * offset, enemy.y - 5);
+          ctx.lineTo(enemy.x - enemy.facing * (offset + 6), enemy.y);
+          ctx.lineTo(enemy.x - enemy.facing * offset, enemy.y + 5);
+          ctx.stroke();
+        }
+      } else if (chewing && nearbyData) {
+        ctx.strokeStyle = '#67e8f9';
+        ctx.fillStyle = '#d9f99d';
+        ctx.globalAlpha = 0.82;
+        ctx.setLineDash([3, 5]);
+        ctx.lineDashOffset = -w.now / 45;
+        ctx.beginPath();
+        ctx.moveTo(enemy.x, enemy.y);
+        ctx.lineTo(nearbyData.x, nearbyData.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (let bit = 0; bit < 3; bit += 1) {
+          const phase = ((w.now / 420) + bit / 3) % 1;
+          ctx.fillRect(
+            nearbyData.x + (enemy.x - nearbyData.x) * phase - 1.5,
+            nearbyData.y + (enemy.y - nearbyData.y) * phase - 1.5,
+            3,
+            3,
+          );
+        }
+      } else {
+        ctx.strokeStyle = '#86efac';
+        ctx.globalAlpha = 0.38 + Math.sin((w.now + enemy.uid * 70) / 170) * 0.12;
+        ctx.setLineDash([2, 6]);
+        ctx.lineDashOffset = w.now / 70;
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y, enemy.radius + 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // Health bar for anything meaningfully tough.
     if (!hidden && !enemy.dying && enemy.hp < enemy.maxHp && enemy.maxHp > 60) {
       const width = Math.max(22, enemy.radius * 2.2);
@@ -5382,6 +5560,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawAwarenessArrow(ctx, w);
   drawRoamingDetectors(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
+  drawRunningMan(ctx, w);
   drawPlayerConeMark(ctx, w);
   drawStormCloud(ctx, w);
   drawOrbiters(ctx, w);

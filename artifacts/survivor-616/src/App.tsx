@@ -34,10 +34,11 @@ import {
   resolveTravelEncounterOpponent,
   type ResolvedTravelEncounterOpponent,
 } from '@/game/travelEncounter';
-import type { AreaDef, RunResult } from '@/game/types';
+import type { AreaDef, RunResult, VendorItemCategory } from '@/game/types';
 import type { ArenaSeat } from '@/game/arena/arenaWorld';
 import type { ArenaNetRole } from '@/game/arena/arenaNet';
 import { ArchivePanel } from '@/ui/ArchivePanel';
+import { DirectorTerminalPanel } from '@/ui/DirectorTerminalPanel';
 import { AreaSelect } from '@/ui/AreaSelect';
 import { BestiaryPanel } from '@/ui/BestiaryPanel';
 import { CharacterSelect } from '@/ui/CharacterSelect';
@@ -85,7 +86,7 @@ type Screen =
   | { name: 'music' }
   | { name: 'studio' }
   | { name: 'recovery' }
-  | { name: 'vendor' }
+  | { name: 'vendor'; initialCategory?: VendorItemCategory }
   | { name: 'workshop' }
   | { name: 'card-shop' }
   | { name: 'settings' }
@@ -94,6 +95,7 @@ type Screen =
   | { name: 'account' }
   | { name: 'feedback' }
   | { name: 'threat-matrix' }
+  | { name: 'director-terminal' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
@@ -149,7 +151,8 @@ function initialScreen(): Screen {
       requested === 'settings' ||
       requested === 'account' ||
       requested === 'feedback' ||
-      requested === 'threat-matrix'
+      requested === 'threat-matrix' ||
+      requested === 'director-terminal'
     ) {
       return { name: requested };
     }
@@ -209,6 +212,9 @@ function Game() {
       case 'vendor':
         setScreen({ name: 'vendor' });
         break;
+      case 'kennel':
+        setScreen({ name: 'vendor', initialCategory: 'lokpet' });
+        break;
       case 'workshop':
         setScreen({ name: 'workshop' });
         break;
@@ -232,6 +238,9 @@ function Game() {
         break;
       case 'threat-matrix':
         setScreen({ name: 'threat-matrix' });
+        break;
+      case 'director-terminal':
+        setScreen({ name: 'director-terminal' });
         break;
     }
   }, [sfx]);
@@ -453,7 +462,7 @@ function Game() {
       return <RecoveryPanel onBack={goHub} />;
 
     case 'vendor':
-      return <VendorPanel onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />;
+      return <VendorPanel initialCategory={screen.initialCategory} onBack={goHub} onOpenThreatMatrix={() => setScreen({ name: 'threat-matrix' })} />;
 
     case 'workshop':
       return <WorkshopPanel onBack={goHub} />;
@@ -478,6 +487,9 @@ function Game() {
 
     case 'threat-matrix':
       return <ThreatMatrixScreen onBack={goHub} />;
+
+    case 'director-terminal':
+      return <DirectorTerminalPanel onBack={goHub} />;
 
     case 'run':
       {

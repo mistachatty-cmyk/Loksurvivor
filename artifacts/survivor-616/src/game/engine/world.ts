@@ -520,6 +520,8 @@ export interface BreakableObstacle extends Aabb {
   nextImpactDamageAt: number;
   broken: boolean;
   brokenAt: number;
+  /** 0..1 visible corruption caused by raw-data decay and Data-Gob bites. */
+  rawDataBreakage: number;
   contacts: number;
   /** The most recent direction this prop was hit from by the player. */
   lastPlayerImpactX: number;
@@ -543,6 +545,28 @@ export interface BreakableObstacle extends Aabb {
   fallAngle?: number;
   hazardUntil?: number;
   hazardNextTickAt?: number;
+}
+
+/**
+ * A one-off, world-level sighting. The Running Man is deliberately not an
+ * EnemyActor: nothing can target, damage, capture, or count him as a kill.
+ */
+export interface RunningManState {
+  phase: 'waiting' | 'warning' | 'running' | 'complete';
+  /** Rare deterministic eligibility time; Infinity means this run has no sighting. */
+  triggerAt: number;
+  warningStartedAt: number;
+  startedAt: number;
+  endsAt: number;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  directionX: number;
+  directionY: number;
+  lastProgress: number;
+  pushedEnemyUids: Set<number>;
+  pushedPropUids: Set<number>;
 }
 
 /**
@@ -766,9 +790,13 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'server-rack': { variant: 'light-breakable', hp: 110 },
   /** Tree Null map: tough cybernetic digital tree with dense foliage. */
   'tree-digital': { variant: 'heavy-metal', hp: 800 },
+  'data-pipe': { variant: 'light-breakable', hp: 105 },
+  'digi-arch': { variant: 'heavy-metal', hp: 360 },
+  'pressure-door': { variant: 'heavy-metal', hp: 300 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
+  'data-pipe', 'digi-arch', 'pressure-door',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -1112,6 +1140,14 @@ export interface World {
   wheelSpin: WheelSpinState | null;
   /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
   director: DirectorRunState;
+  /** Rare invincible cross-screen runner event; never enters `enemies`. */
+  runningMan: RunningManState;
+  /**
+   * Which `DirectorDef` actually fires, chosen at the Digital Archive
+   * terminal (`MetaState.activeDirectorPersonalityId`). Null/unknown id
+   * falls back to `DIRECTORS[0]` in `updateDirector`.
+   */
+  activeDirectorPersonalityId: string | null;
 
   /* ---- Loot box system ---- */
   /** Kill counts at which a milestone box has already dropped (prevent double-drops). */
@@ -1272,6 +1308,10 @@ export function createWorld(
     graphicsQuality?: 'high' | 'balanced' | 'performance';
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
+    /** Which Director personality to spawn for the Director encounter -- see `MetaState.activeDirectorPersonalityId`. */
+    activeDirectorPersonalityId?: string | null;
+    /** Grants this weapon at run start, once, from the SWAT Sauna's reward hole -- see `MetaState.pendingSaunaReward`. */
+    bonusWeaponId?: string;
     extraLifeAvailable?: boolean;
     /** Sector Command: squad cap for this mission. Presence of this enables the mode. */
     sectorSquadCap?: number;
@@ -1332,6 +1372,11 @@ export function createWorld(
 
   const rng = createRng(seed);
   const selectedIncursion = chooseDistrictIncursion(area.id, rng, setup.districtIncursionId);
+  // Keep this rare event on its own deterministic stream so adding/tuning its
+  // presentation can never shift normal enemy, loot, or objective rolls.
+  const runningManRng = createRng(seed ^ 0x6164a11);
+  const runningManEligible = runningManRng() < 0.08;
+  const runningManAngle = runningManRng() * Math.PI * 2;
   const evolved = EVOLUTIONS.find((candidate) =>
     candidate.characterId === character.id &&
     candidate.baseWeaponId === character.weapon.id &&
@@ -1425,6 +1470,7 @@ export function createWorld(
       : null,
     worldColorPalette: setup.worldColorPalette,
     worldColorFullRecolor: setup.worldColorFullRecolor,
+    activeDirectorPersonalityId: setup.activeDirectorPersonalityId ?? null,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
     dashSkill: createDashSkillRuntime(character.dashSkill),
@@ -1580,6 +1626,22 @@ export function createWorld(
       bossUid: null,
       victorious: false,
     },
+    runningMan: {
+      phase: 'waiting',
+      triggerAt: runningManEligible ? 55_000 + runningManRng() * 45_000 : Number.POSITIVE_INFINITY,
+      warningStartedAt: 0,
+      startedAt: 0,
+      endsAt: 0,
+      startX: 0,
+      startY: 0,
+      endX: 0,
+      endY: 0,
+      directionX: Math.cos(runningManAngle),
+      directionY: Math.sin(runningManAngle),
+      lastProgress: 0,
+      pushedEnemyUids: new Set(),
+      pushedPropUids: new Set(),
+    },
     lootBoxMilestonesHit: new Set(),
     pendingReel: [],
     claimedLootPrizes: new WeakSet(),
@@ -1683,6 +1745,14 @@ export function createWorld(
   }
   if (signatureWeapon.follower?.lifetimeMs === 0) spawnFollowers(world, signatureWeapon);
   for (const pet of setup.startingLokPets ?? []) spawnLokPet(world, pet, 'loadout');
+  if (setup.bonusWeaponId) {
+    const bonusDef = WEAPONS_BY_ID[setup.bonusWeaponId];
+    if (bonusDef && !world.weapons.some((entry) => entry.def.id === bonusDef.id)) {
+      const bonusWeapon = { def: bonusDef, level: 1, count: bonusDef.count ?? 1, readyAt: 400 };
+      world.weapons.push(bonusWeapon);
+      if (bonusDef.kind === 'orbit') rebuildOrbiters(world, bonusWeapon);
+    }
+  }
   return world;
 }
 
@@ -1752,6 +1822,7 @@ function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
     nextImpactDamageAt: 0,
     broken: false,
     brokenAt: 0,
+    rawDataBreakage: 0,
     contacts: 0,
     lastPlayerImpactX: 0,
     lastPlayerImpactY: 0,
@@ -1860,6 +1931,22 @@ function modifierSpawnMult(w: World): number {
   if (w.modifiers.unleashedMode) return 8;
   if (w.modifiers.quadSpawnMode) return 4;
   return w.modifiers.doubleMode ? 2 : 1;
+}
+
+function selectedDirector(w: World): (typeof DIRECTORS)[number] | undefined {
+  return DIRECTORS.find((director) => director.id === w.activeDirectorPersonalityId);
+}
+
+function directorHpMult(w: World): number {
+  const effect = selectedDirector(w)?.effect;
+  return effect?.kind === 'spawnBias' ? effect.hpMult : 1;
+}
+
+function directorWaveSpawnMult(w: World, factionName?: string): number {
+  const effect = selectedDirector(w)?.effect;
+  if (!effect || effect.kind === 'none') return 1;
+  if (effect.kind === 'spawnBias') return effect.spawnRateMult;
+  return getFaction(effect.favoredFactionId).name === factionName ? effect.spawnRateMult : 1;
 }
 
 function enemyCap(w: World): number {
@@ -2058,7 +2145,7 @@ function spawnEnemy(w: World, incomingDef: EnemyDef, hpMult: number, position?: 
   // endless mode's own Math.min(1.7, ...) cap uncapped -- see run-modifiers.md.
   const calHpMult = w.threatCalibrations?.hpMult ?? 1;
   const calMassMult = w.threatCalibrations?.massMult ?? 1;
-  const hp = def.hp * hpMult * modifierHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
+  const hp = def.hp * hpMult * modifierHpMult(w) * directorHpMult(w) * w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemyHealthMultiplier, 1) * calHpMult;
   const enemy: EnemyActor = {
     uid: uid(w),
     defId: def.id,
@@ -2245,7 +2332,7 @@ function updateSpawning(w: World, dt: number) {
     const infiniteSpawnMult = infiniteActive ? Math.min(2.4, 1 + infiniteTier * 0.12) : 1;
     const contractSpawnMultiplier = w.challenges.reduce((multiplier, challenge) => multiplier * challenge.enemySpawnMultiplier, 1);
     const densityMult = w.threatCalibrations?.densityMult ?? 1;
-    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult;
+    const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult * directorWaveSpawnMult(w, wave.faction);
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
     while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
@@ -3438,6 +3525,25 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
       pushAlert(w, director.victoryText);
       w.shake = Math.max(w.shake, 14);
     }
+  }
+
+  // Digi-Wolf: "defeat-then-recruit" -- a real chance at the fixed Digi-Wolf
+  // LokPet variant, not a guarantee. No live capture mechanic (see
+  // .agents/memory/grpd-station.md).
+  if (enemy.defId === 'digi-wolf' && w.rng() < 0.7) {
+    const pet = rollLokPet(w.rng, { fixedVariantId: 'digi-wolf' });
+    spawnLokPet(w, pet);
+    pushAlert(w, `${pet.name} follows you home`);
+  }
+
+  // Data-Gobs are feeding, not hunting. Driving one off releases the loose
+  // packets it swallowed and briefly patches nearby exposed world objects.
+  if (enemy.def.faction === 'Data Goblins') {
+    for (const prop of w.breakables) {
+      if (prop.broken || dist2(prop.x, prop.y, enemy.x, enemy.y) > 180 * 180) continue;
+      prop.rawDataBreakage = Math.max(0, prop.rawDataBreakage - 0.14);
+    }
+    w.popups.push({ x: enemy.x, y: enemy.y - 18, text: 'DATA PATCH', color: '#86efac', bornAt: w.now, vy: 26 });
   }
 
   // Loot.
@@ -5176,7 +5282,8 @@ function damageBreakable(
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
-    b.hp -= Math.max(1, amount);
+    const breakageMult = 1 + b.rawDataBreakage * (w.area.rawDataBreakage?.damageVulnerability ?? 0);
+    b.hp -= Math.max(1, amount * breakageMult);
     if (b.hp > 0) {
       if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
       continue;
@@ -5931,6 +6038,29 @@ function updateBreakables(w: World, dt: number) {
   syncObstacleAabbs(w);
 }
 
+function updateRawDataBreakage(w: World, dt: number) {
+  const config = w.area.rawDataBreakage;
+  if (!config) return;
+  for (const prop of w.breakables) {
+    if (prop.broken) continue;
+    const susceptibility = prop.breakable ? 1 : 0.28;
+    prop.rawDataBreakage = clamp(prop.rawDataBreakage + config.ambientPerSec * susceptibility * dt, 0, 1);
+  }
+}
+
+function nearestDataChewTarget(w: World, x: number, y: number, range: number): BreakableObstacle | undefined {
+  let closest: BreakableObstacle | undefined;
+  let closestD2 = range * range;
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.breakable) continue;
+    const d2 = dist2(x, y, prop.x, prop.y);
+    if (d2 >= closestD2) continue;
+    closestD2 = d2;
+    closest = prop;
+  }
+  return closest;
+}
+
 function applyKnockback(actor: Actor, dt: number) {
   actor.x += actor.kx * dt;
   actor.y += actor.ky * dt;
@@ -6349,19 +6479,42 @@ function updateEnemies(w: World, dt: number) {
       spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.accent, 4, 35);
     }
 
-    const dx = trackX - enemy.x;
-    const dy = trackY - enemy.y;
+    const dataGobFleeing = w.area.id === 'rapid-pressure-rooms'
+      && enemy.def.faction === 'Data Goblins'
+      && w.rescue.status === 'freed'
+      && enemy.def.id !== 'data-gob-archgnawer';
+    const chewTarget = traits?.dataChew && !dataGobFleeing
+      ? nearestDataChewTarget(w, enemy.x, enemy.y, traits.dataChew.targetRange)
+      : undefined;
+    const targetX = dataGobFleeing ? enemy.x + (enemy.x - trackX) * 2 : chewTarget?.x ?? trackX;
+    const targetY = dataGobFleeing ? enemy.y + (enemy.y - trackY) * 2 : chewTarget?.y ?? trackY;
+    const dx = targetX - enemy.x;
+    const dy = targetY - enemy.y;
     const distance = Math.hypot(dx, dy) || 1;
+    const playerDistance = Math.hypot(trackX - enemy.x, trackY - enemy.y) || 1;
     const dirX = dx / distance;
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
 
     let speed = enemy.speed * statusSpeedMultiplier(enemy) * fluidOilBoostAt(w, enemy.x, enemy.y);
     speed *= musicMultiplier(w, enemy.def.react, 'speed');
+    if (dataGobFleeing) speed *= 1.55;
     if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;
       enemy.chargeReadyAt = w.now + 2200;
+    }
+
+    if (chewTarget && traits?.dataChew && distance <= enemy.radius + Math.max(chewTarget.w, chewTarget.h) * 0.52) {
+      speed = 0;
+      if (w.now >= enemy.fireReadyAt) {
+        enemy.fireReadyAt = w.now + traits.dataChew.biteMs;
+        enemy.anim = 'attack';
+        enemy.animStartedAt = w.now;
+        chewTarget.rawDataBreakage = clamp(chewTarget.rawDataBreakage + 0.12, 0, 1);
+        damageBreakable(w, chewTarget.x, chewTarget.y, 2, traits.dataChew.chewDamage, 0, enemy.x, enemy.y, undefined, false);
+        spawnParticles(w, chewTarget.x, chewTarget.y, '#86efac', 4, 42);
+      }
     }
 
     switch (enemy.def.behavior) {
@@ -6373,6 +6526,28 @@ function updateEnemies(w: World, dt: number) {
           enemy.chargeReadyAt = w.now + randRange(w.rng, 2200, 3800);
           enemy.anim = 'attack';
           enemy.animStartedAt = w.now;
+        }
+        break;
+      }
+      case 'grappler': {
+        const grabRange = enemy.def.sizeClass === 'giant' ? 205 : 155;
+        const slamRange = enemy.def.sizeClass === 'giant' ? 92 : 68;
+        if (distance < grabRange) speed *= 0.45;
+        if (w.now >= enemy.fireReadyAt && distance < grabRange) {
+          enemy.fireReadyAt = w.now + (enemy.def.sizeClass === 'giant' ? 2200 : 2850);
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+          const pull = enemy.def.sizeClass === 'giant' ? 330 : 235;
+          p.kx -= dirX * pull;
+          p.ky -= dirY * pull;
+          if (distance <= slamRange) damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y);
+          if (canSpawnEnemyEffect(w)) w.effects.push({
+            uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: distance,
+            angle: Math.atan2(p.y - enemy.y, p.x - enemy.x), spread: 0.1,
+            bornAt: w.now, expiresAt: w.now + 260, color: enemy.def.palette.accent,
+            damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false,
+          });
+          pushAlert(w, enemy.def.sizeClass === 'giant' ? 'MAIN EVENT GRAB' : 'GRAPPLE');
         }
         break;
       }
@@ -6993,9 +7168,10 @@ function updateEnemies(w: World, dt: number) {
     // Contact damage.
     const contact = enemy.radius + p.radius;
     const isCutified = enemy.cutifiedUntil && w.now < enemy.cutifiedUntil;
-    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && distance <= contact && w.now >= enemy.contactReadyAt) {
+    if (!isCutified && enemy.ghostUntil <= w.now && enemy.invisibleUntil <= w.now && playerDistance <= contact && w.now >= enemy.contactReadyAt) {
       enemy.contactReadyAt = w.now + 520;
-      damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
+      const contactDamage = traits?.dataChew?.playerDamage ?? enemy.damage;
+      damagePlayer(w, contactDamage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
     }
     const elapsed = w.now - enemy.animStartedAt;
     if (enemy.anim === 'attack' && elapsed < 260) continue;
@@ -8500,7 +8676,7 @@ function spawnDirectorSquad(w: World, def: (typeof DIRECTORS)[number]): number |
 }
 
 /**
- * State machine for the (at most one, currently) Director escalation:
+ * State machine for the (at most one) Director escalation:
  * pending -> active (once triggered, tracked until its boss dies) ->
  * resolved. Follows the same `w.now`-driven re-roll shape as
  * `updateWheelSpin` above. Runs unconditionally -- unlike HordeSpin this is
@@ -8513,7 +8689,11 @@ function updateDirector(w: World) {
   if (state.phase !== 'pending') return;
   if (w.now < state.nextRollAt) return;
 
-  const director = DIRECTORS[0];
+  // A defeated personality selected at the Archive is guaranteed to cut in.
+  // Until one is selected, any Director can invade, making every personality
+  // discoverable and unlockable through ordinary play.
+  const director = DIRECTORS.find((d) => d.id === w.activeDirectorPersonalityId)
+    ?? DIRECTORS[Math.floor(w.rng() * DIRECTORS.length)];
   if (!director) return;
 
   if (w.time < director.triggerAfterSec) {
@@ -8534,6 +8714,111 @@ function updateDirector(w: World) {
   // No boss in the roster (a data mistake) would otherwise strand the
   // encounter in 'active' forever with nothing left to clear it.
   if (state.bossUid === null) state.phase = 'resolved';
+}
+
+/* ------------------------------------------------------------------ */
+/* The Running Man                                                    */
+/* ------------------------------------------------------------------ */
+
+const RUNNING_MAN_WARNING_MS = 1_350;
+const RUNNING_MAN_CROSSING_MS = 1_050;
+const RUNNING_MAN_PATH_HALF_LENGTH = 760;
+const RUNNING_MAN_LANE_HALF_WIDTH = 86;
+
+/**
+ * Push everything near the newly crossed piece of the route away from the
+ * route's center line. The signed perpendicular distance is what guarantees
+ * actors above and below the same line are thrown to opposite sides.
+ */
+function sweepRunningManLane(w: World, state: RunningManState, fromProgress: number, toProgress: number) {
+  const pathX = state.endX - state.startX;
+  const pathY = state.endY - state.startY;
+  const pathLength = Math.hypot(pathX, pathY);
+  if (pathLength < 1) return;
+  const dirX = pathX / pathLength;
+  const dirY = pathY / pathLength;
+  const normalX = -dirY;
+  const normalY = dirX;
+  const fromAlong = Math.min(fromProgress, toProgress) * pathLength - 30;
+  const toAlong = Math.max(fromProgress, toProgress) * pathLength + 30;
+
+  const sideFor = (cross: number, uidValue: number) => Math.abs(cross) > 0.001 ? Math.sign(cross) : (uidValue % 2 === 0 ? 1 : -1);
+
+  for (const enemy of w.enemies) {
+    if (enemy.dying || enemy.commanded || state.pushedEnemyUids.has(enemy.uid)) continue;
+    const relX = enemy.x - state.startX;
+    const relY = enemy.y - state.startY;
+    const along = relX * dirX + relY * dirY;
+    const cross = relX * normalX + relY * normalY;
+    if (along < fromAlong - enemy.radius || along > toAlong + enemy.radius) continue;
+    if (Math.abs(cross) > RUNNING_MAN_LANE_HALF_WIDTH + enemy.radius) continue;
+    const side = sideFor(cross, enemy.uid);
+    const launchSpeed = Math.max(220, resolveImpactTravel(4, enemy.mass, enemyImpactResistance(enemy)));
+    enemy.kx += normalX * side * launchSpeed + dirX * 45;
+    enemy.ky += normalY * side * launchSpeed + dirY * 45;
+    state.pushedEnemyUids.add(enemy.uid);
+    spawnParticles(w, enemy.x, enemy.y, '#f8fafc', 5, 95);
+  }
+
+  for (const prop of w.breakables) {
+    if (prop.broken || !prop.movable || state.pushedPropUids.has(prop.uid)) continue;
+    const relX = prop.x - state.startX;
+    const relY = prop.y - state.startY;
+    const along = relX * dirX + relY * dirY;
+    const cross = relX * normalX + relY * normalY;
+    const propRadius = Math.max(prop.w, prop.h) / 2;
+    if (along < fromAlong - propRadius || along > toAlong + propRadius) continue;
+    if (Math.abs(cross) > RUNNING_MAN_LANE_HALF_WIDTH + propRadius) continue;
+    const side = sideFor(cross, prop.uid);
+    const launchSpeed = Math.max(150, resolveImpactTravel(4, prop.mass));
+    prop.vx += normalX * side * launchSpeed + dirX * 35;
+    prop.vy += normalY * side * launchSpeed + dirY * 35;
+    prop.impactIntensity = Math.max(prop.impactIntensity, 3) as ImpactIntensity;
+    state.pushedPropUids.add(prop.uid);
+    spawnParticles(w, prop.x, prop.y, '#fbbf24', 5, 90);
+  }
+}
+
+/** Rare, one-shot phase machine. Exported for focused deterministic tests. */
+export function updateRunningMan(w: World) {
+  const state = w.runningMan;
+  if (state.phase === 'complete') return;
+
+  if (state.phase === 'waiting') {
+    if (w.now < state.triggerAt) return;
+    const centerX = w.player.x;
+    const centerY = w.player.y;
+    state.startX = centerX - state.directionX * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.startY = centerY - state.directionY * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.endX = centerX + state.directionX * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.endY = centerY + state.directionY * RUNNING_MAN_PATH_HALF_LENGTH;
+    state.warningStartedAt = w.now;
+    state.phase = 'warning';
+    pushAlert(w, 'FOOTSTEPS — clear the crossing line');
+    pushSfx(w, 'bossWarning');
+    return;
+  }
+
+  if (state.phase === 'warning') {
+    if (w.now - state.warningStartedAt < RUNNING_MAN_WARNING_MS) return;
+    state.phase = 'running';
+    state.startedAt = w.now;
+    state.endsAt = w.now + RUNNING_MAN_CROSSING_MS;
+    state.lastProgress = 0;
+    pushAlert(w, 'THE RUNNING MAN');
+    w.shake = Math.max(w.shake, 8);
+  }
+
+  if (state.phase !== 'running') return;
+  const progress = clamp((w.now - state.startedAt) / RUNNING_MAN_CROSSING_MS, 0, 1);
+  sweepRunningManLane(w, state, state.lastProgress, progress);
+  state.lastProgress = progress;
+  if (w.now >= state.endsAt) {
+    // Finish the final sliver even when a low frame rate jumps past endsAt.
+    sweepRunningManLane(w, state, progress, 1);
+    state.lastProgress = 1;
+    state.phase = 'complete';
+  }
 }
 
 /** Resolves 'meteor' weapon strikes once their telegraph window elapses. See run-presentation.md. */
@@ -9927,6 +10212,8 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateStormCloud(w, dt);
   updateWheelSpin(w);
   updateDirector(w);
+  updateRunningMan(w);
+  updateRawDataBreakage(w, dt);
   updateEnemies(w, dt);
   updateRoamingDetectors(w, dt);
   updateBreakables(w, dt);
@@ -9998,6 +10285,19 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
 export function hudSnapshot(w: World): HudSnapshot {
   const ultRemaining = Math.max(0, w.ultReadyAt - w.now);
   const ultTotal = w.character.ultimate.cooldownMs * w.ultCooldownMult;
+  const pressureSystems = w.area.id === 'rapid-pressure-rooms'
+    ? w.breakables.filter((prop) => ['digi-arch', 'data-pipe', 'pressure-door'].includes(prop.kind))
+    : [];
+  const pressureRescue = pressureSystems.length > 0
+    ? {
+      integrityPct: Math.round(
+        pressureSystems.reduce((total, prop) => total + (prop.broken ? 0 : 1 - prop.rawDataBreakage), 0)
+        / pressureSystems.length * 100,
+      ),
+      exposedSystems: pressureSystems.filter((prop) => !prop.broken).length,
+      criticalSystems: pressureSystems.filter((prop) => prop.broken || prop.rawDataBreakage >= 0.7).length,
+    }
+    : undefined;
   const e = w.endless;
   const effectCounts = new Map<string, number>();
   for (const enemy of w.enemies) {
@@ -10028,6 +10328,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     rescueAvailable: w.rescue.status === 'available' || w.rescue.status === 'freeing',
     rescueProgressPct: Math.round(w.rescue.progress * 100),
     rescueAllyName: w.rescue.allyId ? ALLIES_BY_ID[w.rescue.allyId]?.name : undefined,
+    pressureRescue,
     lootBoxesOpened: w.lootBoxesOpened,
     lokPets: w.lokPets.map((pet) => ({
       uid: pet.uid,

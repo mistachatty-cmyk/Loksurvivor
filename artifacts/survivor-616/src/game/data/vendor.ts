@@ -1,4 +1,5 @@
 import type { ChallengeContractDef, MetaState, VendorItemDef } from '@/game/types';
+import { stableHash } from '@/game/data/crewActivities';
 
 /**
  * Permanent hideout purchases. Costs are intentionally fixed: the player can
@@ -459,7 +460,169 @@ export const VENDOR_CATALOG: VendorItemDef[] = [
     maxStacks: 2,
     effects: [{ kind: 'stat', stat: 'area', mult: 1.08, cap: 1.5 }],
   },
+  // Rapid Guard's K9 counter -- GRPD Station, 'grpd-station' hub room. Each
+  // purchase grants a SavedLokPet rolled from that variant (full common/
+  // charged/rare/mythic spread), not a stat effect -- see `grantsLokPetVariantId`
+  // and the 'lokpet' branch of `buyVendorItem` in state/metaStore.tsx.
+  {
+    id: 'rapid-guard-greyhound',
+    name: 'K9 Greyhound',
+    description: 'Rapid Guard says this one outran three separate task forces before anyone thought to just ask it nicely.',
+    category: 'lokpet',
+    cost: 140,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'k9-greyhound',
+  },
+  {
+    id: 'rapid-guard-shepherd',
+    name: 'K9 Shepherd',
+    description: "Retired from the department, not from the job. Rapid Guard swears it still salutes.",
+    category: 'lokpet',
+    cost: 140,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'k9-shepherd',
+  },
+  {
+    id: 'rapid-guard-wolf',
+    name: 'Alley Wolf',
+    description: "Rapid Guard won't say how he got this one. Says the paperwork is 'in progress.'",
+    category: 'lokpet',
+    cost: 260,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'wolf',
+  },
+  // Broader breed ladder, merged in from the dogBreedsDraft.ts review file --
+  // common street dogs up through noble show-breeds. Cost scales with the
+  // variant's LOKPET_VARIANTS `weight` (rarer breed to see, pricier to buy
+  // outright), separate from the stat rarity each purchase still rolls.
+  {
+    id: 'rapid-guard-junkyard-cur',
+    name: 'Junkyard Cur',
+    description: "Rapid Guard's cheapest dog and, he swears, his best judge of character.",
+    category: 'lokpet',
+    cost: 100,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'junkyard-cur',
+  },
+  {
+    id: 'rapid-guard-alley-mutt',
+    name: 'Alley Mutt',
+    description: "Nobody's sure what's in the mix. Rapid Guard says that's half the appeal.",
+    category: 'lokpet',
+    cost: 105,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'alley-mutt',
+  },
+  {
+    id: 'rapid-guard-corner-stray',
+    name: 'Corner Stray',
+    description: 'Rapid Guard had to bribe it off its corner with a whole sandwich.',
+    category: 'lokpet',
+    cost: 110,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'corner-stray',
+  },
+  {
+    id: 'rapid-guard-rust-belt-terrier',
+    name: 'Rust Belt Terrier',
+    description: 'Small dog, big grudge against every rat in the precinct basement.',
+    category: 'lokpet',
+    cost: 160,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'rust-belt-terrier',
+  },
+  {
+    id: 'rapid-guard-frostline-husky',
+    name: 'Frostline Husky',
+    description: "Howls at 3am like it's still somewhere colder. Rapid Guard's used to it by now.",
+    category: 'lokpet',
+    cost: 170,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'frostline-husky',
+  },
+  {
+    id: 'rapid-guard-onyx-doberman',
+    name: 'Onyx Doberman',
+    description: "Rapid Guard doesn't recommend eye contact. Says it's not for you, it just does that.",
+    category: 'lokpet',
+    cost: 230,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'onyx-doberman',
+  },
+  {
+    id: 'rapid-guard-ridge-runner',
+    name: 'Ridge Runner',
+    description: 'Bred for something this city stopped having a long time ago. Still ready for it.',
+    category: 'lokpet',
+    cost: 250,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'ridge-runner',
+  },
+  {
+    id: 'rapid-guard-palace-borzoi',
+    name: 'Palace Borzoi',
+    description: "Rapid Guard's not sure the royalty story is true, but the dog carries it well.",
+    category: 'lokpet',
+    cost: 340,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'palace-borzoi',
+  },
+  {
+    id: 'rapid-guard-imperial-akita',
+    name: 'Imperial Akita',
+    description: 'Watches the counter like it, not Rapid Guard, is the one running this place.',
+    category: 'lokpet',
+    cost: 340,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'imperial-akita',
+  },
+  {
+    id: 'rapid-guard-velvet-saluki',
+    name: 'Velvet Saluki',
+    description: "Doesn't bark, doesn't rush. Rapid Guard says it's just waiting for a reason to run.",
+    category: 'lokpet',
+    cost: 340,
+    maxStacks: 1,
+    grantsLokPetVariantId: 'velvet-saluki',
+  },
 ];
+
+/**
+ * Full pool of Rapid Guard's kennel item ids -- more than fit on the counter
+ * at once. Only K9_ROTATION_SIZE of these are buyable in any given real-world
+ * hour; see currentK9RotationItemIds below.
+ */
+export const K9_ROTATION_ITEM_IDS: string[] = VENDOR_CATALOG
+  .filter((item) => item.category === 'lokpet')
+  .map((item) => item.id);
+
+export const K9_ROTATION_SIZE = 5;
+
+/** Rounds down to the current real-world hour, in hour units since epoch. */
+export function currentK9RotationHour(now: number = Date.now()): number {
+  return Math.floor(now / 3_600_000);
+}
+
+/** The timestamp (ms) when the current hour's kennel lineup turns over. */
+export function nextK9RotationAt(now: number = Date.now()): number {
+  return (currentK9RotationHour(now) + 1) * 3_600_000;
+}
+
+/**
+ * Deterministic per-hour subset of Rapid Guard's kennel: every player sees
+ * the same lineup within a given real-world hour, and it reshuffles at the
+ * top of the next one. Reuses the stableHash seeded-shuffle pattern
+ * rollCrewActivities (data/crewActivities.ts) already uses so a save reload
+ * mid-hour never changes what's on the counter.
+ */
+export function currentK9RotationItemIds(now: number = Date.now()): string[] {
+  const hour = currentK9RotationHour(now);
+  return [...K9_ROTATION_ITEM_IDS]
+    .map((id) => ({ id, rank: stableHash(`k9-rotation:${hour}:${id}`) }))
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, K9_ROTATION_SIZE)
+    .map((entry) => entry.id);
+}
 
 export const VENDOR_CATALOG_BY_ID: Record<string, VendorItemDef> = Object.fromEntries(
   VENDOR_CATALOG.map((item) => [item.id, item]),

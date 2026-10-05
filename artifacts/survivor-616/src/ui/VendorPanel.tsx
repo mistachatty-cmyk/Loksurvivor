@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Anchor,
@@ -15,6 +15,7 @@ import {
   Flame,
   Footprints,
   Gauge,
+  Dog,
   Gem,
   Ghost,
   Globe,
@@ -40,7 +41,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID } from '@/game/data/vendor';
+import {
+  currentK9RotationItemIds,
+  K9_ROTATION_SIZE,
+  nextK9RotationAt,
+  VENDOR_CATALOG,
+  VENDOR_CATALOG_BY_ID,
+} from '@/game/data/vendor';
 import { useMeta } from '@/game/state/metaStore';
 import { humanoidRig } from '@/game/sprites/rigs';
 import type { AnimName, SpritePalette, VendorItemCategory, VendorItemDef } from '@/game/types';
@@ -71,6 +78,7 @@ const QUARTERMASTER_QUIPS = [
 export interface VendorPanelProps {
   onBack: () => void;
   onOpenThreatMatrix?: () => void;
+  initialCategory?: VendorItemCategory;
 }
 
 type CategoryConfig = {
@@ -116,6 +124,13 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
     title: 'Field ops',
     description: 'Gear that changes how a run plays, not just its numbers. Some of it chains — buy the first rung to unlock the next.',
     icon: Radar,
+  },
+  {
+    key: 'lokpet',
+    eyebrow: 'Rapid Guard / 06',
+    title: 'K9 counter',
+    description: "GRPD Station's own kennel. The only place in the city to buy a police dog, or something that only wishes it were one.",
+    icon: Dog,
   },
 ];
 
@@ -168,6 +183,19 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   'relic-tumbler-pick': KeyRound,
   'relic-trigger-spring': Gauge,
   'relic-blast-lens': Expand,
+  'rapid-guard-greyhound': Dog,
+  'rapid-guard-shepherd': Dog,
+  'rapid-guard-wolf': Dog,
+  'rapid-guard-junkyard-cur': Dog,
+  'rapid-guard-alley-mutt': Dog,
+  'rapid-guard-corner-stray': Dog,
+  'rapid-guard-rust-belt-terrier': Dog,
+  'rapid-guard-frostline-husky': Dog,
+  'rapid-guard-onyx-doberman': Dog,
+  'rapid-guard-ridge-runner': Dog,
+  'rapid-guard-palace-borzoi': Dog,
+  'rapid-guard-imperial-akita': Dog,
+  'rapid-guard-velvet-saluki': Dog,
 };
 
 /** Short, hand-written labels for vendor items whose real effect can't be summarized by a single stat/utility delta -- mostly "ability" items, but also any relic/stat item using a `mult` effect the generic summary below doesn't read. */
@@ -194,6 +222,19 @@ const ABILITY_EFFECT_LABELS: Record<string, string> = {
   'night-vision': 'Night tint cut by 75%',
   'relic-trigger-spring': '-6% weapon cooldown / stack',
   'relic-blast-lens': '+8% weapon area / stack',
+  'rapid-guard-greyhound': 'Joins your kennel',
+  'rapid-guard-shepherd': 'Joins your kennel',
+  'rapid-guard-wolf': 'Joins your kennel',
+  'rapid-guard-junkyard-cur': 'Joins your kennel',
+  'rapid-guard-alley-mutt': 'Joins your kennel',
+  'rapid-guard-corner-stray': 'Joins your kennel',
+  'rapid-guard-rust-belt-terrier': 'Joins your kennel',
+  'rapid-guard-frostline-husky': 'Joins your kennel',
+  'rapid-guard-onyx-doberman': 'Joins your kennel',
+  'rapid-guard-ridge-runner': 'Joins your kennel',
+  'rapid-guard-palace-borzoi': 'Joins your kennel',
+  'rapid-guard-imperial-akita': 'Joins your kennel',
+  'rapid-guard-velvet-saluki': 'Joins your kennel',
 };
 
 function ownedStacks(item: VendorItemDef, purchases: Record<string, number>): number {
@@ -403,17 +444,31 @@ function ItemDetail({
   );
 }
 
-export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
+export function VendorPanel({ onBack, onOpenThreatMatrix, initialCategory = 'stat' }: VendorPanelProps) {
   const { meta, buyVendorItem, refundVendorItem, refundAllVendorItems } = useMeta();
-  const [activeCategory, setActiveCategory] = useState<VendorItemCategory>('stat');
+  const [activeCategory, setActiveCategory] = useState<VendorItemCategory>(initialCategory);
   const [selectedId, setSelectedId] = useState<string>(
-    VENDOR_CATALOG.find((item) => item.category === 'stat')?.id ?? VENDOR_CATALOG[0].id,
+    VENDOR_CATALOG.find((item) => item.category === initialCategory)?.id ?? VENDOR_CATALOG[0].id,
   );
   const [reactAnim, setReactAnim] = useState<AnimName>('idle');
   const [line, setLine] = useState(QUARTERMASTER_QUIPS[0]);
   const resetTimer = useRef<number | undefined>(undefined);
+  const [now, setNow] = useState(() => Date.now());
 
-  const itemsInCategory = VENDOR_CATALOG.filter((item) => item.category === activeCategory);
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const k9RotationIds = useMemo(() => new Set(currentK9RotationItemIds(now)), [now]);
+
+  function itemsForCategory(category: VendorItemCategory) {
+    return category === 'lokpet'
+      ? VENDOR_CATALOG.filter((item) => item.category === 'lokpet' && k9RotationIds.has(item.id))
+      : VENDOR_CATALOG.filter((item) => item.category === category);
+  }
+
+  const itemsInCategory = itemsForCategory(activeCategory);
   const selectedItem = itemsInCategory.find((item) => item.id === selectedId) ?? itemsInCategory[0];
 
   const totalOwned = VENDOR_CATALOG.reduce((total, item) => total + ownedStacks(item, meta.vendorPurchases), 0);
@@ -422,9 +477,11 @@ export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
 
   const layout = meta.uiPanelLayout;
 
+  const minutesUntilK9Rotation = Math.max(0, Math.ceil((nextK9RotationAt(now) - now) / 60000));
+
   function selectCategory(category: VendorItemCategory) {
     setActiveCategory(category);
-    const firstItem = VENDOR_CATALOG.find((item) => item.category === category);
+    const firstItem = itemsForCategory(category)[0];
     if (firstItem) setSelectedId(firstItem.id);
   }
 
@@ -440,10 +497,22 @@ export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
   return (
     <ScreenLayout
       title="Quartermaster"
-      subtitle="The back room / Grand Rapids"
+      subtitle="Otis & Rapid Guard / Grand Rapids"
       onBack={onBack}
       action={
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => selectCategory('lokpet')}
+            className={`flex items-center gap-2 border px-3 py-3 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              activeCategory === 'lokpet'
+                ? 'border-sky-300 bg-sky-400/15 text-sky-200'
+                : 'border-sky-500/50 text-sky-300 hover:bg-sky-500/10'
+            }`}
+            data-testid="button-open-k9-counter"
+          >
+            <Dog className="h-4 w-4" /> K9 counter
+          </button>
           <button
             type="button"
             onClick={refundAllVendorItems}
@@ -552,6 +621,20 @@ export function VendorPanel({ onBack, onOpenThreatMatrix }: VendorPanelProps) {
         </div>
 
         <section data-testid={`section-vendor-${activeCategory}`}>
+          {activeCategory === 'lokpet' ? (
+            <div
+              className="mb-4 flex items-start gap-3 border-l-2 border-sky-400/50 bg-sky-500/[0.06] px-4 py-3 text-xs leading-5 text-muted-foreground"
+              data-testid="banner-k9-rotation"
+            >
+              <Dog className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+              <p>
+                <span className="font-bold uppercase tracking-widest text-sky-300">Rapid Guard:</span> &ldquo;Counter
+                only holds {K9_ROTATION_SIZE} dogs out front at a time — rest are in the back kennels. Lineup turns
+                over every hour, so swing back in {minutesUntilK9Rotation}m if you don&apos;t see the one you
+                want.&rdquo;
+              </p>
+            </div>
+          ) : null}
           {selectedItem &&
             (layout === 'rail' ? (
               <div className="grid gap-4 lg:grid-cols-[16rem_1fr]" data-testid="section-vendor-grid">

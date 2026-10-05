@@ -77,3 +77,26 @@ test('Llamá Máma inherits the Crystal Cellar unlock', () => {
     true,
   );
 });
+
+test('the GRPD Vault grants Blue 616 once after the Site Crew zone is cleared', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
+  assert.equal(reducer(initial, { type: 'claimLegendaryPoliceDog' }), initial);
+
+  const eligible = {
+    ...initial,
+    meta: { ...initial.meta, clearedAreaIds: [...initial.meta.clearedAreaIds, 'site-crew-active-zone'] },
+  };
+  const claimed = reducer(eligible, { type: 'claimLegendaryPoliceDog' });
+  const blue = claimed.meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
+  assert.ok(blue);
+  assert.equal(blue.id, 'pet-grpd-blue-616');
+  assert.equal(blue.roll.name, 'Blue 616');
+  assert.equal(blue.roll.rarity, 'mythic');
+  assert.equal(blue.roll.rarityLabel, 'Legendary');
+  assert.equal(blue.roll.legendary, true);
+  assert.equal(blue.favorite, true);
+
+  const repeated = reducer(claimed, { type: 'claimLegendaryPoliceDog' });
+  assert.equal(repeated, claimed);
+  assert.equal(repeated.meta.savedLokPets.filter((pet) => pet.roll.variantId === 'blue-616').length, 1);
+});

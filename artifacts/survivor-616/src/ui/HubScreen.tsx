@@ -15,7 +15,7 @@ import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords } from 'lucide-react';
+import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog } from 'lucide-react';
 import type { CrewActivityIcon } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
@@ -27,8 +27,9 @@ import { useStaggeredEntrance } from '@/anim/hooks/useAnime';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
+import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -57,6 +58,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   studio: { label: 'Studio', icon: RadioTower, testId: 'button-open-studio', description: 'Remix & record' },
   recovery: { label: 'Recovery', icon: Waves, testId: 'button-open-recovery', description: 'Let the crew breathe' },
   vendor: { label: 'Quartermaster', icon: Package, testId: 'button-open-vendor', description: 'Permanent kit & contracts' },
+  kennel: { label: 'K9 Counter', icon: Dog, testId: 'button-open-kennel', description: 'Rapid Guard’s rotating kennel' },
   workshop: { label: 'Relic Workshop', icon: Hammer, testId: 'button-open-workshop', description: 'City recipes & run edges' },
   'card-shop': { label: 'Lock Pack Counter', icon: CreditCard, testId: 'button-open-card-shop', description: 'Open packs & build your Lock Deck' },
   settings: { label: 'Settings', icon: Settings2, testId: 'button-open-settings', description: 'Controls & accessibility' },
@@ -65,6 +67,7 @@ const PANEL_CONFIG: Record<HubPanel, { label: string; icon: any; testId: string;
   account: { label: 'Account', icon: Mail, testId: 'button-open-account', description: 'Waitlist & sign in' },
   feedback: { label: 'Feedback', icon: MessageSquareHeart, testId: 'button-open-feedback', description: 'Ideas & bug reports' },
   'threat-matrix': { label: 'Threat Matrix', icon: ShieldAlert, testId: 'button-open-threat-matrix', description: 'Override & quarantine enemies' },
+  'director-terminal': { label: 'Director Terminal', icon: ScanEye, testId: 'button-open-director-terminal', description: 'Read and select Director personalities' },
 };
 
 const WEATHER_ICONS = { rain: CloudRain, fog: CloudFog, snow: Snowflake, heat: Sun, clear: Sun } as const;
@@ -103,7 +106,7 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const { session } = useAuth();
   const { balance: lokBalance } = useLokEconomy();
@@ -131,6 +134,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const primePalette = primeTakeoverActive ? getCharacter('artisanvalor').palette : null;
   const [isPageVisible, setIsPageVisible] = useState(true);
   const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
+  const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
+  const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
 
   useEffect(() => {
     const updateVisibility = () => setIsPageVisible(document.visibilityState === 'visible');
@@ -474,6 +479,39 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               </div>
            </div>
         </header>
+
+        {activeRoom.id === 'grpd-vault' && blue616 && (
+          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
+                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
+                </div>
+                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
+                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
+              </div>
+              {legendaryPoliceDog ? (
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
+                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
+                    <ShieldCheck className="h-4 w-4" /> Recovered
+                  </div>
+                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
+                    Equip LokPet
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
+                  <Dog className="h-5 w-5" /> Claim Blue 616
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="mb-8 border border-[#fbbf24]/45 bg-black/45 p-4 sm:p-5" data-testid="section-crew-rumor">
           {activeRumor && meta.activeCrewRumor && rumorAlly ? (

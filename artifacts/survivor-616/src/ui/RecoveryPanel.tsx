@@ -33,6 +33,7 @@ export function RecoveryPanel({ onBack }: RecoveryPanelProps) {
     stopRecovery,
     tickRecovery,
     upgradeFacility,
+    claimSaunaHoleReward,
   } = useMeta();
   const [lineIndex, setLineIndex] = useState(0);
 
@@ -52,8 +53,12 @@ export function RecoveryPanel({ onBack }: RecoveryPanelProps) {
   const activeCharacter = meta.recovery.characterId
     ? getCharacter(meta.recovery.characterId)
     : null;
-  const currentIndex = RECOVERY_FACILITIES.findIndex((facility) => facility.id === meta.facilityTier);
-  const nextFacility = RECOVERY_FACILITIES[currentIndex + 1];
+  // The SWAT Sauna is a hut-only reward (see its unlockText), never a
+  // purchasable rung on this cred ladder -- exclude it here, same as the
+  // reducer's own `cost <= 0` guard in `upgradeFacility`.
+  const ladderFacilities = RECOVERY_FACILITIES.filter((facility) => facility.id === 'tub' || facility.cost > 0);
+  const currentIndex = ladderFacilities.findIndex((facility) => facility.id === meta.facilityTier);
+  const nextFacility = ladderFacilities[currentIndex + 1];
   const currentFacility = RECOVERY_FACILITIES_BY_ID[meta.facilityTier];
   const remaining = recoveryRemainingMs(meta);
   const hutIds = new Set(meta.discoveredHutIds);
@@ -172,7 +177,7 @@ export function RecoveryPanel({ onBack }: RecoveryPanelProps) {
               <h2 className="font-black uppercase tracking-wide text-white">Facility ladder</h2>
             </div>
             <div className="space-y-2">
-              {RECOVERY_FACILITIES.map((facility, index) => {
+              {ladderFacilities.map((facility, index) => {
                 const owned = index <= currentIndex;
                 return (
                   <div key={facility.id} className={`flex items-center justify-between border p-3 ${owned ? 'border-primary/40 bg-primary/5' : 'border-border/60 opacity-55'}`}>
@@ -228,6 +233,17 @@ export function RecoveryPanel({ onBack }: RecoveryPanelProps) {
                       >
                         Rest here
                       </button>
+                      {hut.id === 'grpd-swat-sauna' ? (
+                        <button
+                          type="button"
+                          disabled={Boolean(meta.pendingSaunaReward)}
+                          onClick={claimSaunaHoleReward}
+                          className="mt-2 w-full border border-dashed border-amber-300/50 px-3 py-2 text-xs font-bold uppercase tracking-widest text-amber-200 disabled:opacity-35 hover:border-amber-300"
+                          data-testid="button-sauna-hole"
+                        >
+                          {meta.pendingSaunaReward ? 'Something is already in your hand' : 'Reach through the hole'}
+                        </button>
+                      ) : null}
                     </div>
                   );
                 })}
