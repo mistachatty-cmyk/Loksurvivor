@@ -347,6 +347,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Sign-in also returns you to the exact address you started from, rather than the site\u2019s default page.',
     ],
   },
+  {
+    version: '0.12.0',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'The Digi-Verse On The Web',
+    body: [
+      'The 616 Survivor page on the GSix website now shows the Digi-Verse Archives in the game\u2019s original deep red, with an option to switch back to the classic colors.',
+      'A new bar on that page jumps straight to the Archives, the Updates and each lore chapter. The Updates list there is the same patch notes you see in the game, in blue, and it keeps itself current.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

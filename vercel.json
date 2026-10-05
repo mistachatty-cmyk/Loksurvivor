@@ -12,6 +12,19 @@
   ],
   "headers": [
     {
+      "source": "/lok-updates.json",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300"
+        }
+      ]
+    },
+    {
       "source": "/lok-soundtrack.json",
       "headers": [
         {
