@@ -29,12 +29,22 @@ Read before moving or renaming anything under `public/music/` or editing
 - The in-game player is deliberately NOT replaced by `@lok/music`. It owns
   beat analysis, studio hand-off, albums/playlists and unlock gating; the
   shared player is a small listening widget for everywhere else.
-- Each track carries `gate: { app: 'survivor616', objectives: N }`. Hosts that
-  cannot read this game's progress (the hub, other apps) treat the album as
-  fully open; only hosts that pass `isGateOpen` enforce it. In-game gating is
-  unchanged. If the owner wants the website gated too, that needs progress
-  synced to the account — it was not built.
-- No artist is named in the catalog on purpose (see
+- Each track carries `gate: { app: 'survivor616', objectives: N }`. On other
+  sites a gated song opens three ways, in this order: (1) the Lok account's
+  progress (`lok_music_progress`, written by `cloudSyncStore.tsx` from
+  `meta.soundtrackObjectiveCompletions` while signed in, only ever upward) meets
+  the gate; (2) it was earned from an hourly drop and played once, which is
+  permanent (`lok_music_unlocked`, plus this browser); (3) it is this hour's
+  drop, open for 60 minutes. The drop schedule is a pure function of the clock
+  (`packages/lok-music/src/drops.ts` in the GSix hub repo), so it needs no
+  server and everyone sees the same drop. In-game gating is unchanged and
+  separate: playing a drop on the website does NOT unlock the song in the game.
+  The lock is progression, not DRM: the audio URLs are public.
+- Publishing is the only Survivor-side code: `lib/lok-client/src/music.ts` +
+  `saveMusicProgress` in `authStore.tsx`, sent when the number rises. The hub's
+  two tables are created by a hub migration (`20261005000200_lok_music_unlocks.sql`);
+  without it the write fails quietly and the retry waits for the next change.
+- No artist is named in the catalog on purpose (the standard supports `artist` per track or per playlist; set it only when it is true) (see
   `survivor-616-art-assets.md`): nothing is claimed that the project cannot show.
 - The album is AAC/M4A as delivered. The standard's MP3 baseline applies to
   what apps import/export; `convertToMp3` here is the reference converter.

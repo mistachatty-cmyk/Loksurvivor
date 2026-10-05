@@ -5,3 +5,4 @@ export * from "./feedback";
 export * from "./saves";
 export * from "./economy";
 export * from "./lokdex";
+export * from "./music";

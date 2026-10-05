@@ -302,8 +302,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Lokifed Everywhere',
     body: [
       'The Lokifed \u2014 Take 1 soundtrack is now a built-in part of the Lok network. The same album can be played from the GSix site and any other Lok app with the new Lok Music player: play, pause, skip, seek, shuffle, repeat, volume, and pick any song from the list.',
-      'The player costs nothing to load: it stays closed and downloads nothing until someone opens it. Files you add from your own device never leave that device.',
-      'In the game, nothing changes. Tracks still unlock as you complete run objectives. On the website the album is open to everyone to listen to.',
+      'Your progress travels with you. While you are signed in, finishing objectives in the game opens the same songs on the website, so the more you play the more of the album you can listen to there. In the game itself, tracks still unlock exactly as before.',
+      'No sign-in? Once an hour, at a random minute, one locked song opens on the website for an hour. Play it while it is open and it is yours for good, and the player tells you when one is on air.',
+      'The player costs nothing to load: it stays closed and downloads no music until someone presses play. Files you add from your own device never leave that device.',
     ],
   },
 ];
