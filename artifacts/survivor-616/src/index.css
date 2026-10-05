@@ -940,3 +940,11 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion='full']) .settings-slide-from-right, :root:not([data-motion='full']) .settings-slide-from-left { animation: none; }
 }
+
+@keyframes registry-art-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  canvas[style*='registry-art-bob'] { animation: none !important; }
+}

@@ -119,3 +119,23 @@ and nothing is granted (harmless, gameplay never blocks). Suggested values:
 achievement_claimed 10 (daily cap 50), card_exchange_sent 15 (cap 30),
 card_exchange_received 15 (cap 30). Applying them touches the shared
 production project, so it was deliberately left for the owner to approve.
+
+## 0.11.5: LokToken store + card universe (2026-10-05)
+
+Palettes are now LokToken-only (`LOKTOKEN_ONLY_KINDS` in
+`src/lib/lokStoreCatalog.ts`); purchase goes `PaletteGalleryPanel` ->
+`useLokEconomy().spend()` -> `lok-spend` edge fn -> `lok_spend()`. `grantPalette`
+(metaStore) unlocks locally after the server confirms, and re-syncs from
+`lok_inventory` so a purchase follows the account. Existing owned palettes are
+grandfathered. **`lok-spend`, the catalog rows and the registry tables are
+written but not applied to production** -- the full go-live list and the
+design are in `Lok-EcoSystsem/LokToken EcoSystem/LOKTOKEN_STORE.md` and
+`LOK_CARD_UNIVERSE.md`. Until applied, buying a palette says "not on sale yet".
+The `cosmetic` value of `lok_item_type` is already live.
+
+The Universe Binder (`ui/UniverseBinder.tsx`) merges the live `lok_cards`
+registry over local cards. Every card is drawn from a portable art recipe
+(`game/data/cardArt.ts`, `ui/RegistryCardArt.tsx`) so foreign cards look like
+their real model; recipes are procedural JSON, never bitmaps, which keeps the
+`survivor-616-art-assets.md` rule intact. Republish after card/palette content
+changes: `pnpm exec tsx scripts/export-lok-registry.ts <outDir>`.

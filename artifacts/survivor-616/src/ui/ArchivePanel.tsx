@@ -38,6 +38,7 @@ import { AnimatedNumber } from './AnimatedNumber';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { LockDeckCollection } from './LockDeckCollection';
+import { UniverseBinder } from './UniverseBinder';
 import { ScreenLayout } from './ScreenLayout';
 import {
   exportLokPetAsPortableCard,
@@ -779,6 +780,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               ) : (
                 <>
                   <select
+                    data-testid="select-exchange-pet"
                     value={exchangePetId}
                     onChange={(event) => { setExchangePetId(event.target.value); setExchangeOutput(''); }}
                     className="w-full border border-border bg-black/30 px-2 py-2 text-xs text-white"
@@ -860,6 +862,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
               </div>
             )}
           </div>
+          <UniverseBinder meta={meta} />
         </motion.section>
       )}
 

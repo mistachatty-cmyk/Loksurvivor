@@ -20,7 +20,15 @@ import {
   type ReactNode,
 } from 'react';
 
-import { earnLokTokens, getLokProfile, type LokProfileRank } from '@workspace/lok-client';
+import {
+  earnLokTokens,
+  fetchCatalog,
+  fetchOwnedSkus,
+  getLokProfile,
+  spendLokTokens,
+  type LokProfileRank,
+  type SpendResult,
+} from '@workspace/lok-client';
 
 import { useAuth } from '@/state/authStore';
 import { lokClient } from '@/lib/lokClient';
@@ -39,6 +47,13 @@ interface LokEconomyContextValue {
   rank: LokProfileRank | null;
   /** Fire-and-forget -- callers never need to await or handle its result. */
   earn: (eventKey: string, ref?: EarnRef) => void;
+  signedIn: boolean;
+  /** Catalog SKUs this account owns (server-side inventory, follows the account across devices). */
+  ownedSkus: ReadonlySet<string>;
+  /** Live LokToken price for a SKU, or undefined until the catalog loads / when it isn't sold. */
+  priceOf: (sku: string) => number | undefined;
+  /** Buy a catalog SKU. Resolves with the server's verdict; refreshes balance and inventory on success. */
+  spend: (sku: string) => Promise<SpendResult>;
 }
 
 const LokEconomyContext = createContext<LokEconomyContextValue>({
@@ -46,6 +61,10 @@ const LokEconomyContext = createContext<LokEconomyContextValue>({
   lifetimeEarned: null,
   rank: null,
   earn: () => {},
+  signedIn: false,
+  ownedSkus: new Set<string>(),
+  priceOf: () => undefined,
+  spend: async () => ({ ok: false, error: 'not_signed_in' }),
 });
 
 export function LokEconomyProvider({ children }: { children: ReactNode }) {
@@ -53,15 +72,29 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [lifetimeEarned, setLifetimeEarned] = useState<number | null>(null);
   const [rank, setRank] = useState<LokProfileRank | null>(null);
+  const [ownedSkus, setOwnedSkus] = useState<ReadonlySet<string>>(() => new Set());
+  const [prices, setPrices] = useState<Record<string, number>>({});
   const refreshedForUserId = useRef<string | null>(null);
+
+  // The catalog is public-read, so prices load even for signed-out players.
+  useEffect(() => {
+    if (!lokClient) return;
+    void fetchCatalog(lokClient, APP_KEY).then((result) => {
+      if (result.ok) setPrices(Object.fromEntries(result.items.map((item) => [item.sku, item.price])));
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!lokClient || !session) {
       setBalance(null);
       setLifetimeEarned(null);
       setRank(null);
+      setOwnedSkus(new Set());
       return;
     }
+    void fetchOwnedSkus(lokClient).then((owned) => {
+      if (owned.ok) setOwnedSkus(new Set(owned.skus));
+    });
     const profile = await getLokProfile(lokClient, session.user.id, APP_KEY);
     if (!profile.ok) return;
     setBalance(profile.balance ?? null);
@@ -97,7 +130,28 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
     [session, refresh],
   );
 
-  const value: LokEconomyContextValue = { balance, lifetimeEarned, rank, earn };
+  const spend = useCallback(
+    async (sku: string): Promise<SpendResult> => {
+      if (!lokClient || !session) return { ok: false, error: 'not_signed_in' };
+      // One idemKey per account+SKU: a retried request can never charge twice.
+      const result = await spendLokTokens(lokClient, { appKey: APP_KEY, sku, idemKey: `buy:${sku}` });
+      if (result.ok || result.error === 'already_owned') await refresh();
+      return result;
+    },
+    [session, refresh],
+  );
+  const priceOf = useCallback((sku: string) => prices[sku], [prices]);
+
+  const value: LokEconomyContextValue = {
+    balance,
+    lifetimeEarned,
+    rank,
+    earn,
+    signedIn: !!session,
+    ownedSkus,
+    priceOf,
+    spend,
+  };
   return <LokEconomyContext.Provider value={value}>{children}</LokEconomyContext.Provider>;
 }
 

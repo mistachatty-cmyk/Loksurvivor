@@ -70,7 +70,7 @@ test.describe('LOK Universe Exchange', () => {
   });
 
   test('exports a kennel companion as a portable card', async ({ page }) => {
-    await page.locator('select').selectOption('packed-pet');
+    await page.getByTestId('select-exchange-pet').selectOption('packed-pet');
     await page.getByRole('button', { name: 'Generate export' }).click();
     const output = page.locator('textarea[readonly]');
     await expect(output).toBeVisible();

@@ -295,6 +295,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Claiming an achievement or trading a card with another LOK game can now earn LokTokens when you are signed in.',
     ],
   },
+  {
+    version: '0.11.5',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Universe Binder',
+    body: [
+      'The Universe chapter now holds a binder of every card from every LOK game. Browse them all together or one game at a time, and build decks that follow your account.',
+      'Cards from other games are drawn from their own models. Palettes in the Paint Gallery are now bought with LokTokens, so you need to sign in to buy new ones. Palettes you already own stay yours.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
