@@ -291,6 +291,11 @@ content or lore here, do the matching sync as part of the same update.**
   `--check <file>` tells you whether the hub copy is stale. The hub page uses
   this game's own palette (read from `src/index.css`), so a theme change
   carries over on the next export.
+- **Patch notes changed** (every version bump, see "Versioning") -> from
+  `artifacts/survivor-616/`: `pnpm exec tsx scripts/export-public-updates.ts public/lok-updates.json`.
+  The hub reads that file live from `https://survivor.gsix.online/lok-updates.json`
+  for gsix.online/games/survivor616 (the "Updates" page), so nothing is copied
+  into Gsixhub. `src/game/data/publicUpdates.test.ts` fails if you forget.
 - **SDK** lives in `lib/lok-universe` and is **vendored: never edit it here**.
   Change `Lok-EcoSystsem/universe-sdk` and run its `sync-sdk.sh`.
 - Platform manifest: `artifacts/survivor-616/lok.universe.json`.

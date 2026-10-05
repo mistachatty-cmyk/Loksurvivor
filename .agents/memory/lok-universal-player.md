@@ -56,3 +56,11 @@ Read before moving or renaming anything under `public/music/` or editing
   The album files themselves were not re-encoded (lossy to lossy).
 - When adding an album track: update the track list in `musicPlayer.tsx`, add
   the file under `public/music/lokifed-take-1/`, add it to the JSON.
+
+## Public updates for gsix.online (added with 0.12.0)
+
+`public/lok-updates.json` is the patch notes as a `lok.public-updates` document,
+generated from `changelog.ts` by `scripts/export-public-updates.ts`; the hub's
+game page reads it live (cached 15 min) from survivor.gsix.online, with a bundled
+fallback, so every version bump must regenerate it (`publicUpdates.test.ts`
+fails otherwise). Not a copy-into-Gsixhub file, unlike the lore export.
