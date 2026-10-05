@@ -218,7 +218,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
           >
             POWERED BY LOKSERVICES · DESIGNED BY GSIXDESIGNS
           </a>
-          <MotionNotice />
+          {meta.attractModeEnabled ? <MotionNotice /> : null}
         </motion.div>
         {/* Both of these use `position: fixed`, which must escape to the
             viewport -- kept as siblings of motion.div, not nested inside it,

@@ -1634,6 +1634,8 @@ export interface EndlessRouteEventState {
   rewardTokens: number;
 }
 
+export type BuildingSupplyKind = 'health' | 'cred' | 'water-flask' | 'phosphor-ore' | 'silicon-alloy' | 'cyber-resin';
+
 /** Live state kept on the World while running in endless mode. */
 export interface EndlessState {
   /** World-space distance from origin — drives difficulty. */
@@ -1650,6 +1652,12 @@ export interface EndlessState {
   inDungeon: boolean;
   /** Whether the player is exploring an enterable city building. */
   inBuilding: boolean;
+  /** The original room transition remains available as a device setting. */
+  buildingEntryStyle: 'seamless' | 'classic';
+  /** Building occupied in walk-in mode; the street simulation continues. */
+  walkInBuildingId: string | null;
+  /** Supply caches claimed during this run, including unloaded blocks. */
+  claimedBuildingSupplies: Set<string>;
   buildingLabel: string;
   buildingPrefabId: string | null;
   buildingCenterX: number;
@@ -1742,6 +1750,7 @@ export interface EndlessState {
     w: number;
     h: number;
     doorSide: 'north' | 'south' | 'east' | 'west';
+    supplyKind: BuildingSupplyKind | null;
   }>;
 }
 

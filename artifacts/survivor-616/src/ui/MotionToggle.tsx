@@ -4,7 +4,7 @@
  * which freezes the title-screen live feed, hideout rain and parallax, and the
  * walking operative. The choice is stored on this device only.
  */
-import { deviceWantsReducedMotion, getMotionMode, setMotionMode } from '@/anim/motion';
+import { deviceWantsReducedMotion, getMotionMode, liveFeedPausedByDevice, setMotionMode } from '@/anim/motion';
 
 function applyAndReload(mode: 'system' | 'full') {
   setMotionMode(mode);
@@ -13,17 +13,18 @@ function applyAndReload(mode: 'system' | 'full') {
   window.location.reload();
 }
 
-/** Small title-screen notice, shown only when the device is holding animations back. */
+/** Title-screen notice, shown only when the device has paused the live feed. */
 export function MotionNotice() {
-  if (!deviceWantsReducedMotion() || getMotionMode() === 'full') return null;
+  if (!liveFeedPausedByDevice()) return null;
   return (
     <button
       type="button"
       onClick={() => applyAndReload('full')}
-      className="mt-2 font-mono text-[9px] uppercase tracking-widest text-amber-300/80 underline-offset-2 hover:text-amber-200 hover:underline"
+      className="mt-3 inline-flex max-w-full items-center justify-center gap-2 rounded-full border border-amber-300/50 bg-amber-300/10 px-3 py-1.5 text-center font-mono text-[10px] font-bold uppercase tracking-wider text-amber-100 shadow-[0_0_18px_rgba(251,191,36,0.26)] transition-colors hover:border-amber-200/80 hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
       data-testid="button-motion-notice"
     >
-      Animations are paused by your device setting. Tap to always animate.
+      <span className="size-1.5 shrink-0 rounded-full bg-amber-200 shadow-[0_0_8px_rgba(251,191,36,0.9)]" aria-hidden="true" />
+      Live feed paused by your device · Tap to turn on
     </button>
   );
 }

@@ -357,6 +357,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A new bar on that page jumps straight to the Archives, the Updates and each lore chapter. The Updates list there is the same patch notes you see in the game, in blue, and it keeps itself current.',
     ],
   },
+  {
+    version: '0.12.1',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'The Block Stays Alive',
+    body: [
+      'Endless buildings now let you walk in without resetting the street fight. Choose Classic in Settings if you prefer the separate prefab rooms.',
+      'One building per block has a marked, one-time supply find. Floors and soft lighting fit the place, and a lit strip helps you find the doorway.',
+      'The title live feed gets a first-load preview. On later loads, a device request for reduced motion pauses it and shows a small glowing notice. Always animate overrides the pause.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

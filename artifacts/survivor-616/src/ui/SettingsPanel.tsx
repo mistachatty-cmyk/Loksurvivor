@@ -54,6 +54,7 @@ import {
   setLanguagePreference,
   useT,
 } from '@/lib/i18n';
+import { BUILDING_ENTRY_STYLES, getBuildingEntryStyle, setBuildingEntryStyle, type BuildingEntryStyle } from '@/game/state/buildingEntrySetting';
 
 export interface SettingsPanelProps {
   onBack: () => void;
@@ -131,6 +132,38 @@ function FightStyleSetting() {
         ))}
       </div>
       <p className="mt-2 text-xs text-muted-foreground" data-testid="text-fightstyle-blurb">{t(`settings.fightStyle.${style}.blurb`)}</p>
+    </div>
+  );
+}
+
+function BuildingEntrySetting() {
+  const [style, setStyle] = useState<BuildingEntryStyle>(getBuildingEntryStyle);
+  const active = BUILDING_ENTRY_STYLES.find((entry) => entry.id === style)!;
+  return (
+    <div className="mt-3 border border-border/70 bg-background/50 p-4">
+      <h3 className="text-sm font-black uppercase tracking-wide text-white">Endless building entrances</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+        Choose how street buildings work. This device only; the choice applies when you start a new run.
+      </p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {BUILDING_ENTRY_STYLES.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            onClick={() => { setBuildingEntryStyle(entry.id); setStyle(entry.id); }}
+            aria-pressed={style === entry.id}
+            className={`border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+              style === entry.id
+                ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+            }`}
+            data-testid={`button-building-entry-${entry.id}`}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{active.blurb}</p>
     </div>
   );
 }
@@ -901,6 +934,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                 </div>
               </div>
               <FightStyleSetting />
+              <BuildingEntrySetting />
             </div>
           </div>
         </section>
