@@ -108,6 +108,7 @@ import {
 import {
   BUILDING_PREFABS,
   CHUNK_SIZE,
+  buildingSupplyPoint,
   buildingWallObstacles,
   chunkKey,
   chunkOrigin,
@@ -544,6 +545,8 @@ export interface BreakableObstacle extends Aabb {
   uid: number;
   kind: ObstacleDef['kind'];
   propVariant: PropVariant | undefined;
+  /** Page overlay only: copied from the ObstacleDef so the host can find its DOM element. */
+  domId?: number;
   hp: number;
   maxHp: number;
   vx: number;
@@ -840,10 +843,12 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'data-pipe': { variant: 'light-breakable', hp: 105 },
   'digi-arch': { variant: 'heavy-metal', hp: 360 },
   'pressure-door': { variant: 'heavy-metal', hp: 300 },
+  /** Page overlay: an element of a live web page. Immovable; callers pass a per-block hp. */
+  'page-block': { variant: 'fixed-breakable', hp: 60 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
-  'data-pipe', 'digi-arch', 'pressure-door',
+  'data-pipe', 'digi-arch', 'pressure-door', 'page-block',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -904,6 +909,9 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant'>): PropP
   }
   if (variant === 'heavy-metal') {
     return { variant, mass: 8, friction: 0.94, breakable, movable: true };
+  }
+  if (variant === 'fixed-breakable') {
+    return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable, movable: false };
   }
   return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
 }
@@ -1413,6 +1421,7 @@ export function createWorld(
     dvdEasterEggUnlocked?: boolean;
     ownedKeyItemIds?: string[];
     craftedRelicIds?: string[];
+    buildingEntryStyle?: 'seamless' | 'classic';
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1804,6 +1813,9 @@ export function createWorld(
       dungeonDepth: 0,
       inDungeon: false,
       inBuilding: false,
+      buildingEntryStyle: setup.buildingEntryStyle ?? 'seamless',
+      walkInBuildingId: null,
+      claimedBuildingSupplies: new Set(),
       buildingLabel: '',
       buildingPrefabId: null,
       buildingCenterX: 0,
@@ -1901,7 +1913,9 @@ function uid(w: World): number {
 
 function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
   const profile = propProfile(obstacle);
-  const hp = profile.breakable ? (OBSTACLE_WEIGHT_PROFILES[obstacle.kind]?.hp ?? 60) : Number.POSITIVE_INFINITY;
+  const hp = profile.breakable
+    ? (obstacle.hp ?? OBSTACLE_WEIGHT_PROFILES[obstacle.kind]?.hp ?? 60)
+    : Number.POSITIVE_INFINITY;
   return {
     ...obstacle,
     uid: uid(w),
@@ -5673,6 +5687,28 @@ function syncObstacleAabbs(w: World) {
   w.obstacleGridDirty = true;
 }
 
+/**
+ * Add obstacles to a running world (the page overlay streams DOM elements in
+ * as the player scrolls). One sync for the whole batch -- syncObstacleAabbs is
+ * O(n), so adding blocks one at a time would be quadratic.
+ */
+export function addBreakables(w: World, defs: ObstacleDef[]): BreakableObstacle[] {
+  const added = defs.filter((d) => d.kind !== 'pothole').map((d) => createBreakable(w, d));
+  if (added.length === 0) return added;
+  w.breakables.push(...added);
+  syncObstacleAabbs(w);
+  return added;
+}
+
+/** Drop obstacles by uid (streamed out of range, or already handled by the host after breaking). */
+export function removeBreakables(w: World, uids: ReadonlySet<number>): void {
+  if (uids.size === 0) return;
+  const kept = w.breakables.filter((b) => !uids.has(b.uid));
+  if (kept.length === w.breakables.length) return;
+  w.breakables = kept;
+  syncObstacleAabbs(w);
+}
+
 function damageBreakable(
   w: World,
   x: number,
@@ -5730,6 +5766,10 @@ function damageBreakable(
           bornAt: w.now,
         });
       }
+    }
+    if (b.kind === 'page-block') {
+      // Demolition is the whole loop on a page, so every block pays a little XP -- that's what drives level-ups there.
+      w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: clamp(Math.round(b.maxHp / 40), 2, 10), bornAt: w.now });
     }
     if (b.kind === 'street-lamp') {
       b.hazardUntil = w.now + 5200;
@@ -10374,6 +10414,7 @@ function updateEndlessChunks(w: World) {
         w: building.w,
         h: building.h,
         doorSide: building.doorSide,
+        supplyKind: building.supplyKind,
       });
     }
     if (chunk.hasRiver) {
@@ -10513,6 +10554,8 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
 
 function enterDungeon(w: World) {
   const e = w.endless!;
+  e.walkInBuildingId = null;
+  e.buildingLabel = '';
   e.streetReturnX = w.player.x;
   e.streetReturnY = w.player.y;
   e.dungeonDepth += 1;
@@ -10646,13 +10689,43 @@ function updateEndlessDungeon(w: World) {
   const p = w.player;
 
   if (!e.inDungeon && !e.inBuilding) {
-    for (const door of e.buildingEntrances) {
-      if (
-        Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
-        Math.abs(p.y - door.y) < door.h / 2 + p.radius
-      ) {
-        enterBuilding(w, door);
+    if (e.buildingEntryStyle === 'seamless') {
+      const occupied = e.buildings.find((building) =>
+        Math.abs(p.x - building.x) < building.w / 2 - p.radius &&
+        Math.abs(p.y - building.y) < building.h / 2 - p.radius,
+      );
+      e.walkInBuildingId = occupied?.id ?? null;
+      e.buildingLabel = occupied?.name ?? '';
+      if (occupied) {
+        if (occupied.supplyKind && !e.claimedBuildingSupplies.has(occupied.id) &&
+          (occupied.supplyKind !== 'health' || p.hp < p.maxHp)) {
+          const supply = buildingSupplyPoint(occupied);
+          if (Math.hypot(p.x - supply.x, p.y - supply.y) < p.radius + 18) {
+            e.claimedBuildingSupplies.add(occupied.id);
+            w.pickups.push({
+              uid: uid(w),
+              kind: occupied.supplyKind,
+              x: supply.x,
+              y: supply.y,
+              vx: 0,
+              vy: 0,
+              value: occupied.supplyKind === 'health' ? 16 : occupied.supplyKind === 'cred' ? 12 : 1,
+              bornAt: w.now,
+            });
+            pushAlert(w, `${occupied.name} supply found`);
+          }
+        }
         return;
+      }
+    } else {
+      for (const door of e.buildingEntrances) {
+        if (
+          Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
+          Math.abs(p.y - door.y) < door.h / 2 + p.radius
+        ) {
+          enterBuilding(w, door);
+          return;
+        }
       }
     }
     for (const entrance of e.dungeonEntrances) {
@@ -11330,7 +11403,7 @@ export function hudSnapshot(w: World): HudSnapshot {
             worldToChunkCoords(w.player.x, w.player.y).cx,
             worldToChunkCoords(w.player.x, w.player.y).cy,
           ))?.district ?? 'Unmapped district',
-          inBuilding: e.inBuilding,
+          inBuilding: e.inBuilding || Boolean(e.walkInBuildingId),
           buildingLabel: e.buildingLabel,
           playerX: w.player.x,
           playerY: w.player.y,

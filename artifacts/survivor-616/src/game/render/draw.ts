@@ -15,7 +15,7 @@ import { lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
-import { getBuildingPrefab } from '@/game/engine/chunks';
+import { buildingSupplyPoint, getBuildingPrefab } from '@/game/engine/chunks';
 import { blendSpritePalettes } from '@/game/data/characterSkins';
 
 import { drawRig, drawShadow } from './sprite';
@@ -61,6 +61,12 @@ export interface Viewport {
    * map editor overrides it to fit a whole authored map in one frame.
    */
   targetViewOverride?: number;
+  /**
+   * Draw only the actors and effects onto a transparent canvas, with no floor,
+   * sky, lighting, vignette or obstacle art. The page overlay composites this
+   * over a live web page, which supplies the whole backdrop itself.
+   */
+  overlay?: boolean;
 }
 
 type ViewBounds = { left: number; top: number; right: number; bottom: number };
@@ -1110,6 +1116,93 @@ function drawChunkLandmark(
   ctx.restore();
 }
 
+type EndlessBuilding = NonNullable<World['endless']>['buildings'][number];
+
+function drawWalkInFloor(ctx: CanvasRenderingContext2D, building: EndlessBuilding) {
+  const left = building.x - building.w / 2 + 10;
+  const top = building.y - building.h / 2 + 10;
+  const width = building.w - 20;
+  const height = building.h - 20;
+  const id = building.prefabId;
+  const domestic = id === 'duplex' || id === 'apartment' || id === 'penthouse';
+  const tiled = id === 'clinic' || id === 'laundromat' || id === 'harbor-office';
+  const industrial = id === 'warehouse' || id === 'auto-shop' || id === 'toll-plaza' || id === 'lev-substation';
+  const digital = id === 'antenna-hub' || id === 'server-cluster' || id === 'skyline-spire' || id === 'nanite-foundry';
+  const crypt = id === 'catacomb-crypt';
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(left, top, width, height);
+  ctx.clip();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = domestic ? '#182923' : tiled ? '#132631' : industrial ? '#24252b' : digital ? '#111d2b' : crypt ? '#28232b' : '#2a2028';
+  ctx.fillRect(left, top, width, height);
+
+  ctx.strokeStyle = building.accent;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.19;
+  if (domestic || id === 'corner-store' || id === 'bar') {
+    // Floorboards and alternating short seams keep homes distinct from work sites.
+    for (let y = top + 14, row = 0; y < top + height; y += 15, row += 1) {
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(left + width, y);
+      ctx.stroke();
+      for (let x = left + (row % 2 ? 28 : 56); x < left + width; x += 56) {
+        ctx.beginPath();
+        ctx.moveTo(x, y - 15);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      }
+    }
+  } else if (tiled || crypt) {
+    const tile = crypt ? 29 : 22;
+    for (let x = left + tile; x < left + width; x += tile) {
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + height); ctx.stroke();
+    }
+    for (let y = top + tile; y < top + height; y += tile) {
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke();
+    }
+  } else if (industrial) {
+    for (let y = top + 16; y < top + height; y += 18) {
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + width, y); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.11;
+    for (let x = left + 16; x < left + width; x += 36) {
+      ctx.fillRect(x, top, 8, height);
+    }
+  } else if (digital) {
+    for (let x = left + 22; x < left + width; x += 42) {
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, building.y - 8);
+      ctx.lineTo(x + 18, building.y - 8);
+      ctx.stroke();
+      ctx.fillRect(x + 16, building.y - 10, 4, 4);
+    }
+  }
+
+  // The light is localized, keeping actors and the door lane clear in dense fights.
+  const light = ctx.createRadialGradient(building.x, building.y, 8, building.x, building.y, Math.max(width, height) * 0.6);
+  light.addColorStop(0, `${building.accent}30`);
+  light.addColorStop(1, `${building.accent}00`);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = light;
+  ctx.fillRect(left, top, width, height);
+  ctx.restore();
+
+  const door = buildingSupplyPoint(building);
+  ctx.save();
+  ctx.globalAlpha = 0.68;
+  ctx.fillStyle = building.accent;
+  if (building.doorSide === 'north' || building.doorSide === 'south') {
+    ctx.fillRect(door.x - 13, door.y - 3, 26, 6);
+  } else {
+    ctx.fillRect(door.x - 3, door.y - 13, 6, 26);
+  }
+  ctx.restore();
+}
+
 function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
   const e = w.endless;
   if (!e || e.inDungeon || e.inBuilding) return;
@@ -1194,11 +1287,12 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
   for (const building of e.buildings) {
     const left = building.x - building.w / 2;
     const top = building.y - building.h / 2;
+    const walkedInside = e.buildingEntryStyle === 'seamless' && e.walkInBuildingId === building.id;
     ctx.save();
-    ctx.fillStyle = '#131a25';
+    ctx.fillStyle = walkedInside ? '#0a1118' : '#131a25';
     ctx.globalAlpha = 0.96;
     ctx.fillRect(left, top, building.w, building.h);
-    ctx.fillStyle = `${building.accent}18`;
+    ctx.fillStyle = `${building.accent}${walkedInside ? '28' : '18'}`;
     ctx.fillRect(left + 8, top + 8, building.w - 16, building.h - 16);
     ctx.strokeStyle = building.accent;
     ctx.lineWidth = 3;
@@ -1208,43 +1302,83 @@ function drawCityMapFeatures(ctx: CanvasRenderingContext2D, w: World) {
     ctx.lineWidth = 1;
     ctx.strokeRect(left + 7, top + 7, building.w - 14, building.h - 14);
     ctx.setLineDash([]);
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = '#dbeafe';
-    const windowCount = Math.max(2, Math.floor((building.w - 36) / 34));
-    for (let index = 0; index < windowCount; index += 1) {
-      const wx = left + 18 + index * ((building.w - 36) / Math.max(1, windowCount - 1));
-      ctx.fillRect(wx - 5, top + 18, 10, 5);
-      ctx.fillRect(wx - 5, top + building.h - 23, 10, 5);
-    }
-    const isVerticalDoor = building.doorSide === 'east' || building.doorSide === 'west';
-    ctx.fillStyle = '#fff3b0';
-    if (isVerticalDoor) {
-      const dx = building.doorSide === 'west' ? left - 3 : left + building.w - 3;
-      ctx.fillRect(dx, building.y - 10, 6, 20);
+    if (walkedInside) {
+      drawWalkInFloor(ctx, building);
+      ctx.fillStyle = '#fff';
+      ctx.globalAlpha = 0.86;
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(building.name.toUpperCase(), building.x, top + 28);
     } else {
-      const dy = building.doorSide === 'north' ? top - 3 : top + building.h - 3;
-      ctx.fillRect(building.x - 10, dy, 20, 6);
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = '#dbeafe';
+      const windowCount = Math.max(2, Math.floor((building.w - 36) / 34));
+      for (let index = 0; index < windowCount; index += 1) {
+        const wx = left + 18 + index * ((building.w - 36) / Math.max(1, windowCount - 1));
+        ctx.fillRect(wx - 5, top + 18, 10, 5);
+        ctx.fillRect(wx - 5, top + building.h - 23, 10, 5);
+      }
+      const isVerticalDoor = building.doorSide === 'east' || building.doorSide === 'west';
+      ctx.fillStyle = '#fff3b0';
+      if (isVerticalDoor) {
+        const dx = building.doorSide === 'west' ? left - 3 : left + building.w - 3;
+        ctx.fillRect(dx, building.y - 10, 6, 20);
+      } else {
+        const dy = building.doorSide === 'north' ? top - 3 : top + building.h - 3;
+        ctx.fillRect(building.x - 10, dy, 20, 6);
+      }
+      ctx.fillStyle = building.accent;
+      ctx.globalAlpha = 0.95;
+      ctx.fillRect(building.x - Math.min(58, building.sign.length * 4), building.y - 5, Math.min(116, building.sign.length * 8), 15);
+      ctx.fillStyle = '#08111a';
+      ctx.font = 'bold 7px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(building.sign, building.x, building.y + 5);
     }
-    ctx.fillStyle = building.accent;
-    ctx.globalAlpha = 0.95;
-    ctx.fillRect(building.x - Math.min(58, building.sign.length * 4), building.y - 5, Math.min(116, building.sign.length * 8), 15);
-    ctx.fillStyle = '#08111a';
-    ctx.font = 'bold 7px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(building.sign, building.x, building.y + 5);
+    if (e.buildingEntryStyle === 'seamless' && building.supplyKind && !e.claimedBuildingSupplies.has(building.id)) {
+      const supplyColor = building.supplyKind === 'health' ? '#7dffb2'
+        : building.supplyKind === 'water-flask' ? '#38bdf8'
+        : building.supplyKind === 'cred' ? '#fbbf24'
+        : '#c084fc';
+      const supplyLabel = building.supplyKind === 'health' ? 'HEAL'
+        : building.supplyKind === 'water-flask' ? 'WATER'
+        : building.supplyKind === 'cred' ? 'CRED'
+        : 'SALVAGE';
+      ctx.fillStyle = supplyColor;
+      ctx.strokeStyle = supplyColor;
+      if (walkedInside) {
+        const supply = buildingSupplyPoint(building);
+        ctx.globalAlpha = 0.85;
+        ctx.shadowColor = supplyColor;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(supply.x, supply.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(supplyLabel, supply.x, supply.y - 13);
+      } else {
+        ctx.globalAlpha = 0.75;
+        ctx.fillRect(left + 13, top + 35, 6, 6);
+        ctx.font = 'bold 7px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(supplyLabel, left + 24, top + 41);
+      }
+    }
     ctx.textAlign = 'left';
     ctx.restore();
   }
 
   for (const door of e.buildingEntrances) {
     ctx.save();
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = e.buildingEntryStyle === 'seamless' ? 0.42 : 0.85;
     ctx.fillStyle = '#f6c453';
     ctx.fillRect(door.x - door.w / 2, door.y - door.h / 2, door.w, door.h);
     ctx.fillStyle = '#fff3b0';
     ctx.fillRect(door.x - 5, door.y - 8, 10, 16);
     ctx.font = '9px monospace';
-    ctx.fillText('ENTER', door.x - 18, door.y - 20);
+    ctx.fillText(e.buildingEntryStyle === 'seamless' ? 'OPEN' : 'ENTER', door.x - 18, door.y - 20);
     ctx.restore();
   }
 }
@@ -1876,6 +2010,8 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'data-pipe': { top: '#12372f', side: '#071d19', trim: '#86efac' },
   'digi-arch': { top: '#12324a', side: '#071923', trim: '#22d3ee' },
   'pressure-door': { top: '#374151', side: '#171f2b', trim: '#facc15' },
+  /** Never drawn by the page overlay (the live page is the visual); present so the table stays exhaustive. */
+  'page-block': { top: '#4b5563', side: '#1f2937', trim: '#9ca3af' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -2007,10 +2143,23 @@ function drawObstacles(
   // endless mode can have a full 5x5 chunk window's worth of breakables
   // loaded at once, and this ran unfiltered every frame before.
   const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> = [];
+  const closedBuildings = w.endless?.buildingEntryStyle === 'seamless' && !w.endless.inDungeon
+    ? w.endless.buildings.filter((building) =>
+        building.id !== w.endless!.walkInBuildingId &&
+        building.x + building.w / 2 >= viewBounds.left - margin &&
+        building.x - building.w / 2 <= viewBounds.right + margin &&
+        building.y + building.h / 2 >= viewBounds.top - margin &&
+        building.y - building.h / 2 <= viewBounds.bottom + margin,
+      )
+    : [];
   for (const o of w.breakables) {
     if (o.broken) continue;
     if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
       || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
+    if (closedBuildings.some((building) =>
+        Math.abs(o.x - building.x) < building.w / 2 - 12 &&
+        Math.abs(o.y - building.y) < building.h / 2 - 12,
+      )) continue;
     obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind });
   }
 
@@ -6039,9 +6188,14 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const targetView = targetViewForWidth(width, view.targetViewOverride);
   const zoom = Math.max(0.001, width / targetView);
 
+  const overlay = view.overlay === true;
   ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
-  ctx.fillStyle = '#06060a';
-  ctx.fillRect(0, 0, width, height);
+  if (overlay) {
+    ctx.clearRect(0, 0, width, height);
+  } else {
+    ctx.fillStyle = '#06060a';
+    ctx.fillRect(0, 0, width, height);
+  }
 
   const shakeX = w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
   const shakeY = w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
@@ -6078,56 +6232,64 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const showBirds = profile.birds || !w.wildlifeSheltersInRain;
   const showFireflies = profile.fireflies || !w.wildlifeSheltersInRain;
   const cloudPuffs = computeCloudPuffs(w, profile, left, top, right, bottom);
-  drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
-  drawAuthoredGroundTiles(ctx, w);
-  if (w.endless?.inDungeon) {
-    ctx.fillStyle = '#000';
-    ctx.globalAlpha = 0.1 + Math.min(0.08, w.endless.dungeonEraIndex * 0.015);
-    ctx.fillRect(left, top, right - left, bottom - top);
-    ctx.globalAlpha = 1;
+  // Overlay mode skips every layer that paints the environment; only the
+  // actors/pickups/effects below are drawn, over a transparent canvas.
+  if (!overlay) {
+    drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
+    drawAuthoredGroundTiles(ctx, w);
+    if (w.endless?.inDungeon) {
+      ctx.fillStyle = '#000';
+      ctx.globalAlpha = 0.1 + Math.min(0.08, w.endless.dungeonEraIndex * 0.015);
+      ctx.fillRect(left, top, right - left, bottom - top);
+      ctx.globalAlpha = 1;
+    }
+    const tint = timeOfDayTint(w.cycle.phase);
+    if (tint !== 'rgba(0, 0, 0, 0.000)') {
+      ctx.fillStyle = tint;
+      // Low-Light Optics: keep a hint of the time-of-day mood without the city
+      // actually hiding anything from a player who paid not to be surprised.
+      ctx.globalAlpha = w.nightVisionEnabled ? 0.25 : 1;
+      ctx.fillRect(left, top, right - left, bottom - top);
+      ctx.globalAlpha = 1;
+    }
+    drawCloudShadows(ctx, cloudPuffs, profile);
+    drawWetSheen(ctx, w, left, top, right, bottom, profile.rain);
+    drawCityMapFeatures(ctx, w);
+    drawEndlessRouteEvent(ctx, w);
+    drawBuildingInterior(ctx, w);
+    drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
+    drawMillionHordeDensity(ctx, w, viewBounds);
+    drawLightPool(ctx, w);
+    drawLandmark(ctx, w);
+    drawDistrictIncursion(ctx, w);
+    drawObjectLighting(ctx, w);
+    if (sky !== 'roofed') {
+      drawSteamVents(ctx, w, left, top, right, bottom);
+      if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
+      if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
+      drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
+    }
+    drawBeacons(ctx, w);
+    drawArenaEdges(ctx, w, { left, top, right, bottom });
+    drawFog(ctx, w, left, top, right, bottom);
+    drawDungeonRoomBorder(ctx, w);
   }
-  const tint = timeOfDayTint(w.cycle.phase);
-  if (tint !== 'rgba(0, 0, 0, 0.000)') {
-    ctx.fillStyle = tint;
-    // Low-Light Optics: keep a hint of the time-of-day mood without the city
-    // actually hiding anything from a player who paid not to be surprised.
-    ctx.globalAlpha = w.nightVisionEnabled ? 0.25 : 1;
-    ctx.fillRect(left, top, right - left, bottom - top);
-    ctx.globalAlpha = 1;
-  }
-  drawCloudShadows(ctx, cloudPuffs, profile);
-  drawWetSheen(ctx, w, left, top, right, bottom, profile.rain);
-  drawCityMapFeatures(ctx, w);
-  drawEndlessRouteEvent(ctx, w);
-  drawBuildingInterior(ctx, w);
-  drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
-  drawMillionHordeDensity(ctx, w, viewBounds);
-  drawLightPool(ctx, w);
-  drawLandmark(ctx, w);
-  drawDistrictIncursion(ctx, w);
-  drawObjectLighting(ctx, w);
-  if (sky !== 'roofed') {
-    drawSteamVents(ctx, w, left, top, right, bottom);
-    if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
-    if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
-    drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
-  }
-  drawBeacons(ctx, w);
-  drawArenaEdges(ctx, w, { left, top, right, bottom });
-  drawFog(ctx, w, left, top, right, bottom);
-  drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);
   drawPickups(ctx, w);
-  drawDungeonEntrances(ctx, w);
-  drawDungeonExit(ctx, w);
-  drawDungeonChest(ctx, w);
+  if (!overlay) {
+    drawDungeonEntrances(ctx, w);
+    drawDungeonExit(ctx, w);
+    drawDungeonChest(ctx, w);
+  }
   drawFluids(ctx, w);
-  drawPotholes(ctx, w);
-  drawAmbient(ctx, w);
-  drawObstacles(ctx, w, viewBounds);
-  drawAwarenessArrow(ctx, w);
-  drawRoamingDetectors(ctx, w);
+  if (!overlay) {
+    drawPotholes(ctx, w);
+    drawAmbient(ctx, w);
+    drawObstacles(ctx, w, viewBounds);
+    drawAwarenessArrow(ctx, w);
+    drawRoamingDetectors(ctx, w);
+  }
   drawArtisteTrail(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
   drawRunningMan(ctx, w);
@@ -6141,7 +6303,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPendingMeteors(ctx, w);
   drawParticles(ctx, w, viewBounds, visualBudget);
   drawPopups(ctx, w, viewBounds, visualBudget);
-  if (sky !== 'roofed') {
+  if (sky !== 'roofed' && !overlay) {
     if (showBirds) drawBirds(ctx, w, left, top, right, bottom);
     drawClouds(ctx, w, cloudPuffs, profile);
     drawFogBanks(ctx, w, left, top, right, bottom, profile.fog);
@@ -6152,21 +6314,23 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   ctx.restore();
 
   // Vignette keeps the eye on the middle of the fight.
-  const gradient = ctx.createRadialGradient(
-    width / 2,
-    height / 2,
-    Math.min(width, height) * 0.38,
-    width / 2,
-    height / 2,
-    Math.max(width, height) * 0.78,
-  );
-  gradient.addColorStop(0, 'rgba(0,0,0,0)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
+  if (!overlay) {
+    const gradient = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.38,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.78,
+    );
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   // Distant lightning, under the damage flash so a hit still reads as red.
-  const bolt = lightningIntensity(w.now, profile.lightningPeriodMs);
+  const bolt = overlay ? 0 : lightningIntensity(w.now, profile.lightningPeriodMs);
   if (bolt > 0) {
     ctx.globalAlpha = bolt * (sky === 'cyber-storm' ? 0.22 : 0.16);
     ctx.fillStyle = sky === 'cyber-storm' ? '#d8b4fe' : '#cfe0ff';

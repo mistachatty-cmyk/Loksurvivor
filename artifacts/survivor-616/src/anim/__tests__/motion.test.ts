@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { prefersReducedMotion } from '../motion';
+import { liveFeedPausedByDevice, prefersReducedMotion, registerLiveFeedLoad } from '../motion';
 
 /**
  * The contract worth testing here isn't "does it animate" -- it's that a player
@@ -10,7 +10,7 @@ import { prefersReducedMotion } from '../motion';
  */
 
 type MatchMedia = (query: string) => MediaQueryList;
-type FakeWindow = { matchMedia?: MatchMedia };
+type FakeWindow = { matchMedia?: MatchMedia; localStorage?: Pick<Storage, 'getItem' | 'setItem'> };
 
 // This test runs under plain node:test (no jsdom), so `window` doesn't exist
 // at all until a test defines it -- `prefersReducedMotion` reads
@@ -58,4 +58,22 @@ test('prefersReducedMotion does not throw where matchMedia is unavailable', () =
   clearMatchMedia();
   assert.doesNotThrow(() => prefersReducedMotion());
   assert.equal(prefersReducedMotion(), false);
+});
+
+test('live feed gets one preview before a device reduction can pause it', () => {
+  const values = new Map<string, string>();
+  setReducedMotion(true);
+  (globalThis as { window?: FakeWindow }).window!.localStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { values.set(key, value); },
+  };
+
+  registerLiveFeedLoad();
+  assert.equal(liveFeedPausedByDevice(), false);
+  registerLiveFeedLoad();
+  assert.equal(liveFeedPausedByDevice(), true);
+
+  values.set('survivor616.motion', 'full');
+  assert.equal(liveFeedPausedByDevice(), false);
+  clearMatchMedia();
 });

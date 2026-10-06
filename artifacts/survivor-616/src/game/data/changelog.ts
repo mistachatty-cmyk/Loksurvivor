@@ -361,6 +361,27 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '0.12.1',
     date: '2026-10-05',
     kind: 'update',
+    title: 'The Block Stays Alive',
+    body: [
+      'Endless buildings now let you walk in without resetting the street fight. Choose Classic in Settings if you prefer the separate prefab rooms.',
+      'One building per block has a marked, one-time supply find. Floors and soft lighting fit the place, and a lit strip helps you find the doorway.',
+      'The title live feed gets a first-load preview. On later loads, a device request for reduced motion pauses it and shows a small glowing notice. Always animate overrides the pause.',
+    ],
+  },
+  {
+    version: '0.12.2',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Demo Day On The Web',
+    body: [
+      'Demo Day lets The Foreman play on top of any web page. Start it from the Demo Day page on the GSix website, and the page\u2019s text, pictures and buttons become things to smash. Press Esc and everything goes back exactly as it was.',
+      'It is early access: desktop browsers and keyboard only, and it skips sign-in, payment, banking, health and government pages. When you stop, a card shows how much of the page you took down, with a link to save and share it.',
+    ],
+  },
+  {
+    version: '0.12.3',
+    date: '2026-10-06',
+    kind: 'update',
     title: 'Experimental Map Playlist',
     body: [
       'The map picker now has an Experimental overview for bonus, 2×, 4×, classic, infinite, and custom routes. The original map filters are still there.',
