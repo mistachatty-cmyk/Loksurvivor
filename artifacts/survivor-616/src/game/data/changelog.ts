@@ -486,6 +486,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The floating Back button no longer sits on top of an open popup.',
     ],
   },
+  {
+    version: '0.14.2',
+    date: '2026-10-06',
+    kind: 'hotfix',
+    title: 'Hideout and Travel, Armory Found',
+    body: [
+      'The GRPD Armory was stuck behind GRPD Station, which only opens after clearing Division St. Until the station is found, the Luvitnot keeper now holds the Armory entrance on the Sanctum main floor.',
+      'The room list is split in two. Hideout rooms (the Sanctum, the Perch, the Cellar, the Alley Annex, the Back Room and the Sound Booth) are safe. Travel rooms (The Neon Sleeve, Studio 28, GRPD Station, the Vault and Rapid Shelter) are out in the city and are marked with an Ambush risk badge.',
+      'You can only be ambushed when you travel. Studio 28, the Vault and Rapid Shelter now count, and the Perch, Cellar and Alley Annex no longer do. The Travel setting still switches ambushes off.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

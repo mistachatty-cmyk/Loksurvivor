@@ -62,6 +62,16 @@ test('every hub-room trigger points at a real HubRoomDef id', () => {
   }
 });
 
+test('travel rooms can be ambushed and hideout rooms never are', () => {
+  const triggered = new Set(
+    TRAVEL_ENCOUNTER_TRIGGERS.filter((trigger) => trigger.source === 'hub-room').map((trigger) => trigger.roomId),
+  );
+  for (const room of HUB_ROOMS) {
+    if (room.kind === 'travel') assert.ok(triggered.has(room.id), `travel room has no ambush trigger: ${room.id}`);
+    else assert.ok(!triggered.has(room.id), `hideout room must stay safe: ${room.id}`);
+  }
+});
+
 test('a scripted attack sequence drives status to won with exact hp/round', () => {
   let state = createTravelEncounterState({ name: 'Player', maxHp: 20, hp: 20 }, { name: 'Foe', maxHp: 15, hp: 15 });
   state = applyPlayerAttack(state, 10);
