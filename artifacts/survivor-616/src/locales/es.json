@@ -152,5 +152,15 @@
   "overlay.ability.none": "Espacio: último",
   "overlay.stat.hp": "caballos de fuerza",
   "overlay.stat.speed": "Velocidad",
-  "overlay.stat.power": "Fuerza"
+  "overlay.stat.power": "Fuerza",
+  "hub.nav.hideout.title": "escondite",
+  "hub.nav.hideout.note": "Habitaciones seguras. Nada aquí te atacará.",
+  "hub.nav.travel.title": "viajar",
+  "hub.nav.travel.note": "Afuera en la ciudad. Te pueden tender una emboscada en el camino.",
+  "hub.nav.travel.noteOff": "Afuera en la ciudad. Las emboscadas están desactivadas en Configuración.",
+  "hub.nav.travel.badge": "Riesgo de emboscada",
+  "hub.armory.hideoutEntrance": "Armería GRPD",
+  "hub.armory.hideoutEntranceBlurb": "El portero de Luvitnot tiene una entrada segura aquí.",
+  "hub.armory.relocatedEntrance": "Armería GRPD reubicada",
+  "hub.armory.stationUnfound": "La estación GRPD aún no se ha encontrado, por lo que el guardián mantiene la Armería en el escondite por ahora."
 }

@@ -152,5 +152,15 @@
   "overlay.ability.none": "Raum: ultimativ",
   "overlay.stat.hp": "PS",
   "overlay.stat.speed": "Geschwindigkeit",
-  "overlay.stat.power": "Leistung"
+  "overlay.stat.power": "Leistung",
+  "hub.nav.hideout.title": "Versteck",
+  "hub.nav.hideout.note": "Sichere Räume. Nichts hier drin wird Sie erschrecken.",
+  "hub.nav.travel.title": "Reisen",
+  "hub.nav.travel.note": "Draußen in der Stadt. Auf dem Weg dorthin kann man überfallen werden.",
+  "hub.nav.travel.noteOff": "Draußen in der Stadt. Hinterhalte sind in den Einstellungen deaktiviert.",
+  "hub.nav.travel.badge": "Gefahr eines Hinterhalts",
+  "hub.armory.hideoutEntrance": "GRPD-Waffenkammer",
+  "hub.armory.hideoutEntranceBlurb": "Der Luvitnot-Wärter hat hier einen sicheren Zugang",
+  "hub.armory.relocatedEntrance": "Umzug der GRPD-Waffenkammer",
+  "hub.armory.stationUnfound": "Die GRPD-Station ist immer noch unauffindbar, daher behält der Bewahrer die Waffenkammer vorerst im Versteck."
 }

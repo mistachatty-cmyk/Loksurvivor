@@ -152,5 +152,15 @@
   "overlay.ability.none": "Espace : ultime",
   "overlay.stat.hp": "HP",
   "overlay.stat.speed": "Vitesse",
-  "overlay.stat.power": "Pouvoir"
+  "overlay.stat.power": "Pouvoir",
+  "hub.nav.hideout.title": "Cachette",
+  "hub.nav.hideout.note": "Chambres sécurisées. Rien ici ne vous surprendra.",
+  "hub.nav.travel.title": "Voyage",
+  "hub.nav.travel.note": "En ville. Vous pouvez être pris en embuscade sur le chemin.",
+  "hub.nav.travel.noteOff": "En ville. Les embuscades sont désactivées dans les paramètres.",
+  "hub.nav.travel.badge": "Risque d'embuscade",
+  "hub.armory.hideoutEntrance": "Armurerie GRPD",
+  "hub.armory.hideoutEntranceBlurb": "Le gardien Luvitnot détient une entrée sûre ici",
+  "hub.armory.relocatedEntrance": "Armurerie GRPD déplacée",
+  "hub.armory.stationUnfound": "La station GRPD est toujours introuvable, donc le gardien garde l'armurerie dans la cachette pour le moment."
 }

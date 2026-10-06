@@ -152,5 +152,15 @@
   "overlay.ability.none": "Espaço: final",
   "overlay.stat.hp": "HP",
   "overlay.stat.speed": "Velocidade",
-  "overlay.stat.power": "Poder"
+  "overlay.stat.power": "Poder",
+  "hub.nav.hideout.title": "Esconderijo",
+  "hub.nav.hideout.note": "Quartos seguros. Nada aqui vai te surpreender.",
+  "hub.nav.travel.title": "Viajar",
+  "hub.nav.travel.note": "Na cidade. Você pode ser emboscado no caminho até lá.",
+  "hub.nav.travel.noteOff": "Na cidade. As emboscadas estão desativadas nas configurações.",
+  "hub.nav.travel.badge": "Risco de emboscada",
+  "hub.armory.hideoutEntrance": "Arsenal GRPD",
+  "hub.armory.hideoutEntranceBlurb": "O guardião de Luvitnot tem uma entrada segura aqui",
+  "hub.armory.relocatedEntrance": "Arsenal GRPD realocado",
+  "hub.armory.stationUnfound": "A Estação GRPD ainda não foi encontrada, então o Guardião mantém o Arsenal no esconderijo por enquanto."
 }

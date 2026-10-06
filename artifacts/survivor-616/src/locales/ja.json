@@ -152,5 +152,15 @@
   "overlay.ability.none": "スペース：究極",
   "overlay.stat.hp": "HP",
   "overlay.stat.speed": "速度",
-  "overlay.stat.power": "力"
+  "overlay.stat.power": "力",
+  "hub.nav.hideout.title": "隠れ家",
+  "hub.nav.hideout.note": "安全な部屋。ここには何もあなたを驚かせるものはありません。",
+  "hub.nav.travel.title": "旅行",
+  "hub.nav.travel.note": "街に出て。途中で待ち伏せされる可能性があります。",
+  "hub.nav.travel.noteOff": "街に出て。待ち伏せは設定でオフになっています。",
+  "hub.nav.travel.badge": "待ち伏せのリスク",
+  "hub.armory.hideoutEntrance": "GRPD武器庫",
+  "hub.armory.hideoutEntranceBlurb": "ルヴィトノットの番人がここに安全な入り口を確保している",
+  "hub.armory.relocatedEntrance": "GRPD武器庫を移転",
+  "hub.armory.stationUnfound": "GRPDステーションはまだ見つかっていないため、管理人は今のところ隠れ家に武器庫を保管しています。"
 }
