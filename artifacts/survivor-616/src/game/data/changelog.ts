@@ -378,6 +378,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'It is early access: desktop browsers and keyboard only, and it skips sign-in, payment, banking, health and government pages. When you stop, a card shows how much of the page you took down, with a link to save and share it.',
     ],
   },
+  {
+    version: '0.12.3',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Experimental Map Playlist',
+    body: [
+      'The map picker now has an Experimental overview for bonus, 2×, 4×, classic, infinite, and custom routes. The original map filters are still there.',
+      'Every map card now shows its type, including routes you have not unlocked yet.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
