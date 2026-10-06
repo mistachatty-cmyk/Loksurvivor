@@ -13,8 +13,8 @@
       "kind": "hotfix",
       "title": "Popups Stay on Screen",
       "body": [
-        "Fixed popups (card details in The Neon Sleeve, pack odds, the bestiary and more) opening off-center on phones and mobile browsers, forcing you to scroll to reach them.",
-        "Popups now size to the visible screen, so the browser toolbar no longer clips them. A tall popup scrolls inside itself, and its close button stays reachable.",
+        "Fixed popups (card details in The Neon Sleeve, pack odds, the bestiary and more) opening off-center, forcing you to scroll to reach them. On desktop browsers this hit anyone using an animated theme (Midnight Reliquary, Mirror Carnival, Aurora Transit, Chrome Vespers, Paper Lantern): the popup opened far below the screen.",
+        "Popups now size to the visible screen on phones, so the browser toolbar no longer clips them. A tall popup scrolls inside itself, and its close button stays reachable.",
         "The floating Back button no longer sits on top of an open popup."
       ]
     },
