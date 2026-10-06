@@ -487,6 +487,16 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: '0.14.2',
+    date: '2026-10-06',
+    kind: 'hotfix',
+    title: 'Studio Takes Stop Hogging Memory',
+    body: [
+      'Fixed a memory leak in the Studio: deleting a recorded mic take (or any clip) left its audio loaded in memory for the rest of the session. A clip\u2019s audio is now freed once nothing else uses it.',
+      'Clips that share the same audio, and clips still waiting in your library, keep playing normally.',
+    ],
+  },
+  {
     version: '0.15.0',
     date: '2026-10-06',
     kind: 'update',
