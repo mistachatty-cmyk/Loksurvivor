@@ -10,7 +10,8 @@
  * The classic popup (TravelEncounterOverlay) is untouched and stays default.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, LogOut, PawPrint, Shield, Swords } from 'lucide-react';
+import { Heart, LogOut, PawPrint, Repeat2, Shield, Swords } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
@@ -18,7 +19,7 @@ import { ELEMENT_METADATA, getCardVariableProfile } from '@/game/data/cardVariab
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
-import { UNARMED_PUNCH_DAMAGE, cardThrowOutcome, describeOwnedCard } from '@/game/data/travelEncounters';
+import { UNARMED_PUNCH_DAMAGE, cardThrowOutcome, describeOwnedCard, travelTeam } from '@/game/data/travelEncounters';
 import {
   MATCHUP_LABEL,
   describeIntent,
@@ -33,14 +34,18 @@ import {
   createQuickFight,
   quickFightOutcome,
   stepQuickFight,
+  switchQuickFight,
+  switchTargets,
   type OperatorAssist,
   type QuickFightState,
 } from '@/game/engine/quickFight';
-import { effectiveStats, useMeta } from '@/game/state/metaStore';
+import { effectiveStats, lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
+import { petEvolvedLook } from '@/game/engine/petEvolution';
 import type { FightStyle } from '@/game/state/fightStyleSetting';
 import { buildTravelEncounterResultFromOutcome, type ResolvedTravelEncounterOpponent } from '@/game/travelEncounter';
 import type { LokPetElement } from '@/game/types';
 import { HideoutVignette, type GestureAnim } from './HideoutVignette';
+import { LokPetEntrance } from './LokPetEntrance';
 
 export interface EncounterFightOverlayProps {
   style: Exclude<FightStyle, 'classic'>;
@@ -126,9 +131,10 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
   const isArena = style === 'arena';
   const wide = !compact && (isDuo || isArena);
 
-  const leadPet = meta.selectedLokPetIds.length > 0
-    ? meta.savedLokPets.find((pet) => pet.id === meta.selectedLokPetIds[0])
-    : undefined;
+  const t = useT();
+  // Duo and Arena bring the whole selected team and can swap mid-fight; Quick stays on the lead.
+  const canSwitch = isDuo || isArena;
+  const team = travelTeam(meta, canSwitch ? lokPetTeamCapacity(selectedCharacter) : 1);
   const powerMult = effectiveStats(selectedCharacter, meta).power;
   const operatorPalette = resolveCharacterCosmeticPalette(
     selectedCharacter,
@@ -145,7 +151,7 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
             ({ id: opponent.enemyId, name: opponent.name } as never),
         ).element as LokPetElement)
       : 'none';
-    return createQuickFight({ playerPet: leadPet, opponent, enemyElement, depth: isArena ? 'deep' : 'quick' });
+    return createQuickFight({ playerPets: team, maxTeam: canSwitch ? team.length : 1, opponent, enemyElement, depth: isArena ? 'deep' : 'quick' });
   });
   const [busy, setBusy] = useState(false);
   const [fled, setFled] = useState(false);
@@ -172,8 +178,16 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
   };
   const later = (fn: () => void, ms: number) => { timersRef.current.push(window.setTimeout(fn, ms)); };
 
-  const player = fight.battle.playerTeam[0]!;
-  const enemy = fight.battle.enemyTeam[0]!;
+  const activeIndex = fight.battle.activePlayerIndex;
+  const player = fight.battle.playerTeam[activeIndex]!;
+  const enemy = fight.battle.enemyTeam[fight.battle.activeEnemyIndex]!;
+  const teamHp = (state: QuickFightState) => state.battle.playerTeam.reduce((sum, pet) => sum + Math.max(0, pet.hp), 0);
+
+  // The active LokPet steps in with the first-night entrance when the fight opens, on a switch, and after a faint.
+  const activeSaved = team.find((pet) => player.id.includes(pet.id));
+  const activeLook = activeSaved ? petEvolvedLook(activeSaved) : undefined;
+  const entranceKey = `${player.id}-${activeIndex}`;
+  useEffect(() => { sfx.play('lokPetEntrance'); }, [entranceKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const playerRig = useMemo(() => lokPetRig(player.silhouette), [player.silhouette]);
   const playerPalette = useMemo(() => lokPetSpritePalette(player.palette), [player.palette]);
@@ -225,7 +239,6 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
     const assist = chosenAssist?.assist ?? undefined;
     if (chosenAssist?.cardId) consumeThrownCard(chosenAssist.cardId);
     const next = stepQuickFight(fight, moveId, Math.random, assist);
-    const nextPlayer = next.battle.playerTeam[0]!;
     const assistActs = Boolean(assist && assist.kind !== 'cover');
     if (assistActs) playGesture('support', 'attack');
     const lead = assistActs ? BEAT_MS : 0;
@@ -238,7 +251,7 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
         sfx.play(won ? 'kill' : 'hit');
         if (won) { setBusy(false); return; }
         later(() => {
-          if (nextPlayer.hp < player.hp) {
+          if (teamHp(next) < teamHp(fight)) {
             playGesture('left', 'hurt');
             sfx.play(quickFightOutcome(next) === 'lost' ? 'playerDown' : 'playerHurt');
           }
@@ -254,6 +267,26 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
     setFight(cheerQuickFight(fight));
   };
 
+  const handleSwitch = (targetIndex: number) => {
+    if (busy || outcome !== 'active') return;
+    setBusy(true);
+    sfx.play('uiNav');
+    const next = switchQuickFight(fight, targetIndex, Math.random);
+    if (next === fight) { setBusy(false); return; }
+    // The new pet steps in at once (see entranceKey); the opponent's telegraphed move lands after a beat.
+    setFight(next);
+    later(() => {
+      playGesture('right', 'attack');
+      later(() => {
+        if (teamHp(next) < teamHp(fight)) {
+          playGesture('left', 'hurt');
+          sfx.play(quickFightOutcome(next) === 'lost' ? 'playerDown' : 'playerHurt');
+        }
+        setBusy(false);
+      }, BEAT_MS);
+    }, BEAT_MS);
+  };
+
   const handleFlee = () => {
     if (busy || outcome !== 'active') return;
     sfx.play('uiNav');
@@ -264,6 +297,23 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
   const recap = fight.lastRoundLog.slice(-3);
   const roundShown = Math.min(fight.battle.turn, fight.turnCap);
   const vignetteSize = compact ? (isDuo ? 110 : 120) : wide ? 170 : 130;
+
+  const companionBanner = activeLook ? (
+    <div className="mt-3 flex items-center justify-center gap-3" data-testid="fight-companion">
+      <LokPetEntrance
+        entranceKey={entranceKey}
+        silhouette={player.silhouette}
+        palette={player.palette}
+        overlays={activeLook.overlays}
+        size={40}
+        flash
+      />
+      <div className="min-w-0 font-mono uppercase">
+        <p className="truncate text-[11px] font-black text-cyan-100">{player.name}</p>
+        <p className="text-[8px] tracking-wider text-white/50">{t('fight.companion.atYourSide')}</p>
+      </div>
+    </div>
+  ) : null;
 
   const vignette = (
     <HideoutVignette
@@ -372,8 +422,42 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
     </p>
   ) : null;
 
+  const reserves = switchTargets(fight);
+  const switchRow = canSwitch && fight.battle.playerTeam.length > 1 ? (
+    <div className="mt-2" data-testid="row-fight-switch">
+      <p className="mb-1 flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-white/45">
+        <Repeat2 className="h-3 w-3" />{t('fight.switch.title')} · {t('fight.switch.hint')}
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {fight.battle.playerTeam.map((pet, index) => {
+          const isActive = index === activeIndex;
+          const available = reserves.includes(index);
+          return (
+            <button
+              key={pet.id}
+              type="button"
+              disabled={busy || !available}
+              onClick={() => handleSwitch(index)}
+              aria-pressed={isActive}
+              className={`border px-2 py-1.5 text-left transition-all active:scale-[0.97] disabled:opacity-40 ${
+                isActive ? 'border-cyan-300/70 bg-cyan-400/15 text-cyan-100' : 'border-white/15 bg-white/[.03] text-white/70'
+              }`}
+              data-testid={`button-fight-switch-${index}`}
+            >
+              <span className="block max-w-[8rem] truncate font-mono text-[10px] font-black uppercase">{pet.name}</span>
+              <span className="block font-mono text-[8px] text-white/45">
+                {pet.fainted ? t('fight.switch.down') : isActive ? t('fight.switch.active') : `${pet.hp}/${pet.maxHp} HP`}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
   const footerControls = (
     <>
+      {switchRow}
       {isArena && (
         <button
           type="button"
@@ -406,6 +490,8 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
           <p className="mt-1 text-center font-mono text-[9px] uppercase tracking-widest text-white/40">
             {isDuo ? 'Duo' : isArena ? 'Arena' : 'Quick'} · Round {roundShown} of {fight.turnCap}
           </p>
+
+          {companionBanner}
 
           {wide ? (
             <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3 font-mono text-[10px] uppercase text-white/60">

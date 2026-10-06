@@ -21,7 +21,10 @@ import {
   UNARMED_PUNCH_DAMAGE,
   cardThrowDamage,
   cardThrowOutcome,
+  travelLeadPet,
+  travelTeam,
 } from './data/travelEncounters';
+import { rollLokPet } from './data/lokPets';
 
 function findCardBySubject(subjectType: LokDeckCardMetadata['subjectType']): LokAssetManifest<LokDeckCardMetadata> {
   const card = CARD_MANIFESTS.find((candidate) => (candidate.metadata as LokDeckCardMetadata | undefined)?.subjectType === subjectType);
@@ -248,4 +251,16 @@ test('buyCardSalvageProtocol requires both the earned run count and the CC cost,
   assert.equal(unlocked.meta.cardCredits, 0);
 
   assert.equal(reducer(unlocked, { type: 'buyCardSalvageProtocol' }), unlocked);
+});
+
+test('the travel team is the selected loadout in order, lead first, and skips spent pets', () => {
+  const pet = (id: string, stamina: number, starter = false) => ({ id, roll: rollLokPet(() => 0.3), stamina, starter });
+  const meta = {
+    savedLokPets: [pet('kennel-only', 3), pet('a', 2), pet('b', 0), pet('starter', 0, true), pet('c', 1)],
+    selectedLokPetIds: ['c', 'b', 'starter', 'a', 'missing'],
+  };
+  assert.deepEqual(travelTeam(meta).map((p) => p.id), ['c', 'starter', 'a']);
+  assert.deepEqual(travelTeam(meta, 2).map((p) => p.id), ['c', 'starter']);
+  assert.equal(travelLeadPet(meta)?.id, 'c');
+  assert.equal(travelLeadPet({ savedLokPets: [], selectedLokPetIds: [] }), undefined);
 });

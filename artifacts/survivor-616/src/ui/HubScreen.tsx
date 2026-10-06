@@ -36,6 +36,7 @@ import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { useT } from '@/lib/i18n';
 import { grpdArmoryLocation } from '@/game/data/grpdArmory';
+import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
@@ -219,7 +220,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     setSceneLook(id);
     try { localStorage.setItem(SCENE_LOOK_KEY, id); } catch { /* Device storage may be unavailable. */ }
   };
-  const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
+  const companion = travelLeadPet(meta);
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
   const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
 

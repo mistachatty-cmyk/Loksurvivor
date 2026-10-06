@@ -35,6 +35,7 @@ export type SfxCueId =
   | 'pickupKey'
   | 'lootBox'
   | 'cardPack'
+  | 'lokPetEntrance'
   | 'dash'
   | 'ultimate'
   | 'waveStart'
@@ -86,6 +87,7 @@ export const SFX_CUE_BASE: Record<SfxCueId, SfxCueBaseParams> = {
   pickupKey: { wave: 'triangle', freqStart: 587, freqEnd: 880, durationMs: 160, gain: 0.18 },
   lootBox: { wave: 'sawtooth', freqStart: 300, freqEnd: 700, durationMs: 260, gain: 0.22 },
   cardPack: { wave: 'triangle', freqStart: 500, freqEnd: 750, durationMs: 200, gain: 0.2 },
+  lokPetEntrance: { wave: 'triangle', freqStart: 380, freqEnd: 900, durationMs: 260, gain: 0.2, noiseMix: 0.1 },
   dash: { wave: 'sine', freqStart: 900, freqEnd: 300, durationMs: 110, gain: 0.14, noiseMix: 0.15 },
   ultimate: { wave: 'sawtooth', freqStart: 120, freqEnd: 480, durationMs: 480, gain: 0.3, noiseMix: 0.2 },
   waveStart: { wave: 'square', freqStart: 220, freqEnd: 330, durationMs: 260, gain: 0.2 },

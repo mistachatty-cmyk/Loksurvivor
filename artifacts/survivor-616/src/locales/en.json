@@ -76,9 +76,9 @@
   "settings.fightStyle.quick.label": "Quick",
   "settings.fightStyle.quick.blurb": "Your lead LokPet, three moves, at most eight rounds, next enemy move shown.",
   "settings.fightStyle.duo.label": "Duo",
-  "settings.fightStyle.duo.blurb": "Operator and LokPet fight together: pick a LokPet move and an operator assist every round.",
+  "settings.fightStyle.duo.blurb": "Operator and LokPet fight together: pick a LokPet move and an operator assist every round. Bring your selected team and swap LokPets mid-fight.",
   "settings.fightStyle.arena.label": "Arena",
-  "settings.fightStyle.arena.blurb": "The full battle: every move including finishers, Cheer, up to twenty rounds.",
+  "settings.fightStyle.arena.blurb": "The full battle: every move including finishers, Cheer, up to twenty rounds. Bring your selected team and swap LokPets mid-fight.",
 
   "overlay.title": "Demo Day",
   "overlay.hp": "HP",
@@ -170,5 +170,11 @@
   "hub.armory.hideoutEntrance": "GRPD Armory",
   "hub.armory.hideoutEntranceBlurb": "The Luvitnot keeper holds a safe entrance here",
   "hub.armory.relocatedEntrance": "Relocated GRPD Armory",
-  "hub.armory.stationUnfound": "The GRPD Station is still unfound, so the keeper holds the Armory in the hideout for now."
+  "hub.armory.stationUnfound": "The GRPD Station is still unfound, so the keeper holds the Armory in the hideout for now.",
+
+  "fight.companion.atYourSide": "At your side",
+  "fight.switch.title": "Switch LokPet",
+  "fight.switch.hint": "Costs your turn. The opponent still strikes.",
+  "fight.switch.down": "Down",
+  "fight.switch.active": "Out"
 }

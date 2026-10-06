@@ -497,6 +497,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'You can only be ambushed when you travel. Studio 28, the Vault and Rapid Shelter now count, and the Perch, Cellar and Alley Annex no longer do. The Travel setting still switches ambushes off.',
     ],
   },
+  {
+    version: '0.14.3',
+    date: '2026-10-06',
+    kind: 'hotfix',
+    title: 'Your LokPet Travels With You',
+    body: [
+      'Your lead LokPet now comes along on every travel ambush. It steps in beside you with the same entrance it got on your first night in the hideout.',
+      'In Duo and Arena fights you bring your whole selected team and can switch LokPets mid-fight. A switch costs your turn, and the next LokPet steps in with the entrance, including after one is knocked out.',
+      'Arena combat is a travel fight style you can pick in Settings. The classic popup is still the default, and its Send button now replays the entrance.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

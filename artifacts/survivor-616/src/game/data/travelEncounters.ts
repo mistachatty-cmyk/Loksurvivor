@@ -10,7 +10,7 @@
  * Only ever read from `game/travelEncounter.ts` and the travel-encounter UI;
  * `engine/world.ts` never touches any of this.
  */
-import type { CardVariant, OwnedCardRecord } from '@/game/types';
+import type { CardVariant, OwnedCardRecord, SavedLokPet } from '@/game/types';
 import type { LokAssetRarity } from '@/game/lok/types';
 import { CARD_MANIFESTS_BY_ID, type LokDeckCardMetadata } from './cards';
 import { PASSIVE_CARDS_BY_ID, type PassiveCardRarity } from './passiveCards';
@@ -101,6 +101,27 @@ export const CARD_SALVAGE_COST = 40;
  * "classic version" simplification, not a bug. See travel-encounters.md.
  */
 export const PET_ASSIST_DAMAGE_MULT = 1.4;
+
+/**
+ * The LokPets that go with the player when they travel: the selected loadout
+ * in selection order, lead first. A pet can only come along while it has
+ * stamina (starter partners never run out), matching what a run brings.
+ * Every travel fight style and the hideout companion badge use this, so they
+ * always agree on who the lead is.
+ */
+export function travelTeam(
+  meta: { savedLokPets: SavedLokPet[]; selectedLokPetIds: string[] },
+  maxSize = Number.POSITIVE_INFINITY,
+): SavedLokPet[] {
+  return meta.selectedLokPetIds
+    .map((id) => meta.savedLokPets.find((pet) => pet.id === id))
+    .filter((pet): pet is SavedLokPet => Boolean(pet) && (Boolean(pet!.starter) || pet!.stamina > 0))
+    .slice(0, maxSize);
+}
+
+export function travelLeadPet(meta: { savedLokPets: SavedLokPet[]; selectedLokPetIds: string[] }): SavedLokPet | undefined {
+  return travelTeam(meta, 1)[0];
+}
 
 /** Minimum real-world ms between two travel encounters firing in one session -- prevents rapid-fire spam from bouncing between the storefront and other rooms. */
 export const TRAVEL_ENCOUNTER_COOLDOWN_MS = 45_000;
