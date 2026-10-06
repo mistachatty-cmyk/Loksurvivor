@@ -70,9 +70,9 @@
   "settings.fightStyle.quick.label": "Schnell",
   "settings.fightStyle.quick.blurb": "Ihr Vorsprung LokPet, drei Züge, höchstens acht Runden, nächster gegnerischer Zug wird angezeigt.",
   "settings.fightStyle.duo.label": "Duo",
-  "settings.fightStyle.duo.blurb": "Operator und LokPet kämpfen gemeinsam: Wählen Sie in jeder Runde einen LokPet-Zug und einen Operator-Assistenten.",
+  "settings.fightStyle.duo.blurb": "Operator und LokPet kämpfen gemeinsam: Wählen Sie in jeder Runde einen LokPet-Zug und einen Operator-Assistenten. Bringen Sie Ihr ausgewähltes Team mit und tauschen Sie LokPets mitten im Kampf.",
   "settings.fightStyle.arena.label": "Arena",
-  "settings.fightStyle.arena.blurb": "Der komplette Kampf: jede Bewegung inklusive Finisher, Cheer, bis zu zwanzig Runden.",
+  "settings.fightStyle.arena.blurb": "Der komplette Kampf: jede Bewegung inklusive Finisher, Cheer, bis zu zwanzig Runden. Bringen Sie Ihr ausgewähltes Team mit und tauschen Sie LokPets mitten im Kampf.",
   "overlay.title": "Demo Day",
   "overlay.hp": "PS",
   "overlay.level": "LV {{level}}",
@@ -162,5 +162,10 @@
   "hub.armory.hideoutEntrance": "GRPD-Waffenkammer",
   "hub.armory.hideoutEntranceBlurb": "Der Luvitnot-Wärter hat hier einen sicheren Zugang",
   "hub.armory.relocatedEntrance": "Umzug der GRPD-Waffenkammer",
-  "hub.armory.stationUnfound": "Die GRPD-Station ist immer noch unauffindbar, daher behält der Bewahrer die Waffenkammer vorerst im Versteck."
+  "hub.armory.stationUnfound": "Die GRPD-Station ist immer noch unauffindbar, daher behält der Bewahrer die Waffenkammer vorerst im Versteck.",
+  "fight.companion.atYourSide": "An Ihrer Seite",
+  "fight.switch.title": "Schalter LokPet",
+  "fight.switch.hint": "Kostet deinen Zug. Der Gegner schlägt immer noch zu.",
+  "fight.switch.down": "Runter",
+  "fight.switch.active": "Raus"
 }

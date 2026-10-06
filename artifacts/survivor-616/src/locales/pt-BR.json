@@ -70,9 +70,9 @@
   "settings.fightStyle.quick.label": "Rápido",
   "settings.fightStyle.quick.blurb": "Seu líder LokPet, três movimentos, no máximo oito rodadas, próximo movimento inimigo mostrado.",
   "settings.fightStyle.duo.label": "Dupla",
-  "settings.fightStyle.duo.blurb": "Operador e LokPet lutam juntos: escolha um movimento LokPet e um operador auxilia a cada rodada.",
+  "settings.fightStyle.duo.blurb": "Operador e LokPet lutam juntos: escolha um movimento LokPet e um operador auxilia a cada rodada. Traga seu time selecionado e troque LokPets no meio da luta.",
   "settings.fightStyle.arena.label": "Arena",
-  "settings.fightStyle.arena.blurb": "A batalha completa: todos os movimentos, incluindo finalizadores, Cheer, até vinte rodadas.",
+  "settings.fightStyle.arena.blurb": "A batalha completa: todos os movimentos, incluindo finalizadores, Cheer, até vinte rodadas. Traga seu time selecionado e troque LokPets no meio da luta.",
   "overlay.title": "Demo Day",
   "overlay.hp": "HP",
   "overlay.level": "LV {{level}}",
@@ -162,5 +162,10 @@
   "hub.armory.hideoutEntrance": "Arsenal GRPD",
   "hub.armory.hideoutEntranceBlurb": "O guardião de Luvitnot tem uma entrada segura aqui",
   "hub.armory.relocatedEntrance": "Arsenal GRPD realocado",
-  "hub.armory.stationUnfound": "A Estação GRPD ainda não foi encontrada, então o Guardião mantém o Arsenal no esconderijo por enquanto."
+  "hub.armory.stationUnfound": "A Estação GRPD ainda não foi encontrada, então o Guardião mantém o Arsenal no esconderijo por enquanto.",
+  "fight.companion.atYourSide": "Ao seu lado",
+  "fight.switch.title": "Interruptor LokPet",
+  "fight.switch.hint": "Custa sua vez. O oponente ainda ataca.",
+  "fight.switch.down": "Para baixo",
+  "fight.switch.active": "Fora"
 }

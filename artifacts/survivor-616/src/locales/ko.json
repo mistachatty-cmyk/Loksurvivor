@@ -70,9 +70,9 @@
   "settings.fightStyle.quick.label": "빠른",
   "settings.fightStyle.quick.blurb": "당신의 선두 LokPet, 3번의 이동, 최대 8라운드, 다음 적의 이동이 표시됩니다.",
   "settings.fightStyle.duo.label": "듀오",
-  "settings.fightStyle.duo.blurb": "오퍼레이터와 LokPet가 함께 싸웁니다. LokPet 동작을 선택하면 오퍼레이터가 매 라운드마다 지원합니다.",
+  "settings.fightStyle.duo.blurb": "오퍼레이터와 LokPet가 함께 싸웁니다. LokPet 동작을 선택하면 오퍼레이터가 매 라운드마다 지원합니다. 선택한 팀을 데려와 전투 중에 LokPets를 교체하세요.",
   "settings.fightStyle.arena.label": "아레나",
-  "settings.fightStyle.arena.blurb": "전체 전투: 피니셔, 응원을 포함한 모든 동작, 최대 20라운드.",
+  "settings.fightStyle.arena.blurb": "전체 전투: 피니셔, 응원을 포함한 모든 동작, 최대 20라운드. 선택한 팀을 데려와 전투 중에 LokPets를 교체하세요.",
   "overlay.title": "Demo Day",
   "overlay.hp": "HP",
   "overlay.level": "LV {{level}}",
@@ -162,5 +162,10 @@
   "hub.armory.hideoutEntrance": "GRPD 무기고",
   "hub.armory.hideoutEntranceBlurb": "루비노트 키퍼가 이곳에 안전한 입구를 확보하고 있습니다.",
   "hub.armory.relocatedEntrance": "GRPD 무기고 이전",
-  "hub.armory.stationUnfound": "GRPD 스테이션은 아직 발견되지 않았으므로 관리인이 무기고를 은신처에 보관하고 있습니다."
+  "hub.armory.stationUnfound": "GRPD 스테이션은 아직 발견되지 않았으므로 관리인이 무기고를 은신처에 보관하고 있습니다.",
+  "fight.companion.atYourSide": "당신 곁에",
+  "fight.switch.title": "스위치 LokPet",
+  "fight.switch.hint": "당신의 차례에 비용이 듭니다. 상대는 여전히 공격하고 있다.",
+  "fight.switch.down": "아래로",
+  "fight.switch.active": "아웃"
 }

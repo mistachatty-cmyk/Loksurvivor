@@ -70,9 +70,9 @@
   "settings.fightStyle.quick.label": "Rapide",
   "settings.fightStyle.quick.blurb": "Votre leader LokPet, trois mouvements, au maximum huit rounds, prochain mouvement ennemi affiché.",
   "settings.fightStyle.duo.label": "Duo",
-  "settings.fightStyle.duo.blurb": "L'opérateur et LokPet combattent ensemble : choisissez un mouvement LokPet et un opérateur assiste à chaque tour.",
+  "settings.fightStyle.duo.blurb": "L'opérateur et LokPet combattent ensemble : choisissez un mouvement LokPet et un opérateur assiste à chaque tour. Amenez votre équipe sélectionnée et échangez LokPets en plein combat.",
   "settings.fightStyle.arena.label": "Arène",
-  "settings.fightStyle.arena.blurb": "La bataille complète : chaque mouvement, y compris les finishers, Cheer, jusqu'à vingt rounds.",
+  "settings.fightStyle.arena.blurb": "La bataille complète : chaque mouvement, y compris les finishers, Cheer, jusqu'à vingt rounds. Amenez votre équipe sélectionnée et échangez LokPets en plein combat.",
   "overlay.title": "Demo Day",
   "overlay.hp": "HP",
   "overlay.level": "BT {{level}}",
@@ -162,5 +162,10 @@
   "hub.armory.hideoutEntrance": "Armurerie GRPD",
   "hub.armory.hideoutEntranceBlurb": "Le gardien Luvitnot détient une entrée sûre ici",
   "hub.armory.relocatedEntrance": "Armurerie GRPD déplacée",
-  "hub.armory.stationUnfound": "La station GRPD est toujours introuvable, donc le gardien garde l'armurerie dans la cachette pour le moment."
+  "hub.armory.stationUnfound": "La station GRPD est toujours introuvable, donc le gardien garde l'armurerie dans la cachette pour le moment.",
+  "fight.companion.atYourSide": "A vos côtés",
+  "fight.switch.title": "Commutateur LokPet",
+  "fight.switch.hint": "Cela vous coûte votre tour. L'adversaire frappe toujours.",
+  "fight.switch.down": "Vers le bas",
+  "fight.switch.active": "Sortie"
 }
