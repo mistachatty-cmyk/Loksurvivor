@@ -1195,9 +1195,17 @@ export interface ObstacleDef {
      /** Rapid pressure wing: the failed teleport arch keeping the faction cut off. */
      | 'digi-arch'
      /** Rapid pressure wing: reinforced emergency-pressure room seal. */
-     | 'pressure-door';
+     | 'pressure-door'
+     /** Page overlay only: a DOM element on a live web page, standing in as a fixed, breakable block. */
+     | 'page-block';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
+  /** Per-instance hit points; overrides the kind's table value (page overlay blocks scale with element area). */
+  hp?: number;
+  /** Page overlay only: opaque handle the host maps back to its DOM element. The engine never reads it. */
+  domId?: number;
+  /** Solid to the player but not to enemies (nor to the player mid-dash). See `Aabb.soft`. */
+  soft?: boolean;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
   pothole?: {
     trigger: PotholeTrigger;
@@ -1207,7 +1215,8 @@ export interface ObstacleDef {
   };
 }
 
-export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench';
+/** `fixed-breakable` is immovable like `fixed-bench` but still takes damage when its kind has hp. */
+export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench' | 'fixed-breakable';
 
 /**
  * Overhead conditions for an area. Drives clouds, rain, fog and lightning.
@@ -1634,6 +1643,8 @@ export interface EndlessRouteEventState {
   rewardTokens: number;
 }
 
+export type BuildingSupplyKind = 'health' | 'cred' | 'water-flask' | 'phosphor-ore' | 'silicon-alloy' | 'cyber-resin';
+
 /** Live state kept on the World while running in endless mode. */
 export interface EndlessState {
   /** World-space distance from origin — drives difficulty. */
@@ -1650,6 +1661,12 @@ export interface EndlessState {
   inDungeon: boolean;
   /** Whether the player is exploring an enterable city building. */
   inBuilding: boolean;
+  /** The original room transition remains available as a device setting. */
+  buildingEntryStyle: 'seamless' | 'classic';
+  /** Building occupied in walk-in mode; the street simulation continues. */
+  walkInBuildingId: string | null;
+  /** Supply caches claimed during this run, including unloaded blocks. */
+  claimedBuildingSupplies: Set<string>;
   buildingLabel: string;
   buildingPrefabId: string | null;
   buildingCenterX: number;
@@ -1742,6 +1759,7 @@ export interface EndlessState {
     w: number;
     h: number;
     doorSide: 'north' | 'south' | 'east' | 'west';
+    supplyKind: BuildingSupplyKind | null;
   }>;
 }
 
@@ -1783,7 +1801,11 @@ export type CrewActivityId =
   | 'rewire-the-cabinets'
   | 'run-the-high-score-board'
   // GRPD Station
-  | 'run-the-drills';
+  | 'run-the-drills'
+  | 'cook-the-last-feast' | 'count-the-sheep' | 'chart-the-horde'
+  | 'raise-the-palings' | 'tune-the-moon' | 'mix-the-elixir'
+  | 'forge-the-banners' | 'repair-the-cabinets' | 'cycle-the-air'
+  | 'seal-the-hatches' | 'relay-the-pressure' | 'inspect-the-lockers';
 
 export type CrewActivityIcon =
   | 'utensils'

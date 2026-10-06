@@ -109,6 +109,7 @@ import {
 import {
   BUILDING_PREFABS,
   CHUNK_SIZE,
+  buildingSupplyPoint,
   buildingWallObstacles,
   chunkKey,
   chunkOrigin,
@@ -541,10 +542,46 @@ export interface Alert {
   bornAt: number;
 }
 
+/** One breakable damaged (or destroyed) by an area hit. Drained by the page overlay; capped so an undrained log cannot grow. */
+export interface PropHit {
+  uid: number;
+  x: number;
+  y: number;
+  radius: number;
+  amount: number;
+  intensity: number;
+  kill: boolean;
+  at: number;
+}
+
+/** One sizeable area impact, whether or not it touched a breakable (so craters can carve blank page). */
+export interface ImpactEvent {
+  x: number;
+  y: number;
+  radius: number;
+  amount: number;
+  intensity: number;
+  at: number;
+}
+
+export const PROP_HIT_CAP = 64;
+export const IMPACT_CAP = 32;
+/** Smallest blast radius (world units) that is logged as an impact; a projectile's 5-unit contact is not one. */
+export const IMPACT_MIN_RADIUS = 24;
+
 export interface BreakableObstacle extends Aabb {
   uid: number;
   kind: ObstacleDef['kind'];
   propVariant: PropVariant | undefined;
+  /** Page overlay only: copied from the ObstacleDef so the host can find its DOM element. */
+  domId?: number;
+  /** Copied from the ObstacleDef; see `Aabb.soft`. */
+  soft?: boolean;
+  /** Most recent damage this block took: when (run ms), where the blast was centred, and how much. For hit feedback. */
+  lastHitAt?: number;
+  lastHitX?: number;
+  lastHitY?: number;
+  lastDamage?: number;
   hp: number;
   maxHp: number;
   vx: number;
@@ -841,10 +878,12 @@ const OBSTACLE_WEIGHT_PROFILES: Partial<Record<ObstacleDef['kind'], ObstacleWeig
   'data-pipe': { variant: 'light-breakable', hp: 105 },
   'digi-arch': { variant: 'heavy-metal', hp: 360 },
   'pressure-door': { variant: 'heavy-metal', hp: 300 },
+  /** Page overlay: an element of a live web page. Immovable; callers pass a per-block hp. */
+  'page-block': { variant: 'fixed-breakable', hp: 60 },
 };
 const PROJECTILE_BLOCKING_KINDS = new Set<ObstacleDef['kind']>([
   'crate-breakable', 'crate', 'barrel', 'street-lamp', 'cover', 'reflective-surface', 'metal-box', 'bench', 'server-rack', 'tree-digital',
-  'data-pipe', 'digi-arch', 'pressure-door',
+  'data-pipe', 'digi-arch', 'pressure-door', 'page-block',
 ]);
 
 /** Small street-flavor breakables: bonus drops and rare-currency odds are scoped to just these four. */
@@ -905,6 +944,9 @@ function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant'>): PropP
   }
   if (variant === 'heavy-metal') {
     return { variant, mass: 8, friction: 0.94, breakable, movable: true };
+  }
+  if (variant === 'fixed-breakable') {
+    return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable, movable: false };
   }
   return { variant, mass: Number.POSITIVE_INFINITY, friction: 1, breakable: false, movable: false };
 }
@@ -1109,6 +1151,9 @@ export interface World {
   obstacleGrid: Map<number, Aabb[]>;
   /** True once `obstacleGrid` needs rebuilding (obstacles are static, so this only flips on add/break). */
   obstacleGridDirty: boolean;
+  /** Page overlay hit feedback: see `PropHit` / `ImpactEvent`. Drained by the host each frame. */
+  propHits: PropHit[];
+  impacts: ImpactEvent[];
   /**
    * uid -> enemy, rebuilt alongside `grid` every frame (and kept in sync by
    * the mid-frame spawn/removal sites) so uid-based lookups (homing-target
@@ -1422,6 +1467,7 @@ export function createWorld(
     dvdEasterEggUnlocked?: boolean;
     ownedKeyItemIds?: string[];
     craftedRelicIds?: string[];
+    buildingEntryStyle?: 'seamless' | 'classic';
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1636,6 +1682,8 @@ export function createWorld(
     grid: new Map(),
     obstacleGrid: new Map(),
     obstacleGridDirty: true,
+    propHits: [],
+    impacts: [],
     enemiesByUid: new Map(),
     rngSeed: seed,
     endless: undefined,
@@ -1817,6 +1865,9 @@ export function createWorld(
       dungeonDepth: 0,
       inDungeon: false,
       inBuilding: false,
+      buildingEntryStyle: setup.buildingEntryStyle ?? 'seamless',
+      walkInBuildingId: null,
+      claimedBuildingSupplies: new Set(),
       buildingLabel: '',
       buildingPrefabId: null,
       buildingCenterX: 0,
@@ -1914,7 +1965,9 @@ function uid(w: World): number {
 
 function createBreakable(w: World, obstacle: ObstacleDef): BreakableObstacle {
   const profile = propProfile(obstacle);
-  const hp = profile.breakable ? (OBSTACLE_WEIGHT_PROFILES[obstacle.kind]?.hp ?? 60) : Number.POSITIVE_INFINITY;
+  const hp = profile.breakable
+    ? (obstacle.hp ?? OBSTACLE_WEIGHT_PROFILES[obstacle.kind]?.hp ?? 60)
+    : Number.POSITIVE_INFINITY;
   return {
     ...obstacle,
     uid: uid(w),
@@ -5515,11 +5568,14 @@ function collideObstacles(w: World, actor: Actor) {
   const reach = Math.ceil((actor.radius + 4) / CELL);
   const baseX = Math.floor(actor.x / CELL);
   const baseY = Math.floor(actor.y / CELL);
+  // Soft boxes (page overlay text) stop the player but not enemies, and not the player mid-dash.
+  const ignoresSoft = 'def' in actor || (actor === w.player && w.player.dashUntil > w.now);
   for (let ix = -reach; ix <= reach; ix += 1) {
     for (let iy = -reach; iy <= reach; iy += 1) {
       const bucket = w.obstacleGrid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
       if (!bucket) continue;
       for (const box of bucket) {
+        if (box.soft && ignoresSoft) continue;
         // Cheap reject before the precise test.
         if (Math.abs(actor.x - box.x) > box.w / 2 + actor.radius + 4) continue;
         if (Math.abs(actor.y - box.y) > box.h / 2 + actor.radius + 4) continue;
@@ -5698,8 +5754,39 @@ function applyPropImpact(
 function syncObstacleAabbs(w: World) {
   w.obstacles = w.breakables
     .filter((b) => !b.broken)
-    .map(({ x, y, w: bw, h: bh }) => ({ x, y, w: bw, h: bh }));
+    .map(({ x, y, w: bw, h: bh, soft }) => (soft ? { x, y, w: bw, h: bh, soft } : { x, y, w: bw, h: bh }));
   w.obstacleGridDirty = true;
+}
+
+/**
+ * Add obstacles to a running world (the page overlay streams DOM elements in
+ * as the player scrolls). One sync for the whole batch -- syncObstacleAabbs is
+ * O(n), so adding blocks one at a time would be quadratic.
+ */
+export function addBreakables(w: World, defs: ObstacleDef[]): BreakableObstacle[] {
+  const added = defs.filter((d) => d.kind !== 'pothole').map((d) => createBreakable(w, d));
+  if (added.length === 0) return added;
+  w.breakables.push(...added);
+  syncObstacleAabbs(w);
+  return added;
+}
+
+/** Drop obstacles by uid (streamed out of range, or already handled by the host after breaking). */
+export function removeBreakables(w: World, uids: ReadonlySet<number>): void {
+  if (uids.size === 0) return;
+  const kept = w.breakables.filter((b) => !uids.has(b.uid));
+  if (kept.length === w.breakables.length) return;
+  w.breakables = kept;
+  syncObstacleAabbs(w);
+}
+
+/**
+ * Page overlay: contact damage from the player's own body (shoulder-barging a block, bulldozing through one on a
+ * dash). Same path as every other hit, so flash, cracks, drops, sound and the hit log all react; it never raises
+ * a crater because its radius stays under `IMPACT_MIN_RADIUS`.
+ */
+export function damageBlocksNear(w: World, x: number, y: number, radius: number, amount: number, impactIntensity: ImpactIntensity = 0): void {
+  damageBreakable(w, x, y, Math.min(radius, IMPACT_MIN_RADIUS - 1), amount, impactIntensity);
 }
 
 function damageBreakable(
@@ -5716,11 +5803,22 @@ function damageBreakable(
 ) {
   applyPropImpact(w, x, y, radius, impactIntensity, fromX, fromY, impactTrigger, fromPlayer);
   if (w.cardEffects.unbreakableProps) return;
+  if (radius >= IMPACT_MIN_RADIUS) {
+    if (w.impacts.length >= IMPACT_CAP) w.impacts.shift();
+    w.impacts.push({ x, y, radius, amount, intensity: impactIntensity, at: w.now });
+  }
   for (const b of w.breakables) {
     if (b.broken || Math.abs(x - b.x) > b.w / 2 + radius || Math.abs(y - b.y) > b.h / 2 + radius) continue;
     if (!b.breakable) continue;
     const breakageMult = 1 + b.rawDataBreakage * (w.area.rawDataBreakage?.damageVulnerability ?? 0);
-    b.hp -= Math.max(1, amount * breakageMult);
+    const dealt = Math.max(1, amount * breakageMult);
+    b.hp -= dealt;
+    b.lastHitAt = w.now;
+    b.lastHitX = x;
+    b.lastHitY = y;
+    b.lastDamage = dealt;
+    if (w.propHits.length >= PROP_HIT_CAP) w.propHits.shift();
+    w.propHits.push({ uid: b.uid, x, y, radius, amount: dealt, intensity: impactIntensity, kill: b.hp <= 0, at: w.now });
     if (b.hp > 0) {
       if (b.hp <= b.maxHp * 0.5) spawnParticles(w, b.x, b.y, b.kind === 'barrel' ? '#ff9f43' : '#ffe08a', 2, 35);
       continue;
@@ -5759,6 +5857,10 @@ function damageBreakable(
           bornAt: w.now,
         });
       }
+    }
+    if (b.kind === 'page-block') {
+      // Demolition is the whole loop on a page, so every block pays a little XP -- that's what drives level-ups there.
+      w.pickups.push({ uid: uid(w), kind: 'xp', x: b.x, y: b.y, vx: 0, vy: 0, value: clamp(Math.round(b.maxHp / 40), 2, 10), bornAt: w.now });
     }
     if (b.kind === 'street-lamp') {
       b.hazardUntil = w.now + 5200;
@@ -10403,6 +10505,7 @@ function updateEndlessChunks(w: World) {
         w: building.w,
         h: building.h,
         doorSide: building.doorSide,
+        supplyKind: building.supplyKind,
       });
     }
     if (chunk.hasRiver) {
@@ -10542,6 +10645,8 @@ function loadDungeonRoom(w: World, room: number, transition: 'enter' | 'exit' = 
 
 function enterDungeon(w: World) {
   const e = w.endless!;
+  e.walkInBuildingId = null;
+  e.buildingLabel = '';
   e.streetReturnX = w.player.x;
   e.streetReturnY = w.player.y;
   e.dungeonDepth += 1;
@@ -10675,13 +10780,43 @@ function updateEndlessDungeon(w: World) {
   const p = w.player;
 
   if (!e.inDungeon && !e.inBuilding) {
-    for (const door of e.buildingEntrances) {
-      if (
-        Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
-        Math.abs(p.y - door.y) < door.h / 2 + p.radius
-      ) {
-        enterBuilding(w, door);
+    if (e.buildingEntryStyle === 'seamless') {
+      const occupied = e.buildings.find((building) =>
+        Math.abs(p.x - building.x) < building.w / 2 - p.radius &&
+        Math.abs(p.y - building.y) < building.h / 2 - p.radius,
+      );
+      e.walkInBuildingId = occupied?.id ?? null;
+      e.buildingLabel = occupied?.name ?? '';
+      if (occupied) {
+        if (occupied.supplyKind && !e.claimedBuildingSupplies.has(occupied.id) &&
+          (occupied.supplyKind !== 'health' || p.hp < p.maxHp)) {
+          const supply = buildingSupplyPoint(occupied);
+          if (Math.hypot(p.x - supply.x, p.y - supply.y) < p.radius + 18) {
+            e.claimedBuildingSupplies.add(occupied.id);
+            w.pickups.push({
+              uid: uid(w),
+              kind: occupied.supplyKind,
+              x: supply.x,
+              y: supply.y,
+              vx: 0,
+              vy: 0,
+              value: occupied.supplyKind === 'health' ? 16 : occupied.supplyKind === 'cred' ? 12 : 1,
+              bornAt: w.now,
+            });
+            pushAlert(w, `${occupied.name} supply found`);
+          }
+        }
         return;
+      }
+    } else {
+      for (const door of e.buildingEntrances) {
+        if (
+          Math.abs(p.x - door.x) < door.w / 2 + p.radius &&
+          Math.abs(p.y - door.y) < door.h / 2 + p.radius
+        ) {
+          enterBuilding(w, door);
+          return;
+        }
       }
     }
     for (const entrance of e.dungeonEntrances) {
@@ -11359,7 +11494,7 @@ export function hudSnapshot(w: World): HudSnapshot {
             worldToChunkCoords(w.player.x, w.player.y).cx,
             worldToChunkCoords(w.player.x, w.player.y).cy,
           ))?.district ?? 'Unmapped district',
-          inBuilding: e.inBuilding,
+          inBuilding: e.inBuilding || Boolean(e.walkInBuildingId),
           buildingLabel: e.buildingLabel,
           playerX: w.player.x,
           playerY: w.player.y,

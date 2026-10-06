@@ -66,7 +66,7 @@ import {
   cancelArtisteDraw,
 } from '@/game/engine/world';
 import { SILENT_FRAME, type AudioFrame } from '@/game/audio/beatBus';
-import { generateChunk } from '@/game/engine/chunks';
+import { buildingSupplyPoint, generateChunk } from '@/game/engine/chunks';
 import { createRng } from '@/game/engine/math';
 import {
   createInitialMeta,
@@ -2296,6 +2296,22 @@ test('city blocks are deterministic and keep a central crossing through river ro
   assert.ok(first.obstacles.filter((obstacle) => obstacle.kind === 'building').length >= 16);
   assert.equal(first.obstacles.filter((obstacle) => obstacle.kind === 'river').length, 2);
   assert.ok(first.buildingEntrances.length > 0);
+  assert.equal(first.buildings.filter((building) => building.supplyKind).length, 1);
+});
+
+test('a block supply spot is inside its building and clear of solid props', () => {
+  for (const seed of [616, 617, 618, 619]) {
+    const chunk = generateChunk(0, 0, seed);
+    const building = chunk.buildings.find((candidate) => candidate.supplyKind);
+    if (!building) continue;
+    const supply = buildingSupplyPoint(building);
+    assert.ok(Math.abs(supply.x - building.x) < building.w / 2 - 14);
+    assert.ok(Math.abs(supply.y - building.y) < building.h / 2 - 14);
+    assert.ok(chunk.obstacles.every((obstacle) =>
+      Math.abs(supply.x - obstacle.x) >= obstacle.w / 2 + 10 ||
+      Math.abs(supply.y - obstacle.y) >= obstacle.h / 2 + 10,
+    ));
+  }
 });
 
 test('river rows reserve bridges and mark non-crossing edges', () => {
@@ -2368,7 +2384,7 @@ test('endless snapshot exposes loaded blocks, river crossings, and doors', () =>
 
 test('endless buildings expose distinct facades and enterable prefab interiors', () => {
   const area = AREAS.find((entry) => entry.endless)!;
-  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616, [], 1, true, null, { buildingEntryStyle: 'classic' });
   stepWorld(world, 1 / 60, neutralInput);
 
   const endless = world.endless!;
@@ -2380,6 +2396,7 @@ test('endless buildings expose distinct facades and enterable prefab interiors',
   stepWorld(world, 1 / 60, neutralInput);
 
   assert.equal(endless.inBuilding, true);
+  assert.equal(endless.claimedBuildingSupplies.size, 0);
   assert.ok(endless.buildingLabel.length > 0);
   assert.ok(world.obstacles.some((obstacle) => obstacle.w > 300 || obstacle.h > 300));
   assert.ok(world.obstacles.some((obstacle) => obstacle.w < 30 && obstacle.h > 100));
@@ -2387,6 +2404,120 @@ test('endless buildings expose distinct facades and enterable prefab interiors',
   endless.exitZone = { x: world.player.x, y: world.player.y, w: 52, h: 42 };
   stepWorld(world, 1 / 60, neutralInput);
   assert.equal(endless.inBuilding, false);
+});
+
+test('endless walk-in buildings keep the street and combat state in place', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  stepWorld(world, 1 / 60, neutralInput);
+
+  const endless = world.endless!;
+  assert.equal(endless.buildingEntryStyle, 'seamless');
+  const building = endless.buildings.find((candidate) => candidate.id.startsWith('0,0:') && candidate.x > 0 && candidate.y > 0)!;
+  const enemy = addEnemy(world, 'nightcrawler', building.x + 55, building.y);
+  const enemies = world.enemies;
+  const pickups = world.pickups;
+  const projectiles = world.projectiles;
+  const obstacleCount = world.obstacles.length;
+  world.player.x = building.x;
+  world.player.y = building.y;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(endless.inBuilding, false);
+  assert.equal(endless.walkInBuildingId, building.id);
+  assert.equal(endless.buildingLabel, building.name);
+  assert.equal(endless.pendingTransition, null);
+  assert.equal(world.player.x, building.x);
+  assert.equal(world.player.y, building.y);
+  assert.equal(world.enemies, enemies);
+  assert.ok(world.enemies.some((candidate) => candidate.uid === enemy.uid));
+  assert.equal(world.pickups, pickups);
+  assert.equal(world.projectiles, projectiles);
+  assert.equal(world.obstacles.length, obstacleCount);
+
+  world.player.x = 0;
+  world.player.y = 0;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(endless.walkInBuildingId, null);
+  assert.equal(world.obstacles.length, obstacleCount);
+});
+
+test('endless walk-in door can be crossed through its wall opening', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  stepWorld(world, 1 / 60, neutralInput);
+  const door = world.endless!.buildingEntrances.find((candidate) => candidate.buildingId.startsWith('0,0:'))!;
+  const building = world.endless!.buildings.find((candidate) => candidate.id === door.buildingId)!;
+  const dx = door.doorSide === 'west' ? 1 : door.doorSide === 'east' ? -1 : 0;
+  const dy = door.doorSide === 'north' ? 1 : door.doorSide === 'south' ? -1 : 0;
+  world.player.x = door.x - dx * 20;
+  world.player.y = door.y - dy * 20;
+
+  for (let frame = 0; frame < 40 && world.endless!.walkInBuildingId !== building.id; frame += 1) {
+    stepWorld(world, 1 / 60, { ...neutralInput, moveX: dx, moveY: dy });
+  }
+
+  assert.equal(world.endless!.walkInBuildingId, building.id);
+  assert.equal(world.endless!.inBuilding, false);
+});
+
+test('a walk-in building pays its supply once per run', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, 616);
+  stepWorld(world, 1 / 60, neutralInput);
+  const building = world.endless!.buildings.find((candidate) => candidate.id.startsWith('0,0:') && candidate.supplyKind)!;
+  const supply = buildingSupplyPoint(building);
+  world.player.hp = world.player.maxHp - 30;
+  world.player.x = supply.x;
+  world.player.y = supply.y;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.endless!.claimedBuildingSupplies.has(building.id), true);
+  assert.ok(world.alerts.some((alert) => alert.text === `${building.name} supply found`));
+  const cred = world.cred;
+  const hp = world.player.hp;
+  const materials = { ...world.craftingMaterialsCollected };
+
+  world.player.x = 0;
+  world.player.y = 0;
+  stepWorld(world, 1 / 60, neutralInput);
+  world.player.x = supply.x;
+  world.player.y = supply.y;
+  stepWorld(world, 1 / 60, neutralInput);
+
+  assert.equal(world.endless!.claimedBuildingSupplies.size, 1);
+  assert.equal(world.cred, cred);
+  assert.equal(world.player.hp, hp);
+  assert.deepEqual(world.craftingMaterialsCollected, materials);
+  assert.equal(world.alerts.filter((alert) => alert.text === `${building.name} supply found`).length, 1);
+
+  world.player.x = 3200;
+  world.player.y = 3200;
+  stepWorld(world, 1 / 60, neutralInput);
+  world.player.x = supply.x;
+  world.player.y = supply.y;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.endless!.claimedBuildingSupplies.has(building.id), true);
+});
+
+test('a healing supply waits until the operator needs it', () => {
+  const area = AREAS.find((entry) => entry.endless)!;
+  const seed = Array.from({ length: 32 }, (_, index) => 616 + index)
+    .find((candidate) => generateChunk(0, 0, candidate).buildings.some((building) => building.supplyKind === 'health'))!;
+  assert.ok(seed);
+  const world = createWorld(area, testCharacter('chain-whip'), CHARACTERS[0].stats, seed);
+  stepWorld(world, 1 / 60, neutralInput);
+  const building = world.endless!.buildings.find((candidate) => candidate.id.startsWith('0,0:') && candidate.supplyKind === 'health')!;
+  const supply = buildingSupplyPoint(building);
+  world.player.x = supply.x;
+  world.player.y = supply.y;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.endless!.claimedBuildingSupplies.has(building.id), false);
+
+  world.player.hp -= 20;
+  stepWorld(world, 1 / 60, neutralInput);
+  assert.equal(world.endless!.claimedBuildingSupplies.has(building.id), true);
+  assert.ok(world.player.hp > world.player.maxHp - 20);
 });
 
 test('entering a landmark block adds a non-blocking navigation cue', () => {

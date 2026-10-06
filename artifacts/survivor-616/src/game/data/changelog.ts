@@ -358,7 +358,93 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: '0.12.1',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'The Block Stays Alive',
+    body: [
+      'Endless buildings now let you walk in without resetting the street fight. Choose Classic in Settings if you prefer the separate prefab rooms.',
+      'One building per block has a marked, one-time supply find. Floors and soft lighting fit the place, and a lit strip helps you find the doorway.',
+      'The title live feed gets a first-load preview. On later loads, a device request for reduced motion pauses it and shows a small glowing notice. Always animate overrides the pause.',
+    ],
+  },
+  {
+    version: '0.12.2',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Demo Day On The Web',
+    body: [
+      'Demo Day lets The Foreman play on top of any web page. Start it from the Demo Day page on the GSix website, and the page\u2019s text, pictures and buttons become things to smash. Press Esc and everything goes back exactly as it was.',
+      'It is early access: desktop browsers and keyboard only, and it skips sign-in, payment, banking, health and government pages. When you stop, a card shows how much of the page you took down, with a link to save and share it.',
+    ],
+  },
+  {
+    version: '0.12.3',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Experimental Map Playlist',
+    body: [
+      'The map picker now has an Experimental overview for bonus, 2×, 4×, classic, infinite, and custom routes. The original map filters are still there.',
+      'Every map card now shows its type, including routes you have not unlocked yet.',
+    ],
+  },
+  {
+    version: '0.12.4',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'The Crew After Hours',
+    body: [
+      'Eleven new crew jobs widen the hideout rotation. Rapid Shelter now has working assignments of its own, and every rescued ally has more than one reachable job.',
+      'Rescue crew to earn Ember Guard and Moon Runner colors for every fighter, plus three animated hideout scene looks. The original scene and original fighter colors stay available.',
+      'Three new hats join the loot-token shop. Watch for a tiny feudal age, a garlic orbit, and one more run before dawn.',
+    ],
+  },
+  {
+    version: '0.12.5',
+    date: '2026-10-05',
+    kind: 'hotfix',
+    title: 'Back To The Arcade',
+    body: [
+      'Signing in from the game on the GSix website now brings you straight back to the arcade page, signed in and ready to play, instead of leaving you on the standalone game page.',
+    ],
+  },
+  {
+    version: '0.12.6',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Demo Day Breaks Through',
+    body: [
+      'Smashing a page now tears real holes in it: the streets of 616 show through wherever text, pictures and buttons were destroyed, with a hard pixel edge and scorch marks around big blasts. The page underneath is never touched, so quitting puts everything back instantly.',
+      'Breaking things now feels like it: hit flashes, cracks that spread across damaged blocks, pieces that dissolve away and fly off in the page\u2019s own colours, climbing damage numbers, a combo counter, heavy-hit freezes, screen shake, a soft glow around blasts and sound effects (M mutes).',
+      'Demo Day is now a survival game: waves of glitch enemies arrive in tiers while you tear the page down, a boss shows up as the page falls, and clearing 70% of the page and the boss completes the level. You can dash (Shift, or double-tap a direction) through enemies and text with a brief invulnerable window, pause with Esc or P (it also pauses when you switch tabs), pick level-up upgrades with 1, 2 or 3, and open loot boxes for prizes. Settings include Zen mode with no enemies, game speed, screen shake and more.',
+      'Everything you break pays out for what it was: headings give big XP, links some, buttons and inputs can heal, large images are loot crates, and ad frames set off a street sweep. Footers, navigation and headings are armored (hazard tape along the top), article text is soft, and the deeper down the page you go the tougher the enemies get; dense text brings more of them. The level is named after the page, and your report link now breaks down what came down.',
+      'Pick any of the 69 survivors before you start (or switch from the pause menu): a searchable roster with portraits, every character playable. Zero Day\u2019s freeze-and-throw and Artiste\u2019s draw-dodge work on the F key, since there is no mouse to aim with.',
+      'The Foreman moves about 30% faster and the game now runs on a chunkier pixel grid that stays locked to the page as it scrolls. While you play, clicks and the mouse wheel no longer reach the page, so a destroyed link cannot be followed by accident.',
+    ],
+  },
+  {
     version: '0.13.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Forge and Settings Tune-Up',
+    body: [
+      'Dev Mode now shows all five usable Forge slots inside the workshop, matching the save rules.',
+      'Save downloads now include your forged operators alongside game progress. Older progress-only files still import without erasing operators already on this device.',
+      'Settings has a section finder and music volume control. The Forge keeps a compact preview visible on phones and adds undo, redo, duplicate, and a warning before replacing unsaved work.',
+    ],
+  },
+  {
+    version: '0.13.1',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Faster Forge Starts',
+    body: [
+      'The Forge now has one-tap Street, Tech, Mystic, and Wild starting designs, plus reset buttons for body, palette, and each feature section.',
+      'Settings has a fullscreen control for browsers that support it. Esc still leaves fullscreen normally.',
+    ],
+  },
+  {
+    version: '0.13.2',
     date: '2026-10-06',
     kind: 'update',
     title: 'The GRPD Armory Opens',
@@ -369,7 +455,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.13.1',
+    version: '0.13.3',
     date: '2026-10-06',
     kind: 'update',
     title: 'Armory Spawn Control',

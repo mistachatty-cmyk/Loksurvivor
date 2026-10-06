@@ -21,6 +21,7 @@ import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudL
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { activeCardEffects } from '@/game/data/passiveCards';
 import { getFirstNightChapter } from '@/game/data/firstNight';
+import { getBuildingEntryStyle } from '@/game/state/buildingEntrySetting';
 import { nextRescueAllyId } from '@/game/data/progression';
 import { createRunHighlightRecorder } from '@/game/data/runHighlights';
 import { createClipRecorder } from '@/game/media/clipRecorder';
@@ -401,6 +402,7 @@ export function RunScreen({
         knownRelicIds: meta.knownRelicIds,
         ownedKeyItemIds: meta.ownedKeyItemIds,
         craftedRelicIds: meta.craftedRelicIds,
+        buildingEntryStyle: getBuildingEntryStyle(),
         episode,
         episodeProgress: episode ? meta.episodeProgressById[episode.id] : undefined,
         wildlifeSheltersInRain: meta.wildlifeSheltersInRain,

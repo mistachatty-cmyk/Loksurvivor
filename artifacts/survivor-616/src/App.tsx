@@ -36,6 +36,7 @@ import {
 } from '@/game/travelEncounter';
 import type { AreaDef, RunResult, VendorItemCategory } from '@/game/types';
 import type { ArenaSeat } from '@/game/arena/arenaWorld';
+import type { ArenaNetRole } from '@/game/arena/arenaNet';
 import { ArchivePanel } from '@/ui/ArchivePanel';
 import { DirectorTerminalPanel } from '@/ui/DirectorTerminalPanel';
 import { AreaSelect } from '@/ui/AreaSelect';
@@ -72,6 +73,7 @@ import { customMapToArea } from '@/game/data/customMaps';
 import { MapBuilder } from '@/ui/MapBuilder';
 import { SectorCommandScreen } from '@/ui/SectorCommandScreen';
 import { ArenaSetupScreen } from '@/ui/ArenaSetupScreen';
+import { ArenaJoinScreen } from '@/ui/ArenaJoinScreen';
 import { ArenaScreen } from '@/game/ArenaScreen';
 const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default: m.StudioScreen })));
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
@@ -107,7 +109,8 @@ type Screen =
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
   | { name: 'arena-setup' }
-  | { name: 'arena'; area: AreaDef; seats: ArenaSeat[] }
+  | { name: 'arena-join'; initialCode?: string }
+  | { name: 'arena'; area: AreaDef; seats: ArenaSeat[]; net?: ArenaNetRole }
   | { name: 'run-setup'; areaId?: string; challengeIds?: string[]; episodeId?: string; missionId?: string; destination: 'run' | 'hub' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
@@ -127,6 +130,13 @@ interface PendingTravelEncounter {
  * game can be reached without replaying progress. Only honoured in dev.
  */
 function initialScreen(): Screen {
+  // `?room=CODE` is the shareable arena-invite link -- honoured in every
+  // build (not dev-only like the rest of this function), since it's how a
+  // friend actually joins a LokSurvivorArena online room.
+  if (typeof window !== 'undefined') {
+    const roomCode = new URLSearchParams(window.location.search).get('room');
+    if (roomCode) return { name: 'arena-join', initialCode: roomCode };
+  }
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
     const requested = params.get('screen');
@@ -405,12 +415,22 @@ function Game() {
       return (
         <ArenaSetupScreen
           onBack={goHub}
-          onLaunch={(area, seats) => setScreen({ name: 'arena', area, seats })}
+          onLaunch={(area, seats, net) => setScreen({ name: 'arena', area, seats, net })}
+          onJoinOnline={() => setScreen({ name: 'arena-join' })}
+        />
+      );
+
+    case 'arena-join':
+      return (
+        <ArenaJoinScreen
+          initialCode={screen.initialCode}
+          onBack={goHub}
+          onLaunch={(area, seats, net) => setScreen({ name: 'arena', area, seats, net })}
         />
       );
 
     case 'arena':
-      return <ArenaScreen area={screen.area} seats={screen.seats} onExit={goHub} />;
+      return <ArenaScreen area={screen.area} seats={screen.seats} net={screen.net} onExit={goHub} />;
 
     case 'sector-command':
       return (

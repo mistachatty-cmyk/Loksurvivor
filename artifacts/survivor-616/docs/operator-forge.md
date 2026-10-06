@@ -37,6 +37,18 @@ The owner found the new screen content too much, so it is now an **end-game unlo
   operator's kit and never replaces a premade operator.
 - A Forge found with the old taps stays available and on. Operators saved beyond
   the slot count stay on the roster and are listed as "made before slots existed".
+- Turning on Dev Mode also opens the Forge and all five slots immediately. This
+  grants temporary access, not end-game progress: turning Dev Mode off hides the
+  Forge and unearned slots again, while designs stay saved. Reload after
+  switching Dev Mode to refresh the roster.
+
+## The Forge Five
+
+Five new authored operators sit in the normal roster: Vitrail, Cinder Kiln,
+Threadwake, Quarry Choir and Comet Courier. They have their own rigs, signature
+weapons and projectile drawings in `data/forgeFive.ts` and
+`render/forgeFiveVfx.ts`. Their weapons are starting weapons only and are absent
+from the shared loot pool. They do not consume custom operator slots.
 
 Rules and goals are in `data/endgameUnlocks.ts`; state is in
 `state/operatorForgeStore.ts`.

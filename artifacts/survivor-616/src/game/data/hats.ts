@@ -14,6 +14,9 @@ export const HATS: HatDef[] = [
   { id: 'null-sector-badge', name: 'Null Sector Access Badge', description: 'A cracked ID card for a server room that was decommissioned before the badge was printed. It still gets you in.', cost: 4, tier: 'legendary', style: 'orbital-eye' },
   { id: 'rooftop-antenna', name: 'Rooftop Antenna', description: 'A bent broadcast antenna with one stubborn blinking light.', cost: 3, tier: 'rare', style: 'antenna' },
   { id: 'crate-digger', name: 'Crate Digger', description: 'A battered vinyl disc spinning lazily just above the hairline.', cost: 3, tier: 'rare', style: 'vinyl-disc' },
+  { id: 'feudal-cone', name: 'Feudal Traffic Cone', description: 'The crew asked for a castle. Theo built a cone and announced the feudal age anyway.', cost: 2, tier: 'uncommon', style: 'cone' },
+  { id: 'garlic-satellite', name: 'Garlic Satellite', description: 'Its orbit is technically a build. The vampires are technically unimpressed.', cost: 3, tier: 'rare', style: 'satellite' },
+  { id: 'last-crown', name: 'One More Crown', description: 'Just one more run before bed, said the monarch at dawn.', cost: 4, tier: 'legendary', style: 'crown' },
 ];
 export const HATS_BY_ID: Record<string, HatDef> = Object.fromEntries(HATS.map((hat) => [hat.id, hat]));
 export const DEFAULT_HAT_ID = 'no-hat';

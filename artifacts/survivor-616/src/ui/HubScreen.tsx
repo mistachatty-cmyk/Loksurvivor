@@ -121,6 +121,14 @@ const RUMOR_ICONS: Record<string, typeof Bell> = {
   magnet: Magnet,
 };
 
+const SCENE_LOOKS = [
+  { id: 'original', name: 'Original', crew: 0, note: 'The hideout as you found it.' },
+  { id: 'ember', name: 'Ember Watch', crew: 2, note: 'Warm drifting sparks and a firelit street.' },
+  { id: 'moon', name: 'Moonlit Shift', crew: 5, note: 'A slow moon glow over the rooftops.' },
+  { id: 'arcade', name: 'After Hours', crew: 9, note: 'Arcade colors cross the walls in soft waves.' },
+] as const;
+const SCENE_LOOK_KEY = 'survivor616.hideout.sceneLook';
+
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
@@ -195,6 +203,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     () => meta.hideoutArrivalEnabled && !hasShownHideoutArrivalThisSession,
   );
   const [showLorePopup, setShowLorePopup] = useState(false);
+  const [sceneLook, setSceneLook] = useState(() => {
+    try { return localStorage.getItem(SCENE_LOOK_KEY) ?? 'original'; } catch { return 'original'; }
+  });
+  const earnedSceneLook = SCENE_LOOKS.find((look) => look.id === sceneLook && rescuedAllies.length >= look.crew) ?? SCENE_LOOKS[0];
+  const chooseSceneLook = (id: string) => {
+    setSceneLook(id);
+    try { localStorage.setItem(SCENE_LOOK_KEY, id); } catch { /* Device storage may be unavailable. */ }
+  };
   const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
   const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
@@ -330,10 +346,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           {/* CSS background, not an <img>: reference art must never render as a
               raw document image if the stylesheet is missing. */}
           <div
-            className="h-full w-full bg-cover bg-center opacity-40 mix-blend-luminosity grayscale"
+            className={`h-full w-full bg-cover bg-center opacity-40 mix-blend-luminosity grayscale scene-look-photo scene-look-${earnedSceneLook.id}`}
             style={{ backgroundImage: `url(${import.meta.env.BASE_URL}${activeRoom.backdrop})` }}
             aria-hidden="true"
           />
+          {earnedSceneLook.id !== 'original' && <div className={`scene-look-layer scene-look-${earnedSceneLook.id}`} style={{ animationPlayState: isPageVisible ? 'running' : 'paused' }} aria-hidden="true" />}
            <div
              // Bounded to one viewport, not `inset-0` against this screen's
              // full (much taller) scrollable height -- every child here uses
@@ -385,6 +402,13 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
           />
         )}
+        <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-primary">Hideout scene</span>
+          {SCENE_LOOKS.map((look) => {
+            const earned = rescuedAllies.length >= look.crew;
+            return <button key={look.id} type="button" disabled={!earned} title={earned ? look.note : `Rescue ${look.crew} crew to earn`} aria-pressed={earnedSceneLook.id === look.id} onClick={() => chooseSceneLook(look.id)} className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${earnedSceneLook.id === look.id ? 'bg-primary text-primary-foreground' : earned ? 'bg-white/10 text-white hover:bg-white/20' : 'cursor-not-allowed bg-white/5 text-white/35'}`}>{look.name}{!earned && ` · ${look.crew} crew`}</button>;
+          })}
+        </div>
         <header className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
