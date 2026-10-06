@@ -102,6 +102,7 @@ type Screen =
   | { name: 'threat-matrix' }
   | { name: 'director-terminal' }
   | { name: 'dust-mite-rancher' }
+  | { name: 'frog-ranch' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
@@ -151,6 +152,7 @@ function initialScreen(): Screen {
       requested === 'card-shop' ||
       requested === 'weapon-bans' ||
       requested === 'grpd-armory' ||
+      requested === 'frog-ranch' ||
       requested === 'settings' ||
       requested === 'account' ||
       requested === 'feedback' ||
@@ -250,6 +252,9 @@ function Game() {
         break;
       case 'dust-mite-rancher':
         setScreen({ name: 'dust-mite-rancher' });
+        break;
+      case 'frog-ranch':
+        setScreen({ name: 'frog-ranch' });
         break;
       case 'director-terminal':
         setScreen({ name: 'director-terminal' });
@@ -484,7 +489,7 @@ function Game() {
       return <WeaponBansScreen onBack={goHub} />;
 
     case 'grpd-armory':
-      return <GrpdArmoryScreen onBack={goHub} />;
+      return <GrpdArmoryScreen onBack={() => { setRoomId(meta.grpdArmoryAnchor === 'hideout' ? 'main-floor' : 'grpd-station'); goHub(); }} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} onOpenLooksAndLokPets={() => setScreen({ name: 'run-setup', destination: 'hub' })} />;
@@ -506,6 +511,9 @@ function Game() {
 
     case 'dust-mite-rancher':
       return <DustMiteRancherPanel onBack={goHub} onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })} />;
+
+    case 'frog-ranch':
+      return <DustMiteRancherPanel initialCategory="frogs" onBack={goHub} onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })} />;
 
     case 'director-terminal':
       return <DirectorTerminalPanel onBack={goHub} />;

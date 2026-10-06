@@ -40,7 +40,7 @@ import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -82,6 +82,7 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   feedback: { icon: MessageSquareHeart, testId: 'button-open-feedback' },
   'threat-matrix': { icon: ShieldAlert, testId: 'button-open-threat-matrix' },
   'dust-mite-rancher': { icon: Bug, testId: 'button-open-dust-mite-rancher' },
+  'frog-ranch': { icon: Zap, testId: 'button-open-frog-ranch' },
   'director-terminal': { icon: ScanEye, testId: 'button-open-director-terminal' },
 };
 
@@ -638,6 +639,29 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                 {activeRoom.id === 'main-floor' && (
                   <button
                     type="button"
+                    onClick={() => onOpen('frog-ranch')}
+                    data-testid="button-hideout-frog-ranch"
+                    className="group flex items-center gap-3 border border-emerald-300/40 bg-emerald-950/40 px-3 py-2 text-left transition hover:border-emerald-200 hover:bg-emerald-950/70"
+                  >
+                    <Zap className="h-5 w-5 text-emerald-300 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-100">Circuit Frog Ranch</span>
+                      <span className="block text-[10px] text-emerald-100/70">Meet Jeremey Frogster · adopt and train frogs</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-emerald-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && meta.grpdArmoryAnchor === 'hideout' && (
+                  <button type="button" onClick={() => onOpen('grpd-armory')} data-testid="button-hideout-grpd-armory"
+                    className="group flex items-center gap-3 border border-sky-200/50 bg-sky-950/50 px-3 py-2 text-left transition hover:border-amber-200 hover:bg-sky-950/80">
+                    <ShieldCheck className="h-5 w-5 text-amber-200" />
+                    <span><span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100">Relocated GRPD Armory</span><span className="block text-[10px] text-sky-100/70">The Luvitnot keeper holds a safe entrance here</span></span>
+                    <ArrowRight className="h-3.5 w-3.5 text-sky-200/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
                     onClick={onOpenArena}
                     data-testid="button-hideout-arena"
                     className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
@@ -659,8 +683,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         {activeRoom.id === 'grpd-station' && (
           <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.</p></div>
-              <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>
+              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{meta.grpdArmoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
+              {meta.grpdArmoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
             </div>
           </section>
         )}

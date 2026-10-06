@@ -1,20 +1,24 @@
 import { useState } from 'react';
-import { LockKeyhole, Search, ShieldCheck } from 'lucide-react';
+import { BookOpen, LockKeyhole, Search, ShieldCheck, Waves } from 'lucide-react';
 import { GRPD_BLUEPRINTS, GRPD_KILLS_PER_SEAL, GRPD_MAX_SPAWN_MULTIPLIER, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdOfferWeight, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { WEAPONS } from '@/game/data/weapons';
 import { ALL_WEAPON_DEFS } from '@/game/data/weaponPixelModels';
 import { useMeta } from '@/game/state/metaStore';
 import { ScreenLayout } from './ScreenLayout';
 import { WeaponIcon } from './WeaponIcon';
+import { RigPortrait } from './RigPortrait';
+import { LorePopup } from './LorePopup';
+import { LUVITNOT_KEEPER } from '@/game/data/npcCast';
 
 const FIELD_WEAPONS = WEAPONS.filter((weapon) => !isGrpdPlayableWeapon(weapon.id));
 const FIELD_IDS = new Set(WEAPONS.map((weapon) => weapon.id));
 const SPECIAL_WEAPONS = ALL_WEAPON_DEFS.filter((weapon) => !FIELD_IDS.has(weapon.id));
 
 export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
-  const { meta, unlockGrpdWeapon, toggleGrpdWeapon, buyGrpdSpawnTier, setGrpdAutoIncreaseEnabled, toggleWeaponDisabled } = useMeta();
+  const { meta, unlockGrpdWeapon, toggleGrpdWeapon, buyGrpdSpawnTier, setGrpdAutoIncreaseEnabled, setGrpdArmoryAnchor, toggleWeaponDisabled } = useMeta();
   const [tab, setTab] = useState<'archive' | 'field' | 'special'>('archive');
   const [query, setQuery] = useState('');
+  const [showKeeperLore, setShowKeeperLore] = useState(false);
   const seals = grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals);
   const milestones = grpdEarnedSeals(meta.totalKills);
   const nextKillGoal = (milestones + 1) * GRPD_KILLS_PER_SEAL;
@@ -25,9 +29,24 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
   const special = SPECIAL_WEAPONS.filter((entry) => `${entry.name} ${entry.description} ${entry.kind}`.toLowerCase().includes(needle));
 
   return (
-    <ScreenLayout title="GRPD Armory" subtitle="Division St. · Evidence archive" backdrop="art/street.jpeg" onBack={onBack}
+    <ScreenLayout title="GRPD Armory" subtitle={meta.grpdArmoryAnchor === 'station' ? 'Division St. · Evidence archive' : 'Hideout · Relocated evidence archive'} backdrop="art/street.jpeg" onBack={onBack}
       action={<div className="border border-sky-300/40 bg-sky-950/60 px-4 py-2 text-right font-mono"><span className="block text-[10px] uppercase tracking-widest text-sky-200">Evidence seals</span><strong className="text-2xl text-white" data-testid="grpd-seals">{seals}</strong></div>}>
       <div className="max-w-7xl space-y-5">
+        <section className="flex flex-wrap items-center gap-4 border border-amber-200/50 bg-gradient-to-r from-slate-950/95 via-sky-950/90 to-slate-950/95 p-4" data-testid="grpd-luvitnot-keeper">
+          <div className="grid h-36 w-36 shrink-0 place-items-center border border-amber-200/50 bg-sky-950/70 shadow-[0_0_28px_rgba(125,211,252,.2)]" data-testid="portrait-luvitnot-keeper">
+            <RigPortrait rig={LUVITNOT_KEEPER.rig} palette={LUVITNOT_KEEPER.palette} size={132} />
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Eclipse-born · Keeper of the sealed shelves</p>
+            <h2 className="text-2xl font-black text-white">The Luvitnot Keeper</h2>
+            <p className="max-w-2xl text-sm leading-relaxed text-sky-100/75">Water, spirit, data, and energy hold a humanlike shape inside a white suit trimmed in gold. Its glass helmet and sealed suit protect visitors from the raw current. The keeper guards the archive and hums with its Luvitnot kin when the whole Armory must move.</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-200" aria-live="polite" data-testid="grpd-armory-anchor">Current anchor: {meta.grpdArmoryAnchor === 'station' ? 'GRPD Station' : 'Hideout main floor'}</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button type="button" onClick={() => setGrpdArmoryAnchor(meta.grpdArmoryAnchor === 'station' ? 'hideout' : 'station')} className="flex min-h-10 items-center justify-center gap-2 border border-emerald-200/60 bg-emerald-900/30 px-3 font-mono text-xs font-bold uppercase text-emerald-100 hover:bg-emerald-900/50" data-testid="button-shift-grpd-armory"><Waves size={16} /> {meta.grpdArmoryAnchor === 'station' ? 'Hum shift to hideout' : 'Return to station'}</button>
+            <button type="button" onClick={() => setShowKeeperLore(true)} className="flex min-h-10 items-center justify-center gap-2 border border-amber-200/40 px-3 font-mono text-xs font-bold uppercase text-amber-100 hover:bg-amber-200/10" data-testid="button-luvitnot-lore"><BookOpen size={16} /> Keeper lore</button>
+          </div>
+        </section>
         <section className="border border-sky-300/25 bg-slate-950/70 p-4 sm:p-5">
           <p className="text-sm text-slate-200">Recovered designs stay in the evidence archive until fabricated. A fabricated weapon starts <strong>off</strong>; switch it on to let future runs offer it. Your existing field weapons stay available and can be managed here too.</p>
           <div className="mt-3 grid gap-2 font-mono text-xs text-sky-100 sm:grid-cols-3">
@@ -102,6 +121,7 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
           </div>
         </div>}
       </div>
+      {showKeeperLore && <LorePopup onClose={() => setShowKeeperLore(false)} initialChapterId={LUVITNOT_KEEPER.loreId} />}
     </ScreenLayout>
   );
 }

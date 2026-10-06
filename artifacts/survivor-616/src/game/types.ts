@@ -2309,6 +2309,8 @@ export interface MetaState {
   grpdSpawnTierByWeaponId: Record<string, number>;
   /** Whether lifetime kills raise archived weapon offer weight. */
   grpdAutoIncreaseEnabled: boolean;
+  /** The Luvitnot keeper can move the Armory between these two safe entrances. */
+  grpdArmoryAnchor: 'station' | 'hideout';
   totalRuns: number;
   bestSurvivalSec: number;
   /** Every level-up across every run, ever -- never resets. Feeds the persistent player level. */

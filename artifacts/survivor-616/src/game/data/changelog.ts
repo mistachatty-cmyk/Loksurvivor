@@ -378,6 +378,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Turn it back on whenever you want the bonus from your current lifetime kill total.',
     ],
   },
+  {
+    version: '0.14.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'The Frogsters and the Armory Keeper',
+    body: [
+      'Jeremey Frogster now welcomes survivors to the Circuit Frog Ranch, while his twin Jeramy runs the boards at Gorilla Studios. Both have their own animated character models and a shared story in the Digi-Verse Archives.',
+      'The GRPD Armory has a Luvitnot keeper: an Eclipse-born water and spirit being in a white-and-gold protective suit with a glass helmet.',
+      'Ask the keeper to hum-shift the Armory between the GRPD Station and the hideout. The entrance follows its saved location.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

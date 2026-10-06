@@ -152,7 +152,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 24;
+const META_VERSION = 25;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -327,6 +327,7 @@ export function createInitialMeta(): MetaState {
     grpdActiveWeaponIds: [],
     grpdSpawnTierByWeaponId: {},
     grpdAutoIncreaseEnabled: true,
+    grpdArmoryAnchor: 'station',
     totalRuns: 0,
     bestSurvivalSec: 0,
     totalLevelUps: 0,
@@ -1274,6 +1275,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
         .map(([id, tier]) => [id, Math.max(1, Math.min(GRPD_MAX_SPAWN_MULTIPLIER, Math.floor(Number(tier) || 1)))]),
     ),
     grpdAutoIncreaseEnabled: parsed.grpdAutoIncreaseEnabled !== false,
+    grpdArmoryAnchor: parsed.grpdArmoryAnchor === 'hideout' ? 'hideout' : 'station',
     totalRuns: counter(parsed.totalRuns),
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
     totalLevelUps: counter(parsed.totalLevelUps),
@@ -1971,6 +1973,7 @@ type Action =
   | { type: 'toggleGrpdWeapon'; weaponId: string }
   | { type: 'buyGrpdSpawnTier'; weaponId: string }
   | { type: 'setGrpdAutoIncreaseEnabled'; enabled: boolean }
+  | { type: 'setGrpdArmoryAnchor'; anchor: MetaState['grpdArmoryAnchor'] }
   | { type: 'setAllWeaponsDisabled'; disabled: boolean }
   | { type: 'togglePassiveDisabled'; passiveId: string }
   | { type: 'setAllPassivesDisabled'; disabled: boolean }
@@ -2768,6 +2771,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'setGrpdAutoIncreaseEnabled':
       return { ...state, meta: { ...state.meta, grpdAutoIncreaseEnabled: action.enabled } };
+
+    case 'setGrpdArmoryAnchor':
+      return { ...state, meta: { ...state.meta, grpdArmoryAnchor: action.anchor } };
 
     case 'setAllWeaponsDisabled': {
       return {
@@ -3997,6 +4003,7 @@ export interface MetaContextValue {
   toggleGrpdWeapon: (weaponId: string) => void;
   buyGrpdSpawnTier: (weaponId: string) => void;
   setGrpdAutoIncreaseEnabled: (enabled: boolean) => void;
+  setGrpdArmoryAnchor: (anchor: MetaState['grpdArmoryAnchor']) => void;
   setAllWeaponsDisabled: (disabled: boolean) => void;
   togglePassiveDisabled: (passiveId: string) => void;
   setAllPassivesDisabled: (disabled: boolean) => void;
@@ -4296,6 +4303,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const toggleGrpdWeapon = useCallback((weaponId: string) => dispatch({ type: 'toggleGrpdWeapon', weaponId }), []);
   const buyGrpdSpawnTier = useCallback((weaponId: string) => dispatch({ type: 'buyGrpdSpawnTier', weaponId }), []);
   const setGrpdAutoIncreaseEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setGrpdAutoIncreaseEnabled', enabled }), []);
+  const setGrpdArmoryAnchor = useCallback((anchor: MetaState['grpdArmoryAnchor']) => dispatch({ type: 'setGrpdArmoryAnchor', anchor }), []);
   const setAllWeaponsDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllWeaponsDisabled', disabled }), []);
   const togglePassiveDisabled = useCallback((passiveId: string) => dispatch({ type: 'togglePassiveDisabled', passiveId }), []);
   const setAllPassivesDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllPassivesDisabled', disabled }), []);
@@ -4484,6 +4492,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleGrpdWeapon,
       buyGrpdSpawnTier,
       setGrpdAutoIncreaseEnabled,
+      setGrpdArmoryAnchor,
       setAllWeaponsDisabled,
       togglePassiveDisabled,
       setAllPassivesDisabled,
@@ -4636,6 +4645,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleGrpdWeapon,
     buyGrpdSpawnTier,
     setGrpdAutoIncreaseEnabled,
+    setGrpdArmoryAnchor,
     setAllWeaponsDisabled,
     togglePassiveDisabled,
     setAllPassivesDisabled,

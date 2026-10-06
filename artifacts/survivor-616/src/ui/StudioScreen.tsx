@@ -27,6 +27,7 @@ import {
   Trash2,
   Upload,
   X,
+  BookOpen,
 } from 'lucide-react';
 
 import { ScreenLayout } from './ScreenLayout';
@@ -42,6 +43,9 @@ import { EFFECTS, findEffect } from '@/game/audio/studio/effects';
 import { INSTRUMENTS } from '@/game/audio/studio/instruments';
 import { useMeta } from '@/game/state/metaStore';
 import { MAX_BPM, MIN_BPM } from '@/game/audio/studio/project';
+import { JERAMY_FROGSTER } from '@/game/data/npcCast';
+import { RigPortrait } from './RigPortrait';
+import { LorePopup } from './LorePopup';
 
 const STUDIO_TABS = [
   { id: 'clips', label: 'Clips' },
@@ -65,6 +69,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
   const projectInputRef = useRef<HTMLInputElement>(null);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<StudioTab>('arrange');
+  const [showJeramyLore, setShowJeramyLore] = useState(false);
 
   const targetTrackId = studio.project.tracks[0]?.id;
   const hasInstrumentTrack = studio.project.tracks.some((track) => track.instrumentId);
@@ -425,7 +430,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
   );
 
   return (
-    <ScreenLayout title="Studio" subtitle="616 Records" onBack={onBack}>
+    <ScreenLayout title="Studio" subtitle="Gorilla Studios · 616 Records" onBack={onBack}>
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0"
@@ -443,6 +448,17 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           void studio.importFiles(event.dataTransfer.files);
         }}
       >
+        <section className="flex flex-wrap items-center gap-4 border border-fuchsia-300/35 bg-slate-950/75 p-3 sm:p-4" data-testid="studio-jeramy-host">
+          <div className="grid h-28 w-28 shrink-0 place-items-center border border-cyan-300/40 bg-violet-950/70" data-testid="portrait-jeramy-frogster">
+            <RigPortrait rig={JERAMY_FROGSTER.rig} palette={JERAMY_FROGSTER.palette} size={108} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200">Gorilla Studios · Room engineer</p>
+            <h2 className="text-xl font-black text-white">Jeramy</h2>
+            <p className="mt-1 max-w-2xl text-sm text-white/70">Same silver hair and sharp glasses as his twin Jeremey at the Circuit Frog Ranch. Jeramy keeps the boards warm and gives every survivor a place to turn a rough night into a track.</p>
+          </div>
+          <button type="button" onClick={() => setShowJeramyLore(true)} className="flex min-h-10 items-center gap-2 border border-fuchsia-300/50 px-3 font-mono text-xs font-bold uppercase text-fuchsia-100 hover:bg-fuchsia-300/10" data-testid="button-jeramy-lore"><BookOpen size={15} /> Meet the twins</button>
+        </section>
         {/* ---- transport ---- */}
         <div className="flex flex-wrap items-center gap-3 border border-border bg-card/60 p-4">
           <button
@@ -716,6 +732,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           </div>
         )}
       </div>
+      {showJeramyLore && <LorePopup onClose={() => setShowJeramyLore(false)} initialChapterId={JERAMY_FROGSTER.loreId} />}
     </ScreenLayout>
   );
 }
