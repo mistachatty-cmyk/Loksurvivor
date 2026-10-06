@@ -39,6 +39,18 @@ function storage(): Storage | null {
 
 const KNOWN_EARNED = new Set<string>([...ENDGAME_FEATURE_IDS, ...CUSTOM_SLOT_IDS]);
 
+/** Dev Mode is stored with the main save, which is available before the roster is built. */
+function devModeForgeAccess(): boolean {
+  try {
+    const raw = storage()?.getItem('survivor616.meta.v1');
+    if (!raw) return false;
+    const meta = JSON.parse(raw) as { devModeAccessUnlocked?: unknown; devModeAllUnlocks?: unknown };
+    return meta.devModeAccessUnlocked === true && meta.devModeAllUnlocks === true;
+  } catch {
+    return false;
+  }
+}
+
 function read(): ForgeState {
   const empty: ForgeState = { unlocked: false, operators: [], earned: [], toggles: {} };
   const store = storage();
@@ -102,12 +114,14 @@ export function earnedEndgameIds(): string[] {
 
 /** How many custom slots have been earned. */
 export function earnedSlotCount(): number {
+  if (devModeForgeAccess()) return CUSTOM_SLOT_IDS.length;
   const earned = read().earned;
   return CUSTOM_SLOT_IDS.filter((id) => earned.includes(id)).length;
 }
 
 /** Whether a feature has been earned (or, for the Forge, was already found before it became an unlock). */
 export function isFeatureAvailable(id: EndgameFeatureId): boolean {
+  if (id === 'forge' && devModeForgeAccess()) return true;
   const state = read();
   if (state.earned.includes(id)) return true;
   return id === 'forge' && state.unlocked;
@@ -115,6 +129,7 @@ export function isFeatureAvailable(id: EndgameFeatureId): boolean {
 
 /** Whether the player has it switched on. Earned features default to off, except a Forge found before this change. */
 export function isFeatureEnabled(id: EndgameFeatureId): boolean {
+  if (id === 'forge' && devModeForgeAccess()) return true;
   const state = read();
   const available = state.earned.includes(id) || (id === 'forge' && state.unlocked);
   if (!available) return false;
@@ -145,7 +160,7 @@ export function loadRosterForgedOperators(): ForgedOperator[] {
 /** How many more operators can be kept: earned slots minus operators already saved (never below 0). */
 export function freeSlotCount(): number {
   const state = read();
-  const slots = CUSTOM_SLOT_IDS.filter((id) => state.earned.includes(id)).length;
+  const slots = earnedSlotCount();
   return Math.max(0, slots - state.operators.length);
 }
 
@@ -156,7 +171,7 @@ export function saveForgedOperator(op: ForgedOperator): boolean {
   const operators = [...state.operators];
   if (existing >= 0) operators[existing] = op;
   else {
-    const slots = CUSTOM_SLOT_IDS.filter((id) => state.earned.includes(id)).length;
+    const slots = earnedSlotCount();
     if (operators.length >= slots || operators.length >= MAX_FORGED_OPERATORS) return false;
     operators.push(op);
   }

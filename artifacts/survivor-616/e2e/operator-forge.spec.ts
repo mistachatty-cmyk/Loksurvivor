@@ -35,6 +35,23 @@ async function openEndgame(page: Page) {
 }
 
 test.describe('operator forge', () => {
+  test('Dev Mode exposes the Forge and five temporary slots without map clears', async ({ page }) => {
+    await page.addInitScript((key) => {
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, JSON.stringify({
+          version: 22, onboarded: true, totalRuns: 3, hideoutArrivalEnabled: false,
+          devModeAccessUnlocked: true, devModeAllUnlocks: true, clearedAreaIds: [],
+        }));
+      }
+    }, META_KEY);
+    await page.goto('/?screen=settings');
+    await page.getByTestId('tab-settings-endgame').click();
+    await expect(page.getByTestId('switch-endgame-forge')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('slot-endgame-slot-beast-master')).toContainText('earned');
+    await page.getByTestId('button-open-forge').click();
+    await expect(page.getByTestId('panel-operator-forge')).toBeVisible();
+  });
+
   test('is behind the end game until earned, then designs, saves and plays a new operator', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));

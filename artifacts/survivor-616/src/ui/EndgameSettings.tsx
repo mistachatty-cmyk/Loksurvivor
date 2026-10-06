@@ -16,7 +16,7 @@ export function EndgameSettings() {
   const [forgeOpen, setForgeOpen] = useState(false);
   const [needsReload, setNeedsReload] = useState(false);
 
-  const available = ENDGAME_FEATURES.filter((f) => isFeatureAvailable(f.id));
+  const available = ENDGAME_FEATURES.filter((f) => isFeatureAvailable(f.id) || (f.id === 'forge' && meta.devModeAllUnlocks));
   const [burst, setBurst] = useState<{ id: string; n: number } | null>(null);
 
   const toggle = (id: EndgameFeatureId, needsPageReload: boolean) => {
@@ -27,19 +27,21 @@ export function EndgameSettings() {
     bump((n) => n + 1);
   };
 
-  const forgeOn = isFeatureEnabled('forge');
+  const forgeOn = meta.devModeAllUnlocks || isFeatureEnabled('forge');
 
   return (
     <section className="endgame-panel mx-auto max-w-5xl p-5 sm:p-6" data-testid="endgame-section">
       <p className="text-xs font-bold uppercase tracking-[0.25em] text-fuchsia-200">End game</p>
       <h2 className="endgame-title mt-1 text-3xl font-black uppercase">Victory Lap</h2>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        Earned by clearing every standard map. Each one is off until you turn it on, and none of them change the operators you already have.
+        {meta.devModeAllUnlocks
+          ? 'Dev Mode opens the Operator Forge and all five design slots. Your created operators stay saved when Dev Mode is off.'
+          : 'Earned by clearing every standard map. Each one is off until you turn it on, and none of them change the operators you already have.'}
       </p>
 
       <ul className="mt-4 space-y-2">
         {available.map((feature) => {
-          const on = isFeatureEnabled(feature.id);
+          const on = (feature.id === 'forge' && meta.devModeAllUnlocks) || isFeatureEnabled(feature.id);
           return (
             <li key={feature.id} className={`relative flex items-start gap-3 border p-3 transition-shadow ${on ? 'endgame-card-on border-fuchsia-300/60 bg-fuchsia-400/10' : 'border-border/70 bg-background/50'}`}>
               {burst?.id === feature.id ? <Sparks key={burst.n} /> : null}
@@ -48,6 +50,7 @@ export function EndgameSettings() {
                 role="switch"
                 aria-checked={on}
                 aria-label={feature.label}
+                disabled={feature.id === 'forge' && meta.devModeAllUnlocks}
                 onClick={() => toggle(feature.id, feature.needsReload)}
                 className={`mt-0.5 h-6 w-11 shrink-0 border transition-colors ${on ? 'border-primary bg-primary' : 'border-border bg-background'}`}
                 data-testid={`switch-endgame-${feature.id}`}
@@ -56,7 +59,7 @@ export function EndgameSettings() {
               </button>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black uppercase text-white">{feature.label}</p>
-                <p className="text-xs leading-relaxed text-muted-foreground">{feature.blurb}</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">{feature.id === 'forge' && meta.devModeAllUnlocks ? 'On while Dev Mode is active. Open the Forge below to create up to five operators.' : feature.blurb}</p>
               </div>
             </li>
           );
@@ -86,7 +89,7 @@ export function EndgameSettings() {
       <h3 className="mt-6 text-sm font-black uppercase tracking-wide text-white">Custom operator slots</h3>
       <ul className="mt-2 grid gap-2 sm:grid-cols-2" data-testid="list-endgame-slots">
         {CUSTOM_SLOTS.map((slot) => {
-          const earned = isSlotEarned(slot, meta);
+          const earned = meta.devModeAllUnlocks || isSlotEarned(slot, meta);
           const goal = slot.goal?.(meta);
           return (
             <li key={slot.id} className={`border p-3 ${earned ? 'endgame-slot-earned border-amber-300/60 bg-amber-300/5' : 'border-border/70 bg-background/50 opacity-80'}`} data-testid={`slot-endgame-${slot.id}`}>

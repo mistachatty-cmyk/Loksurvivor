@@ -150,6 +150,21 @@ describe('end-game store: toggles, slots and the roster', () => {
     assert.equal(isFeatureAvailable('inspector'), false);
   });
 
+  it('opens the Forge and five temporary slots in Dev Mode, then restores progression', () => {
+    (globalThis.localStorage as Storage).setItem('survivor616.meta.v1', JSON.stringify({ devModeAccessUnlocked: true, devModeAllUnlocks: true }));
+    assert.equal(isFeatureEnabled('forge'), true);
+    assert.equal(earnedSlotCount(), 5);
+    assert.equal(saveForgedOperator(makeOp('dev-operator')), true);
+    assert.equal(loadRosterForgedOperators().length, 1);
+
+    (globalThis.localStorage as Storage).setItem('survivor616.meta.v1', JSON.stringify({ devModeAccessUnlocked: true, devModeAllUnlocks: false }));
+    assert.equal(isFeatureEnabled('forge'), false);
+    assert.equal(earnedSlotCount(), 0);
+    assert.equal(loadRosterForgedOperators().length, 0);
+    assert.equal(saveForgedOperator(makeOp('second-operator')), false);
+    assert.equal(JSON.parse(globalThis.localStorage.getItem(FORGE_STORAGE_KEY)!).operators.length, 1, 'created operator remains saved');
+  });
+
   it('survives corrupt storage', () => {
     (globalThis.localStorage as Storage).setItem(FORGE_STORAGE_KEY, '{nope');
     assert.equal(earnedSlotCount(), 0);
