@@ -19,6 +19,9 @@ import {
   stepWorld,
   type World,
 } from '@/game/engine/world';
+import { createSfxEngine, type SfxEngine } from '@/game/audio/sfxEngine';
+import { DEFAULT_SFX_STYLE, type SfxCueId } from '@/game/audio/sfxCues';
+import { createRng } from '@/game/engine/math';
 import { renderGroundLayer, renderWorld } from '@/game/render/draw';
 import {
   blockToObstacle,
@@ -35,6 +38,29 @@ import {
   type DocSize,
   type PageBlock,
 } from './pageModel';
+import {
+  HIT_STOP_COOLDOWN_MS,
+  FLOATER_LIFE_MS,
+  addFloater,
+  comboAlive,
+  comboBreak,
+  crackCells,
+  crackStage,
+  dissolveDone,
+  dissolveLevel,
+  floaterRise,
+  hitStopMs,
+  newCombo,
+  pruneFloaters,
+  spawnDebris,
+  stepDebris,
+  FLASH_MS,
+  type Debris,
+  type Floater,
+} from './fx';
+import { collectLights } from './lights';
+import { measureText, textCells } from './pixelFont';
+import { addOutline, binariseAlpha } from './pixelPass';
 import { fillWindow, HoleField } from './reveal';
 import { reportUrl } from './runLink';
 import { CELL_CSS, SPEED_MULT, SPRITE_UNITS, WORLD_K, lowResSize, snapToCell, targetViewUnits } from './scale';
@@ -50,6 +76,10 @@ const CRATER_MIN_RADIUS = 40;
 const CRATER_MIN_INTENSITY = 2;
 const CRATER_SHRINK = 0.8;
 const MAX_CRATERS = 400;
+/** Page lighter than this gets no additive glow (light on white is invisible). */
+const GLOW_MAX_PAGE_LUMA = 170;
+const OUTLINE = 0xff0a0605;
+const COMBO_BANNER_MIN = 3;
 const SPAWN_CLEARANCE = 56;
 const CHARACTER_ID = 'foreman';
 
@@ -89,6 +119,7 @@ canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-ren
 .card .actions { display: flex; gap: 8px; }
 .card .actions a, .card .actions button { flex: 1; text-align: center; font: inherit; color: #0b0b0e; background: #f2c14e; border: 0; padding: 6px 8px; cursor: pointer; text-decoration: none; font-weight: 700; }
 .card .actions button { color: #f4f1ea; background: rgba(255,255,255,.12); font-weight: 400; }
+.glow { position: fixed; left: 0; top: 0; pointer-events: none; image-rendering: auto; transform-origin: 0 0; }
 .shield { position: fixed; inset: 0; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: default; }
 .toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: rgba(15,15,20,.92); border: 1px solid rgba(255,255,255,.35); padding: 8px 12px; }
 `;
@@ -142,6 +173,26 @@ export class DemoDaySession {
   private lastOrigin = { x: Number.NaN, y: Number.NaN };
   private holesInWindow = 0;
   private ownerIds = new WeakMap<Element, number>();
+
+  /* feel: flashes, dissolves, debris, numbers, combo, hit-stop, sound */
+  private rng = createRng(1);
+  private floaters: Floater[] = [];
+  private debris: Debris[] = [];
+  private dissolves: Array<{ block: PageBlock; bornAt: number; level: number }> = [];
+  private combo = newCombo();
+  private hitStopUntil = 0;
+  private lastHitStopAt = -1e9;
+  private audio: AudioContext | null = null;
+  private sfx: SfxEngine | null = null;
+  private muted = false;
+  private crackCache = new Map<string, Array<[number, number]>>();
+  private ownerColors = new WeakMap<Element, string[]>();
+  private actorCanvas: HTMLCanvasElement | null = null;
+  private actorCtx: CanvasRenderingContext2D | null = null;
+  private lightHost: HTMLElement | null = null;
+  private lightCanvas: HTMLCanvasElement | null = null;
+  private lightCtx: CanvasRenderingContext2D | null = null;
+  private lightsOn = false;
   private nextOwnerId = 1;
 
   constructor(win: Window = window) {
@@ -185,8 +236,18 @@ export class DemoDaySession {
 
     this.field = new HoleField(Math.ceil(this.doc.w / CELL_CSS), Math.ceil(this.doc.h / CELL_CSS));
     this.craters = [];
-    this.scenery = createScenery(this.readPageLook(), this.win.location.hostname);
+    const look = this.readPageLook();
+    this.scenery = createScenery(look, this.win.location.hostname);
+    this.lightsOn = look.luma < GLOW_MAX_PAGE_LUMA;
     this.lastFieldVersion = -1;
+    this.rng = createRng((Date.now() % 1e9) | 0);
+    this.floaters = [];
+    this.debris = [];
+    this.dissolves = [];
+    this.combo = newCombo();
+    this.hitStopUntil = 0;
+    this.crackCache.clear();
+    this.ensureAudio();
 
     const spawnPage = {
       x: Math.min(this.doc.w - 1, this.win.scrollX + viewport.w / 2),
@@ -197,6 +258,7 @@ export class DemoDaySession {
     world.player.y = spawnWorld.y;
     skipBlocksNear(this.blocks, spawnPage, SPAWN_CLEARANCE);
 
+    this.mountLightHost();
     this.layout();
     this.stream(true);
 
@@ -236,6 +298,13 @@ export class DemoDaySession {
     this.world = null;
     this.scenery = null;
     this.field.clear();
+    this.floaters = [];
+    this.debris = [];
+    this.dissolves = [];
+    this.sfx?.dispose();
+    this.sfx = null;
+    void this.audio?.close().catch(() => undefined);
+    this.audio = null;
     if (summary && (summary.elapsedSec >= 3 || summary.destroyedPct > 0)) this.showEndCard(summary, restore);
     return summary;
   }
@@ -244,6 +313,7 @@ export class DemoDaySession {
   restorePage(): void {
     this.field.clear();
     this.craters = [];
+    this.dissolves = [];
     for (const b of this.blocks) b.destroyed = false;
     this.rescan();
   }
@@ -267,6 +337,12 @@ export class DemoDaySession {
     const { editable, activatable } = isEditableTarget(e.composedPath()[0]);
     if (editable) return;
     const key = e.key.toLowerCase();
+    this.ensureAudio();
+    if (key === 'm') {
+      this.muted = !this.muted;
+      this.sfx?.setEnabled(!this.muted);
+      return;
+    }
     if (key === 'escape') {
       this.stop(true);
       return;
@@ -324,11 +400,12 @@ export class DemoDaySession {
     const world = this.world;
     const dt = Math.min(0.1, Math.max(0, (now - this.lastTime) / 1000));
     this.lastTime = now;
-    this.acc += dt;
+    const frozen = now < this.hitStopUntil;
+    if (!frozen) this.acc += dt;
 
     const move = this.moveVector();
     let steps = 0;
-    while (this.acc >= FIXED_STEP && steps < MAX_SUBSTEPS) {
+    while (!frozen && this.acc >= FIXED_STEP && steps < MAX_SUBSTEPS) {
       stepWorld(world, FIXED_STEP, { ...move, ultimate: this.ultRequested });
       this.ultRequested = false;
       this.acc -= FIXED_STEP;
@@ -337,9 +414,13 @@ export class DemoDaySession {
     if (steps === MAX_SUBSTEPS) this.acc = 0;
 
     this.autoLevelUp(world);
-    this.collectBroken(world);
+    this.processHits(world);
+    this.collectBroken(world, now);
     this.collectImpacts(world);
-    world.propHits.length = 0;
+    this.updateDissolves(world);
+    stepDebris(this.debris, dt);
+    pruneFloaters(this.floaters, world.now);
+    this.drainSfx(world);
     if (now - this.lastStream >= STREAM_EVERY_MS) {
       this.lastStream = now;
       this.stream(false);
@@ -424,10 +505,12 @@ export class DemoDaySession {
     if (gone.size > 0) removeBreakables(world, gone);
   }
 
-  /** Every block the game just broke becomes a hole in the reveal (the page itself is untouched). */
-  private collectBroken(world: World): void {
+  /**
+   * Every block the game just broke flashes, dissolves into a hole in the reveal (the page itself is untouched),
+   * throws debris, feeds the combo and, when it is big, briefly stops the world.
+   */
+  private collectBroken(world: World, realNow: number): void {
     const gone = new Set<number>();
-    let punched = false;
     for (const b of world.breakables) {
       if (b.kind !== 'page-block' || !b.broken || b.domId === undefined) continue;
       gone.add(b.uid);
@@ -435,11 +518,119 @@ export class DemoDaySession {
       const block = this.blocks[b.domId];
       if (!block || block.destroyed) continue;
       block.destroyed = true;
-      this.punchBlock(block);
-      punched = true;
+      this.dissolves.push({ block, bornAt: world.now, level: 0 });
+      const hit = worldToPage(b.lastHitX ?? world.player.x, b.lastHitY ?? world.player.y, this.doc);
+      this.throwDebris(block, { x: hit.x / CELL_CSS, y: hit.y / CELL_CSS });
+      this.playSfx('obstacleBreak');
+      const milestone = comboBreak(this.combo, world.now);
+      if (milestone !== null) this.playSfx('speedTally');
+      const stop = hitStopMs(b.maxHp, 1);
+      if (stop > 0 && realNow - this.lastHitStopAt > HIT_STOP_COOLDOWN_MS) {
+        this.hitStopUntil = realNow + stop;
+        this.lastHitStopAt = realNow;
+      }
     }
     if (gone.size > 0) removeBreakables(world, gone);
-    if (punched) this.cascadeIntoHoles(world);
+  }
+
+  /** Advance every dissolve: after the flash the rect is eaten away in dither steps, then finally opened whole. */
+  private updateDissolves(world: World): void {
+    if (this.dissolves.length === 0) return;
+    let finished = false;
+    for (let i = this.dissolves.length - 1; i >= 0; i -= 1) {
+      const d = this.dissolves[i]!;
+      const age = world.now - d.bornAt;
+      const b = d.block;
+      const rect = [b.x / CELL_CSS, b.y / CELL_CSS, b.w / CELL_CSS, b.h / CELL_CSS] as const;
+      if (dissolveDone(age)) {
+        this.field.addRect(...rect);
+        this.dissolves.splice(i, 1);
+        finished = true;
+        continue;
+      }
+      const level = dissolveLevel(age);
+      if (level > d.level) {
+        d.level = level;
+        this.field.addDither(...rect, level);
+      }
+    }
+    if (finished) this.cascadeIntoHoles(world);
+  }
+
+  /** Colours a block's debris should have: the text colour for text, the element's own paint (or the page accent) for boxes. */
+  private debrisColors(block: PageBlock): string[] {
+    const el = this.elements[block.owner];
+    if (!el) return ['#e8ecf1'];
+    const cached = this.ownerColors.get(el);
+    if (cached) return cached;
+    const cs = this.win.getComputedStyle(el);
+    const colors: string[] = [];
+    const text = parseCssColor(cs.color);
+    const paint = parseCssColor(cs.backgroundColor) ?? parseCssColor(cs.borderTopColor);
+    const css = (c: { r: number; g: number; b: number }) => `rgb(${c.r},${c.g},${c.b})`;
+    if (block.kind === 'text') {
+      if (text) colors.push(css(text));
+    } else {
+      if (paint) colors.push(css(paint));
+      if (text) colors.push(css(text));
+    }
+    if (colors.length === 0) colors.push('#cfd6df');
+    this.ownerColors.set(el, colors);
+    return colors;
+  }
+
+  private throwDebris(block: PageBlock, from: { x: number; y: number }): void {
+    const wCells = block.w / CELL_CSS;
+    const hCells = block.h / CELL_CSS;
+    const count = Math.max(3, Math.min(28, Math.round(Math.sqrt(wCells * hCells) * 0.9)));
+    spawnDebris(this.debris, this.rng, { x: block.x / CELL_CSS, y: block.y / CELL_CSS, w: wCells, h: hCells }, from, this.debrisColors(block), count);
+  }
+
+  /** Damage numbers, hit sounds. Merged per block so a flurry of hits reads as one climbing number. */
+  private processHits(world: World): void {
+    if (world.propHits.length === 0) return;
+    const byUid = new Map<number, number>();
+    for (const b of world.breakables) if (b.domId !== undefined) byUid.set(b.uid, b.domId);
+    let struck = false;
+    for (const hit of world.propHits) {
+      const id = byUid.get(hit.uid);
+      const block = id === undefined ? undefined : this.blocks[id];
+      if (!block || hit.amount < 1) continue;
+      struck = true;
+      addFloater(this.floaters, block.id, (block.x + block.w / 2) / CELL_CSS, block.y / CELL_CSS - 2, hit.amount, hit.kill, world.now);
+    }
+    world.propHits.length = 0;
+    if (struck) this.playSfx('hit');
+  }
+
+  /* ------------------------------------------------------------ sound */
+
+  /** The AudioContext is made on a user gesture (start or the first key), never at load. */
+  private ensureAudio(): void {
+    if (!this.audio) {
+      try {
+        const audioWin = this.win as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
+        const Ctor = audioWin.AudioContext ?? audioWin.webkitAudioContext;
+        if (Ctor) {
+          this.audio = new Ctor();
+          this.sfx = createSfxEngine(this.audio);
+          this.sfx.setEnabled(!this.muted);
+        }
+      } catch {
+        this.audio = null;
+        this.sfx = null;
+      }
+    }
+    if (this.audio?.state === 'suspended') void this.audio.resume().catch(() => undefined);
+  }
+
+  private playSfx(cue: SfxCueId, onBeat = false): void {
+    this.sfx?.play(cue, DEFAULT_SFX_STYLE, onBeat);
+  }
+
+  private drainSfx(world: World): void {
+    if (world.sfxEvents.length === 0) return;
+    for (const ev of world.sfxEvents.splice(0)) this.playSfx(ev.cue, ev.onBeat);
   }
 
   /** Big blasts carve craters (blank page included: that is the "background revealed"), every blast leaves soot. */
@@ -536,8 +727,11 @@ export class DemoDaySession {
     const k = Math.min(1, dt * 8);
     const sx = Math.round(this.win.scrollX);
     const sy = Math.round(this.win.scrollY);
-    const nx = Math.min(maxX, Math.max(0, snapToCell(sx + (target.x - sx) * k)));
-    const ny = Math.min(maxY, Math.max(0, snapToCell(sy + (target.y - sy) * k)));
+    // Heavy hits shake the real scroll in whole cells, so the page and the game shake together (zero at clamped edges).
+    const shake = world.shake > 3 ? Math.min(2, Math.round(world.shake / 8)) : 0;
+    const jitter = () => (shake > 0 ? Math.round((this.rng() * 2 - 1) * shake) * CELL_CSS : 0);
+    const nx = Math.min(maxX, Math.max(0, snapToCell(sx + (target.x - sx) * k) + jitter()));
+    const ny = Math.min(maxY, Math.max(0, snapToCell(sy + (target.y - sy) * k) + jitter()));
     if (nx !== sx || ny !== sy) this.win.scrollTo({ left: nx, top: ny, behavior: 'instant' });
   }
 
@@ -562,7 +756,139 @@ export class DemoDaySession {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.lowW, this.lowH);
     this.drawReveal(world, view, cellX, cellY);
-    renderWorld(ctx, world, { ...view, overlay: true, preserve: true });
+    this.drawPageFx(world, cellX, cellY);
+    this.drawDebris(cellX, cellY);
+    this.drawActors(world, view);
+    this.drawFloaters(world, cellX, cellY);
+    this.drawCombo(world);
+    this.drawLights(world, sx, sy, cellX, cellY);
+  }
+
+  /** Actors, projectiles and particles on their own canvas, so alpha can be snapped and outlined without touching the reveal. */
+  private drawActors(world: World, view: { width: number; height: number; dpr: number; targetViewOverride: number }): void {
+    const { ctx, actorCtx, actorCanvas } = this;
+    if (!ctx || !actorCtx || !actorCanvas) return;
+    renderWorld(actorCtx, world, { ...view, overlay: true });
+    const img = actorCtx.getImageData(0, 0, this.lowW, this.lowH);
+    const px = new Uint32Array(img.data.buffer);
+    binariseAlpha(px, 110);
+    addOutline(px, this.lowW, this.lowH, OUTLINE);
+    actorCtx.putImageData(img, 0, 0);
+    ctx.drawImage(actorCanvas, 0, 0);
+  }
+
+  /** Hit flash, break flash and cracks, painted over the page at each block's own cells. */
+  private drawPageFx(world: World, cellX: number, cellY: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const view = { x0: cellX - 2, y0: cellY - 2, x1: cellX + this.lowW + 2, y1: cellY + this.lowH + 2 };
+    const inView = (b: PageBlock) => {
+      const bx = b.x / CELL_CSS;
+      const by = b.y / CELL_CSS;
+      return bx < view.x1 && by < view.y1 && bx + b.w / CELL_CSS > view.x0 && by + b.h / CELL_CSS > view.y0;
+    };
+    for (const b of world.breakables) {
+      if (b.kind !== 'page-block' || b.domId === undefined || b.broken) continue;
+      const block = this.blocks[b.domId];
+      if (!block || !inView(block)) continue;
+      const bx = Math.floor(block.x / CELL_CSS) - cellX;
+      const by = Math.floor(block.y / CELL_CSS) - cellY;
+      const bw = Math.ceil(block.w / CELL_CSS);
+      const bh = Math.ceil(block.h / CELL_CSS);
+      if (b.lastHitAt !== undefined && world.now - b.lastHitAt < 90) {
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fillRect(bx, by, bw, bh);
+      }
+      const stage = crackStage(b.maxHp > 0 ? b.hp / b.maxHp : 1);
+      if (stage === 0) continue;
+      const key = `${block.id}:${stage}`;
+      let cells = this.crackCache.get(key);
+      if (!cells) {
+        cells = crackCells(block.id + 1, bw, bh, stage);
+        this.crackCache.set(key, cells);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      for (const [x, y] of cells) ctx.fillRect(bx + x + 1, by + y, 1, 1);
+      ctx.fillStyle = '#05060a';
+      for (const [x, y] of cells) ctx.fillRect(bx + x, by + y, 1, 1);
+    }
+    for (const d of this.dissolves) {
+      if (world.now - d.bornAt >= FLASH_MS) continue;
+      const b = d.block;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillRect(Math.floor(b.x / CELL_CSS) - cellX, Math.floor(b.y / CELL_CSS) - cellY, Math.ceil(b.w / CELL_CSS), Math.ceil(b.h / CELL_CSS));
+    }
+  }
+
+  private drawDebris(cellX: number, cellY: number): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    for (const d of this.debris) {
+      if (d.life < d.maxLife * 0.2 && (Math.floor(d.x) + Math.floor(d.y)) % 2 === 0) continue; // dither out at the end
+      ctx.fillStyle = d.color;
+      ctx.fillRect(Math.floor(d.x - cellX), Math.floor(d.y - cellY), d.size, d.size);
+    }
+  }
+
+  /** Pixel text with a one-cell dark outline, `scale` cells per font cell. */
+  private drawPixelText(text: string, x: number, y: number, colour: string, scale = 1): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const cells = textCells(text);
+    ctx.fillStyle = '#05060a';
+    for (const [cx, cy] of cells) {
+      for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) ctx.fillRect(x + cx * scale + ox, y + cy * scale + oy, scale, scale);
+    }
+    ctx.fillStyle = colour;
+    for (const [cx, cy] of cells) ctx.fillRect(x + cx * scale, y + cy * scale, scale, scale);
+  }
+
+  private drawFloaters(world: World, cellX: number, cellY: number): void {
+    for (const f of this.floaters) {
+      const age = world.now - f.bornAt;
+      if (age > FLOATER_LIFE_MS) continue;
+      const scale = f.kill ? 2 : 1;
+      const w = measureText(f.text) * scale;
+      this.drawPixelText(f.text, Math.floor(f.x - w / 2 - cellX), Math.floor(f.y - floaterRise(age) - cellY), f.kill ? '#ffd45e' : '#ffffff', scale);
+    }
+  }
+
+  private drawCombo(world: World): void {
+    const count = comboAlive(this.combo, world.now);
+    if (count < COMBO_BANNER_MIN) return;
+    const text = `X${count}`;
+    const scale = count >= 25 ? 3 : 2;
+    const w = measureText(text) * scale;
+    this.drawPixelText(text, Math.floor(this.lowW / 2 - w / 2), 8, count >= 25 ? '#ff8c42' : '#ffd45e', scale);
+    this.drawPixelText('COMBO', Math.floor(this.lowW / 2 - measureText('COMBO') / 2), 8 + 5 * scale + 3, '#ffffff', 1);
+  }
+
+  /** Soft additive glow between the page and the pixel layer: half resolution, smoothed, drawn with `lighter`. */
+  private drawLights(world: World, sx: number, sy: number, cellX: number, cellY: number): void {
+    const { lightCtx, lightCanvas } = this;
+    if (!lightCtx || !lightCanvas) return;
+    lightCtx.setTransform(1, 0, 0, 1, 0, 0);
+    lightCtx.globalCompositeOperation = 'source-over';
+    lightCtx.globalAlpha = 1;
+    lightCtx.clearRect(0, 0, lightCanvas.width, lightCanvas.height);
+    lightCanvas.style.transform = `translate(${-(sx - cellX * CELL_CSS)}px, ${-(sy - cellY * CELL_CSS)}px)`;
+    const halfW = (this.lowW * SPRITE_UNITS) / 2;
+    const halfH = (this.lowH * SPRITE_UNITS) / 2;
+    const cam = world.camera;
+    const lights = collectLights(world, { left: cam.x - halfW, top: cam.y - halfH, right: cam.x + halfW, bottom: cam.y + halfH });
+    lightCtx.globalCompositeOperation = 'lighter';
+    for (const l of lights) {
+      const lx = ((l.x - cam.x) / SPRITE_UNITS + this.lowW / 2) / 2;
+      const ly = ((l.y - cam.y) / SPRITE_UNITS + this.lowH / 2) / 2;
+      const r = Math.max(2, l.r / SPRITE_UNITS / 2);
+      const g = lightCtx.createRadialGradient(lx, ly, 0, lx, ly, r);
+      g.addColorStop(0, l.color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      lightCtx.globalAlpha = l.a;
+      lightCtx.fillStyle = g;
+      lightCtx.fillRect(lx - r, ly - r, r * 2, r * 2);
+    }
+    lightCtx.globalAlpha = 1;
   }
 
   /** Scenery through the holes, then rim/shade/soot, onto the pixel canvas (under the actors). */
@@ -684,6 +1010,30 @@ export class DemoDaySession {
     this.edgeCtx = edge.ctx;
     this.sceneCanvas = scene.canvas;
     this.sceneCtx = scene.ctx;
+    const actor = doc.createElement('canvas');
+    this.actorCanvas = actor;
+    this.actorCtx = actor.getContext('2d', { willReadFrequently: true });
+  }
+
+  /** The additive light layer: its own top-level host (blend modes need a top-level element) stacked under the pixel layer. */
+  private mountLightHost(): void {
+    if (!this.lightsOn || !this.host) return;
+    const doc = this.win.document;
+    const host = doc.createElement('div');
+    host.setAttribute('data-demoday', '');
+    const cssApi = (this.win as unknown as { CSS?: { supports?: (p: string, v: string) => boolean } }).CSS;
+    const blend = cssApi?.supports?.('mix-blend-mode', 'plus-lighter') ? 'plus-lighter' : 'screen';
+    host.style.cssText = `all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;mix-blend-mode:${blend};`;
+    const root = host.attachShadow({ mode: 'open' });
+    const style = doc.createElement('style');
+    style.textContent = STYLE;
+    const canvas = doc.createElement('canvas');
+    canvas.className = 'glow';
+    root.append(style, canvas);
+    doc.documentElement.insertBefore(host, this.host);
+    this.lightHost = host;
+    this.lightCanvas = canvas;
+    this.lightCtx = canvas.getContext('2d');
   }
 
   private row(doc: Document, label: string, barClass: string) {
@@ -704,6 +1054,12 @@ export class DemoDaySession {
 
   private unmount(): void {
     this.host?.remove();
+    this.lightHost?.remove();
+    this.lightHost = null;
+    this.lightCanvas = null;
+    this.lightCtx = null;
+    this.actorCanvas = null;
+    this.actorCtx = null;
     this.host = null;
     this.canvas = null;
     this.ctx = null;
@@ -728,6 +1084,16 @@ export class DemoDaySession {
     }
     canvas.style.width = `${this.lowW * CELL_CSS}px`;
     canvas.style.height = `${this.lowH * CELL_CSS}px`;
+    if (this.actorCanvas) {
+      this.actorCanvas.width = this.lowW;
+      this.actorCanvas.height = this.lowH;
+    }
+    if (this.lightCanvas) {
+      this.lightCanvas.width = Math.ceil(this.lowW / 2);
+      this.lightCanvas.height = Math.ceil(this.lowH / 2);
+      this.lightCanvas.style.width = `${this.lowW * CELL_CSS}px`;
+      this.lightCanvas.style.height = `${this.lowH * CELL_CSS}px`;
+    }
     this.maskBuf = new Uint32Array(this.lowW * this.lowH);
     this.edgeBuf = new Uint32Array(this.lowW * this.lowH);
     this.lastFieldVersion = -1;

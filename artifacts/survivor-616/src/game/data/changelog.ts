@@ -385,6 +385,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Demo Day Breaks Through',
     body: [
       'Smashing a page now tears real holes in it: the streets of 616 show through wherever text, pictures and buttons were destroyed, with a hard pixel edge and scorch marks around big blasts. The page underneath is never touched, so quitting puts everything back instantly.',
+      'Breaking things now feels like it: hit flashes, cracks that spread across damaged blocks, pieces that dissolve away and fly off in the page\u2019s own colours, climbing damage numbers, a combo counter, heavy-hit freezes, screen shake, a soft glow around blasts and sound effects (M mutes).',
       'The Foreman moves about 30% faster and the game now runs on a chunkier pixel grid that stays locked to the page as it scrolls. While you play, clicks and the mouse wheel no longer reach the page, so a destroyed link cannot be followed by accident.',
     ],
   },

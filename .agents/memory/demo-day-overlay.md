@@ -107,6 +107,19 @@ dark page is the same colour as the text's backdrop, so "nothing visibly happene
   whose centre ends up in a hole is cascade-destroyed so nobody is walled in by an invisible block.
 - Re-scan after a resize maps destroyed blocks back by (element, ordinal) and re-applies craters.
 
+## Feel pass (M2, in 0.12.3)
+
+`fx.ts` (pure, tested): crack stages (66/33/15% hp, seeded per block id, each stage a superset), dissolve
+(50 ms white flash then four Bayer-dither steps, `HoleField.addDither`), hit-stop (<= 60 ms, 150 ms cooldown,
+only for blocks with maxHp >= 40), combo (1.2 s window, milestones), merged damage numbers, debris. `pixelFont.ts`
+is a 3x5 bitmap font (the low-res canvas has no usable system font). `pixelPass.ts` binarises alpha and
+outlines the actor layer, which is drawn on its own canvas so the reveal underneath is untouched. `lights.ts`
+collects glows for an additive layer: a separate top-level host with `mix-blend-mode: plus-lighter` (fallback
+`screen`) stacked UNDER the pixel layer at half resolution, skipped on light pages (light on white is
+invisible). Sound is `createSfxEngine` on an AudioContext created on the start gesture; M mutes.
+Not done: real-text/image-shard debris (debris is the element's own colours), a quality tier that turns the AA
+pass/glow off on slow machines.
+
 ## Not done yet (Phase 1 backlog)
 
 Strings are English constants in `overlay/strings.ts` (the bundle cannot use React `useT()`); move to

@@ -53,7 +53,7 @@ await page.keyboard.press('Space');
 await page.waitForTimeout(600);
 
 const canvas = await page.evaluate(() => {
-  const c = document.querySelector('[data-demoday]')?.shadowRoot?.querySelector('canvas');
+  const c = [...document.querySelectorAll('[data-demoday]')].map((h) => h.shadowRoot?.querySelector('canvas:not(.glow)')).find(Boolean);
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
   let opaque = 0, luma = 0;
   for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { opaque += 1; luma += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; }

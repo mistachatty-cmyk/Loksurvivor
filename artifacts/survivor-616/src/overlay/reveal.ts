@@ -29,7 +29,7 @@ export const EDGE_NONE: EdgeKind = 0;
 export const EDGE_RIM: EdgeKind = 1;
 export const EDGE_SHADE: EdgeKind = 2;
 
-const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+export const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
 export class HoleField {
   readonly cols: number;
@@ -97,6 +97,27 @@ export class HoleField {
     if (x1 < x0 || y1 < y0) return null;
     let changed = false;
     for (let cy = y0; cy <= y1; cy += 1) for (let cx = x0; cx <= x1; cx += 1) if (this.setHole(cx, cy)) changed = true;
+    if (!changed) return null;
+    this.version += 1;
+    return { x0: x0 - 1, y0: y0 - 1, x1: x1 + 1, y1: y1 + 1 };
+  }
+
+  /**
+   * One dissolve step: open only the cells whose 4x4 Bayer value is below `level` (0..16), so successive calls with
+   * rising levels eat the rect away in a dither pattern. Level 16 opens the whole rect.
+   */
+  addDither(x: number, y: number, w: number, h: number, level: number): CellBox | null {
+    const x0 = Math.max(0, Math.floor(x));
+    const y0 = Math.max(0, Math.floor(y));
+    const x1 = Math.min(this.cols - 1, Math.ceil(x + w) - 1);
+    const y1 = Math.min(this.rows - 1, Math.ceil(y + h) - 1);
+    if (x1 < x0 || y1 < y0 || level <= 0) return null;
+    let changed = false;
+    for (let cy = y0; cy <= y1; cy += 1) {
+      for (let cx = x0; cx <= x1; cx += 1) {
+        if (BAYER4[(cy & 3) * 4 + (cx & 3)]! < level && this.setHole(cx, cy)) changed = true;
+      }
+    }
     if (!changed) return null;
     this.version += 1;
     return { x0: x0 - 1, y0: y0 - 1, x1: x1 + 1, y1: y1 + 1 };
