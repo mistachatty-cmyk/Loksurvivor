@@ -51,6 +51,8 @@
   "hub.room.threat-matrix.description": "敵をオーバーライドして隔離する",
   "hub.room.dust-mite-rancher.label": "イエダニランチャー",
   "hub.room.dust-mite-rancher.description": "Barnabyの純粋なデータペット牧場・養子縁組と餌やり",
+  "hub.room.frog-ranch.label": "サーキットフロッグ牧場",
+  "hub.room.frog-ranch.description": "ジェレミー・フロッグスターのカエルの生息地",
   "hub.room.director-terminal.label": "ディレクターターミナル",
   "hub.room.director-terminal.description": "ディレクターのパーソナリティを読んで選択する",
   "settings.title": "設定",
