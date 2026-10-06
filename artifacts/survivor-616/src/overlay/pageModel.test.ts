@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import { getCharacter } from '@/game/data/characters';
 import { addBreakables, createWorld, stepWorld } from '@/game/engine/world';
+import { SPRITE_SCALE } from '@/game/render/draw';
+import { CELL_CSS, SPEED_MULT, SPRITE_UNITS, WORLD_K, lowResSize, snapToCell, targetViewUnits } from './scale';
 import {
   MAX_ACTIVE_BLOCKS,
   blockHp,
@@ -23,7 +25,7 @@ import {
 const doc = { w: 1200, h: 4000 };
 
 function pb(id: number, x: number, y: number, w = 100, h = 40): PageBlock {
-  return { id, owner: id, kind: 'box', x, y, w, h, hp: blockHp(w, h), destroyed: false, skip: false };
+  return { id, owner: id, kind: 'box', role: 'box', armor: 1, x, y, w, h, hp: blockHp(w, h), destroyed: false, skip: false };
 }
 
 test('blockHp scales with area and stays inside its clamp', () => {
@@ -34,26 +36,37 @@ test('blockHp scales with area and stays inside its clamp', () => {
 });
 
 test('page/world mapping round-trips and centres the document on the origin', () => {
-  assert.deepEqual(pageToWorld(600, 2000, doc), { x: 0, y: 0 });
-  assert.deepEqual(pageToWorld(0, 0, doc), { x: -600, y: -2000 });
-  const p = worldToPage(123.5, -77, doc);
-  assert.deepEqual(pageToWorld(p.x, p.y, doc), { x: 123.5, y: -77 });
+  assert.deepEqual(pageToWorld(600, 2000, doc, 1), { x: 0, y: 0 });
+  assert.deepEqual(pageToWorld(0, 0, doc, 1), { x: -600, y: -2000 });
+  const p = worldToPage(123.5, -77, doc, 1);
+  assert.deepEqual(pageToWorld(p.x, p.y, doc, 1), { x: 123.5, y: -77 });
+  // at the real scale, world units are page px divided by k
+  const q = pageToWorld(600 + WORLD_K * 10, 2000 - WORLD_K * 20, doc);
+  assert.ok(Math.abs(q.x - 10) < 1e-9 && Math.abs(q.y + 20) < 1e-9);
+  const back = worldToPage(q.x, q.y, doc);
+  assert.ok(Math.abs(back.x - (600 + WORLD_K * 10)) < 1e-9);
 });
 
 test('blockToObstacle converts a top-left rect to a centred page-block carrying hp and id', () => {
-  const o = blockToObstacle(pb(9, 500, 1980, 200, 40), doc);
+  const o = blockToObstacle(pb(9, 500, 1980, 200, 40), doc, 1);
   assert.equal(o.kind, 'page-block');
   assert.equal(o.domId, 9);
   assert.equal(o.hp, blockHp(200, 40));
   assert.equal(o.w, 200);
   assert.equal(o.h, 40);
+  assert.equal(o.soft, true, 'page text is solid to the player only');
   // centre of the rect is page (600, 2000) = world origin
   assert.deepEqual({ x: o.x, y: o.y }, { x: 0, y: 0 });
+  // at the real scale the box shrinks to world units but hp is unchanged
+  const scaled = blockToObstacle(pb(9, 500, 1980, 200, 40), doc);
+  assert.ok(Math.abs(scaled.w - 200 / WORLD_K) < 1e-9 && Math.abs(scaled.h - 40 / WORLD_K) < 1e-9);
+  assert.equal(scaled.hp, o.hp);
 });
 
 test('camera lines up with a viewport-pinned canvas and the scroll target clamps to the page', () => {
   const canvas = { w: 1000, h: 600 };
-  assert.deepEqual(cameraForScroll({ x: 0, y: 0 }, canvas, doc), pageToWorld(500, 300, doc));
+  assert.deepEqual(cameraForScroll({ x: 0, y: 0 }, canvas, doc, 1), pageToWorld(500, 300, doc, 1));
+  assert.deepEqual(cameraForScroll({ x: 100, y: 800 }, canvas, doc, 1), pageToWorld(600, 1100, doc, 1));
   assert.deepEqual(cameraForScroll({ x: 100, y: 800 }, canvas, doc), pageToWorld(600, 1100, doc));
 
   const view = { w: 1000, h: 600 };
@@ -111,18 +124,20 @@ test('skipBlocksNear flags blocks overlapping the spawn so the player is not bor
 });
 
 test('overlayArea builds a world exactly the size of the page with the Foreman, no waves and no timed clear', () => {
-  const area = overlayArea(doc);
+  const area = overlayArea(doc, 1);
   assert.deepEqual(area.bounds, doc);
+  const real = overlayArea(doc);
+  assert.ok(Math.abs(real.bounds.w - doc.w / WORLD_K) < 1e-9 && Math.abs(real.bounds.h - doc.h / WORLD_K) < 1e-9);
   assert.equal(area.waves.length, 0);
   assert.ok(area.durationSec > 1e6);
 
   const foreman = getCharacter('foreman');
   assert.equal(foreman.id, 'foreman');
-  const world = createWorld(area, foreman, foreman.stats, 4242);
+  const world = createWorld(real, foreman, foreman.stats, 4242);
   assert.equal(world.outcome, 'running');
   assert.equal(world.enemies.length, 0);
-  assert.equal(world.bounds.w, doc.w);
-  assert.equal(world.bounds.h, doc.h);
+  assert.equal(world.bounds.w, real.bounds.w);
+  assert.equal(world.bounds.h, real.bounds.h);
 });
 
 test('end to end: the Foreman, with no enemies at all, breaks page-blocks that are within reach', () => {
@@ -139,4 +154,29 @@ test('end to end: the Foreman, with no enemies at all, breaks page-blocks that a
   const touched = world.breakables.filter((b) => b.broken || b.hp < b.maxHp);
   assert.ok(touched.length > 0, `Foreman damaged ${touched.length}/3 blocks in 12s with no enemies`);
   assert.equal(world.outcome, 'running', 'pure demolition world never ends the run by itself');
+});
+
+test('scale constants: integer css cell, in step with the renderer, and the world is page / k', () => {
+  assert.ok(Number.isInteger(CELL_CSS), 'a fractional cell would drift off the page at fractional dpr');
+  assert.equal(SPRITE_UNITS, SPRITE_SCALE, 'overlay/scale.ts must match SPRITE_SCALE in render/draw.ts');
+  assert.ok(Math.abs(WORLD_K - CELL_CSS / SPRITE_UNITS) < 1e-12);
+  assert.ok(SPEED_MULT > 1 && SPEED_MULT <= 1.5);
+});
+
+test('the M0 pace target holds: the Foreman crosses a 1280px viewport in 7-9 seconds', () => {
+  const foreman = getCharacter('foreman');
+  const cssPerSecond = foreman.stats.speed * SPEED_MULT * WORLD_K;
+  const seconds = 1280 / cssPerSecond;
+  assert.ok(seconds >= 7 && seconds <= 9.2, `crossing took ${seconds.toFixed(1)}s`);
+});
+
+test('snapToCell lands on exact cell multiples and lowResSize covers the viewport', () => {
+  assert.equal(snapToCell(0), 0);
+  assert.equal(snapToCell(4), 3);
+  assert.equal(snapToCell(5), 6);
+  assert.equal(snapToCell(1000.4) % CELL_CSS, 0);
+  assert.deepEqual(lowResSize({ w: 1280, h: 720 }), { w: Math.ceil(1280 / CELL_CSS), h: 240 });
+  const low = lowResSize({ w: 1281, h: 721 });
+  assert.ok(low.w * CELL_CSS >= 1281 && low.h * CELL_CSS >= 721);
+  assert.equal(targetViewUnits(100), 100 * SPRITE_UNITS);
 });

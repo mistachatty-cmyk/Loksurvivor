@@ -24,7 +24,7 @@ import { clamp, dist2 } from '@/game/engine/math';
 import { drawForgeFiveProjectile } from './forgeFiveVfx';
 
 /** World units of sprite height per rig pixel. */
-const SPRITE_SCALE = 2.05;
+export const SPRITE_SCALE = 2.05;
 /** LokPets read as small companions, a notch below full enemy scale. */
 const LOKPET_SPRITE_SCALE = SPRITE_SCALE * 0.82;
 
@@ -68,6 +68,8 @@ export interface Viewport {
    * over a live web page, which supplies the whole backdrop itself.
    */
   overlay?: boolean;
+  /** With `overlay`, keep whatever the caller already drew on the canvas (the reveal layer) instead of clearing it first. */
+  preserve?: boolean;
 }
 
 type ViewBounds = { left: number; top: number; right: number; bottom: number };
@@ -6180,6 +6182,44 @@ function drawArtisteTrail(ctx: CanvasRenderingContext2D, w: World) {
   ctx.restore();
 }
 
+/**
+ * Scenery only, for the page overlay's reveal layer: the area's ground, authored tiles, street dressing and
+ * landmark, drawn straight to `ctx` with no shake, actors, sky or lighting. `cam` is the world point at the
+ * centre of the canvas. Deterministic in (world, cam), so it can be redrawn every frame and animate (disco
+ * hue-cycle follows `w.now`). `w` can be any World; the overlay uses a second, never-stepped one built from a
+ * real area, because its own area is a black page-sized arena.
+ */
+export function renderGroundLayer(
+  ctx: CanvasRenderingContext2D,
+  w: World,
+  view: Pick<Viewport, 'width' | 'height' | 'dpr' | 'targetViewOverride'>,
+  cam: { x: number; y: number },
+) {
+  const { width, height, dpr } = view;
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+  const safeDpr = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  const zoom = Math.max(0.001, width / targetViewForWidth(width, view.targetViewOverride));
+  ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
+  ctx.save();
+  ctx.translate(width / 2, height / 2);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-cam.x, -cam.y);
+  const left = cam.x - width / 2 / zoom - 40;
+  const right = cam.x + width / 2 / zoom + 40;
+  const top = cam.y - height / 2 / zoom - 40;
+  const bottom = cam.y + height / 2 / zoom + 40;
+  drawGround(ctx, w, left, top, right, bottom);
+  drawAuthoredGroundTiles(ctx, w);
+  drawStreetDressing(ctx, w, left, top, right, bottom);
+  drawLandmark(ctx, w);
+  const tint = timeOfDayTint(w.cycle.phase);
+  if (tint !== 'rgba(0, 0, 0, 0.000)') {
+    ctx.fillStyle = tint;
+    ctx.fillRect(left, top, right - left, bottom - top);
+  }
+  ctx.restore();
+}
+
 export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewport) {
   const { width, height, dpr } = view;
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
@@ -6194,14 +6234,16 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const overlay = view.overlay === true;
   ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
   if (overlay) {
-    ctx.clearRect(0, 0, width, height);
+    if (!view.preserve) ctx.clearRect(0, 0, width, height);
   } else {
     ctx.fillStyle = '#06060a';
     ctx.fillRect(0, 0, width, height);
   }
 
-  const shakeX = w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
-  const shakeY = w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
+  // The page overlay shakes the real scroll position in whole cells instead, so the page and the
+  // game move together; a fractional random translate here would tear the sprites off the pixel grid.
+  const shakeX = !overlay && w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
+  const shakeY = !overlay && w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
 
   ctx.save();
   ctx.translate(width / 2 + shakeX, height / 2 + shakeY);
@@ -6234,7 +6276,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   // through bad weather than duck out of sight for it.
   const showBirds = profile.birds || !w.wildlifeSheltersInRain;
   const showFireflies = profile.fireflies || !w.wildlifeSheltersInRain;
-  const cloudPuffs = computeCloudPuffs(w, profile, left, top, right, bottom);
+  const cloudPuffs = overlay ? [] : computeCloudPuffs(w, profile, left, top, right, bottom);
   // Overlay mode skips every layer that paints the environment; only the
   // actors/pickups/effects below are drawn, over a transparent canvas.
   if (!overlay) {
