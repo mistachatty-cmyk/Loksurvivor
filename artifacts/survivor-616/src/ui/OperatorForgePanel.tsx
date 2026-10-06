@@ -55,6 +55,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const [genSpecies, setGenSpecies] = useState('');
   const [genFlavor, setGenFlavor] = useState('');
   const [design, setDesign] = useState<OperatorDesign>(() => generateOperatorDesign(seed));
+  const baseDesign = useRef(design);
   const [identity, setIdentity] = useState(() => generateOperatorIdentity(seed, generateOperatorDesign(seed)));
   const [kitId, setKitId] = useState(() => kits[0]?.id ?? '');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -110,13 +111,15 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const close = () => { if (confirmDiscard()) onClose(); };
 
   const loadSeed = useCallback(
-    (nextSeed: string) => {
+    (nextSeed: string, preset?: OperatorFlavor) => {
       if (dirty && !window.confirm('Replace your unsaved Forge changes with a generated design?')) return;
       skipHistory.current = true;
       setPast([]);
       setFuture([]);
-      const options = { species: genSpecies || undefined, flavor: (genFlavor || undefined) as OperatorFlavor | undefined, coreOnly: !factionRaces };
+      const options = { species: preset ? undefined : genSpecies || undefined, flavor: preset ?? (genFlavor || undefined) as OperatorFlavor | undefined, coreOnly: !factionRaces };
       const nextDesign = generateOperatorDesign(nextSeed, options);
+      baseDesign.current = nextDesign;
+      if (preset) { setGenFlavor(preset); setGenSpecies(''); }
       setSeed(nextSeed);
       setDesign(nextDesign);
       setIdentity(generateOperatorIdentity(nextSeed, nextDesign));
@@ -128,6 +131,24 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
   const reroll = (target: RerollTarget) => {
     setDesign((current) => rerollDesign(current, target, freshSeed()));
+    setDirty(true);
+  };
+
+  const resetSection = (section: 'body' | 'palette' | string) => {
+    const baseline = baseDesign.current;
+    if (section === 'body') setDesign((current) => ({ ...current, body: baseline.body }));
+    else if (section === 'palette') setDesign((current) => ({ ...current, palette: baseline.palette, paletteSpec: baseline.paletteSpec }));
+    else {
+      const categories = FORGE_CATEGORIES.filter((category) => category.group === section);
+      setDesign((current) => {
+        const look = { ...current.look };
+        for (const category of categories) {
+          look[category.field] = baseline.look[category.field];
+          look[category.colorField] = baseline.look[category.colorField];
+        }
+        return { ...current, look };
+      });
+    }
     setDirty(true);
   };
 
@@ -194,6 +215,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     }
     setEditingId(id);
     setDirty(false);
+    baseDesign.current = design;
     refreshSaved();
     notify(`${op.name} saved. Reload to add them to your roster.`);
   };
@@ -224,6 +246,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     setPast([]);
     setFuture([]);
     setDesign(op.design);
+    baseDesign.current = op.design;
     setIdentity({ name: op.name, handle: op.handle, tagline: op.tagline, bio: op.bio });
     setKitId(op.kitId);
     setEditingId(op.id);
@@ -258,6 +281,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     setPast([]);
     setFuture([]);
     setDesign(original.design);
+    baseDesign.current = original.design;
     setIdentity({ name: original.name, handle: original.handle, tagline: original.tagline, bio: original.bio });
     setKitId(original.kitId);
     setDirty(false);
@@ -427,6 +451,11 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               <p className="mt-1 text-sm text-muted-foreground">
                 Every seed makes the same operator every time, so a seed is a shareable recipe.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Quick start designs">
+                {([['street', 'Street'], ['tech', 'Tech'], ['mystic', 'Mystic'], ['wild', 'Wild']] as const).map(([flavor, label]) => (
+                  <button key={flavor} type="button" className={BUTTON} onClick={() => loadSeed(freshSeed(), flavor)}>Start {label}</button>
+                ))}
+              </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <label className="block">
                   <span className={LABEL}>Species</span>
@@ -464,7 +493,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
             <section id="forge-body" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-body">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-black uppercase tracking-wide">Body</h2>
-                <button type="button" className={BUTTON} onClick={() => reroll('body')}>Roll body</button>
+                <div className="flex flex-wrap gap-2"><button type="button" className={BUTTON} onClick={() => resetSection('body')}>Reset body</button><button type="button" className={BUTTON} onClick={() => reroll('body')}>Roll body</button></div>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {BODY_BUILDS.map((b) => (
@@ -496,6 +525,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-black uppercase tracking-wide">Palette</h2>
                 <div className="flex gap-2">
+                  <button type="button" className={BUTTON} onClick={() => resetSection('palette')}>Reset palette</button>
                   <button type="button" className={BUTTON} onClick={() => reroll('palette')} data-testid="button-forge-roll-palette">Roll palette</button>
                   <button type="button" className={BUTTON} onClick={() => reroll('colors')} data-testid="button-forge-roll-colors">Reshuffle item colors</button>
                 </div>
@@ -546,7 +576,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
             {FORGE_GROUPS.map((group) => (
               <section key={group} id={`forge-${group.toLowerCase().replace(/\s+/g, '-')}`} className="scroll-mt-36 border border-border bg-card p-4" data-testid={`section-forge-${group.toLowerCase()}`}>
-                <h2 className="text-sm font-black uppercase tracking-wide">{group}</h2>
+                <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-black uppercase tracking-wide">{group}</h2><button type="button" className={BUTTON} onClick={() => resetSection(group)}>Reset section</button></div>
                 <div className="mt-3 space-y-2">
                   {FORGE_CATEGORIES.filter((c) => c.group === group).map((cat) => (
                     <div key={cat.field} className="grid grid-cols-[1fr_auto] items-end gap-2 sm:grid-cols-[130px_1fr_130px_auto]">
