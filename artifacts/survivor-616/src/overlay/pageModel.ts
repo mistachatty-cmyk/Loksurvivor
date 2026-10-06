@@ -7,6 +7,7 @@
  * FULL extent (the engine halves it), so `world = page - docSize/2`.
  */
 import type { AreaDef, ObstacleDef } from '@/game/types';
+import { WORLD_K } from './scale';
 
 export interface DocSize {
   w: number;
@@ -14,6 +15,9 @@ export interface DocSize {
 }
 
 /** One measurable element of the host page, in page (not viewport) pixels. */
+/** What a block IS on the page. Drives what it drops and how tough it is. */
+export type BlockRole = 'text' | 'link' | 'heading' | 'button' | 'image' | 'frame' | 'input' | 'box';
+
 export interface PageBlock {
   /** Index into the scan result; also the `domId` the engine carries on the breakable. */
   id: number;
@@ -24,6 +28,9 @@ export interface PageBlock {
    * `text`: one chunk of a line of text; breaking it cuts a hole in the owner instead.
    */
   kind: 'box' | 'text';
+  role: BlockRole;
+  /** HP multiplier from page structure (footer 2.5, nav/header 1.5, article 0.8, headings extra); 1 is plain. */
+  armor: number;
   x: number;
   y: number;
   w: number;
@@ -58,18 +65,21 @@ export function clampDocSize(size: DocSize, viewport: DocSize): DocSize {
   };
 }
 
-export function pageToWorld(px: number, py: number, doc: DocSize): { x: number; y: number } {
-  return { x: px - doc.w / 2, y: py - doc.h / 2 };
+export function pageToWorld(px: number, py: number, doc: DocSize, k: number = WORLD_K): { x: number; y: number } {
+  return { x: (px - doc.w / 2) / k, y: (py - doc.h / 2) / k };
 }
 
-export function worldToPage(wx: number, wy: number, doc: DocSize): { x: number; y: number } {
-  return { x: wx + doc.w / 2, y: wy + doc.h / 2 };
+export function worldToPage(wx: number, wy: number, doc: DocSize, k: number = WORLD_K): { x: number; y: number } {
+  return { x: wx * k + doc.w / 2, y: wy * k + doc.h / 2 };
 }
 
-/** The engine wants centres; the page gives top-left corners. */
-export function blockToObstacle(b: PageBlock, doc: DocSize): ObstacleDef {
-  const c = pageToWorld(b.x + b.w / 2, b.y + b.h / 2, doc);
-  return { x: c.x, y: c.y, w: b.w, h: b.h, kind: 'page-block', hp: b.hp, domId: b.id };
+/**
+ * The engine wants centres in world units; the page gives top-left corners in css px. Page blocks are `soft`:
+ * solid to the player, but enemies walk through them (so a horde never jams on a paragraph) and so does a dash.
+ */
+export function blockToObstacle(b: PageBlock, doc: DocSize, k: number = WORLD_K): ObstacleDef {
+  const c = pageToWorld(b.x + b.w / 2, b.y + b.h / 2, doc, k);
+  return { x: c.x, y: c.y, w: b.w / k, h: b.h / k, kind: 'page-block', hp: b.hp, domId: b.id, soft: true };
 }
 
 /**
@@ -80,8 +90,9 @@ export function cameraForScroll(
   scroll: { x: number; y: number },
   canvasCss: DocSize,
   doc: DocSize,
+  k: number = WORLD_K,
 ): { x: number; y: number } {
-  return pageToWorld(scroll.x + canvasCss.w / 2, scroll.y + canvasCss.h / 2, doc);
+  return pageToWorld(scroll.x + canvasCss.w / 2, scroll.y + canvasCss.h / 2, doc, k);
 }
 
 /** Scroll position that centres a page point in the viewport, clamped to what the page can scroll. */
@@ -157,14 +168,14 @@ export function skipBlocksNear(blocks: PageBlock[], pagePoint: { x: number; y: n
  * clear never fires. Typed against `AreaDef` only, so it pulls in none of the
  * authored map data.
  */
-export function overlayArea(doc: DocSize): AreaDef {
+export function overlayArea(doc: DocSize, k: number = WORLD_K): AreaDef {
   return {
     id: 'page-overlay',
     name: 'Demo Day',
     district: '616',
     description: 'The page you are standing on.',
     backdrop: '',
-    bounds: { w: doc.w, h: doc.h },
+    bounds: { w: doc.w / k, h: doc.h / k },
     ground: { base: '#000000', tile: '#000000', seam: '#000000', glow: '#000000' },
     obstacles: [],
     durationSec: 1e9,
