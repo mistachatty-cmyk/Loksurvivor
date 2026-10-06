@@ -152,5 +152,15 @@
   "overlay.ability.none": "공간: 궁극",
   "overlay.stat.hp": "HP",
   "overlay.stat.speed": "속도",
-  "overlay.stat.power": "힘"
+  "overlay.stat.power": "힘",
+  "hub.nav.hideout.title": "은신처",
+  "hub.nav.hideout.note": "안전한 객실. 여기에 있는 어떤 것도 당신을 뛰어넘지 못할 것입니다.",
+  "hub.nav.travel.title": "여행",
+  "hub.nav.travel.note": "도시 밖으로. 가는 길에 매복 공격을 받을 수 있습니다.",
+  "hub.nav.travel.noteOff": "도시 밖으로. 매복은 설정에서 꺼집니다.",
+  "hub.nav.travel.badge": "매복 위험",
+  "hub.armory.hideoutEntrance": "GRPD 무기고",
+  "hub.armory.hideoutEntranceBlurb": "루비노트 키퍼가 이곳에 안전한 입구를 확보하고 있습니다.",
+  "hub.armory.relocatedEntrance": "GRPD 무기고 이전",
+  "hub.armory.stationUnfound": "GRPD 스테이션은 아직 발견되지 않았으므로 관리인이 무기고를 은신처에 보관하고 있습니다."
 }
