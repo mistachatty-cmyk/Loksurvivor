@@ -399,6 +399,15 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Three new hats join the loot-token shop. Watch for a tiny feudal age, a garlic orbit, and one more run before dawn.',
     ],
   },
+  {
+    version: '0.12.5',
+    date: '2026-10-05',
+    kind: 'hotfix',
+    title: 'Back To The Arcade',
+    body: [
+      'Signing in from the game on the GSix website now brings you straight back to the arcade page, signed in and ready to play, instead of leaving you on the standalone game page.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

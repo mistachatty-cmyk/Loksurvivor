@@ -7,6 +7,16 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 36,
+      "version": "0.12.5",
+      "date": "2026-10-05",
+      "kind": "hotfix",
+      "title": "Back To The Arcade",
+      "body": [
+        "Signing in from the game on the GSix website now brings you straight back to the arcade page, signed in and ready to play, instead of leaving you on the standalone game page."
+      ]
+    },
+    {
       "number": 35,
       "version": "0.12.4",
       "date": "2026-10-04",
