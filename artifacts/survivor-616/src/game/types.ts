@@ -2299,6 +2299,14 @@ export interface MetaState {
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
   totalKills: number;
+  /** GRPD evidence seals are earned every 1,000 lifetime kills; this is the spent amount. */
+  grpdSpentSeals: number;
+  /** Completed field prototypes fabricated at the GRPD Armory. */
+  grpdUnlockedWeaponIds: string[];
+  /** Fabricated prototypes explicitly enabled for future runs. */
+  grpdActiveWeaponIds: string[];
+  /** Purchased offer-weight tier for each fabricated prototype, from 1 to 5. */
+  grpdSpawnTierByWeaponId: Record<string, number>;
   totalRuns: number;
   bestSurvivalSec: number;
   /** Every level-up across every run, ever -- never resets. Feeds the persistent player level. */

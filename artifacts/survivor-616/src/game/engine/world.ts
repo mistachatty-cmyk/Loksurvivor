@@ -16,6 +16,7 @@ import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { PASSIVES, PASSIVES_BY_ID } from '@/game/data/passives';
 import { UPGRADES, ALLIES_BY_ID } from '@/game/data/progression';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { grpdOfferWeight, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { rollPrize } from '@/game/data/prizes';
 import { LOKPET_ELEMENT_COLORS, getLokPetEvolutionStage, rollLokPet } from '@/game/data/lokPets';
 import { evolvedLook } from '@/game/engine/petEvolution';
@@ -1248,6 +1249,9 @@ export interface World {
   /* ---- Threat Matrix & Special mechanics ---- */
   disabledEnemyIds?: string[];
   disabledWeaponIds?: string[];
+  grpdActiveWeaponIds: string[];
+  grpdSpawnTierByWeaponId: Record<string, number>;
+  grpdCareerKills: number;
   disabledPassiveIds?: string[];
   threatCalibrations?: ThreatCalibrations;
   threatEventTimers?: {
@@ -1407,6 +1411,9 @@ export function createWorld(
     cardEffects?: ActiveCardEffects;
     disabledEnemyIds?: string[];
     disabledWeaponIds?: string[];
+    grpdActiveWeaponIds?: string[];
+    grpdSpawnTierByWeaponId?: Record<string, number>;
+    grpdCareerKills?: number;
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
@@ -1747,6 +1754,9 @@ export function createWorld(
     cardEffects: setup.cardEffects ?? { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false },
     disabledEnemyIds: setup.disabledEnemyIds ?? [],
     disabledWeaponIds: setup.disabledWeaponIds ?? [],
+    grpdActiveWeaponIds: setup.grpdActiveWeaponIds ?? [],
+    grpdSpawnTierByWeaponId: setup.grpdSpawnTierByWeaponId ?? {},
+    grpdCareerKills: setup.grpdCareerKills ?? 0,
     disabledPassiveIds: setup.disabledPassiveIds ?? [],
     threatCalibrations: setup.threatCalibrations,
     threatEventTimers: {
@@ -1844,7 +1854,7 @@ export function createWorld(
   for (const pet of setup.startingLokPets ?? []) spawnLokPet(world, pet, 'loadout');
   if (setup.bonusWeaponId) {
     const bonusDef = WEAPONS_BY_ID[setup.bonusWeaponId];
-    if (bonusDef && !world.weapons.some((entry) => entry.def.id === bonusDef.id)) {
+    if (bonusDef && grpdWeaponEligible(world, bonusDef.id) && !world.weapons.some((entry) => entry.def.id === bonusDef.id)) {
       const bonusWeapon = { def: bonusDef, level: 1, count: bonusDef.count ?? 1, readyAt: 400 };
       world.weapons.push(bonusWeapon);
       if (bonusDef.kind === 'orbit') rebuildOrbiters(world, bonusWeapon);
@@ -5135,10 +5145,11 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   }
   if (w.weapons.length < 6) {
     for (const weapon of Object.values(WEAPONS_BY_ID)) {
+      if (!grpdWeaponEligible(w, weapon.id)) continue;
       if (w.disabledWeaponIds && w.disabledWeaponIds.includes(weapon.id)) continue;
       if (!isWeaponUnlockedForLoot(weapon, w.unlockedCharacterIds)) continue;
       if (!w.weapons.some((entry) => entry.def.id === weapon.id)) {
-        pool.push({ id: `weapon-${weapon.id}`, name: weapon.name, description: weapon.description, weight: weaponLootWeight(weapon), maxStacks: 1, effects: [], cardKind: 'weapon', weaponId: weapon.id });
+        pool.push({ id: `weapon-${weapon.id}`, name: weapon.name, description: weapon.description, weight: grpdWeaponOfferWeight(w, weapon.id, weaponLootWeight(weapon)), maxStacks: 1, effects: [], cardKind: 'weapon', weaponId: weapon.id });
       }
     }
   }
@@ -5214,6 +5225,16 @@ export function isWeaponUnlockedForLoot(weapon: WeaponDef, unlockedCharacterIds:
 
 export function weaponLootWeight(weapon: WeaponDef): number {
   return weapon.kind === 'hazard' ? 2 : 5;
+}
+
+function grpdWeaponEligible(w: World, weaponId: string): boolean {
+  return !isGrpdPlayableWeapon(weaponId) || w.grpdActiveWeaponIds.includes(weaponId);
+}
+
+function grpdWeaponOfferWeight(w: World, weaponId: string, baseWeight: number): number {
+  return isGrpdPlayableWeapon(weaponId)
+    ? grpdOfferWeight(baseWeight, w.grpdCareerKills, w.grpdSpawnTierByWeaponId[weaponId] ?? 1)
+    : baseWeight;
 }
 
 export function applyUpgrade(w: World, upgrade: UpgradeDef) {
@@ -5354,10 +5375,15 @@ export function claimLootPrize(w: World, prize: LootPrizeDef) {
     case 'weapon': {
       // Pick a weapon the player doesn't own yet and add it.
       const unowned = Object.values(WEAPONS_BY_ID).filter(
-        (wep) => !w.weapons.some((entry) => entry.def.id === wep.id),
+        (wep) => grpdWeaponEligible(w, wep.id)
+          && !(w.disabledWeaponIds ?? []).includes(wep.id)
+          && isWeaponUnlockedForLoot(wep, w.unlockedCharacterIds)
+          && !w.weapons.some((entry) => entry.def.id === wep.id),
       );
       if (unowned.length > 0 && w.weapons.length < 6) {
-        const def = unowned[Math.floor(w.rng() * unowned.length)]!;
+        const totalWeight = unowned.reduce((sum, weapon) => sum + grpdWeaponOfferWeight(w, weapon.id, weaponLootWeight(weapon)), 0);
+        let roll = w.rng() * totalWeight;
+        const def = unowned.find((weapon) => (roll -= grpdWeaponOfferWeight(w, weapon.id, weaponLootWeight(weapon))) <= 0) ?? unowned[unowned.length - 1]!;
         const runWeapon = { def, level: 1, count: def.count ?? 1, readyAt: w.now + 500 };
         w.weapons.push(runWeapon);
         if (def.kind === 'orbit') rebuildOrbiters(w, runWeapon);

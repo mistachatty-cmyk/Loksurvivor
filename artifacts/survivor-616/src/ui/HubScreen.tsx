@@ -40,7 +40,7 @@ import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher';
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -74,6 +74,7 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   workshop: { icon: Hammer, testId: 'button-open-workshop' },
   'card-shop': { icon: CreditCard, testId: 'button-open-card-shop' },
   'weapon-bans': { icon: Clapperboard, testId: 'button-open-weapon-bans' },
+  'grpd-armory': { icon: ShieldCheck, testId: 'button-open-grpd-armory' },
   settings: { icon: Settings2, testId: 'button-open-settings' },
   'palette-store': { icon: Palette, testId: 'button-open-palette-store' },
   'sound-booth': { icon: Disc3, testId: 'button-open-sound-booth' },
@@ -654,6 +655,15 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </CollapsibleSection>
             </div>
         </header>
+
+        {activeRoom.id === 'grpd-station' && (
+          <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.</p></div>
+              <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>
+            </div>
+          </section>
+        )}
 
         {activeRoom.id === 'grpd-vault' && blue616 && (
           <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">

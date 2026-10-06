@@ -55,6 +55,7 @@ import { AccountPanel } from '@/ui/AccountPanel';
 import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { CardShopPanel } from '@/ui/CardShopPanel';
 import { WeaponBansScreen } from '@/ui/WeaponBansScreen';
+import { GrpdArmoryScreen } from '@/ui/GrpdArmoryScreen';
 import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
 import { DustMiteRancherPanel } from '@/ui/DustMiteRancherPanel';
@@ -92,6 +93,7 @@ type Screen =
   | { name: 'workshop' }
   | { name: 'card-shop' }
   | { name: 'weapon-bans' }
+  | { name: 'grpd-armory' }
   | { name: 'settings' }
   | { name: 'palette-store' }
   | { name: 'sound-booth' }
@@ -148,6 +150,7 @@ function initialScreen(): Screen {
       requested === 'workshop' ||
       requested === 'card-shop' ||
       requested === 'weapon-bans' ||
+      requested === 'grpd-armory' ||
       requested === 'settings' ||
       requested === 'account' ||
       requested === 'feedback' ||
@@ -223,6 +226,9 @@ function Game() {
         break;
       case 'weapon-bans':
         setScreen({ name: 'weapon-bans' });
+        break;
+      case 'grpd-armory':
+        setScreen({ name: 'grpd-armory' });
         break;
       case 'settings':
         setScreen({ name: 'settings' });
@@ -476,6 +482,9 @@ function Game() {
 
     case 'weapon-bans':
       return <WeaponBansScreen onBack={goHub} />;
+
+    case 'grpd-armory':
+      return <GrpdArmoryScreen onBack={goHub} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} onOpenLooksAndLokPets={() => setScreen({ name: 'run-setup', destination: 'hub' })} />;

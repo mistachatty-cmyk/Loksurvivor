@@ -1,6 +1,9 @@
 import type { WeaponDef } from '@/game/types';
 
 export const WEAPONS: WeaponDef[] = [
+  { id: 'crossing-baton', name: 'Crossing Baton', kind: 'wave', description: 'Two green crossing stripes sweep ahead and slow a crowd long enough to change lanes.', damage: 18, cooldownMs: 1150, range: 185, count: 2, levelDamageScale: 0.25, impactIntensity: 2, color: '#80f2c2', statusEffectId: 'slow' },
+  { id: 'rivet-driver', name: 'Rivet Driver', kind: 'projectile', description: 'A straight, heavy rivet punches through two enemies and rebounds from hard street cover.', damage: 27, cooldownMs: 1050, range: 440, speed: 450, count: 1, pierce: 2, lifetimeMs: 1350, levelDamageScale: 0.28, impactIntensity: 3, color: '#e0b78b', obstacleInteraction: 'reflect' },
+  { id: 'deck-sling', name: 'Deck Sling', kind: 'projectile', description: 'Three hard-light cards fan through the nearest pack with a sharp Archive snap.', damage: 13, cooldownMs: 740, range: 385, speed: 390, count: 3, pierce: 1, lifetimeMs: 1200, levelDamageScale: 0.23, impactIntensity: 2, color: '#d6adff', obstacleInteraction: 'block' },
   { id: 'freestyle-mic', name: 'Freestyle Mic', kind: 'melee', description: 'A close-range shockwave with a heavy downbeat.', damage: 18, cooldownMs: 720, range: 78, levelDamageScale: 0.22, impactIntensity: 3, impactTrigger: 'ground-shock', color: '#ffb000' },
   { id: 'boombox', name: 'Boombox', kind: 'aura', description: 'Bass rattles every enemy in your personal block.', damage: 8, cooldownMs: 850, range: 92, levelDamageScale: 0.18, impactIntensity: 1, color: '#ff5f6d' },
   { id: 'turntable', name: 'Turntable', kind: 'orbit', description: 'Vinyl blades orbit you and punish anyone who gets close.', damage: 12, cooldownMs: 0, range: 58, speed: 2.8, count: 2, levelDamageScale: 0.2, impactIntensity: 1, color: '#6ee7ff' },

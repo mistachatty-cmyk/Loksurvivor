@@ -357,6 +357,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A new bar on that page jumps straight to the Archives, the Updates and each lore chapter. The Updates list there is the same patch notes you see in the game, in blue, and it keeps itself current.',
     ],
   },
+  {
+    version: '0.13.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'The GRPD Armory Opens',
+    body: [
+      'The GRPD Station now holds an evidence archive of thirty weapon designs, each with its own pixel model. Sealed designs stay out of runs.',
+      'Crossing Baton, Rivet Driver, and Deck Sling are the first field prototypes. Earn an evidence seal every 1,000 lifetime kills, fabricate a prototype, then switch it on before it can appear in future runs.',
+      'Every 1,000 kills adds 0.01 relative offer weight to active GRPD weapons. You can spend evidence seals on individual 2×, 3×, 4×, and 5× offer tiers.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
