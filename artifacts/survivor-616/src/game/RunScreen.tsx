@@ -437,6 +437,7 @@ export function RunScreen({
         grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id)),
         grpdSpawnTierByWeaponId: meta.grpdSpawnTierByWeaponId,
         grpdCareerKills: meta.totalKills,
+        grpdAutoIncreaseEnabled: meta.grpdAutoIncreaseEnabled,
         disabledPassiveIds: meta.disabledPassiveIds,
         threatCalibrations: meta.threatCalibrations,
         threatUpgrades: meta.threatUpgrades,

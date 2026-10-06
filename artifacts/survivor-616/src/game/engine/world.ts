@@ -1252,6 +1252,7 @@ export interface World {
   grpdActiveWeaponIds: string[];
   grpdSpawnTierByWeaponId: Record<string, number>;
   grpdCareerKills: number;
+  grpdAutoIncreaseEnabled: boolean;
   disabledPassiveIds?: string[];
   threatCalibrations?: ThreatCalibrations;
   threatEventTimers?: {
@@ -1414,6 +1415,7 @@ export function createWorld(
     grpdActiveWeaponIds?: string[];
     grpdSpawnTierByWeaponId?: Record<string, number>;
     grpdCareerKills?: number;
+    grpdAutoIncreaseEnabled?: boolean;
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
@@ -1757,6 +1759,7 @@ export function createWorld(
     grpdActiveWeaponIds: setup.grpdActiveWeaponIds ?? [],
     grpdSpawnTierByWeaponId: setup.grpdSpawnTierByWeaponId ?? {},
     grpdCareerKills: setup.grpdCareerKills ?? 0,
+    grpdAutoIncreaseEnabled: setup.grpdAutoIncreaseEnabled ?? true,
     disabledPassiveIds: setup.disabledPassiveIds ?? [],
     threatCalibrations: setup.threatCalibrations,
     threatEventTimers: {
@@ -5233,7 +5236,7 @@ function grpdWeaponEligible(w: World, weaponId: string): boolean {
 
 function grpdWeaponOfferWeight(w: World, weaponId: string, baseWeight: number): number {
   return isGrpdPlayableWeapon(weaponId)
-    ? grpdOfferWeight(baseWeight, w.grpdCareerKills, w.grpdSpawnTierByWeaponId[weaponId] ?? 1)
+    ? grpdOfferWeight(baseWeight, w.grpdCareerKills, w.grpdSpawnTierByWeaponId[weaponId] ?? 1, w.grpdAutoIncreaseEnabled)
     : baseWeight;
 }
 

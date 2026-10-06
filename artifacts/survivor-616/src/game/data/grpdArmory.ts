@@ -67,9 +67,9 @@ export function grpdNextTierCost(currentTier: number): number {
 }
 
 /** Each completed 1,000-kill milestone adds 0.01 relative offer weight. */
-export function grpdOfferWeight(baseWeight: number, totalKills: number, multiplier: number): number {
+export function grpdOfferWeight(baseWeight: number, totalKills: number, multiplier: number, autoIncreaseEnabled = true): number {
   const tier = Math.max(1, Math.min(GRPD_MAX_SPAWN_MULTIPLIER, Math.floor(multiplier)));
-  return baseWeight * (1 + grpdEarnedSeals(totalKills) * 0.01) * tier;
+  return baseWeight * (1 + (autoIncreaseEnabled ? grpdEarnedSeals(totalKills) * 0.01 : 0)) * tier;
 }
 
 export function isGrpdPlayableWeapon(id: string): boolean {

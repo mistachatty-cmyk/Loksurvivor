@@ -12,7 +12,7 @@ const FIELD_IDS = new Set(WEAPONS.map((weapon) => weapon.id));
 const SPECIAL_WEAPONS = ALL_WEAPON_DEFS.filter((weapon) => !FIELD_IDS.has(weapon.id));
 
 export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
-  const { meta, unlockGrpdWeapon, toggleGrpdWeapon, buyGrpdSpawnTier, toggleWeaponDisabled } = useMeta();
+  const { meta, unlockGrpdWeapon, toggleGrpdWeapon, buyGrpdSpawnTier, setGrpdAutoIncreaseEnabled, toggleWeaponDisabled } = useMeta();
   const [tab, setTab] = useState<'archive' | 'field' | 'special'>('archive');
   const [query, setQuery] = useState('');
   const seals = grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals);
@@ -32,10 +32,14 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
           <p className="text-sm text-slate-200">Recovered designs stay in the evidence archive until fabricated. A fabricated weapon starts <strong>off</strong>; switch it on to let future runs offer it. Your existing field weapons stay available and can be managed here too.</p>
           <div className="mt-3 grid gap-2 font-mono text-xs text-sky-100 sm:grid-cols-3">
             <span>{meta.totalKills.toLocaleString()} lifetime kills · next seal at {nextKillGoal.toLocaleString()}</span>
-            <span>Each {GRPD_KILLS_PER_SEAL.toLocaleString()} kills: +0.01 relative offer weight</span>
+            <span>Each {GRPD_KILLS_PER_SEAL.toLocaleString()} kills: +0.01 relative offer weight when enabled</span>
             <span>Purchased tier: 1× to {GRPD_MAX_SPAWN_MULTIPLIER}× per weapon</span>
           </div>
           <p className="mt-2 text-xs text-slate-400">Evidence seals come only from lifetime kill milestones. Fabricating a ready prototype costs 1 seal. Buying 2×, 3×, 4×, and 5× costs 1, 2, 3, and 4 seals respectively. Modifiers affect offer frequency, not weapon damage.</p>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-white/15 bg-black/35 p-3">
+            <div><h2 className="text-sm font-bold text-white">Automatic kill increase</h2><p className="text-xs text-slate-300">Apply the +0.01 bonus for each 1,000 lifetime kills to active archive weapons. Off removes the kill bonus while keeping purchased tiers. On recalculates it from your current lifetime kills.</p></div>
+            <button type="button" role="switch" aria-checked={meta.grpdAutoIncreaseEnabled} onClick={() => setGrpdAutoIncreaseEnabled(!meta.grpdAutoIncreaseEnabled)} className={`min-h-10 min-w-20 border px-3 text-xs font-black uppercase ${meta.grpdAutoIncreaseEnabled ? 'border-emerald-300 bg-emerald-300/20 text-emerald-100' : 'border-white/30 bg-slate-800 text-white/70'}`} data-testid="grpd-auto-increase-toggle">{meta.grpdAutoIncreaseEnabled ? 'On' : 'Off'}</button>
+          </div>
         </section>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -58,7 +62,7 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
             const banned = !!weaponId && meta.disabledWeaponIds.includes(weaponId);
             const tier = weaponId ? meta.grpdSpawnTierByWeaponId[weaponId] ?? 1 : 1;
             const nextCost = grpdNextTierCost(tier);
-            const offerBoost = grpdOfferWeight(1, meta.totalKills, tier);
+            const offerBoost = grpdOfferWeight(1, meta.totalKills, tier, meta.grpdAutoIncreaseEnabled);
             return <article key={entry.id} className={`flex flex-col gap-3 border p-4 ${active && !banned ? 'border-emerald-300/50 bg-emerald-950/15' : 'border-white/15 bg-black/45'}`} data-testid={`grpd-blueprint-${entry.id}`}>
               <div className="flex gap-3">
                 <div className="shrink-0 border border-white/15 bg-slate-950 p-2"><WeaponIcon weaponId={weaponId ?? entry.id} kind={entry.kind} color={entry.color} size={56} label={entry.name} /></div>

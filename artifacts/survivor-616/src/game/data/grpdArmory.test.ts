@@ -24,14 +24,17 @@ test('evidence seals and offer tiers follow lifetime kills and cannot refund spe
   assert.equal(grpdOfferWeight(5, 0, 1), 5);
   assert.equal(grpdOfferWeight(5, 1000, 1), 5.05);
   assert.equal(grpdOfferWeight(5, 1000, 5), 25.25);
+  assert.equal(grpdOfferWeight(5, 1000, 5, false), 25);
 });
 
 test('older saves have no fabricated or active archive weapons', () => {
   const old = createInitialMeta();
-  const meta = normalizeMeta({ ...old, grpdUnlockedWeaponIds: undefined, grpdActiveWeaponIds: undefined, grpdSpawnTierByWeaponId: undefined, grpdSpentSeals: undefined });
+  const meta = normalizeMeta({ ...old, grpdUnlockedWeaponIds: undefined, grpdActiveWeaponIds: undefined, grpdSpawnTierByWeaponId: undefined, grpdSpentSeals: undefined, grpdAutoIncreaseEnabled: undefined });
   assert.deepEqual(meta.grpdUnlockedWeaponIds, []);
   assert.deepEqual(meta.grpdActiveWeaponIds, []);
   assert.equal(meta.grpdSpentSeals, 0);
+  assert.equal(meta.grpdAutoIncreaseEnabled, true);
+  assert.equal(normalizeMeta({ ...old, grpdAutoIncreaseEnabled: false }).grpdAutoIncreaseEnabled, false);
 });
 
 test('only active GRPD prototypes appear among level-up choices', () => {
@@ -50,6 +53,18 @@ test('only active GRPD prototypes appear among level-up choices', () => {
   const activeChoices = rollUpgradeChoices(active, 500);
   assert.ok(activeChoices.some((choice) => choice.weaponId === 'crossing-baton'));
   assert.ok(!activeChoices.some((choice) => choice.weaponId === 'rivet-driver' || choice.weaponId === 'deck-sling'));
+
+  const controlled = createWorld(area, character, character.stats, 616, [], 1, true, null, {
+    unlockedCharacterIds: [character.id],
+    grpdActiveWeaponIds: ['crossing-baton'],
+    grpdCareerKills: 1000,
+    grpdSpawnTierByWeaponId: { 'crossing-baton': 2 },
+    grpdAutoIncreaseEnabled: false,
+  });
+  const controlledChoice = rollUpgradeChoices(controlled, 500).find((choice) => choice.weaponId === 'crossing-baton');
+  const activeChoice = activeChoices.find((choice) => choice.weaponId === 'crossing-baton');
+  assert.ok(controlledChoice && activeChoice);
+  assert.equal(activeChoice.weight, controlledChoice.weight * 1.01);
 });
 
 test('weapon chest rewards honor the archive switch', () => {

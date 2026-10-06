@@ -2307,6 +2307,8 @@ export interface MetaState {
   grpdActiveWeaponIds: string[];
   /** Purchased offer-weight tier for each fabricated prototype, from 1 to 5. */
   grpdSpawnTierByWeaponId: Record<string, number>;
+  /** Whether lifetime kills raise archived weapon offer weight. */
+  grpdAutoIncreaseEnabled: boolean;
   totalRuns: number;
   bestSurvivalSec: number;
   /** Every level-up across every run, ever -- never resets. Feeds the persistent player level. */

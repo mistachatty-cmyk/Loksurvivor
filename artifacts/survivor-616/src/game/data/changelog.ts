@@ -368,6 +368,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Every 1,000 kills adds 0.01 relative offer weight to active GRPD weapons. You can spend evidence seals on individual 2×, 3×, 4×, and 5× offer tiers.',
     ],
   },
+  {
+    version: '0.13.1',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Armory Spawn Control',
+    body: [
+      'The GRPD Armory now has an automatic kill increase switch. Turn it off to remove the +0.01 offer weight gained every 1,000 lifetime kills while keeping your purchased tiers.',
+      'Turn it back on whenever you want the bonus from your current lifetime kill total.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
