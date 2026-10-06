@@ -22,6 +22,7 @@ import {
   type User,
 } from '@workspace/lok-client';
 
+import { consumeArcadeReturn, rememberArcadeReturn } from '@/lib/arcadeReturn';
 import { lokClient } from '@/lib/lokClient';
 import { LOKDEX_APP_KEY, type LokDexSnapshot } from '@/lib/lokDexSnapshot';
 import { MUSIC_APP_KEY } from '@/lib/lokMusicProgress';
@@ -51,6 +52,13 @@ interface AuthContextValue {
   saveMusicProgress: (objectives: number) => Promise<{ error: string | null }>;
 }
 
+/** Sign-in begun inside the GSix arcade player ends back on that arcade page. */
+function returnToArcade(session: Session | null) {
+  if (!session) return;
+  const destination = consumeArcadeReturn();
+  if (destination) window.location.replace(destination);
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -64,9 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled) {
         setSession(session);
         setLoading(false);
+        returnToArcade(session);
       }
     });
-    const unsubscribe = onAuthStateChange(lokClient, (session) => setSession(session));
+    const unsubscribe = onAuthStateChange(lokClient, (session) => {
+      setSession(session);
+      returnToArcade(session);
+    });
     return () => {
       cancelled = true;
       unsubscribe();
@@ -87,13 +99,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const doSignInWithGoogle = useCallback(async () => {
     if (!lokClient) return { error: 'Auth is not configured yet.' };
-    const { error } = await signInWithGoogle(lokClient);
+    const { error } = await signInWithGoogle(lokClient, undefined, { onFramed: rememberArcadeReturn });
     return { error: error?.message ?? null };
   }, []);
 
   const doSignInWithApple = useCallback(async () => {
     if (!lokClient) return { error: 'Auth is not configured yet.' };
-    const { error } = await signInWithApple(lokClient);
+    const { error } = await signInWithApple(lokClient, undefined, { onFramed: rememberArcadeReturn });
     return { error: error?.message ?? null };
   }, []);
 
