@@ -486,6 +486,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The floating Back button no longer sits on top of an open popup.',
     ],
   },
+  {
+    version: '0.15.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Walk the Hideout',
+    body: [
+      'You can walk your operator around the hideout now. Tap the ground, or use the arrow keys or A and D, and walk up to the things in each room to use them.',
+      'The bell cord, the Relay Crate, the Static Jar, the Beacon Lamp and a few others hand out small finds once a day. The stoop cat and the old telescope can start something, too.',
+      'LokPets can do more than get petted. Scratch, fetch, boogie, snack break, nap together, and go on a sniff hunt. Every pet likes different things, and a closer bond opens up more of them and makes rare finds a little more likely.',
+      'Little choice events turn up around the hideout and when you move between rooms. Pick what to do and see how it goes. A few rare surprises are hiding in there.',
+      'It is all capped per day, and you can switch each part off in Settings under Hideout.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

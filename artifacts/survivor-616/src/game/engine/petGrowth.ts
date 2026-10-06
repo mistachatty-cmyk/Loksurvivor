@@ -62,9 +62,9 @@ export const BOND_RANK_BY_ID: Record<BondRankId, BondRank> = Object.fromEntries(
 /** Bond a pet can earn per local day, so it cannot be ground out in an hour. */
 export const BOND_DAILY_CAP = 12;
 
-export type BondSource = 'run' | 'travel' | 'treat' | 'battle' | 'care' | 'event';
+export type BondSource = 'run' | 'travel' | 'treat' | 'battle' | 'care' | 'event' | 'play';
 
-export const BOND_GAIN: Record<BondSource, number> = { run: 3, travel: 1, treat: 2, battle: 2, care: 2, event: 1 };
+export const BOND_GAIN: Record<BondSource, number> = { run: 3, travel: 1, treat: 2, battle: 2, care: 2, event: 1, play: 1 };
 
 export function bondRankFor(bond: number | undefined): BondRank {
   const value = Math.max(0, bond ?? 0);

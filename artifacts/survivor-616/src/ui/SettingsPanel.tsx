@@ -249,6 +249,9 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setHideoutPreview,
     setHideoutPets,
     setHideoutEvents,
+    setHideoutInteractive,
+    setHideoutPetPlay,
+    setHideoutChoiceEvents,
     setHideoutStickyHeadOut,
     setSplashTextEnabled,
     setOneLineTitleEnabled,
@@ -848,6 +851,46 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                         data-testid={`button-hideout-events-${mode}`}
                       >
                         {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {([
+                    ['walk', 'settings.hideout.walk.title', 'settings.hideout.walk.description', meta.hideoutInteractive, setHideoutInteractive],
+                    ['play', 'settings.hideout.play.title', 'settings.hideout.play.description', meta.hideoutPetPlay, setHideoutPetPlay],
+                  ] as const).map(([id, titleKey, descKey, enabled, setEnabled]) => (
+                    <div key={id}>
+                      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t(titleKey)}</h3>
+                      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t(descKey)}</p>
+                      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t(titleKey)}>
+                        {([[true, 'settings.hideout.on'], [false, 'settings.hideout.off']] as const).map(([value, labelKey]) => (
+                          <button
+                            key={String(value)}
+                            type="button"
+                            onClick={() => setEnabled(value)}
+                            aria-pressed={enabled === value}
+                            className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${enabled === value ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                            data-testid={`button-hideout-${id}-${value ? 'on' : 'off'}`}
+                          >
+                            {t(labelKey)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.choice.title')}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.choice.description')}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.choice.title')}>
+                    {([['on', 'settings.hideout.normal'], ['quiet', 'settings.hideout.rarely'], ['off', 'settings.hideout.off']] as const).map(([mode, labelKey]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setHideoutChoiceEvents(mode)}
+                        aria-pressed={meta.hideoutChoiceEvents === mode}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${meta.hideoutChoiceEvents === mode ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-choice-${mode}`}
+                      >
+                        {t(labelKey)}
                       </button>
                     ))}
                   </div>
