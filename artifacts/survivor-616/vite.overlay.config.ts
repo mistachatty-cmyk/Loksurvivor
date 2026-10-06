@@ -7,7 +7,7 @@ import { defineConfig } from 'vite';
  * page. Deliberately has no React, Tailwind, audio or Supabase plugins -- the
  * engine + renderer + data it imports are plain TypeScript.
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   // The game's public/ folder is 8+ MB of art and music; the overlay uses none of it.
   publicDir: false,
   resolve: {
@@ -19,8 +19,10 @@ export default defineConfig({
     'process.env.NODE_ENV': JSON.stringify('production'),
   },
   build: {
-    outDir: path.resolve(import.meta.dirname, 'dist/overlay'),
-    emptyOutDir: true,
+    // `--mode public` writes next to the site build (dist/public/demoday.js, served as
+    // survivor.gsix.online/demoday.js) without wiping it; the default is a standalone dist/overlay.
+    outDir: path.resolve(import.meta.dirname, mode === 'public' ? 'dist/public' : 'dist/overlay'),
+    emptyOutDir: mode !== 'public',
     target: 'es2020',
     minify: 'esbuild',
     reportCompressedSize: true,
@@ -34,4 +36,4 @@ export default defineConfig({
       output: { inlineDynamicImports: true },
     },
   },
-});
+}));

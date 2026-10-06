@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0 --port 3000",
-    "build": "vite build --config vite.config.ts",
+    "build": "vite build --config vite.config.ts && vite build --config vite.overlay.config.ts --mode public",
     "build:overlay": "vite build --config vite.overlay.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0 --port 3000",
     "typecheck": "tsc -p tsconfig.json --noEmit",

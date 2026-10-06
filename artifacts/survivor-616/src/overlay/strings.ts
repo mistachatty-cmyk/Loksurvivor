@@ -16,6 +16,14 @@ export const STRINGS = {
   creditName: 'Destroy Any Website · Sprite Fusion',
   refusedPrefix: 'Demo Day skipped this page: it looks like',
   nothingToBreak: 'Demo Day found nothing on this page to break.',
+  endTitle: 'Demo over',
+  endRestored: 'The page has been put back.',
+  endDestroyed: 'Page destroyed',
+  endKills: 'Kills',
+  endLevel: 'Level',
+  endTime: 'Time',
+  endShare: 'Save & share',
+  endClose: 'Close',
 } as const;
 
 /** Original game, credited the same way the GSix hub already credits it. */

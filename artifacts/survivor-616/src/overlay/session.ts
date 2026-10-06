@@ -32,6 +32,7 @@ import {
   type DocSize,
   type PageBlock,
 } from './pageModel';
+import { reportUrl } from './runLink';
 import { scanPage, sensitivePageReason } from './scanner';
 import { CREDIT_URL, STRINGS } from './strings';
 
@@ -69,6 +70,14 @@ canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-ren
 .dock button:hover, .dock a:hover { background: rgba(40,40,52,.95); }
 .credit { position: fixed; right: 10px; bottom: 10px; pointer-events: auto; opacity: .8; }
 .credit a { color: #f4f1ea; text-decoration: underline; }
+.card { position: fixed; right: 16px; bottom: 16px; width: 260px; pointer-events: auto; background: rgba(15,15,20,.96); border: 1px solid rgba(255,255,255,.4); box-shadow: 0 6px 24px rgba(0,0,0,.45); padding: 12px 14px; display: grid; gap: 8px; }
+.card h2 { all: unset; display: block; font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #f2c14e; }
+.card dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 0; }
+.card dt { opacity: .75; }
+.card dd { margin: 0; text-align: right; font-weight: 700; }
+.card .actions { display: flex; gap: 8px; }
+.card .actions a, .card .actions button { flex: 1; text-align: center; font: inherit; color: #0b0b0e; background: #f2c14e; border: 0; padding: 6px 8px; cursor: pointer; text-decoration: none; font-weight: 700; }
+.card .actions button { color: #f4f1ea; background: rgba(255,255,255,.12); font-weight: 400; }
 .toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: rgba(15,15,20,.92); border: 1px solid rgba(255,255,255,.35); padding: 8px 12px; }
 `;
 
@@ -184,6 +193,7 @@ export class DemoDaySession {
     this.keys.clear();
     this.alive.clear();
     this.world = null;
+    if (summary && (summary.elapsedSec >= 3 || summary.destroyedPct > 0)) this.showEndCard(summary, restore);
     return summary;
   }
 
@@ -517,6 +527,67 @@ export class DemoDaySession {
     if (this.hpFill) this.hpFill.style.width = `${hud.maxHp > 0 ? (hud.hp / hud.maxHp) * 100 : 0}%`;
     if (this.pctFill) this.pctFill.style.width = `${pct}%`;
     if (this.pctText) this.pctText.textContent = `${Math.round(pct)}%`;
+  }
+
+  /**
+   * What the player sees after the page is put back: their numbers and a link to the hub's report page.
+   * The run rides in the link's fragment, so nothing about it (or the page) is sent anywhere.
+   */
+  private showEndCard(summary: RunSummary, restored: boolean): void {
+    const doc = this.win.document;
+    const host = doc.createElement('div');
+    host.setAttribute('data-demoday', '');
+    host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
+    const root = host.attachShadow({ mode: 'open' });
+    const style = doc.createElement('style');
+    style.textContent = STYLE;
+
+    const layer = doc.createElement('div');
+    layer.className = 'layer';
+    const card = doc.createElement('div');
+    card.className = 'card';
+
+    const title = doc.createElement('h2');
+    title.textContent = STRINGS.endTitle;
+    const note = doc.createElement('div');
+    note.textContent = restored ? STRINGS.endRestored : '';
+    note.hidden = !restored;
+
+    const stats = doc.createElement('dl');
+    const minutes = Math.floor(summary.elapsedSec / 60);
+    const seconds = String(summary.elapsedSec % 60).padStart(2, '0');
+    const rows: Array<[string, string]> = [
+      [STRINGS.endDestroyed, `${summary.destroyedPct}%`],
+      [STRINGS.endKills, String(summary.kills)],
+      [STRINGS.endLevel, String(summary.level)],
+      [STRINGS.endTime, `${minutes}:${seconds}`],
+    ];
+    for (const [label, value] of rows) {
+      const dt = doc.createElement('dt');
+      dt.textContent = label;
+      const dd = doc.createElement('dd');
+      dd.textContent = value;
+      stats.append(dt, dd);
+    }
+
+    const actions = doc.createElement('div');
+    actions.className = 'actions';
+    const share = doc.createElement('a');
+    share.href = reportUrl(summary);
+    share.target = '_blank';
+    share.rel = 'noopener noreferrer';
+    share.textContent = STRINGS.endShare;
+    const close = doc.createElement('button');
+    close.type = 'button';
+    close.textContent = STRINGS.endClose;
+    close.addEventListener('click', () => host.remove());
+    actions.append(share, close);
+
+    card.append(title, note, stats, actions);
+    layer.appendChild(card);
+    root.append(style, layer);
+    doc.documentElement.appendChild(host);
+    this.win.setTimeout(() => host.remove(), 45000);
   }
 
   /** A short message that clears itself. Used before the overlay is mounted, so it carries its own host. */
