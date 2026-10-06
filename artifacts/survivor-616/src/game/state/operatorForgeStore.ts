@@ -20,7 +20,7 @@ export const FORGE_STORAGE_KEY = 'survivor616.forge.v1';
  * Forge became an end-game unlock. It is still honored so nobody who already
  * had the Forge loses it. New access comes from `earned`.
  */
-interface ForgeState {
+export interface ForgeState {
   unlocked: boolean;
   operators: ForgedOperator[];
   /** Sticky end-game unlock ids (features and custom slots). */
@@ -51,14 +51,10 @@ function devModeForgeAccess(): boolean {
   }
 }
 
-function read(): ForgeState {
-  const empty: ForgeState = { unlocked: false, operators: [], earned: [], toggles: {} };
-  const store = storage();
-  if (!store) return empty;
+function normalizeForgeState(input: unknown): ForgeState | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const parsed = input as { unlocked?: unknown; operators?: unknown; earned?: unknown; toggles?: unknown };
   try {
-    const raw = store.getItem(FORGE_STORAGE_KEY);
-    if (!raw) return empty;
-    const parsed = JSON.parse(raw) as { unlocked?: unknown; operators?: unknown; earned?: unknown; toggles?: unknown };
     const seen = new Set<string>();
     const operators: ForgedOperator[] = [];
     if (Array.isArray(parsed.operators)) {
@@ -82,6 +78,18 @@ function read(): ForgeState {
     }
     return { unlocked: parsed.unlocked === true, operators, earned, toggles };
   } catch {
+    return null;
+  }
+}
+
+function read(): ForgeState {
+  const empty: ForgeState = { unlocked: false, operators: [], earned: [], toggles: {} };
+  const store = storage();
+  if (!store) return empty;
+  try {
+    const raw = store.getItem(FORGE_STORAGE_KEY);
+    return raw ? normalizeForgeState(JSON.parse(raw)) ?? empty : empty;
+  } catch {
     return empty;
   }
 }
@@ -95,6 +103,25 @@ function write(state: ForgeState): boolean {
   } catch {
     return false;
   }
+}
+
+/** Validated snapshot for a portable progress archive. */
+export function exportForgeState(): ForgeState {
+  return read();
+}
+
+/** Replaces device-local Forge data after an archive has been validated. */
+export function importForgeState(input: unknown): boolean {
+  const state = normalizeForgeState(input);
+  return state ? write(state) : false;
+}
+
+export function isValidForgeState(input: unknown): boolean {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
+  const raw = input as Record<string, unknown>;
+  if (typeof raw.unlocked !== 'boolean' || !Array.isArray(raw.operators) || !Array.isArray(raw.earned) || !raw.toggles || typeof raw.toggles !== 'object' || Array.isArray(raw.toggles)) return false;
+  const normalized = normalizeForgeState(input);
+  return normalized !== null && normalized.operators.length === raw.operators.length;
 }
 
 /* ------------------------------------------------------------------ */

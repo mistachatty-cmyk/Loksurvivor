@@ -27,8 +27,11 @@ import {
 } from 'lucide-react';
 
 import { toast } from '@/hooks/use-toast';
+import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
-import { activeUiThemeSwatchId, parseMetaFile, serializeMeta, useMeta } from '@/game/state/metaStore';
+import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { importForgeState } from '@/game/state/operatorForgeStore';
+import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
@@ -60,6 +63,45 @@ export interface SettingsPanelProps {
   onBack: () => void;
   onOpenLooksAndLokPets?: () => void;
 }
+
+const SETTINGS_DESTINATIONS = [
+  { id: 'settings-language', label: 'Language', terms: 'translation device' },
+  { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom' },
+  { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
+  { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode' },
+  { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
+  { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
+  { id: 'settings-customization', label: 'Customization', terms: 'theme palette looks skins' },
+  { id: 'settings-data', label: 'Save data', terms: 'backup export import progress forge' },
+  { id: 'settings-advanced', label: 'Advanced', terms: 'developer dev mode' },
+] as const;
+
+function SettingsJumpNav() {
+  const [query, setQuery] = useState('');
+  const matches = SETTINGS_DESTINATIONS.filter((item) => `${item.label} ${item.terms}`.toLowerCase().includes(query.trim().toLowerCase()));
+  return (
+    <nav className="border border-border bg-card p-4 lg:col-span-2" aria-label="Settings sections">
+      <label htmlFor="settings-section-search" className="block text-sm font-black uppercase text-white">Find a section</label>
+      <input id="settings-section-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try audio, controls, Forge..." className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm text-white" />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {matches.map((item) => <a key={item.id} href={`#${item.id}`} className="inline-flex min-h-10 items-center border border-border bg-background px-3 py-2 text-xs font-bold uppercase text-white hover:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{item.label}</a>)}
+        {matches.length === 0 ? <p className="text-sm text-muted-foreground">No section matches that search.</p> : null}
+      </div>
+    </nav>
+  );
+}
+
+function MusicVolumeSetting() {
+  const player = useMusicPlayer();
+  return <div className="mt-3 border border-border/70 bg-background/50 p-4">
+    <div className="flex items-center justify-between gap-3">
+      <div><h3 className="text-sm font-black uppercase text-white">Music volume</h3><p className="mt-1 text-xs text-muted-foreground">The same level and mute choice used in the music player.</p></div>
+      <button type="button" className="min-h-10 border border-border px-3 text-xs font-bold uppercase text-white" onClick={player.toggleMute} aria-pressed={player.muted}>{player.muted ? 'Unmute' : 'Mute'}</button>
+    </div>
+    <label className="mt-3 block text-xs text-white" htmlFor="settings-music-volume">Volume {Math.round(player.volume * 100)}%</label>
+    <input id="settings-music-volume" type="range" min={0} max={1} step={0.01} value={player.volume} onChange={(event) => player.setVolume(Number(event.target.value))} className="mt-2 w-full accent-primary" />
+  </div>;
+}
 /**
  * Language picker. Hidden until at least one translated file exists, so it
  * adds nothing to the screen before the Auto-translate action has run.
@@ -73,7 +115,7 @@ function LanguageSetting() {
     void setLanguagePreference(next);
   };
   return (
-    <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-language-settings">
+    <section id="settings-language" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-language-settings">
       <div className="flex items-start gap-4">
         <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
           <Languages className="h-5 w-5" />
@@ -259,14 +301,14 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
   }, [unlockDevModeAccess]);
 
   const handleExportSave = useCallback(() => {
-    const blob = new Blob([serializeMeta(meta)], { type: 'application/json' });
+    const blob = new Blob([serializeSaveArchive(meta)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `616-survivor-save-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    toast({ title: 'Save exported', description: 'Saved to your downloads.' });
+    toast({ title: 'Save exported', description: 'Progress and forged operators saved to your downloads.' });
   }, [meta]);
 
   const handleImportSave = useCallback(
@@ -275,7 +317,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
       event.target.value = '';
       if (!file) return;
       void file.text().then((text) => {
-        const parsed = parseMetaFile(text);
+        const parsed = parseSaveArchive(text);
         if (!parsed) {
           toast({
             title: "Couldn't import save",
@@ -284,10 +326,17 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           });
           return;
         }
-        if (!window.confirm('Importing will replace your current progress with this save file. Continue?')) return;
-        importMeta(parsed);
-        toast({ title: 'Save imported', description: 'Your progress has been replaced with the imported save.' });
-      });
+        const details = parsed.legacy
+          ? 'This older save contains progress only. Your current forged operators will be kept.'
+          : 'This archive contains progress and forged operators. Both will replace the current data.';
+        if (!window.confirm(`${details} Continue?`)) return;
+        if (parsed.forge && !importForgeState(parsed.forge)) {
+          toast({ title: "Couldn't import save", description: 'This device could not store the forged operators. Your current progress was kept.', variant: 'destructive' });
+          return;
+        }
+        importMeta(parsed.meta);
+        toast({ title: 'Save imported', description: parsed.legacy ? 'Progress imported; existing forged operators kept.' : 'Progress and forged operators imported. Reload to update the roster.' });
+      }).catch(() => toast({ title: "Couldn't read file", variant: 'destructive' }));
     },
     [importMeta],
   );
@@ -296,9 +345,16 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     <ScreenLayout title={t('settings.title')} subtitle={t('settings.subtitle')} onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">{t('common.looksLokpets')}</button> : undefined}>
     <SettingsPager endgame={<EndgameSettings />} standard={
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
+        <SettingsJumpNav />
         <LanguageSetting />
-        <UiTransparencyControls />
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
+        <div id="settings-accessibility" className="space-y-4 scroll-mt-24 lg:col-span-2">
+          <UiTransparencyControls />
+          <section className="border border-border bg-card p-5 sm:p-6">
+            <h2 className="text-xl font-black uppercase text-white">Motion</h2>
+            <MotionSetting />
+          </section>
+        </div>
+        <section id="settings-display" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <PauseCircle className="h-5 w-5" />
@@ -541,7 +597,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-music-reactive-settings">
+        <section id="settings-audio" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-music-reactive-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-400/10 text-fuchsia-200">
               <Activity className="h-5 w-5" />
@@ -580,6 +636,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   <span>Turn this off and the run plays exactly as it does in silence.</span>
                 </div>
               </div>
+              <MusicVolumeSetting />
               <div className="mt-5 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -654,7 +711,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
-              <MotionSetting />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -933,13 +989,13 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
-              <FightStyleSetting />
+              <div id="settings-gameplay" className="scroll-mt-24"><FightStyleSetting /></div>
               <BuildingEntrySetting />
             </div>
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-gyro-settings">
+        <section id="settings-controls" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-gyro-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
               <Compass className="h-5 w-5" />
@@ -1347,7 +1403,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-ui-theme-settings">
+        <section id="settings-customization" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-ui-theme-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <Palette className="h-5 w-5" />
@@ -1531,7 +1587,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
+        <section id="settings-data" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <Save className="h-5 w-5" />
@@ -1545,8 +1601,9 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
               </p>
               <h2 className="mt-1 text-xl font-black uppercase text-white">Back up or transfer your progress</h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                Export a save file to keep as a backup or move to another browser or device. Signing in
-                under Account keeps your progress synced automatically instead.
+                Export progress and forged operators to move them to another browser or device. Music files,
+                playlists, Studio projects, and device display preferences are stored separately and are not in this file.
+                Older progress-only saves still import.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -1570,7 +1627,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         </section>
 
         {meta.devModeAccessUnlocked ? (
-          <section className="border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
+          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
                 <FlaskConical className="h-5 w-5" />
@@ -1608,7 +1665,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             </div>
           </section>
         ) : (
-          <section className="border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-gate">
+          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-gate">
             <button
               type="button"
               onClick={handleDevAccessTap}
