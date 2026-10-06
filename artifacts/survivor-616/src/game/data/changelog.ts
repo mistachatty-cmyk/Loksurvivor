@@ -475,6 +475,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Ask the keeper to hum-shift the Armory between the GRPD Station and the hideout. The entrance follows its saved location.',
     ],
   },
+  {
+    version: '0.14.1',
+    date: '2026-10-06',
+    kind: 'hotfix',
+    title: 'Popups Stay on Screen',
+    body: [
+      'Fixed popups (card details in The Neon Sleeve, pack odds, the bestiary and more) opening off-center on phones and mobile browsers, forcing you to scroll to reach them.',
+      'Popups now size to the visible screen, so the browser toolbar no longer clips them. A tall popup scrolls inside itself, and its close button stays reachable.',
+      'The floating Back button no longer sits on top of an open popup.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

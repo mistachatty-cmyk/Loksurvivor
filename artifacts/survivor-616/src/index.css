@@ -81,6 +81,10 @@
   filter: saturate(1.18) brightness(1.08);
 }
 
+/* The phone-only floating Back button must not sit on top of an open popup
+   (it covered the bottom of card/pack dialogs and invited mis-taps). */
+body:has([role='dialog'][aria-modal='true']) [data-testid='button-back-floating'] { display: none; }
+
 /* During combat the persistent soundtrack becomes a tiny edge transport so it
    cannot reserve a second top row or overlap the run timer. */
 body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] {

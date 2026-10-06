@@ -7,6 +7,76 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 43,
+      "version": "0.14.1",
+      "date": "2026-10-06",
+      "kind": "hotfix",
+      "title": "Popups Stay on Screen",
+      "body": [
+        "Fixed popups (card details in The Neon Sleeve, pack odds, the bestiary and more) opening off-center on phones and mobile browsers, forcing you to scroll to reach them.",
+        "Popups now size to the visible screen, so the browser toolbar no longer clips them. A tall popup scrolls inside itself, and its close button stays reachable.",
+        "The floating Back button no longer sits on top of an open popup."
+      ]
+    },
+    {
+      "number": 42,
+      "version": "0.14.0",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "The Frogsters and the Armory Keeper",
+      "body": [
+        "Jeremey Frogster now welcomes survivors to the Circuit Frog Ranch, while his twin Jeramy runs the boards at Gorilla Studios. Both have their own animated character models and a shared story in the Digi-Verse Archives.",
+        "The GRPD Armory has a Luvitnot keeper: an Eclipse-born water and spirit being in a white-and-gold protective suit with a glass helmet.",
+        "Ask the keeper to hum-shift the Armory between the GRPD Station and the hideout. The entrance follows its saved location."
+      ]
+    },
+    {
+      "number": 41,
+      "version": "0.13.3",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "Armory Spawn Control",
+      "body": [
+        "The GRPD Armory now has an automatic kill increase switch. Turn it off to remove the +0.01 offer weight gained every 1,000 lifetime kills while keeping your purchased tiers.",
+        "Turn it back on whenever you want the bonus from your current lifetime kill total."
+      ]
+    },
+    {
+      "number": 40,
+      "version": "0.13.2",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "The GRPD Armory Opens",
+      "body": [
+        "The GRPD Station now holds an evidence archive of thirty weapon designs, each with its own pixel model. Sealed designs stay out of runs.",
+        "Crossing Baton, Rivet Driver, and Deck Sling are the first field prototypes. Earn an evidence seal every 1,000 lifetime kills, fabricate a prototype, then switch it on before it can appear in future runs.",
+        "Every 1,000 kills adds 0.01 relative offer weight to active GRPD weapons. You can spend evidence seals on individual 2×, 3×, 4×, and 5× offer tiers."
+      ]
+    },
+    {
+      "number": 39,
+      "version": "0.13.1",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "Faster Forge Starts",
+      "body": [
+        "The Forge now has one-tap Street, Tech, Mystic, and Wild starting designs, plus reset buttons for body, palette, and each feature section.",
+        "Settings has a fullscreen control for browsers that support it. Esc still leaves fullscreen normally."
+      ]
+    },
+    {
+      "number": 38,
+      "version": "0.13.0",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "Forge and Settings Tune-Up",
+      "body": [
+        "Dev Mode now shows all five usable Forge slots inside the workshop, matching the save rules.",
+        "Save downloads now include your forged operators alongside game progress. Older progress-only files still import without erasing operators already on this device.",
+        "Settings has a section finder and music volume control. The Forge keeps a compact preview visible on phones and adds undo, redo, duplicate, and a warning before replacing unsaved work."
+      ]
+    },
+    {
       "number": 37,
       "version": "0.12.6",
       "date": "2026-10-06",
