@@ -126,8 +126,20 @@ export const HIDEOUT_EVENTS: HideoutEventDef[] = [
 
 export const HIDEOUT_EVENTS_BY_ID: Record<string, HideoutEventDef> = Object.fromEntries(HIDEOUT_EVENTS.map((e) => [e.id, e]));
 
+/**
+ * The part of an event the picker needs, so other tables (pet care verbs, choice events)
+ * reuse the same conditions, cooldowns and weighted pick instead of copying them.
+ */
+export interface EventGate {
+  id: string;
+  weight: number;
+  cooldownMs: number;
+  once?: boolean;
+  when: HideoutEventDef['when'];
+}
+
 /** True when the event's conditions fit right now (cooldowns are checked separately). */
-export function eventFits(def: HideoutEventDef, ctx: HideoutEventContext): boolean {
+export function eventFits(def: Pick<EventGate, 'when'>, ctx: HideoutEventContext): boolean {
   const w = def.when;
   if (w.minBond && BOND_RANK_BY_ID[ctx.bondRank].order < BOND_RANK_BY_ID[w.minBond].order) return false;
   if (w.timeOfDay && !w.timeOfDay.includes(timeOfDayFor(ctx.hour))) return false;
@@ -139,7 +151,7 @@ export function eventFits(def: HideoutEventDef, ctx: HideoutEventContext): boole
 }
 
 /** `history` maps event id to the last time it played for this pet. */
-export function eventReady(def: HideoutEventDef, history: Record<string, number> | undefined, now: number): boolean {
+export function eventReady(def: Pick<EventGate, 'id' | 'once' | 'cooldownMs'>, history: Record<string, number> | undefined, now: number): boolean {
   const last = history?.[def.id];
   if (last === undefined) return true;
   if (def.once) return false;
@@ -147,13 +159,13 @@ export function eventReady(def: HideoutEventDef, history: Record<string, number>
 }
 
 /** Weighted pick among the events that fit and are off cooldown. Null when nothing fits. */
-export function pickHideoutEvent(
+export function pickHideoutEvent<T extends EventGate = HideoutEventDef>(
   ctx: HideoutEventContext,
   history: Record<string, number> | undefined,
   now: number,
   rng: () => number,
-  defs: HideoutEventDef[] = HIDEOUT_EVENTS,
-): HideoutEventDef | null {
+  defs: readonly T[] = HIDEOUT_EVENTS as unknown as readonly T[],
+): T | null {
   const options = defs.filter((def) => eventFits(def, ctx) && eventReady(def, history, now));
   const total = options.reduce((sum, def) => sum + def.weight, 0);
   if (options.length === 0 || total <= 0) return null;
