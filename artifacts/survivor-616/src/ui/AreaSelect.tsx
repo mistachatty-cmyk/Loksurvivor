@@ -36,14 +36,30 @@ const THEME_LABELS: Record<string, { label: string; color: string }> = {
   wasteland: { label: 'Perimeter Highway', color: 'text-orange-400 border-orange-400/40 bg-orange-400/10' },
 };
 
+type AreaPlaylist = AreaCategory | 'experimental';
+
+const EXPERIMENTAL_CATEGORIES: ReadonlySet<AreaCategory> = new Set(['bonus', '2x', '4x', 'classic', 'endless']);
+
+const MAP_TYPE_BADGES: Record<AreaCategory, { label: string; color: string }> = {
+  standard: { label: 'Standard', color: 'border-white/30 bg-white/10 text-white' },
+  bonus: { label: 'Bonus', color: 'border-violet-300/50 bg-violet-300/15 text-violet-100' },
+  '2x': { label: '2× Arena', color: 'border-orange-300/50 bg-orange-300/15 text-orange-100' },
+  '4x': { label: '4× Arena', color: 'border-amber-300/50 bg-amber-300/15 text-amber-100' },
+  classic: { label: 'Classic', color: 'border-sky-300/50 bg-sky-300/15 text-sky-100' },
+  endless: { label: 'Infinite World', color: 'border-cyan-300/50 bg-cyan-300/15 text-cyan-100' },
+};
+
 export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const { unlockedAreas, lockedAreas, meta, selectedCharacter } = useMeta();
   const customMaps = meta.customMaps;
   const challenges = availableChallengeContracts(meta);
   const [selectedChallengeIds, setSelectedChallengeIds] = useState<string[]>([]);
-  const [filter, setFilter] = useState<AreaCategory>('standard');
+  const [filter, setFilter] = useState<AreaPlaylist>('standard');
 
-  const inFilter = (area: (typeof unlockedAreas)[number], nextFilter: AreaCategory) => areaCategory(area) === nextFilter;
+  const inFilter = (area: (typeof unlockedAreas)[number], nextFilter: AreaPlaylist) => {
+    const category = areaCategory(area);
+    return nextFilter === 'experimental' ? EXPERIMENTAL_CATEGORIES.has(category) : category === nextFilter;
+  };
 
   const toggleChallenge = (id: string) => {
     setSelectedChallengeIds((current) => {
@@ -66,6 +82,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
   const twoXCount = allAuthoredAreas.filter((area) => areaCategory(area) === '2x').length;
   const fourXCount = allAuthoredAreas.filter((area) => areaCategory(area) === '4x').length;
   const bonusCount = allAuthoredAreas.filter((area) => areaCategory(area) === 'bonus').length + customMaps.length;
+  const experimentalCount = allAuthoredAreas.filter((area) => EXPERIMENTAL_CATEGORIES.has(areaCategory(area))).length + customMaps.length;
 
   return (
     <ScreenLayout 
@@ -124,6 +141,9 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
       {/* Mode Filters */}
       <div className="mb-6 min-w-0 border-b border-border/60 pb-4">
         <div className="flex max-w-full snap-x snap-mandatory items-center gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="area-category-strip">
+          <button type="button" onClick={() => setFilter('experimental')} data-testid="button-area-filter-experimental" aria-pressed={filter === 'experimental'} className={`flex shrink-0 snap-start items-center gap-1.5 whitespace-nowrap border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${filter === 'experimental' ? 'border-pink-300 bg-pink-300 text-black' : 'border-border bg-card text-muted-foreground hover:border-pink-300/60 hover:text-pink-200'}`}>
+            <Sparkles className="h-3.5 w-3.5" /> Experimental ({experimentalCount})
+          </button>
           <button
             type="button"
             onClick={() => setFilter('endless')}
@@ -167,10 +187,13 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
             <span>Unbounded 640px procedural grid · Subterranean vaults & rooftop networks</span>
           </div>
         )}
+        {filter === 'experimental' && (
+          <p className="mt-2 text-[11px] font-mono text-pink-100/80">Alternate arena scales, custom routes, classic runs, and infinite worlds. Each card shows its map type.</p>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filter === 'bonus' && customMaps.map((map, i) => {
+        {(filter === 'bonus' || filter === 'experimental') && customMaps.map((map, i) => {
           const area = customMapToArea(map);
           const mapIssues = customMapValidationIssues(map);
           const launchable = mapIssues.length === 0;
@@ -201,6 +224,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                 </div>
                 <p className="mt-auto line-clamp-2 text-xs text-muted-foreground">{area.description}</p>
                 <div className="mt-4 flex items-center gap-2">
+                  <span className="border border-cyan-200/40 bg-cyan-200/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">Custom</span>
                   <span className="border border-cyan-200/30 bg-cyan-200/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">{map.placements.length} objects</span>
                   <span className="border border-border bg-black/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-white">{map.durationSec}s</span>
                   <span className={`ml-auto font-mono text-[10px] font-bold uppercase tracking-widest ${launchable ? 'text-cyan-100' : 'text-amber-200'}`}>{launchable ? map.threat : 'needs enemy'}</span>
@@ -211,6 +235,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
         })}
         {filteredUnlocked.map((area, i) => {
           const isCleared = meta.clearedAreaIds.includes(area.id);
+          const mapTypeBadge = MAP_TYPE_BADGES[areaCategory(area)];
           const threatColor = THREAT_COLORS[area.threat];
           const themeInfo = area.endlessTheme ? THEME_LABELS[area.endlessTheme] : null;
 
@@ -279,6 +304,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                 )}
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest ${mapTypeBadge.color}`}>{mapTypeBadge.label}</span>
                   <div className={`flex items-center gap-1.5 px-2 py-1 border ${threatColor}`}>
                     <AlertTriangle className="w-3 h-3" />
                     <span className="text-[10px] font-bold uppercase tracking-widest">{area.threat} Threat</span>
@@ -305,12 +331,6 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
                     <div className="flex items-center gap-1.5 border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-cyan-100">
                       <Maximize2 className="h-3 w-3" />
                       <span className="text-[10px] font-bold uppercase tracking-widest">XL Route</span>
-                    </div>
-                  ) : null}
-                  {area.id.endsWith('-4x') ? (
-                    <div className="flex items-center gap-1.5 border border-amber-400/50 bg-amber-400/15 px-2 py-1 text-amber-200">
-                      <Sparkles className="h-3 w-3 text-amber-300" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">4× Extreme</span>
                     </div>
                   ) : null}
                   {area.sky === 'fog' || area.sky === 'roofed' || area.district.toLowerCase().includes('sub-basement') || area.district.toLowerCase().includes('catacombs') ? (
@@ -345,6 +365,7 @@ export function AreaSelect({ onBack, onLaunch }: AreaSelectProps) {
             <div className="relative z-20 flex flex-col items-center justify-center h-full text-center">
               <Lock className="w-8 h-8 text-muted-foreground mb-3" />
               <h2 className="text-xl font-black text-white uppercase tracking-tight mb-1">{area.name}</h2>
+              <span className={`mb-2 border px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-widest ${MAP_TYPE_BADGES[areaCategory(area)].color}`}>{MAP_TYPE_BADGES[areaCategory(area)].label}</span>
               <div className="flex items-center gap-2 mb-2">
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{area.district}</p>
                 {area.endless && (

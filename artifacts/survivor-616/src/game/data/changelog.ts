@@ -357,6 +357,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A new bar on that page jumps straight to the Archives, the Updates and each lore chapter. The Updates list there is the same patch notes you see in the game, in blue, and it keeps itself current.',
     ],
   },
+  {
+    version: '0.12.1',
+    date: '2026-10-05',
+    kind: 'update',
+    title: 'Experimental Map Playlist',
+    body: [
+      'The map picker now has an Experimental overview for bonus, 2×, 4×, classic, infinite, and custom routes. The original map filters are still there.',
+      'Every map card now shows its type, including routes you have not unlocked yet.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
