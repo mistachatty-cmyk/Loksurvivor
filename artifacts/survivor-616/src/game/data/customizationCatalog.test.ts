@@ -29,13 +29,13 @@ test('run auras cover six paid styles across multiple cosmetic tiers', () => {
   assert.deepEqual(new Set(RUN_AURAS.map((aura) => aura.tier)), new Set(['standard', 'uncommon', 'rare', 'legendary']));
 });
 
-test('every fighter has five distinct personal skins and the last is episode-gated', () => {
+test('every fighter has seven distinct personal skins with episode and crew earnables', () => {
   for (const character of CHARACTERS) {
     const skins = getCharacterSkins(character);
-    assert.equal(skins.length, 5);
-    assert.equal(new Set(skins.map((skin) => skin.id)).size, 5);
+    assert.equal(skins.length, 7);
+    assert.equal(new Set(skins.map((skin) => skin.id)).size, 7);
     assert.equal(skins.filter((skin) => skin.episodeRequired).length, 1);
-    assert.equal(new Set(skins.map((skin) => skin.palette.body)).size, 5);
+    assert.deepEqual(skins.filter((skin) => skin.crewRequired).map((skin) => skin.crewRequired), [3, 8]);
   }
 
   const character = CHARACTERS[0]!;
@@ -46,6 +46,9 @@ test('every fighter has five distinct personal skins and the last is episode-gat
   const unlockedMeta = { ...createInitialMeta(), completedEpisodeIds: [episode.id] };
   const unlocked = reducer({ meta: unlockedMeta, lastRun: null }, { type: 'selectCharacterSkin', characterId: character.id, skinId: episodeSkin.id });
   assert.equal(unlocked.meta.characterSkinByCharacterId[character.id], episodeSkin.id);
+  const crewSkin = getCharacterSkins(character).find((skin) => skin.crewRequired === 3)!;
+  const crewLocked = reducer({ meta: createInitialMeta(), lastRun: null }, { type: 'selectCharacterSkin', characterId: character.id, skinId: crewSkin.id });
+  assert.equal(crewLocked.meta.characterSkinByCharacterId[character.id], undefined);
 });
 
 test('aura purchases charge once and only owned auras can be equipped', () => {

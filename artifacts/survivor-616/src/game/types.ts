@@ -1799,7 +1799,11 @@ export type CrewActivityId =
   | 'rewire-the-cabinets'
   | 'run-the-high-score-board'
   // GRPD Station
-  | 'run-the-drills';
+  | 'run-the-drills'
+  | 'cook-the-last-feast' | 'count-the-sheep' | 'chart-the-horde'
+  | 'raise-the-palings' | 'tune-the-moon' | 'mix-the-elixir'
+  | 'forge-the-banners' | 'repair-the-cabinets' | 'cycle-the-air'
+  | 'seal-the-hatches' | 'relay-the-pressure' | 'inspect-the-lockers';
 
 export type CrewActivityIcon =
   | 'utensils'

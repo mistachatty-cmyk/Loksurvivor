@@ -7,6 +7,29 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 35,
+      "version": "0.12.4",
+      "date": "2026-10-04",
+      "kind": "update",
+      "title": "The Crew After Hours",
+      "body": [
+        "Eleven new crew jobs widen the hideout rotation. Rapid Shelter now has working assignments of its own, and every rescued ally has more than one reachable job.",
+        "Rescue crew to earn Ember Guard and Moon Runner colors for every fighter, plus three animated hideout scene looks. The original scene and original fighter colors stay available.",
+        "Three new hats join the loot-token shop. Watch for a tiny feudal age, a garlic orbit, and one more run before dawn."
+      ]
+    },
+    {
+      "number": 34,
+      "version": "0.12.3",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "Experimental Map Playlist",
+      "body": [
+        "The map picker now has an Experimental overview for bonus, 2×, 4×, classic, infinite, and custom routes. The original map filters are still there.",
+        "Every map card now shows its type, including routes you have not unlocked yet."
+      ]
+    },
+    {
       "number": 33,
       "version": "0.12.2",
       "date": "2026-10-06",

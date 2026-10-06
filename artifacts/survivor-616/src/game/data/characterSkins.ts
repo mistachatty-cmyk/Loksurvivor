@@ -1,6 +1,6 @@
 import type { CharacterDef, SpritePalette } from '@/game/types';
 
-export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'cel-broadcast' | 'episode';
+export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'cel-broadcast' | 'episode' | 'ember-guard' | 'moon-runner';
 
 export interface CharacterSkinDef {
   id: string;
@@ -9,6 +9,7 @@ export interface CharacterSkinDef {
   description: string;
   style: CharacterSkinStyle;
   episodeRequired: boolean;
+  crewRequired?: number;
   palette: SpritePalette;
 }
 
@@ -60,6 +61,16 @@ function paletteVariant(base: SpritePalette, style: CharacterSkinStyle, seed: nu
     skin: mixColor(base.skin, '#fff4e0', 0.35),
     glow: mixColor(hot, '#ffffff', 0.25),
   };
+  if (style === 'ember-guard') return {
+    ink: mixColor(base.ink, '#1c0806', 0.5), body: mixColor(base.body, '#8e301e', 0.55),
+    bodyDark: mixColor(base.bodyDark, '#301015', 0.55), accent: mixColor(base.accent, '#ffae51', 0.75),
+    accentBright: '#fff1ca', skin: base.skin, glow: '#ffcc64',
+  };
+  if (style === 'moon-runner') return {
+    ink: mixColor(base.ink, '#07132e', 0.5), body: mixColor(base.body, '#304f9e', 0.55),
+    bodyDark: mixColor(base.bodyDark, '#0c1945', 0.55), accent: mixColor(base.accent, '#7ed9ff', 0.7),
+    accentBright: '#e5f7ff', skin: base.skin, glow: '#a0bbff',
+  };
   return {
     ink: mixColor(base.ink, '#000000', 0.3),
     body: mixColor(base.body, hot, 0.34),
@@ -77,12 +88,14 @@ export function characterSkinId(characterId: string, style: CharacterSkinStyle):
 
 export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
   const seed = [...character.id].reduce((total, letter) => total + letter.charCodeAt(0), 0);
-  const variants: Array<Pick<CharacterSkinDef, 'style' | 'name' | 'description' | 'episodeRequired'>> = [
+  const variants: Array<Pick<CharacterSkinDef, 'style' | 'name' | 'description' | 'episodeRequired' | 'crewRequired'>> = [
     { style: 'original', name: 'Original', description: 'The character’s authored street colors.', episodeRequired: false },
     { style: 'nocturne', name: 'Nocturne', description: 'A cool late-night version of the original look.', episodeRequired: false },
     { style: 'countertone', name: 'Countertone', description: 'A loud complementary remix unique to this fighter.', episodeRequired: false },
     { style: 'cel-broadcast', name: 'Cel Broadcast', description: 'A hand-inked anime rebroadcast — flat saturated color and a blown-out rim light.', episodeRequired: false },
     { style: 'episode', name: 'Afterstory', description: 'The personal colorway earned by completing this character’s episode.', episodeRequired: true },
+    { style: 'ember-guard', name: 'Ember Guard', description: 'Earned by rescuing three crew. Warm copper and firelight.', episodeRequired: false, crewRequired: 3 },
+    { style: 'moon-runner', name: 'Moon Runner', description: 'Earned by rescuing eight crew. Cool midnight and moonlight.', episodeRequired: false, crewRequired: 8 },
   ];
   return variants.map((skin) => ({
     ...skin,
@@ -95,6 +108,10 @@ export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
 export function getCharacterSkin(character: CharacterDef, skinId?: string): CharacterSkinDef {
   const skins = getCharacterSkins(character);
   return skins.find((skin) => skin.id === skinId) ?? skins[0]!;
+}
+
+export function isCharacterSkinUnlocked(skin: CharacterSkinDef, crewCount: number, episodeComplete: boolean): boolean {
+  return (!skin.episodeRequired || episodeComplete) && crewCount >= (skin.crewRequired ?? 0);
 }
 
 export function blendSpritePalettes(personal: SpritePalette, world: SpritePalette, amount = 0.42): SpritePalette {

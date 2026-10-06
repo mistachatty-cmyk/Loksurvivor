@@ -887,6 +887,18 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   :root:not([data-motion='full']) .intro-screen *, :root:not([data-motion='full']) .intro-screen { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
 }
 [data-testid^='run-hud'], [data-testid='run-intel-drawer'], [data-testid='button-loot-tray'], [data-testid='button-loot-tray-options'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-hud, 1)); }
+.scene-look-photo { transition: filter .6s ease, transform .6s ease; }
+.scene-look-photo.scene-look-ember { filter: sepia(.85) saturate(1.5); }
+.scene-look-photo.scene-look-moon { filter: hue-rotate(165deg) saturate(1.25); }
+.scene-look-photo.scene-look-arcade { filter: hue-rotate(270deg) saturate(2); }
+.scene-look-layer { position: absolute; inset: 0; z-index: 11; pointer-events: none; background-size: 260px 260px, cover; opacity: .35; }
+.scene-look-layer.scene-look-ember { background-image: radial-gradient(circle, #ffbd65 0 1px, transparent 2px), radial-gradient(ellipse at 60% 90%, #a9461f88, transparent 65%); animation: scene-embers 18s linear infinite; }
+.scene-look-layer.scene-look-moon { background-image: radial-gradient(circle at 70% 17%, #b5d9ff99, transparent 16%), linear-gradient(110deg, transparent 20%, #668fdf44 50%, transparent 80%); animation: scene-moon 12s ease-in-out infinite alternate; }
+.scene-look-layer.scene-look-arcade { background-image: repeating-linear-gradient(105deg, transparent 0 75px, #ff48aa55 90px, #51eeff55 110px, transparent 135px); background-size: 600px 100%; animation: scene-arcade 14s linear infinite; }
+@keyframes scene-embers { from { background-position: 0 260px, center; } to { background-position: 130px 0, center; } }
+@keyframes scene-moon { from { opacity: .4; transform: translateX(-2%); } to { opacity: .8; transform: translateX(2%); } }
+@keyframes scene-arcade { from { background-position: -600px 0; } to { background-position: 600px 0; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='full']) .scene-look-layer { animation: none; } }
 [data-testid^='overlay-'], [role='dialog'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-popups, 1)); }
 header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opacity-all, 1) * var(--ui-opacity-menus, 1)); }
 

@@ -18,7 +18,7 @@ import {
   type CharacterFatigueSummary,
 } from '@/game/state/metaStore';
 import { CHARACTER_EPISODE_BY_CHARACTER_ID } from '@/game/data/episodes';
-import { getCharacterSkins, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
+import { getCharacterSkins, isCharacterSkinUnlocked, resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { DEFAULT_PALETTE_ID, getActivePalette, getThemePalette } from '@/game/data/themedPalettes';
 import { characterMasteryStatBonus, characterRankTitle } from '@/game/data/characterMastery';
 import type { CharacterDef, MetaState } from '@/game/types';
@@ -319,7 +319,7 @@ function CharacterDetail({
         </div>
         <div className="mt-2 grid grid-cols-4 gap-1.5">
           {skins.map((skin) => {
-            const locked = skin.episodeRequired && status !== 'completed';
+            const locked = !isCharacterSkinUnlocked(skin, meta.rescuedAllyIds.length, status === 'completed');
             const selected = selectedSkinId === skin.id;
             return (
               <button
@@ -328,7 +328,7 @@ function CharacterDetail({
                 onClick={() => { if (!locked) onSelectSkin(character.id, skin.id); }}
                 disabled={locked}
                 aria-pressed={selected}
-                aria-label={`${skin.name}${locked ? ', complete episode to unlock' : ''}`}
+                aria-label={`${skin.name}${locked ? skin.crewRequired ? `, rescue ${skin.crewRequired} crew to unlock` : ', complete episode to unlock' : ''}`}
                 className={`min-w-0 border p-1.5 text-left transition-colors ${selected ? 'border-primary bg-primary/10' : 'border-white/15 bg-black/25'} disabled:opacity-35`}
                 data-testid={`button-character-skin-${skin.style}`}
               >
