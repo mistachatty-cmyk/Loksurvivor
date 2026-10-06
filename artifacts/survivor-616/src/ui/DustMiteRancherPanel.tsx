@@ -24,10 +24,13 @@ import { LOKPET_VARIANTS } from '@/game/data/lokPets';
 import type { LokPetVariantDef } from '@/game/types';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { LorePopup } from './LorePopup';
+import { RigPortrait } from './RigPortrait';
+import { JEREMEY_FROGSTER } from '@/game/data/npcCast';
 
 export interface DustMiteRancherPanelProps {
   onBack: () => void;
   onOpenLokPetBattle?: () => void;
+  initialCategory?: 'mites' | 'frogs';
 }
 
 interface RanchPetOffering {
@@ -235,9 +238,9 @@ const MINES_DIG_SITES: MinesDigSite[] = [
   },
 ];
 
-export function DustMiteRancherPanel({ onBack, onOpenLokPetBattle }: DustMiteRancherPanelProps) {
+export function DustMiteRancherPanel({ onBack, onOpenLokPetBattle, initialCategory = 'mites' }: DustMiteRancherPanelProps) {
   const { meta, adoptRancherPet, feedRanchKibble, toggleFavoriteLokPet, setLokPetLoadout } = useMeta();
-  const [selectedCategory, setSelectedCategory] = useState<'mites' | 'sloths' | 'frogs' | 'birds' | 'mines'>('mites');
+  const [selectedCategory, setSelectedCategory] = useState<'mites' | 'sloths' | 'frogs' | 'birds' | 'mines'>(initialCategory);
   const [showLore, setShowLore] = useState(false);
   const [adoptionMessage, setAdoptionMessage] = useState<string | null>(null);
   const [excavatingSite, setExcavatingSite] = useState<string | null>(null);
@@ -305,11 +308,11 @@ export function DustMiteRancherPanel({ onBack, onOpenLokPetBattle }: DustMiteRan
             <div className="flex items-center gap-2">
               <Bug className="h-5 w-5 text-amber-400" />
               <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-amber-100">
-                Barnaby's Dust Mite & Data-Pet Ranch
+                {selectedCategory === 'frogs' ? "Jeremey Frogster's Circuit Frog Ranch" : "Barnaby's Dust Mite & Data-Pet Ranch"}
               </h1>
             </div>
             <p className="font-mono text-[10px] uppercase tracking-widest text-amber-400/80">
-              Sub-Conduit Sector 9 · Pure Non-Organic Synthetic Data Life
+              {selectedCategory === 'frogs' ? 'Coolant Conduit · Circuit Frog Habitat' : 'Sub-Conduit Sector 9 · Pure Non-Organic Synthetic Data Life'}
             </p>
           </div>
         </div>
@@ -348,20 +351,24 @@ export function DustMiteRancherPanel({ onBack, onOpenLokPetBattle }: DustMiteRan
       {/* Rancher Dialogue & Philosophy Banner */}
       <div className="max-w-6xl mx-auto mt-4 border border-amber-500/30 bg-amber-950/20 p-4 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-start gap-4">
-          <div className="w-16 h-16 shrink-0 grid place-items-center border-2 border-amber-500/60 bg-amber-950/60 shadow-[0_0_15px_rgba(245,158,11,0.25)]">
-            <Wheat className="h-8 w-8 text-amber-400" />
+          <div className="h-28 w-28 shrink-0 grid place-items-center border-2 border-amber-500/60 bg-amber-950/60 shadow-[0_0_15px_rgba(245,158,11,0.25)]" data-testid={selectedCategory === 'frogs' ? 'portrait-jeremey-frogster' : undefined}>
+            {selectedCategory === 'frogs'
+              ? <RigPortrait rig={JEREMEY_FROGSTER.rig} palette={JEREMEY_FROGSTER.palette} size={106} />
+              : <Wheat className="h-8 w-8 text-amber-400" />}
           </div>
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs font-black uppercase tracking-widest text-amber-300">
-                Barnaby Bit-Herder // Master Rancher
+                {selectedCategory === 'frogs' ? 'Jeremey Frogster // Circuit Frog Rancher' : 'Barnaby Bit-Herder // Master Rancher'}
               </span>
               <span className="border border-amber-500/50 bg-amber-500/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-amber-200">
-                100% NON-ORGANIC CODE
+                {selectedCategory === 'frogs' ? 'GRAY HAIR · GLASSES · COWBOY HAT' : '100% NON-ORGANIC CODE'}
               </span>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-amber-100/90 font-serif italic">
-              "Howdy, survivor! Folks who woke up after the Great Eclipse keep looking for fur and meat. Let me tell you straight: every single critter on this ranch is <strong>pure executable bytecode</strong>! Zero biology, zero organic cells, zero disease. They eat memory bloat, roll like kinetic pinballs, and shred ARCHON's drones in the Arena. Pick you out a fine battle mite, a chill-byte sloth, a circuit toad, or a pixel hawk. Feed 'em high-density Byte-Kibble and watch 'em dominate!"
+              {selectedCategory === 'frogs'
+                ? '“The coolant channels are their trails. Give a Circuit Frog room to jump, and it will find a path no patrol can predict. Jeramy keeps the beat upstairs; I keep these little conductors safe down here.”'
+                : <>"Howdy, survivor! Folks who woke up after the Great Eclipse keep looking for fur and meat. Let me tell you straight: every single critter on this ranch is <strong>pure executable bytecode</strong>! Zero biology, zero organic cells, zero disease. They eat memory bloat, roll like kinetic pinballs, and shred ARCHON's drones in the Arena. Pick you out a fine battle mite, a chill-byte sloth, a circuit toad, or a pixel hawk. Feed 'em high-density Byte-Kibble and watch 'em dominate!"</>}
             </p>
           </div>
         </div>
@@ -682,7 +689,7 @@ export function DustMiteRancherPanel({ onBack, onOpenLokPetBattle }: DustMiteRan
 
       {/* Lore Popup Modal */}
       <AnimatePresence>
-        {showLore && <LorePopup onClose={() => setShowLore(false)} initialChapterId="data-pets-pure-synthetic-fauna" />}
+        {showLore && <LorePopup onClose={() => setShowLore(false)} initialChapterId={selectedCategory === 'frogs' ? 'frogster-twins' : 'data-pets-pure-synthetic-fauna'} />}
       </AnimatePresence>
     </div>
   );

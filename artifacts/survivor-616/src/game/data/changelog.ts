@@ -443,6 +443,38 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings has a fullscreen control for browsers that support it. Esc still leaves fullscreen normally.',
     ],
   },
+  {
+    version: '0.13.2',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'The GRPD Armory Opens',
+    body: [
+      'The GRPD Station now holds an evidence archive of thirty weapon designs, each with its own pixel model. Sealed designs stay out of runs.',
+      'Crossing Baton, Rivet Driver, and Deck Sling are the first field prototypes. Earn an evidence seal every 1,000 lifetime kills, fabricate a prototype, then switch it on before it can appear in future runs.',
+      'Every 1,000 kills adds 0.01 relative offer weight to active GRPD weapons. You can spend evidence seals on individual 2×, 3×, 4×, and 5× offer tiers.',
+    ],
+  },
+  {
+    version: '0.13.3',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Armory Spawn Control',
+    body: [
+      'The GRPD Armory now has an automatic kill increase switch. Turn it off to remove the +0.01 offer weight gained every 1,000 lifetime kills while keeping your purchased tiers.',
+      'Turn it back on whenever you want the bonus from your current lifetime kill total.',
+    ],
+  },
+  {
+    version: '0.14.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'The Frogsters and the Armory Keeper',
+    body: [
+      'Jeremey Frogster now welcomes survivors to the Circuit Frog Ranch, while his twin Jeramy runs the boards at Gorilla Studios. Both have their own animated character models and a shared story in the Digi-Verse Archives.',
+      'The GRPD Armory has a Luvitnot keeper: an Eclipse-born water and spirit being in a white-and-gold protective suit with a glass helmet.',
+      'Ask the keeper to hum-shift the Armory between the GRPD Station and the hideout. The entrance follows its saved location.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

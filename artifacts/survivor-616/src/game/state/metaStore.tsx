@@ -81,6 +81,7 @@ import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/
 import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
+import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { earnedEndgame, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
@@ -151,7 +152,7 @@ export function normalizeThreatCalibrations(raw: unknown): ThreatCalibrations {
 }
 
 const STORAGE_KEY = 'survivor616.meta.v1';
-const META_VERSION = 22;
+const META_VERSION = 25;
 export const MAX_FATIGUE_PCT = 5;
 export const FATIGUE_PER_RUN_PCT = 0.5;
 export const BASE_LOKPET_TEAM_SLOTS = 3;
@@ -321,6 +322,12 @@ export function createInitialMeta(): MetaState {
     petElixirUpdatedAt: Date.now(),
     bestiary: {},
     totalKills: 0,
+    grpdSpentSeals: 0,
+    grpdUnlockedWeaponIds: [],
+    grpdActiveWeaponIds: [],
+    grpdSpawnTierByWeaponId: {},
+    grpdAutoIncreaseEnabled: true,
+    grpdArmoryAnchor: 'station',
     totalRuns: 0,
     bestSurvivalSec: 0,
     totalLevelUps: 0,
@@ -1259,6 +1266,16 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ...recoveredElixirs,
     bestiary,
     totalKills: counter(parsed.totalKills),
+    grpdSpentSeals: counter(parsed.grpdSpentSeals),
+    grpdUnlockedWeaponIds: idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []),
+    grpdActiveWeaponIds: idList(parsed.grpdActiveWeaponIds, new Set(idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, [])), []),
+    grpdSpawnTierByWeaponId: Object.fromEntries(
+      Object.entries(parsed.grpdSpawnTierByWeaponId ?? {})
+        .filter(([id]) => GRPD_PLAYABLE_WEAPON_IDS.has(id))
+        .map(([id, tier]) => [id, Math.max(1, Math.min(GRPD_MAX_SPAWN_MULTIPLIER, Math.floor(Number(tier) || 1)))]),
+    ),
+    grpdAutoIncreaseEnabled: parsed.grpdAutoIncreaseEnabled !== false,
+    grpdArmoryAnchor: parsed.grpdArmoryAnchor === 'hideout' ? 'hideout' : 'station',
     totalRuns: counter(parsed.totalRuns),
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
     totalLevelUps: counter(parsed.totalLevelUps),
@@ -1952,6 +1969,11 @@ type Action =
   | { type: 'toggleEnemyDisabled'; enemyId: string }
   | { type: 'setAllEnemiesDisabled'; disabled: boolean }
   | { type: 'toggleWeaponDisabled'; weaponId: string }
+  | { type: 'unlockGrpdWeapon'; weaponId: string }
+  | { type: 'toggleGrpdWeapon'; weaponId: string }
+  | { type: 'buyGrpdSpawnTier'; weaponId: string }
+  | { type: 'setGrpdAutoIncreaseEnabled'; enabled: boolean }
+  | { type: 'setGrpdArmoryAnchor'; anchor: MetaState['grpdArmoryAnchor'] }
   | { type: 'setAllWeaponsDisabled'; disabled: boolean }
   | { type: 'togglePassiveDisabled'; passiveId: string }
   | { type: 'setAllPassivesDisabled'; disabled: boolean }
@@ -2711,12 +2733,54 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, disabledWeaponIds } };
     }
 
+    case 'unlockGrpdWeapon': {
+      const weaponId = action.weaponId;
+      if (!GRPD_PLAYABLE_WEAPON_IDS.has(weaponId) || state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (grpdAvailableSeals(state.meta.totalKills, state.meta.grpdSpentSeals) < GRPD_UNLOCK_SEAL_COST) return state;
+      return { ...state, meta: {
+        ...state.meta,
+        grpdSpentSeals: state.meta.grpdSpentSeals + GRPD_UNLOCK_SEAL_COST,
+        grpdUnlockedWeaponIds: [...state.meta.grpdUnlockedWeaponIds, weaponId],
+        grpdSpawnTierByWeaponId: { ...state.meta.grpdSpawnTierByWeaponId, [weaponId]: 1 },
+      } };
+    }
+
+    case 'toggleGrpdWeapon': {
+      const weaponId = action.weaponId;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      const active = state.meta.grpdActiveWeaponIds;
+      return { ...state, meta: {
+        ...state.meta,
+        grpdActiveWeaponIds: active.includes(weaponId) ? active.filter((id) => id !== weaponId) : [...active, weaponId],
+      } };
+    }
+
+    case 'buyGrpdSpawnTier': {
+      const weaponId = action.weaponId;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      const current = state.meta.grpdSpawnTierByWeaponId[weaponId] ?? 1;
+      if (current >= GRPD_MAX_SPAWN_MULTIPLIER) return state;
+      const cost = grpdNextTierCost(current);
+      if (grpdAvailableSeals(state.meta.totalKills, state.meta.grpdSpentSeals) < cost) return state;
+      return { ...state, meta: {
+        ...state.meta,
+        grpdSpentSeals: state.meta.grpdSpentSeals + cost,
+        grpdSpawnTierByWeaponId: { ...state.meta.grpdSpawnTierByWeaponId, [weaponId]: current + 1 },
+      } };
+    }
+
+    case 'setGrpdAutoIncreaseEnabled':
+      return { ...state, meta: { ...state.meta, grpdAutoIncreaseEnabled: action.enabled } };
+
+    case 'setGrpdArmoryAnchor':
+      return { ...state, meta: { ...state.meta, grpdArmoryAnchor: action.anchor } };
+
     case 'setAllWeaponsDisabled': {
       return {
         ...state,
         meta: {
           ...state.meta,
-          disabledWeaponIds: action.disabled ? Object.keys(WEAPONS_BY_ID) : [],
+          disabledWeaponIds: action.disabled ? Object.keys(WEAPONS_BY_ID).filter((id) => !isGrpdPlayableWeapon(id)) : [],
         },
       };
     }
@@ -3708,6 +3772,19 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         ];
       }
 
+      const newEvidenceSeals = grpdEarnedSeals(next.totalKills) - grpdEarnedSeals(prev.totalKills);
+      if (newEvidenceSeals > 0) {
+        next.pendingNotifications = [
+          ...next.pendingNotifications,
+          {
+            id: `grpd-evidence-${next.totalKills}`,
+            title: `${newEvidenceSeals} GRPD evidence seal${newEvidenceSeals === 1 ? '' : 's'} earned`,
+            body: 'Visit the GRPD Armory to fabricate an archived weapon or raise its spawn modifier.',
+            createdAt: Date.now(),
+          },
+        ];
+      }
+
       // Check DVD Bouncing Logo Easter Egg Unlock:
       // Condition 1: Finished every authored area
       // Condition 2: Cleared bubbleWash (especially with optional side quest objectives completed)
@@ -3922,6 +3999,11 @@ export interface MetaContextValue {
   toggleEnemyDisabled: (enemyId: string) => void;
   setAllEnemiesDisabled: (disabled: boolean) => void;
   toggleWeaponDisabled: (weaponId: string) => void;
+  unlockGrpdWeapon: (weaponId: string) => void;
+  toggleGrpdWeapon: (weaponId: string) => void;
+  buyGrpdSpawnTier: (weaponId: string) => void;
+  setGrpdAutoIncreaseEnabled: (enabled: boolean) => void;
+  setGrpdArmoryAnchor: (anchor: MetaState['grpdArmoryAnchor']) => void;
   setAllWeaponsDisabled: (disabled: boolean) => void;
   togglePassiveDisabled: (passiveId: string) => void;
   setAllPassivesDisabled: (disabled: boolean) => void;
@@ -4217,6 +4299,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setAllEnemiesDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllEnemiesDisabled', disabled }), []);
   const toggleThreatUpgrade = useCallback((upgradeId: string) => dispatch({ type: 'toggleThreatUpgrade', upgradeId }), []);
   const toggleWeaponDisabled = useCallback((weaponId: string) => dispatch({ type: 'toggleWeaponDisabled', weaponId }), []);
+  const unlockGrpdWeapon = useCallback((weaponId: string) => dispatch({ type: 'unlockGrpdWeapon', weaponId }), []);
+  const toggleGrpdWeapon = useCallback((weaponId: string) => dispatch({ type: 'toggleGrpdWeapon', weaponId }), []);
+  const buyGrpdSpawnTier = useCallback((weaponId: string) => dispatch({ type: 'buyGrpdSpawnTier', weaponId }), []);
+  const setGrpdAutoIncreaseEnabled = useCallback((enabled: boolean) => dispatch({ type: 'setGrpdAutoIncreaseEnabled', enabled }), []);
+  const setGrpdArmoryAnchor = useCallback((anchor: MetaState['grpdArmoryAnchor']) => dispatch({ type: 'setGrpdArmoryAnchor', anchor }), []);
   const setAllWeaponsDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllWeaponsDisabled', disabled }), []);
   const togglePassiveDisabled = useCallback((passiveId: string) => dispatch({ type: 'togglePassiveDisabled', passiveId }), []);
   const setAllPassivesDisabled = useCallback((disabled: boolean) => dispatch({ type: 'setAllPassivesDisabled', disabled }), []);
@@ -4401,6 +4488,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleEnemyDisabled,
       setAllEnemiesDisabled,
       toggleWeaponDisabled,
+      unlockGrpdWeapon,
+      toggleGrpdWeapon,
+      buyGrpdSpawnTier,
+      setGrpdAutoIncreaseEnabled,
+      setGrpdArmoryAnchor,
       setAllWeaponsDisabled,
       togglePassiveDisabled,
       setAllPassivesDisabled,
@@ -4549,6 +4641,11 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleEnemyDisabled,
     setAllEnemiesDisabled,
     toggleWeaponDisabled,
+    unlockGrpdWeapon,
+    toggleGrpdWeapon,
+    buyGrpdSpawnTier,
+    setGrpdAutoIncreaseEnabled,
+    setGrpdArmoryAnchor,
     setAllWeaponsDisabled,
     togglePassiveDisabled,
     setAllPassivesDisabled,

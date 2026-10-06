@@ -38,6 +38,8 @@
   "hub.room.card-shop.description": "Open packs & build your Lock Deck",
   "hub.room.weapon-bans.label": "Studio 28",
   "hub.room.weapon-bans.description": "Tonight's ban list",
+  "hub.room.grpd-armory.label": "GRPD Armory",
+  "hub.room.grpd-armory.description": "Archive and activate recovered weapons",
   "hub.room.settings.label": "Settings",
   "hub.room.settings.description": "Controls & accessibility",
   "hub.room.palette-store.label": "Customization Shop",
@@ -52,6 +54,8 @@
   "hub.room.threat-matrix.description": "Override & quarantine enemies",
   "hub.room.dust-mite-rancher.label": "Dust Mite Rancher",
   "hub.room.dust-mite-rancher.description": "Barnaby’s pure data-pet ranch · adopt & feed",
+  "hub.room.frog-ranch.label": "Circuit Frog Ranch",
+  "hub.room.frog-ranch.description": "Jeremey Frogster's frog habitat",
   "hub.room.director-terminal.label": "Director Terminal",
   "hub.room.director-terminal.description": "Read and select Director personalities",
 

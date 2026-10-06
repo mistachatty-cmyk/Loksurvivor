@@ -56,6 +56,7 @@ import { AccountPanel } from '@/ui/AccountPanel';
 import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { CardShopPanel } from '@/ui/CardShopPanel';
 import { WeaponBansScreen } from '@/ui/WeaponBansScreen';
+import { GrpdArmoryScreen } from '@/ui/GrpdArmoryScreen';
 import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
 import { DustMiteRancherPanel } from '@/ui/DustMiteRancherPanel';
@@ -94,6 +95,7 @@ type Screen =
   | { name: 'workshop' }
   | { name: 'card-shop' }
   | { name: 'weapon-bans' }
+  | { name: 'grpd-armory' }
   | { name: 'settings' }
   | { name: 'palette-store' }
   | { name: 'sound-booth' }
@@ -102,6 +104,7 @@ type Screen =
   | { name: 'threat-matrix' }
   | { name: 'director-terminal' }
   | { name: 'dust-mite-rancher' }
+  | { name: 'frog-ranch' }
   | { name: 'map-editor' }
   | { name: 'sector-command' }
   | { name: 'lokpet-battle'; initialTab?: 'league' | 'sparring' | 'kennel' }
@@ -158,6 +161,8 @@ function initialScreen(): Screen {
       requested === 'workshop' ||
       requested === 'card-shop' ||
       requested === 'weapon-bans' ||
+      requested === 'grpd-armory' ||
+      requested === 'frog-ranch' ||
       requested === 'settings' ||
       requested === 'account' ||
       requested === 'feedback' ||
@@ -234,6 +239,9 @@ function Game() {
       case 'weapon-bans':
         setScreen({ name: 'weapon-bans' });
         break;
+      case 'grpd-armory':
+        setScreen({ name: 'grpd-armory' });
+        break;
       case 'settings':
         setScreen({ name: 'settings' });
         break;
@@ -254,6 +262,9 @@ function Game() {
         break;
       case 'dust-mite-rancher':
         setScreen({ name: 'dust-mite-rancher' });
+        break;
+      case 'frog-ranch':
+        setScreen({ name: 'frog-ranch' });
         break;
       case 'director-terminal':
         setScreen({ name: 'director-terminal' });
@@ -497,6 +508,9 @@ function Game() {
     case 'weapon-bans':
       return <WeaponBansScreen onBack={goHub} />;
 
+    case 'grpd-armory':
+      return <GrpdArmoryScreen onBack={() => { setRoomId(meta.grpdArmoryAnchor === 'hideout' ? 'main-floor' : 'grpd-station'); goHub(); }} />;
+
     case 'settings':
       return <SettingsPanel onBack={goHub} onOpenLooksAndLokPets={() => setScreen({ name: 'run-setup', destination: 'hub' })} />;
 
@@ -517,6 +531,9 @@ function Game() {
 
     case 'dust-mite-rancher':
       return <DustMiteRancherPanel onBack={goHub} onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })} />;
+
+    case 'frog-ranch':
+      return <DustMiteRancherPanel initialCategory="frogs" onBack={goHub} onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })} />;
 
     case 'director-terminal':
       return <DirectorTerminalPanel onBack={goHub} />;
