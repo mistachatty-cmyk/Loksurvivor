@@ -144,6 +144,18 @@ pass/glow off on slow machines.
 - Tuning lives in sims, not guesses: `buildOverlayWaves` was run against all 69 characters wandering idle for
   3 minutes; only three very fragile characters (blink-choir, sleet, horse-you) fell early.
 
+## Roster (M4, in 0.12.3)
+
+- Every one of the 69 characters is playable; unlock rules are ignored on purpose (no cross-origin progression
+  exists to gate on). `ui.ts` `buildCharacterSelect` is a searchable, arrow-key grid with portraits baked by
+  `drawRig` at 1x; the pick is remembered in `demoday.character.v1` and every start opens the picker (Enter
+  plays). Switching from the pause menu restores the page and starts a fresh world.
+- `overlayAbilities.ts`: the only pointer-shaped skills are Zero Day (freeze cone, then a second F throws all
+  frozen enemies) and Artiste (F draws a straight line ahead). Storm Chaser's cloud auto-cycles, dash skills ride
+  the dash key, everything else is the ultimate. `overlayAbilities.test.ts` runs ALL characters for 900 steps
+  with waves, dashes, ultimates and the key skill, so a character added later is covered automatically.
+- The report link now carries the real character id (`RunSummary.character`).
+
 ## Not done yet (Phase 1 backlog)
 
 Strings are English constants in `overlay/strings.ts` (the bundle cannot use React `useT()`); move to

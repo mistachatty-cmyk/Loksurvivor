@@ -142,5 +142,18 @@
   "overlay.value.speed115": "Fast",
   "overlay.value.speed13": "Faster",
   "overlay.value.on": "On",
-  "overlay.value.off": "Off"
+  "overlay.value.off": "Off",
+  "overlay.select.title": "Choose your survivor",
+  "overlay.select.search": "Search survivors",
+  "overlay.select.play": "Play as {{name}}",
+  "overlay.select.count": "{{shown}} of {{total}} survivors",
+  "overlay.select.none": "No survivor matches that search.",
+  "overlay.select.restart": "Switching survivors restarts the page.",
+  "overlay.select.legendary": "Legendary",
+  "overlay.ability.freeze": "F: freeze cone, then press F again to throw",
+  "overlay.ability.draw": "F: draw a line ahead and dash through it",
+  "overlay.ability.none": "Space: ultimate",
+  "overlay.stat.hp": "HP",
+  "overlay.stat.speed": "Speed",
+  "overlay.stat.power": "Power"
 }
