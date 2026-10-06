@@ -486,6 +486,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The floating Back button no longer sits on top of an open popup.',
     ],
   },
+  {
+    version: '0.14.2',
+    date: '2026-10-06',
+    kind: 'hotfix',
+    title: 'Studio Takes Stop Hogging Memory',
+    body: [
+      'Fixed a memory leak in the Studio: deleting a recorded mic take (or any clip) left its audio loaded in memory for the rest of the session. A clip\u2019s audio is now freed once nothing else uses it.',
+      'Clips that share the same audio, and clips still waiting in your library, keep playing normally.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
