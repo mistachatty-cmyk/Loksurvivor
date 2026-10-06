@@ -7,6 +7,17 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 44,
+      "version": "0.14.2",
+      "date": "2026-10-06",
+      "kind": "hotfix",
+      "title": "Studio Takes Stop Hogging Memory",
+      "body": [
+        "Fixed a memory leak in the Studio: deleting a recorded mic take (or any clip) left its audio loaded in memory for the rest of the session. A clip’s audio is now freed once nothing else uses it.",
+        "Clips that share the same audio, and clips still waiting in your library, keep playing normally."
+      ]
+    },
+    {
       "number": 43,
       "version": "0.14.1",
       "date": "2026-10-06",
