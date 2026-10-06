@@ -61,6 +61,12 @@ export interface Viewport {
    * map editor overrides it to fit a whole authored map in one frame.
    */
   targetViewOverride?: number;
+  /**
+   * Draw only the actors and effects onto a transparent canvas, with no floor,
+   * sky, lighting, vignette or obstacle art. The page overlay composites this
+   * over a live web page, which supplies the whole backdrop itself.
+   */
+  overlay?: boolean;
 }
 
 type ViewBounds = { left: number; top: number; right: number; bottom: number };
@@ -2004,6 +2010,8 @@ const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; 
   'data-pipe': { top: '#12372f', side: '#071d19', trim: '#86efac' },
   'digi-arch': { top: '#12324a', side: '#071923', trim: '#22d3ee' },
   'pressure-door': { top: '#374151', side: '#171f2b', trim: '#facc15' },
+  /** Never drawn by the page overlay (the live page is the visual); present so the table stays exhaustive. */
+  'page-block': { top: '#4b5563', side: '#1f2937', trim: '#9ca3af' },
 };
 
 const FLUID_FILL_COLORS: Record<FluidKind, { base: string; rim: string; glow: string }> = {
@@ -6180,9 +6188,14 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const targetView = targetViewForWidth(width, view.targetViewOverride);
   const zoom = Math.max(0.001, width / targetView);
 
+  const overlay = view.overlay === true;
   ctx.setTransform(safeDpr, 0, 0, safeDpr, 0, 0);
-  ctx.fillStyle = '#06060a';
-  ctx.fillRect(0, 0, width, height);
+  if (overlay) {
+    ctx.clearRect(0, 0, width, height);
+  } else {
+    ctx.fillStyle = '#06060a';
+    ctx.fillRect(0, 0, width, height);
+  }
 
   const shakeX = w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
   const shakeY = w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
@@ -6219,56 +6232,64 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   const showBirds = profile.birds || !w.wildlifeSheltersInRain;
   const showFireflies = profile.fireflies || !w.wildlifeSheltersInRain;
   const cloudPuffs = computeCloudPuffs(w, profile, left, top, right, bottom);
-  drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
-  drawAuthoredGroundTiles(ctx, w);
-  if (w.endless?.inDungeon) {
-    ctx.fillStyle = '#000';
-    ctx.globalAlpha = 0.1 + Math.min(0.08, w.endless.dungeonEraIndex * 0.015);
-    ctx.fillRect(left, top, right - left, bottom - top);
-    ctx.globalAlpha = 1;
+  // Overlay mode skips every layer that paints the environment; only the
+  // actors/pickups/effects below are drawn, over a transparent canvas.
+  if (!overlay) {
+    drawGround(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
+    drawAuthoredGroundTiles(ctx, w);
+    if (w.endless?.inDungeon) {
+      ctx.fillStyle = '#000';
+      ctx.globalAlpha = 0.1 + Math.min(0.08, w.endless.dungeonEraIndex * 0.015);
+      ctx.fillRect(left, top, right - left, bottom - top);
+      ctx.globalAlpha = 1;
+    }
+    const tint = timeOfDayTint(w.cycle.phase);
+    if (tint !== 'rgba(0, 0, 0, 0.000)') {
+      ctx.fillStyle = tint;
+      // Low-Light Optics: keep a hint of the time-of-day mood without the city
+      // actually hiding anything from a player who paid not to be surprised.
+      ctx.globalAlpha = w.nightVisionEnabled ? 0.25 : 1;
+      ctx.fillRect(left, top, right - left, bottom - top);
+      ctx.globalAlpha = 1;
+    }
+    drawCloudShadows(ctx, cloudPuffs, profile);
+    drawWetSheen(ctx, w, left, top, right, bottom, profile.rain);
+    drawCityMapFeatures(ctx, w);
+    drawEndlessRouteEvent(ctx, w);
+    drawBuildingInterior(ctx, w);
+    drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
+    drawMillionHordeDensity(ctx, w, viewBounds);
+    drawLightPool(ctx, w);
+    drawLandmark(ctx, w);
+    drawDistrictIncursion(ctx, w);
+    drawObjectLighting(ctx, w);
+    if (sky !== 'roofed') {
+      drawSteamVents(ctx, w, left, top, right, bottom);
+      if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
+      if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
+      drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
+    }
+    drawBeacons(ctx, w);
+    drawArenaEdges(ctx, w, { left, top, right, bottom });
+    drawFog(ctx, w, left, top, right, bottom);
+    drawDungeonRoomBorder(ctx, w);
   }
-  const tint = timeOfDayTint(w.cycle.phase);
-  if (tint !== 'rgba(0, 0, 0, 0.000)') {
-    ctx.fillStyle = tint;
-    // Low-Light Optics: keep a hint of the time-of-day mood without the city
-    // actually hiding anything from a player who paid not to be surprised.
-    ctx.globalAlpha = w.nightVisionEnabled ? 0.25 : 1;
-    ctx.fillRect(left, top, right - left, bottom - top);
-    ctx.globalAlpha = 1;
-  }
-  drawCloudShadows(ctx, cloudPuffs, profile);
-  drawWetSheen(ctx, w, left, top, right, bottom, profile.rain);
-  drawCityMapFeatures(ctx, w);
-  drawEndlessRouteEvent(ctx, w);
-  drawBuildingInterior(ctx, w);
-  drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
-  drawMillionHordeDensity(ctx, w, viewBounds);
-  drawLightPool(ctx, w);
-  drawLandmark(ctx, w);
-  drawDistrictIncursion(ctx, w);
-  drawObjectLighting(ctx, w);
-  if (sky !== 'roofed') {
-    drawSteamVents(ctx, w, left, top, right, bottom);
-    if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);
-    if (profile.litter) drawWindLitter(ctx, w, left, top, right, bottom);
-    drawPuddleRipples(ctx, w, left, top, right, bottom, profile.rain);
-  }
-  drawBeacons(ctx, w);
-  drawArenaEdges(ctx, w, { left, top, right, bottom });
-  drawFog(ctx, w, left, top, right, bottom);
-  drawDungeonRoomBorder(ctx, w);
   drawPersistentAura(ctx, w);
   drawRescue(ctx, w);
   drawPickups(ctx, w);
-  drawDungeonEntrances(ctx, w);
-  drawDungeonExit(ctx, w);
-  drawDungeonChest(ctx, w);
+  if (!overlay) {
+    drawDungeonEntrances(ctx, w);
+    drawDungeonExit(ctx, w);
+    drawDungeonChest(ctx, w);
+  }
   drawFluids(ctx, w);
-  drawPotholes(ctx, w);
-  drawAmbient(ctx, w);
-  drawObstacles(ctx, w, viewBounds);
-  drawAwarenessArrow(ctx, w);
-  drawRoamingDetectors(ctx, w);
+  if (!overlay) {
+    drawPotholes(ctx, w);
+    drawAmbient(ctx, w);
+    drawObstacles(ctx, w, viewBounds);
+    drawAwarenessArrow(ctx, w);
+    drawRoamingDetectors(ctx, w);
+  }
   drawArtisteTrail(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
   drawRunningMan(ctx, w);
@@ -6282,7 +6303,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   drawPendingMeteors(ctx, w);
   drawParticles(ctx, w, viewBounds, visualBudget);
   drawPopups(ctx, w, viewBounds, visualBudget);
-  if (sky !== 'roofed') {
+  if (sky !== 'roofed' && !overlay) {
     if (showBirds) drawBirds(ctx, w, left, top, right, bottom);
     drawClouds(ctx, w, cloudPuffs, profile);
     drawFogBanks(ctx, w, left, top, right, bottom, profile.fog);
@@ -6293,21 +6314,23 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   ctx.restore();
 
   // Vignette keeps the eye on the middle of the fight.
-  const gradient = ctx.createRadialGradient(
-    width / 2,
-    height / 2,
-    Math.min(width, height) * 0.38,
-    width / 2,
-    height / 2,
-    Math.max(width, height) * 0.78,
-  );
-  gradient.addColorStop(0, 'rgba(0,0,0,0)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
+  if (!overlay) {
+    const gradient = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.38,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.78,
+    );
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   // Distant lightning, under the damage flash so a hit still reads as red.
-  const bolt = lightningIntensity(w.now, profile.lightningPeriodMs);
+  const bolt = overlay ? 0 : lightningIntensity(w.now, profile.lightningPeriodMs);
   if (bolt > 0) {
     ctx.globalAlpha = bolt * (sky === 'cyber-storm' ? 0.22 : 0.16);
     ctx.fillStyle = sky === 'cyber-storm' ? '#d8b4fe' : '#cfe0ff';

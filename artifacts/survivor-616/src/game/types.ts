@@ -1195,9 +1195,15 @@ export interface ObstacleDef {
      /** Rapid pressure wing: the failed teleport arch keeping the faction cut off. */
      | 'digi-arch'
      /** Rapid pressure wing: reinforced emergency-pressure room seal. */
-     | 'pressure-door';
+     | 'pressure-door'
+     /** Page overlay only: a DOM element on a live web page, standing in as a fixed, breakable block. */
+     | 'page-block';
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
+  /** Per-instance hit points; overrides the kind's table value (page overlay blocks scale with element area). */
+  hp?: number;
+  /** Page overlay only: opaque handle the host maps back to its DOM element. The engine never reads it. */
+  domId?: number;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
   pothole?: {
     trigger: PotholeTrigger;
@@ -1207,7 +1213,8 @@ export interface ObstacleDef {
   };
 }
 
-export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench';
+/** `fixed-breakable` is immovable like `fixed-bench` but still takes damage when its kind has hp. */
+export type PropVariant = 'light-breakable' | 'medium-movable' | 'heavy-metal' | 'fixed-bench' | 'fixed-breakable';
 
 /**
  * Overhead conditions for an area. Drives clouds, rain, fog and lightning.

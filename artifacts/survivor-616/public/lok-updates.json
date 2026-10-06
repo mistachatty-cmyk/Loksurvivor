@@ -7,6 +7,17 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 33,
+      "version": "0.12.2",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "Demo Day On The Web",
+      "body": [
+        "Demo Day lets The Foreman play on top of any web page. Start it from the Demo Day page on the GSix website, and the page’s text, pictures and buttons become things to smash. Press Esc and everything goes back exactly as it was.",
+        "It is early access: desktop browsers and keyboard only, and it skips sign-in, payment, banking, health and government pages. When you stop, a card shows how much of the page you took down, with a link to save and share it."
+      ]
+    },
+    {
       "number": 32,
       "version": "0.12.1",
       "date": "2026-10-05",

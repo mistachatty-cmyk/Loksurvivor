@@ -835,6 +835,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
       'beacon-tower': [44, 60, 44, 60],
       'security-gate': [70, 110, 24, 32],
       'bunker-hatch': [50, 68, 50, 68],
+      'page-block': [44, 72, 44, 72],
       'data-pipe': [28, 120, 24, 150],
       'digi-arch': [58, 76, 92, 124],
       'pressure-door': [90, 132, 26, 40],
