@@ -433,6 +433,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings has a section finder and music volume control. The Forge keeps a compact preview visible on phones and adds undo, redo, duplicate, and a warning before replacing unsaved work.',
     ],
   },
+  {
+    version: '0.13.1',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Faster Forge Starts',
+    body: [
+      'The Forge now has one-tap Street, Tech, Mystic, and Wild starting designs, plus reset buttons for body, palette, and each feature section.',
+      'Settings has a fullscreen control for browsers that support it. Esc still leaves fullscreen normally.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -45,6 +45,7 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
+import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
@@ -66,7 +67,7 @@ export interface SettingsPanelProps {
 
 const SETTINGS_DESTINATIONS = [
   { id: 'settings-language', label: 'Language', terms: 'translation device' },
-  { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom' },
+  { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom fullscreen' },
   { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
   { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode' },
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
@@ -549,6 +550,8 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             </div>
           </div>
         </section>
+
+        <FullscreenSetting />
 
         {/* Studio plugins -- off unless deliberately enabled, because this is
             the one feature that runs code from off the device. */}
