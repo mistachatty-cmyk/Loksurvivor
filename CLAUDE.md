@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+When the user says **“Pullcheck,” read `docs/PULLCHECK.md` before inspecting pull requests**. It lists old PR branches that must be skipped during routine review.
+
 ## What this repo is
 
 A pnpm workspace monorepo. The only real product is **"616 Survivor"**, a browser
