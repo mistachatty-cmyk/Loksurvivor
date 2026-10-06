@@ -21,6 +21,7 @@ import { blendSpritePalettes } from '@/game/data/characterSkins';
 import { drawRig, drawShadow } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
 import { clamp, dist2 } from '@/game/engine/math';
+import { drawForgeFiveProjectile } from './forgeFiveVfx';
 
 /** World units of sprite height per rig pixel. */
 const SPRITE_SCALE = 2.05;
@@ -4334,6 +4335,8 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
       ctx.restore();
       continue;
     }
+
+    if (drawForgeFiveProjectile(ctx, proj, w.now)) continue;
 
     if (proj.customKind === 'dvd-logo') {
       ctx.save();

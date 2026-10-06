@@ -1581,8 +1581,8 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Developer access unlocked</p>
                     <h2 className="mt-1 text-xl font-black uppercase text-white">Catalog registry</h2>
                     <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      Temporarily expose every registered character, area, room, theme, palette, and aura. Turning
-                      this off restores your real progression and never grants permanent ownership.
+                      Temporarily expose every registered character, area, room, theme, palette, aura, and the Operator Forge with five design slots. Turning
+                      this off restores your real progression and never grants permanent ownership. Reload after switching Dev Mode to update forged operators on the roster.
                     </p>
                   </div>
                   <button

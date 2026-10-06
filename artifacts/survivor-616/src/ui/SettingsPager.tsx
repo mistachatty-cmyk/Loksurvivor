@@ -19,7 +19,7 @@ export function SettingsPager({ standard, endgame }: { standard: ReactNode; endg
   const t = useT();
   const [page, setPage] = useState<Page>('standard');
   const [direction, setDirection] = useState<'right' | 'left'>('right');
-  const accessible = endgameReached(meta) || earnedEndgameIds().length > 0;
+  const accessible = meta.devModeAllUnlocks || endgameReached(meta) || earnedEndgameIds().length > 0;
 
   const go = (next: Page) => {
     if (next === page) return;
