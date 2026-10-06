@@ -1,8 +1,12 @@
 /**
- * One Demo Day run on a live page: scans the page, builds the world, runs the
- * fixed-step loop, follows the player with the real scroll, renders the game
- * onto a low-resolution transparent canvas stacked over the page, and hides
- * (reversibly) whatever gets broken.
+ * One Demo Day run on a live page: scans the page, builds the world, runs the fixed-step loop, follows the
+ * player with the real scroll, and draws the game onto a low-resolution canvas stacked over the page.
+ *
+ * The page itself is NEVER modified. What gets "destroyed" is recorded in a `HoleField` (in low-res cells) and
+ * the canvas paints the game's own ground through those holes, opaque, so the reveal reads on any page colour;
+ * removing the overlay is the whole restore. While playing, an input shield stops clicks and manual scrolling
+ * reaching the page (so a "destroyed" link cannot be followed) and the scroll is driven in whole cells so the
+ * canvas and the page share one pixel grid.
  */
 import { getCharacter } from '@/game/data/characters';
 import {
@@ -15,8 +19,7 @@ import {
   stepWorld,
   type World,
 } from '@/game/engine/world';
-import { renderWorld } from '@/game/render/draw';
-import { PageHider } from './hider';
+import { renderGroundLayer, renderWorld } from '@/game/render/draw';
 import {
   blockToObstacle,
   cameraForScroll,
@@ -32,19 +35,27 @@ import {
   type DocSize,
   type PageBlock,
 } from './pageModel';
+import { fillWindow, HoleField } from './reveal';
 import { reportUrl } from './runLink';
+import { CELL_CSS, SPEED_MULT, SPRITE_UNITS, WORLD_K, lowResSize, snapToCell, targetViewUnits } from './scale';
 import { scanPage, sensitivePageReason } from './scanner';
+import { createScenery, pageLook, parseCssColor, type PageLook, type Scenery } from './scenery';
 import { CREDIT_URL, STRINGS } from './strings';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 5;
-/** Game pixel size in CSS px: the page is hi-res, the game is deliberately chunky. */
-const PIXEL = 2;
 const STREAM_EVERY_MS = 250;
+/** A crater only carves the page for a big, heavy hit; smaller blasts just leave soot. */
+const CRATER_MIN_RADIUS = 40;
+const CRATER_MIN_INTENSITY = 2;
+const CRATER_SHRINK = 0.8;
+const MAX_CRATERS = 400;
 const SPAWN_CLEARANCE = 56;
 const CHARACTER_ID = 'foreman';
 
 const MOVE_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright']);
+/** Keys that would scroll or navigate the page under the game. */
+const PAGE_KEYS = new Set(['pageup', 'pagedown', 'home', 'end', 'tab', 'enter', ' ']);
 
 export type StartResult = { ok: true } | { ok: false; reason: string };
 
@@ -58,17 +69,17 @@ export interface RunSummary {
 const STYLE = `
 :host { all: initial; }
 .layer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; font: 12px/1.3 ui-monospace, Menlo, Consolas, monospace; color: #f4f1ea; }
-canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none; }
-.hud { position: fixed; top: 10px; left: 10px; display: grid; gap: 6px; text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-rendering: crisp-edges; pointer-events: none; transform-origin: 0 0; }
+.hud { position: fixed; top: 10px; left: 10px; display: grid; gap: 6px; padding: 6px 8px; background: rgba(15,15,20,.85); border: 1px solid rgba(255,255,255,.25); text-shadow: 0 1px 0 #000; }
 .bar { width: 180px; height: 10px; background: rgba(0,0,0,.6); border: 1px solid #000; box-shadow: 0 0 0 1px rgba(255,255,255,.25); }
 .bar > i { display: block; height: 100%; width: 0; background: #e4572e; }
 .bar.pct > i { background: #f2c14e; }
 .row { display: flex; gap: 8px; align-items: center; }
 .dock { position: fixed; left: 10px; bottom: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
-.dock .hint { opacity: .85; text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+.dock .hint { padding: 4px 8px; background: rgba(15,15,20,.85); border: 1px solid rgba(255,255,255,.2); text-shadow: 0 1px 0 #000; }
 .dock button, .dock a { pointer-events: auto; font: inherit; color: #f4f1ea; background: rgba(15,15,20,.88); border: 1px solid rgba(255,255,255,.35); padding: 4px 8px; cursor: pointer; text-decoration: none; }
 .dock button:hover, .dock a:hover { background: rgba(40,40,52,.95); }
-.credit { position: fixed; right: 10px; bottom: 10px; pointer-events: auto; opacity: .8; }
+.credit { position: fixed; right: 10px; bottom: 10px; pointer-events: auto; padding: 4px 8px; background: rgba(15,15,20,.85); border: 1px solid rgba(255,255,255,.2); }
 .credit a { color: #f4f1ea; text-decoration: underline; }
 .card { position: fixed; right: 16px; bottom: 16px; width: 260px; pointer-events: auto; background: rgba(15,15,20,.96); border: 1px solid rgba(255,255,255,.4); box-shadow: 0 6px 24px rgba(0,0,0,.45); padding: 12px 14px; display: grid; gap: 8px; }
 .card h2 { all: unset; display: block; font-size: 14px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #f2c14e; }
@@ -78,6 +89,7 @@ canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-ren
 .card .actions { display: flex; gap: 8px; }
 .card .actions a, .card .actions button { flex: 1; text-align: center; font: inherit; color: #0b0b0e; background: #f2c14e; border: 0; padding: 6px 8px; cursor: pointer; text-decoration: none; font-weight: 700; }
 .card .actions button { color: #f4f1ea; background: rgba(255,255,255,.12); font-weight: 400; }
+.shield { position: fixed; inset: 0; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: default; }
 .toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: rgba(15,15,20,.92); border: 1px solid rgba(255,255,255,.35); padding: 8px 12px; }
 `;
 
@@ -90,7 +102,6 @@ function isEditableTarget(target: EventTarget | undefined): { editable: boolean;
 
 export class DemoDaySession {
   private readonly win: Window;
-  private readonly hider = new PageHider();
   private readonly keys = new Set<string>();
   private readonly alive = new Map<number, number>(); // block id -> breakable uid
 
@@ -115,6 +126,24 @@ export class DemoDaySession {
   private resizeTimer = 0;
   private running = false;
 
+  /* the reveal: what was destroyed, and the scenery drawn through it */
+  private field = new HoleField(1, 1);
+  private craters: Array<{ x: number; y: number; r: number }> = [];
+  private scenery: Scenery | null = null;
+  private maskBuf = new Uint32Array(0);
+  private edgeBuf = new Uint32Array(0);
+  private maskCanvas: HTMLCanvasElement | null = null;
+  private edgeCanvas: HTMLCanvasElement | null = null;
+  private sceneCanvas: HTMLCanvasElement | null = null;
+  private maskCtx: CanvasRenderingContext2D | null = null;
+  private edgeCtx: CanvasRenderingContext2D | null = null;
+  private sceneCtx: CanvasRenderingContext2D | null = null;
+  private lastFieldVersion = -1;
+  private lastOrigin = { x: Number.NaN, y: Number.NaN };
+  private holesInWindow = 0;
+  private ownerIds = new WeakMap<Element, number>();
+  private nextOwnerId = 1;
+
   constructor(win: Window = window) {
     this.win = win;
   }
@@ -138,8 +167,8 @@ export class DemoDaySession {
       viewport,
     );
 
+    (this.win.document.activeElement as HTMLElement | null)?.blur?.();
     this.mount();
-    this.blocks = [];
     const scan = scanPage(this.win, this.host ? [this.host] : []);
     this.blocks = scan.blocks;
     this.elements = scan.elements;
@@ -150,8 +179,14 @@ export class DemoDaySession {
     }
 
     const foreman = getCharacter(CHARACTER_ID);
-    const world = createWorld(overlayArea(this.doc), foreman, foreman.stats, (Date.now() % 100000) | 0, [], 1, false);
+    const stats = { ...foreman.stats, speed: foreman.stats.speed * SPEED_MULT };
+    const world = createWorld(overlayArea(this.doc), foreman, stats, (Date.now() % 100000) | 0, [], 1, false);
     this.world = world;
+
+    this.field = new HoleField(Math.ceil(this.doc.w / CELL_CSS), Math.ceil(this.doc.h / CELL_CSS));
+    this.craters = [];
+    this.scenery = createScenery(this.readPageLook(), this.win.location.hostname);
+    this.lastFieldVersion = -1;
 
     const spawnPage = {
       x: Math.min(this.doc.w - 1, this.win.scrollX + viewport.w / 2),
@@ -169,6 +204,8 @@ export class DemoDaySession {
     this.win.addEventListener('keyup', this.onKeyUp, true);
     this.win.addEventListener('blur', this.onBlur);
     this.win.addEventListener('resize', this.onResize);
+    this.win.addEventListener('wheel', this.onScrollInput, { capture: true, passive: false });
+    this.win.addEventListener('touchmove', this.onScrollInput, { capture: true, passive: false });
 
     this.running = true;
     this.lastTime = performance.now();
@@ -177,7 +214,10 @@ export class DemoDaySession {
     return { ok: true };
   }
 
-  /** Stop the run. `restore` puts every hidden element back; pass false to leave the wreckage for a screenshot. */
+  /**
+   * Stop the run. The page was never modified, so removing the overlay is the whole restore. `restore = false`
+   * leaves the final frame (holes and all) up for a moment instead, for a screenshot.
+   */
   stop(restore = true): RunSummary | null {
     if (!this.running && !this.host) return null;
     const summary = this.summary();
@@ -187,19 +227,23 @@ export class DemoDaySession {
     this.win.removeEventListener('keyup', this.onKeyUp, true);
     this.win.removeEventListener('blur', this.onBlur);
     this.win.removeEventListener('resize', this.onResize);
+    this.win.removeEventListener('wheel', this.onScrollInput, true);
+    this.win.removeEventListener('touchmove', this.onScrollInput, true);
     this.win.clearTimeout(this.resizeTimer);
-    if (restore) this.hider.restoreAll();
     this.unmount();
     this.keys.clear();
     this.alive.clear();
     this.world = null;
+    this.scenery = null;
+    this.field.clear();
     if (summary && (summary.elapsedSec >= 3 || summary.destroyedPct > 0)) this.showEndCard(summary, restore);
     return summary;
   }
 
-  /** Put every hidden element back without ending the run. */
+  /** Put the page back to whole without ending the run: forget every hole and let every block be hit again. */
   restorePage(): void {
-    this.hider.restoreAll();
+    this.field.clear();
+    this.craters = [];
     for (const b of this.blocks) b.destroyed = false;
     this.rescan();
   }
@@ -236,7 +280,10 @@ export class DemoDaySession {
     if (MOVE_KEYS.has(key)) {
       this.keys.add(key);
       e.preventDefault();
+      return;
     }
+    // Page keys (scroll, tab, enter) must not move or activate the page underneath, but stay usable on our own buttons.
+    if (PAGE_KEYS.has(key) && !activatable) e.preventDefault();
   };
 
   private readonly onKeyUp = (e: KeyboardEvent) => {
@@ -245,6 +292,11 @@ export class DemoDaySession {
 
   private readonly onBlur = () => {
     this.keys.clear();
+  };
+
+  /** The driven scroll is the only scroll while playing: wheel and touch never reach the page. */
+  private readonly onScrollInput = (e: Event) => {
+    if (e.cancelable) e.preventDefault();
   };
 
   private readonly onResize = () => {
@@ -286,6 +338,8 @@ export class DemoDaySession {
 
     this.autoLevelUp(world);
     this.collectBroken(world);
+    this.collectImpacts(world);
+    world.propHits.length = 0;
     if (now - this.lastStream >= STREAM_EVERY_MS) {
       this.lastStream = now;
       this.stream(false);
@@ -316,45 +370,101 @@ export class DemoDaySession {
     }
   }
 
-  /**
-   * Apply every block the game just broke to the page, and drop it from the world. A `box` hides its whole
-   * element (and every block nested inside it, which would otherwise linger as an invisible wall); a `text`
-   * chunk cuts a hole in its owner.
-   */
+  /* ------------------------------------------------------------ reveal */
+
+  /** Page background and accent colours, from computed styles only (no pixel readback). */
+  private readPageLook(): PageLook {
+    const doc = this.win.document;
+    const bg = (el: Element | null) => (el ? parseCssColor(this.win.getComputedStyle(el).backgroundColor) : null);
+    const background = bg(doc.body) ?? bg(doc.documentElement);
+    const accentEl = doc.querySelector('main a[href], a[href], h1');
+    const accent = accentEl ? parseCssColor(this.win.getComputedStyle(accentEl).color) : null;
+    return pageLook(background, accent);
+  }
+
+  /** Stable key for "this block of this element", so destroyed state survives a re-scan. */
+  private blockKeys(): Map<number, string> {
+    const counts = new Map<string, number>();
+    const keys = new Map<number, string>();
+    for (const b of this.blocks) {
+      const el = this.elements[b.owner];
+      if (!el) continue;
+      let id = this.ownerIds.get(el);
+      if (id === undefined) {
+        id = this.nextOwnerId++;
+        this.ownerIds.set(el, id);
+      }
+      const base = `${id}:${b.kind}`;
+      const n = counts.get(base) ?? 0;
+      counts.set(base, n + 1);
+      keys.set(b.id, `${base}:${n}`);
+    }
+    return keys;
+  }
+
+  /** Cut a hole for a destroyed block, then take down anything now standing in a hole. */
+  private punchBlock(b: PageBlock): void {
+    this.field.addRect(b.x / CELL_CSS, b.y / CELL_CSS, b.w / CELL_CSS, b.h / CELL_CSS);
+  }
+
+  /** Blocks whose centre now sits in a hole are gone too: the player cannot be walled in by an invisible block. */
+  private cascadeIntoHoles(world: World): void {
+    const gone = new Set<number>();
+    for (const [id, uid] of this.alive) {
+      const b = this.blocks[id];
+      if (!b || b.destroyed) continue;
+      if (this.field.isHole(Math.floor((b.x + b.w / 2) / CELL_CSS), Math.floor((b.y + b.h / 2) / CELL_CSS))) {
+        b.destroyed = true;
+        gone.add(uid);
+      }
+    }
+    for (const uid of gone) {
+      for (const [id, u] of this.alive) if (u === uid) this.alive.delete(id);
+    }
+    if (gone.size > 0) removeBreakables(world, gone);
+  }
+
+  /** Every block the game just broke becomes a hole in the reveal (the page itself is untouched). */
   private collectBroken(world: World): void {
     const gone = new Set<number>();
-    const scroll = { x: this.win.scrollX, y: this.win.scrollY };
+    let punched = false;
     for (const b of world.breakables) {
       if (b.kind !== 'page-block' || !b.broken || b.domId === undefined) continue;
       gone.add(b.uid);
       this.alive.delete(b.domId);
       const block = this.blocks[b.domId];
       if (!block || block.destroyed) continue;
-      const el = this.elements[block.owner];
-      if (!el) continue;
       block.destroyed = true;
-      if (block.kind === 'box') {
-        this.hider.hide(el);
-        this.destroyNestedIn(el, gone);
-      } else {
-        this.hider.cut(el, { x: block.x, y: block.y, w: block.w, h: block.h }, scroll);
-      }
+      this.punchBlock(block);
+      punched = true;
     }
-    removeBreakables(world, gone);
+    if (gone.size > 0) removeBreakables(world, gone);
+    if (punched) this.cascadeIntoHoles(world);
   }
 
-  /** Blocks owned by an element inside a hidden one are gone with it. */
-  private destroyNestedIn(root: Element, gone: Set<number>): void {
-    for (const other of this.blocks) {
-      if (other.destroyed) continue;
-      const el = this.elements[other.owner];
-      if (!el || !root.contains(el)) continue;
-      other.destroyed = true;
-      const uid = this.alive.get(other.id);
-      if (uid !== undefined) gone.add(uid);
-      this.alive.delete(other.id);
+  /** Big blasts carve craters (blank page included: that is the "background revealed"), every blast leaves soot. */
+  private collectImpacts(world: World): void {
+    if (world.impacts.length === 0) return;
+    let carved = false;
+    for (const hit of world.impacts) {
+      const page = worldToPage(hit.x, hit.y, this.doc);
+      const cx = page.x / CELL_CSS;
+      const cy = page.y / CELL_CSS;
+      const rCells = hit.radius / SPRITE_UNITS;
+      if (hit.radius >= CRATER_MIN_RADIUS && hit.intensity >= CRATER_MIN_INTENSITY) {
+        const r = Math.max(2, rCells * CRATER_SHRINK);
+        if (this.field.addCircle(cx, cy, r)) {
+          carved = true;
+          if (this.craters.length < MAX_CRATERS) this.craters.push({ x: cx, y: cy, r });
+        }
+      }
+      this.field.addScorch(cx, cy, rCells * 1.5);
     }
+    world.impacts.length = 0;
+    if (carved) this.cascadeIntoHoles(world);
   }
+
+  /* ------------------------------------------------------------ world sync */
 
   /** Keep only blocks near the player alive in the world (the page can be tens of thousands of px tall). */
   private stream(initial: boolean): void {
@@ -380,53 +490,127 @@ export class DemoDaySession {
     void initial;
   }
 
-  /** Re-measure after a resize: positions can reflow. Elements already hidden stay hidden and are skipped by the scan. */
+  /**
+   * Re-measure after a resize: positions can reflow. The page was never changed, so the scan sees everything;
+   * destroyed blocks are matched back by (element, ordinal) and the holes rebuilt from them plus the craters.
+   * The world keeps the page size it started with, so anything that now lies outside it is left alone.
+   */
   private rescan(): void {
     const world = this.world;
     if (!world || !this.running) return;
-    const uids = new Set(this.alive.values());
-    removeBreakables(world, uids);
+    const before = this.blockKeys();
+    const destroyedKeys = new Set<string>();
+    for (const b of this.blocks) if (b.destroyed) destroyedKeys.add(before.get(b.id) ?? '');
+
+    removeBreakables(world, new Set(this.alive.values()));
     this.alive.clear();
     const scan = scanPage(this.win, this.host ? [this.host] : []);
     this.blocks = scan.blocks;
     this.elements = scan.elements;
+
+    const after = this.blockKeys();
+    this.field.clear();
+    for (const b of this.blocks) {
+      if (b.x + b.w > this.doc.w || b.y + b.h > this.doc.h) b.skip = true;
+      if (destroyedKeys.has(after.get(b.id) ?? '\0')) {
+        b.destroyed = true;
+        this.punchBlock(b);
+      }
+    }
+    for (const c of this.craters) this.field.addCircle(c.x, c.y, c.r);
     const pagePos = worldToPage(world.player.x, world.player.y, this.doc);
     skipBlocksNear(this.blocks, pagePos, SPAWN_CLEARANCE);
     this.stream(false);
   }
 
-  /** The real window scroll follows the player, so the canvas and the page stay locked together. */
+  /**
+   * The real window scroll follows the player, in whole cells, so the canvas and the page stay on one grid.
+   * The page is not user-scrollable while the shield is up, so this is the only thing that moves it.
+   */
   private followWithScroll(world: World, dt: number): void {
     const viewport = { w: this.win.innerWidth, h: this.win.innerHeight };
     const pagePos = worldToPage(world.player.x, world.player.y, this.doc);
     const target = scrollTargetFor(pagePos, viewport, this.doc);
+    const maxX = Math.max(0, this.doc.w - viewport.w);
+    const maxY = Math.max(0, this.doc.h - viewport.h);
     const k = Math.min(1, dt * 8);
-    const nx = this.win.scrollX + (target.x - this.win.scrollX) * k;
-    const ny = this.win.scrollY + (target.y - this.win.scrollY) * k;
-    if (Math.abs(nx - this.win.scrollX) > 0.5 || Math.abs(ny - this.win.scrollY) > 0.5) {
-      this.win.scrollTo({ left: Math.round(nx), top: Math.round(ny), behavior: 'instant' });
-    }
+    const sx = Math.round(this.win.scrollX);
+    const sy = Math.round(this.win.scrollY);
+    const nx = Math.min(maxX, Math.max(0, snapToCell(sx + (target.x - sx) * k)));
+    const ny = Math.min(maxY, Math.max(0, snapToCell(sy + (target.y - sy) * k)));
+    if (nx !== sx || ny !== sy) this.win.scrollTo({ left: nx, top: ny, behavior: 'instant' });
   }
+
+  /* ------------------------------------------------------------ drawing */
 
   private render(world: World): void {
     const ctx = this.ctx;
-    if (!ctx) return;
-    world.camera = cameraForScroll(
-      { x: this.win.scrollX, y: this.win.scrollY },
-      { w: this.lowW * PIXEL, h: this.lowH * PIXEL },
-      this.doc,
-    );
-    renderWorld(ctx, world, {
-      width: this.lowW,
-      height: this.lowH,
-      dpr: 1,
-      // 1 world unit == 1 CSS px on screen; the canvas then draws it at 1/PIXEL size and CSS scales it back up.
-      targetViewOverride: this.lowW * PIXEL,
-      overlay: true,
-    });
+    const canvas = this.canvas;
+    if (!ctx || !canvas) return;
+    const sx = Math.round(this.win.scrollX);
+    const sy = Math.round(this.win.scrollY);
+    const cellX = Math.floor(sx / CELL_CSS);
+    const cellY = Math.floor(sy / CELL_CSS);
+    // The canvas is one cell wider/taller than the viewport; shifting it by the sub-cell scroll remainder keeps it
+    // locked to the page even where the scroll is clamped to a non-multiple (the bottom of the page).
+    canvas.style.transform = `translate(${-(sx - cellX * CELL_CSS)}px, ${-(sy - cellY * CELL_CSS)}px)`;
+
+    const originCss = { x: cellX * CELL_CSS, y: cellY * CELL_CSS };
+    world.camera = cameraForScroll(originCss, { w: this.lowW * CELL_CSS, h: this.lowH * CELL_CSS }, this.doc);
+
+    const view = { width: this.lowW, height: this.lowH, dpr: 1, targetViewOverride: targetViewUnits(this.lowW) };
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.lowW, this.lowH);
+    this.drawReveal(world, view, cellX, cellY);
+    renderWorld(ctx, world, { ...view, overlay: true, preserve: true });
+  }
+
+  /** Scenery through the holes, then rim/shade/soot, onto the pixel canvas (under the actors). */
+  private drawReveal(world: World, view: { width: number; height: number; dpr: number; targetViewOverride: number }, cellX: number, cellY: number): void {
+    const { ctx, scenery } = this;
+    if (!ctx || !scenery || !this.maskCtx || !this.edgeCtx || !this.sceneCtx || !this.maskCanvas || !this.edgeCanvas || !this.sceneCanvas) return;
+    if (this.field.holeCount === 0 && this.field.version === 0) return;
+
+    const moved = cellX !== this.lastOrigin.x || cellY !== this.lastOrigin.y;
+    if (this.field.version !== this.lastFieldVersion || moved) {
+      this.lastFieldVersion = this.field.version;
+      this.lastOrigin = { x: cellX, y: cellY };
+      this.holesInWindow = fillWindow(this.field, cellX, cellY, this.lowW, this.lowH, this.maskBuf, this.edgeBuf, scenery.edges);
+      this.maskCtx.putImageData(new ImageData(new Uint8ClampedArray(this.maskBuf.buffer, 0, this.lowW * this.lowH * 4), this.lowW, this.lowH), 0, 0);
+      this.edgeCtx.putImageData(new ImageData(new Uint8ClampedArray(this.edgeBuf.buffer, 0, this.lowW * this.lowH * 4), this.lowW, this.lowH), 0, 0);
+    }
+
+    if (this.holesInWindow > 0) {
+      const sw = scenery.world;
+      sw.now = world.now;
+      sw.time = world.time;
+      sw.cycle = world.cycle;
+      // Mirror-wrap the camera so a page taller than the area's own map keeps showing authored scenery.
+      const centreX = (cellX * CELL_CSS + (this.lowW * CELL_CSS) / 2) / WORLD_K;
+      const centreY = (cellY * CELL_CSS + (this.lowH * CELL_CSS) / 2) / WORLD_K;
+      const wrap = (v: number, size: number) => (((v % size) + size) % size) - size / 2;
+      const cam = { x: wrap(centreX, sw.bounds.w), y: wrap(centreY, sw.bounds.h) };
+
+      const sc = this.sceneCtx;
+      sc.setTransform(1, 0, 0, 1, 0, 0);
+      sc.globalCompositeOperation = 'source-over';
+      sc.clearRect(0, 0, this.lowW, this.lowH);
+      renderGroundLayer(sc, sw, view, cam);
+      sc.setTransform(1, 0, 0, 1, 0, 0);
+      sc.globalCompositeOperation = 'destination-in';
+      sc.drawImage(this.maskCanvas, 0, 0);
+      sc.globalCompositeOperation = 'source-over';
+      ctx.drawImage(this.sceneCanvas, 0, 0);
+    }
+    ctx.drawImage(this.edgeCanvas, 0, 0);
   }
 
   /* ------------------------------------------------------------- DOM */
+
+  private makeCanvas(doc: Document): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null } {
+    const canvas = doc.createElement('canvas');
+    return { canvas, ctx: canvas.getContext('2d', { willReadFrequently: false }) };
+  }
 
   private mount(): void {
     const doc = this.win.document;
@@ -441,8 +625,16 @@ export class DemoDaySession {
 
     const layer = doc.createElement('div');
     layer.className = 'layer';
-    const canvas = doc.createElement('canvas');
-    layer.appendChild(canvas);
+    // The shield sits under the canvas and the UI: it takes every pointer event so the page below is inert.
+    const shield = doc.createElement('div');
+    shield.className = 'shield';
+    shield.addEventListener('wheel', this.onScrollInput, { passive: false });
+    shield.addEventListener('touchmove', this.onScrollInput, { passive: false });
+    shield.addEventListener('contextmenu', (e) => e.preventDefault());
+    layer.appendChild(shield);
+
+    const main = this.makeCanvas(doc);
+    layer.appendChild(main.canvas);
 
     const hud = doc.createElement('div');
     hud.className = 'hud';
@@ -480,8 +672,18 @@ export class DemoDaySession {
     root.appendChild(layer);
     doc.documentElement.appendChild(host);
     this.host = host;
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.canvas = main.canvas;
+    this.ctx = main.ctx;
+    // Off-screen work canvases (never attached): the hole mask, the rim/soot layer and the scenery pass.
+    const mask = this.makeCanvas(doc);
+    const edge = this.makeCanvas(doc);
+    const scene = this.makeCanvas(doc);
+    this.maskCanvas = mask.canvas;
+    this.maskCtx = mask.ctx;
+    this.edgeCanvas = edge.canvas;
+    this.edgeCtx = edge.ctx;
+    this.sceneCanvas = scene.canvas;
+    this.sceneCtx = scene.ctx;
   }
 
   private row(doc: Document, label: string, barClass: string) {
@@ -505,20 +707,30 @@ export class DemoDaySession {
     this.host = null;
     this.canvas = null;
     this.ctx = null;
+    this.maskCanvas = this.edgeCanvas = this.sceneCanvas = null;
+    this.maskCtx = this.edgeCtx = this.sceneCtx = null;
     this.hpFill = null;
     this.pctFill = null;
     this.pctText = null;
   }
 
+  /** Size every low-res surface to cover the viewport in whole cells (+1 so the sub-cell scroll shift never shows a gap). */
   private layout(): void {
     const canvas = this.canvas;
     if (!canvas) return;
-    this.lowW = Math.max(1, Math.ceil(this.win.innerWidth / PIXEL));
-    this.lowH = Math.max(1, Math.ceil(this.win.innerHeight / PIXEL));
-    canvas.width = this.lowW;
-    canvas.height = this.lowH;
-    canvas.style.width = `${this.lowW * PIXEL}px`;
-    canvas.style.height = `${this.lowH * PIXEL}px`;
+    const low = lowResSize({ w: this.win.innerWidth, h: this.win.innerHeight });
+    this.lowW = low.w + 1;
+    this.lowH = low.h + 1;
+    for (const c of [canvas, this.maskCanvas, this.edgeCanvas, this.sceneCanvas]) {
+      if (!c) continue;
+      c.width = this.lowW;
+      c.height = this.lowH;
+    }
+    canvas.style.width = `${this.lowW * CELL_CSS}px`;
+    canvas.style.height = `${this.lowH * CELL_CSS}px`;
+    this.maskBuf = new Uint32Array(this.lowW * this.lowH);
+    this.edgeBuf = new Uint32Array(this.lowW * this.lowH);
+    this.lastFieldVersion = -1;
   }
 
   private updateHud(world: World): void {

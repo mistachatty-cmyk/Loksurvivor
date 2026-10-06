@@ -1204,6 +1204,8 @@ export interface ObstacleDef {
   hp?: number;
   /** Page overlay only: opaque handle the host maps back to its DOM element. The engine never reads it. */
   domId?: number;
+  /** Solid to the player but not to enemies (nor to the player mid-dash). See `Aabb.soft`. */
+  soft?: boolean;
   /** Lethal pothole tuning; present only when kind === 'pothole'. */
   pothole?: {
     trigger: PotholeTrigger;

@@ -87,6 +87,26 @@ window scrolls to follow the player (`scrollTargetFor`), so the canvas and the p
 - Nothing on the hub pages works until this repo is deployed with the overlay; until then the hub's Wreck button
   reports "Try again" and the Tamagotchi falls back to Sprite Fusion's tool.
 
+## v2 reveal architecture (M1, shipped as 0.12.3)
+
+The spike's clip-path/visibility hiding is gone from the default path (`hider.ts` is kept only as a possible
+fallback for unsupported pages). Why: holes in the host element revealed the page's own background, which on a
+dark page is the same colour as the text's backdrop, so "nothing visibly happened".
+- **The page is never mutated.** Destroyed blocks go into a `HoleField` (`reveal.ts`, cells of `CELL_CSS` = 3 css
+  px, lazy 256-row bands). Each frame the canvas paints a second never-stepped world (`scenery.ts`: a real
+  `AreaDef`'s ground via `renderGroundLayer`, palette re-lit against the page's computed background so a hole is
+  visible on dark AND light pages) through the holes (`destination-in` mask), then rim/shade/soot, then actors.
+  Restore = remove the overlay. `scripts/overlay-check.mjs` asserts body HTML and computed styles are identical.
+- **Scale:** world = page / `WORLD_K` (3/2.05); 1 rig pixel = 1 cell; Foreman speed x `SPEED_MULT` 1.3. The cell
+  is an INTEGER css px (device-derived cells drift at fractional dpr). Scroll is driven in whole cells and the
+  canvas is shifted by the sub-cell remainder (page bottom is rarely a multiple of 3).
+- **Input shield:** a full-viewport element inside the shadow root takes clicks/wheel/touch; window-level
+  wheel/touchmove and page keys (PageUp/Down, Home/End, Tab, Enter, Space) are `preventDefault`ed. The
+  world keeps the page size it had at start; content that grows or reflows beyond it is skipped on re-scan.
+- Craters come from `world.impacts` (radius >= 40, intensity >= 2) and carve blank page too; any live block
+  whose centre ends up in a hole is cascade-destroyed so nobody is walled in by an invisible block.
+- Re-scan after a resize maps destroyed blocks back by (element, ordinal) and re-applies craters.
+
 ## Not done yet (Phase 1 backlog)
 
 Strings are English constants in `overlay/strings.ts` (the bundle cannot use React `useT()`); move to
