@@ -81,6 +81,10 @@
   filter: saturate(1.18) brightness(1.08);
 }
 
+/* The phone-only floating Back button must not sit on top of an open popup
+   (it covered the bottom of card/pack dialogs and invited mis-taps). */
+body:has([role='dialog'][aria-modal='true']) [data-testid='button-back-floating'] { display: none; }
+
 /* During combat the persistent soundtrack becomes a tiny edge transport so it
    cannot reserve a second top row or overlap the run timer. */
 body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] {
@@ -315,14 +319,32 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='prism-block'][data-ui-swatch='porch-teal'] { --primary: 166 88% 58%; --accent-foreground: 166 88% 58%; --ring: 166 88% 58%; }
 [data-ui-theme='crown-static'][data-ui-swatch='royal-violet'] { --primary: 274 100% 72%; --accent-foreground: 274 100% 72%; --ring: 274 100% 72%; }
 [data-ui-theme='crown-static'][data-ui-swatch='ice-static'] { --primary: 192 100% 72%; --accent-foreground: 192 100% 72%; --ring: 192 100% 72%; }
-[data-ui-theme='midnight-reliquary'] { --background: 224 48% 5%; --foreground: 213 48% 96%; --card: 225 42% 9%; --card-foreground: 213 48% 96%; --primary: 196 100% 70%; --primary-foreground: 224 48% 5%; --secondary: 226 34% 14%; --secondary-foreground: 213 48% 96%; --muted: 226 28% 12%; --muted-foreground: 215 22% 66%; --accent: 196 65% 15%; --accent-foreground: 196 100% 70%; --border: 207 58% 35%; --input: 207 58% 35%; --ring: 196 100% 70%; background-image: radial-gradient(circle at 50% 100%, hsl(196 100% 68% / .16), transparent 48%); animation: reliquary-breathe 5.5s ease-in-out infinite; }
-[data-ui-theme='mirror-carnival'] { --background: 294 37% 6%; --foreground: 330 58% 97%; --card: 295 32% 11%; --card-foreground: 330 58% 97%; --primary: 337 100% 72%; --primary-foreground: 294 37% 6%; --secondary: 292 28% 16%; --secondary-foreground: 330 58% 97%; --muted: 292 22% 13%; --muted-foreground: 293 22% 68%; --accent: 337 65% 16%; --accent-foreground: 337 100% 72%; --border: 306 58% 36%; --input: 306 58% 36%; --ring: 337 100% 72%; background-image: conic-gradient(from 180deg at 50% 50%, hsl(337 100% 65% / .08), hsl(167 100% 60% / .08), hsl(278 100% 68% / .08), hsl(337 100% 65% / .08)); animation: carnival-shift 9s linear infinite; }
+[data-ui-theme='midnight-reliquary'] { --background: 224 48% 5%; --foreground: 213 48% 96%; --card: 225 42% 9%; --card-foreground: 213 48% 96%; --primary: 196 100% 70%; --primary-foreground: 224 48% 5%; --secondary: 226 34% 14%; --secondary-foreground: 213 48% 96%; --muted: 226 28% 12%; --muted-foreground: 215 22% 66%; --accent: 196 65% 15%; --accent-foreground: 196 100% 70%; --border: 207 58% 35%; --input: 207 58% 35%; --ring: 196 100% 70%;  }
+[data-ui-theme='mirror-carnival'] { --background: 294 37% 6%; --foreground: 330 58% 97%; --card: 295 32% 11%; --card-foreground: 330 58% 97%; --primary: 337 100% 72%; --primary-foreground: 294 37% 6%; --secondary: 292 28% 16%; --secondary-foreground: 330 58% 97%; --muted: 292 22% 13%; --muted-foreground: 293 22% 68%; --accent: 337 65% 16%; --accent-foreground: 337 100% 72%; --border: 306 58% 36%; --input: 306 58% 36%; --ring: 337 100% 72%;  }
 [data-ui-theme='midnight-reliquary'][data-ui-swatch='moon-violet'] { --primary: 267 100% 76%; --accent-foreground: 267 100% 76%; --ring: 267 100% 76%; }
 [data-ui-theme='midnight-reliquary'][data-ui-swatch='relic-gold'] { --primary: 45 100% 68%; --accent-foreground: 45 100% 68%; --ring: 45 100% 68%; }
 [data-ui-theme='mirror-carnival'][data-ui-swatch='electric-mint'] { --primary: 167 100% 67%; --accent-foreground: 167 100% 67%; --ring: 167 100% 67%; }
 [data-ui-theme='mirror-carnival'][data-ui-swatch='ultraviolet'] { --primary: 278 100% 74%; --accent-foreground: 278 100% 74%; --ring: 278 100% 74%; }
 @keyframes reliquary-breathe { 50% { filter: brightness(1.14) saturate(1.13); } }
 @keyframes carnival-shift { to { filter: hue-rotate(28deg) saturate(1.18); } }
+
+/* Theme atmosphere layers. These used to be a `background-image` plus an
+   infinite `filter` animation on the [data-ui-theme] wrapper itself, but any
+   non-`none` filter on an ancestor turns it into the containing block for
+   `position: fixed` descendants: every popup then centred on the whole (very
+   tall) page wrapper instead of the window, so it opened off-screen and had
+   to be scrolled to. The tint and its animation live on a decorative fixed
+   layer instead, which has no descendants to capture. */
+[data-ui-theme='midnight-reliquary']::before, [data-ui-theme='mirror-carnival']::before,
+[data-ui-theme='aurora-transit']::before, [data-ui-theme='chrome-vespers']::before,
+[data-ui-theme='paper-lantern']::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+}
+[data-ui-theme='midnight-reliquary']::before { background-image: radial-gradient(circle at 50% 100%, hsl(196 100% 68% / .16), transparent 48%); animation: reliquary-breathe 5.5s ease-in-out infinite; }
+[data-ui-theme='mirror-carnival']::before { background-image: conic-gradient(from 180deg at 50% 50%, hsl(337 100% 65% / .08), hsl(167 100% 60% / .08), hsl(278 100% 68% / .08), hsl(337 100% 65% / .08)); animation: carnival-shift 9s linear infinite; }
+[data-ui-theme='aurora-transit']::before { background-image: conic-gradient(from 200deg at 50% 0%, hsl(168 90% 55% / .1), hsl(275 85% 60% / .1), hsl(190 60% 70% / .1), hsl(168 90% 55% / .1)); animation: aurora-drift-bg 12s linear infinite; }
+[data-ui-theme='chrome-vespers']::before { background-image: linear-gradient(160deg, hsl(35 90% 55% / .07), transparent 45%, hsl(255 55% 45% / .08)); animation: vespers-breathe 6s ease-in-out infinite; }
+[data-ui-theme='paper-lantern']::before { background-image: radial-gradient(circle at 50% 0%, hsl(28 90% 60% / .1), transparent 40%); animation: lantern-flicker 4.2s ease-in-out infinite; }
 
 /* Night Drive: a cool, cinematic chrome that still uses the same UI tokens. */
 [data-ui-theme='night-drive'] {
@@ -542,8 +564,6 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   --muted: 202 30% 12%; --muted-foreground: 190 18% 63%;
   --accent: 168 60% 15%; --accent-foreground: 168 90% 60%;
   --border: 190 55% 30%; --input: 190 55% 30%; --ring: 168 90% 60%;
-  background-image: conic-gradient(from 200deg at 50% 0%, hsl(168 90% 55% / .1), hsl(275 85% 60% / .1), hsl(190 60% 70% / .1), hsl(168 90% 55% / .1));
-  animation: aurora-drift-bg 12s linear infinite;
 }
 [data-ui-theme='aurora-transit'][data-ui-swatch='violet-curtain'] { --primary: 275 85% 68%; --accent-foreground: 275 85% 68%; --ring: 275 85% 68%; }
 [data-ui-theme='aurora-transit'][data-ui-swatch='frost-white'] { --primary: 190 60% 85%; --accent-foreground: 190 60% 85%; --ring: 190 60% 85%; }
@@ -558,8 +578,6 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   --muted: 255 22% 13%; --muted-foreground: 260 16% 66%;
   --accent: 255 55% 17%; --accent-foreground: 35 90% 62%;
   --border: 255 45% 32%; --input: 255 45% 32%; --ring: 35 90% 62%;
-  background-image: linear-gradient(160deg, hsl(35 90% 55% / .07), transparent 45%, hsl(255 55% 45% / .08));
-  animation: vespers-breathe 6s ease-in-out infinite;
 }
 [data-ui-theme='chrome-vespers'][data-ui-swatch='rose-chrome'] { --primary: 340 85% 68%; --accent-foreground: 340 85% 68%; --ring: 340 85% 68%; }
 [data-ui-theme='chrome-vespers'][data-ui-swatch='steel-violet'] { --primary: 255 55% 68%; --accent-foreground: 255 55% 68%; --ring: 255 55% 68%; }
@@ -589,8 +607,6 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   --muted: 28 20% 13%; --muted-foreground: 33 16% 64%;
   --accent: 28 70% 16%; --accent-foreground: 28 90% 62%;
   --border: 30 50% 30%; --input: 30 50% 30%; --ring: 28 90% 62%;
-  background-image: radial-gradient(circle at 50% 0%, hsl(28 90% 60% / .1), transparent 40%);
-  animation: lantern-flicker 4.2s ease-in-out infinite;
 }
 [data-ui-theme='paper-lantern'][data-ui-swatch='paper-cream'] { --primary: 42 60% 88%; --accent-foreground: 42 60% 88%; --ring: 42 60% 88%; }
 [data-ui-theme='paper-lantern'][data-ui-swatch='ember-red'] { --primary: 8 85% 62%; --accent-foreground: 8 85% 62%; --ring: 8 85% 62%; }
