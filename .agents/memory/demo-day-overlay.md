@@ -156,6 +156,23 @@ pass/glow off on slow machines.
   with waves, dashes, ultimates and the key skill, so a character added later is covered automatically.
 - The report link now carries the real character id (`RunSummary.character`).
 
+## Data mechanics (M5, in 0.12.3)
+
+- The scanner tags every block with a `role` (text, link, heading, button, image, frame, input, box) and an
+  `armor` HP multiplier from page structure (footer 2.5, nav/header 1.5, aside/form 1.2, article 0.8, headings x2).
+  Armor >= 1.4 draws a hazard-tape edge on the block.
+- `drops.ts` is the role -> drop table (headings big XP, links XP, buttons/inputs health, big images a loot
+  crate, frames a sweep + crate; a sweep pickup throws a huge crater, which is the point). Crates have a per-page
+  budget of 14, then pay triple cred. Depth down the page improves the odds. Pickups are pushed straight into
+  `world.pickups`; the engine's own pickup handling does the rest.
+- `tuneWaves` rescales the scripted waves every stream tick from their BASE values (never compounding): enemy HP
+  +80% at the very bottom of the page, spawn rate 0.7x-1.5x by text density near the player.
+- Report: `teardown.ts` counts roles/words/px/biggest/combo; `runLink.ts` attaches it as an optional `x` on the
+  version-1 payload so an older hub decoder still opens the link (the hub only reads fields it knows). The hub
+  decoder (`lib/demoday-report.ts`) validates `x`; the fragment must stay under 512 chars (test enforces < 480).
+- NOT done: heading-as-boss-bar, Ctrl-F hunt, consent-banner / ad-frame elites, input turrets (the costly ones),
+  colour tint of FX, the "Footer Fortress" final boss.
+
 ## Not done yet (Phase 1 backlog)
 
 Strings are English constants in `overlay/strings.ts` (the bundle cannot use React `useT()`); move to

@@ -15,6 +15,9 @@ export interface DocSize {
 }
 
 /** One measurable element of the host page, in page (not viewport) pixels. */
+/** What a block IS on the page. Drives what it drops and how tough it is. */
+export type BlockRole = 'text' | 'link' | 'heading' | 'button' | 'image' | 'frame' | 'input' | 'box';
+
 export interface PageBlock {
   /** Index into the scan result; also the `domId` the engine carries on the breakable. */
   id: number;
@@ -25,6 +28,9 @@ export interface PageBlock {
    * `text`: one chunk of a line of text; breaking it cuts a hole in the owner instead.
    */
   kind: 'box' | 'text';
+  role: BlockRole;
+  /** HP multiplier from page structure (footer 2.5, nav/header 1.5, article 0.8, headings extra); 1 is plain. */
+  armor: number;
   x: number;
   y: number;
   w: number;

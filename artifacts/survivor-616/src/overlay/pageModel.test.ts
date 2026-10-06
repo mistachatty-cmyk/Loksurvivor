@@ -25,7 +25,7 @@ import {
 const doc = { w: 1200, h: 4000 };
 
 function pb(id: number, x: number, y: number, w = 100, h = 40): PageBlock {
-  return { id, owner: id, kind: 'box', x, y, w, h, hp: blockHp(w, h), destroyed: false, skip: false };
+  return { id, owner: id, kind: 'box', role: 'box', armor: 1, x, y, w, h, hp: blockHp(w, h), destroyed: false, skip: false };
 }
 
 test('blockHp scales with area and stays inside its clamp', () => {

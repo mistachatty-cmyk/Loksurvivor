@@ -64,6 +64,8 @@ import {
   type Floater,
 } from './fx';
 import { collectLights } from './lights';
+import { LOOT_BOX_BUDGET, rollDrops } from './drops';
+import { emptyTeardown, tallyBlock, type Teardown } from './teardown';
 import { measureText, textCells } from './pixelFont';
 import { addOutline, binariseAlpha } from './pixelPass';
 import { fillWindow, HoleField } from './reveal';
@@ -122,6 +124,7 @@ export type StartResult = { ok: true } | { ok: false; reason: string };
 export interface RunSummary {
   /** Character id the run was played with. */
   character: string;
+  teardown: Teardown;
   destroyedPct: number;
   kills: number;
   level: number;
@@ -137,7 +140,9 @@ canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-ren
 .bar > i { display: block; height: 100%; width: 0; background: #e4572e; }
 .bar.pct > i { background: #f2c14e; }
 .row { display: flex; gap: 8px; align-items: center; }
-.dock { position: fixed; left: 10px; bottom: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.dock { position: fixed; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 8px; align-items: center; pointer-events: none; }
+.dock .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1280px) { .credit { bottom: 46px; } }
 .dock .hint { padding: 4px 8px; background: rgba(15,15,20,.85); border: 1px solid rgba(255,255,255,.2); text-shadow: 0 1px 0 #000; }
 .dock button, .dock a { pointer-events: auto; font: inherit; color: #f4f1ea; background: rgba(15,15,20,.88); border: 1px solid rgba(255,255,255,.35); padding: 4px 8px; cursor: pointer; text-decoration: none; }
 .dock button:hover, .dock a:hover { background: rgba(40,40,52,.95); }
@@ -264,6 +269,9 @@ export class DemoDaySession {
   private lightCtx: CanvasRenderingContext2D | null = null;
   private lightsOn = false;
   private nextOwnerId = 1;
+  private teardown: Teardown = emptyTeardown();
+  private lootLeft = { value: LOOT_BOX_BUDGET };
+  private waveBase: Array<{ rate: number; hp: number }> = [];
 
   /* survival: phases, menus, settings, dash, objective */
   onLevelComplete?: (summary: RunSummary) => void;
@@ -351,6 +359,8 @@ export class DemoDaySession {
     this.debris = [];
     this.dissolves = [];
     this.combo = newCombo();
+    this.teardown = emptyTeardown();
+    this.lootLeft = { value: LOOT_BOX_BUDGET };
     this.hitStopUntil = 0;
     this.crackCache.clear();
     this.ensureAudio();
@@ -427,8 +437,10 @@ export class DemoDaySession {
   summary(): RunSummary | null {
     if (!this.world) return null;
     const hud = hudSnapshot(this.world);
+    this.teardown.combo = this.combo.best;
     return {
       character: this.characterId,
+      teardown: this.teardown,
       destroyedPct: Math.round(destroyedFraction(this.blocks) * 100),
       kills: hud.kills,
       level: hud.level,
@@ -607,6 +619,7 @@ export class DemoDaySession {
     const stats = { ...character.stats, speed: character.stats.speed * SPEED_MULT };
     const world = createWorld(overlayArea(this.doc), character, stats, (Date.now() % 100000) | 0, [], 1, false);
     world.area.waves = buildOverlayWaves({ blocks: this.blocks.length, zen: this.settings.mode === 'zen' });
+    this.waveBase = world.area.waves.map((wave) => ({ rate: wave.ratePerSec, hp: wave.hpMult ?? 1 }));
     const spawn = pageToWorld(this.spawnPage(viewport).x, this.spawnPage(viewport).y, this.doc);
     world.player.x = spawn.x;
     world.player.y = spawn.y;
@@ -651,6 +664,8 @@ export class DemoDaySession {
       this.floaters = [];
       this.debris = [];
       this.combo = newCombo();
+      this.teardown = emptyTeardown();
+      this.lootLeft = { value: LOOT_BOX_BUDGET };
       this.hitStopUntil = 0;
       this.ultRequested = false;
       this.dashRequest = null;
@@ -685,6 +700,7 @@ export class DemoDaySession {
     if (world) {
       const zen = this.settings.mode === 'zen';
       world.area.waves = buildOverlayWaves({ blocks: this.blocks.length, zen });
+      this.waveBase = world.area.waves.map((wave) => ({ rate: wave.ratePerSec, hp: wave.hpMult ?? 1 }));
       if (this.bossSpawned && !zen) world.area.waves.push(finaleWave(world.time));
     }
   }
@@ -978,6 +994,7 @@ export class DemoDaySession {
       if (!b || b.destroyed) continue;
       if (this.field.isHole(Math.floor((b.x + b.w / 2) / CELL_CSS), Math.floor((b.y + b.h / 2) / CELL_CSS))) {
         b.destroyed = true;
+        tallyBlock(this.teardown, b);
         gone.add(uid);
       }
     }
@@ -1000,6 +1017,8 @@ export class DemoDaySession {
       const block = this.blocks[b.domId];
       if (!block || block.destroyed) continue;
       block.destroyed = true;
+      tallyBlock(this.teardown, block);
+      this.dropFor(world, block);
       this.dissolves.push({ block, bornAt: world.now, level: 0 });
       const hit = worldToPage(b.lastHitX ?? world.player.x, b.lastHitY ?? world.player.y, this.doc);
       this.throwDebris(block, { x: hit.x / CELL_CSS, y: hit.y / CELL_CSS });
@@ -1059,6 +1078,28 @@ export class DemoDaySession {
     if (colors.length === 0) colors.push('#cfd6df');
     this.ownerColors.set(el, colors);
     return colors;
+  }
+
+  /** The extras a destroyed block pays out for what it was (see `drops.ts`), dropped where it stood. */
+  private dropFor(world: World, block: PageBlock): void {
+    const drops = rollDrops(
+      { role: block.role, area: block.w * block.h, depth: Math.min(1, Math.max(0, block.y / Math.max(1, this.doc.h))), lootLeft: this.lootLeft },
+      this.rng,
+    );
+    if (drops.length === 0) return;
+    const c = pageToWorld(block.x + block.w / 2, block.y + block.h / 2, this.doc);
+    for (const d of drops) {
+      world.pickups.push({
+        uid: world.nextUid++,
+        kind: d.kind,
+        x: c.x + (this.rng() - 0.5) * Math.min(24, block.w / WORLD_K),
+        y: c.y + (this.rng() - 0.5) * Math.min(12, block.h / WORLD_K),
+        vx: (this.rng() - 0.5) * 40,
+        vy: (this.rng() - 0.5) * 40,
+        value: d.value,
+        bornAt: world.now,
+      });
+    }
   }
 
   private throwDebris(block: PageBlock, from: { x: number; y: number }): void {
@@ -1161,6 +1202,26 @@ export class DemoDaySession {
       for (const c of created) if (c.domId !== undefined) this.alive.set(c.domId, c.uid);
     }
     void initial;
+    this.tuneWaves(world, desired, pagePos.y);
+  }
+
+  /**
+   * The page shapes the fight: deeper down it, enemies are tougher (+80% at the very bottom), and a text-dense
+   * stretch brings more of them (up to +50%) while an image-heavy one brings fewer. Scales the scripted waves from
+   * their base values, so it never compounds.
+   */
+  private tuneWaves(world: World, near: readonly PageBlock[], playerPageY: number): void {
+    const depth = Math.min(1, Math.max(0, playerPageY / Math.max(1, this.doc.h)));
+    let textArea = 0;
+    for (const b of near) if (b.kind === 'text') textArea += b.w * b.h;
+    const windowArea = this.doc.w * Math.min(this.doc.h, this.win.innerHeight * 3);
+    const density = Math.min(1.5, Math.max(0.7, 0.7 + (textArea / Math.max(1, windowArea)) * 2.5));
+    world.area.waves.forEach((wave, i) => {
+      const base = this.waveBase[i];
+      if (!base) return;
+      wave.ratePerSec = base.rate * density;
+      wave.hpMult = base.hp * (1 + 0.8 * depth);
+    });
   }
 
   /**
@@ -1281,6 +1342,13 @@ export class DemoDaySession {
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.fillRect(bx, by, bw, bh);
       }
+      if (block.armor >= 1.4) {
+        // armored page structure (footer, nav, headings): a hazard-tape edge along the top
+        for (let i = 0; i < bw; i += 1) {
+          ctx.fillStyle = i % 2 === 0 ? '#f2c14e' : '#14110a';
+          ctx.fillRect(bx + i, by, 1, 1);
+        }
+      }
       const stage = crackStage(b.maxHp > 0 ? b.hp / b.maxHp : 1);
       if (stage === 0) continue;
       const key = `${block.id}:${stage}`;
@@ -1330,7 +1398,7 @@ export class DemoDaySession {
     for (const f of this.floaters) {
       const age = world.now - f.bornAt;
       if (age > FLOATER_LIFE_MS) continue;
-      const scale = f.kill ? 2 : 1;
+      const scale = f.kill && f.amount >= 150 ? 2 : 1;
       const w = measureText(f.text) * scale;
       this.drawPixelText(f.text, Math.floor(f.x - w / 2 - cellX), Math.floor(f.y - floaterRise(age) - cellY), f.kill ? '#ffd45e' : '#ffffff', scale);
     }
@@ -1459,7 +1527,13 @@ export class DemoDaySession {
     const ability = doc.createElement('div');
     ability.className = 'sub';
     this.hud = { level: xpRow.name, xp: xpRow.fill, objective, dash: dashRow.fill, ability };
-    hud.append(hpRow.el, xpRow.el, pctRow.el, objective, dashRow.el, ability);
+    // The level is named after the page (read from the page's own title, shown only to the player, never sent anywhere).
+    const title = doc.createElement('div');
+    title.className = 'sub';
+    const pageTitle = (this.win.document.title || '').trim();
+    title.textContent = pageTitle.length > 30 ? `${pageTitle.slice(0, 29)}\u2026` : pageTitle;
+    title.hidden = pageTitle.length === 0;
+    hud.append(title, hpRow.el, xpRow.el, pctRow.el, objective, dashRow.el, ability);
     layer.appendChild(hud);
 
     const dock = doc.createElement('div');

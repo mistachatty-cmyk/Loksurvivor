@@ -132,7 +132,7 @@ export interface Floater {
 
 export const FLOATER_MERGE_MS = 120;
 export const FLOATER_LIFE_MS = 700;
-const FLOATER_CAP = 40;
+const FLOATER_CAP = 14;
 
 /** Hits on one block within 120 ms add up into one number instead of a stack of them. */
 export function addFloater(list: Floater[], key: number, x: number, y: number, amount: number, kill: boolean, nowMs: number): void {
