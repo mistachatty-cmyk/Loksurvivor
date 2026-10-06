@@ -135,5 +135,18 @@
   "overlay.value.speed115": "Schnell",
   "overlay.value.speed13": "Schneller",
   "overlay.value.on": "Auf",
-  "overlay.value.off": "Aus"
+  "overlay.value.off": "Aus",
+  "overlay.select.title": "Wählen Sie Ihren Überlebenden",
+  "overlay.select.search": "Suche nach Überlebenden",
+  "overlay.select.play": "Spielen Sie als {{name}}",
+  "overlay.select.count": "{{shown}} von {{total}}-Überlebenden",
+  "overlay.select.none": "Zu dieser Suche passt kein Überlebender.",
+  "overlay.select.restart": "Beim Wechseln der Überlebenden wird die Seite neu gestartet.",
+  "overlay.select.legendary": "Legendär",
+  "overlay.ability.freeze": "F: Kegel einfrieren, dann erneut F drücken, um zu werfen",
+  "overlay.ability.draw": "F: Zeichne eine Linie nach vorne und renne durch sie hindurch",
+  "overlay.ability.none": "Raum: ultimativ",
+  "overlay.stat.hp": "PS",
+  "overlay.stat.speed": "Geschwindigkeit",
+  "overlay.stat.power": "Leistung"
 }

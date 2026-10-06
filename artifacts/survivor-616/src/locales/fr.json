@@ -135,5 +135,18 @@
   "overlay.value.speed115": "Rapide",
   "overlay.value.speed13": "Plus rapide",
   "overlay.value.on": "Sur",
-  "overlay.value.off": "Désactivé"
+  "overlay.value.off": "Désactivé",
+  "overlay.select.title": "Choisissez votre survivant",
+  "overlay.select.search": "Rechercher des survivants",
+  "overlay.select.play": "Incarnez {{name}}",
+  "overlay.select.count": "{{shown}} des survivants de {{total}}",
+  "overlay.select.none": "Aucun survivant ne correspond à cette recherche.",
+  "overlay.select.restart": "Changer de survivant redémarre la page.",
+  "overlay.select.legendary": "Légendaire",
+  "overlay.ability.freeze": "F : geler le cône, puis appuyer à nouveau sur F pour lancer",
+  "overlay.ability.draw": "F : tracez une ligne devant vous et foncez à travers elle",
+  "overlay.ability.none": "Espace : ultime",
+  "overlay.stat.hp": "HP",
+  "overlay.stat.speed": "Vitesse",
+  "overlay.stat.power": "Pouvoir"
 }

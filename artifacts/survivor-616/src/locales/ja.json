@@ -135,5 +135,18 @@
   "overlay.value.speed115": "速い",
   "overlay.value.speed13": "より速く",
   "overlay.value.on": "オン",
-  "overlay.value.off": "オフ"
+  "overlay.value.off": "オフ",
+  "overlay.select.title": "生存者を選択してください",
+  "overlay.select.search": "生存者の捜索",
+  "overlay.select.play": "{{name}} としてプレイする",
+  "overlay.select.count": "{{total}} 生存者の {{shown}}",
+  "overlay.select.none": "その検索に一致する生存者はいません。",
+  "overlay.select.restart": "サバイバーを切り替えるとページが再開されます。",
+  "overlay.select.legendary": "伝説の",
+  "overlay.ability.freeze": "F: コーンを凍結し、もう一度 F を押して投げます",
+  "overlay.ability.draw": "F: 前方に線を引き、そこを駆け抜けます",
+  "overlay.ability.none": "スペース：究極",
+  "overlay.stat.hp": "HP",
+  "overlay.stat.speed": "速度",
+  "overlay.stat.power": "力"
 }
