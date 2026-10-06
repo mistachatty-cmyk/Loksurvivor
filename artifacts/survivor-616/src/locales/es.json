@@ -135,5 +135,18 @@
   "overlay.value.speed115": "Rápido",
   "overlay.value.speed13": "Más rápido",
   "overlay.value.on": "encendido",
-  "overlay.value.off": "Apagado"
+  "overlay.value.off": "Apagado",
+  "overlay.select.title": "Elige tu superviviente",
+  "overlay.select.search": "Buscar supervivientes",
+  "overlay.select.play": "Juega como {{name}}",
+  "overlay.select.count": "{{shown}} de supervivientes de {{total}}",
+  "overlay.select.none": "Ningún superviviente coincide con esa búsqueda.",
+  "overlay.select.restart": "Al cambiar de supervivientes se reinicia la página.",
+  "overlay.select.legendary": "Legendario",
+  "overlay.ability.freeze": "F: congelar el cono, luego presionar F nuevamente para lanzar",
+  "overlay.ability.draw": "F: dibuja una línea adelante y atraviesala",
+  "overlay.ability.none": "Espacio: último",
+  "overlay.stat.hp": "caballos de fuerza",
+  "overlay.stat.speed": "Velocidad",
+  "overlay.stat.power": "Fuerza"
 }

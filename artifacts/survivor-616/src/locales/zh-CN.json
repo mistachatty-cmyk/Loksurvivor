@@ -135,5 +135,18 @@
   "overlay.value.speed115": "快点",
   "overlay.value.speed13": "快点",
   "overlay.value.on": "打开",
-  "overlay.value.off": "关闭"
+  "overlay.value.off": "关闭",
+  "overlay.select.title": "选择你的幸存者",
+  "overlay.select.search": "搜寻幸存者",
+  "overlay.select.play": "扮演 {{name}}",
+  "overlay.select.count": "{{total}}幸存者的{{shown}}",
+  "overlay.select.none": "没有幸存者与该搜索匹配。",
+  "overlay.select.restart": "切换幸存者会重新启动页面。",
+  "overlay.select.legendary": "传奇",
+  "overlay.ability.freeze": "F：冻结圆锥体，然后再按F键投掷",
+  "overlay.ability.draw": "F：在前面画一条线并冲过去",
+  "overlay.ability.none": "空间：极致",
+  "overlay.stat.hp": "惠普",
+  "overlay.stat.speed": "速度",
+  "overlay.stat.power": "力量"
 }

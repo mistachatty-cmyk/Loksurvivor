@@ -135,5 +135,18 @@
   "overlay.value.speed115": "Rápido",
   "overlay.value.speed13": "Mais rápido",
   "overlay.value.on": "Ligado",
-  "overlay.value.off": "Desligado"
+  "overlay.value.off": "Desligado",
+  "overlay.select.title": "Escolha seu sobrevivente",
+  "overlay.select.search": "Pesquisar sobreviventes",
+  "overlay.select.play": "Jogue como {{name}}",
+  "overlay.select.count": "{{shown}} de sobreviventes {{total}}",
+  "overlay.select.none": "Nenhum sobrevivente corresponde a essa pesquisa.",
+  "overlay.select.restart": "A troca de sobreviventes reinicia a página.",
+  "overlay.select.legendary": "Lendário",
+  "overlay.ability.freeze": "F: congele o cone e pressione F novamente para lançar",
+  "overlay.ability.draw": "F: desenhe uma linha à frente e passe por ela",
+  "overlay.ability.none": "Espaço: final",
+  "overlay.stat.hp": "HP",
+  "overlay.stat.speed": "Velocidade",
+  "overlay.stat.power": "Poder"
 }

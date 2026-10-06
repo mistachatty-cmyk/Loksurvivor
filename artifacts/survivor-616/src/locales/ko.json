@@ -135,5 +135,18 @@
   "overlay.value.speed115": "빠르게",
   "overlay.value.speed13": "더 빠르게",
   "overlay.value.on": "켜짐",
-  "overlay.value.off": "끄기"
+  "overlay.value.off": "끄기",
+  "overlay.select.title": "생존자를 선택하세요",
+  "overlay.select.search": "생존자 수색",
+  "overlay.select.play": "{{name}}로 플레이",
+  "overlay.select.count": "{{total}} 생존자의 {{shown}}",
+  "overlay.select.none": "해당 검색어와 일치하는 생존자가 없습니다.",
+  "overlay.select.restart": "생존자를 전환하면 페이지가 다시 시작됩니다.",
+  "overlay.select.legendary": "전설적인",
+  "overlay.ability.freeze": "F: 원뿔을 얼린 후 다시 F를 눌러 던집니다.",
+  "overlay.ability.draw": "F: 앞에 선을 그리고 그 선을 통과하여 돌진합니다.",
+  "overlay.ability.none": "공간: 궁극",
+  "overlay.stat.hp": "HP",
+  "overlay.stat.speed": "속도",
+  "overlay.stat.power": "힘"
 }
