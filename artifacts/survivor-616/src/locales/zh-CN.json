@@ -35,6 +35,8 @@
   "hub.room.card-shop.description": "打开包装并构建您的 Lock Deck",
   "hub.room.weapon-bans.label": "Studio 28",
   "hub.room.weapon-bans.description": "今晚的禁赛名单",
+  "hub.room.grpd-armory.label": "GRPD军械库",
+  "hub.room.grpd-armory.description": "存档并激活回收的武器",
   "hub.room.settings.label": "设置",
   "hub.room.settings.description": "控制和辅助功能",
   "hub.room.palette-store.label": "定制店",

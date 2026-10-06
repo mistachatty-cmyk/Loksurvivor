@@ -35,6 +35,8 @@
   "hub.room.card-shop.description": "パックを開けて Lock Deck を構築しましょう",
   "hub.room.weapon-bans.label": "Studio 28",
   "hub.room.weapon-bans.description": "今夜の禁止リスト",
+  "hub.room.grpd-armory.label": "GRPD武器庫",
+  "hub.room.grpd-armory.description": "回収した武器をアーカイブしてアクティブ化する",
   "hub.room.settings.label": "設定",
   "hub.room.settings.description": "コントロールとアクセシビリティ",
   "hub.room.palette-store.label": "カスタマイズショップ",

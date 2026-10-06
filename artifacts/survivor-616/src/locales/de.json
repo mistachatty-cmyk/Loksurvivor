@@ -35,6 +35,8 @@
   "hub.room.card-shop.description": "Öffnen Sie Pakete und bauen Sie Ihr Lock Deck",
   "hub.room.weapon-bans.label": "Studio 28",
   "hub.room.weapon-bans.description": "Die Sperrliste für heute Abend",
+  "hub.room.grpd-armory.label": "GRPD-Waffenkammer",
+  "hub.room.grpd-armory.description": "Archivieren und aktivieren Sie geborgene Waffen",
   "hub.room.settings.label": "Einstellungen",
   "hub.room.settings.description": "Kontrollen und Zugänglichkeit",
   "hub.room.palette-store.label": "Anpassungsshop",

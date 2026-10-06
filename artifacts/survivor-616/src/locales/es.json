@@ -35,6 +35,8 @@
   "hub.room.card-shop.description": "Abre paquetes y construye tu Lock Deck",
   "hub.room.weapon-bans.label": "Studio 28",
   "hub.room.weapon-bans.description": "Lista de prohibiciones de esta noche",
+  "hub.room.grpd-armory.label": "Armería GRPD",
+  "hub.room.grpd-armory.description": "Archivar y activar armas recuperadas.",
   "hub.room.settings.label": "Ajustes",
   "hub.room.settings.description": "Controles y accesibilidad",
   "hub.room.palette-store.label": "Tienda de personalización",

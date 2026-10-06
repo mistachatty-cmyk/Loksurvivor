@@ -35,6 +35,8 @@
   "hub.room.card-shop.description": "Abra pacotes e construa seu Lock Deck",
   "hub.room.weapon-bans.label": "Studio 28",
   "hub.room.weapon-bans.description": "Lista de banimentos desta noite",
+  "hub.room.grpd-armory.label": "Arsenal GRPD",
+  "hub.room.grpd-armory.description": "Arquive e ative armas recuperadas",
   "hub.room.settings.label": "Configurações",
   "hub.room.settings.description": "Controles e acessibilidade",
   "hub.room.palette-store.label": "Loja de personalização",

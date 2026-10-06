@@ -35,6 +35,8 @@
   "hub.room.card-shop.description": "팩을 열고 Lock Deck를 구축하세요",
   "hub.room.weapon-bans.label": "Studio 28",
   "hub.room.weapon-bans.description": "오늘 밤의 금지 목록",
+  "hub.room.grpd-armory.label": "GRPD 무기고",
+  "hub.room.grpd-armory.description": "회수된 무기 보관 및 활성화",
   "hub.room.settings.label": "설정",
   "hub.room.settings.description": "제어 및 접근성",
   "hub.room.palette-store.label": "맞춤 제작 상점",
