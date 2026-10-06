@@ -12,7 +12,10 @@ import { getCharacter } from '@/game/data/characters';
 import {
   addBreakables,
   applyUpgrade,
+  claimLootPrize,
   createWorld,
+  damageBlocksNear,
+  dashPlayer,
   hudSnapshot,
   removeBreakables,
   rollUpgradeChoices,
@@ -21,6 +24,7 @@ import {
 } from '@/game/engine/world';
 import { createSfxEngine, type SfxEngine } from '@/game/audio/sfxEngine';
 import { DEFAULT_SFX_STYLE, type SfxCueId } from '@/game/audio/sfxCues';
+import type { UpgradeDef } from '@/game/types';
 import { createRng } from '@/game/engine/math';
 import { renderGroundLayer, renderWorld } from '@/game/render/draw';
 import {
@@ -66,7 +70,19 @@ import { reportUrl } from './runLink';
 import { CELL_CSS, SPEED_MULT, SPRITE_UNITS, WORLD_K, lowResSize, snapToCell, targetViewUnits } from './scale';
 import { scanPage, sensitivePageReason } from './scanner';
 import { createScenery, pageLook, parseCssColor, type PageLook, type Scenery } from './scenery';
-import { CREDIT_URL, STRINGS } from './strings';
+import { CREDIT_URL } from './strings';
+import { refreshLocale, t } from './i18n';
+import { FINALE_BOSS_ID, buildOverlayWaves, finaleWave } from './waves';
+import { OBJECTIVE_PCT, levelComplete, levelStage, shouldSpawnBoss } from './level';
+import {
+  gameSpeedFactor,
+  loadSettings,
+  nextSetting,
+  saveSettings,
+  type SettingId,
+  type Settings,
+} from './settings';
+import { buildCompleteCard, buildDeadCard, buildLevelUp, buildPauseMenu, buildSettingsPanel } from './ui';
 
 const FIXED_STEP = 1 / 60;
 const MAX_SUBSTEPS = 5;
@@ -80,6 +96,17 @@ const MAX_CRATERS = 400;
 const GLOW_MAX_PAGE_LUMA = 170;
 const OUTLINE = 0xff0a0605;
 const COMBO_BANNER_MIN = 3;
+const DOUBLE_TAP_MS = 260;
+const DASH_COOLDOWN_MS = 820;
+const DASH_INVULN_MS = 260;
+/** The body is "blocked" when it covers under this share of the distance its speed should have carried it. */
+const BLOCKED_RATIO = 0.4;
+
+function keyDirection(key: string): { x: number; y: number } {
+  const x = key === 'd' || key === 'arrowright' ? 1 : key === 'a' || key === 'arrowleft' ? -1 : 0;
+  const y = key === 's' || key === 'arrowdown' ? 1 : key === 'w' || key === 'arrowup' ? -1 : 0;
+  return { x, y };
+}
 const SPAWN_CLEARANCE = 56;
 const CHARACTER_ID = 'foreman';
 
@@ -120,6 +147,32 @@ canvas { position: fixed; left: 0; top: 0; image-rendering: pixelated; image-ren
 .card .actions a, .card .actions button { flex: 1; text-align: center; font: inherit; color: #0b0b0e; background: #f2c14e; border: 0; padding: 6px 8px; cursor: pointer; text-decoration: none; font-weight: 700; }
 .card .actions button { color: #f4f1ea; background: rgba(255,255,255,.12); font-weight: 400; }
 .glow { position: fixed; left: 0; top: 0; pointer-events: none; image-rendering: auto; transform-origin: 0 0; }
+[hidden] { display: none !important; }
+.menus { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5,6,10,.5); pointer-events: auto; }
+.menus.open { display: flex; }
+.panel { min-width: 260px; max-width: min(92vw, 560px); max-height: 90vh; overflow: auto; background: rgba(15,15,20,.97); border: 1px solid rgba(255,255,255,.4); box-shadow: 0 8px 32px rgba(0,0,0,.55); padding: 16px 18px; display: grid; gap: 10px; }
+.panel h2 { all: unset; display: block; font-size: 16px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #f2c14e; }
+.panel h3 { all: unset; display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; opacity: .7; margin-top: 6px; }
+.panel p { margin: 0; }
+.panel-body { display: grid; gap: 8px; }
+.panel button, .panel a.btn { font: inherit; color: #f4f1ea; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.3); padding: 8px 12px; cursor: pointer; text-align: center; text-decoration: none; }
+.panel button:hover, .panel a.btn:hover { background: rgba(255,255,255,.2); }
+.panel button:focus-visible, .panel a:focus-visible { outline: 2px solid #f2c14e; outline-offset: 1px; }
+.panel .primary { background: #f2c14e; color: #0b0b0e; font-weight: 700; border-color: #f2c14e; }
+.panel .danger { border-color: #e4572e; color: #ffb4a0; }
+.setting { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.setting-value { min-width: 130px; }
+.choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.choice { display: grid; gap: 4px; text-align: left; align-content: start; min-height: 110px; }
+.choice-key { color: #f2c14e; font-weight: 700; }
+.choice-desc { opacity: .8; font-size: 11px; }
+.credit-link { color: #f4f1ea; opacity: .6; font-size: 11px; }
+.hint-line { opacity: .75; }
+.notice { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); background: rgba(15,15,20,.92); border: 1px solid #f2c14e; color: #f2c14e; padding: 6px 14px; font-weight: 700; letter-spacing: .06em; pointer-events: none; }
+.hud .sub { opacity: .8; }
+.bar.xp > i { background: #4de1ff; }
+.bar.dash > i { background: #a78bfa; }
+@media (max-width: 640px) { .choices { grid-template-columns: 1fr; } }
 .shield { position: fixed; inset: 0; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: default; }
 .toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: rgba(15,15,20,.92); border: 1px solid rgba(255,255,255,.35); padding: 8px 12px; }
 `;
@@ -195,6 +248,29 @@ export class DemoDaySession {
   private lightsOn = false;
   private nextOwnerId = 1;
 
+  /* survival: phases, menus, settings, dash, objective */
+  onLevelComplete?: (summary: RunSummary) => void;
+  private settings: Settings = loadSettings(null);
+  private phase: 'playing' | 'paused' | 'levelup' | 'complete' | 'dead' = 'playing';
+  private menuLayer: HTMLElement | null = null;
+  private settingsOpen = false;
+  private dashRequest: { x: number; y: number } | null = null;
+  private readonly lastTap = new Map<string, number>();
+  private lastMove = { x: 0, y: 1 };
+  private lastPos = { x: 0, y: 0 };
+  private shoulderAt = 0;
+  private dashHitAt = 0;
+  private bossSpawned = false;
+  private levelDone = false;
+  private noticeEl: HTMLElement | null = null;
+  private noticeTimer = 0;
+  private hud: {
+    level: HTMLElement | null;
+    xp: HTMLElement | null;
+    objective: HTMLElement | null;
+    dash: HTMLElement | null;
+  } = { level: null, xp: null, objective: null, dash: null };
+
   constructor(win: Window = window) {
     this.win = win;
   }
@@ -207,7 +283,7 @@ export class DemoDaySession {
     if (this.running) return { ok: true };
     const reason = sensitivePageReason(this.win);
     if (reason) {
-      this.toast(`${STRINGS.refusedPrefix} ${reason}.`);
+      this.toast(t('overlay.refused', { reason: t(`overlay.reason.${reason}` as const) }));
       return { ok: false, reason };
     }
 
@@ -218,6 +294,8 @@ export class DemoDaySession {
       viewport,
     );
 
+    refreshLocale(this.win.navigator.languages?.length ? this.win.navigator.languages : [this.win.navigator.language]);
+    this.settings = loadSettings(this.storage());
     (this.win.document.activeElement as HTMLElement | null)?.blur?.();
     this.mount();
     const scan = scanPage(this.win, this.host ? [this.host] : []);
@@ -225,7 +303,7 @@ export class DemoDaySession {
     this.elements = scan.elements;
     if (this.blocks.length === 0) {
       this.unmount();
-      this.toast(STRINGS.nothingToBreak);
+      this.toast(t('overlay.nothing'));
       return { ok: false, reason: 'nothing to break' };
     }
 
@@ -233,12 +311,20 @@ export class DemoDaySession {
     const stats = { ...foreman.stats, speed: foreman.stats.speed * SPEED_MULT };
     const world = createWorld(overlayArea(this.doc), foreman, stats, (Date.now() % 100000) | 0, [], 1, false);
     this.world = world;
+    world.area.waves = buildOverlayWaves({ blocks: this.blocks.length, zen: this.settings.mode === 'zen' });
 
+    this.phase = 'playing';
+    this.settingsOpen = false;
+    this.dashRequest = null;
+    this.bossSpawned = false;
+    this.levelDone = false;
+    this.lastPos = { x: world.player.x, y: world.player.y };
     this.field = new HoleField(Math.ceil(this.doc.w / CELL_CSS), Math.ceil(this.doc.h / CELL_CSS));
     this.craters = [];
     const look = this.readPageLook();
     this.scenery = createScenery(look, this.win.location.hostname);
     this.lightsOn = look.luma < GLOW_MAX_PAGE_LUMA;
+    this.applySettings();
     this.lastFieldVersion = -1;
     this.rng = createRng((Date.now() % 1e9) | 0);
     this.floaters = [];
@@ -259,12 +345,14 @@ export class DemoDaySession {
     skipBlocksNear(this.blocks, spawnPage, SPAWN_CLEARANCE);
 
     this.mountLightHost();
+    this.applySettings();
     this.layout();
     this.stream(true);
 
     this.win.addEventListener('keydown', this.onKeyDown, true);
     this.win.addEventListener('keyup', this.onKeyUp, true);
     this.win.addEventListener('blur', this.onBlur);
+    this.win.document.addEventListener('visibilitychange', this.onVisibility);
     this.win.addEventListener('resize', this.onResize);
     this.win.addEventListener('wheel', this.onScrollInput, { capture: true, passive: false });
     this.win.addEventListener('touchmove', this.onScrollInput, { capture: true, passive: false });
@@ -288,7 +376,9 @@ export class DemoDaySession {
     this.win.removeEventListener('keydown', this.onKeyDown, true);
     this.win.removeEventListener('keyup', this.onKeyUp, true);
     this.win.removeEventListener('blur', this.onBlur);
+    this.win.document.removeEventListener('visibilitychange', this.onVisibility);
     this.win.removeEventListener('resize', this.onResize);
+    this.win.clearTimeout(this.noticeTimer);
     this.win.removeEventListener('wheel', this.onScrollInput, true);
     this.win.removeEventListener('touchmove', this.onScrollInput, true);
     this.win.clearTimeout(this.resizeTimer);
@@ -338,24 +428,45 @@ export class DemoDaySession {
     if (editable) return;
     const key = e.key.toLowerCase();
     this.ensureAudio();
-    if (key === 'm') {
+    if (key === 'm' && !e.repeat) {
       this.muted = !this.muted;
-      this.sfx?.setEnabled(!this.muted);
+      this.applySettings();
       return;
     }
-    if (key === 'escape') {
-      this.stop(true);
+    if (key === 'escape' || key === 'p') {
+      if (e.repeat) return;
+      e.preventDefault();
+      this.onPauseKey();
       return;
+    }
+    if (this.phase === 'levelup') {
+      const n = Number(key);
+      if (n >= 1 && n <= this.levelUpChoices.length) {
+        e.preventDefault();
+        this.pickUpgrade(this.levelUpChoices[n - 1]!);
+        return;
+      }
     }
     if (key === ' ') {
       if (activatable) return; // let a focused button/link keep its own Space
-      this.ultRequested = true;
+      if (this.phase === 'playing') this.ultRequested = true;
       e.preventDefault();
       return;
     }
+    if (key === 'shift') {
+      if (this.phase === 'playing' && !e.repeat) this.requestDash();
+      return;
+    }
     if (MOVE_KEYS.has(key)) {
-      this.keys.add(key);
       e.preventDefault();
+      if (this.phase !== 'playing') return;
+      if (!e.repeat) {
+        const last = this.lastTap.get(key);
+        const nowMs = performance.now();
+        this.lastTap.set(key, nowMs);
+        if (last !== undefined && nowMs - last < DOUBLE_TAP_MS) this.requestDash(keyDirection(key));
+      }
+      this.keys.add(key);
       return;
     }
     // Page keys (scroll, tab, enter) must not move or activate the page underneath, but stay usable on our own buttons.
@@ -368,6 +479,14 @@ export class DemoDaySession {
 
   private readonly onBlur = () => {
     this.keys.clear();
+    this.pause();
+  };
+
+  private readonly onVisibility = () => {
+    if (this.win.document.hidden) {
+      this.keys.clear();
+      this.pause();
+    }
   };
 
   /** The driven scroll is the only scroll while playing: wheel and touch never reach the page. */
@@ -400,10 +519,14 @@ export class DemoDaySession {
     const world = this.world;
     const dt = Math.min(0.1, Math.max(0, (now - this.lastTime) / 1000));
     this.lastTime = now;
-    const frozen = now < this.hitStopUntil;
-    if (!frozen) this.acc += dt;
+    const live = this.phase === 'playing';
+    const frozen = !live || now < this.hitStopUntil;
+    if (live && !frozen) this.acc += dt * gameSpeedFactor(this.settings);
+    if (!live) this.acc = 0;
 
     const move = this.moveVector();
+    if (move.moveX !== 0 || move.moveY !== 0) this.lastMove = { x: move.moveX, y: move.moveY };
+    if (live) this.tryDash(world);
     let steps = 0;
     while (!frozen && this.acc >= FIXED_STEP && steps < MAX_SUBSTEPS) {
       stepWorld(world, FIXED_STEP, { ...move, ultimate: this.ultRequested });
@@ -413,29 +536,267 @@ export class DemoDaySession {
     }
     if (steps === MAX_SUBSTEPS) this.acc = 0;
 
-    this.autoLevelUp(world);
-    this.processHits(world);
-    this.collectBroken(world, now);
-    this.collectImpacts(world);
-    this.updateDissolves(world);
-    stepDebris(this.debris, dt);
-    pruneFloaters(this.floaters, world.now);
-    this.drainSfx(world);
-    if (now - this.lastStream >= STREAM_EVERY_MS) {
-      this.lastStream = now;
-      this.stream(false);
+    if (live) {
+      this.bodyContact(world, steps * FIXED_STEP, move);
+      this.processHits(world);
+      this.collectBroken(world, now);
+      this.collectImpacts(world);
+      this.updateDissolves(world);
+      stepDebris(this.debris, dt);
+      pruneFloaters(this.floaters, world.now);
+      this.drainSfx(world);
+      this.drainLoot(world);
+      this.checkLevelFlow(world);
+      this.followWithScroll(world, dt);
     }
-    this.followWithScroll(world, dt);
     this.render(world);
     if (now - this.lastHud >= 100) {
       this.lastHud = now;
       this.updateHud(world);
     }
-    if (world.outcome !== 'running') {
-      this.toast(STRINGS.title);
-    }
     this.raf = this.win.requestAnimationFrame(this.frame);
   };
+
+  /* ------------------------------------------------------- survival flow */
+
+  private storage(): Storage | null {
+    try {
+      return this.win.localStorage;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Push the current settings into everything that reads them. Safe to call any time. */
+  private applySettings(): void {
+    this.sfx?.setEnabled(this.settings.sfx && !this.muted);
+    if (this.lightHost) this.lightHost.style.display = this.lightsOn && this.settings.glow && !this.settings.reducedFlashes ? '' : 'none';
+    const world = this.world;
+    if (world) {
+      const zen = this.settings.mode === 'zen';
+      world.area.waves = buildOverlayWaves({ blocks: this.blocks.length, zen });
+      if (this.bossSpawned && !zen) world.area.waves.push(finaleWave(world.time));
+    }
+  }
+
+  /** Esc / P: pause, or step back out of whatever menu is open. */
+  private onPauseKey(): void {
+    if (this.phase === 'playing') this.pause();
+    else if (this.phase === 'paused') {
+      if (this.settingsOpen) this.openPauseMenu();
+      else this.resume();
+    }
+  }
+
+  private pause(): void {
+    if (this.phase !== 'playing' || !this.world) return;
+    this.phase = 'paused';
+    this.keys.clear();
+    this.openPauseMenu();
+  }
+
+  private resume(): void {
+    if (this.phase !== 'paused') return;
+    this.closeMenu();
+    this.phase = 'playing';
+    this.acc = 0;
+    this.lastTime = performance.now();
+  }
+
+  private openPauseMenu(): void {
+    this.settingsOpen = false;
+    const summary = this.summary();
+    this.showMenu(
+      buildPauseMenu(this.win.document, {
+        onResume: () => this.resume(),
+        onSettings: () => this.openSettings(),
+        onRestore: () => {
+          this.restorePage();
+          this.resume();
+        },
+        shareUrl: summary ? reportUrl(summary) : CREDIT_URL,
+        onLeave: () => void this.stop(true),
+        creditUrl: CREDIT_URL,
+      }),
+    );
+  }
+
+  private openSettings(): void {
+    this.settingsOpen = true;
+    this.showMenu(
+      buildSettingsPanel(
+        this.win.document,
+        this.settings,
+        (id: SettingId) => {
+          this.settings = nextSetting(this.settings, id);
+          saveSettings(this.storage(), this.settings);
+          this.applySettings();
+          return this.settings;
+        },
+        () => this.openPauseMenu(),
+      ),
+    );
+  }
+
+  private showMenu(panel: HTMLElement): void {
+    const layer = this.menuLayer;
+    if (!layer) return;
+    layer.replaceChildren(panel);
+    layer.classList.add('open');
+    (panel.querySelector('button.primary, button, a') as HTMLElement | null)?.focus();
+  }
+
+  private closeMenu(): void {
+    this.menuLayer?.replaceChildren();
+    this.menuLayer?.classList.remove('open');
+    this.settingsOpen = false;
+  }
+
+  /** A short, self-clearing line near the top of the screen (boss warnings, loot). */
+  private notice(message: string): void {
+    const layer = this.host?.shadowRoot?.querySelector('.layer');
+    if (!layer) return;
+    this.noticeEl?.remove();
+    const doc = this.win.document;
+    const el = doc.createElement('div');
+    el.className = 'notice';
+    el.textContent = message;
+    layer.appendChild(el);
+    this.noticeEl = el;
+    this.win.clearTimeout(this.noticeTimer);
+    this.noticeTimer = this.win.setTimeout(() => el.remove(), 2600);
+  }
+
+  private requestDash(direction?: { x: number; y: number }): void {
+    const mv = this.moveVector();
+    const dir = direction ?? (mv.moveX !== 0 || mv.moveY !== 0 ? { x: mv.moveX, y: mv.moveY } : this.lastMove);
+    this.dashRequest = dir;
+  }
+
+  private tryDash(world: World): void {
+    const req = this.dashRequest;
+    if (!req) return;
+    this.dashRequest = null;
+    if (dashPlayer(world, req.x, req.y)) {
+      world.player.invulnUntil = Math.max(world.player.invulnUntil, world.now + DASH_INVULN_MS);
+    }
+  }
+
+  /**
+   * Walking into page text chews at it (about 1.5x power per second) so the player is never walled in by blocks
+   * the weapons do not reach, and a dash bulldozes through whatever it overlaps.
+   */
+  private bodyContact(world: World, simSec: number, move: { moveX: number; moveY: number }): void {
+    const p = world.player;
+    const moved = Math.hypot(p.x - this.lastPos.x, p.y - this.lastPos.y);
+    this.lastPos = { x: p.x, y: p.y };
+    if (p.dashUntil > world.now) {
+      if (world.now - this.dashHitAt >= 60) {
+        this.dashHitAt = world.now;
+        damageBlocksNear(world, p.x, p.y, p.radius + 8, 8 * world.stats.power, 1);
+      }
+      return;
+    }
+    if ((move.moveX === 0 && move.moveY === 0) || simSec <= 0) return;
+    const expected = world.stats.speed * simSec;
+    if (moved >= expected * BLOCKED_RATIO || world.now - this.shoulderAt < 250) return;
+    this.shoulderAt = world.now;
+    damageBlocksNear(world, p.x, p.y, p.radius + 3, Math.max(1, 1.5 * world.stats.power * 0.25));
+  }
+
+  /** Loot boxes queue prizes that grant nothing until claimed; claim at once so the reel can never stall the run. */
+  private drainLoot(world: World): void {
+    while (world.pendingReel.length > 0) {
+      const prize = world.pendingReel.shift()!;
+      claimLootPrize(world, prize);
+      this.playSfx('lootBox');
+      this.notice(t('overlay.loot', { label: prize.label }));
+    }
+  }
+
+  private levelState() {
+    const world = this.world!;
+    return {
+      destroyed: destroyedFraction(this.blocks),
+      elapsedSec: world.time,
+      zen: this.settings.mode === 'zen',
+      bossSpawned: this.bossSpawned,
+      bossKilled: (world.killsByEnemy[FINALE_BOSS_ID] ?? 0) >= 1,
+    };
+  }
+
+  /** Level-ups, the boss, completion and death: everything that changes which screen the player is looking at. */
+  private checkLevelFlow(world: World): void {
+    if (world.outcome === 'dead' && this.phase === 'playing') {
+      this.phase = 'dead';
+      this.keys.clear();
+      const summary = this.summary();
+      this.showMenu(
+        buildDeadCard(this.win.document, { shareUrl: summary ? reportUrl(summary) : CREDIT_URL, onLeave: () => void this.stop(true) }),
+      );
+      return;
+    }
+    if (world.pendingLevelUps > 0) {
+      if (this.settings.levelUp === 'auto') this.autoLevelUp(world);
+      else {
+        this.openLevelUp(world);
+        return;
+      }
+    }
+    const state = this.levelState();
+    if (shouldSpawnBoss(state)) {
+      this.bossSpawned = true;
+      world.area.waves.push(finaleWave(world.time));
+      this.notice(t('overlay.boss.warning'));
+      this.playSfx('bossWarning');
+    }
+    if (!this.levelDone && levelComplete(state)) this.completeLevel();
+  }
+
+  private levelUpChoices: UpgradeDef[] = [];
+
+  private openLevelUp(world: World): void {
+    const choices = rollUpgradeChoices(world);
+    if (choices.length === 0) {
+      world.pendingLevelUps = 0;
+      return;
+    }
+    this.levelUpChoices = choices;
+    this.phase = 'levelup';
+    this.keys.clear();
+    this.showMenu(buildLevelUp(this.win.document, world.level, choices, (choice) => this.pickUpgrade(choice)));
+  }
+
+  private pickUpgrade(choice: UpgradeDef): void {
+    const world = this.world;
+    if (!world || this.phase !== 'levelup') return;
+    applyUpgrade(world, choice);
+    this.closeMenu();
+    this.phase = 'playing';
+    this.acc = 0;
+    this.lastTime = performance.now();
+  }
+
+  private completeLevel(): void {
+    this.levelDone = true;
+    this.phase = 'complete';
+    this.keys.clear();
+    const summary = this.summary();
+    if (summary) this.onLevelComplete?.(summary);
+    this.playSfx('levelUp');
+    this.showMenu(
+      buildCompleteCard(this.win.document, summary?.destroyedPct ?? Math.round(OBJECTIVE_PCT * 100), {
+        shareUrl: summary ? reportUrl(summary) : CREDIT_URL,
+        onKeep: () => {
+          this.closeMenu();
+          this.phase = 'playing';
+          this.acc = 0;
+          this.lastTime = performance.now();
+        },
+        onLeave: () => void this.stop(true),
+      }),
+    );
+  }
 
   /** Level-ups pick a random upgrade (the game's own "random-live" presentation) so the page never waits on a menu. */
   private autoLevelUp(world: World): void {
@@ -525,7 +886,7 @@ export class DemoDaySession {
       const milestone = comboBreak(this.combo, world.now);
       if (milestone !== null) this.playSfx('speedTally');
       const stop = hitStopMs(b.maxHp, 1);
-      if (stop > 0 && realNow - this.lastHitStopAt > HIT_STOP_COOLDOWN_MS) {
+      if (stop > 0 && this.settings.hitStop && realNow - this.lastHitStopAt > HIT_STOP_COOLDOWN_MS) {
         this.hitStopUntil = realNow + stop;
         this.lastHitStopAt = realNow;
       }
@@ -728,7 +1089,7 @@ export class DemoDaySession {
     const sx = Math.round(this.win.scrollX);
     const sy = Math.round(this.win.scrollY);
     // Heavy hits shake the real scroll in whole cells, so the page and the game shake together (zero at clamped edges).
-    const shake = world.shake > 3 ? Math.min(2, Math.round(world.shake / 8)) : 0;
+    const shake = this.settings.shake && world.shake > 3 ? Math.min(2, Math.round(world.shake / 8)) : 0;
     const jitter = () => (shake > 0 ? Math.round((this.rng() * 2 - 1) * shake) * CELL_CSS : 0);
     const nx = Math.min(maxX, Math.max(0, snapToCell(sx + (target.x - sx) * k) + jitter()));
     const ny = Math.min(maxY, Math.max(0, snapToCell(sy + (target.y - sy) * k) + jitter()));
@@ -772,7 +1133,7 @@ export class DemoDaySession {
     const img = actorCtx.getImageData(0, 0, this.lowW, this.lowH);
     const px = new Uint32Array(img.data.buffer);
     binariseAlpha(px, 110);
-    addOutline(px, this.lowW, this.lowH, OUTLINE);
+    if (this.settings.outline) addOutline(px, this.lowW, this.lowH, OUTLINE);
     actorCtx.putImageData(img, 0, 0);
     ctx.drawImage(actorCanvas, 0, 0);
   }
@@ -795,7 +1156,7 @@ export class DemoDaySession {
       const by = Math.floor(block.y / CELL_CSS) - cellY;
       const bw = Math.ceil(block.w / CELL_CSS);
       const bh = Math.ceil(block.h / CELL_CSS);
-      if (b.lastHitAt !== undefined && world.now - b.lastHitAt < 90) {
+      if (!this.settings.reducedFlashes && b.lastHitAt !== undefined && world.now - b.lastHitAt < 90) {
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.fillRect(bx, by, bw, bh);
       }
@@ -813,7 +1174,7 @@ export class DemoDaySession {
       for (const [x, y] of cells) ctx.fillRect(bx + x, by + y, 1, 1);
     }
     for (const d of this.dissolves) {
-      if (world.now - d.bornAt >= FLASH_MS) continue;
+      if (this.settings.reducedFlashes || world.now - d.bornAt >= FLASH_MS) continue;
       const b = d.block;
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.fillRect(Math.floor(b.x / CELL_CSS) - cellX, Math.floor(b.y / CELL_CSS) - cellY, Math.ceil(b.w / CELL_CSS), Math.ceil(b.h / CELL_CSS));
@@ -844,6 +1205,7 @@ export class DemoDaySession {
   }
 
   private drawFloaters(world: World, cellX: number, cellY: number): void {
+    if (!this.settings.damageNumbers) return;
     for (const f of this.floaters) {
       const age = world.now - f.bornAt;
       if (age > FLOATER_LIFE_MS) continue;
@@ -964,36 +1326,46 @@ export class DemoDaySession {
 
     const hud = doc.createElement('div');
     hud.className = 'hud';
-    const hpRow = this.row(doc, STRINGS.hp, 'bar');
-    const pctRow = this.row(doc, STRINGS.destroyed, 'bar pct');
+    const hpRow = this.row(doc, t('overlay.hp'), 'bar');
+    const xpRow = this.row(doc, t('overlay.level', { level: 1 }), 'bar xp');
+    const pctRow = this.row(doc, t('overlay.destroyed'), 'bar pct');
+    const dashRow = this.row(doc, t('overlay.dash'), 'bar dash');
+    const objective = doc.createElement('div');
+    objective.className = 'sub';
     this.hpFill = hpRow.fill;
     this.pctFill = pctRow.fill;
     this.pctText = pctRow.value;
-    hud.append(hpRow.el, pctRow.el);
+    this.hud = { level: xpRow.name, xp: xpRow.fill, objective, dash: dashRow.fill };
+    hud.append(hpRow.el, xpRow.el, pctRow.el, objective, dashRow.el);
     layer.appendChild(hud);
 
     const dock = doc.createElement('div');
     dock.className = 'dock';
     const exit = doc.createElement('button');
     exit.type = 'button';
-    exit.textContent = STRINGS.exit;
+    exit.textContent = t('overlay.exit');
     exit.addEventListener('click', () => this.stop(true));
     const hint = doc.createElement('span');
     hint.className = 'hint';
-    hint.textContent = STRINGS.hint;
+    hint.textContent = t('overlay.hint');
     dock.append(exit, hint);
     layer.appendChild(dock);
 
     const credit = doc.createElement('div');
     credit.className = 'credit';
-    credit.append(`${STRINGS.creditPrefix} `);
+    credit.append(`${t('overlay.credit.prefix')} `);
     const link = doc.createElement('a');
     link.href = CREDIT_URL;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = STRINGS.creditName;
+    link.textContent = t('overlay.credit.name');
     credit.appendChild(link);
     layer.appendChild(credit);
+
+    const menus = doc.createElement('div');
+    menus.className = 'menus';
+    layer.appendChild(menus);
+    this.menuLayer = menus;
 
     root.appendChild(layer);
     doc.documentElement.appendChild(host);
@@ -1049,7 +1421,7 @@ export class DemoDaySession {
     const fill = doc.createElement('i');
     bar.appendChild(fill);
     el.append(head, bar);
-    return { el, fill, value };
+    return { el, fill, value, name };
   }
 
   private unmount(): void {
@@ -1068,6 +1440,9 @@ export class DemoDaySession {
     this.hpFill = null;
     this.pctFill = null;
     this.pctText = null;
+    this.menuLayer = null;
+    this.noticeEl = null;
+    this.hud = { level: null, xp: null, objective: null, dash: null };
   }
 
   /** Size every low-res surface to cover the viewport in whole cells (+1 so the sub-cell scroll shift never shows a gap). */
@@ -1105,6 +1480,17 @@ export class DemoDaySession {
     if (this.hpFill) this.hpFill.style.width = `${hud.maxHp > 0 ? (hud.hp / hud.maxHp) * 100 : 0}%`;
     if (this.pctFill) this.pctFill.style.width = `${pct}%`;
     if (this.pctText) this.pctText.textContent = `${Math.round(pct)}%`;
+    if (this.hud.level) this.hud.level.textContent = t('overlay.level', { level: hud.level });
+    if (this.hud.xp) this.hud.xp.style.width = `${hud.xpToNext > 0 ? Math.min(100, (hud.xp / hud.xpToNext) * 100) : 0}%`;
+    if (this.hud.objective) {
+      const stage = levelStage(this.levelState());
+      this.hud.objective.textContent =
+        stage === 'smash' ? t('overlay.objective', { pct: Math.round(OBJECTIVE_PCT * 100) }) : stage === 'boss' ? t('overlay.objective.boss') : '';
+    }
+    if (this.hud.dash) {
+      const left = Math.max(0, world.player.dashReadyAt - world.now);
+      this.hud.dash.style.width = `${Math.round((1 - Math.min(1, left / DASH_COOLDOWN_MS)) * 100)}%`;
+    }
   }
 
   /**
@@ -1126,19 +1512,19 @@ export class DemoDaySession {
     card.className = 'card';
 
     const title = doc.createElement('h2');
-    title.textContent = STRINGS.endTitle;
+    title.textContent = t('overlay.end.title');
     const note = doc.createElement('div');
-    note.textContent = restored ? STRINGS.endRestored : '';
+    note.textContent = restored ? t('overlay.end.restored') : '';
     note.hidden = !restored;
 
     const stats = doc.createElement('dl');
     const minutes = Math.floor(summary.elapsedSec / 60);
     const seconds = String(summary.elapsedSec % 60).padStart(2, '0');
     const rows: Array<[string, string]> = [
-      [STRINGS.endDestroyed, `${summary.destroyedPct}%`],
-      [STRINGS.endKills, String(summary.kills)],
-      [STRINGS.endLevel, String(summary.level)],
-      [STRINGS.endTime, `${minutes}:${seconds}`],
+      [t('overlay.end.destroyed'), `${summary.destroyedPct}%`],
+      [t('overlay.end.kills'), String(summary.kills)],
+      [t('overlay.end.level'), String(summary.level)],
+      [t('overlay.end.time'), `${minutes}:${seconds}`],
     ];
     for (const [label, value] of rows) {
       const dt = doc.createElement('dt');
@@ -1154,10 +1540,10 @@ export class DemoDaySession {
     share.href = reportUrl(summary);
     share.target = '_blank';
     share.rel = 'noopener noreferrer';
-    share.textContent = STRINGS.endShare;
+    share.textContent = t('overlay.end.share');
     const close = doc.createElement('button');
     close.type = 'button';
-    close.textContent = STRINGS.endClose;
+    close.textContent = t('overlay.end.close');
     close.addEventListener('click', () => host.remove());
     actions.append(share, close);
 

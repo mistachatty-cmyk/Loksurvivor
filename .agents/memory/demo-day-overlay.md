@@ -120,6 +120,30 @@ invisible). Sound is `createSfxEngine` on an AudioContext created on the start g
 Not done: real-text/image-shard debris (debris is the element's own colours), a quality tier that turns the AA
 pass/glow off on slow machines.
 
+## Survival layer (M3, in 0.12.3)
+
+- Default mode is survival: `waves.ts` builds the wave list from the page's block count (tiers by time, gentler
+  first 40 s, mid bosses) and the overlay swaps it into `world.area.waves` (the engine re-reads it every tick;
+  `spawnCredit` tolerates the list growing). Zen = no waves. `level.ts` holds the goal: boss at 40% destroyed or
+  4 min (`finaleWave`, `stack-overflow`), complete at 70% plus the boss dead (zen: 70% alone).
+  `onLevelComplete` is the hook for the later site-hop mode (see `demo-day-future-modes.md`).
+- Phases `playing | paused | levelup | complete | dead` live in `session.ts`; every non-playing phase freezes the
+  simulation (`acc = 0`), keeps the shield up, and shows a panel built by `ui.ts`. Esc/P pause, blur and a
+  hidden tab auto-pause. Level-up cards are the engine's own `rollUpgradeChoices` (1/2/3); `levelUp: auto`
+  keeps the old random pick. Loot-box prizes are claimed at once (`claimLootPrize`) because the engine grants
+  nothing until the reel is claimed, so an undrained `pendingReel` would silently stall.
+- Dash is Shift or a double-tap (260 ms); the overlay adds 260 ms of `invulnUntil` and bulldozes blocks with
+  `damageBlocksNear` (exported from the engine, radius clamped under the crater threshold). Walking into text
+  chews at it (~1.5x power/s) only when the body is actually blocked, so no weapon is needed to get free.
+- Settings are a declarative schema (`settings.ts`), saved to `demoday.settings.v1` in the HOST page's
+  localStorage (blocked on `about:blank`/sandboxed pages: it falls back to defaults). The settings code
+  (`encodeSettingsCode`) exists for moving them between sites; the UI for it is not built.
+- All overlay text is `overlay.*` in `en.json` via `i18n.ts` (eager `import.meta.glob`, so every language ships
+  in the one script; the scanner returns reason codes, not English). Canvas text (combo) uses the 3x5 pixel font
+  and is English only.
+- Tuning lives in sims, not guesses: `buildOverlayWaves` was run against all 69 characters wandering idle for
+  3 minutes; only three very fragile characters (blink-choir, sleet, horse-you) fell early.
+
 ## Not done yet (Phase 1 backlog)
 
 Strings are English constants in `overlay/strings.ts` (the bundle cannot use React `useT()`); move to

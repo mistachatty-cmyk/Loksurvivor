@@ -5751,6 +5751,15 @@ export function removeBreakables(w: World, uids: ReadonlySet<number>): void {
   syncObstacleAabbs(w);
 }
 
+/**
+ * Page overlay: contact damage from the player's own body (shoulder-barging a block, bulldozing through one on a
+ * dash). Same path as every other hit, so flash, cracks, drops, sound and the hit log all react; it never raises
+ * a crater because its radius stays under `IMPACT_MIN_RADIUS`.
+ */
+export function damageBlocksNear(w: World, x: number, y: number, radius: number, amount: number, impactIntensity: ImpactIntensity = 0): void {
+  damageBreakable(w, x, y, Math.min(radius, IMPACT_MIN_RADIUS - 1), amount, impactIntensity);
+}
+
 function damageBreakable(
   w: World,
   x: number,

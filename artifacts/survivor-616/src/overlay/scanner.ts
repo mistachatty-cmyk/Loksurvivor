@@ -173,15 +173,17 @@ export function scanPage(win: Window, ignore: readonly Element[] = []): ScanResu
 /** Domains where smashing the page would be unwelcome or unsafe: money, health, government. */
 const SENSITIVE_HOST = /(^|\.)(chase|bankofamerica|wellsfargo|citi|capitalone|usbank|paypal|stripe|venmo|coinbase|robinhood|fidelity|schwab|vanguard|mychart|irs)\.(com|org|net|gov)$|\.(gov|mil|bank)$/i;
 
-/** A reason to refuse to start, or null when the page is fine. */
-export function sensitivePageReason(win: Window): string | null {
+export type SensitiveReason = 'finance' | 'signin' | 'payment';
+
+/** A code for why to refuse to start (the overlay words it in the player's language), or null when the page is fine. */
+export function sensitivePageReason(win: Window): SensitiveReason | null {
   const doc = win.document;
   const host = win.location.hostname;
-  if (SENSITIVE_HOST.test(host)) return 'banking, payment, health or government site';
-  if (doc.querySelector('input[type="password"]')) return 'a sign-in form';
+  if (SENSITIVE_HOST.test(host)) return 'finance';
+  if (doc.querySelector('input[type="password"]')) return 'signin';
   for (const frame of Array.from(doc.querySelectorAll('iframe'))) {
     const src = (frame.getAttribute('src') ?? '').toLowerCase();
-    if (/(js\.stripe\.com|paypal\.com|checkout|payment|secure\.)/.test(src)) return 'a payment form';
+    if (/(js\.stripe\.com|paypal\.com|checkout|payment|secure\.)/.test(src)) return 'payment';
   }
   return null;
 }
