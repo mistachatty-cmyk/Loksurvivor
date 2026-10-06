@@ -72,6 +72,21 @@ window scrolls to follow the player (`scrollTargetFor`), so the canvas and the p
 - With no enemies the Foreman still breaks blocks in reach (weapons fall back to facing; novas/auras damage
   breakables directly). His 1.9 s meteor cooldown is slow for a demo; tune before shipping.
 
+## Shipping and the hub side
+
+- `pnpm build` now also emits `dist/public/demoday.js` (`vite.overlay.config.ts --mode public`, which must not
+  wipe the site build); `vercel.json` gives `/demoday.js` open CORS and a 5-minute cache. It is served from
+  `survivor.gsix.online/demoday.js`. Static files win over the SPA catch-all rewrite, so no rewrite change.
+- The GSix hub (repo `Gsixhub`, `apps/hub/DEMODAY.md`) has the designed pages `/games/demoday` and
+  `/games/demoday/report`, a registry entry (`kind: "overlay"`), and the Tamagotchi button that starts the overlay
+  in place. The pages load the bundle from the URL above with `referrerPolicy = "no-referrer"`.
+- Report contract: on stop the overlay shows an end card whose "Save & share" link is
+  `https://gsix.online/games/demoday/report#r=<base64url {"v":1,"pct","kills","level","sec","ch"}>`. The
+  fragment is never sent to a server and carries no page address. `src/overlay/runLink.ts` is the encoder; the hub's
+  `lib/demoday-report.ts` is the validating decoder. Change both together.
+- Nothing on the hub pages works until this repo is deployed with the overlay; until then the hub's Wreck button
+  reports "Try again" and the Tamagotchi falls back to Sprite Fusion's tool.
+
 ## Not done yet (Phase 1 backlog)
 
 Strings are English constants in `overlay/strings.ts` (the bundle cannot use React `useT()`); move to
