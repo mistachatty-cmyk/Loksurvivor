@@ -422,6 +422,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Foreman moves about 30% faster and the game now runs on a chunkier pixel grid that stays locked to the page as it scrolls. While you play, clicks and the mouse wheel no longer reach the page, so a destroyed link cannot be followed by accident.',
     ],
   },
+  {
+    version: '0.13.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Forge and Settings Tune-Up',
+    body: [
+      'Dev Mode now shows all five usable Forge slots inside the workshop, matching the save rules.',
+      'Save downloads now include your forged operators alongside game progress. Older progress-only files still import without erasing operators already on this device.',
+      'Settings has a section finder and music volume control. The Forge keeps a compact preview visible on phones and adds undo, redo, duplicate, and a warning before replacing unsaved work.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

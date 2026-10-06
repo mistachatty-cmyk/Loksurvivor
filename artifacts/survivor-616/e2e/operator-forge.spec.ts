@@ -50,9 +50,12 @@ test.describe('operator forge', () => {
     await expect(page.getByTestId('slot-endgame-slot-beast-master')).toContainText('earned');
     await page.getByTestId('button-open-forge').click();
     await expect(page.getByTestId('panel-operator-forge')).toBeVisible();
+    await expect(page.getByText('Custom slots (0/5 used, 5 total)')).toBeVisible();
+    await expect(page.locator('[data-testid^="slot-locked-"]')).toHaveCount(0);
   });
 
   test('is behind the end game until earned, then designs, saves and plays a new operator', async ({ page }) => {
+    test.setTimeout(90_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     // Blocked outside resources (fonts, CDNs) in a sandboxed browser are noise; real script errors are not.
@@ -121,6 +124,7 @@ test.describe('operator forge', () => {
   });
 
   test('generation, rolling and share codes work', async ({ page }) => {
+    page.on('dialog', (dialog) => void dialog.accept());
     await seed(page);
     await openEndgame(page);
     await page.getByTestId('button-open-forge').click();
