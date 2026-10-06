@@ -388,6 +388,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Every map card now shows its type, including routes you have not unlocked yet.',
     ],
   },
+  {
+    version: '0.12.4',
+    date: '2026-10-04',
+    kind: 'update',
+    title: 'The Crew After Hours',
+    body: [
+      'Eleven new crew jobs widen the hideout rotation. Rapid Shelter now has working assignments of its own, and every rescued ally has more than one reachable job.',
+      'Rescue crew to earn Ember Guard and Moon Runner colors for every fighter, plus three animated hideout scene looks. The original scene and original fighter colors stay available.',
+      'Three new hats join the loot-token shop. Watch for a tiny feudal age, a garlic orbit, and one more run before dawn.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
