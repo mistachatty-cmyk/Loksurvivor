@@ -47,6 +47,7 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
+import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
@@ -392,6 +393,10 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           <section className="border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
+          </section>
+          <section className="border border-border bg-card p-5 sm:p-6">
+            <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>
+            <ScrollbarSetting />
           </section>
         </div>
         <section id="settings-display" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">

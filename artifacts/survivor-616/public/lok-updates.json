@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 54,
+      "version": "0.19.2",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T22:45:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "A Quieter Scrollbar",
+      "body": [
+        "The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.",
+        "Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral."
+      ]
+    },
+    {
       "number": 53,
       "version": "0.19.1",
       "date": "2026-10-07",

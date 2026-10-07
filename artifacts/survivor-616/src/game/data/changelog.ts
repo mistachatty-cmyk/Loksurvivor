@@ -645,6 +645,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone.',
     ],
   },
+  {
+    version: '0.19.2',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T22:45:00Z',
+    kind: 'hotfix',
+    title: 'A Quieter Scrollbar',
+    body: [
+      'The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.',
+      'Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

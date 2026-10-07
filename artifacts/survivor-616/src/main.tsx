@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
 import { restoreUiTransparency } from '@/ui/UiTransparencyControls';
+import { applyScrollbarPrefs } from '@/lib/scrollbar';
 import { applyMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
 
@@ -69,6 +70,7 @@ function installRuntimeDiagnostics(): void {
 installRuntimeDiagnostics();
 restoreUiTransparency();
 applyMotionMode();
+applyScrollbarPrefs();
 registerLiveFeedLoad();
 
 function mount(): void {
