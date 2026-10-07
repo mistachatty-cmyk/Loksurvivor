@@ -16,6 +16,8 @@ export interface PublicUpdateEntry {
   number: number;
   version: string;
   date: string;
+  /** UTC instant the update landed (ISO 8601); absent for the earliest notes. */
+  publishedAt?: string;
   kind: ChangelogKind;
   categoryLabel: string;
   categoryColor: string;
@@ -47,6 +49,7 @@ export function buildPublicUpdates(): PublicUpdates {
       number: updateNumber(entry),
       version: entry.version,
       date: entry.date,
+      ...(entry.publishedAt ? { publishedAt: entry.publishedAt } : {}),
       kind: entry.kind,
       categoryLabel: CHANGELOG_KIND_META[entry.kind].label,
       categoryColor: CHANGELOG_KIND_META[entry.kind].color,

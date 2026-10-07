@@ -16,7 +16,10 @@ export const STUDIO_NAME = 'Kinetic Souls';
 
 export interface ChangelogEntry {
   version: string;
+  /** UTC calendar day (`YYYY-MM-DD`) the update landed; always the day part of `publishedAt` when that is set. */
   date: string;
+  /** UTC instant the update landed on main (`YYYY-MM-DDTHH:MM:SSZ`). Absent only for the pre-import 0.1.x-0.5.x notes. */
+  publishedAt?: string;
   kind: ChangelogKind;
   title: string;
   body: string[];
@@ -87,6 +90,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.6.0',
     date: '2026-09-21',
+    publishedAt: '2026-09-21T03:49:15Z',
     kind: 'update',
     title: 'Looks, LokPets, and a Hideout That Makes Sense',
     body: [
@@ -103,6 +107,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.7.0',
     date: '2026-09-21',
+    publishedAt: '2026-09-21T12:58:38Z',
     kind: 'update',
     title: 'Your Frame, Your Soundtrack',
     body: [
@@ -114,6 +119,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.8.0',
     date: '2026-09-27',
+    publishedAt: '2026-09-27T02:06:21Z',
     kind: 'update',
     title: 'The Defector Reaches the Spire',
     body: [
@@ -125,6 +131,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.9.0',
     date: '2026-09-28',
+    publishedAt: '2026-09-28T14:37:48Z',
     kind: 'update',
     title: 'Hazards Get Their Own Identity',
     body: [
@@ -137,6 +144,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.0',
     date: '2026-09-28',
+    publishedAt: '2026-09-28T16:13:35Z',
     kind: 'update',
     title: 'The Horde Hits Seven Digits',
     body: [
@@ -149,6 +157,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.1',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'update',
     title: 'The Underground Update',
     body: [
@@ -162,6 +171,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.2',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'update',
     title: 'Card Style Choice',
     body: [
@@ -171,6 +181,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.3',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'hotfix',
     title: 'Soundtrack Wake-Up',
     body: [
@@ -181,6 +192,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.4',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'hotfix',
     title: 'Motion Override',
     body: [
@@ -190,6 +202,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.5',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'update',
     title: 'Studio 28 Filters',
     body: [
@@ -199,6 +212,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.6',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:27:39Z',
     kind: 'update',
     title: 'Clearer Fights',
     body: [
@@ -209,6 +223,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.7',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:35:18Z',
     kind: 'update',
     title: 'Travel Fight Styles',
     body: [
@@ -220,6 +235,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.8',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T20:09:36Z',
     kind: 'update',
     title: 'The Operator Forge',
     body: [
@@ -232,6 +248,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.9',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T20:43:20Z',
     kind: 'update',
     title: 'End Game: Victory Lap',
     body: [
@@ -244,6 +261,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.0',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T22:02:41Z',
     kind: 'update',
     title: 'Bond and Growth',
     body: [
@@ -257,6 +275,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.1',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T22:26:35Z',
     kind: 'update',
     title: 'Hideout Companions',
     body: [
@@ -269,6 +288,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.2',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T22:51:41Z',
     kind: 'update',
     title: 'Evolution Paths',
     body: [
@@ -280,6 +300,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.3',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T23:10:50Z',
     kind: 'update',
     title: 'Language Support',
     body: [
@@ -290,6 +311,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.4',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T03:17:16Z',
     kind: 'update',
     title: 'Your LokDex Follows You',
     body: [
@@ -300,6 +322,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.5',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T03:53:34Z',
     kind: 'update',
     title: 'Universe Hookups',
     body: [
@@ -310,6 +333,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.6',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T03:53:34Z',
     kind: 'update',
     title: 'Universe Binder',
     body: [
@@ -320,6 +344,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.7',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T04:04:07Z',
     kind: 'update',
     title: 'Lokifed Everywhere',
     body: [
@@ -332,6 +357,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.8',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T04:20:18Z',
     kind: 'update',
     title: 'Where the Songs Come From',
     body: [
@@ -342,6 +368,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.9',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T04:31:03Z',
     kind: 'hotfix',
     title: 'Sign In Inside The Arcade',
     body: [
@@ -352,6 +379,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.0',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T05:17:50Z',
     kind: 'update',
     title: 'The Digi-Verse On The Web',
     body: [
@@ -362,6 +390,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.1',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T22:47:59Z',
     kind: 'update',
     title: 'The Block Stays Alive',
     body: [
@@ -373,6 +402,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.2',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T00:30:56Z',
     kind: 'update',
     title: 'Demo Day On The Web',
     body: [
@@ -383,6 +413,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.3',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T03:49:26Z',
     kind: 'update',
     title: 'Experimental Map Playlist',
     body: [
@@ -392,7 +423,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.12.4',
-    date: '2026-10-04',
+    date: '2026-10-06',
+    publishedAt: '2026-10-06T04:18:52Z',
     kind: 'update',
     title: 'The Crew After Hours',
     body: [
@@ -403,7 +435,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.12.5',
-    date: '2026-10-05',
+    date: '2026-10-06',
+    publishedAt: '2026-10-06T04:20:47Z',
     kind: 'hotfix',
     title: 'Back To The Arcade',
     body: [
@@ -413,6 +446,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.6',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T04:22:14Z',
     kind: 'update',
     title: 'Demo Day Breaks Through',
     body: [
@@ -427,6 +461,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.0',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T12:00:10Z',
     kind: 'update',
     title: 'Forge and Settings Tune-Up',
     body: [
@@ -438,6 +473,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.1',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T12:13:10Z',
     kind: 'update',
     title: 'Faster Forge Starts',
     body: [
@@ -448,6 +484,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.2',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T21:04:32Z',
     kind: 'update',
     title: 'The GRPD Armory Opens',
     body: [
@@ -459,6 +496,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.3',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T21:04:32Z',
     kind: 'update',
     title: 'Armory Spawn Control',
     body: [
@@ -469,6 +507,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.14.0',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T21:04:32Z',
     kind: 'update',
     title: 'The Frogsters and the Armory Keeper',
     body: [
@@ -480,6 +519,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.14.1',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T22:53:52Z',
     kind: 'hotfix',
     title: 'Popups Stay on Screen',
     body: [
@@ -491,6 +531,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.14.2',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T23:20:13Z',
     kind: 'hotfix',
     title: 'Studio Takes Stop Hogging Memory',
     body: [
@@ -501,6 +542,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.15.0',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T23:33:39Z',
     kind: 'update',
     title: 'Walk the Hideout',
     body: [
@@ -513,7 +555,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.15.1',
-    date: '2026-10-06',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T02:42:28Z',
     kind: 'hotfix',
     title: 'Hideout and Travel, Armory Found',
     body: [
@@ -524,7 +567,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.15.2',
-    date: '2026-10-06',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T02:42:28Z',
     kind: 'hotfix',
     title: 'Your LokPet Travels With You',
     body: [
@@ -536,6 +580,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.16.0',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T20:29:46Z',
     kind: 'update',
     title: 'Ten Scores Leave the Armory',
     body: [
@@ -547,6 +592,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.17.0',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T20:38:30Z',
     kind: 'update',
     title: 'Floodline Breach and the Map Builder',
     body: [
@@ -558,11 +604,23 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.18.0',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T20:57:33Z',
     kind: 'update',
     title: 'Four Ways the Block Changes',
     body: [
       'Release notes now have four distinct looks: green Bugfixes, amber Hotfixes, vibrant cyan Major Updates, and red Expansions. Each carries a short piece of 616 lore.',
       'Choose which kinds may open an automatic popup in Settings. Every note stays in the Updates history, even when its popup is off.',
+    ],
+  },
+  {
+    version: '0.18.1',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T21:10:00Z',
+    kind: 'hotfix',
+    title: 'Every Update Wears Its Own Date',
+    body: [
+      'Patch notes used to pile up under a handful of shared dates. Each note now carries the exact day and time it reached the game, in the Updates history and on gsix.online.',
+      'A few notes that were filed under the wrong day have been corrected.',
     ],
   },
 ];
