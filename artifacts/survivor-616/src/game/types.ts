@@ -10,6 +10,7 @@ import type { BeatReaction } from '@/game/data/reactivity';
 import type { MusicSpawnEvent } from '@/game/data/musicEvents';
 import type { RunHighlight } from '@/game/data/runHighlights';
 import type { SfxStyleDef } from '@/game/audio/sfxCues';
+import type { ChangelogKind } from '@/game/data/changelogKinds';
 
 export interface Vec2 {
   x: number;
@@ -2532,6 +2533,8 @@ export interface MetaState {
   pendingNotifications: PendingNotification[];
   /** Highest changelog version (see `data/changelog.ts`) the player has acknowledged via the update popup. */
   lastSeenChangelogVersion: string;
+  /** Which update categories may open an automatic notice on the hub. */
+  updatePopupKinds: Record<ChangelogKind, boolean>;
   /** Relic crafting materials gathered from runs, chests, and deep mines. */
   relicMaterials: Record<string, number>;
   /** Real relics crafted at the Workshop Forge that grant permanent/toggled run perks. */

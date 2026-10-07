@@ -4,6 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { CHANGELOG } from './changelog';
+import { CHANGELOG_KIND_META } from './changelogKinds';
 import { buildPublicUpdates, PUBLIC_UPDATES_SCHEMA, serializePublicUpdates } from './publicUpdates';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -16,7 +17,12 @@ test('the public updates document carries every patch note, newest first, number
   assert.equal(doc.updates[0]!.version, CHANGELOG[CHANGELOG.length - 1]!.version);
   assert.equal(doc.updates[doc.updates.length - 1]!.number, 1);
   assert.equal(doc.updates[0]!.number, CHANGELOG.length);
-  for (const entry of doc.updates) assert.ok(entry.body.length > 0 && entry.title && entry.date);
+  for (const entry of doc.updates) {
+    assert.ok(entry.body.length > 0 && entry.title && entry.date);
+    assert.equal(entry.categoryLabel, CHANGELOG_KIND_META[entry.kind].label);
+    assert.equal(entry.categoryColor, CHANGELOG_KIND_META[entry.kind].color);
+    assert.equal(entry.categoryLore, CHANGELOG_KIND_META[entry.kind].lore);
+  }
 });
 
 test('public/lok-updates.json matches the changelog. If this fails, regenerate it', () => {

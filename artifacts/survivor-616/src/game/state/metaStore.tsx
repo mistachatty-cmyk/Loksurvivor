@@ -44,6 +44,7 @@ import {
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import { CHARACTER_MASTERY_STAT_EFFECTS, characterRankTitle } from '@/game/data/characterMastery';
 import { CURRENT_VERSION } from '@/game/data/changelog';
+import { DEFAULT_UPDATE_POPUP_KINDS, normalizeUpdatePopupKinds, type ChangelogKind } from '@/game/data/changelogKinds';
 import {
   advanceDailyContracts,
   contractDayKey,
@@ -432,6 +433,7 @@ export function createInitialMeta(): MetaState {
     dvdEasterEggUnlocked: false,
     pendingNotifications: [],
     lastSeenChangelogVersion: CURRENT_VERSION,
+    updatePopupKinds: { ...DEFAULT_UPDATE_POPUP_KINDS },
     relicMaterials: { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
     craftedRelicIds: [],
     ownedKeyItemIds: ['digiscope'],
@@ -1441,6 +1443,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // "older than every real version," so those players see the update
     // popup summarizing everything they missed, once.
     lastSeenChangelogVersion: typeof parsed.lastSeenChangelogVersion === 'string' ? parsed.lastSeenChangelogVersion : '0.0.0',
+    updatePopupKinds: normalizeUpdatePopupKinds(parsed.updatePopupKinds),
     relicMaterials: typeof parsed.relicMaterials === 'object' && parsed.relicMaterials !== null
       ? (parsed.relicMaterials as Record<string, number>)
       : { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
@@ -1995,6 +1998,7 @@ type Action =
   | { type: 'dismissNotifications'; ids: string[] }
   | { type: 'announceEndgame'; ids: string[]; now: number }
   | { type: 'acknowledgeChangelog' }
+  | { type: 'setUpdatePopupKind'; kind: ChangelogKind; enabled: boolean }
   | { type: 'buyGenerator'; id: string; now: number }
   | { type: 'refreshGeneratorIncome'; now: number }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
@@ -3534,6 +3538,15 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         meta: { ...state.meta, lastSeenChangelogVersion: CURRENT_VERSION },
       };
 
+    case 'setUpdatePopupKind':
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          updatePopupKinds: { ...state.meta.updatePopupKinds, [action.kind]: action.enabled },
+        },
+      };
+
     case 'refreshGeneratorIncome':
       return { ...state, meta: { ...state.meta, ...settleGeneratorIncome(state.meta, action.now) } };
 
@@ -4077,6 +4090,7 @@ export interface MetaContextValue {
   toggleRunModifier: (key: keyof RunModifiers) => void;
   dismissNotifications: (ids: string[]) => void;
   acknowledgeChangelog: () => void;
+  setUpdatePopupKind: (kind: ChangelogKind, enabled: boolean) => void;
   buyGenerator: (id: string) => void;
   refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
@@ -4364,6 +4378,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
   const dismissNotifications = useCallback((ids: string[]) => dispatch({ type: 'dismissNotifications', ids }), []);
   const acknowledgeChangelog = useCallback(() => dispatch({ type: 'acknowledgeChangelog' }), []);
+  const setUpdatePopupKind = useCallback((kind: ChangelogKind, enabled: boolean) => dispatch({ type: 'setUpdatePopupKind', kind, enabled }), []);
   const buyGenerator = useCallback((id: string) => dispatch({ type: 'buyGenerator', id, now: Date.now() }), []);
   const refreshGeneratorIncome = useCallback(() => dispatch({ type: 'refreshGeneratorIncome', now: Date.now() }), []);
   const setUiDensity = useCallback(
@@ -4577,6 +4592,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleRunModifier,
       dismissNotifications,
       acknowledgeChangelog,
+      setUpdatePopupKind,
       buyGenerator,
       refreshGeneratorIncome,
       setUiDensity,
@@ -4736,6 +4752,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleRunModifier,
     dismissNotifications,
     acknowledgeChangelog,
+    setUpdatePopupKind,
     buyGenerator,
     refreshGeneratorIncome,
     setUiDensity,

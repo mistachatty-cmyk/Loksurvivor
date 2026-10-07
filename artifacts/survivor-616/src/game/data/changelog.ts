@@ -10,12 +10,14 @@
  * (bug-only), and just append a new entry -- `CURRENT_VERSION` and the
  * "Update #" counter both derive from this array, nothing else to update.
  */
+import type { ChangelogKind } from './changelogKinds';
+
 export const STUDIO_NAME = 'Kinetic Souls';
 
 export interface ChangelogEntry {
   version: string;
   date: string;
-  kind: 'update' | 'hotfix';
+  kind: ChangelogKind;
   title: string;
   body: string[];
 }
@@ -507,6 +509,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'LokPets can do more than get petted. Scratch, fetch, boogie, snack break, nap together, and go on a sniff hunt. Every pet likes different things, and a closer bond opens up more of them and makes rare finds a little more likely.',
       'Little choice events turn up around the hideout and when you move between rooms. Pick what to do and see how it goes. A few rare surprises are hiding in there.',
       'It is all capped per day, and you can switch each part off in Settings under Hideout.',
+    ],
+  },
+  {
+    version: '0.16.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Four Ways the Block Changes',
+    body: [
+      'Release notes now have four distinct looks: green Bugfixes, amber Hotfixes, vibrant cyan Major Updates, and red Expansions. Each carries a short piece of 616 lore.',
+      'Choose which kinds may open an automatic popup in Settings. Every note stays in the Updates history, even when its popup is off.',
     ],
   },
 ];
