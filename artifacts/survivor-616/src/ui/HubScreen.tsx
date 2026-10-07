@@ -8,6 +8,8 @@ import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { allyRig } from '@/game/data/progression';
+import { crewSpeak } from '@/game/engine/crewSpeak';
+import { getCrewTalkMode, getCrewTalkTone } from '@/game/state/crewTalkSetting';
 import { RigPortrait } from './RigPortrait';
 import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
@@ -200,6 +202,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
   const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
   const noticeSeqRef = useRef(0);
+  const crewRecentRef = useRef(new Map<string, string[]>());
   const showStripNotice = (title: string, line: string) => {
     noticeSeqRef.current += 1;
     setStripNotice({ seq: noticeSeqRef.current, title, line });
@@ -261,7 +264,20 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const handlePropUse = (propId: string) => {
     if (propId.startsWith('ally:')) {
       const ally = rescuedAllies.find((candidate) => candidate.id === propId.slice(5));
-      if (ally) showStripNotice(ally.name, ally.blurb);
+      if (!ally) return;
+      if (getCrewTalkMode() === 'blurb') { showStripNotice(ally.name, ally.blurb); return; }
+      const seen = crewRecentRef.current.get(ally.id) ?? [];
+      const line = crewSpeak({
+        allyId: ally.id,
+        roomName: activeRoom?.name ?? '',
+        weather: getHideoutScene(activeRoomId).weather,
+        crewNames: rescuedAllies.filter((other) => other.id !== ally.id).map((other) => other.name),
+        tone: getCrewTalkTone(),
+        rng: Math.random,
+        recent: seen,
+      });
+      crewRecentRef.current.set(ally.id, [...seen, line].slice(-12));
+      showStripNotice(ally.name, line);
       return;
     }
     const def = HIDEOUT_PROPS_BY_ID[propId];

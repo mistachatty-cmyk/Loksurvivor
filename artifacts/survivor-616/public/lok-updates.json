@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 54,
+      "version": "0.19.2",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Crew Have a Lot to Say",
+      "body": [
+        "Rescued crew in the hideout now say something new every time you walk up to them, in their own voice. Vee talks shop, Mama Jo feeds you, Nyx talks paint, Deacon counts the hour.",
+        "Settings has a new Crew chatter choice: fresh lines or the original intro only, plus a Family or Wry tone. Wry is drier and more grown-up, and both stay fine for a child to read."
+      ]
+    },
+    {
       "number": 53,
       "version": "0.19.1",
       "date": "2026-10-07",

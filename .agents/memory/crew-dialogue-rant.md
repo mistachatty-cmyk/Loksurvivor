@@ -1,6 +1,6 @@
 # Crew dialogue generator — Rant as the reference
 
-Status: **design only, nothing built yet.** Special directions and communications
+Status: **built (v0.19.2).** `engine/crewTalk.ts` (expander), `engine/crewSpeak.ts` (context glue), `data/crewVoices.ts` (a voice record per ally + shared pools), `state/crewTalkSetting.ts` (device-local mode/tone), `crewTalk.test.ts`. Fragments are inline English in the data file, like ally blurbs, not en.json keys (thousands of fragments); only the settings labels are in en.json. Original design notes follow. Special directions and communications
 for individual characters will be added by the user later; leave a slot for them.
 
 Goal: rescued crew standing in hideout rooms (see `HubScreen.tsx`, props with id
