@@ -423,6 +423,15 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext, showArrival]);
 
   const weatherIcon = WEATHER_ICONS[scene.weather];
+  const sceneLinks: Array<{ testId: string; title: string; blurb: string; icon: typeof Radio; tone: string; onClick: () => void }> = [
+    { testId: 'button-hideout-computer', title: 'Sanctum computer', blurb: 'Open map builder', icon: MonitorDot, tone: 'border-cyan-200/35 bg-cyan-950/30 text-cyan-200 hover:border-cyan-200/80 hover:bg-cyan-950/60', onClick: onOpenMapEditor },
+    { testId: 'button-hideout-sector-command', title: 'Sector Command', blurb: 'Direct captured units · campaign', icon: Radio, tone: 'border-amber-200/35 bg-amber-950/30 text-amber-200 hover:border-amber-200/80 hover:bg-amber-950/60', onClick: onOpenSectorCommand },
+    ...(onOpenLokPetBattle ? [{ testId: 'button-hideout-lokpet-battle', title: 'Lit Corner Battle Arena', blurb: 'Experimental · LokPet Battles · Sparring & League', icon: Swords, tone: 'border-pink-400/40 bg-pink-950/40 text-pink-300 hover:border-pink-300 hover:bg-pink-950/70', onClick: onOpenLokPetBattle }] : []),
+    { testId: 'button-hideout-dust-mite-rancher', title: 'Dust Mite Rancher', blurb: 'Barnaby’s pure data-pet ranch · adopt & feed', icon: Bug, tone: 'border-amber-400/40 bg-amber-950/40 text-amber-400 hover:border-amber-300 hover:bg-amber-950/70', onClick: () => onOpen('dust-mite-rancher') },
+    { testId: 'button-hideout-frog-ranch', title: 'Circuit Frog Ranch', blurb: 'Meet Jeremey Frogster · adopt and train frogs', icon: Zap, tone: 'border-emerald-300/40 bg-emerald-950/40 text-emerald-300 hover:border-emerald-200 hover:bg-emerald-950/70', onClick: () => onOpen('frog-ranch') },
+    ...(armoryAnchor === 'hideout' ? [{ testId: 'button-hideout-grpd-armory', title: stationFound ? t('hub.armory.relocatedEntrance') : t('hub.armory.hideoutEntrance'), blurb: t('hub.armory.hideoutEntranceBlurb'), icon: ShieldCheck, tone: 'border-sky-200/50 bg-sky-950/50 text-amber-200 hover:border-amber-200 hover:bg-sky-950/80', onClick: () => onOpen('grpd-armory') }] : []),
+    { testId: 'button-hideout-arena', title: 'LokSurvivorArena', blurb: 'Experimental · 2-4 players · most kills wins', icon: Users, tone: 'border-violet-200/35 bg-violet-950/30 text-violet-200 hover:border-violet-200/80 hover:bg-violet-950/60', onClick: onOpenArena },
+  ];
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
     [roomAllies.length, scene.flavorLines, selectedCharacter.id],
@@ -789,124 +798,50 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
               testId="hideout-scene"
             >
-            <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-             <div className="flex items-center gap-3">
-               <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
-                 {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
-               </span>
-               <div>
-                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{scene.weatherLabel}</p>
-                 <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
-               </div>
-             </div>
-             <div className="hidden h-px bg-border sm:block" />
-              <div className="flex flex-col gap-3 text-right sm:items-end">
-                <div className="flex items-center gap-2">
-                  <Building2 className="hidden h-4 w-4 text-primary sm:block" />
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
-                    <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
+            <div className="flex flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-3 border border-border/60 bg-black/20 p-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                    {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{scene.weatherLabel}</p>
+                    <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
                   </div>
                 </div>
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={onOpenMapEditor}
-                    data-testid="button-hideout-computer"
-                    className="group flex items-center gap-3 border border-cyan-200/35 bg-cyan-950/30 px-3 py-2 text-left transition hover:border-cyan-200/80 hover:bg-cyan-950/60"
-                  >
-                    <MonitorDot className="h-5 w-5 text-cyan-200 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">Sanctum computer</span>
-                      <span className="block text-[10px] text-cyan-100/60">Open map builder</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-cyan-200/70" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={onOpenSectorCommand}
-                    data-testid="button-hideout-sector-command"
-                    className="group flex items-center gap-3 border border-amber-200/35 bg-amber-950/30 px-3 py-2 text-left transition hover:border-amber-200/80 hover:bg-amber-950/60"
-                  >
-                    <Radio className="h-5 w-5 text-amber-200 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-100">Sector Command</span>
-                      <span className="block text-[10px] text-amber-100/60">Direct captured units · campaign</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && onOpenLokPetBattle && (
-                  <button
-                    type="button"
-                    onClick={onOpenLokPetBattle}
-                    data-testid="button-hideout-lokpet-battle"
-                    className="group flex items-center gap-3 border border-pink-400/40 bg-pink-950/40 px-3 py-2 text-left transition hover:border-pink-300 hover:bg-pink-950/70"
-                  >
-                    <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
-                      <span className="block text-[10px] text-pink-200/70">Experimental · LokPet Battles · Sparring & League</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={() => onOpen('dust-mite-rancher')}
-                    data-testid="button-hideout-dust-mite-rancher"
-                    className="group flex items-center gap-3 border border-amber-400/40 bg-amber-950/40 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-amber-950/70"
-                  >
-                    <Bug className="h-5 w-5 text-amber-400 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-200">Dust Mite Rancher</span>
-                      <span className="block text-[10px] text-amber-200/70">Barnaby’s pure data-pet ranch · adopt & feed</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-amber-300/80" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={() => onOpen('frog-ranch')}
-                    data-testid="button-hideout-frog-ranch"
-                    className="group flex items-center gap-3 border border-emerald-300/40 bg-emerald-950/40 px-3 py-2 text-left transition hover:border-emerald-200 hover:bg-emerald-950/70"
-                  >
-                    <Zap className="h-5 w-5 text-emerald-300 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-100">Circuit Frog Ranch</span>
-                      <span className="block text-[10px] text-emerald-100/70">Meet Jeremey Frogster · adopt and train frogs</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-emerald-300/80" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && armoryAnchor === 'hideout' && (
-                  <button type="button" onClick={() => onOpen('grpd-armory')} data-testid="button-hideout-grpd-armory"
-                    className="group flex items-center gap-3 border border-sky-200/50 bg-sky-950/50 px-3 py-2 text-left transition hover:border-amber-200 hover:bg-sky-950/80">
-                    <ShieldCheck className="h-5 w-5 text-amber-200" />
-                    <span><span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100">{stationFound ? t('hub.armory.relocatedEntrance') : t('hub.armory.hideoutEntrance')}</span><span className="block text-[10px] text-sky-100/70">{t('hub.armory.hideoutEntranceBlurb')}</span></span>
-                    <ArrowRight className="h-3.5 w-3.5 text-sky-200/80" />
-                  </button>
-                )}
-                {activeRoom.id === 'main-floor' && (
-                  <button
-                    type="button"
-                    onClick={onOpenArena}
-                    data-testid="button-hideout-arena"
-                    className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
-                  >
-                    <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
-                    <span>
-                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
-                      <span className="block text-[10px] text-violet-100/60">Experimental · 2-4 players · most kills wins</span>
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
-                  </button>
-                )}
+                <div className="flex items-center gap-3 border border-border/60 bg-black/20 p-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                    <Building2 className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
+                    <p className="text-xs text-muted-foreground">{scene.homeDescription}</p>
+                  </div>
+                </div>
               </div>
+              {activeRoom.id === 'main-floor' && (
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" data-testid="hideout-scene-links">
+                  {sceneLinks.map((link) => {
+                    const Icon = link.icon;
+                    return (
+                      <button
+                        key={link.testId}
+                        type="button"
+                        onClick={link.onClick}
+                        data-testid={link.testId}
+                        className={`group flex min-h-14 items-center gap-3 border px-3 py-2 text-left transition active:scale-[0.98] ${link.tone}`}
+                      >
+                        <Icon className="h-5 w-5 shrink-0 transition group-hover:scale-110 group-hover:text-white" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-mono text-[10px] font-bold uppercase tracking-widest text-white">{link.title}</span>
+                          <span className="block text-[10px] leading-snug text-white/60">{link.blurb}</span>
+                        </span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             </CollapsibleSection>
             </div>
