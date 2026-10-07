@@ -5720,6 +5720,10 @@ function drawActors(
     return hueShiftPalette(base, degrees);
   };
 
+  // Hoisted out of the per-enemy loop: it was a filter-free `some` over every
+  // breakable for every visible enemy.
+  const liveBreakables = w.breakables.filter((b) => !b.broken);
+
   for (const enemy of sorted) {
     // Fog of war: hostiles are only drawn where you can currently see. An
     // "explored" cell remembers the terrain, never the units standing on it.
@@ -5933,11 +5937,18 @@ function drawActors(
       ctx.restore();
     }
     if (!skipEnemyShadows) drawShadow(ctx, enemy.x, enemy.y + 2, enemy.radius * (1 - Math.max(dissolve, fallProgress) * 0.6));
-    const shadowed = w.breakables.some((b) => !b.broken &&
-      enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
-      enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius);
-    ctx.save();
-    ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
+    let shadowed = false;
+    for (let bi = 0; bi < liveBreakables.length; bi += 1) {
+      const b = liveBreakables[bi]!;
+      if (enemy.x > b.x + 10 - enemy.radius && enemy.x < b.x + b.w + 10 + enemy.radius &&
+        enemy.y > b.y + 12 - enemy.radius && enemy.y < b.y + b.h + 12 + enemy.radius) {
+        shadowed = true;
+        break;
+      }
+    }
+    const enemyAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
+    const alphaBefore = ctx.globalAlpha;
+    ctx.globalAlpha = enemyAlpha;
     const enemyPalette = withHueShift(enemy.def, enemy.uid, resolveEnemyPalette(enemy.def));
     const grossed = enemy.activeEffects.some((effect) => effect.id === 'grossed-out' && effect.expiresAt > w.now);
     const squirmX = grossed ? Math.sin(w.now / 42 + enemy.uid) * 5 : 0;
@@ -5962,7 +5973,7 @@ function drawActors(
           : freeze ? { color: STATUS_EFFECTS_BY_ID.freeze!.color, alpha: 0.38 } : undefined,
       },
     );
-    ctx.restore();
+    ctx.globalAlpha = alphaBefore;
     if (grossed) {
       ctx.save();
       ctx.strokeStyle = '#d5f77e';
@@ -6074,48 +6085,80 @@ function drawActors(
   drawGuests(ctx, w);
 }
 
-/** Constant-cost density proxy for Million Horde. Each mark represents a
- * crowd cell containing thousands of aggregated enemies; fully interactive
- * actors are still drawn by drawActors above this layer. */
-function drawMillionHordeDensity(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds) {
-  const horde = w.millionHorde;
-  if (!horde || horde.virtualPopulation < 1_000) return;
-
-  const maxMarks = w.graphicsQuality === 'performance' ? 72 : w.graphicsQuality === 'balanced' ? 128 : 220;
-  const density = clamp(Math.log10(horde.virtualPopulation) / 7, 0.15, 1);
-  const markCount = Math.max(24, Math.round(maxMarks * density));
-  const width = bounds.right - bounds.left;
-  const height = bounds.bottom - bounds.top;
-  const phase = w.now / 900;
+/**
+ * Million Horde crowd: every dot is a real member of the crowd field with its
+ * own position, waiting in the shell just outside the camera until a live
+ * actor slot opens. Only the sampled in-view subset is drawn (bounded per
+ * frame), batched into two paths, so the cost does not grow with population.
+ */
+function drawMillionHordeCrowd(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds) {
+  const field = w.hordeField;
+  if (!field || field.count === 0) return;
+  const margin = 10;
+  const left = bounds.left - margin;
+  const right = bounds.right + margin;
+  const top = bounds.top - margin;
+  const bottom = bounds.bottom + margin;
+  const count = field.count;
+  const xs = field.x;
+  const ys = field.y;
+  const visible = field.visible;
+  const limit = w.graphicsQuality === 'performance' ? 1800 : w.graphicsQuality === 'balanced' ? 3600 : field.visibleCount;
+  const total = Math.min(field.visibleCount, limit);
 
   ctx.save();
   ctx.fillStyle = '#ef4444';
-  ctx.strokeStyle = '#fecaca';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < markCount; i += 1) {
-    // Irrational multipliers form a stable, allocation-free scatter. The
-    // small phase offset makes the mass breathe without changing gameplay.
-    const ux = (i * 0.61803398875 + (w.rngSeed % 97) * 0.013) % 1;
-    const uy = (i * 0.41421356237 + (w.rngSeed % 53) * 0.017) % 1;
-    const x = bounds.left + ux * width + Math.sin(phase + i) * 3;
-    const y = bounds.top + uy * height + Math.cos(phase * 0.8 + i * 0.7) * 2;
-    const dx = x - w.player.x;
-    const dy = y - w.player.y;
-    if (dx * dx + dy * dy < 95 * 95) continue;
-    const size = 2.5 + (i % 4) * 0.8;
-    ctx.globalAlpha = 0.1 + density * 0.16;
-    ctx.beginPath();
-    ctx.moveTo(x, y - size * 1.8);
-    ctx.lineTo(x - size, y + size);
-    ctx.lineTo(x + size, y + size);
-    ctx.closePath();
-    ctx.fill();
-    if (i % 7 === 0) {
-      ctx.globalAlpha = 0.12 + density * 0.12;
-      ctx.stroke();
-    }
+  ctx.globalAlpha = 0.62;
+  ctx.beginPath();
+  for (let k = 0; k < total; k += 1) {
+    const i = visible[k]!;
+    if (i >= count || k % 5 === 0) continue;
+    const x = xs[i]!;
+    const y = ys[i]!;
+    if (x < left || x > right || y < top || y > bottom) continue;
+    ctx.rect(x - 1.1, y - 1.6, 2.2, 3.2);
   }
+  ctx.fill();
+  ctx.fillStyle = '#fecaca';
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  for (let k = 0; k < total; k += 5) {
+    const i = visible[k]!;
+    if (i >= count) continue;
+    const x = xs[i]!;
+    const y = ys[i]!;
+    if (x < left || x > right || y < top || y > bottom) continue;
+    ctx.rect(x - 1.1, y - 1.6, 2.2, 3.2);
+  }
+  ctx.fill();
   ctx.restore();
+}
+
+/**
+ * Screen-space edge glow that thickens with the size of the waiting crowd, so
+ * a population too large to draw dot by dot still reads as a mass pressing in.
+ * Four gradient strips: constant cost at any population.
+ */
+function drawMillionHordePressure(ctx: CanvasRenderingContext2D, w: World, width: number, height: number) {
+  const field = w.hordeField;
+  if (!field || field.count < 20_000) return;
+  const density = clamp(Math.log10(field.count) / 7, 0.2, 1);
+  const alpha = 0.1 + density * 0.2;
+  const depthX = Math.min(width * 0.16, 150);
+  const depthY = Math.min(height * 0.2, 130);
+  const edge = `rgba(239,68,68,${alpha.toFixed(3)})`;
+  const clear = 'rgba(239,68,68,0)';
+  const strip = (x0: number, y0: number, x1: number, y1: number, rx: number, ry: number, rw: number, rh: number) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, edge);
+    g.addColorStop(1, clear);
+    ctx.fillStyle = g;
+    ctx.fillRect(rx, ry, rw, rh);
+  };
+  strip(0, 0, depthX, 0, 0, 0, depthX, height);
+  strip(width, 0, width - depthX, 0, width - depthX, 0, depthX, height);
+  strip(0, 0, 0, depthY, 0, 0, width, depthY);
+  strip(0, height, 0, height - depthY, 0, height - depthY, width, depthY);
 }
 
 /**
@@ -6563,7 +6606,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     drawBuildingInterior(ctx, w);
     drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
     drawMapSetPieces(ctx, w);
-    drawMillionHordeDensity(ctx, w, viewBounds);
+    drawMillionHordeCrowd(ctx, w, viewBounds);
     drawLightPool(ctx, w);
     drawLandmark(ctx, w);
     drawDistrictIncursion(ctx, w);
@@ -6655,6 +6698,8 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
   }
+
+  if (!overlay) drawMillionHordePressure(ctx, w, width, height);
 
   // Distant lightning, under the damage flash so a hit still reads as red.
   const bolt = overlay ? 0 : lightningIntensity(w.now, profile.lightningPeriodMs);

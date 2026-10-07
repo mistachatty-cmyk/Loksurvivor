@@ -645,6 +645,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone.',
     ],
   },
+  {
+    version: '0.19.2',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'update',
+    title: 'A Real Million',
+    body: [
+      'Million Horde now holds real millions. Every one of the up to ten million enemies has its own place in the crowd, walks in toward you, waits in a mass just past the edge of the screen, and steps into the fight as room opens up. It used to be a counter standing in for the crowd; kills now count one enemy at a time. Weaker phones hold a smaller crowd, and the cost per frame stays flat whatever its size.',
+      'Big fights run lighter everywhere. Crowd collisions, the death dissolve, sprite drawing and loot trimming were all rebuilt to do less work, so mass wipes should stay smooth. Nothing about the way anything looks or plays changed.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
