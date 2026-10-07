@@ -623,6 +623,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A few notes that were filed under the wrong day have been corrected.',
     ],
   },
+  {
+    version: '0.19.0',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T21:15:41Z',
+    kind: 'update',
+    title: 'Damage Numbers, Cascade Style',
+    body: [
+      'Settings now has a Damage numbers choice. Classic is the same short yellow number as always. Cascade keeps numbers on screen longer and stacks them above each enemy you hit.',
+      'In Cascade, the bigger the hit the bigger and brighter the number: white, yellow, orange, red, pink, violet, cyan, and a glowing gold for the biggest hits. Crits count as one step higher.',
+      'Display only. It never changes how much damage you deal.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

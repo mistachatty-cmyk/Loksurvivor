@@ -10,6 +10,7 @@
  */
 
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
+import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
@@ -473,6 +474,12 @@ export interface Popup {
   color: string;
   bornAt: number;
   vy: number;
+  /** Cascade style only: damage tier (see `data/damageNumbers.ts`), which sets size and glow. */
+  tier?: number;
+  /** Cascade style only: how long the number lives. Classic popups last 700 ms. */
+  lifeMs?: number;
+  /** Cascade style only: the enemy that was hit, so its numbers stack. */
+  ownerUid?: number;
 }
 
 export interface Particle {
@@ -1291,6 +1298,8 @@ export interface World {
    * popups, enemy outlines/shadows), never difficulty or rewards.
    */
   graphicsQuality: 'high' | 'balanced' | 'performance';
+  /** Settings: which damage-number style to draw. Render-only; never affects damage. */
+  damageNumberStyle: DamageNumberStyle;
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
   wheelSpin: WheelSpinState | null;
   /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
@@ -1478,6 +1487,7 @@ export function createWorld(
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
     graphicsQuality?: 'high' | 'balanced' | 'performance';
+    damageNumberStyle?: DamageNumberStyle;
     runtimePerformanceTier?: RuntimePerformanceTier;
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
@@ -1807,6 +1817,7 @@ export function createWorld(
       ? { virtualPopulation: 0, peakPopulation: 0, defeatedPopulation: 0 }
       : null,
     graphicsQuality: setup.graphicsQuality ?? 'high',
+    damageNumberStyle: setup.damageNumberStyle ?? 'classic',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
           phase: 'idle',
@@ -3645,7 +3656,7 @@ function emitEnemyImpactBurst(
   w.shake = Math.max(w.shake, 6);
 }
 
-function damageEnemy(
+export function damageEnemy(
   w: World,
   enemy: EnemyActor,
   amount: number,
@@ -3734,7 +3745,9 @@ function damageEnemy(
   }
 
   const denseUnleashed = isDenseForQuality(w);
-  if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
+  if (w.damageNumberStyle === 'cascade') {
+    pushCascadeNumber(w, enemy, dealt, isCrit, denseUnleashed);
+  } else if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
     w.popups.push({
       x: enemy.x + randRange(w.rng, -5, 5),
       y: enemy.y + enemy.radius + 10,
@@ -3754,6 +3767,41 @@ function damageEnemy(
   if (enemy.hp <= 0) {
     killEnemy(w, enemy, killerId);
   }
+}
+
+/**
+ * Cascade damage numbers: a longer-lived number above the enemy that stacks
+ * with that enemy's recent numbers and takes its color and size from the hit.
+ * Decorative only. In a dense swarm only bigger hits, crits and a third of the
+ * rest are shown so the screen still reads.
+ */
+function pushCascadeNumber(w: World, enemy: EnemyActor, dealt: number, isCrit: boolean, dense: boolean) {
+  const tier = damageTier(dealt, isCrit);
+  if (dense && !isCrit && tier < 3 && enemy.uid % 3 !== 0) return;
+  let mine = 0;
+  for (let i = w.popups.length - 1; i >= 0; i -= 1) {
+    const older = w.popups[i]!;
+    if (older.ownerUid !== enemy.uid) continue;
+    mine += 1;
+    if (mine >= CASCADE_STACK_PER_ENEMY) {
+      w.popups.splice(i, 1);
+    } else {
+      older.y -= CASCADE_STACK_STEP;
+    }
+  }
+  w.popups.push({
+    x: enemy.x + randRange(w.rng, -6, 6),
+    y: enemy.y - enemy.radius - 6,
+    text: isCrit ? `${dealt}!` : String(dealt),
+    color: DAMAGE_TIERS[tier]!.color,
+    bornAt: w.now,
+    vy: -30,
+    tier,
+    lifeMs: cascadeLifeMs(tier),
+    ownerUid: enemy.uid,
+  });
+  const budget = dense ? 60 : 110;
+  if (w.popups.length > budget) w.popups.splice(0, w.popups.length - budget);
 }
 
 /** Apply a metadata-defined effect, refreshing duration and stacking safely. */
@@ -10603,7 +10651,7 @@ function updateParticles(w: World, dt: number) {
     const popup = w.popups[i]!;
     popup.y += popup.vy * dt;
     popup.vy *= Math.pow(0.25, dt);
-    if (w.now - popup.bornAt > 700) w.popups.splice(i, 1);
+    if (w.now - popup.bornAt > (popup.lifeMs ?? 700)) w.popups.splice(i, 1);
   }
   for (let i = w.alerts.length - 1; i >= 0; i -= 1) {
     if (w.now - w.alerts[i]!.bornAt > 2600) w.alerts.splice(i, 1);

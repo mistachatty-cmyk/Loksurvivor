@@ -59,6 +59,10 @@
   "hub.room.director-terminal.label": "Director Terminal",
   "hub.room.director-terminal.description": "Read and select Director personalities",
 
+  "settings.damageNumbers.title": "Damage numbers",
+  "settings.damageNumbers.classic": "Classic",
+  "settings.damageNumbers.cascade": "Cascade",
+  "settings.damageNumbers.description": "Classic is the original short yellow number. Cascade keeps numbers up longer, stacks them above each enemy, and shifts color and size as hits get bigger. Display only; never changes damage.",
   "settings.title": "Settings",
   "settings.subtitle": "Controls & accessibility",
   "settings.tabs.aria": "Settings pages",

@@ -6,7 +6,8 @@
  * reads as pixel art without needing image atlases.
  */
 
-import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type World } from '@/game/engine/world';
+import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Popup, type World } from '@/game/engine/world';
+import { DAMAGE_TIERS, GLOW_FROM_TIER } from '@/game/data/damageNumbers';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
@@ -6166,6 +6167,34 @@ function drawParticles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBoun
   ctx.globalAlpha = 1;
 }
 
+/**
+ * One cascade-style damage number: sized by tier, outlined for contrast, with
+ * a quick scale-pop on landing, a fade over the last third of its life, and a
+ * colored glow from `GLOW_FROM_TIER` up (skipped on the minimal visual budget).
+ * Caller has set `textAlign = 'center'`.
+ */
+function drawCascadePopup(ctx: CanvasRenderingContext2D, w: World, popup: Popup, allowGlow: boolean) {
+  const tier = DAMAGE_TIERS[popup.tier ?? 0]!;
+  const age = w.now - popup.bornAt;
+  const life = age / (popup.lifeMs ?? 1500);
+  const pop = age < 140 ? 1 + 0.45 * (1 - age / 140) : 1;
+  const size = Math.round(tier.size * pop);
+  ctx.globalAlpha = life < 0.65 ? 1 : Math.max(0, 1 - (life - 0.65) / 0.35);
+  ctx.font = `900 ${size}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeText(popup.text, popup.x, popup.y);
+  if (allowGlow && (popup.tier ?? 0) >= GLOW_FROM_TIER) {
+    ctx.shadowColor = popup.color;
+    ctx.shadowBlur = 8 + (popup.tier ?? 0);
+  }
+  ctx.fillStyle = popup.color;
+  ctx.fillText(popup.text, popup.x, popup.y);
+  ctx.shadowBlur = 0;
+  ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
+}
+
 function drawPopups(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds, visualBudget: NonNullable<Viewport['visualBudget']>) {
   ctx.font = 'bold 13px ui-monospace, SFMono-Regular, Menlo, monospace';
   ctx.textAlign = 'center';
@@ -6174,6 +6203,10 @@ function drawPopups(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds,
   for (const popup of w.popups) {
     if (!isNearView(popup.x, popup.y, bounds, 32) || drawn >= limit) continue;
     drawn += 1;
+    if (popup.tier !== undefined) {
+      drawCascadePopup(ctx, w, popup, visualBudget !== 'minimal');
+      continue;
+    }
     const life = (w.now - popup.bornAt) / 700;
     ctx.globalAlpha = Math.max(0, 1 - life);
     ctx.fillStyle = '#000000';
@@ -6182,6 +6215,7 @@ function drawPopups(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds,
     ctx.fillText(popup.text, popup.x, popup.y);
   }
   ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
   ctx.textAlign = 'left';
 }
 
