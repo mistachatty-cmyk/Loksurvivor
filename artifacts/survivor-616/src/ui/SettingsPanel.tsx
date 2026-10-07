@@ -47,6 +47,7 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
+import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
@@ -75,6 +76,7 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
   { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
   { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
+  { id: 'settings-scrollbar', label: 'Scrollbar', terms: 'scroll bar slim hidden' },
   { id: 'settings-minimap', label: 'Minimap', terms: 'endless map radar' },
   { id: 'settings-prop-launches', label: 'Prop launches', terms: 'physics clickable props' },
   { id: 'settings-chaos', label: 'Chaos toggles', terms: 'invert mirror world palette cheat' },
@@ -398,6 +400,10 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           <section className="border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
+          </section>
+          <section id="settings-scrollbar" className="scroll-mt-24 ="border border-border bg-card p-5 sm:p-6">
+            <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>
+            <ScrollbarSetting />
           </section>
         </div>
         <section id="settings-display" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
