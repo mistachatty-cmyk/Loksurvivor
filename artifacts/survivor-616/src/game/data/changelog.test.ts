@@ -46,3 +46,17 @@ test('updateNumber counts up from 1 in ship order', () => {
   assert.equal(updateNumber(CHANGELOG[0]!), 1);
   assert.equal(updateNumber(CHANGELOG[CHANGELOG.length - 1]!), CHANGELOG.length);
 });
+
+test('every note after the 0.5.x import carries a publishedAt that matches its date, and the order never goes backwards', () => {
+  let last = '';
+  for (const entry of CHANGELOG) {
+    if (!entry.publishedAt) {
+      assert.ok(compareVersions(entry.version, '0.6.0') < 0, `${entry.version} is missing publishedAt`);
+      continue;
+    }
+    assert.match(entry.publishedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, `${entry.version} publishedAt is not a UTC ISO instant`);
+    assert.equal(entry.date, entry.publishedAt.slice(0, 10), `${entry.version} date disagrees with publishedAt`);
+    assert.ok(entry.publishedAt >= last, `${entry.version} is dated before the note above it`);
+    last = entry.publishedAt;
+  }
+});
