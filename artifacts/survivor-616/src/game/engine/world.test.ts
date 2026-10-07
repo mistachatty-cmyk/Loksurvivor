@@ -26,6 +26,7 @@ import {
   armArtisteDraw,
   createWorld,
   beginArtisteDraw,
+  damageEnemy,
   dashPlayer,
   buildResult,
   claimLootPrize,
@@ -3890,4 +3891,26 @@ test('Artiste can cancel or discard a short mark without consuming cooldown', ()
   cancelArtisteDraw(world);
   assert.equal(world.artisteDraw?.armed, false);
   assert.equal(world.artisteDraw?.nextReadyAt, 0);
+});
+
+test('cascade damage numbers stack above the enemy, colour by tier and last longer than classic', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const classic = createWorld(area, testCharacter('digifrog-lance'), CHARACTERS[0]!.stats, 41);
+  const cascade = createWorld(area, testCharacter('digifrog-lance'), CHARACTERS[0]!.stats, 41, [], 1, true, null, undefined);
+  cascade.damageNumberStyle = 'cascade';
+  for (const w of [classic, cascade]) {
+    w.stats.crit = 0;
+    const e = addEnemy(w, 'nightcrawler', 120, 0);
+    e.hp = e.maxHp = 100000;
+    for (const amount of [3, 30, 300]) damageEnemy(w, e, amount, 0, 0, 0);
+  }
+  assert.ok(classic.popups.every((p) => p.tier === undefined && p.lifeMs === undefined), 'classic popups are unchanged');
+  assert.equal(cascade.popups.length, 3);
+  assert.deepEqual(cascade.popups.map((p) => p.tier), [0, 2, 5]);
+  assert.equal(new Set(cascade.popups.map((p) => p.color)).size, 3, 'each tier has its own color');
+  assert.ok(cascade.popups[0]!.y < cascade.popups[1]!.y && cascade.popups[1]!.y < cascade.popups[2]!.y, 'older numbers sit higher');
+  assert.ok(cascade.popups.every((p) => (p.lifeMs ?? 0) > 700));
+  const e = cascade.enemies[0]!;
+  for (let i = 0; i < 12; i += 1) damageEnemy(cascade, e, 5, 0, 0, 0);
+  assert.ok(cascade.popups.filter((p) => p.ownerUid === e.uid).length <= 6, 'one enemy keeps at most six stacked numbers');
 });

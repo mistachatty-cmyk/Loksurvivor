@@ -1505,6 +1505,8 @@ export interface RunModifiers {
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';
+import type { DamageNumberStyle } from './data/damageNumbers';
+export type { DamageNumberStyle };
 export type CompanionRevealStyle = 'ambush' | 'classic';
 export type RuntimePerformanceTier = 'constrained-mobile' | 'standard-mobile' | 'high-mobile' | 'desktop';
 
@@ -2257,6 +2259,8 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: GraphicsQuality;
+  /** How hit numbers look. 'classic' (default) is the original popup; see `data/damageNumbers.ts`. */
+  damageNumberStyle: DamageNumberStyle;
   /**
    * How the starter LokPet encounter reveals your first companion.
    * 'ambush' (default) has the companion leap in and strike alongside you

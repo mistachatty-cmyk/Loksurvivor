@@ -17,6 +17,7 @@ import {
 } from 'react';
 
 import { AREAS, getArea } from '@/game/data/areas';
+import { isDamageNumberStyle } from '@/game/data/damageNumbers';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getCharacterSkins, isCharacterSkinUnlocked } from '@/game/data/characterSkins';
@@ -277,6 +278,7 @@ export function createInitialMeta(): MetaState {
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
     graphicsQuality: 'high',
+    damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
     soundtrackObjectiveCompletions: 0,
@@ -1215,6 +1217,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
         ? parsed.graphicsQuality
         : 'high',
+    damageNumberStyle: isDamageNumberStyle(parsed.damageNumberStyle) ? parsed.damageNumberStyle : 'classic',
     companionRevealStyle: parsed.companionRevealStyle === 'classic' ? 'classic' : 'ambush',
     frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
     soundtrackObjectiveCompletions: counter(parsed.soundtrackObjectiveCompletions),
@@ -1954,6 +1957,7 @@ type Action =
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
+  | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
   | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
   | { type: 'setFogAmbianceMode'; mode: MetaState['fogAmbianceMode'] }
@@ -3237,6 +3241,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'setPauseMapVisible':
       return { ...state, meta: { ...state.meta, pauseMapVisible: action.enabled } };
 
+    case 'setDamageNumberStyle':
+      return { ...state, meta: { ...state.meta, damageNumberStyle: action.style } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -4052,6 +4058,7 @@ export interface MetaContextValue {
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
+  setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
   setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
   setFogAmbianceMode: (mode: MetaState['fogAmbianceMode']) => void;
@@ -4264,6 +4271,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
+  const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
   const setCompanionRevealStyle = useCallback((style: MetaState['companionRevealStyle']) => dispatch({ type: 'setCompanionRevealStyle', style }), []);
   const setFrameRateMode = useCallback((mode: MetaState['frameRateMode']) => dispatch({ type: 'setFrameRateMode', mode }), []);
   const setFogAmbianceMode = useCallback((mode: MetaState['fogAmbianceMode']) => dispatch({ type: 'setFogAmbianceMode', mode }), []);
@@ -4554,6 +4562,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPresentation,
       setPauseMapVisible,
       setGraphicsQuality,
+      setDamageNumberStyle,
       setCompanionRevealStyle,
       setFrameRateMode,
       setFogAmbianceMode,
@@ -4715,6 +4724,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
     setFogAmbianceMode,

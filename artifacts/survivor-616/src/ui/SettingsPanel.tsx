@@ -30,6 +30,7 @@ import { toast } from '@/hooks/use-toast';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { DAMAGE_NUMBER_STYLES } from '@/game/data/damageNumbers';
 import { importForgeState } from '@/game/state/operatorForgeStore';
 import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
@@ -224,6 +225,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
     setFogAmbianceMode,
@@ -422,6 +424,24 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
                 <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">{t('settings.damageNumbers.title')}</p>
+                  <div className="grid grid-cols-2 gap-1" role="group" aria-label={t('settings.damageNumbers.title')}>
+                    {DAMAGE_NUMBER_STYLES.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setDamageNumberStyle(option.id)}
+                        aria-pressed={meta.damageNumberStyle === option.id}
+                        className={`border p-2 uppercase ${meta.damageNumberStyle === option.id ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-damage-numbers-${option.id}`}
+                      >
+                        {t(`settings.damageNumbers.${option.id}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{t('settings.damageNumbers.description')}</p>
+                </div>
                 <div>
                   <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
                   <div className="grid grid-cols-3 gap-1">
