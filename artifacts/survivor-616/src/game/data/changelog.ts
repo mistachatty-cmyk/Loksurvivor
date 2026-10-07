@@ -645,6 +645,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone.',
     ],
   },
+  {
+    version: '0.19.2',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'hotfix',
+    title: 'Settings Jump Menu Complete',
+    body: [
+      'The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
