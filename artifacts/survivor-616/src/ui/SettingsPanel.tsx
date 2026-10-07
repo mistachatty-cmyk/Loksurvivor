@@ -76,6 +76,13 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
   { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
   { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
+  { id: 'settings-scrollbar', label: 'Scrollbar', terms: 'scroll bar slim hidden' },
+  { id: 'settings-minimap', label: 'Minimap', terms: 'endless map radar' },
+  { id: 'settings-prop-launches', label: 'Prop launches', terms: 'physics clickable props' },
+  { id: 'settings-chaos', label: 'Chaos toggles', terms: 'invert mirror world palette cheat' },
+  { id: 'settings-wildlife', label: 'Wildlife', terms: 'birds fireflies weather' },
+  { id: 'settings-card-layout', label: 'Card layout', terms: 'grid list density' },
+  { id: 'settings-panel-layout', label: 'Panel layout', terms: 'detail panel side bottom' },
   { id: 'settings-customization', label: 'Customization', terms: 'theme palette looks skins' },
   { id: 'settings-data', label: 'Save data', terms: 'backup export import progress forge' },
   { id: 'settings-advanced', label: 'Advanced', terms: 'developer dev mode' },
@@ -394,7 +401,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
           </section>
-          <section className="border border-border bg-card p-5 sm:p-6">
+          <section id="settings-scrollbar" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>
             <ScrollbarSetting />
           </section>
@@ -1189,7 +1196,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
+        <section id="settings-minimap" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-cyan-200/40 bg-cyan-300/10 text-cyan-200">
               <Map className="h-5 w-5" />
@@ -1252,7 +1259,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
+        <section id="settings-prop-launches" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <MousePointer2 className="h-5 w-5" />
@@ -1296,7 +1303,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         </section>
 
         {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 || vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
-          <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
+          <section id="settings-chaos" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
                 <FlipVertical2 className="h-5 w-5" />
@@ -1377,7 +1384,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </section>
         ) : null}
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
+        <section id="settings-wildlife" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
               <Bird className="h-5 w-5" />
@@ -1410,7 +1417,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
+        <section id="settings-card-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-300/10 text-emerald-200">
               <LayoutDashboard className="h-5 w-5" />
@@ -1460,7 +1467,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
+        <section id="settings-panel-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <PanelRight className="h-5 w-5" />
