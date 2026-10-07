@@ -389,6 +389,7 @@ export function nextRescueAllyId(
 export const HUB_ROOMS: HubRoomDef[] = [
   {
     id: 'main-floor',
+    kind: 'hideout',
     name: 'The Sanctum',
     subtitle: 'Main floor',
     description:
@@ -400,6 +401,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'rooftop-perch',
+    kind: 'hideout',
     name: 'The Perch',
     subtitle: 'Rooftop recovery deck',
     description:
@@ -411,6 +413,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-cellar',
+    kind: 'hideout',
     name: 'The Cellar',
     subtitle: 'Hidden room',
     description:
@@ -422,6 +425,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-alley',
+    kind: 'hideout',
     name: 'The Alley Annex',
     subtitle: 'Back-door workshop',
     description:
@@ -433,6 +437,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-storefront',
+    kind: 'travel',
     name: 'The Neon Sleeve',
     subtitle: 'The Neon Sleeve',
     description:
@@ -446,6 +451,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'studio-28',
+    kind: 'travel',
     name: 'Studio 28',
     subtitle: 'One-screen picture house',
     description:
@@ -460,6 +466,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-back-room',
+    kind: 'hideout',
     name: 'The Back Room',
     subtitle: 'Salvaged cabinet row',
     description:
@@ -471,6 +478,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-sound-booth',
+    kind: 'hideout',
     name: 'The Sound Booth',
     subtitle: 'Patch bay and foldback',
     description:
@@ -484,6 +492,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'grpd-station',
+    kind: 'travel',
     name: 'GRPD Station',
     subtitle: 'Division St.',
     description:
@@ -501,6 +510,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'grpd-vault',
+    kind: 'travel',
     name: 'The Vault',
     subtitle: 'Sealed evidence room',
     description:
@@ -512,6 +522,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'rapid-shelter',
+    kind: 'travel',
     name: 'Rapid Shelter',
     subtitle: 'Digi-Arch safe side',
     description:

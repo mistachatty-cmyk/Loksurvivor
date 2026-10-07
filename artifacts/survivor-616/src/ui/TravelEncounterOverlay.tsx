@@ -7,6 +7,7 @@
  * formula (cardThrowOutcome in data/travelEncounters.ts).
  */
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n';
 import { LogOut, PawPrint, Sparkles, Swords, Zap } from 'lucide-react';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
@@ -26,6 +27,7 @@ import {
   UNARMED_PUNCH_DAMAGE,
   cardThrowOutcome,
   describeOwnedCard,
+  travelLeadPet,
 } from '@/game/data/travelEncounters';
 import {
   applyFlee,
@@ -37,6 +39,8 @@ import {
   type TravelEncounterState,
 } from '@/game/travelEncounter';
 import { HideoutVignette, type GestureAnim } from './HideoutVignette';
+import { LokPetEntrance } from './LokPetEntrance';
+import { petEvolvedLook } from '@/game/engine/petEvolution';
 
 export interface TravelEncounterOverlayProps {
   opponent: ResolvedTravelEncounterOpponent;
@@ -65,9 +69,11 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
   // Ties the minigame to real character/ally progression without a bespoke
   // formula: `power` is already the game's one "you hit harder" multiplier.
   const powerMult = effectiveStats(selectedCharacter, meta).power;
-  const assistPet = meta.selectedLokPetIds.length > 0
-    ? meta.savedLokPets.find((pet) => pet.id === meta.selectedLokPetIds[0])
-    : undefined;
+  const t = useT();
+  const assistPet = travelLeadPet(meta);
+  // Bumped by the Send button so the pet's entrance plays again.
+  const [entrance, setEntrance] = useState(0);
+  const assistLook = assistPet ? petEvolvedLook(assistPet) : undefined;
 
   const [combat, setCombat] = useState<TravelEncounterState>(() =>
     createTravelEncounterState(
@@ -83,6 +89,12 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
   const timersRef = useRef<number[]>([]);
 
   useEffect(() => () => { timersRef.current.forEach((id) => window.clearTimeout(id)); }, []);
+
+  // The lead LokPet steps in when the scrap starts, and again whenever it is sent in.
+  useEffect(() => {
+    if (assistPet) sfx.play('lokPetEntrance');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entrance, assistPet?.id]);
 
   useEffect(() => {
     if (combat.status === 'active' || settledRef.current) return;
@@ -174,6 +186,23 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
             controlledGesture={gesture}
           />
         </div>
+
+        {assistPet && assistLook && (
+          <div className="mt-2 flex items-center justify-center gap-3" data-testid="travel-companion">
+            <LokPetEntrance
+              entranceKey={`${assistPet.id}-${entrance}`}
+              silhouette={assistPet.roll.silhouette}
+              palette={assistLook.palette}
+              overlays={assistLook.overlays}
+              size={44}
+              flash
+            />
+            <div className="min-w-0 font-mono uppercase">
+              <p className="truncate text-[11px] font-black text-sky-100">{assistPet.name ?? assistPet.roll.name}</p>
+              <p className="text-[8px] tracking-wider text-white/50">{t('fight.companion.atYourSide')}</p>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-3 font-mono text-[10px] uppercase text-white/60">
           <div>
@@ -319,6 +348,7 @@ export function TravelEncounterOverlay({ opponent, rng, label, onClose }: Travel
                 disabled={busy}
                 onClick={() => {
                   setPetUsed(true);
+                  setEntrance((value) => value + 1);
                   handleAttack(Math.round(assistPet.roll.stats.damage * PET_ASSIST_DAMAGE_MULT * powerMult), `Sent ${assistPet.roll.name}`);
                 }}
                 className="mt-2 w-full border border-sky-300/30 bg-sky-400/[.06] p-3 font-mono text-xs font-black uppercase text-sky-100 transition-all active:scale-[0.97] disabled:opacity-40"

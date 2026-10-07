@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BookOpen, LockKeyhole, Search, ShieldCheck, Waves } from 'lucide-react';
-import { GRPD_BLUEPRINTS, GRPD_KILLS_PER_SEAL, GRPD_MAX_SPAWN_MULTIPLIER, grpdAvailableSeals, grpdEarnedSeals, grpdEndgameKillGoal, grpdEndgameWeaponEarned, grpdNextTierCost, grpdOfferWeight, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { GRPD_BLUEPRINTS, GRPD_KILLS_PER_SEAL, GRPD_MAX_SPAWN_MULTIPLIER, grpdAvailableSeals, grpdEarnedSeals, grpdArmoryLocation, grpdEndgameKillGoal, grpdEndgameWeaponEarned, grpdNextTierCost, grpdOfferWeight, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
 import { endgameReached } from '@/game/data/endgameUnlocks';
 import { WEAPONS } from '@/game/data/weapons';
 import { ALL_WEAPON_DEFS } from '@/game/data/weaponPixelModels';
@@ -10,13 +10,17 @@ import { WeaponIcon } from './WeaponIcon';
 import { RigPortrait } from './RigPortrait';
 import { LorePopup } from './LorePopup';
 import { LUVITNOT_KEEPER } from '@/game/data/npcCast';
+import { useT } from '@/lib/i18n';
 
 const FIELD_WEAPONS = WEAPONS.filter((weapon) => !isGrpdPlayableWeapon(weapon.id));
 const FIELD_IDS = new Set(WEAPONS.map((weapon) => weapon.id));
 const SPECIAL_WEAPONS = ALL_WEAPON_DEFS.filter((weapon) => !FIELD_IDS.has(weapon.id));
 
 export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
-  const { meta, unlockGrpdWeapon, toggleGrpdWeapon, buyGrpdSpawnTier, setGrpdAutoIncreaseEnabled, setGrpdArmoryAnchor, toggleWeaponDisabled } = useMeta();
+  const { meta, unlockedRooms, unlockGrpdWeapon, toggleGrpdWeapon, buyGrpdSpawnTier, setGrpdAutoIncreaseEnabled, setGrpdArmoryAnchor, toggleWeaponDisabled } = useMeta();
+  const t = useT();
+  const stationFound = unlockedRooms.some((room) => room.id === 'grpd-station');
+  const anchor = grpdArmoryLocation(meta.grpdArmoryAnchor, stationFound);
   const [tab, setTab] = useState<'archive' | 'field' | 'special'>('archive');
   const [query, setQuery] = useState('');
   const [loreId, setLoreId] = useState<string | null>(null);
@@ -30,7 +34,7 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
   const special = SPECIAL_WEAPONS.filter((entry) => `${entry.name} ${entry.description} ${entry.kind}`.toLowerCase().includes(needle));
 
   return (
-    <ScreenLayout title="GRPD Armory" subtitle={meta.grpdArmoryAnchor === 'station' ? 'Division St. · Evidence archive' : 'Hideout · Relocated evidence archive'} backdrop="art/street.jpeg" onBack={onBack}
+    <ScreenLayout title="GRPD Armory" subtitle={anchor === 'station' ? 'Division St. · Evidence archive' : 'Hideout · Relocated evidence archive'} backdrop="art/street.jpeg" onBack={onBack}
       action={<div className="border border-sky-300/40 bg-sky-950/60 px-4 py-2 text-right font-mono"><span className="block text-[10px] uppercase tracking-widest text-sky-200">Evidence seals</span><strong className="text-2xl text-white" data-testid="grpd-seals">{seals}</strong></div>}>
       <div className="max-w-7xl space-y-5">
         <section className="flex flex-wrap items-center gap-4 border border-amber-200/50 bg-gradient-to-r from-slate-950/95 via-sky-950/90 to-slate-950/95 p-4" data-testid="grpd-luvitnot-keeper">
@@ -41,10 +45,11 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-amber-200">Eclipse-born · Keeper of the sealed shelves</p>
             <h2 className="text-2xl font-black text-white">The Luvitnot Keeper</h2>
             <p className="max-w-2xl text-sm leading-relaxed text-sky-100/75">Water, spirit, data, and energy hold a humanlike shape inside a white suit trimmed in gold. Its glass helmet and sealed suit protect visitors from the raw current. The keeper guards the archive and hums with its Luvitnot kin when the whole Armory must move.</p>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-200" aria-live="polite" data-testid="grpd-armory-anchor">Current anchor: {meta.grpdArmoryAnchor === 'station' ? 'GRPD Station' : 'Hideout main floor'}</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-200" aria-live="polite" data-testid="grpd-armory-anchor">Current anchor: {anchor === 'station' ? 'GRPD Station' : 'Hideout main floor'}</p>
+            {!stationFound && <p className="text-xs text-sky-100/60" data-testid="grpd-armory-station-unfound">{t('hub.armory.stationUnfound')}</p>}
           </div>
           <div className="flex flex-col gap-2">
-            <button type="button" onClick={() => setGrpdArmoryAnchor(meta.grpdArmoryAnchor === 'station' ? 'hideout' : 'station')} className="flex min-h-10 items-center justify-center gap-2 border border-emerald-200/60 bg-emerald-900/30 px-3 font-mono text-xs font-bold uppercase text-emerald-100 hover:bg-emerald-900/50" data-testid="button-shift-grpd-armory"><Waves size={16} /> {meta.grpdArmoryAnchor === 'station' ? 'Hum shift to hideout' : 'Return to station'}</button>
+            {stationFound && <button type="button" onClick={() => setGrpdArmoryAnchor(anchor === 'station' ? 'hideout' : 'station')} className="flex min-h-10 items-center justify-center gap-2 border border-emerald-200/60 bg-emerald-900/30 px-3 font-mono text-xs font-bold uppercase text-emerald-100 hover:bg-emerald-900/50" data-testid="button-shift-grpd-armory"><Waves size={16} /> {anchor === 'station' ? 'Hum shift to hideout' : 'Return to station'}</button>}
             <button type="button" onClick={() => setLoreId(LUVITNOT_KEEPER.loreId)} className="flex min-h-10 items-center justify-center gap-2 border border-amber-200/40 px-3 font-mono text-xs font-bold uppercase text-amber-100 hover:bg-amber-200/10" data-testid="button-luvitnot-lore"><BookOpen size={16} /> Keeper lore</button>
           </div>
         </section>
@@ -55,7 +60,7 @@ export function GrpdArmoryScreen({ onBack }: { onBack: () => void }) {
             <span>Each {GRPD_KILLS_PER_SEAL.toLocaleString()} kills: +0.01 relative offer weight when enabled</span>
             <span>Purchased tier: 1× to {GRPD_MAX_SPAWN_MULTIPLIER}× per weapon</span>
           </div>
-          <p className="mt-2 text-xs text-slate-400">Evidence seals come only from lifetime kill milestones. Fabricating an early field prototype costs 1 seal. The DigiFrog Lance and Digi-Tana Trinity unlock after Victory Lap at alternating 750,000 and 1,000,000 additional lifetime-kill milestones; each stays off until you switch it on. Buying 2×, 3×, 4×, and 5× costs 1, 2, 3, and 4 seals respectively. Modifiers affect offer frequency, not weapon damage.</p>
+          <p className="mt-2 text-xs text-slate-400">Evidence seals come only from lifetime kill milestones. Fabricating an early field prototype costs 1 seal. The ten Volume I endgame weapons unlock after Victory Lap at alternating 750,000 and 1,000,000 additional lifetime-kill milestones; each stays off until you switch it on. Buying 2×, 3×, 4×, and 5× costs 1, 2, 3, and 4 seals respectively. Modifiers affect offer frequency, not weapon damage.</p>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border border-white/15 bg-black/35 p-3">
             <div><h2 className="text-sm font-bold text-white">Automatic kill increase</h2><p className="text-xs text-slate-300">Apply the +0.01 bonus for each 1,000 lifetime kills to active archive weapons. Off removes the kill bonus while keeping purchased tiers. On recalculates it from your current lifetime kills.</p></div>
             <button type="button" role="switch" aria-checked={meta.grpdAutoIncreaseEnabled} onClick={() => setGrpdAutoIncreaseEnabled(!meta.grpdAutoIncreaseEnabled)} className={`min-h-10 min-w-20 border px-3 text-xs font-black uppercase ${meta.grpdAutoIncreaseEnabled ? 'border-emerald-300 bg-emerald-300/20 text-emerald-100' : 'border-white/30 bg-slate-800 text-white/70'}`} data-testid="grpd-auto-increase-toggle">{meta.grpdAutoIncreaseEnabled ? 'On' : 'Off'}</button>

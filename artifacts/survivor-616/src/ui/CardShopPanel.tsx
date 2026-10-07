@@ -882,7 +882,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
             aria-modal="true"
             onMouseDown={(e) => e.target === e.currentTarget && setShowOddsModal(false)}
           >
-            <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto border border-white/20 bg-[#0d0d15] p-5 shadow-2xl">
+            <div className="relative w-full max-w-xl max-h-[90dvh] overflow-y-auto border border-white/20 bg-[#0d0d15] p-5 shadow-2xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2">
                   <Dices className="h-5 w-5 text-amber-300" />

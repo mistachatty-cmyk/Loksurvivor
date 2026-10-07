@@ -21,7 +21,10 @@ import {
   UNARMED_PUNCH_DAMAGE,
   cardThrowDamage,
   cardThrowOutcome,
+  travelLeadPet,
+  travelTeam,
 } from './data/travelEncounters';
+import { rollLokPet } from './data/lokPets';
 
 function findCardBySubject(subjectType: LokDeckCardMetadata['subjectType']): LokAssetManifest<LokDeckCardMetadata> {
   const card = CARD_MANIFESTS.find((candidate) => (candidate.metadata as LokDeckCardMetadata | undefined)?.subjectType === subjectType);
@@ -59,6 +62,16 @@ test('every hub-room trigger points at a real HubRoomDef id', () => {
   const hubRoomIds = new Set(HUB_ROOMS.map((room) => room.id));
   for (const trigger of TRAVEL_ENCOUNTER_TRIGGERS) {
     if (trigger.source === 'hub-room') assert.ok(trigger.roomId && hubRoomIds.has(trigger.roomId), `missing hub room id: ${trigger.roomId}`);
+  }
+});
+
+test('travel rooms can be ambushed and hideout rooms never are', () => {
+  const triggered = new Set(
+    TRAVEL_ENCOUNTER_TRIGGERS.filter((trigger) => trigger.source === 'hub-room').map((trigger) => trigger.roomId),
+  );
+  for (const room of HUB_ROOMS) {
+    if (room.kind === 'travel') assert.ok(triggered.has(room.id), `travel room has no ambush trigger: ${room.id}`);
+    else assert.ok(!triggered.has(room.id), `hideout room must stay safe: ${room.id}`);
   }
 });
 
@@ -238,4 +251,16 @@ test('buyCardSalvageProtocol requires both the earned run count and the CC cost,
   assert.equal(unlocked.meta.cardCredits, 0);
 
   assert.equal(reducer(unlocked, { type: 'buyCardSalvageProtocol' }), unlocked);
+});
+
+test('the travel team is the selected loadout in order, lead first, and skips spent pets', () => {
+  const pet = (id: string, stamina: number, starter = false) => ({ id, roll: rollLokPet(() => 0.3), stamina, starter });
+  const meta = {
+    savedLokPets: [pet('kennel-only', 3), pet('a', 2), pet('b', 0), pet('starter', 0, true), pet('c', 1)],
+    selectedLokPetIds: ['c', 'b', 'starter', 'a', 'missing'],
+  };
+  assert.deepEqual(travelTeam(meta).map((p) => p.id), ['c', 'starter', 'a']);
+  assert.deepEqual(travelTeam(meta, 2).map((p) => p.id), ['c', 'starter']);
+  assert.equal(travelLeadPet(meta)?.id, 'c');
+  assert.equal(travelLeadPet({ savedLokPets: [], selectedLokPetIds: [] }), undefined);
 });

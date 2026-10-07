@@ -20,13 +20,15 @@ deliberate follow-up design pass -- that's a bigger, separate feature.
 ## Triggers are a data table, not inline `if` checks
 
 `TRAVEL_ENCOUNTER_TRIGGERS` in `data/travelEncounters.ts` is the only place
-that decides where an encounter can fire. It deliberately excludes every
-hideout room except `the-storefront` -- the user was explicit that other
-hideout rooms (the Sanctum, the Perch, the Cellar, etc.) should never
-trigger this, only "places in the city" should, and the LokPet Card Shop is
-the first of those even though it's still implemented as a `HubRoomDef`.
-Adding a future city-location trigger is a one-line table entry, never a new
-`if` wired into `HubScreen.tsx`/`AreaSelect.tsx`.
+that decides where an encounter can fire. Every `HubRoomDef` has a
+`kind: 'hideout' | 'travel'`: **travel** rooms (the Neon Sleeve, Studio 28,
+GRPD Station, the Vault, Rapid Shelter) are out in the city and each has a
+trigger; **hideout** rooms (the Sanctum, the Perch, the Cellar, the Alley
+Annex, the Back Room, the Sound Booth) are the safe base and must never have
+one. `travelEncounter.test.ts` enforces both directions. The hub nav groups
+rooms by `kind` and badges travel rooms "Ambush risk". Adding a future
+city-location trigger is a one-line table entry, never a new `if` wired into
+`HubScreen.tsx`/`AreaSelect.tsx`; a new room must pick a `kind`.
 
 ## The overlay is local `Game()` state, not a new `Screen` variant
 

@@ -72,6 +72,17 @@ import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '@/game/data/achievements';
 import type { BattleRewards } from '@/game/engine/lokPetBattleTypes';
 import { getExpForLevel } from '@/game/engine/petExpCurve';
 import { HIDEOUT_EVENTS_BY_ID } from '@/game/data/hideoutEvents';
+import { applyPetCare } from '@/game/data/petCare';
+import { applyChoice } from '@/game/engine/choiceEvents';
+import { HIDEOUT_PROPS_BY_ID, propClaimKey, propReady, resolvePropReward } from '@/game/data/hideoutProps';
+import {
+  MAX_CLAIMS,
+  REWARD_KEYS,
+  bondLuck,
+  emptyLedger,
+  grantWithFallback,
+  trimClaims,
+} from '@/game/engine/hideoutRewards';
 import { chooseBranch, normalizeEvolutionPath, undoBranch } from '@/game/engine/petEvolution';
 import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDayKey, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
@@ -293,6 +304,11 @@ export function createInitialMeta(): MetaState {
     hideoutPreviewEnabled: true,
     hideoutPets: 'all',
     hideoutEvents: 'on',
+    hideoutInteractive: true,
+    hideoutPetPlay: true,
+    hideoutChoiceEvents: 'on',
+    hideoutClaims: {},
+    hideoutLedger: emptyLedger(),
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
@@ -871,7 +887,7 @@ export const STARTER_LOKPET_FREE_REFRESH_MS = 60 * 60 * 1000;
 export const HANDHELD_DIGISCOPE_COST = 240;
 const ELIXIR_GRANT_MS = 20 * 60 * 1000;
 const ELIXIR_GRANT_AMOUNT = 3;
-const ELIXIR_CAP = 18;
+export const ELIXIR_CAP = 18;
 
 function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
   if (!Array.isArray(value)) return [];
@@ -919,6 +935,27 @@ function normalizeHideoutEventHistory(value: unknown): SavedLokPet['hideoutEvent
     .sort((a, b) => (b[1] as number) - (a[1] as number))
     .slice(0, 40);
   return entries.length > 0 ? (Object.fromEntries(entries) as Record<string, number>) : undefined;
+}
+
+function normalizeHideoutClaims(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const entries = Object.entries(value).filter(
+    ([id, at]) => id.length > 0 && id.length <= 48 && typeof at === 'number' && Number.isFinite(at) && at > 0,
+  ) as Array<[string, number]>;
+  return trimClaims(Object.fromEntries(entries.slice(0, MAX_CLAIMS * 4)));
+}
+
+function normalizeHideoutLedger(value: unknown): MetaState['hideoutLedger'] {
+  if (!isRecord(value) || typeof value.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value.day)) return emptyLedger();
+  const granted: MetaState['hideoutLedger']['granted'] = {};
+  if (isRecord(value.granted)) {
+    for (const key of [...REWARD_KEYS, 'petExp'] as const) {
+      const amount = value.granted[key];
+      if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) granted[key] = Math.min(100_000, Math.floor(amount));
+    }
+  }
+  const count = (raw: unknown) => (typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? Math.min(1000, Math.floor(raw)) : 0);
+  return { day: value.day, granted, events: count(value.events), rare: count(value.rare) };
 }
 
 function normalizePetNames(value: unknown): SavedLokPet['names'] {
@@ -1233,6 +1270,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutPreviewEnabled: parsed.hideoutPreviewEnabled !== false,
     hideoutPets: parsed.hideoutPets === 'companion' || parsed.hideoutPets === 'off' ? parsed.hideoutPets : 'all',
     hideoutEvents: parsed.hideoutEvents === 'quiet' || parsed.hideoutEvents === 'off' ? parsed.hideoutEvents : 'on',
+    hideoutInteractive: parsed.hideoutInteractive !== false,
+    hideoutPetPlay: parsed.hideoutPetPlay !== false,
+    hideoutChoiceEvents: parsed.hideoutChoiceEvents === 'quiet' || parsed.hideoutChoiceEvents === 'off' ? parsed.hideoutChoiceEvents : 'on',
+    hideoutClaims: normalizeHideoutClaims(parsed.hideoutClaims),
+    hideoutLedger: normalizeHideoutLedger(parsed.hideoutLedger),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
@@ -1925,6 +1967,12 @@ type Action =
   | { type: 'setHideoutPreview'; enabled: boolean }
   | { type: 'setHideoutPets'; mode: MetaState['hideoutPets'] }
   | { type: 'setHideoutEvents'; mode: MetaState['hideoutEvents'] }
+  | { type: 'setHideoutInteractive'; enabled: boolean }
+  | { type: 'setHideoutPetPlay'; enabled: boolean }
+  | { type: 'setHideoutChoiceEvents'; mode: MetaState['hideoutChoiceEvents'] }
+  | { type: 'activateHideoutProp'; propId: string; seed: number; now: number }
+  | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
+  | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
   | { type: 'chooseLokPetBranch'; id: string; branchId: string; now: number }
   | { type: 'undoLokPetBranch'; id: string; now: number }
@@ -3235,6 +3283,52 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'setHideoutEvents':
       return { ...state, meta: { ...state.meta, hideoutEvents: action.mode } };
 
+    case 'setHideoutInteractive':
+      return { ...state, meta: { ...state.meta, hideoutInteractive: action.enabled } };
+
+    case 'setHideoutPetPlay':
+      return { ...state, meta: { ...state.meta, hideoutPetPlay: action.enabled } };
+
+    case 'setHideoutChoiceEvents':
+      return { ...state, meta: { ...state.meta, hideoutChoiceEvents: action.mode } };
+
+    case 'resolveChoiceEvent': {
+      // A choice event: validation, the rolled outcome and the payout all live in `applyChoice`
+      // (and the shared reward policy). A repeat of the same event inside its cooldown is a no-op.
+      const result = applyChoice(state.meta, action.eventId, action.choiceId, action.seed, {
+        now: action.now,
+        petId: action.petId,
+        propId: action.propId,
+        elixirCap: ELIXIR_CAP,
+      });
+      return result.ok ? { ...state, meta: result.meta } : state;
+    }
+
+    case 'playWithLokPet': {
+      // A play verb: cooldown per pet, XP and bond scaled by mood, plus the verb's small find.
+      // The rules (and every cap) live in `applyPetCare` and the shared reward policy.
+      const outcome = applyPetCare(state.meta, action.petId, action.verbId, action.seed, {
+        now: action.now,
+        musicPlaying: action.musicPlaying,
+        elixirCap: ELIXIR_CAP,
+      });
+      return outcome.ok ? { ...state, meta: outcome.meta } : state;
+    }
+
+    case 'activateHideoutProp': {
+      // A reward prop pays out once per cooldown; everything else about a prop (lines,
+      // opening a panel, starting an event) never touches the save.
+      const def = HIDEOUT_PROPS_BY_ID[action.propId];
+      if (!def || def.action.kind !== 'reward') return state;
+      if (def.unlock && !isUnlocked(def.unlock, state.meta)) return state;
+      if (!propReady(def, state.meta.hideoutClaims, action.now)) return state;
+      const roll = resolvePropReward(def, createRng(action.seed), bondLuck(state.meta.savedLokPets));
+      if (!roll) return state;
+      const result = grantWithFallback(state.meta, roll.reward, roll.fallback, { now: action.now, rare: roll.rare, elixirCap: ELIXIR_CAP });
+      const claimed = trimClaims({ ...result.meta.hideoutClaims, [propClaimKey(def.id)]: action.now });
+      return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
+    }
+
     case 'chooseLokPetBranch': {
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
       if (!pet) return state;
@@ -3957,6 +4051,12 @@ export interface MetaContextValue {
   setHideoutPreview: (enabled: boolean) => void;
   setHideoutPets: (mode: MetaState['hideoutPets']) => void;
   setHideoutEvents: (mode: MetaState['hideoutEvents']) => void;
+  setHideoutInteractive: (enabled: boolean) => void;
+  setHideoutPetPlay: (enabled: boolean) => void;
+  setHideoutChoiceEvents: (mode: MetaState['hideoutChoiceEvents']) => void;
+  activateHideoutProp: (propId: string, seed: number) => void;
+  playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
+  resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
   chooseLokPetBranch: (id: string, branchId: string) => void;
   undoLokPetBranch: (id: string) => void;
@@ -4181,6 +4281,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   );
   const setHideoutPets = useCallback((mode: MetaState['hideoutPets']) => dispatch({ type: 'setHideoutPets', mode }), []);
   const setHideoutEvents = useCallback((mode: MetaState['hideoutEvents']) => dispatch({ type: 'setHideoutEvents', mode }), []);
+  const setHideoutInteractive = useCallback((enabled: boolean) => dispatch({ type: 'setHideoutInteractive', enabled }), []);
+  const setHideoutPetPlay = useCallback((enabled: boolean) => dispatch({ type: 'setHideoutPetPlay', enabled }), []);
+  const setHideoutChoiceEvents = useCallback((mode: MetaState['hideoutChoiceEvents']) => dispatch({ type: 'setHideoutChoiceEvents', mode }), []);
+  const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
+  const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
+  const activateHideoutProp = useCallback((propId: string, seed: number) => dispatch({ type: 'activateHideoutProp', propId, seed, now: Date.now() }), []);
   const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
   const chooseLokPetBranch = useCallback((id: string, branchId: string) => dispatch({ type: 'chooseLokPetBranch', id, branchId, now: Date.now() }), []);
   const undoLokPetBranch = useCallback((id: string) => dispatch({ type: 'undoLokPetBranch', id, now: Date.now() }), []);
@@ -4445,6 +4551,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutPreview,
       setHideoutPets,
       setHideoutEvents,
+      setHideoutInteractive,
+      setHideoutPetPlay,
+      setHideoutChoiceEvents,
+      activateHideoutProp,
+      playWithLokPet,
+      resolveChoiceEvent,
       careForLokPet,
       chooseLokPetBranch,
       undoLokPetBranch,
@@ -4599,6 +4711,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setHideoutPreview,
     setHideoutPets,
     setHideoutEvents,
+    setHideoutInteractive,
+    setHideoutPetPlay,
+    setHideoutChoiceEvents,
+    activateHideoutProp,
+    playWithLokPet,
+    resolveChoiceEvent,
     careForLokPet,
     chooseLokPetBranch,
     undoLokPetBranch,

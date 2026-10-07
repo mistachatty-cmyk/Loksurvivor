@@ -146,22 +146,28 @@ export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; o
       aria-label="Card details"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="relative grid w-full max-w-2xl overflow-hidden border border-white/20 bg-[#0a0a0f] shadow-2xl md:grid-cols-[230px_1fr] max-h-[90vh]">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-3 top-3 z-30 grid h-8 w-8 place-items-center border border-white/20 bg-black/70 text-white hover:border-white/50"
-          aria-label="Close card details"
-        >
-          <X className="h-4 w-4" />
-        </button>
+      <div className="relative grid max-h-[92dvh] w-full max-w-2xl overflow-y-auto border border-white/20 bg-[#0a0a0f] shadow-2xl md:grid-cols-[230px_1fr] md:overflow-hidden">
+        {/* Zero-height sticky row so the close button stays reachable while the
+            stacked (phone) layout scrolls inside the panel. */}
+        <div className="sticky top-0 z-30 col-span-full h-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-3 top-3 grid h-9 w-9 place-items-center border border-white/20 bg-black/70 text-white hover:border-white/50"
+            aria-label="Close card details"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
         {/* Left: Interactive Card Preview with Mode Switcher */}
         <div
           className="flex flex-col items-center justify-center border-b border-white/10 p-4 md:border-b-0 md:border-r bg-[radial-gradient(circle_at_center,var(--card-glow),transparent_68%)]"
           style={{ '--card-glow': rarity.glow } as React.CSSProperties}
         >
-          <LokDeckCardView card={card} owned={owned} size="standard" mode={previewMode} />
+          <div className="w-full max-w-[200px] md:max-w-none">
+            <LokDeckCardView card={card} owned={owned} size="standard" mode={previewMode} />
+          </div>
           <div className="mt-3"><CardStyleToggle value={previewMode} onChange={setPreviewMode} compact /></div>
           <p className="mt-1 text-center font-mono text-[8px] text-white/40 uppercase tracking-widest">
             {previewMode === 'classic' ? 'Original Foil Frame' : previewMode === 'new' ? 'Streamlined New Look' : 'Tilt & Holographic Foil'}
@@ -169,7 +175,7 @@ export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; o
         </div>
 
         {/* Right: Rich Variable Classification & Combat Breakdown */}
-        <div className="flex flex-col p-5 max-h-[85vh] overflow-y-auto">
+        <div className="flex flex-col p-5 md:max-h-[85dvh] md:overflow-y-auto">
           <div className="flex flex-wrap items-center gap-1.5">
             <span
               className="px-2 py-0.5 font-mono text-[8.5px] font-black uppercase text-black rounded shadow-sm"

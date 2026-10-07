@@ -1541,6 +1541,17 @@ export interface DirectorRunState {
 }
 
 /** A one-shot meta-progression announcement, drained and shown by the hub on return. See `MetaState.pendingNotifications`. */
+/** A hideout panel a room tile or prop can open. */
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch';
+
+/** Today's hideout payouts (local day), see `engine/hideoutRewards.ts`. */
+export interface HideoutLedger {
+  day: string;
+  granted: Partial<Record<'cred' | 'cardCredits' | 'lokPetTreats' | 'petElixirs' | 'skeletonKeys' | 'petExp', number>>;
+  events: number;
+  rare: number;
+}
+
 export interface PendingNotification {
   id: string;
   title: string;
@@ -1912,9 +1923,19 @@ export interface AmbientKindDef {
   fleeRadius: number;
 }
 
+/**
+ * Where a room sits relative to the hideout. `hideout` rooms are part of the
+ * safe base and never trigger a travel ambush; `travel` rooms are out in the
+ * city, so walking there can pull the player into a travel encounter (see
+ * `TRAVEL_ENCOUNTER_TRIGGERS`).
+ */
+export type HubRoomKind = 'hideout' | 'travel';
+
 export interface HubRoomDef {
   id: string;
   name: string;
+  /** Hideout rooms are safe; travel rooms can be ambushed on arrival. */
+  kind: HubRoomKind;
   subtitle: string;
   description: string;
   backdrop: string;
@@ -2262,6 +2283,16 @@ export interface MetaState {
   hideoutPets: 'all' | 'companion' | 'off';
   /** How often small pet events play in the Hideout: normal, rarely, or never. */
   hideoutEvents: 'on' | 'quiet' | 'off';
+  /** Walk the operator with taps or arrow keys and use the props around each room. On by default. */
+  hideoutInteractive: boolean;
+  /** The pet play bar (scratch, fetch, nap together...) under the Hideout strip. On by default. */
+  hideoutPetPlay: boolean;
+  /** How often a choice event offers itself while you move around: normal, rarely, or never. */
+  hideoutChoiceEvents: 'on' | 'quiet' | 'off';
+  /** When each prop, choice event or rare find last paid out (ms), keyed `prop.<id>`, `event.<id>`, `rare.<item>`. */
+  hideoutClaims: Record<string, number>;
+  /** What the hideout has handed out today, so small rewards stay small. */
+  hideoutLedger: HideoutLedger;
   /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */
   hideoutStickyHeadOutEnabled: boolean;
   /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
