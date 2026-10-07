@@ -660,6 +660,20 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.16) 3px);
 }
 
+/*
+ * Low-profile scrollbar. Slim by default and tinted from --primary, so every
+ * data-ui-theme recolors it with no per-theme rules. Preferences live on
+ * <html data-scrollbar / data-scrollbar-tint> (see lib/scrollbar.ts).
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.35) transparent;
+}
+:root[data-scrollbar-tint='neutral'] * { scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent; }
+:root[data-scrollbar='standard'] * { scrollbar-width: auto; scrollbar-color: auto; }
+:root[data-scrollbar='hidden'] * { scrollbar-width: none; }
+:root[data-scrollbar='hidden'] *::-webkit-scrollbar { display: none; }
+
 @layer base {
   * {
     @apply border-border;

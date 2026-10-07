@@ -648,7 +648,38 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.19.2',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T22:45:00Z',
+    kind: 'hotfix',
+    title: 'A Quieter Scrollbar',
+    body: [
+      'The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.',
+      'Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral.',
+    ],
+  },
+  {
+    version: '0.19.3',
+    date: '2026-10-07',
     publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'hotfix',
+    title: 'Settings Jump Menu Complete',
+    body: [
+      'The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Scrollbar, Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout.',
+    ],
+  },
+  {
+    version: '0.19.4',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:50:00Z',
+    kind: 'hotfix',
+    title: 'Sealed Card Secrets',
+    body: [
+      'Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it.',
+    ],
+  },
+  {
+    version: '0.19.5',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T00:10:00Z',
     kind: 'update',
     title: 'A Real Million',
     body: [
