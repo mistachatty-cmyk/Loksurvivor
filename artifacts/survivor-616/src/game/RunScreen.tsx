@@ -60,6 +60,7 @@ import {
   selectCommandedUnitByUid,
   selectControlGroup,
   setCommandMode,
+  setHordeView,
   updateCommandSelection,
   updateArtisteDraw,
   primePhysicsObject,
@@ -873,7 +874,16 @@ export function RunScreen({
       return { width, height, dpr: backingW / width };
     };
 
+    // Million Horde keeps its waiting crowd just outside the camera; tell the
+    // engine how much of the world this screen shows.
+    const reportHordeView = (v: { width: number; height: number }) => {
+      if (!world.hordeField) return;
+      const target = targetViewForWidth(v.width);
+      const zoom = Math.max(0.001, v.width / target);
+      setHordeView(world, v.width / 2 / zoom, v.height / 2 / zoom);
+    };
     let view = resize();
+    reportHordeView(view);
 
     clipRecorderRef.current.start(world.now);
 
@@ -885,6 +895,7 @@ export function RunScreen({
       if (time - sizeCheckedAt > 250) {
         sizeCheckedAt = time;
         view = resize();
+        reportHordeView(view);
       }
 
       if (phaseRef.current === 'countdown') {
