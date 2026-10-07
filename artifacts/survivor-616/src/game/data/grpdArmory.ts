@@ -13,10 +13,10 @@ export interface ArmoryBlueprint {
 
 /** Concept blueprints stay visible even while their combat implementation is sealed. */
 export const GRPD_BLUEPRINTS: ArmoryBlueprint[] = [
-  { id: 'digifrog-lance', name: 'DigiFrog Lance', source: 'Volume I', kind: 'melee', color: '#7ee787', description: 'A bonded frog sweeps and bounces a caught enemy.' },
-  { id: 'firewall-verse', name: 'Firewall Verse', source: 'Volume I', kind: 'melee', color: '#ff765b', description: 'A legendary Digi-Tana draws protective cuts.' },
-  { id: 'rewind-mercy', name: 'Rewind Mercy', source: 'Volume I', kind: 'melee', color: '#c8e8ef', description: 'A legendary Digi-Tana returns marked threats to an earlier path.' },
-  { id: 'eclipse-severance', name: 'Eclipse Severance', source: 'Volume I', kind: 'melee', color: '#b080ee', description: 'A legendary Digi-Tana opens and closes a breach seam.' },
+  { id: 'digifrog-lance', name: 'DigiFrog Lance', source: 'Volume I', kind: 'melee', color: '#7ee787', description: 'A bonded frog sweeps and bounces a caught enemy.', playableWeaponId: 'digifrog-lance' },
+  { id: 'firewall-verse', name: 'Firewall Verse', source: 'Volume I', kind: 'melee', color: '#ff765b', description: 'A legendary Digi-Tana draws protective cuts.', playableWeaponId: 'firewall-verse' },
+  { id: 'rewind-mercy', name: 'Rewind Mercy', source: 'Volume I', kind: 'melee', color: '#c8e8ef', description: 'A legendary Digi-Tana returns marked threats to an earlier path.', playableWeaponId: 'rewind-mercy' },
+  { id: 'eclipse-severance', name: 'Eclipse Severance', source: 'Volume I', kind: 'melee', color: '#b080ee', description: 'A legendary Digi-Tana opens and closes a breach seam.', playableWeaponId: 'eclipse-severance' },
   { id: 'cipher-cathedral', name: 'Cipher Cathedral', source: 'Volume I', kind: 'wave', color: '#9edfff', description: 'Three glyphs assemble into a temporary shelter and trap.' },
   { id: 'subwoofer-railstaff', name: 'Subwoofer Railstaff', source: 'Volume I', kind: 'wave', color: '#e69cff', description: 'A staff drives a bass packet down a planted rail.' },
   { id: 'commentstorm-crown', name: 'Commentstorm Crown', source: 'Volume I', kind: 'orbit', color: '#ffe38d', description: 'Hostile taunts feed a punctuation storm.' },
@@ -48,6 +48,28 @@ export const GRPD_BLUEPRINTS: ArmoryBlueprint[] = [
 export const GRPD_PLAYABLE_WEAPON_IDS = new Set(
   GRPD_BLUEPRINTS.flatMap((blueprint) => blueprint.playableWeaponId ? [blueprint.playableWeaponId] : []),
 );
+
+/** The new shelf opens after Victory Lap. Each step requires another 750k or 1m kills. */
+export const GRPD_ENDGAME_WEAPON_ORDER = ['digifrog-lance', 'firewall-verse', 'rewind-mercy', 'eclipse-severance'] as const;
+export const GRPD_ENDGAME_KILL_INTERVALS = [750_000, 1_000_000] as const;
+const ENDGAME_IDS: ReadonlySet<string> = new Set(GRPD_ENDGAME_WEAPON_ORDER);
+
+export function grpdEndgameKillGoal(weaponId: string): number | undefined {
+  const index = GRPD_ENDGAME_WEAPON_ORDER.findIndex((id) => id === weaponId);
+  if (index < 0) return undefined;
+  let goal = 0;
+  for (let step = 0; step <= index; step += 1) goal += GRPD_ENDGAME_KILL_INTERVALS[step % GRPD_ENDGAME_KILL_INTERVALS.length]!;
+  return goal;
+}
+
+export function isGrpdEndgameWeapon(id: string): boolean {
+  return ENDGAME_IDS.has(id);
+}
+
+export function grpdEndgameWeaponEarned(id: string, totalKills: number, endgameUnlocked: boolean): boolean {
+  const goal = grpdEndgameKillGoal(id);
+  return goal !== undefined && endgameUnlocked && totalKills >= goal;
+}
 
 export const GRPD_KILLS_PER_SEAL = 1000;
 export const GRPD_UNLOCK_SEAL_COST = 1;

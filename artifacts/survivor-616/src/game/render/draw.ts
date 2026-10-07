@@ -11,7 +11,7 @@ import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
-import { lokPetSpritePalette } from '@/game/data/lokPets';
+import { LOKPET_VARIANTS_BY_ID, lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
@@ -3421,6 +3421,24 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.radius * (0.55 + life * 0.5), effect.angle - sweep, effect.angle + sweep);
         ctx.stroke();
+        if (effect.weaponId?.startsWith('firewall-') || effect.weaponId?.startsWith('rewind-') || effect.weaponId?.startsWith('eclipse-')) {
+          ctx.shadowColor = effect.color;
+          ctx.shadowBlur = 16 * fade;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2 + 3 * fade;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.radius * (0.55 + life * 0.5), effect.angle - sweep, effect.angle + sweep);
+          ctx.stroke();
+          if (effect.weaponId.startsWith('eclipse-')) {
+            ctx.setLineDash([12, 7]);
+            ctx.strokeStyle = '#7c3aed';
+            ctx.lineWidth = 5 * fade;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.radius * (0.69 + life * 0.5), effect.angle - sweep, effect.angle + sweep);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
         break;
       }
       case 'nova':
@@ -5813,13 +5831,15 @@ function drawActors(
     ctx.save();
     ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
     const enemyPalette = withHueShift(enemy.def, enemy.uid, resolveEnemyPalette(enemy.def));
+    const grossed = enemy.activeEffects.some((effect) => effect.id === 'grossed-out' && effect.expiresAt > w.now);
+    const squirmX = grossed ? Math.sin(w.now / 42 + enemy.uid) * 5 : 0;
     drawRig(
       ctx,
       enemy.def.rig,
       enemyPalette,
       enemy.anim,
       stoned ? 0 : w.now - enemy.animStartedAt,
-      enemy.x,
+      enemy.x + squirmX,
       enemy.y + 2 + fallProgress * 10,
       enemy.facing,
       SPRITE_SCALE * sizeClassScale(enemy.def) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
@@ -5835,6 +5855,16 @@ function drawActors(
       },
     );
     ctx.restore();
+    if (grossed) {
+      ctx.save();
+      ctx.strokeStyle = '#d5f77e';
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 8, -0.8, 2.8);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (!hidden && !enemy.dying && enemy.def.faction === 'Data Goblins') {
       const fleeing = w.area.id === 'rapid-pressure-rooms'
@@ -6337,6 +6367,28 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   }
   drawArtisteTrail(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
+  if (w.frogSwing) {
+    const caught = w.enemies.find((enemy) => enemy.uid === w.frogSwing!.targetUid && !enemy.dying);
+    if (caught) {
+      ctx.save();
+      const digiFrog = LOKPET_VARIANTS_BY_ID['circuit-frog']!;
+      drawRig(ctx, evolvedRig('circuit-frog', []), lokPetSpritePalette(digiFrog.palette), 'idle', w.now - w.frogSwing.startedAt, w.player.x + w.player.facing * 13, w.player.y - 8, w.player.facing, LOKPET_SPRITE_SCALE * 0.66);
+      ctx.strokeStyle = '#f28dbd';
+      ctx.shadowColor = '#7ee787';
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = w.frogSwing.evolved ? 8 : 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(w.player.x, w.player.y - 6);
+      ctx.quadraticCurveTo((w.player.x + caught.x) / 2, (w.player.y + caught.y) / 2 - 20, caught.x, caught.y);
+      ctx.stroke();
+      ctx.fillStyle = '#b5f59d';
+      ctx.beginPath();
+      ctx.arc(caught.x, caught.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
   drawRunningMan(ctx, w);
   drawPlayerConeMark(ctx, w);
   drawStormCloud(ctx, w);

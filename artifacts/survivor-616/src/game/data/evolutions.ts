@@ -9,6 +9,34 @@ const evolved = (id: string, name: string, description: string, baseWeaponId: st
 });
 
 export const EVOLUTIONS: EvolutionDef[] = [
+  {
+    id: 'tongue-tether-typhoon', name: 'Tongue-Tether Typhoon',
+    description: 'Max DigiFrog Lance and Chain Whip, then take Street Map. The thrown enemy ricochets through a wider crowd.',
+    identity: 'A DigiFrog catches, swirls, and hurls a whole lane of threats.', color: '#a7f3d0',
+    baseWeaponId: 'digifrog-lance', requiredWeaponId: 'chain-whip', requiredPassiveId: 'street-map', requiredBaseLevel: 8, requiredWeaponLevel: 8, endgameOnly: true,
+    result: { ...WEAPONS_BY_ID['digifrog-lance']!, id: 'tongue-tether-typhoon', name: 'Tongue-Tether Typhoon', damage: 44, range: 310, cooldownMs: 1550, color: '#a7f3d0' },
+  },
+  {
+    id: 'firewall-last-bar', name: 'Firewall Verse: Last Bar',
+    description: 'Max Firewall Verse and Boombox, then take Subwoofer. A second flaming guard arc answers the first.',
+    identity: 'Two heat-written bars keep a moving safe lane open.', color: '#ffab73',
+    baseWeaponId: 'firewall-verse', requiredWeaponId: 'boombox', requiredPassiveId: 'subwoofer', requiredBaseLevel: 8, requiredWeaponLevel: 8, endgameOnly: true,
+    result: { ...WEAPONS_BY_ID['firewall-verse']!, id: 'firewall-last-bar', name: 'Firewall Verse: Last Bar', damage: 48, range: 190, cooldownMs: 780, color: '#ffab73' },
+  },
+  {
+    id: 'rewind-encore', name: 'Rewind Mercy: Encore',
+    description: 'Max Rewind Mercy and Turntable, then take Vinyl Record. Marked threats snap back through a second cutting beat.',
+    identity: 'A time-spliced encore catches enemies where they stood.', color: '#e0f7ff',
+    baseWeaponId: 'rewind-mercy', requiredWeaponId: 'turntable', requiredPassiveId: 'vinyl-record', requiredBaseLevel: 8, requiredWeaponLevel: 8, endgameOnly: true,
+    result: { ...WEAPONS_BY_ID['rewind-mercy']!, id: 'rewind-encore', name: 'Rewind Mercy: Encore', damage: 40, range: 215, cooldownMs: 900, color: '#e0f7ff' },
+  },
+  {
+    id: 'eclipse-closed-circuit', name: 'Eclipse Severance: Closed Circuit',
+    description: 'Max Eclipse Severance and Rift Arc, then take Backup Drive. Paired breach cuts close around the crowd.',
+    identity: 'A violet seam cuts twice, then seals the breach behind the survivor.', color: '#d8a9ff',
+    baseWeaponId: 'eclipse-severance', requiredWeaponId: 'rift-arc', requiredPassiveId: 'backup-drive', requiredBaseLevel: 8, requiredWeaponLevel: 8, endgameOnly: true,
+    result: { ...WEAPONS_BY_ID['eclipse-severance']!, id: 'eclipse-closed-circuit', name: 'Eclipse Severance: Closed Circuit', damage: 59, range: 240, cooldownMs: 1150, color: '#d8a9ff' },
+  },
   evolved('gold-mic', 'Gold Mic', 'A plated shockwave that hits hard and reaches further.', 'freestyle-mic', 'gold-chain', 34, 102, 660),
   evolved('block-party', 'Block Party', 'The whole block becomes a bass-heavy danger zone.', 'boombox', 'subwoofer', 17, 140, 720),
   evolved('double-deck', 'Double Deck', 'Twin vinyl blades spin twice as fast.', 'turntable', 'vinyl-record', 24, 72, 0),

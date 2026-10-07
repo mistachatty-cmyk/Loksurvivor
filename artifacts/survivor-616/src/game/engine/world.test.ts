@@ -217,6 +217,54 @@ function addProjectile(
   return projectile;
 }
 
+test('DigiFrog Lance carries a target, throws it, and leaves sticky and grossed-out enemies', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const world = createWorld(area, testCharacter('digifrog-lance'), CHARACTERS[0]!.stats, 616);
+  const caught = addEnemy(world, 'nightcrawler', 70, 0);
+  caught.hp = caught.maxHp = 1000;
+  const witness = addEnemy(world, 'nightcrawler', 200, 200);
+  witness.uid = 901;
+  witness.hp = witness.maxHp = 1000;
+  world.weapons[0]!.readyAt = 0;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(world.frogSwing);
+  for (let frame = 0; frame < 18; frame += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(world.frogSwing, null);
+  assert.ok(world.frogThrows.length > 0);
+  assert.ok(caught.activeEffects.some((effect) => effect.id === 'sticky'));
+  witness.x = caught.x + 8;
+  witness.y = caught.y + 8;
+  stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(witness.activeEffects.some((effect) => effect.id === 'sticky'));
+  assert.ok(witness.activeEffects.some((effect) => effect.id === 'grossed-out'));
+});
+
+test('the Digi-Tana Trinity has three distinct combat paths', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const fire = createWorld(area, testCharacter('firewall-verse'), CHARACTERS[0]!.stats, 617);
+  addEnemy(fire, 'nightcrawler', 80, 0);
+  fire.weapons[0]!.readyAt = 0;
+  stepWorld(fire, 1 / 30, neutralInput);
+  assert.ok(fire.effects.some((effect) => effect.weaponId === 'firewall-verse' && effect.kind === 'hazard'));
+
+  const rewind = createWorld(area, testCharacter('rewind-mercy'), CHARACTERS[0]!.stats, 618);
+  const marked = addEnemy(rewind, 'nightcrawler', 80, 0);
+  marked.hp = marked.maxHp = 1000;
+  rewind.weapons[0]!.readyAt = 0;
+  stepWorld(rewind, 1 / 30, neutralInput);
+  assert.equal(rewind.rewindMarks.length, 1);
+  marked.x = 180;
+  for (let frame = 0; frame < 13; frame += 1) stepWorld(rewind, 1 / 30, neutralInput);
+  assert.equal(rewind.rewindMarks.length, 0);
+  assert.ok(marked.x < 130, 'the marked threat returns near its earlier position');
+
+  const eclipse = createWorld(area, testCharacter('eclipse-severance'), CHARACTERS[0]!.stats, 619);
+  addEnemy(eclipse, 'nightcrawler', 80, 0);
+  eclipse.weapons[0]!.readyAt = 0;
+  stepWorld(eclipse, 1 / 30, neutralInput);
+  assert.ok(eclipse.effects.some((effect) => effect.weaponId === 'eclipse-severance' && effect.kind === 'laser'));
+});
+
 test('impact travel respects authored force, mass, and resistance', () => {
   const light = resolveImpactTravel(3, 0.6);
   const heavy = resolveImpactTravel(3, 3.2);

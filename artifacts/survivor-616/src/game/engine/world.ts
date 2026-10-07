@@ -224,6 +224,8 @@ export interface EnemyActor extends Actor {
   frozenUntil: number;
   /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
   selectedForThrow: boolean;
+  /** Temporarily carried by the DigiFrog tongue; other weapons can still hit it. */
+  frogHeldUntil?: number;
   /**
    * Sector Command: permanently captured and fighting for the player. Distinct
    * from the legacy `convertedUntil` timer (the allymaker weapon), which stays
@@ -984,6 +986,34 @@ function weaponImpact(weapon: Pick<WeaponDef, 'impactIntensity'>): ImpactIntensi
 /* World                                                               */
 /* ------------------------------------------------------------------ */
 
+interface FrogSwing {
+  targetUid: number;
+  startedAt: number;
+  releaseAt: number;
+  angle: number;
+  reach: number;
+  damage: number;
+  level: number;
+  evolved: boolean;
+}
+
+interface FrogThrow {
+  targetUid: number;
+  expiresAt: number;
+  damage: number;
+  level: number;
+  hitUids: Set<number>;
+}
+
+interface RewindMark {
+  targetUid: number;
+  x: number;
+  y: number;
+  readyAt: number;
+  damage: number;
+  evolved: boolean;
+}
+
 export interface World {
   area: AreaDef;
   character: CharacterDef;
@@ -1048,6 +1078,9 @@ export interface World {
   musicColorOverride?: SpritePalette;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
+  frogSwing: FrogSwing | null;
+  frogThrows: FrogThrow[];
+  rewindMarks: RewindMark[];
   /** Runtime bookkeeping for the character's dash skill, when it has one. */
   dashSkill: DashSkillRuntime | null;
   /** Account-wide signature evolution active for the selected character. */
@@ -1298,6 +1331,7 @@ export interface World {
   grpdSpawnTierByWeaponId: Record<string, number>;
   grpdCareerKills: number;
   grpdAutoIncreaseEnabled: boolean;
+  endgameEvolutionsEnabled: boolean;
   disabledPassiveIds?: string[];
   threatCalibrations?: ThreatCalibrations;
   threatEventTimers?: {
@@ -1461,6 +1495,7 @@ export function createWorld(
     grpdSpawnTierByWeaponId?: Record<string, number>;
     grpdCareerKills?: number;
     grpdAutoIncreaseEnabled?: boolean;
+    endgameEvolutionsEnabled?: boolean;
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
@@ -1615,6 +1650,9 @@ export function createWorld(
     activeDirectorPersonalityId: setup.activeDirectorPersonalityId ?? null,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
+    frogSwing: null,
+    frogThrows: [],
+    rewindMarks: [],
     dashSkill: createDashSkillRuntime(character.dashSkill),
     activeEvolution: evolved,
     knownRelicIds: [...new Set(setup.knownRelicIds ?? [])],
@@ -1808,6 +1846,7 @@ export function createWorld(
     grpdSpawnTierByWeaponId: setup.grpdSpawnTierByWeaponId ?? {},
     grpdCareerKills: setup.grpdCareerKills ?? 0,
     grpdAutoIncreaseEnabled: setup.grpdAutoIncreaseEnabled ?? true,
+    endgameEvolutionsEnabled: setup.endgameEvolutionsEnabled ?? false,
     disabledPassiveIds: setup.disabledPassiveIds ?? [],
     threatCalibrations: setup.threatCalibrations,
     threatEventTimers: {
@@ -4445,6 +4484,142 @@ function fireLegendaryWeapon(w: World, runWeapon: RunWeapon, damage: number, rea
   return true;
 }
 
+function fireArchiveWeapon(w: World, runWeapon: RunWeapon, damage: number, reach: number): boolean {
+  const weapon = runWeapon.def;
+  const evolved = ['tongue-tether-typhoon', 'firewall-last-bar', 'rewind-encore', 'eclipse-closed-circuit'].includes(weapon.id);
+  const frog = weapon.id === 'digifrog-lance' || weapon.id === 'tongue-tether-typhoon';
+  const firewall = weapon.id === 'firewall-verse' || weapon.id === 'firewall-last-bar';
+  const rewind = weapon.id === 'rewind-mercy' || weapon.id === 'rewind-encore';
+  const eclipse = weapon.id === 'eclipse-severance' || weapon.id === 'eclipse-closed-circuit';
+  if (!frog && !firewall && !rewind && !eclipse) return false;
+  const p = w.player;
+  const target = nearestEnemy(w, p.x, p.y, reach + 25);
+  const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.facing > 0 ? 0 : Math.PI;
+  p.facing = Math.cos(angle) >= 0 ? 1 : -1;
+  p.anim = 'attack';
+  p.animStartedAt = w.now;
+  const color = weapon.color ?? '#ffffff';
+
+  if (frog) {
+    if (target && !w.frogSwing && !target.commanded) {
+      const level = Math.max(1, runWeapon.level);
+      const sweepMs = Math.max(340, (evolved ? 650 : 520) - (level - 1) * 20);
+      w.frogSwing = { targetUid: target.uid, startedAt: w.now, releaseAt: w.now + sweepMs, angle, reach, damage, level, evolved };
+      target.frogHeldUntil = w.frogSwing.releaseAt;
+      spawnParticles(w, target.x, target.y, color, 9, 85);
+      pushAlert(w, evolved ? 'DIGIFROG · TYPHOON CATCH' : 'DIGIFROG · TONGUE CATCH');
+    }
+    return true;
+  }
+
+  const slash = (arcAngle: number, offset: number, spread: number, slashDamage: number) => {
+    w.effects.push({
+      uid: uid(w), kind: 'slash', weaponId: weapon.id, x: p.x, y: p.y, radius: reach,
+      angle: arcAngle, spread, bornAt: w.now + offset, expiresAt: w.now + offset + 260,
+      color, damage: slashDamage, impactIntensity: weaponImpact(weapon),
+      hitUids: new Set(), followPlayer: true, statusEffectId: weapon.statusEffectId,
+    });
+  };
+  if (firewall) {
+    slash(angle, 0, 0.85, damage);
+    if (evolved) slash(angle + 0.4, 160, 0.85, damage * 0.7);
+    w.effects.push({
+      uid: uid(w), kind: 'hazard', weaponId: weapon.id,
+      x: p.x + Math.cos(angle) * reach * 0.68, y: p.y + Math.sin(angle) * reach * 0.68,
+      radius: reach * 0.52, angle, spread: 0, bornAt: w.now, expiresAt: w.now + (evolved ? 1800 : 1150),
+      color, damage: damage * 0.22, impactIntensity: 1, hitUids: new Set(), followPlayer: false, statusEffectId: 'burning',
+    });
+  } else if (rewind) {
+    slash(angle, 0, 0.68, damage);
+    if (target) {
+      w.rewindMarks.push({ targetUid: target.uid, x: target.x, y: target.y, readyAt: w.now + (evolved ? 620 : 420), damage: damage * (evolved ? 0.85 : 0.55), evolved });
+      spawnParticles(w, target.x, target.y, color, 7, 65);
+    }
+  } else {
+    slash(angle, 0, 0.48, damage);
+    const seamCount = evolved ? 2 : 1;
+    for (let i = 0; i < seamCount; i += 1) {
+      const seamAngle = angle + (i === 0 ? -0.22 : 0.22);
+      w.effects.push({
+        uid: uid(w), kind: 'laser', weaponId: weapon.id, x: p.x, y: p.y,
+        radius: reach, angle: seamAngle, spread: 0.16, bornAt: w.now + i * 130,
+        expiresAt: w.now + i * 130 + 420, color, damage: damage * 0.65,
+        impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, statusEffectId: 'slow',
+      });
+    }
+  }
+  w.shake = Math.max(w.shake, evolved ? 4 : 2);
+  return true;
+}
+
+function applyFrogStatus(w: World, enemy: EnemyActor, id: 'sticky' | 'grossed-out', level: number) {
+  applyStatusEffect(w, enemy, id);
+  const effect = enemy.activeEffects.find((entry) => entry.id === id);
+  if (effect) effect.expiresAt = Math.max(effect.expiresAt, w.now + (id === 'sticky' ? 2400 + (level - 1) * 160 : 650 + (level - 1) * 60));
+}
+
+function updateArchiveCombat(w: World) {
+  const swing = w.frogSwing;
+  if (swing) {
+    const caught = w.enemies.find((enemy) => enemy.uid === swing.targetUid && !enemy.dying);
+    if (!caught) w.frogSwing = null;
+    else if (w.now < swing.releaseAt) {
+      const progress = clamp((w.now - swing.startedAt) / (swing.releaseAt - swing.startedAt), 0, 1);
+      const angle = swing.angle - 1.15 + progress * 2.3;
+      caught.x = w.player.x + Math.cos(angle) * swing.reach * 0.7;
+      caught.y = w.player.y + Math.sin(angle) * swing.reach * 0.7;
+      caught.kx = 0;
+      caught.ky = 0;
+      applyFrogStatus(w, caught, 'sticky', swing.level);
+    } else {
+      caught.frogHeldUntil = 0;
+      const throwAngle = swing.angle + 1.05;
+      const force = (swing.evolved ? 780 : 570) + (swing.level - 1) * 26;
+      caught.kx = Math.cos(throwAngle) * force;
+      caught.ky = Math.sin(throwAngle) * force;
+      damageEnemy(w, caught, swing.damage, 3, w.player.x, w.player.y, 'sticky');
+      applyFrogStatus(w, caught, 'sticky', swing.level);
+      if (!caught.dying) w.frogThrows.push({ targetUid: caught.uid, expiresAt: w.now + 1050 + (swing.level - 1) * 80, damage: swing.damage * (swing.evolved ? 0.9 : 0.55), level: swing.level, hitUids: new Set([caught.uid]) });
+      w.frogSwing = null;
+      w.shake = Math.max(w.shake, swing.evolved ? 6 : 4);
+    }
+  }
+  for (let i = w.frogThrows.length - 1; i >= 0; i -= 1) {
+    const thrown = w.frogThrows[i]!;
+    const source = w.enemies.find((enemy) => enemy.uid === thrown.targetUid && !enemy.dying);
+    if (!source || w.now >= thrown.expiresAt) { w.frogThrows.splice(i, 1); continue; }
+    forEachNearby(w, source.x, source.y, source.radius + 34, (enemy) => {
+      if (enemy.dying || enemy.uid === source.uid || thrown.hitUids.has(enemy.uid)) return;
+      if (dist2(source.x, source.y, enemy.x, enemy.y) > (source.radius + enemy.radius + 16) ** 2) return;
+      thrown.hitUids.add(enemy.uid);
+      damageEnemy(w, enemy, thrown.damage, 4, source.x, source.y, 'sticky');
+      applyFrogStatus(w, enemy, 'sticky', thrown.level);
+      source.kx *= -(0.66 + (thrown.level - 1) * 0.025);
+      source.ky *= -(0.66 + (thrown.level - 1) * 0.025);
+      forEachNearby(w, enemy.x, enemy.y, 92, (witness) => {
+        if (!witness.dying && witness.uid !== source.uid) applyFrogStatus(w, witness, 'grossed-out', thrown.level);
+      });
+      spawnParticles(w, enemy.x, enemy.y, '#9afa99', 11, 100);
+    });
+  }
+  for (let i = w.rewindMarks.length - 1; i >= 0; i -= 1) {
+    const mark = w.rewindMarks[i]!;
+    if (w.now < mark.readyAt) continue;
+    const enemy = w.enemies.find((entry) => entry.uid === mark.targetUid && !entry.dying);
+    if (enemy && !enemy.commanded) {
+      spawnParticles(w, enemy.x, enemy.y, '#c8e8ef', 9, 95);
+      enemy.x = mark.x;
+      enemy.y = mark.y;
+      enemy.kx = 0;
+      enemy.ky = 0;
+      damageEnemy(w, enemy, mark.damage, 2, w.player.x, w.player.y, 'slow');
+      if (mark.evolved) novaDamage(w, mark.x, mark.y, 62, mark.damage * 0.45, 1, 'slow');
+      spawnParticles(w, mark.x, mark.y, '#e0f7ff', 13, 100);
+    }
+    w.rewindMarks.splice(i, 1);
+  }
+}
+
 function fireWeapon(w: World, runWeapon: RunWeapon) {
   const weapon = runWeapon.def;
   const p = w.player;
@@ -4454,6 +4629,7 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
   const behavior = weaponEvolutionBehavior(w, weapon);
 
   if (fireLegendaryWeapon(w, runWeapon, damage, reach)) return;
+  if (fireArchiveWeapon(w, runWeapon, damage, reach)) return;
 
   switch (weapon.kind) {
     case 'follower': {
@@ -5217,6 +5393,7 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
     }
   }
   for (const evolution of EVOLUTIONS) {
+    if (evolution.endgameOnly && !w.endgameEvolutionsEnabled) continue;
     if (w.disabledWeaponIds && w.disabledWeaponIds.includes(evolution.id)) continue;
     const weapon = w.weapons.find((entry) => entry.def.id === evolution.baseWeaponId);
     if (!weapon || weapon.def.id === evolution.id) continue;
@@ -6976,6 +7153,11 @@ function updateEnemies(w: World, dt: number) {
   const enemyMoveBreakables = w.breakables.filter((b) => !b.broken && b.movable);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
+    if (enemy.frogHeldUntil && w.now < enemy.frogHeldUntil) {
+      enemy.vx = 0;
+      enemy.vy = 0;
+      continue;
+    }
     // Zero Day: frozen "stone" enemies are fully inert -- no AI, no attacks,
     // no contact damage (the contact check further down never runs since we
     // skip the rest of the loop body for them entirely).
@@ -11212,6 +11394,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateRunningMan(w);
   updateRawDataBreakage(w, dt);
   updateEnemies(w, dt);
+  updateArchiveCombat(w);
   updateRoamingDetectors(w, dt);
   updateBreakables(w, dt);
   updateFluids(w);

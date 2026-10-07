@@ -475,6 +475,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Ask the keeper to hum-shift the Armory between the GRPD Station and the hideout. The entrance follows its saved location.',
     ],
   },
+  {
+    version: '0.14.1',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'The Trinity and the Frog Take the Field',
+    body: [
+      'DigiFrog Lance and the three legendary Digi-Tanas now unlock for every survivor after Victory Lap at alternating 750,000 and 1,000,000 lifetime-kill steps. They stay switched off until you activate them in the GRPD Armory.',
+      'The frog catches, sweeps, throws, and bounces enemies; sticky residue slows the crowd and nearby witnesses squirm. Firewall Verse guards with fire, Rewind Mercy returns a marked threat, and Eclipse Severance cuts a slowing seam.',
+      'Each has a weapon-and-passive evolution recipe. Endgame weapon evolutions start on when Victory Lap opens and can be switched off in Endgame settings.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
