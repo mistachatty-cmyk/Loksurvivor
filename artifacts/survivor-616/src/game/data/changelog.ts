@@ -669,7 +669,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.20.2',
     date: '2026-10-07',
-    publishedAt: '2026-10-08T00:30:00Z',
+    publishedAt: '2026-10-07T23:59:30Z',
     kind: 'update',
     title: 'Next-Gen Fitters and Their Drops',
     body: [
