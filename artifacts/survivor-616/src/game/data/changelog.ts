@@ -687,6 +687,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Big fights run lighter everywhere. Crowd collisions, the death dissolve, sprite drawing and loot trimming were all rebuilt to do less work, so mass wipes should stay smooth. Nothing about the way anything looks or plays changed.',
     ],
   },
+  {
+    version: '0.19.6',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T01:00:00Z',
+    kind: 'update',
+    title: 'Shinier Drops',
+    body: [
+      'Every drop got a new look. Gems are faceted and catch the light, coins spin, chests have lids that rattle and seams that creak, and crystals, flasks and resin glow and shimmer. Drops now bounce out when they spawn, cast a small shadow, streak toward you when the magnet pulls them, and pop when collected.',
+      'Prefer the old look? Settings has a new Drop style choice: Enhanced or Classic. Performance graphics always uses Classic. Display only; nothing about drops or rewards changed.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

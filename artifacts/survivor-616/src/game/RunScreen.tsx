@@ -430,6 +430,7 @@ export function RunScreen({
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0)).map((pet) => ({ ...pet.roll, level: pet.level ?? 1, ...(pet.evolutionPath ? { evolutionBranchId: pet.evolutionPath.branchId } : {}) })),
         modifiers: meta.runModifiers,
         graphicsQuality: meta.graphicsQuality,
+        dropStyle: meta.dropStyle,
         damageNumberStyle: meta.damageNumberStyle,
         runtimePerformanceTier: detectRuntimePerformanceTier(),
         worldColorPalette: activeWorldPalette,

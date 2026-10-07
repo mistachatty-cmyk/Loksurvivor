@@ -2259,6 +2259,8 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: GraphicsQuality;
+  /** Drop art: 'enhanced' (default) or the original 'classic' look. Render-only. */
+  dropStyle: 'enhanced' | 'classic';
   /** How hit numbers look. 'classic' (default) is the original popup; see `data/damageNumbers.ts`. */
   damageNumberStyle: DamageNumberStyle;
   /**

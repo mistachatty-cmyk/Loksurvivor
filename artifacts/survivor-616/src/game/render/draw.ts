@@ -6,6 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { drawEnhancedPickup } from './pickupArt';
 import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Popup, type World } from '@/game/engine/world';
 import { DAMAGE_TIERS, GLOW_FROM_TIER } from '@/game/data/damageNumbers';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
@@ -3058,6 +3059,11 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
     const pop = age >= 180 ? 1 : 0.35 + 0.65 * (age / 180);
 
     ctx.save();
+    if (w.dropStyle === 'enhanced' && w.graphicsQuality !== 'performance') {
+      drawEnhancedPickup(ctx, pickup, w.now, w.graphicsQuality !== 'high');
+      ctx.restore();
+      continue;
+    }
     switch (pickup.kind) {
       case 'xp': {
         const tier = xpGemTier(pickup.value);

@@ -278,6 +278,7 @@ export function createInitialMeta(): MetaState {
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
     graphicsQuality: 'high',
+    dropStyle: 'enhanced',
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -1217,6 +1218,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
         ? parsed.graphicsQuality
         : 'high',
+    dropStyle: parsed.dropStyle === 'classic' ? 'classic' : 'enhanced',
     damageNumberStyle: isDamageNumberStyle(parsed.damageNumberStyle) ? parsed.damageNumberStyle : 'classic',
     companionRevealStyle: parsed.companionRevealStyle === 'classic' ? 'classic' : 'ambush',
     frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
@@ -1957,6 +1959,7 @@ type Action =
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
+  | { type: 'setDropStyle'; style: MetaState['dropStyle'] }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
   | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
@@ -3243,6 +3246,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'setDamageNumberStyle':
       return { ...state, meta: { ...state.meta, damageNumberStyle: action.style } };
+    case 'setDropStyle':
+      return { ...state, meta: { ...state.meta, dropStyle: action.style } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -4058,6 +4063,7 @@ export interface MetaContextValue {
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
+  setDropStyle: (style: MetaState['dropStyle']) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
   setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
@@ -4270,6 +4276,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLootPresentation = useCallback((value: MetaState['lootPresentation']) => dispatch({ type: 'setLootPresentation', value }), []);
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
+  const setDropStyle = useCallback((style: MetaState['dropStyle']) => dispatch({ type: 'setDropStyle', style }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
   const setCompanionRevealStyle = useCallback((style: MetaState['companionRevealStyle']) => dispatch({ type: 'setCompanionRevealStyle', style }), []);
@@ -4562,6 +4569,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPresentation,
       setPauseMapVisible,
       setGraphicsQuality,
+      setDropStyle,
       setDamageNumberStyle,
       setCompanionRevealStyle,
       setFrameRateMode,
@@ -4724,6 +4732,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setDropStyle,
     setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,

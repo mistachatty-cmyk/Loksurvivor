@@ -1305,6 +1305,8 @@ export interface World {
    * popups, enemy outlines/shadows), never difficulty or rewards.
    */
   graphicsQuality: 'high' | 'balanced' | 'performance';
+  /** Settings: enhanced (default) or classic drop art. Render-only. */
+  dropStyle: 'enhanced' | 'classic';
   /** Settings: which damage-number style to draw. Render-only; never affects damage. */
   damageNumberStyle: DamageNumberStyle;
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
@@ -1494,6 +1496,7 @@ export function createWorld(
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
     graphicsQuality?: 'high' | 'balanced' | 'performance';
+    dropStyle?: 'enhanced' | 'classic';
     damageNumberStyle?: DamageNumberStyle;
     runtimePerformanceTier?: RuntimePerformanceTier;
     worldColorPalette?: SpritePalette;
@@ -1829,6 +1832,7 @@ export function createWorld(
     hordeView: { hold: 520, ky: 1.4, drawHalfW: 580, drawHalfH: 380 },
     hordeFedThisStep: 0,
     graphicsQuality: setup.graphicsQuality ?? 'high',
+    dropStyle: setup.dropStyle ?? 'enhanced',
     damageNumberStyle: setup.damageNumberStyle ?? 'classic',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
@@ -10443,6 +10447,14 @@ function updateAmbientDrops(w: World) {
   spawnParticles(w, x, y, '#ffe8a3', 6, 60);
 }
 
+/** Kinds whose collect branch spawns no particles of its own get a small burst. */
+const PICKUP_BURST_COLOR: Partial<Record<PickupKind, string>> = {
+  xp: '#9aefff',
+  health: '#7dffb2',
+  cred: '#ffd166',
+  coin: '#e8d48a',
+};
+
 function updatePickups(w: World, dt: number) {
   const p = w.player;
   const magnet = w.stats.magnet;
@@ -10652,6 +10664,8 @@ function updatePickups(w: World, dt: number) {
           break;
         }
       }
+      const burstColor = PICKUP_BURST_COLOR[pickup.kind];
+      if (burstColor) spawnParticles(w, pickup.x, pickup.y, burstColor, pickup.kind === 'xp' && pickup.value >= 10 ? 7 : 4, 55);
       w.pickups.splice(i, 1);
     }
   }
