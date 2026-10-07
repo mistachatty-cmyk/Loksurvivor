@@ -2,7 +2,7 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
+import { ELIXIR_CAP, isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
@@ -14,7 +14,16 @@ import { FirstNightBoard } from './FirstNightBoard';
 import { ContractBoard } from './ContractBoard';
 import { NotificationToasts } from './NotificationToasts';
 import { CollapsibleSection } from './CollapsibleSection';
-import { HideoutPreview, type HideoutPetInfo } from './HideoutPreview';
+import { HideoutPreview, type HideoutPetInfo, type HideoutPropInfo, type PlayCue, type StripNotice } from './HideoutPreview';
+import { HideoutPlayBar } from './HideoutPlayBar';
+import { describeReward } from './hideoutRewardText';
+import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
+import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER, type NpcCastMember } from '@/game/data/npcCast';
+import { bondLuck, eventsLeftToday, grantWithFallback } from '@/game/engine/hideoutRewards';
+import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
+import { createRng } from '@/game/engine/math';
+import { applyPetCare, PET_CARE_VERBS_BY_ID } from '@/game/data/petCare';
+import { beatBus } from '@/game/audio/beatBus';
 import { petEvolvedLook } from '@/game/engine/petEvolution';
 import { bondRankFor, petCallName } from '@/game/engine/petGrowth';
 import { CurrencyGlossary } from './CurrencyGlossary';
@@ -22,7 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Skull, Users, Music, Unlock, Lock, ArrowLeft, ArrowRight, Package, Settings2, Waves, SprayCan, Utensils, CloudRain, Snowflake, Sun, CloudFog, Building2, RadioTower, Trees, Compass, Map as MapIcon, Radio, ShieldCheck, ShieldAlert, Sparkles, PackageCheck, Bell, Magnet, Hammer, MonitorDot, Lamp, BookOpen, PartyPopper, KeyRound, Palette, Mail, MessageSquareHeart, Droplet, Coffee, Heart, Camera, Sunrise, Disc, Disc3, Flame, Book, Wrench, Zap, Calculator, Paintbrush, Scroll, Footprints, ShoppingBag, CreditCard, Swords, ScanEye, Dog, HelpCircle, Clapperboard, Bug } from 'lucide-react';
 import { LorePopup } from './LorePopup';
-import type { CrewActivityIcon } from '@/game/types';
+import type { CrewActivityIcon, HubPanel } from '@/game/types';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { startHideoutAmbience, type AmbienceHandle } from '@/game/audio/ambience';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
@@ -34,7 +43,7 @@ import { LokPetIcon } from './LokPetVariantSheet';
 import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
-import { useT } from '@/lib/i18n';
+import { useT, useLocale } from '@/lib/i18n';
 import { grpdArmoryLocation } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
@@ -42,7 +51,7 @@ import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
 
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch';
+export type { HubPanel };
 
 export interface HubScreenProps {
   /** Currently displayed hideout room id. */
@@ -58,6 +67,8 @@ export interface HubScreenProps {
   onOpenArena: () => void;
   /** Reopens the companion and visual setup screen without starting a run. */
   onOpenRunSetup: () => void;
+  /** Opens a choice event scene (from a prop or the "something is happening" chip). */
+  onStartChoiceEvent?: (eventId: string, propId?: string) => void;
   /** Returns to the cold-open title screen. */
   onBack?: () => void;
 }
@@ -130,11 +141,17 @@ const SCENE_LOOKS = [
   { id: 'arcade', name: 'After Hours', crew: 9, note: 'Arcade colors cross the walls in soft waves.' },
 ] as const;
 const SCENE_LOOK_KEY = 'survivor616.hideout.sceneLook';
+const NPC_PROP_CAST: Record<string, NpcCastMember> = {
+  'jeremey-frogster': JEREMEY_FROGSTER,
+  'jeramy-frogster': JERAMY_FROGSTER,
+  'luvitnot-keeper': LUVITNOT_KEEPER,
+};
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onBack }: HubScreenProps) {
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent } = useMeta();
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
+  const locale = useLocale();
   const { session } = useAuth();
   const { balance: lokBalance } = useLokEconomy();
   // Memoized so the palette object identity stays stable across re-renders
@@ -178,6 +195,100 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     ),
     [selectedCharacter, meta.characterSkinByCharacterId, meta.activePaletteId, meta.worldPaletteBlendEnabled],
   );
+  const activeRoomId = unlockedRooms.find((r) => r.id === roomId)?.id ?? unlockedRooms[0]?.id ?? roomId;
+  const [stripNotice, setStripNotice] = useState<StripNotice | undefined>(undefined);
+  const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
+  const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
+  const noticeSeqRef = useRef(0);
+  const showStripNotice = (title: string, line: string) => {
+    noticeSeqRef.current += 1;
+    setStripNotice({ seq: noticeSeqRef.current, title, line });
+  };
+
+  // The props standing in this room. Memoized so a poll tick does not rebuild them (the strip
+  // reads them through a ref, but a new array each render would still churn the parent).
+  const hideoutPropInfos = useMemo<HideoutPropInfo[]>(() => {
+    if (!meta.hideoutInteractive || !meta.hideoutPreviewEnabled) return [];
+    const now = Date.now();
+    return propsForRoom(activeRoomId).map((def) => {
+      const npc = def.npcId ? NPC_PROP_CAST[def.npcId] : undefined;
+      return {
+        id: def.id,
+        x: def.x,
+        art: def.art,
+        accent: def.accent,
+        label: t(def.labelKey),
+        ready: def.action.kind !== 'talk' && def.action.kind !== 'panel' ? propReady(def, meta.hideoutClaims, now) : false,
+        npc: npc ? { rig: npc.rig, palette: npc.palette } : undefined,
+      };
+    });
+  // `t` never changes identity, so the locale is what relabels the props.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutClaims, locale]);
+
+  // The pet the play bar is about: the one you last tapped on the strip, else the first walker.
+  const focusPet = meta.savedLokPets.find((pet) => pet.id === (hideoutPets.some((p) => p.id === focusPetId) ? focusPetId : hideoutPets[0]?.id));
+
+  const handlePlay = (verbId: string) => {
+    const def = PET_CARE_VERBS_BY_ID[verbId];
+    if (!def || !focusPet) return;
+    const now = Date.now();
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const musicPlaying = beatBus.read().source !== 'none';
+    // Same function the reducer runs, so the toast shows exactly what was paid.
+    const outcome = applyPetCare(meta, focusPet.id, verbId, seed, { now, musicPlaying, elixirCap: ELIXIR_CAP });
+    if (!outcome.ok) return;
+    playWithLokPet(focusPet.id, verbId, seed, musicPlaying);
+    const name = petCallName(focusPet);
+    noticeSeqRef.current += 1;
+    setPlayCue({ seq: noticeSeqRef.current, petId: focusPet.id, move: def.move, emote: def.emote, durationMs: def.durationMs });
+    const line = t(outcome.rareTextKey ?? def.lineKeys[outcome.mood], { pet: name, you: focusPet.names?.callsYou?.trim() || 'you' });
+    const found = describeReward(outcome.applied, t);
+    showStripNotice(t(def.labelKey), found ? `${line} ${t('hideout.life.found', { items: found })}` : line);
+  };
+
+  const handlePropUse = (propId: string) => {
+    const def = HIDEOUT_PROPS_BY_ID[propId];
+    if (!def) return;
+    const title = t(def.labelKey);
+    const line = t(def.lineKeys[Math.floor(Math.random() * def.lineKeys.length)] ?? def.lineKeys[0]!);
+    const action = def.action;
+    if (action.kind === 'talk') {
+      showStripNotice(title, line);
+    } else if (action.kind === 'panel') {
+      showStripNotice(title, line);
+      onOpen(action.panel);
+    } else if (action.kind === 'reward') {
+      const now = Date.now();
+      if (!propReady(def, meta.hideoutClaims, now)) {
+        showStripNotice(title, t('hideout.life.usedToday'));
+        return;
+      }
+      // Preview with the same seed the reducer will use, so the toast shows exactly what was paid.
+      const seed = Math.floor(Math.random() * 0x7fffffff);
+      const roll = resolvePropReward(def, createRng(seed), bondLuck(meta.savedLokPets));
+      const preview = roll ? grantWithFallback(meta, roll.reward, roll.fallback, { now, rare: roll.rare, elixirCap: ELIXIR_CAP }) : null;
+      activateHideoutProp(propId, seed);
+      const found = preview ? describeReward(preview.applied, t) : '';
+      const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;
+      showStripNotice(title, found ? `${text} ${t('hideout.life.found', { items: found })}` : text);
+    } else if (action.kind === 'event') {
+      const now = Date.now();
+      if (!propReady(def, meta.hideoutClaims, now)) {
+        showStripNotice(title, t('hideout.life.usedToday'));
+        return;
+      }
+      const pet = eventPetFor(meta);
+      const picked = eventsLeftToday(meta.hideoutLedger, now) > 0
+        ? pickChoiceEvent(action.pool, meta.hideoutClaims, { now, pet, weather: getHideoutScene(activeRoomId).weather, musicPlaying: beatBus.read().source !== 'none' }, Math.random)
+        : null;
+      if (picked && onStartChoiceEvent) onStartChoiceEvent(picked.id, def.id);
+      else showStripNotice(title, line);
+    } else {
+      showStripNotice(title, line);
+    }
+  };
+
   const roomNavRef = useRef<HTMLDivElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
@@ -241,6 +352,56 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   useEffect(() => {
     claimDailyLogin();
   }, [claimDailyLogin]);
+
+  // Choice events that find you while you are in the hideout: a "something is happening" chip on
+  // the strip (never a pop-up), and a nudge now and then after you have walked a good way.
+  const [eventChip, setEventChip] = useState<string | null>(null);
+  const eventChipRef = useRef<string | null>(null);
+  eventChipRef.current = eventChip;
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
+  const lastWalkOfferRef = useRef(0);
+
+  const offerChoiceEvent = (pool: string) => {
+    const m = metaRef.current;
+    const now = Date.now();
+    if (eventChipRef.current || eventsLeftToday(m.hideoutLedger, now) <= 0) return;
+    const pet = eventPetFor(m);
+    const picked = pickChoiceEvent(pool, m.hideoutClaims, { now, pet, weather: getHideoutScene(activeRoomId).weather, musicPlaying: beatBus.read().source !== 'none' }, Math.random);
+    if (picked) setEventChip(picked.id);
+  };
+
+  useEffect(() => {
+    if (!meta.hideoutPreviewEnabled || meta.hideoutChoiceEvents === 'off' || showArrival) return undefined;
+    const fast = import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents');
+    const slow = meta.hideoutChoiceEvents === 'quiet' ? 3 : 1;
+    let timer = 0;
+    const schedule = (ms: number) => { timer = window.setTimeout(offer, ms); };
+    const offer = () => {
+      if (document.visibilityState === 'visible') offerChoiceEvent('idle');
+      schedule((240_000 + Math.random() * 300_000) * slow);
+    };
+    schedule(fast ? 3000 : 90_000 * slow);
+    return () => window.clearTimeout(timer);
+    // The offer reads the latest meta through a ref, so only the settings restart the timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meta.hideoutPreviewEnabled, meta.hideoutChoiceEvents, showArrival]);
+
+  // A chip left alone fades after a minute, and a new room starts fresh.
+  useEffect(() => {
+    if (!eventChip) return undefined;
+    const timer = window.setTimeout(() => setEventChip(null), 60_000);
+    return () => window.clearTimeout(timer);
+  }, [eventChip]);
+  useEffect(() => { setEventChip(null); }, [activeRoomId]);
+
+  const handleWalkBeat = () => {
+    const m = metaRef.current;
+    const now = Date.now();
+    if (m.hideoutChoiceEvents === 'off' || now - lastWalkOfferRef.current < 180_000) return;
+    lastWalkOfferRef.current = now;
+    if (Math.random() < 0.3 * (m.hideoutChoiceEvents === 'quiet' ? 0.4 : 1)) offerChoiceEvent('walk');
+  };
 
   /**
    * Optional procedural ambience for the room you are standing in. Off unless
@@ -409,8 +570,30 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             onPetCare={careForLokPet}
             onPetEvent={completeHideoutEvent}
             firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
+            props={hideoutPropInfos}
+            interactive={meta.hideoutInteractive}
+            keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary}
+            notice={stripNotice}
+            cue={playCue}
+            onPropUse={handlePropUse}
+            onFocusPet={setFocusPetId}
+            onWalkBeat={handleWalkBeat}
+            eventChip={eventChip ? { label: t('hideout.life.eventChip'), aria: t('hideout.life.eventChipAria') } : null}
+            onEventChip={() => {
+              const id = eventChip;
+              setEventChip(null);
+              if (id) onStartChoiceEvent?.(id);
+            }}
           />
         )}
+        {meta.hideoutPreviewEnabled && meta.hideoutPetPlay && focusPet ? (
+          <HideoutPlayBar
+            pet={focusPet}
+            others={hideoutPets.filter((pet) => pet.id !== focusPet.id).map((pet) => ({ id: pet.id, name: pet.name }))}
+            onPlay={handlePlay}
+            onSwitch={setFocusPetId}
+          />
+        ) : null}
         <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-primary">Hideout scene</span>
           {SCENE_LOOKS.map((look) => {

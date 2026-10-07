@@ -272,6 +272,9 @@ just *what*, so the reasoning doesn't need to be re-derived:
   is separate from the allymaker's `convertedUntil`, the mobile rule that the
   movement stick and the RTS pointer grammar never share a pointer-down, and
   the Tier 2/3 economies that are typed but deliberately unbuilt.
+- `hideout-interactables.md` — read before adding a hideout prop, pet play verb, choice event or anything else that
+  pays a reward in the hideout: every payout must go through `engine/hideoutRewards.ts` (daily caps, rare limits), and
+  idle events are a chip on the strip, never a pop-up.
 - `MEMORY.md` — index/entry point for the above.
 
 ## LOK universe, store and gsix.online sync

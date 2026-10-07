@@ -490,6 +490,29 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '0.14.2',
     date: '2026-10-06',
     kind: 'hotfix',
+    title: 'Studio Takes Stop Hogging Memory',
+    body: [
+      'Fixed a memory leak in the Studio: deleting a recorded mic take (or any clip) left its audio loaded in memory for the rest of the session. A clip\u2019s audio is now freed once nothing else uses it.',
+      'Clips that share the same audio, and clips still waiting in your library, keep playing normally.',
+    ],
+  },
+  {
+    version: '0.15.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Walk the Hideout',
+    body: [
+      'You can walk your operator around the hideout now. Tap the ground, or use the arrow keys or A and D, and walk up to the things in each room to use them.',
+      'The bell cord, the Relay Crate, the Static Jar, the Beacon Lamp and a few others hand out small finds once a day. The stoop cat and the old telescope can start something, too.',
+      'LokPets can do more than get petted. Scratch, fetch, boogie, snack break, nap together, and go on a sniff hunt. Every pet likes different things, and a closer bond opens up more of them and makes rare finds a little more likely.',
+      'Little choice events turn up around the hideout and when you move between rooms. Pick what to do and see how it goes. A few rare surprises are hiding in there.',
+      'It is all capped per day, and you can switch each part off in Settings under Hideout.',
+    ],
+  },
+  {
+    version: '0.15.1',
+    date: '2026-10-06',
+    kind: 'hotfix',
     title: 'Hideout and Travel, Armory Found',
     body: [
       'The GRPD Armory was stuck behind GRPD Station, which only opens after clearing Division St. Until the station is found, the Luvitnot keeper now holds the Armory entrance on the Sanctum main floor.',
@@ -498,7 +521,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.14.3',
+    version: '0.15.2',
     date: '2026-10-06',
     kind: 'hotfix',
     title: 'Your LokPet Travels With You',

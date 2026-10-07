@@ -7,8 +7,8 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
-      "number": 45,
-      "version": "0.14.3",
+      "number": 47,
+      "version": "0.15.2",
       "date": "2026-10-06",
       "kind": "hotfix",
       "title": "Your LokPet Travels With You",
@@ -19,8 +19,8 @@
       ]
     },
     {
-      "number": 44,
-      "version": "0.14.2",
+      "number": 46,
+      "version": "0.15.1",
       "date": "2026-10-06",
       "kind": "hotfix",
       "title": "Hideout and Travel, Armory Found",
@@ -28,6 +28,31 @@
         "The GRPD Armory was stuck behind GRPD Station, which only opens after clearing Division St. Until the station is found, the Luvitnot keeper now holds the Armory entrance on the Sanctum main floor.",
         "The room list is split in two. Hideout rooms (the Sanctum, the Perch, the Cellar, the Alley Annex, the Back Room and the Sound Booth) are safe. Travel rooms (The Neon Sleeve, Studio 28, GRPD Station, the Vault and Rapid Shelter) are out in the city and are marked with an Ambush risk badge.",
         "You can only be ambushed when you travel. Studio 28, the Vault and Rapid Shelter now count, and the Perch, Cellar and Alley Annex no longer do. The Travel setting still switches ambushes off."
+      ]
+    },
+    {
+      "number": 45,
+      "version": "0.15.0",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "Walk the Hideout",
+      "body": [
+        "You can walk your operator around the hideout now. Tap the ground, or use the arrow keys or A and D, and walk up to the things in each room to use them.",
+        "The bell cord, the Relay Crate, the Static Jar, the Beacon Lamp and a few others hand out small finds once a day. The stoop cat and the old telescope can start something, too.",
+        "LokPets can do more than get petted. Scratch, fetch, boogie, snack break, nap together, and go on a sniff hunt. Every pet likes different things, and a closer bond opens up more of them and makes rare finds a little more likely.",
+        "Little choice events turn up around the hideout and when you move between rooms. Pick what to do and see how it goes. A few rare surprises are hiding in there.",
+        "It is all capped per day, and you can switch each part off in Settings under Hideout."
+      ]
+    },
+    {
+      "number": 44,
+      "version": "0.14.2",
+      "date": "2026-10-06",
+      "kind": "hotfix",
+      "title": "Studio Takes Stop Hogging Memory",
+      "body": [
+        "Fixed a memory leak in the Studio: deleting a recorded mic take (or any clip) left its audio loaded in memory for the rest of the session. A clip’s audio is now freed once nothing else uses it.",
+        "Clips that share the same audio, and clips still waiting in your library, keep playing normally."
       ]
     },
     {

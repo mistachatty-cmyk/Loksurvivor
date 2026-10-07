@@ -65,6 +65,10 @@ import { MusicNowPlaying } from '@/ui/MusicNowPlaying';
 import { FocusWidgetMount } from '@/ui/FocusWidgetMount';
 import { TravelEncounterOverlay } from '@/ui/TravelEncounterOverlay';
 import { EncounterFightOverlay } from '@/ui/EncounterFightOverlay';
+import { ChoiceEventOverlay } from '@/ui/ChoiceEventOverlay';
+import { CHOICE_TRIGGERS } from '@/game/data/choiceEvents';
+import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
+import { eventsLeftToday } from '@/game/engine/hideoutRewards';
 import { getFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
@@ -115,6 +119,18 @@ type Screen =
   | { name: 'run-setup'; areaId?: string; challengeIds?: string[]; episodeId?: string; missionId?: string; destination: 'run' | 'hub' }
   | { name: 'run'; areaId: string; challengeIds?: string[]; episodeId?: string; missionId?: string }
   | { name: 'summary'; result: RunResult };
+
+/** A choice event waiting on the player (from a trigger, a prop or the "something is happening" chip). */
+interface PendingChoiceEvent {
+  eventId: string;
+  petId?: string;
+  propId?: string;
+  /** Runs once the scene is closed; for a trigger this is the navigation it interrupted. */
+  onResolved: () => void;
+}
+
+/** Session-only breather between choice events, like the one travel fights have. */
+const CHOICE_EVENT_COOLDOWN_MS = 60_000;
 
 interface PendingTravelEncounter {
   opponent: ResolvedTravelEncounterOpponent;
@@ -182,6 +198,7 @@ function Game() {
   const [screen, setScreen] = useState<Screen>(() => initialScreen());
   const [roomId, setRoomId] = useState('main-floor');
   const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
+  const [choiceEvent, setChoiceEvent] = useState<PendingChoiceEvent | null>(null);
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { earn: earnLokTokens } = useLokEconomy();
 
@@ -321,9 +338,11 @@ function Game() {
   );
 
   const lastTravelEncounterAtRef = useRef(0);
+  const lastChoiceEventAtRef = useRef(0);
 
-  const attemptTravelEncounter = useCallback(
-    (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void) => {
+  /** Starts a travel fight when one fires; returns whether it did. */
+  const tryTravelFight = useCallback(
+    (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void): boolean => {
       // Never ambush a brand-new player before they've finished a real run
       // and learned the basics, and never fire back-to-back within a
       // session -- both gaps in the original v1 rollout.
@@ -332,22 +351,58 @@ function Game() {
         meta.totalRuns < TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS ||
         Date.now() - lastTravelEncounterAtRef.current < TRAVEL_ENCOUNTER_COOLDOWN_MS
       ) {
-        proceed();
-        return;
+        return false;
       }
       const trigger = TRAVEL_ENCOUNTER_TRIGGERS.find(
         (candidate) => candidate.source === source && (source !== 'hub-room' || candidate.roomId === targetRoomId),
       );
-      if (!trigger || Math.random() >= trigger.chance) {
-        proceed();
-        return;
-      }
+      if (!trigger || Math.random() >= trigger.chance) return false;
       lastTravelEncounterAtRef.current = Date.now();
       const rng = createRng(Date.now());
       const opponent = resolveTravelEncounterOpponent(pickTravelEncounterOpponent(rng), rng);
       setTravelEncounter({ opponent, rng, label: trigger.label, fightStyle: getFightStyle(), onResolved: proceed });
+      return true;
     },
     [meta.travelEncountersEnabled, meta.totalRuns],
+  );
+
+  /**
+   * Offers a choice event on the same navigation points as the travel fights (never both for one
+   * move). It has its own switch in Settings, its own session breather and a daily limit, and a
+   * missed or closed scene costs nothing.
+   */
+  const tryChoiceEvent = useCallback(
+    (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void): boolean => {
+      const now = Date.now();
+      if (
+        meta.hideoutChoiceEvents === 'off' ||
+        meta.totalRuns < TRAVEL_ENCOUNTER_MIN_TOTAL_RUNS ||
+        now - lastChoiceEventAtRef.current < CHOICE_EVENT_COOLDOWN_MS ||
+        eventsLeftToday(meta.hideoutLedger, now) <= 0
+      ) {
+        return false;
+      }
+      const trigger = CHOICE_TRIGGERS.find(
+        (candidate) => candidate.source === source && (source !== 'hub-room' || candidate.roomId === targetRoomId),
+      );
+      if (!trigger || Math.random() >= trigger.chance * (meta.hideoutChoiceEvents === 'quiet' ? 0.4 : 1)) return false;
+      const pet = eventPetFor(meta);
+      const picked = pickChoiceEvent(trigger.pool, meta.hideoutClaims, { now, pet }, Math.random);
+      if (!picked) return false;
+      lastChoiceEventAtRef.current = now;
+      setChoiceEvent({ eventId: picked.id, petId: pet?.id, onResolved: proceed });
+      return true;
+    },
+    [meta],
+  );
+
+  const attemptTravelEncounter = useCallback(
+    (source: TravelEncounterSource, targetRoomId: string | undefined, proceed: () => void) => {
+      if (tryTravelFight(source, targetRoomId, proceed)) return;
+      if (tryChoiceEvent(source, targetRoomId, proceed)) return;
+      proceed();
+    },
+    [tryTravelFight, tryChoiceEvent],
   );
 
   function renderScreen(): ReactNode {
@@ -407,6 +462,10 @@ function Game() {
           onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
           onOpenArena={() => setScreen({ name: 'arena-setup' })}
           onOpenRunSetup={() => setScreen({ name: 'run-setup', destination: 'hub' })}
+          onStartChoiceEvent={(eventId, propId) => {
+            lastChoiceEventAtRef.current = Date.now();
+            setChoiceEvent({ eventId, propId, petId: eventPetFor(meta)?.id, onResolved: () => undefined });
+          }}
           onBack={() => setScreen({ name: 'intro' })}
         />
       );
@@ -599,6 +658,18 @@ function Game() {
   return (
     <>
       {renderScreen()}
+      {choiceEvent && (
+        <ChoiceEventOverlay
+          eventId={choiceEvent.eventId}
+          petId={choiceEvent.petId}
+          propId={choiceEvent.propId}
+          onClose={() => {
+            const proceed = choiceEvent.onResolved;
+            setChoiceEvent(null);
+            proceed();
+          }}
+        />
+      )}
       {travelEncounter && (() => {
         const close = () => {
           const proceed = travelEncounter.onResolved;

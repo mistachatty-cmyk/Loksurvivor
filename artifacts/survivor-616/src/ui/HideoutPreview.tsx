@@ -12,10 +12,18 @@
  * and show a one-line prompt in the corner, never a modal. The movement rules are
  * pure and tested in `engine/hideoutPets.ts`.
  *
+ * Walk and props (v0.15.0): tap the ground or press the arrow keys / A and D to walk
+ * the operator yourself, and walk up to the props of the room (`data/hideoutProps.ts`)
+ * to use them. After a few idle seconds the operator goes back to wandering. The
+ * steering rules are pure and tested in `engine/hideoutWalk.ts`; turning "Walk and
+ * props" off in Settings gives back the old tap-to-call behavior unchanged.
+ *
  * Deliberately does not run the real simulation (`stepWorld`) -- this is
  * decoration behind static menu content, not gameplay.
  */
 import { useEffect, useRef, useState } from 'react';
+
+import { useT } from '@/lib/i18n';
 
 import { beatBus } from '@/game/audio/beatBus';
 import {
@@ -23,7 +31,9 @@ import {
   pickHideoutEvent,
   temperamentFor,
   type HideoutEmote,
+  type HideoutMove,
 } from '@/game/data/hideoutEvents';
+import type { PropArt } from '@/game/data/hideoutProps';
 import { lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import {
@@ -34,11 +44,19 @@ import {
   setEmote,
   startMove,
   stepHideoutPet,
-  stepOperatorWalk,
   tapPet,
   type HideoutPetState,
 } from '@/game/engine/hideoutPets';
+import {
+  createOperatorControl,
+  nearestProp,
+  nudgeOperator,
+  setGoal,
+  standingSpot,
+  stepOperatorControl,
+} from '@/game/engine/hideoutWalk';
 import type { BondRankId } from '@/game/engine/petGrowth';
+import { drawProp, PROP_HALF_WIDTH_UNITS, PROP_HEIGHT_UNITS } from '@/ui/hideoutPropArt';
 import { drawRig } from '@/game/render/sprite';
 import type { EvolutionOverlayId, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
@@ -60,6 +78,35 @@ export interface HideoutPetInfo {
   history?: Record<string, number>;
 }
 
+/** A prop standing in the current room, already translated and with its ready state worked out. */
+export interface HideoutPropInfo {
+  id: string;
+  /** 0 to 1 along the walking range. */
+  x: number;
+  art: PropArt;
+  accent: string;
+  label: string;
+  /** Using it would pay out right now. */
+  ready: boolean;
+  npc?: { rig: SpriteRig; palette: SpritePalette };
+}
+
+/** A pet play move the parent wants the strip to perform. A new `seq` triggers it. */
+export interface PlayCue {
+  seq: number;
+  petId: string;
+  move: HideoutMove;
+  emote: HideoutEmote;
+  durationMs: number;
+}
+
+/** A line to show in the corner. A new `seq` shows it. */
+export interface StripNotice {
+  seq: number;
+  title: string;
+  line: string;
+}
+
 export interface HideoutPreviewProps {
   rig: SpriteRig;
   palette: SpritePalette;
@@ -77,6 +124,21 @@ export interface HideoutPreviewProps {
   onPetEvent?: (petId: string, eventId: string) => void;
   /** Delay before the first event, ms. */
   firstEventDelayMs?: number;
+  /** Props in the room. Empty when Walk and props is off. */
+  props?: HideoutPropInfo[];
+  /** Walk with taps and keys. Off keeps the old tap-the-ground-to-call behavior. */
+  interactive?: boolean;
+  /** False while a dialog is open, so keys never steer behind it. */
+  keyboardActive?: boolean;
+  cue?: PlayCue;
+  notice?: StripNotice;
+  onPropUse?: (propId: string) => void;
+  onFocusPet?: (petId: string) => void;
+  /** The operator has walked this many pixels under your control (reported each time it adds up to a stroll). */
+  onWalkBeat?: (strollPx: number) => void;
+  /** A "something is happening" prompt waiting for a tap. */
+  eventChip?: { label: string; aria: string } | null;
+  onEventChip?: () => void;
 }
 
 const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
@@ -97,15 +159,32 @@ const MAX_PETS = 4;
 export function HideoutPreview({
   rig, palette, height = 176, className = '', pets = [], weather = 'clear', eventsMode = 'on',
   onPetCare, onPetEvent, firstEventDelayMs = 9000,
+  props: roomProps = [], interactive = false, keyboardActive = true, cue, notice,
+  onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip,
 }: HideoutPreviewProps) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [toast, setToast] = useState<{ key: number; title: string; line: string } | null>(null);
+  const [nearProp, setNearProp] = useState<{ id: string; label: string; ready: boolean } | null>(null);
 
   // The effect below keeps one canvas loop alive for as long as the operator's look is
   // unchanged, so everything else reaches it through this ref instead of restarting it.
-  const live = useRef({ pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs });
-  live.current = { pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs };
+  const live = useRef({
+    pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat,
+  });
+  live.current = {
+    pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat,
+  };
+
+  // Keyed on `seq` so a parent re-render that rebuilds the object does not restart the toast.
+  const noticeSeq = notice?.seq;
+  useEffect(() => {
+    if (notice) setToast({ key: notice.seq, title: notice.title, line: notice.line });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noticeSeq]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -167,6 +246,19 @@ export function HideoutPreview({
     const rng = Math.random;
     const operator = createOperatorWalk(range(), 0);
     if (reduceMotion) operator.mode = 'rest';
+    const control = createOperatorControl();
+    const keys = { left: false, right: false };
+    /** A prop the player tapped; used the moment the operator reaches it. */
+    let pendingProp: string | null = null;
+    let nearId: string | null = null;
+    let lastCueSeq = live.current.cue?.seq ?? 0;
+    // Props are about 32 units tall; one unit is this many pixels on a strip of this height.
+    const propUnit = cssH * 0.0105;
+    const reachPx = unit * 0.6;
+    const propPositions = () => {
+      const r = range();
+      return live.current.roomProps.map((info) => ({ info, x: r.min + info.x * (r.max - r.min) }));
+    };
     const states = new Map<string, HideoutPetState>();
     const looks = new Map<string, { rig: SpriteRig; pal: SpritePalette; scale: number; height: number }>();
     const localHistory = new Map<string, Record<string, number>>();
@@ -226,7 +318,19 @@ export function HideoutPreview({
       ctx.clearRect(0, 0, cssW, cssH);
 
       if (!reduceMotion) {
-        stepOperatorWalk(operator, dt, now, r, rng);
+        // With Walk and props off the operator only ever wanders, exactly as before.
+        if (!settings.interactive) control.mode = 'auto';
+        const walk = stepOperatorControl(operator, control, settings.interactive ? keys : { left: false, right: false }, dt, now, r, rng);
+        if (walk.arrived && pendingProp) {
+          const id = pendingProp;
+          pendingProp = null;
+          settings.onPropUse?.(id);
+        }
+        if (control.strollPx >= 900) {
+          const px = control.strollPx;
+          control.strollPx = 0;
+          settings.onWalkBeat?.(px);
+        }
         wanted.forEach((info, slot) => {
           const state = states.get(info.id);
           if (state) stepHideoutPet(state, { dt, now, operator, slot, range: r, unit, rng });
@@ -236,6 +340,45 @@ export function HideoutPreview({
         wanted.forEach((info, slot) => {
           const state = states.get(info.id);
           if (state) { state.x = operator.x - (slot + 1) * unit * 0.5; state.facing = 1; state.walking = false; }
+        });
+      }
+
+      // A play move from the parent (scratch, fetch, nap together...).
+      const cueNow = settings.cue;
+      if (cueNow && cueNow.seq !== lastCueSeq) {
+        lastCueSeq = cueNow.seq;
+        const state = states.get(cueNow.petId);
+        const info = wanted.find((candidate) => candidate.id === cueNow.petId);
+        if (state && info) {
+          state.mode = 'follow';
+          startMove(state, cueNow.move, now, cueNow.durationMs);
+          setEmote(state, cueNow.emote, now, Math.min(cueNow.durationMs, 2600));
+          burst(state.x, groundY - petLook(info).height, info.palette.glow, 6, now);
+        }
+      }
+
+      // Which prop is within reach (drives the prompt chip), and draw them behind the pets.
+      const placed = propPositions();
+      const close = settings.interactive ? nearestProp(operator.x, placed, reachPx) : null;
+      const closeId = close ? close.info.id : null;
+      if (closeId !== nearId) {
+        nearId = closeId;
+        setNearProp(close ? { id: close.info.id, label: close.info.label, ready: close.info.ready } : null);
+      }
+      for (const prop of placed) {
+        if (prop.info.art === 'npc' && prop.info.npc) {
+          ctx.save();
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          ctx.ellipse(prop.x, groundY, 13 * propUnit, 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          drawRig(ctx, prop.info.npc.rig, prop.info.npc.palette, 'idle', reduceMotion ? 0 : now, prop.x, groundY, operator.x >= prop.x ? 1 : -1, scale * 0.9, { outline: true });
+        }
+        drawProp(ctx, {
+          art: prop.info.art, x: prop.x, groundY, s: propUnit, accent: prop.info.accent,
+          ready: prop.info.ready, near: prop.info.id === closeId, now, reduceMotion,
         });
       }
 
@@ -362,14 +505,25 @@ export function HideoutPreview({
     };
     raf = requestAnimationFrame(frame);
 
-    // Tap a pet to pet it; tap the ground and the pets trot over.
-    const onPointerDown = (event: PointerEvent) => {
-      const wanted = live.current.pets.slice(0, MAX_PETS);
-      if (wanted.length === 0) return;
-      const rect = canvas.getBoundingClientRect();
-      const px = event.clientX - rect.left;
-      const py = event.clientY - rect.top;
+    // Tap a pet to pet it, tap a prop to walk over and use it, tap the ground to walk there.
+    // A tap is a quick press that barely moves, so a vertical swipe on the strip still scrolls
+    // the page (the canvas only claims horizontal pans) instead of petting or walking.
+    let down: { x: number; y: number; at: number; id: number } | null = null;
+    const useProp = (id: string) => {
+      pendingProp = null;
+      live.current.onPropUse?.(id);
+    };
+    const walkToProp = (id: string, propX: number, now: number) => {
+      const r = range();
+      const spot = standingSpot(operator.x, propX, unit * 0.35);
+      pendingProp = id;
+      setGoal(operator, control, spot, now, r, reduceMotion);
+      if (reduceMotion) useProp(id);
+    };
+    const handleTap = (px: number, py: number) => {
       const now = performance.now() - start;
+      const settings = live.current;
+      const wanted = settings.pets.slice(0, MAX_PETS);
       let hit: HideoutPetInfo | undefined;
       let hitState: HideoutPetState | undefined;
       for (const info of wanted) {
@@ -386,18 +540,108 @@ export function HideoutPreview({
       if (hit && hitState) {
         tapPet(hitState, now);
         burst(hitState.x, groundY - petLook(hit).height, hit.palette.glow, 5, now);
-        live.current.onPetCare?.(hit.id);
-      } else if (!reduceMotion) {
+        settings.onPetCare?.(hit.id);
+        settings.onFocusPet?.(hit.id);
+        return;
+      }
+      if (settings.interactive) {
+        for (const prop of propPositions()) {
+          const half = Math.max(22, PROP_HALF_WIDTH_UNITS * propUnit);
+          if (Math.abs(px - prop.x) <= half && py >= groundY - (PROP_HEIGHT_UNITS + 10) * propUnit && py <= groundY + 10) {
+            burst(prop.x, groundY - PROP_HEIGHT_UNITS * propUnit, prop.info.accent, 4, now);
+            walkToProp(prop.info.id, prop.x, now);
+            return;
+          }
+        }
+        pendingProp = null;
+        const r = range();
+        setGoal(operator, control, px, now, r, reduceMotion);
+        ripples.push({ x: Math.max(r.min, Math.min(r.max, px)), born: now });
+        return;
+      }
+      if (wanted.length > 0 && !reduceMotion) {
         const r = range();
         callPets([...states.values()], Math.max(r.min, Math.min(r.max, px)), now, r, unit);
         ripples.push({ x: px, born: now });
       }
     };
+    const onPointerDown = (event: PointerEvent) => {
+      down = { x: event.clientX, y: event.clientY, at: performance.now(), id: event.pointerId };
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const started = down;
+      down = null;
+      if (!started || started.id !== event.pointerId) return;
+      if (Math.hypot(event.clientX - started.x, event.clientY - started.y) > 10 || performance.now() - started.at > 450) return;
+      const rect = canvas.getBoundingClientRect();
+      handleTap(event.clientX - rect.left, event.clientY - rect.top);
+    };
+    const onPointerCancel = () => { down = null; };
     canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerCancel);
+
+    // Keyboard: left/right (or A/D) walk, E or Enter uses the prop beside you. Up, down and
+    // space are left alone so the page still scrolls, and nothing is read while you type or a
+    // dialog is open.
+    const typingTarget = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el || !el.tagName) return false;
+      return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+    };
+    const keyReady = (event: KeyboardEvent) => {
+      const settings = live.current;
+      return settings.interactive && settings.keyboardActive && scrollT < 1 && isVisible && !event.defaultPrevented
+        && !document.querySelector('[aria-modal="true"]')
+        && !event.ctrlKey && !event.metaKey && !event.altKey && !typingTarget(event.target);
+    };
+    const directionOf = (key: string): 'left' | 'right' | null => {
+      if (key === 'ArrowLeft' || key === 'a' || key === 'A') return 'left';
+      if (key === 'ArrowRight' || key === 'd' || key === 'D') return 'right';
+      return null;
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!keyReady(event)) return;
+      const side = directionOf(event.key);
+      if (side) {
+        event.preventDefault();
+        pendingProp = null;
+        if (reduceMotion) {
+          if (!event.repeat) nudgeOperator(operator, control, side === 'right' ? 1 : -1, unit * 0.5, performance.now() - start, range());
+        } else {
+          keys[side] = true;
+        }
+        return;
+      }
+      const active = document.activeElement;
+      const onBody = !active || active === document.body;
+      if (event.key === 'e' || event.key === 'E' || (event.key === 'Enter' && onBody)) {
+        const close = nearestProp(operator.x, propPositions(), reachPx);
+        if (close) {
+          event.preventDefault();
+          useProp(close.info.id);
+        }
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const side = directionOf(event.key);
+      if (side) keys[side] = false;
+    };
+    const clearKeys = () => { keys.left = false; keys.right = false; };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', clearKeys);
+    document.addEventListener('visibilitychange', clearKeys);
 
     return () => {
       cancelAnimationFrame(raf);
       canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', clearKeys);
+      document.removeEventListener('visibilitychange', clearKeys);
       resizeObserver.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('scroll', onScroll);
@@ -419,14 +663,46 @@ export function HideoutPreview({
           slicing across the character instead of atmosphere. Same dim
           treatment AttractMode's own background sim uses. */}
       <div className="pointer-events-none absolute inset-0 z-0 bg-black/35" aria-hidden="true" />
-      <canvas ref={canvasRef} className={`relative z-10 block h-full w-full ${pets.length > 0 ? 'cursor-pointer' : ''}`} role="img" aria-label={pets.length > 0 ? 'Your operator and LokPets in the hideout. Tap a pet to pet it, or tap the ground to call it over.' : 'Your operator walking the hideout'} data-testid="hideout-preview-canvas" />
+      <canvas
+        ref={canvasRef}
+        className={`relative z-10 block h-full w-full ${pets.length > 0 || interactive ? 'cursor-pointer' : ''}`}
+        style={{ touchAction: 'pan-y' }}
+        role="img"
+        aria-label={interactive ? t('hideout.life.stripAria') : pets.length > 0 ? 'Your operator and LokPets in the hideout. Tap a pet to pet it, or tap the ground to call it over.' : 'Your operator walking the hideout'}
+        data-testid="hideout-preview-canvas"
+      />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-1/2 bg-gradient-to-t from-background to-transparent" aria-hidden="true" />
+      {(interactive && nearProp) || eventChip ? (
+        <div className="absolute bottom-2 right-3 z-30 flex flex-col items-end gap-1.5">
+          {eventChip ? (
+            <button
+              type="button"
+              onClick={onEventChip}
+              className="min-h-9 border border-pink-200/60 bg-pink-950/80 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100 backdrop-blur-sm hover:border-pink-100"
+              aria-label={eventChip.aria}
+              data-testid="hideout-event-chip"
+            >
+              ! {eventChip.label}
+            </button>
+          ) : null}
+          {interactive && nearProp ? (
+            <button
+              type="button"
+              onClick={() => live.current.onPropUse?.(nearProp.id)}
+              className="min-h-9 border border-white/25 bg-black/75 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white backdrop-blur-sm hover:border-white/60"
+              data-testid="hideout-prop-prompt"
+            >
+              {t('hideout.life.useProp', { label: nearProp.label })}{nearProp.ready ? ' •' : ''}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {toast ? (
         <div
           key={toast.key}
           role="status"
           aria-live="polite"
-          className="pointer-events-none absolute bottom-2 left-3 z-30 max-w-[min(26rem,calc(100%-1.5rem))] border border-white/15 bg-black/70 px-3 py-1.5 text-white backdrop-blur-sm"
+          className="pointer-events-none absolute bottom-2 left-3 z-30 max-w-[min(26rem,calc(100%-12.5rem))] sm:max-w-[min(26rem,calc(100%-1.5rem))] border border-white/15 bg-black/70 px-3 py-1.5 text-white backdrop-blur-sm"
           data-testid="hideout-pet-event"
         >
           <p className="font-mono text-[9px] font-bold uppercase tracking-[.2em] text-pink-200">{toast.title}</p>
