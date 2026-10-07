@@ -635,6 +635,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Display only. It never changes how much damage you deal.',
     ],
   },
+  {
+    version: '0.19.1',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T22:30:00Z',
+    kind: 'hotfix',
+    title: 'Tidier Hideout Links',
+    body: [
+      'The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
