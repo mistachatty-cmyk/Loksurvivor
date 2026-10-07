@@ -19,7 +19,7 @@ test.describe('hideout custom map builder', () => {
   });
 
   test('opens from the main-floor computer and persists a route draft', async ({ page }) => {
-    await page.goto('/?screen=hub');
+    await page.goto('/?screen=hub', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('button-hideout-computer').click();
     await page.getByTestId('button-create-custom-map').last().click();
     await expect(page.getByTestId('custom-map-canvas')).toBeVisible();
@@ -27,7 +27,7 @@ test.describe('hideout custom map builder', () => {
     await page.getByTestId('input-custom-map-name').fill('Midnight grid');
     await page.getByTestId('button-place-enemy:nightcrawler').click();
     await page.getByTestId('button-save-custom-map').click();
-    await page.reload();
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByTestId('button-hideout-computer').click();
 
     await expect(page.getByTestId('input-custom-map-name')).toHaveValue('Midnight grid');
@@ -44,7 +44,7 @@ test.describe('hideout custom map builder', () => {
         }),
       );
     });
-    await page.goto('/?screen=hub');
+    await page.goto('/?screen=hub', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('button-room-rooftop-perch').click();
     await expect(page.getByTestId('button-hideout-computer')).toHaveCount(0);
   });
@@ -70,7 +70,7 @@ test.describe('hideout custom map builder', () => {
         }),
       );
     }, initialMeta);
-    await page.goto('/?screen=areas');
+    await page.goto('/?screen=areas', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('button-area-filter-bonus').click();
 
     const card = page.getByTestId('button-custom-map-custom-empty-route');
@@ -108,7 +108,7 @@ test.describe('hideout custom map builder', () => {
         }),
       );
     }, initialMeta);
-    await page.goto('/?screen=areas');
+    await page.goto('/?screen=areas', { waitUntil: 'domcontentloaded' });
     await page.getByTestId('button-area-filter-bonus').click();
     await page.getByTestId('button-custom-map-custom-playable-route').click();
     await expect(page.getByTestId('screen-run')).toBeVisible();
@@ -150,7 +150,7 @@ test.describe('mobile hideout regression', () => {
       }
     });
 
-    await page.goto('/?screen=hub');
+    await page.goto('/?screen=hub', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('hideout-scene')).toBeVisible();
     await expect(page.getByTestId('button-hideout-computer')).toBeVisible();
 
@@ -183,7 +183,7 @@ test.describe('mobile map categories', () => {
         devModeAllUnlocks: true,
       }));
     });
-    await page.goto('/?screen=areas');
+    await page.goto('/?screen=areas', { waitUntil: 'domcontentloaded' });
 
     const strip = page.getByTestId('area-category-strip');
     await expect(strip).toBeVisible();

@@ -3705,6 +3705,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (result.cleared && result.discoveryId) {
         discoveryIds = addUnique(discoveryIds, result.discoveryId);
       }
+      for (const findId of result.mapFindIds ?? []) {
+        if (findId === 'breach-616-plate' || findId === 'transit-coil-found') discoveryIds = addUnique(discoveryIds, findId);
+      }
       const discoveredRelic = result.cleared && result.discoveryId
         ? RELIC_BY_DISCOVERY_ID[result.discoveryId]
         : undefined;
@@ -3761,6 +3764,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
       const next: MetaState = {
         ...prev,
+        ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
         rescuedAllyIds,
         discoveryIds,

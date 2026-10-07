@@ -542,6 +542,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Endgame weapon evolution switch starts on when Victory Lap opens and can be turned off without sealing the base weapons.',
     ],
   },
+  {
+    version: '0.17.0',
+    date: '2026-10-07',
+    kind: 'update',
+    title: 'Floodline Breach and the Map Builder',
+    body: [
+      'Survive Floodline Breach and Glassroot Annex, two finite arenas built with new street and Null scenery.',
+      'Restore relays, destroy root anchors, open the transit cache, and find the 616 Plate and Transit Coil. The coil unlocks the Catenary Harpoon.',
+      'The map builder now supports pickups, interactables, ambiance, grouped prefabs, seeded remix, editable templates, encounter timing, zoom, undo and redo, and playtesting through the game renderer.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
