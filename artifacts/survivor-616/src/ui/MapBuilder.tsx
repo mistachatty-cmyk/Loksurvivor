@@ -31,7 +31,13 @@ import {
   CUSTOM_MAP_MAX_BOUNDS,
   CUSTOM_MAP_MIN_BOUNDS,
   MAX_CUSTOM_MAP_PLACEMENTS,
+  customMapValidationIssues,
+  areaToCustomMapTemplate,
+  generateCustomMap,
+  normalizePersonalPrefabs,
 } from '@/game/data/customMaps';
+import { expandMapPrefab, MAP_PREFABS, MAP_PROP_ART_BY_ID, type MapPrefab } from '@/game/data/mapPack';
+import { drawMapPackProp } from '@/game/render/mapPackArt';
 import { AREAS } from '@/game/data/areas';
 import { useMeta } from '@/game/state/metaStore';
 import type { CustomMap, CustomMapPlacement } from '@/game/types';
@@ -55,6 +61,9 @@ const CATEGORY_ICONS: Record<string, typeof Box> = {
   encounter: Radio,
   'spawn-point': Crosshair,
   'objective-marker': MapPinned,
+  pickup: Plus,
+  interactable: Radio,
+  ambiance: Layers3,
 };
 
 const THREAT_OPTIONS: Array<{ value: CustomMap['threat']; label: string; detail: string }> = [
@@ -91,7 +100,27 @@ function newPlacement(assetId: string, index: number, map: CustomMap): CustomMap
     y: snap(clamp(0, -map.bounds.h / 2 + h / 2, map.bounds.h / 2 - h / 2)),
     w,
     h,
+    mode: asset?.defaultMode,
   };
+}
+
+function AssetThumbnail({ artId, color, category }: { artId?: string; color: string; category: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const art = artId ? MAP_PROP_ART_BY_ID[artId] : undefined;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context || !art) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.save();
+    context.translate(24, 20);
+    const scale = Math.min(32 / art.w, 32 / art.h);
+    context.scale(scale, scale);
+    drawMapPackProp(context, artId!, 0, 0, art.w, art.h, 0, 0);
+    context.restore();
+  }, [artId]);
+  const Icon = CATEGORY_ICONS[category] ?? Box;
+  return artId ? <canvas ref={ref} width={48} height={40} className="h-9 w-10 shrink-0" aria-hidden /> : <span className="grid h-9 w-10 shrink-0 place-items-center border border-current/30 bg-[#071116]/70" style={{ color }}><Icon className="h-4 w-4" /></span>;
 }
 
 function displayCoordinate(value: number) {
@@ -111,6 +140,17 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
   const [draft, setDraft] = useState<CustomMap | null>(maps[0] ?? null);
   const [search, setSearch] = useState('');
   const [selectedPlacementId, setSelectedPlacementId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [undoStack, setUndoStack] = useState<CustomMap[]>([]);
+  const [redoStack, setRedoStack] = useState<CustomMap[]>([]);
+  const [zoom, setZoom] = useState(1);
+  const [gridVisible, setGridVisible] = useState(true);
+  const [seed, setSeed] = useState('616');
+  const [prefabName, setPrefabName] = useState('');
+  const [remixTheme, setRemixTheme] = useState<'street' | 'null' | 'breach'>('breach');
+  const [personalPrefabs, setPersonalPrefabs] = useState<MapPrefab[]>(() => {
+    try { return normalizePersonalPrefabs(JSON.parse(localStorage.getItem('survivor616-map-prefabs-v1') ?? '[]')); } catch { return []; }
+  });
   const [snapEnabled, setSnapEnabled] = useState(true);
   // Draw the draft through the real game renderer behind the (still
   // draggable) placement markers, so authors can see the actual map.
@@ -126,6 +166,9 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
     encounter: true,
     'spawn-point': true,
     'objective-marker': true,
+    pickup: true,
+    interactable: true,
+    ambiance: true,
   });
   const [notice, setNotice] = useState('');
   const [isDirty, setIsDirty] = useState(false);
@@ -133,6 +176,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
   const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const knownMapIds = useRef(new Set(maps.map((map) => map.id)));
+  useEffect(() => { try { localStorage.setItem('survivor616-map-prefabs-v1', JSON.stringify(personalPrefabs)); } catch { setNotice('Prefab storage is full. Remove older groups.'); } }, [personalPrefabs]);
 
   useEffect(() => {
     const newest = maps[0];
@@ -148,6 +192,9 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
       setActiveMapId(next.id);
       setDraft(next);
       setSelectedPlacementId(null);
+      setSelectedIds([]);
+      setUndoStack([]);
+      setRedoStack([]);
       setIsDirty(false);
     } else if (draft && !isDirty) {
       const fresh = maps.find((map) => map.id === activeMapId);
@@ -174,27 +221,35 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
 
   const validation = useMemo(() => {
     if (!activeMap) return [];
-    const warnings: string[] = [];
-    const threatPlacements = activeMap.placements.filter(
-      (item) => item.category === 'enemy' || item.category === 'encounter',
-    );
-    if (threatPlacements.length === 0) warnings.push('No enemy pressure is scheduled. Add an enemy or encounter before launch.');
-    if (activeMap.placements.length > MAX_CUSTOM_MAP_PLACEMENTS - 10) {
-      warnings.push(`Placement count is almost full (${activeMap.placements.length}/${MAX_CUSTOM_MAP_PLACEMENTS}).`);
-    }
-    if (!activeMap.landmarkAssetId) warnings.push('No landmark selected. A route marker helps survivors orient themselves.');
-    return warnings;
+    return customMapValidationIssues(activeMap);
   }, [activeMap]);
 
   const updateDraft = (updates: Partial<CustomMap>) => {
-    setDraft((current) => (current ? { ...current, ...updates, updatedAt: Date.now() } : current));
+    if (!activeMap) return;
+    setUndoStack((history) => [...history.slice(-39), activeMap]);
+    setRedoStack([]);
+    setDraft({ ...activeMap, ...updates, updatedAt: Date.now() });
     setIsDirty(true);
+  };
+
+  const undo = () => {
+    const previous = undoStack.at(-1);
+    if (!previous || !activeMap) return;
+    setRedoStack((history) => [...history, activeMap]); setUndoStack((history) => history.slice(0, -1)); setDraft(previous); setIsDirty(true);
+  };
+  const redo = () => {
+    const next = redoStack.at(-1);
+    if (!next || !activeMap) return;
+    setUndoStack((history) => [...history, activeMap]); setRedoStack((history) => history.slice(0, -1)); setDraft(next); setIsDirty(true);
   };
 
   const selectMap = (map: CustomMap) => {
     setActiveMapId(map.id);
     setDraft(map);
     setSelectedPlacementId(null);
+    setSelectedIds([]);
+    setUndoStack([]);
+    setRedoStack([]);
     setIsDirty(false);
     setNotice('');
   };
@@ -236,8 +291,8 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
   };
 
   const handleLaunch = () => {
-    if (!activeMap || validation.some((warning) => warning.startsWith('No enemy pressure'))) {
-      setNotice('Add at least one enemy or encounter before launch.');
+    if (!activeMap || validation.length) {
+      setNotice(validation[0] ?? 'Route cannot launch.');
       return;
     }
     const next = { ...activeMap, name: activeMap.name.trim() || 'Untitled night route', updatedAt: Date.now() };
@@ -262,6 +317,11 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
       setNotice(activeMap.landmarkAssetId === asset.id ? 'Landmark cleared.' : `${asset.name} marked as the route landmark.`);
       return;
     }
+    if (asset.category === 'ambiance') {
+      updateDraft({ ambiance: asset.id.slice('ambiance:'.length) as CustomMap['ambiance'] });
+      setNotice(`${asset.name} applied.`);
+      return;
+    }
     if (activeMap.placements.length >= MAX_CUSTOM_MAP_PLACEMENTS) {
       setNotice('Placement limit reached. Remove an item before adding another.');
       return;
@@ -269,6 +329,58 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
     const placement = newPlacement(asset.id, activeMap.placements.length + 1, activeMap);
     updateDraft({ placements: [...activeMap.placements, placement] });
     setSelectedPlacementId(placement.id);
+    setSelectedIds([placement.id]);
+  };
+
+  const placePrefab = (prefab: MapPrefab) => {
+    if (!activeMap) return;
+    const groupId = `group-${Date.now().toString(36)}`;
+    const pieces = expandMapPrefab(prefab, { x: 0, y: 0 }, groupId);
+    if (activeMap.placements.length + pieces.length > MAX_CUSTOM_MAP_PLACEMENTS) { setNotice('Not enough placement slots for this group.'); return; }
+    updateDraft({ placements: [...activeMap.placements, ...pieces] });
+    setSelectedIds(pieces.map((piece) => piece.id)); setSelectedPlacementId(pieces[0]?.id ?? null);
+  };
+
+  const selectedGroup = activeMap?.placements.filter((placement) => selectedIds.includes(placement.id)) ?? [];
+  const transformGroup = (kind: 'rotate' | 'duplicate' | 'ungroup') => {
+    if (!activeMap || !selectedGroup.length) return;
+    if (kind === 'ungroup') { updateDraft({ placements: activeMap.placements.map((piece) => selectedIds.includes(piece.id) ? { ...piece, groupId: undefined } : piece) }); return; }
+    const cx = selectedGroup.reduce((sum, piece) => sum + piece.x, 0) / selectedGroup.length;
+    const cy = selectedGroup.reduce((sum, piece) => sum + piece.y, 0) / selectedGroup.length;
+    if (kind === 'rotate') {
+      updateDraft({ placements: activeMap.placements.map((piece) => selectedIds.includes(piece.id) ? { ...piece, x: snap(cx - (piece.y - cy)), y: snap(cy + (piece.x - cx)), w: piece.h, h: piece.w } : piece) });
+    } else {
+      if (activeMap.placements.length + selectedGroup.length > MAX_CUSTOM_MAP_PLACEMENTS) return;
+      const groupId = `group-${Date.now().toString(36)}`;
+      const copies = selectedGroup.map((piece, index) => ({ ...piece, id: `${groupId}-${index}`, groupId, x: piece.x + 40, y: piece.y + 40 }));
+      updateDraft({ placements: [...activeMap.placements, ...copies] }); setSelectedIds(copies.map((piece) => piece.id)); setSelectedPlacementId(copies[0]?.id ?? null);
+    }
+  };
+  const groupSelection = () => {
+    if (!activeMap || selectedIds.length < 2) return;
+    const groupId = `group-${Date.now().toString(36)}`;
+    updateDraft({ placements: activeMap.placements.map((piece) => selectedIds.includes(piece.id) ? { ...piece, groupId } : piece) });
+  };
+  const saveGroup = () => {
+    if (!selectedGroup.length) return;
+    const cx = selectedGroup.reduce((sum, piece) => sum + piece.x, 0) / selectedGroup.length;
+    const cy = selectedGroup.reduce((sum, piece) => sum + piece.y, 0) / selectedGroup.length;
+    const id = `personal-${Date.now().toString(36)}`;
+    const prefab: MapPrefab = { id, name: prefabName.trim() || `Group ${personalPrefabs.length + 1}`, theme: selectedGroup.some((piece) => piece.assetId.includes('root') || piece.assetId.includes('resin')) ? 'null' : 'street', pieces: selectedGroup.slice(0, 20).map((piece) => ({ assetId: piece.assetId, category: piece.category, x: Math.round(piece.x - cx), y: Math.round(piece.y - cy), w: piece.w, h: piece.h, mode: piece.mode, fromSec: piece.fromSec, toSec: piece.toSec, ratePerSec: piece.ratePerSec, burst: piece.burst })) };
+    setPersonalPrefabs((items) => normalizePersonalPrefabs([prefab, ...items])); setNotice('Group saved to your prefab library.');
+    setPrefabName('');
+  };
+
+  const loadTemplate = (areaId: string) => {
+    if (!activeMap) return;
+    const area = AREAS.find((candidate) => candidate.id === areaId);
+    if (!area) return;
+    const next = areaToCustomMapTemplate(area, activeMap.id);
+    updateDraft({ ...next, name: `${area.name} draft` }); setSelectedIds([]); setSelectedPlacementId(null);
+  };
+  const remix = () => {
+    if (!activeMap) return;
+    updateDraft(generateCustomMap(seed || '616', remixTheme, activeMap.id)); setSelectedIds([]); setSelectedPlacementId(null);
   };
 
   const updatePlacement = (id: string, updates: Partial<CustomMapPlacement>) => {
@@ -329,6 +441,8 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
     const point = pointerPosition(event);
     if (!point) return;
     setSelectedPlacementId(placement.id);
+    if (event.shiftKey || event.ctrlKey) setSelectedIds((ids) => ids.includes(placement.id) ? ids.filter((id) => id !== placement.id) : [...ids, placement.id]);
+    else if (!selectedIds.includes(placement.id)) setSelectedIds(placement.groupId ? activeMap?.placements.filter((piece) => piece.groupId === placement.groupId).map((piece) => piece.id) ?? [placement.id] : [placement.id]);
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     setDragging({ id: placement.id, offsetX: point.x - placement.x, offsetY: point.y - placement.y });
   };
@@ -341,7 +455,10 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
     if (!placement) return;
     const x = clamp(point.x - dragging.offsetX, -activeMap.bounds.w / 2 + placement.w / 2, activeMap.bounds.w / 2 - placement.w / 2);
     const y = clamp(point.y - dragging.offsetY, -activeMap.bounds.h / 2 + placement.h / 2, activeMap.bounds.h / 2 - placement.h / 2);
-    updatePlacement(dragging.id, { x: snapEnabled ? snap(x) : Math.round(x), y: snapEnabled ? snap(y) : Math.round(y) });
+    const nextX = clamp(snapEnabled ? snap(x) : Math.round(x), -activeMap.bounds.w / 2 + placement.w / 2, activeMap.bounds.w / 2 - placement.w / 2);
+    const nextY = clamp(snapEnabled ? snap(y) : Math.round(y), -activeMap.bounds.h / 2 + placement.h / 2, activeMap.bounds.h / 2 - placement.h / 2);
+    const dx = nextX - placement.x; const dy = nextY - placement.y;
+    if (dx || dy) updateDraft({ placements: activeMap.placements.map((piece) => (piece.id === dragging.id || selectedIds.includes(piece.id)) ? { ...piece, x: clamp(piece.x + dx, -activeMap.bounds.w / 2 + piece.w / 2, activeMap.bounds.w / 2 - piece.w / 2), y: clamp(piece.y + dy, -activeMap.bounds.h / 2 + piece.h / 2, activeMap.bounds.h / 2 - piece.h / 2) } : piece) });
   };
 
   const endDrag = () => setDragging(null);
@@ -354,7 +471,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
     : undefined;
 
   return (
-    <div className="min-h-[100dvh] overflow-x-hidden bg-[#071116] text-slate-100">
+    <div data-ui-theme={meta.uiTheme} className="min-h-[100dvh] overflow-x-hidden bg-[#071116] text-slate-100">
       <div className="pointer-events-none fixed inset-0 z-0 opacity-50" style={{ background: 'radial-gradient(circle at 80% 0%, rgba(21, 102, 112, .2), transparent 40%)' }} />
       <header className="relative z-10 border-b border-cyan-200/15 bg-[#0b171c]/95 px-4 py-4 shadow-[0_12px_50px_rgba(0,0,0,.22)] sm:px-7">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
@@ -462,18 +579,19 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                 </div>
               </div>
 
+              <div className="max-h-[760px] overflow-auto">
               <div
                 ref={canvasRef}
                 data-testid="custom-map-canvas"
-                className="relative isolate mx-auto w-full max-w-[940px] touch-none overflow-hidden border border-cyan-100/25 bg-cover bg-center shadow-[0_20px_60px_rgba(0,0,0,.35)]"
-                style={canvasStyle}
+                className="relative isolate mx-auto touch-none overflow-hidden border border-cyan-100/25 bg-cover bg-center shadow-[0_20px_60px_rgba(0,0,0,.35)]"
+                style={{ ...canvasStyle, width: `${zoom * 100}%`, minWidth: 360 }}
                 onPointerMove={handlePointerMove}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
-                onPointerDown={() => setSelectedPlacementId(null)}
+                onPointerDown={() => { setSelectedPlacementId(null); setSelectedIds([]); }}
               >
                 {livePreview && <MapLivePreview map={activeMap} />}
-                <div className="pointer-events-none absolute inset-0 z-[1] opacity-30" style={{ backgroundImage: `linear-gradient(rgba(132, 220, 226, .2) 1px, transparent 1px), linear-gradient(90deg, rgba(132, 220, 226, .2) 1px, transparent 1px)`, backgroundSize: `${(CUSTOM_MAP_GRID / activeMap.bounds.w) * 100}% ${(CUSTOM_MAP_GRID / activeMap.bounds.h) * 100}%` }} />
+                {gridVisible && <div className="pointer-events-none absolute inset-0 z-[1] opacity-30" style={{ backgroundImage: `linear-gradient(rgba(132, 220, 226, .2) 1px, transparent 1px), linear-gradient(90deg, rgba(132, 220, 226, .2) 1px, transparent 1px)`, backgroundSize: `${(CUSTOM_MAP_GRID / activeMap.bounds.w) * 100}% ${(CUSTOM_MAP_GRID / activeMap.bounds.h) * 100}%` }} />}
                 <div className="pointer-events-none absolute inset-0 border-[12px] border-[#071116]/60" />
                 <div className="pointer-events-none absolute left-4 top-4 border border-cyan-100/20 bg-[#071116]/70 px-2 py-1 font-mono text-[9px] uppercase tracking-[.2em] text-cyan-100/65">north / {activeMap.bounds.w} × {activeMap.bounds.h}</div>
                 <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-cyan-100/60"><Crosshair className="h-3 w-3" /> origin 0, 0</div>
@@ -486,7 +604,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                 {activeMap.placements.map((placement) => {
                   const asset = assetFromId(placement.assetId);
                   if (!asset) return null;
-                  const isSelected = placement.id === selectedPlacementId;
+                  const isSelected = selectedIds.includes(placement.id);
                   return (
                     <button
                       type="button"
@@ -503,6 +621,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                   );
                 })}
               </div>
+              </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border border-cyan-100/15 bg-[#0c1a20]/70 px-4 py-3">
                 <div className="flex items-center gap-5 font-mono text-[10px] uppercase tracking-widest text-slate-400">
@@ -516,6 +635,10 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                     <input type="checkbox" checked={livePreview} onChange={(event) => setLivePreview(event.target.checked)} className="accent-orange-300" data-testid="toggle-live-preview" />
                     Live art
                   </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-cyan-100/70"><input type="checkbox" checked={gridVisible} onChange={(event) => setGridVisible(event.target.checked)} className="accent-orange-300" /> Grid</label>
+                  <button type="button" onClick={undo} disabled={!undoStack.length} className="disabled:opacity-30">Undo</button>
+                  <button type="button" onClick={redo} disabled={!redoStack.length} className="disabled:opacity-30">Redo</button>
+                  <label className="flex items-center gap-2">Zoom <input aria-label="Map zoom" type="range" min="1" max="2.5" step="0.25" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} className="w-20 accent-orange-300" /></label>
                 </div>
                 <div className="font-mono text-[10px] uppercase tracking-widest text-orange-200/70">{activeMap.threat} threat · {activeMap.durationSec}s route</div>
               </div>
@@ -532,6 +655,11 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                   <p className="mt-1 text-xs text-slate-500">Tune the conditions before you draw.</p>
                 </div>
                 <div className="space-y-4 p-4">
+                  <div className="space-y-2 border-b border-cyan-100/10 pb-4">
+                    <p className="font-mono text-[9px] font-bold uppercase tracking-[.2em] text-slate-400">Start from a finished map</p>
+                    <select aria-label="Map template" defaultValue="" onChange={(event) => { if (event.target.value) loadTemplate(event.target.value); event.target.value = ''; }} className="w-full border border-cyan-100/15 bg-[#071116] p-2 text-xs text-slate-100"><option value="">Choose a template</option><option value="floodline-breach">Floodline Breach</option><option value="glassroot-annex">Glassroot Annex</option></select>
+                    <div className="flex gap-1"><select aria-label="Remix theme" value={remixTheme} onChange={(event) => setRemixTheme(event.target.value as typeof remixTheme)} className="border border-cyan-100/15 bg-[#071116] p-2 text-xs"><option value="street">Street</option><option value="null">Null</option><option value="breach">Breach</option></select><input aria-label="Remix seed" value={seed} onChange={(event) => setSeed(event.target.value)} className="min-w-0 flex-1 border border-cyan-100/15 bg-[#071116] p-2 text-xs" /><button type="button" onClick={remix} className="bg-orange-300 px-2 text-xs font-bold text-[#091216]">Generate</button></div>
+                  </div>
                   <div>
                     <label htmlFor="custom-map-search" className="font-mono text-[9px] font-bold uppercase tracking-[.2em] text-slate-400">Asset feed</label>
                     <div className="relative mt-2">
@@ -577,6 +705,12 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                 </div>
               </section>
 
+              <section className="border border-cyan-100/15 bg-[#0c1a20]/90 p-4">
+                <p className="font-mono text-[9px] font-bold uppercase tracking-[.25em] text-cyan-200/60">Encounter timeline</p>
+                <div className="mt-2 flex justify-between font-mono text-[8px] text-slate-500"><span>0:00</span><span>{Math.floor(activeMap.durationSec / 60)}:{String(activeMap.durationSec % 60).padStart(2, '0')}</span></div>
+                <div className="mt-2 max-h-40 space-y-2 overflow-y-auto">{activeMap.placements.filter((piece) => piece.category === 'enemy' || piece.category === 'encounter').sort((a, b) => (a.fromSec ?? 0) - (b.fromSec ?? 0)).map((piece) => <button type="button" key={piece.id} onClick={() => { setSelectedPlacementId(piece.id); setSelectedIds([piece.id]); }} className="w-full text-left text-[9px] text-slate-300"><span>{assetFromId(piece.assetId)?.name} · {piece.fromSec ?? 0}s–{piece.toSec ?? activeMap.durationSec}s</span><span className="mt-1 block h-1.5 bg-slate-800"><span className="block h-full bg-orange-300" style={{ marginLeft: `${((piece.fromSec ?? 0) / activeMap.durationSec) * 100}%`, width: `${(((piece.toSec ?? activeMap.durationSec) - (piece.fromSec ?? 0)) / activeMap.durationSec) * 100}%` }} /></span></button>)}{!activeMap.placements.some((piece) => piece.category === 'enemy' || piece.category === 'encounter') && <p className="text-[10px] text-slate-500">Place an enemy or encounter to schedule pressure.</p>}</div>
+              </section>
+
               <section className="border border-cyan-100/15 bg-[#0c1a20]/90">
                 <div className="border-b border-cyan-100/10 px-4 py-3">
                   <p className="font-mono text-[9px] font-bold uppercase tracking-[.25em] text-cyan-200/60">Asset index</p>
@@ -595,10 +729,10 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                           {isOpen ? <ChevronUp className="h-3.5 w-3.5 text-slate-600" /> : <ChevronDown className="h-3.5 w-3.5 text-slate-600" />}
                         </button>
                         {isOpen && assets.map((asset) => {
-                          const isSetting = asset.category === 'ground' || asset.category === 'landmark';
+                          const isSetting = asset.category === 'ground' || asset.category === 'landmark' || asset.category === 'ambiance';
                           const isActiveSetting = asset.category === 'ground'
                             ? activeMap.groundAssetId === asset.id
-                            : activeMap.landmarkAssetId === asset.id;
+                            : asset.category === 'ambiance' ? activeMap.ambiance === asset.id.slice('ambiance:'.length) : activeMap.landmarkAssetId === asset.id;
                           return (
                             <button
                               type="button"
@@ -607,7 +741,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                               onClick={() => placeAsset(asset.id)}
                               className={`group mb-1 flex w-full items-center gap-2 border px-2 py-2 text-left transition ${isActiveSetting ? 'border-orange-300/60 bg-orange-300/[.08]' : 'border-transparent bg-[#071116]/45 hover:border-cyan-100/25 hover:bg-cyan-100/[.05]'}`}
                             >
-                              <span className="grid h-7 w-7 shrink-0 place-items-center border border-current/30 bg-[#071116]/70" style={{ color: asset.color }}><span className="h-2 w-2 rounded-full bg-current shadow-[0_0_10px_currentColor]" /></span>
+                              <AssetThumbnail artId={asset.artAssetId} color={asset.color} category={asset.category} />
                               <span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-bold uppercase text-slate-200">{asset.name}</span><span className="mt-0.5 block truncate text-[9px] text-slate-500">{asset.description}</span></span>
                               {isSetting ? <span className="font-mono text-[8px] uppercase tracking-wider text-orange-200/60">{isActiveSetting ? <Check className="h-3.5 w-3.5" /> : 'set'}</span> : <Plus className="h-3.5 w-3.5 shrink-0 text-slate-600 transition group-hover:text-orange-200" />}
                             </button>
@@ -618,6 +752,15 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                   })}
                   {filteredAssets.length === 0 && <p className="p-6 text-center font-mono text-[10px] uppercase tracking-widest text-slate-500">No matching assets</p>}
                 </div>
+              </section>
+
+              <section className="border border-cyan-100/15 bg-[#0c1a20]/90 p-4">
+                <p className="font-mono text-[9px] font-bold uppercase tracking-[.25em] text-cyan-200/60">Prefab library</p>
+                <p className="mt-1 text-xs text-slate-500">Place a group, then drag or rotate it as one.</p>
+                <div className="mt-3 max-h-44 space-y-1 overflow-y-auto">{[...MAP_PREFABS, ...personalPrefabs].map((prefab) => <div key={prefab.id} className="flex items-center gap-1"><button type="button" onClick={() => placePrefab(prefab)} className="flex-1 border border-cyan-100/15 px-2 py-1 text-left text-[10px] uppercase text-slate-200 hover:border-orange-300">{prefab.name} <span className="text-slate-500">({prefab.pieces.length})</span></button>{prefab.id.startsWith('personal-') && <button type="button" aria-label={`Delete ${prefab.name}`} onClick={() => setPersonalPrefabs((items) => items.filter((item) => item.id !== prefab.id))} className="p-1 text-red-200"><Trash2 className="h-3 w-3" /></button>}</div>)}</div>
+                <p className="mt-3 text-[10px] text-slate-500">Shift or Ctrl click to select several objects.</p>
+                <input aria-label="Prefab name" value={prefabName} onChange={(event) => setPrefabName(event.target.value.slice(0, 40))} placeholder="Name your prefab" className="mt-2 w-full border border-cyan-100/15 bg-[#071116] p-2 text-xs" />
+                <div className="mt-2 grid grid-cols-2 gap-1 text-[9px] uppercase"><button type="button" onClick={groupSelection} disabled={selectedIds.length < 2} className="border border-cyan-100/20 p-2 disabled:opacity-30">Group selection</button><button type="button" onClick={() => transformGroup('rotate')} disabled={!selectedIds.length} className="border border-cyan-100/20 p-2 disabled:opacity-30">Rotate 90°</button><button type="button" onClick={() => transformGroup('duplicate')} disabled={!selectedIds.length} className="border border-cyan-100/20 p-2 disabled:opacity-30">Duplicate group</button><button type="button" onClick={() => transformGroup('ungroup')} disabled={!selectedIds.length} className="border border-cyan-100/20 p-2 disabled:opacity-30">Ungroup</button><button type="button" onClick={saveGroup} disabled={!selectedIds.length} className="col-span-2 border border-orange-300/50 p-2 text-orange-200 disabled:opacity-30">Save prefab</button></div>
               </section>
 
               <section className="border border-cyan-100/15 bg-[#0c1a20]/90 p-4">
@@ -638,7 +781,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                             type="number"
                             step={field === 'x' || field === 'y' ? CUSTOM_MAP_GRID : 4}
                             min={field === 'w' || field === 'h' ? 12 : undefined}
-                            max={field === 'w' || field === 'h' ? 260 : undefined}
+                            max={field === 'w' || field === 'h' ? (selectedPlacement.category === 'tile' ? activeMap.bounds[field] : 360) : undefined}
                             value={selectedPlacement[field]}
                             onChange={(event) => {
                               const value = Number(event.target.value);
@@ -650,6 +793,8 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
                         </label>
                       ))}
                     </div>
+                    {selectedPlacement.category === 'structure' && assetFromId(selectedPlacement.assetId)?.artAssetId && <label className="mt-3 block text-[10px] text-slate-400">Behavior<select aria-label="Prop behavior" value={selectedPlacement.mode ?? assetFromId(selectedPlacement.assetId)?.defaultMode ?? 'permanent'} onChange={(event) => updatePlacement(selectedPlacement.id, { mode: event.target.value as CustomMapPlacement['mode'] })} className="mt-1 w-full border border-cyan-100/20 bg-[#071116] p-2 text-slate-100">{MAP_PROP_ART_BY_ID[assetFromId(selectedPlacement.assetId)!.artAssetId!]?.modes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label>}
+                    {(selectedPlacement.category === 'enemy' || selectedPlacement.category === 'encounter') && <div className="mt-3 grid grid-cols-2 gap-2">{(['fromSec', 'toSec', 'ratePerSec', 'burst'] as const).map((field) => <label key={field} className="text-[9px] uppercase text-slate-400">{field}<input type="number" aria-label={field} min={field === 'ratePerSec' ? 0.05 : field === 'burst' ? 1 : 0} max={field === 'burst' ? 12 : field === 'ratePerSec' ? 5 : activeMap.durationSec} step={field === 'ratePerSec' ? 0.05 : 1} value={selectedPlacement[field] ?? (field === 'toSec' ? activeMap.durationSec : field === 'ratePerSec' ? 0.65 : field === 'burst' ? 1 : 0)} onChange={(event) => updatePlacement(selectedPlacement.id, { [field]: Number(event.target.value) })} className="mt-1 w-full border border-cyan-100/20 bg-[#071116] p-1 text-slate-100" /></label>)}</div>}
                     <div className="mt-4 flex gap-2">
                       <button type="button" onClick={duplicatePlacement} data-testid="button-duplicate-placement" className="flex flex-1 items-center justify-center gap-2 border border-cyan-100/20 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-slate-300 transition hover:border-cyan-100/50 hover:text-cyan-100"><Copy className="h-3.5 w-3.5" /> Clone</button>
                       <button type="button" onClick={removePlacement} data-testid="button-delete-placement" className="flex flex-1 items-center justify-center gap-2 border border-red-200/20 py-2 font-mono text-[9px] font-bold uppercase tracking-widest text-red-200/75 transition hover:border-red-200/60 hover:text-red-100"><Trash2 className="h-3.5 w-3.5" /> Remove</button>
@@ -661,7 +806,7 @@ export function MapBuilder({ onBack, onLaunch }: MapBuilderProps) {
               <section className="border border-orange-200/20 bg-orange-200/[.04] p-4">
                 <div className="flex items-center gap-2 text-orange-200"><AlertTriangle className="h-4 w-4" /><p className="font-mono text-[9px] font-bold uppercase tracking-[.2em]">Preflight</p></div>
                 {validation.length > 0 ? <ul className="mt-3 space-y-2">{validation.map((warning) => <li key={warning} className="flex gap-2 text-[10px] leading-relaxed text-orange-100/75"><Minus className="mt-0.5 h-3 w-3 shrink-0" />{warning}</li>)}</ul> : <p className="mt-3 flex items-center gap-2 text-[10px] text-emerald-200"><Check className="h-3.5 w-3.5" /> Route has the minimum checkpoints for launch.</p>}
-                 <button type="button" onClick={handleLaunch} disabled={validation.some((warning) => warning.startsWith('No enemy pressure'))} data-testid="button-launch-custom-map" className="mt-4 flex w-full items-center justify-center gap-2 bg-orange-300 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-[#091216] transition hover:bg-orange-200 disabled:cursor-not-allowed disabled:opacity-40"><Upload className="h-3.5 w-3.5" /> Launch route</button>
+                 <button type="button" onClick={handleLaunch} disabled={validation.length > 0} data-testid="button-launch-custom-map" className="mt-4 flex w-full items-center justify-center gap-2 bg-orange-300 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-[#091216] transition hover:bg-orange-200 disabled:cursor-not-allowed disabled:opacity-40"><Upload className="h-3.5 w-3.5" /> Playtest route</button>
               </section>
             </>
           )}

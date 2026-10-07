@@ -35,6 +35,11 @@ kinds and existing enemy ids (`nightcrawler`/`bloodhound`/`corner-cutter`/
 `crypt-spitter`/`crypt-bouncer`), chained after `lev-syndicate-spire` via
 `clearArea`.
 
+`grpd-station` is a `kind: 'travel'` room (ambushable). The GRPD Armory entrance
+falls back to the hideout main floor until the station is found
+(`grpdArmoryLocation()` in `data/grpdArmory.ts`), so it is never stuck behind the
+late Division St. clear.
+
 A second room, **`grpd-vault`** ("The Vault," the user's "locked room with a
 super safe door"), originally shipped as an unreachable future-content
 hook. It now unlocks by clearing `site-crew-active-zone`: the Site Crew cuts

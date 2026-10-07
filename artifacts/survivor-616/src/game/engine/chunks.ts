@@ -800,6 +800,7 @@ export function generateChunk(cx: number, cy: number, runSeed: number, themeId: 
 
     // Sizes by kind.
     const sizes: Record<ObstacleDef['kind'], [number, number, number, number]> = {
+      'map-prop': [40, 80, 40, 80],
       car: [100, 130, 44, 58],
       dumpster: [55, 75, 44, 58],
       crate: [44, 72, 44, 72],

@@ -512,8 +512,52 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.16.0',
+    version: '0.15.1',
     date: '2026-10-06',
+    kind: 'hotfix',
+    title: 'Hideout and Travel, Armory Found',
+    body: [
+      'The GRPD Armory was stuck behind GRPD Station, which only opens after clearing Division St. Until the station is found, the Luvitnot keeper now holds the Armory entrance on the Sanctum main floor.',
+      'The room list is split in two. Hideout rooms (the Sanctum, the Perch, the Cellar, the Alley Annex, the Back Room and the Sound Booth) are safe. Travel rooms (The Neon Sleeve, Studio 28, GRPD Station, the Vault and Rapid Shelter) are out in the city and are marked with an Ambush risk badge.',
+      'You can only be ambushed when you travel. Studio 28, the Vault and Rapid Shelter now count, and the Perch, Cellar and Alley Annex no longer do. The Travel setting still switches ambushes off.',
+    ],
+  },
+  {
+    version: '0.15.2',
+    date: '2026-10-06',
+    kind: 'hotfix',
+    title: 'Your LokPet Travels With You',
+    body: [
+      'Your lead LokPet now comes along on every travel ambush. It steps in beside you with the same entrance it got on your first night in the hideout.',
+      'In Duo and Arena fights you bring your whole selected team and can switch LokPets mid-fight. A switch costs your turn, and the next LokPet steps in with the entrance, including after one is knocked out.',
+      'Arena combat is a travel fight style you can pick in Settings. The classic popup is still the default, and its Send button now replays the entrance.',
+    ],
+  },
+  {
+    version: '0.16.0',
+    date: '2026-10-07',
+    kind: 'update',
+    title: 'Ten Scores Leave the Armory',
+    body: [
+      'DigiFrog Lance, the three legendary Digi-Tanas, and six more Volume I weapons now unlock after Victory Lap at alternating 750,000 and 1,000,000 lifetime-kill steps.',
+      'Each weapon stays off until you activate it in the GRPD Armory. Every design has its own combat pattern, pixel model, and three-part evolution recipe.',
+      'The Endgame weapon evolution switch starts on when Victory Lap opens and can be turned off without sealing the base weapons.',
+    ],
+  },
+  {
+    version: '0.17.0',
+    date: '2026-10-07',
+    kind: 'update',
+    title: 'Floodline Breach and the Map Builder',
+    body: [
+      'Survive Floodline Breach and Glassroot Annex, two finite arenas built with new street and Null scenery.',
+      'Restore relays, destroy root anchors, open the transit cache, and find the 616 Plate and Transit Coil. The coil unlocks the Catenary Harpoon.',
+      'The map builder now supports pickups, interactables, ambiance, grouped prefabs, seeded remix, editable templates, encounter timing, zoom, undo and redo, and playtesting through the game renderer.',
+    ],
+  },
+  {
+    version: '0.18.0',
+    date: '2026-10-07',
     kind: 'update',
     title: 'Four Ways the Block Changes',
     body: [

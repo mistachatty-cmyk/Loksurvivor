@@ -389,6 +389,7 @@ export function nextRescueAllyId(
 export const HUB_ROOMS: HubRoomDef[] = [
   {
     id: 'main-floor',
+    kind: 'hideout',
     name: 'The Sanctum',
     subtitle: 'Main floor',
     description:
@@ -400,6 +401,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'rooftop-perch',
+    kind: 'hideout',
     name: 'The Perch',
     subtitle: 'Rooftop recovery deck',
     description:
@@ -411,6 +413,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-cellar',
+    kind: 'hideout',
     name: 'The Cellar',
     subtitle: 'Hidden room',
     description:
@@ -422,6 +425,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-alley',
+    kind: 'hideout',
     name: 'The Alley Annex',
     subtitle: 'Back-door workshop',
     description:
@@ -433,6 +437,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-storefront',
+    kind: 'travel',
     name: 'The Neon Sleeve',
     subtitle: 'The Neon Sleeve',
     description:
@@ -446,6 +451,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'studio-28',
+    kind: 'travel',
     name: 'Studio 28',
     subtitle: 'One-screen picture house',
     description:
@@ -460,6 +466,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-back-room',
+    kind: 'hideout',
     name: 'The Back Room',
     subtitle: 'Salvaged cabinet row',
     description:
@@ -471,6 +478,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'the-sound-booth',
+    kind: 'hideout',
     name: 'The Sound Booth',
     subtitle: 'Patch bay and foldback',
     description:
@@ -484,6 +492,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'grpd-station',
+    kind: 'travel',
     name: 'GRPD Station',
     subtitle: 'Division St.',
     description:
@@ -501,6 +510,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'grpd-vault',
+    kind: 'travel',
     name: 'The Vault',
     subtitle: 'Sealed evidence room',
     description:
@@ -512,6 +522,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
   },
   {
     id: 'rapid-shelter',
+    kind: 'travel',
     name: 'Rapid Shelter',
     subtitle: 'Digi-Arch safe side',
     description:
@@ -550,6 +561,10 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'bubble-wash-cleanse', name: 'The Bubble Wash Cleanse', blurb: 'A siren-triggered wall of suds that scours the whole basin clean twice a shift, whether or not anyone is still standing in it.' },
   { id: 'digital-soul-core', name: 'The Digital Soul Core', blurb: "A crystallized fragment of every human essence The Director's foundry has compiled so far. It hums when it recognizes a name." },
   { id: 'tree-null-log', name: 'The Tree Null Log', blurb: "A growth ring cut from Yggdrasil Null's trunk, its rings encoded instead of counted -- one bio-digital season per line." },
+  { id: 'floodline-breach-log', name: 'Floodline Exchange Ledger', blurb: 'A transit ledger that kept printing 616 after the roots reached the platforms.' },
+  { id: 'glassroot-annex-log', name: 'Glassroot Field Note', blurb: 'A field note mapping false trees around the buried shrine.' },
+  { id: 'breach-616-plate', name: 'The 616 Plate', blurb: 'A fractured station plate found under the Floodline relays. Its rain-worn number follows you home.' },
+  { id: 'transit-coil-found', name: 'The Transit Coil', blurb: 'An intact rail coil that powers the Catenary Harpoon.' },
   { id: 'grpd-station-found', name: 'GRPD Station — Division St.', blurb: 'A precinct nobody decommissioned on paper. The lights are still department-metered.' },
   { id: 'rapid-pressure-rooms-cleared', name: 'Rapid Shelter Reconnected', blurb: 'The Data-Gobs scattered, the pressure doors opened, and one Digi-Arch finally held a route long enough to bring the trapped Rapids through.' },
   { id: 'supabuilda-belt', name: 'Supabuilda Championship Belt', blurb: 'A scarred heavyweight belt taken from the Main Event Rack after the Heavy Floor finally went quiet.' },

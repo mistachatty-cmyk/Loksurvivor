@@ -17,6 +17,9 @@ import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
+import { grpdEndgameWeaponEarned } from '@/game/data/grpdArmory';
+import { endgameReached } from '@/game/data/endgameUnlocks';
+import { isFeatureEnabled } from '@/game/state/operatorForgeStore';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { activeCardEffects } from '@/game/data/passiveCards';
@@ -49,6 +52,7 @@ import {
   endFreezeSelectionDrag,
   hudSnapshot,
   missionSnapshot,
+  nearbyMapInteractable,
   orderSelectedUnits,
   assignControlGroup,
   selectAllCommandedUnits,
@@ -232,6 +236,8 @@ export function RunScreen({
   const finishedRef = useRef(false);
   const keysRef = useRef(new Set<string>());
   const ultRequestRef = useRef(false);
+  const interactRequestRef = useRef(false);
+  const gamepadInteractHeldRef = useRef(false);
   const stickRef = useRef<StickState>({
     active: false,
     pointerId: null,
@@ -428,6 +434,7 @@ export function RunScreen({
         worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
         activeDirectorPersonalityId: meta.activeDirectorPersonalityId,
         bonusWeaponId: meta.pendingSaunaReward?.weaponId,
+        unlockedMapFindIds: meta.discoveryIds,
         sectorSquadCap: mission?.squadCap,
         playerStart: missionPlayerStart,
         mission,
@@ -436,7 +443,8 @@ export function RunScreen({
         cardEffects: activeCardEffects(meta),
         disabledEnemyIds: meta.disabledEnemyIds,
         disabledWeaponIds: meta.disabledWeaponIds,
-        grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id)),
+        grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id) || grpdEndgameWeaponEarned(id, meta.totalKills, endgameReached(meta))),
+        endgameEvolutionsEnabled: isFeatureEnabled('weaponEvolutions'),
         grpdSpawnTierByWeaponId: meta.grpdSpawnTierByWeaponId,
         grpdCareerKills: meta.totalKills,
         grpdAutoIncreaseEnabled: meta.grpdAutoIncreaseEnabled,
@@ -460,6 +468,7 @@ export function RunScreen({
       }
       keysRef.current.add(key);
       if (key === ' ') ultRequestRef.current = true;
+      if (key === 'f' && !event.repeat) interactRequestRef.current = true;
       if (key === 'tab') {
         event.preventDefault();
         tacticalCameraRef.current.toggleTacticalView();
@@ -905,6 +914,12 @@ export function RunScreen({
 
         let ultimate = ultRequestRef.current;
         ultRequestRef.current = false;
+        const pad = navigator.getGamepads?.()[0];
+        const gamepadInteract = Boolean(pad?.buttons[0]?.pressed);
+        if (gamepadInteract && !gamepadInteractHeldRef.current) interactRequestRef.current = true;
+        gamepadInteractHeldRef.current = gamepadInteract;
+        let interact = interactRequestRef.current;
+        interactRequestRef.current = false;
 
         // Read the beat once per rendered frame and hold it across every
         // catch-up substep -- re-reading inside the loop would let one beat
@@ -916,8 +931,9 @@ export function RunScreen({
         accumulator = Math.min(accumulator + dt, FIXED_STEP * MAX_SUBSTEPS);
         while (accumulator >= FIXED_STEP) {
           accumulator -= FIXED_STEP;
-          stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate, audio });
+          stepWorld(world, FIXED_STEP, { moveX, moveY, ultimate, interact, audio });
           ultimate = false;
+          interact = false;
           if ((world.pendingLevelUps > 0 && levelUpPausesRef.current) || world.outcome !== 'running') break;
         }
 
@@ -1428,6 +1444,18 @@ export function RunScreen({
         onPointerCancel={endPointer}
         data-testid="surface-controls"
       />
+      {phase === 'playing' && worldRef.current && nearbyMapInteractable(worldRef.current) ? (
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => { interactRequestRef.current = true; }}
+          className="absolute bottom-28 right-5 z-40 rounded-full border border-cyan-200/70 bg-slate-950/85 px-5 py-4 text-xs font-black uppercase tracking-wider text-cyan-100 shadow-lg"
+          data-testid="button-map-interact"
+          aria-label={`Interact with ${nearbyMapInteractable(worldRef.current)?.kind}`}
+        >
+          Use · {nearbyMapInteractable(worldRef.current)?.kind}
+        </button>
+      ) : null}
 
       {/* Artiste: a cheap screen-space live stroke while the pointer is down. */}
       {artisteStroke && artisteStroke.length > 1 ? (

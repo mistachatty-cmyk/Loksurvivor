@@ -511,7 +511,8 @@ export type WeaponKind =
   /** 4th-wall breaking / system error attack: drags selection marquees, blue-screens, and corrupts memory. */
   | 'glitch'
   /** Easter egg weapon: classic DVD bouncing screensaver icon that ricochets and explodes on corner hits. */
-  | 'dvd-bounce';
+  | 'dvd-bounce'
+  | 'arc-tether';
 
 /**
  * Shared physical-impact spectrum for authored attacks.
@@ -561,6 +562,8 @@ export interface WeaponDef {
   impactTrigger?: PotholeTrigger;
   /** Optional tint used when this weapon is not a character signature. */
   color?: string;
+  /** Discovery required before a map-find weapon joins normal level-up rolls. */
+  lootUnlockDiscoveryId?: string;
   /** How this projectile behaves when it meets reflective cover. */
   obstacleInteraction?: 'block' | 'reflect';
   /** Optional crowd-control effect applied by this weapon's hits. */
@@ -647,6 +650,8 @@ export interface EvolutionDef {
   name: string;
   description: string;
   baseWeaponId: string;
+  /** Can be offered only when the earned Victory Lap evolution switch is on. */
+  endgameOnly?: boolean;
   /** Evolution partner weapon requirement: requires owning this weapon maxed (level 8). */
   requiredWeaponId?: string;
   requiredWeaponLevel?: number;
@@ -1159,6 +1164,8 @@ export interface WaveDef {
   hpMult?: number;
   formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait' | 'spiral' | 'phalanx' | 'crossfire' | 'vortex';
   faction?: string;
+  /** Authored finite-map entry; omitted waves keep their usual spawn ring. */
+  spawnAt?: { x: number; y: number };
 }
 
 export interface ObstacleDef {
@@ -1198,7 +1205,9 @@ export interface ObstacleDef {
      /** Rapid pressure wing: reinforced emergency-pressure room seal. */
      | 'pressure-door'
      /** Page overlay only: a DOM element on a live web page, standing in as a fixed, breakable block. */
-     | 'page-block';
+     | 'page-block' | 'map-prop';
+  /** Detailed map-pack artwork shared by the editor and live renderer. */
+  artAssetId?: string;
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Per-instance hit points; overrides the kind's table value (page overlay blocks scale with element area). */
@@ -1258,6 +1267,15 @@ export interface AreaDef {
     seam: string;
     glow: string;
   }>;
+  /** Art-only objects do not enter the collision or damage simulation. */
+  decorations?: ObstacleDef[];
+  /** Authored finite-map entry locations. */
+  playerStart?: { x: number; y: number };
+  hostileEntries?: Array<{ x: number; y: number }>;
+  /** Placed supplies and interactive set pieces. */
+  mapPickups?: Array<{ id: string; kind: string; x: number; y: number; value?: number }>;
+  mapInteractables?: Array<{ id: string; kind: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil'; x: number; y: number; w: number; h: number }>;
+  mapFeature?: 'fractured-616' | 'glassroot-shrine';
   /** Overhead conditions; defaults to 'clear' when omitted. */
   sky?: AreaSky;
   obstacles: ObstacleDef[];
@@ -1267,6 +1285,7 @@ export interface AreaDef {
     description: string;
     kind: 'market' | 'rail-yard' | 'plaza' | 'floodgate' | 'pressure-rooms';
     accent: string;
+    position?: { x: number; y: number };
   };
   /** Slow environmental corruption that Data-Gobs accelerate by chewing. */
   rawDataBreakage?: {
@@ -1325,7 +1344,10 @@ export type CustomMapAssetCategory =
   /** Where the player (or a Sector Command faction) enters the map. */
   | 'spawn-point'
   /** A named point a mission objective can reference (hold, escort, destroy). */
-  | 'objective-marker';
+  | 'objective-marker'
+  | 'pickup'
+  | 'interactable'
+  | 'ambiance';
 
 export interface CustomMapPlacement {
   id: string;
@@ -1335,18 +1357,29 @@ export interface CustomMapPlacement {
   y: number;
   w: number;
   h: number;
+  mode?: 'permanent' | 'breakable' | 'cosmetic';
+  groupId?: string;
+  fromSec?: number;
+  toSec?: number;
+  ratePerSec?: number;
+  burst?: number;
 }
 
 export interface CustomMap {
+  mapFeature?: 'fractured-616' | 'glassroot-shrine';
+  version?: 2;
   id: string;
   name: string;
   bounds: { w: number; h: number };
   groundAssetId: string;
   landmarkAssetId: string | null;
+  landmarkPosition?: { x: number; y: number };
   placements: CustomMapPlacement[];
   durationSec: number;
   threat: AreaDef['threat'];
   backdrop: string;
+  sky?: AreaSky;
+  ambiance?: 'street-rain' | 'null-spores' | 'breach' | 'clear';
   updatedAt: number;
 }
 
@@ -1369,6 +1402,11 @@ export interface CustomMapAsset {
   markerRole?: 'hold' | 'destroy' | 'escort' | 'extract';
   /** beacon only: which `SectorStructureDef` this placement builds. */
   beaconId?: string;
+  /** Map pack props use one physics kind and choose artwork by this id. */
+  artAssetId?: string;
+  pickupKind?: string;
+  interactableKind?: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil';
+  defaultMode?: CustomMapPlacement['mode'];
 }
 
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
@@ -1922,9 +1960,19 @@ export interface AmbientKindDef {
   fleeRadius: number;
 }
 
+/**
+ * Where a room sits relative to the hideout. `hideout` rooms are part of the
+ * safe base and never trigger a travel ambush; `travel` rooms are out in the
+ * city, so walking there can pull the player into a travel encounter (see
+ * `TRAVEL_ENCOUNTER_TRIGGERS`).
+ */
+export type HubRoomKind = 'hideout' | 'travel';
+
 export interface HubRoomDef {
   id: string;
   name: string;
+  /** Hideout rooms are safe; travel rooms can be ambushed on arrival. */
+  kind: HubRoomKind;
   subtitle: string;
   description: string;
   backdrop: string;
@@ -2060,6 +2108,8 @@ export interface UIThemeDef {
   starter?: boolean;
   /** Secret until earned through a rare reload takeover or Dev Mode. */
   hidden?: boolean;
+  /** Reward from an authored in-world find, excluded from random cold-open reveals. */
+  findOnly?: true;
   /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
   swatches?: UIThemeSwatchDef[];
 }
@@ -2590,6 +2640,8 @@ export interface RunResult {
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;
   discoveryId?: string;
+  /** Finds are kept even when the player falls before the area clear. */
+  mapFindIds?: string[];
   newlyUnlockedCharacterIds: string[];
   loadout: {
     weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;

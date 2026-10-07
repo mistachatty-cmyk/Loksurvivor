@@ -1,5 +1,6 @@
 import { AREAS } from '@/game/data/areas';
 import { ENEMIES } from '@/game/data/enemies';
+import { expandMapPrefab, MAP_PACK_ASSETS, MAP_PREFABS, MAP_PROP_ART_BY_ID, type MapPrefab } from './mapPack';
 import type {
   AreaDef,
   CustomMap,
@@ -10,10 +11,10 @@ import type {
 } from '@/game/types';
 
 export const MAX_CUSTOM_MAPS = 12;
-export const MAX_CUSTOM_MAP_PLACEMENTS = 120;
+export const MAX_CUSTOM_MAP_PLACEMENTS = 300;
 export const CUSTOM_MAP_GRID = 20;
 export const CUSTOM_MAP_MIN_BOUNDS = { w: 480, h: 360 };
-export const CUSTOM_MAP_MAX_BOUNDS = { w: 1400, h: 1000 };
+export const CUSTOM_MAP_MAX_BOUNDS = { w: 3200, h: 2600 };
 
 const GROUND_ASSETS: CustomMapAsset[] = AREAS
   .filter((area) => !area.endless)
@@ -46,10 +47,15 @@ const TILE_ASSETS: CustomMapAsset[] = AREAS
     h: 64,
   }));
 
+for (const area of AREAS) for (const [index, tile] of (area.authoredGroundTiles ?? []).entries()) {
+  if (TILE_ASSETS.some((asset) => asset.groundStyle?.base === tile.base && asset.groundStyle?.tile === tile.tile)) continue;
+  TILE_ASSETS.push({ id: `tile-authored:${area.id}:${index}`, category: 'tile', name: `${area.name} zone ${index + 1}`, description: 'Paint this authored zone treatment.', color: tile.glow, groundStyle: { base: tile.base, tile: tile.tile, seam: tile.seam, glow: tile.glow }, w: 64, h: 64 });
+}
+
 const STRUCTURE_KINDS: Array<ObstacleDef['kind']> = Array.from(new Set(
   AREAS.flatMap((area) => area.obstacles)
     .map((obstacle) => obstacle.kind)
-    .filter((kind) => kind !== 'pothole'),
+    .filter((kind) => kind !== 'pothole' && kind !== 'map-prop'),
 ));
 
 const STRUCTURE_LABELS: Partial<Record<ObstacleDef['kind'], string>> = {
@@ -185,10 +191,33 @@ export const BEACON_ASSETS: CustomMapAsset[] = [
   { id: 'beacon:repeater-beacon', category: 'beacon', name: 'Null Repeater', description: 'Slower reinforcements, sturdier body.', color: '#38bdf8', w: 56, h: 56, beaconId: 'repeater-beacon' },
 ];
 
+const PICKUP_ASSETS: CustomMapAsset[] = [
+  { id: 'pickup:health', category: 'pickup', name: 'Health kit', description: 'A one-time field heal.', color: '#4ade80', w: 28, h: 28, pickupKind: 'health' },
+  { id: 'pickup:cred', category: 'pickup', name: 'Cred stash', description: 'A small placed cache of cred.', color: '#fbbf24', w: 28, h: 28, pickupKind: 'cred' },
+  { id: 'pickup:cyber-resin', category: 'pickup', name: 'Cyber resin', description: 'Null crafting material.', color: '#c084fc', w: 28, h: 28, pickupKind: 'cyber-resin' },
+  { id: 'pickup:rootglass-cell', category: 'pickup', name: 'Rootglass cell', description: 'Temporary weapon cooldown boost.', color: '#5eead4', w: 30, h: 30, pickupKind: 'rootglass-cell' },
+];
+
+const INTERACTABLE_ASSETS: CustomMapAsset[] = [
+  { id: 'interactable:relay', category: 'interactable', name: 'Relay console', description: 'Activate nearby to restore lighting and open a route.', color: '#fbbf24', w: 70, h: 68, interactableKind: 'relay' },
+  { id: 'interactable:root-anchor', category: 'interactable', name: 'Root anchor', description: 'Destroy this living node to quiet nearby spores.', color: '#34d399', w: 70, h: 70, interactableKind: 'root-anchor' },
+  { id: 'interactable:cache', category: 'interactable', name: 'Transit cache', description: 'Open once for supplies.', color: '#f59e0b', w: 76, h: 62, interactableKind: 'cache' },
+  { id: 'interactable:plate', category: 'interactable', name: '616 Plate', description: 'A hidden world find that unlocks the Breach 616 theme.', color: '#fcd34d', w: 48, h: 48, interactableKind: 'plate' },
+  { id: 'interactable:coil', category: 'interactable', name: 'Transit Coil', description: 'Find the Catenary Harpoon.', color: '#67e8f9', w: 48, h: 48, interactableKind: 'coil' },
+];
+
+const AMBIANCE_ASSETS: CustomMapAsset[] = [
+  { id: 'ambiance:street-rain', category: 'ambiance', name: 'Street rain', description: 'Rain, wet sheen and steam.', color: '#60a5fa' },
+  { id: 'ambiance:null-spores', category: 'ambiance', name: 'Null spores', description: 'Roofed grove with drifting spores.', color: '#34d399' },
+  { id: 'ambiance:breach', category: 'ambiance', name: 'Breach weather', description: 'Rain with Null-lit particles.', color: '#5eead4' },
+  { id: 'ambiance:clear', category: 'ambiance', name: 'Clear night', description: 'Dry sky and restrained glow.', color: '#fbbf24' },
+];
+
 export const CUSTOM_MAP_ASSETS: CustomMapAsset[] = [
   ...GROUND_ASSETS,
   ...TILE_ASSETS,
   ...STRUCTURE_ASSETS,
+  ...MAP_PACK_ASSETS,
   ...HAZARD_ASSETS,
   ...LANDMARK_ASSETS,
   ...ENEMY_ASSETS,
@@ -196,6 +225,9 @@ export const CUSTOM_MAP_ASSETS: CustomMapAsset[] = [
   ...SPAWN_POINT_ASSETS,
   ...OBJECTIVE_MARKER_ASSETS,
   ...BEACON_ASSETS,
+  ...PICKUP_ASSETS,
+  ...INTERACTABLE_ASSETS,
+  ...AMBIANCE_ASSETS,
 ];
 
 export const CUSTOM_MAP_ASSETS_BY_ID: Record<string, CustomMapAsset> = Object.fromEntries(
@@ -213,6 +245,9 @@ export const CUSTOM_MAP_ASSET_CATEGORIES = [
   { id: 'encounter', label: 'Encounters & waves' },
   { id: 'spawn-point', label: 'Spawn points' },
   { id: 'objective-marker', label: 'Objective markers' },
+  { id: 'pickup', label: 'Items & supplies' },
+  { id: 'interactable', label: 'Interactables' },
+  { id: 'ambiance', label: 'Ambiance presets' },
 ] as const;
 
 /** Sector Command reads these off an authored map; they are never world geometry. */
@@ -243,6 +278,7 @@ export function assetFromId(assetId: string): CustomMapAsset | undefined {
 export function createCustomMap(id = `custom-${Date.now().toString(36)}`): CustomMap {
   const ground = GROUND_ASSETS[0]!;
   return {
+    version: 2,
     id,
     name: 'New night route',
     bounds: { ...CUSTOM_MAP_MIN_BOUNDS },
@@ -252,6 +288,8 @@ export function createCustomMap(id = `custom-${Date.now().toString(36)}`): Custo
     durationSec: 120,
     threat: 'rising',
     backdrop: AREAS.find((area) => area.id === ground.areaId)?.backdrop ?? 'art/street.jpeg',
+    sky: 'clear',
+    ambiance: 'clear',
     updatedAt: Date.now(),
   };
 }
@@ -300,8 +338,8 @@ export function normalizeCustomMap(value: unknown, fallbackId = `custom-${Date.n
       const asset = typeof item.assetId === 'string' ? assetFromId(item.assetId) : undefined;
       const category = validCategory(item.category);
       if (!asset || !category || asset.category !== category) continue;
-      const w = clampInt(item.w, 12, 260, asset.w ?? 60);
-      const h = clampInt(item.h, 12, 260, asset.h ?? 60);
+      const w = clampInt(item.w, 12, category === 'tile' ? bounds.w : 360, asset.w ?? 60);
+      const h = clampInt(item.h, 12, category === 'tile' ? bounds.h : 360, asset.h ?? 60);
       placements.push({
         id: typeof item.id === 'string' ? item.id.slice(0, 64) : `placement-${placements.length + 1}`,
         assetId: asset.id,
@@ -310,6 +348,14 @@ export function normalizeCustomMap(value: unknown, fallbackId = `custom-${Date.n
         y: clampInt(item.y, -bounds.h / 2 + h / 2, bounds.h / 2 - h / 2, 0),
         w,
         h,
+        ...(asset.artAssetId ? { mode: MAP_PROP_ART_BY_ID[asset.artAssetId]?.modes.includes(item.mode ?? 'breakable') ? item.mode : asset.defaultMode } : {}),
+        ...(typeof item.groupId === 'string' && item.groupId.length <= 64 ? { groupId: item.groupId } : {}),
+        ...(item.category === 'enemy' || item.category === 'encounter' ? {
+          fromSec: clampInt(item.fromSec, 0, 599, placements.length * 8),
+          toSec: clampInt(item.toSec, 1, 600, clampInt(raw.durationSec, 60, 600, 120)),
+          ratePerSec: Math.max(0.05, Math.min(5, finite(item.ratePerSec, 0.65))),
+          burst: clampInt(item.burst, 1, 12, 1),
+        } : {}),
       });
     }
   }
@@ -321,15 +367,23 @@ export function normalizeCustomMap(value: unknown, fallbackId = `custom-${Date.n
     ? raw.threat
     : fallback.threat;
   return {
+    version: 2,
     id,
     name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 48) : fallback.name,
     bounds,
     groundAssetId: ground?.category === 'ground' ? ground.id : fallback.groundAssetId,
     landmarkAssetId,
+    mapFeature: raw.mapFeature === 'fractured-616' || raw.mapFeature === 'glassroot-shrine' ? raw.mapFeature : undefined,
+    landmarkPosition: raw.landmarkPosition && typeof raw.landmarkPosition === 'object' ? {
+      x: clampInt(raw.landmarkPosition.x, -bounds.w / 2, bounds.w / 2, 0),
+      y: clampInt(raw.landmarkPosition.y, -bounds.h / 2, bounds.h / 2, -150),
+    } : undefined,
     placements,
     durationSec: clampInt(raw.durationSec, 60, 600, fallback.durationSec),
     threat,
     backdrop: ground?.areaId ? (AREAS.find((area) => area.id === ground.areaId)?.backdrop ?? fallback.backdrop) : fallback.backdrop,
+    sky: raw.sky === 'rain' || raw.sky === 'fog' || raw.sky === 'overcast' || raw.sky === 'roofed' || raw.sky === 'clear' ? raw.sky : fallback.sky,
+    ambiance: raw.ambiance === 'street-rain' || raw.ambiance === 'null-spores' || raw.ambiance === 'breach' || raw.ambiance === 'clear' ? raw.ambiance : fallback.ambiance,
     updatedAt: Math.max(0, finite(raw.updatedAt, Date.now())),
   };
 }
@@ -356,6 +410,65 @@ export function customMapValidationIssues(map: CustomMap): string[] {
   if (map.placements.length > MAX_CUSTOM_MAP_PLACEMENTS) {
     issues.push(`Route exceeds the ${MAX_CUSTOM_MAP_PLACEMENTS}-placement limit.`);
   }
+  for (const placement of map.placements) {
+    const asset = assetFromId(placement.assetId);
+    if (!asset || asset.category !== placement.category) { issues.push(`Unknown asset ${placement.assetId}. Replace this placement.`); continue; }
+    if (Math.abs(placement.x) + placement.w / 2 > map.bounds.w / 2 || Math.abs(placement.y) + placement.h / 2 > map.bounds.h / 2) {
+      issues.push(`${asset.name} at ${placement.x}, ${placement.y} crosses the map edge.`);
+    }
+    if (asset.artAssetId && placement.mode && !MAP_PROP_ART_BY_ID[asset.artAssetId]?.modes.includes(placement.mode)) {
+      issues.push(`${asset.name} does not support ${placement.mode} behavior.`);
+    }
+  }
+  const start = map.placements.find((placement) => placement.assetId === 'spawn-point:player');
+  const solids = map.placements.filter((placement) =>
+    (placement.category === 'structure' && placement.mode !== 'cosmetic') ||
+    (placement.category === 'interactable' && placement.assetId === 'interactable:root-anchor'),
+  );
+  if (start && solids.some((solid) => Math.abs(start.x - solid.x) < solid.w / 2 + 18 && Math.abs(start.y - solid.y) < solid.h / 2 + 18)) {
+    issues.push('Player start overlaps solid scenery.');
+  }
+  for (const entry of map.placements.filter((placement) => placement.assetId === 'spawn-point:hostile')) {
+    if (solids.some((solid) => Math.abs(entry.x - solid.x) < solid.w / 2 + 18 && Math.abs(entry.y - solid.y) < solid.h / 2 + 18)) {
+      issues.push('A hostile entry overlaps solid scenery.');
+      break;
+    }
+  }
+  for (const wave of map.placements.filter((placement) => placement.category === 'enemy' || placement.category === 'encounter')) {
+    if ((wave.fromSec ?? 0) >= (wave.toSec ?? map.durationSec) || (wave.toSec ?? map.durationSec) > map.durationSec) {
+      issues.push('An encounter has an invalid time window.');
+      break;
+    }
+  }
+  const permanent = map.placements.filter((placement) => placement.category === 'structure' && placement.mode !== 'breakable' && placement.mode !== 'cosmetic');
+  const cell = 64;
+  const columns = Math.ceil(map.bounds.w / cell);
+  const rows = Math.ceil(map.bounds.h / cell);
+  const center = (col: number, row: number) => ({ x: -map.bounds.w / 2 + (col + 0.5) * cell, y: -map.bounds.h / 2 + (row + 0.5) * cell });
+  const free = (col: number, row: number) => {
+    if (col < 0 || row < 0 || col >= columns || row >= rows) return false;
+    const point = center(col, row);
+    return !permanent.some((solid) => Math.abs(point.x - solid.x) < solid.w / 2 + 18 && Math.abs(point.y - solid.y) < solid.h / 2 + 18);
+  };
+  const startPoint = start ?? { x: 0, y: 0 };
+  const startCol = Math.floor((startPoint.x + map.bounds.w / 2) / cell);
+  const startRow = Math.floor((startPoint.y + map.bounds.h / 2) / cell);
+  const visited = new Set<number>();
+  const queue: Array<[number, number]> = [[startCol, startRow]];
+  for (let head = 0; head < queue.length; head += 1) {
+    const [col, row] = queue[head]!;
+    const key = row * columns + col;
+    if (visited.has(key) || !free(col, row)) continue;
+    visited.add(key);
+    queue.push([col + 1, row], [col - 1, row], [col, row + 1], [col, row - 1]);
+  }
+  for (const target of map.placements.filter((placement) => placement.category === 'interactable' || placement.category === 'objective-marker')) {
+    const reachable = [...visited].some((key) => {
+      const point = center(key % columns, Math.floor(key / columns));
+      return Math.hypot(point.x - target.x, point.y - target.y) <= (target.category === 'interactable' ? 110 : 75);
+    });
+    if (!reachable) issues.push(`${assetFromId(target.assetId)?.name ?? 'Objective'} at ${target.x}, ${target.y} is blocked by permanent scenery.`);
+  }
   return issues;
 }
 
@@ -371,6 +484,15 @@ function obstacleFromPlacement(placement: CustomMapPlacement, asset: CustomMapAs
     };
   }
   if (placement.category !== 'structure') return null;
+  if (asset.artAssetId) {
+    if (placement.mode === 'cosmetic') return null;
+    return {
+      x: placement.x, y: placement.y, w: placement.w, h: placement.h,
+      kind: 'map-prop', artAssetId: asset.artAssetId,
+      propVariant: placement.mode === 'breakable' ? 'fixed-breakable' : 'fixed-bench',
+      ...(placement.mode === 'breakable' ? { hp: 120 } : {}),
+    };
+  }
   const kind = asset.id.slice('structure:'.length) as ObstacleDef['kind'];
   return { x: placement.x, y: placement.y, w: placement.w, h: placement.h, kind };
 }
@@ -382,6 +504,14 @@ export function customMapToArea(map: CustomMap): AreaDef {
   const obstacles = normalized.placements
     .map((placement) => obstacleFromPlacement(placement, assetFromId(placement.assetId) ?? {} as CustomMapAsset))
     .filter((obstacle): obstacle is ObstacleDef => Boolean(obstacle));
+  for (const anchor of normalized.placements.filter((placement) => placement.assetId === 'interactable:root-anchor')) {
+    if (!obstacles.some((obstacle) => obstacle.artAssetId === 'node-pylon' && Math.abs(obstacle.x - anchor.x) < 8 && Math.abs(obstacle.y - anchor.y) < 8)) {
+      obstacles.push({ x: anchor.x, y: anchor.y, w: anchor.w, h: anchor.h, kind: 'map-prop', artAssetId: 'node-pylon', hp: 120, propVariant: 'fixed-breakable' });
+    }
+  }
+  const decorations: ObstacleDef[] = normalized.placements
+    .filter((placement) => placement.category === 'structure' && placement.mode === 'cosmetic')
+    .map((placement) => ({ x: placement.x, y: placement.y, w: placement.w, h: placement.h, kind: 'map-prop', artAssetId: assetFromId(placement.assetId)?.artAssetId }));
   const authoredGroundTiles = normalized.placements
     .filter((placement) => placement.category === 'tile')
     .map((placement) => {
@@ -395,11 +525,12 @@ export function customMapToArea(map: CustomMap): AreaDef {
       const enemyId = asset?.enemyId ?? ENEMIES[0]!.id;
       return {
         ...(asset?.wave ?? {}),
-        fromSec: Math.min(normalized.durationSec - 1, index * 8),
-        toSec: normalized.durationSec,
+        fromSec: placement.fromSec ?? Math.min(normalized.durationSec - 1, index * 8),
+        toSec: placement.toSec ?? normalized.durationSec,
         enemyId,
-        ratePerSec: asset?.wave?.ratePerSec ?? 0.65,
-        burst: asset?.wave?.burst ?? 1,
+        ratePerSec: placement.ratePerSec ?? asset?.wave?.ratePerSec ?? 0.65,
+        burst: placement.burst ?? asset?.wave?.burst ?? 1,
+        spawnAt: { x: placement.x, y: placement.y },
       };
     });
   const landmark = normalized.landmarkAssetId ? assetFromId(normalized.landmarkAssetId) : undefined;
@@ -413,8 +544,15 @@ export function customMapToArea(map: CustomMap): AreaDef {
     bounds: normalized.bounds,
     ground: sourceArea?.ground ?? AREAS[0]!.ground,
     obstacles,
+    decorations,
+    playerStart: spawnPointsOf(normalized, 'player').map((placement) => ({ x: placement.x, y: placement.y }))[0],
+    hostileEntries: spawnPointsOf(normalized, 'hostile').map((placement) => ({ x: placement.x, y: placement.y })),
+    mapPickups: normalized.placements.filter((placement) => placement.category === 'pickup').map((placement) => ({ id: placement.id, kind: assetFromId(placement.assetId)?.pickupKind ?? 'health', x: placement.x, y: placement.y })),
+    mapInteractables: normalized.placements.filter((placement) => placement.category === 'interactable').map((placement) => ({ id: placement.id, kind: assetFromId(placement.assetId)?.interactableKind ?? 'cache', x: placement.x, y: placement.y, w: placement.w, h: placement.h })),
+    sky: normalized.ambiance === 'street-rain' || normalized.ambiance === 'breach' ? 'rain' : normalized.ambiance === 'null-spores' ? 'roofed' : normalized.sky,
+    mapFeature: normalized.mapFeature,
     authoredGroundTiles,
-    landmark: landmarkSource ? { ...landmarkSource } : undefined,
+    landmark: landmarkSource ? { ...landmarkSource, position: normalized.landmarkPosition } : undefined,
     durationSec: normalized.durationSec,
     waves: waves.length > 0 ? waves : [{
       fromSec: 0,
@@ -426,4 +564,72 @@ export function customMapToArea(map: CustomMap): AreaDef {
     unlock: { kind: 'default' },
     threat: normalized.threat,
   };
+}
+
+/** Convert a shipped arena to the same editable format used by saves and playtest. */
+export function areaToCustomMapTemplate(area: AreaDef, id: string): CustomMap {
+  const ground = GROUND_ASSETS.find((asset) => asset.areaId === area.id) ?? GROUND_ASSETS[0]!;
+  const placements: CustomMapPlacement[] = [];
+  const add = (assetId: string, x: number, y: number, w?: number, h?: number, extra: Partial<CustomMapPlacement> = {}) => {
+    const asset = assetFromId(assetId);
+    if (!asset || placements.length >= MAX_CUSTOM_MAP_PLACEMENTS) return;
+    placements.push({ id: `template-${placements.length}`, assetId, category: asset.category as CustomMapPlacement['category'], x, y, w: w ?? asset.w ?? 60, h: h ?? asset.h ?? 60, ...extra });
+  };
+  for (const tile of area.authoredGroundTiles ?? []) {
+    const match = TILE_ASSETS.find((asset) => asset.groundStyle?.base === tile.base && asset.groundStyle?.tile === tile.tile);
+    if (match) add(match.id, tile.x, tile.y, tile.w, tile.h);
+  }
+  for (const obstacle of area.obstacles) {
+    const assetId = obstacle.artAssetId ? `map-prop:${obstacle.artAssetId}` : `structure:${obstacle.kind}`;
+    if (assetFromId(assetId)) add(assetId, obstacle.x, obstacle.y, obstacle.w, obstacle.h, { mode: obstacle.hp ? 'breakable' : 'permanent' });
+  }
+  for (const obstacle of area.decorations ?? []) if (obstacle.artAssetId) add(`map-prop:${obstacle.artAssetId}`, obstacle.x, obstacle.y, obstacle.w, obstacle.h, { mode: 'cosmetic' });
+  if (area.playerStart) add('spawn-point:player', area.playerStart.x, area.playerStart.y);
+  for (const entry of area.hostileEntries ?? []) add('spawn-point:hostile', entry.x, entry.y);
+  for (const item of area.mapPickups ?? []) add(`pickup:${item.kind}`, item.x, item.y);
+  for (const item of area.mapInteractables ?? []) add(`interactable:${item.kind}`, item.x, item.y, item.w, item.h);
+  for (const wave of area.waves) {
+    const assetId = `encounter:${wave.enemyId}`;
+    const point = wave.spawnAt ?? area.hostileEntries?.[0] ?? { x: 0, y: 0 };
+    add(assetId, point.x, point.y, undefined, undefined, { fromSec: wave.fromSec, toSec: wave.toSec, ratePerSec: wave.ratePerSec, burst: wave.burst });
+  }
+  return normalizeCustomMap({ version: 2, id, name: area.name, bounds: area.bounds, groundAssetId: ground.id, landmarkAssetId: null, placements, durationSec: area.durationSec, threat: area.threat, backdrop: area.backdrop, sky: area.sky, ambiance: area.id === 'floodline-breach' ? 'breach' : area.id === 'glassroot-annex' ? 'null-spores' : 'clear', mapFeature: area.mapFeature, updatedAt: Date.now() }, id)!;
+}
+
+/** A stable remix yields an ordinary editable map; no random state is retained at runtime. */
+export function generateCustomMap(seed: string, theme: 'street' | 'null' | 'breach', id: string): CustomMap {
+  let state = 2166136261;
+  for (const character of `${theme}:${seed}`) state = Math.imul(state ^ character.charCodeAt(0), 16777619);
+  const random = () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return (state >>> 0) / 4294967296; };
+  const base = AREAS.find((area) => area.id === (theme === 'street' ? 'monroe-strip' : theme === 'null' ? 'glassroot-annex' : 'floodline-breach'))!;
+  const map = areaToCustomMapTemplate(base, id);
+  map.name = `${theme === 'breach' ? 'Breach' : theme === 'null' ? 'Null' : 'Street'} remix ${seed.slice(0, 12)}`;
+  map.placements = map.placements.filter((placement) => !placement.id.startsWith('template-') || placement.category === 'spawn-point' || placement.category === 'interactable' || placement.category === 'pickup' || placement.category === 'tile');
+  const prefabs = MAP_PREFABS.filter((prefab) => theme === 'breach' || prefab.theme === theme);
+  for (let index = 0; index < 7; index += 1) {
+    const prefab = prefabs[Math.floor(random() * prefabs.length)]!;
+    const x = Math.round(((random() - 0.5) * (map.bounds.w - 500)) / CUSTOM_MAP_GRID) * CUSTOM_MAP_GRID;
+    const y = Math.round(((random() - 0.5) * (map.bounds.h - 400)) / CUSTOM_MAP_GRID) * CUSTOM_MAP_GRID;
+    const additions = expandMapPrefab(prefab, { x, y }, `remix-${index}`, Math.floor(random() * 4));
+    map.placements.push(...additions.filter((piece) => Math.abs(piece.x) < map.bounds.w / 2 - piece.w / 2 && Math.abs(piece.y) < map.bounds.h / 2 - piece.h / 2));
+  }
+  const enemies = ENEMY_ASSETS.filter((asset) => theme === 'street' ? !asset.enemyId?.includes('root') : true);
+  for (let index = 0; index < 5; index += 1) {
+    const asset = enemies[Math.floor(random() * enemies.length)]!;
+    const side = index % 2 ? -1 : 1;
+    const fromSec = index * Math.floor(map.durationSec / 7);
+    map.placements.push({ id: `remix-wave-${index}`, assetId: asset.id, category: 'enemy', x: side * (map.bounds.w / 2 - 100), y: Math.round((random() - 0.5) * (map.bounds.h - 200)), w: asset.w ?? 40, h: asset.h ?? 40, fromSec, toSec: map.durationSec, ratePerSec: 0.4 + random() * 0.5, burst: 1 + Math.floor(random() * 2) });
+  }
+  return normalizeCustomMap(map, id)!;
+}
+
+export function normalizePersonalPrefabs(value: unknown): MapPrefab[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 32).flatMap((candidate): MapPrefab[] => {
+    if (!candidate || typeof candidate !== 'object') return [];
+    const prefab = candidate as Partial<MapPrefab>;
+    if (typeof prefab.id !== 'string' || !/^personal-[a-z0-9-]+$/i.test(prefab.id) || typeof prefab.name !== 'string' || !Array.isArray(prefab.pieces)) return [];
+    const pieces = prefab.pieces.slice(0, 20).filter((piece) => piece && assetFromId(piece.assetId)).map((piece) => ({ ...piece, x: clampInt(piece.x, -1000, 1000, 0), y: clampInt(piece.y, -1000, 1000, 0) }));
+    return pieces.length ? [{ id: prefab.id, name: prefab.name.slice(0, 40), theme: prefab.theme === 'null' ? 'null' : 'street', pieces }] : [];
+  });
 }

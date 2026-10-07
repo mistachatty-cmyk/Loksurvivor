@@ -93,8 +93,8 @@ import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/
 import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
-import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
-import { earnedEndgame, featureById, slotById } from '@/game/data/endgameUnlocks';
+import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
 import type {
@@ -1192,6 +1192,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedGeneratorIds,
     generatorAccrualAt: Math.max(0, typeof parsed.generatorAccrualAt === 'number' ? parsed.generatorAccrualAt : Date.now()),
   });
+  const clearedAreaIds = idList(parsed.clearedAreaIds, areaIds, []);
+  const savedTotalKills = counter(parsed.totalKills);
+  const fabricatedGrpdIds = idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []).filter((id) => !isGrpdEndgameWeapon(id));
+  const earnedEndgameGrpdIds = [...GRPD_PLAYABLE_WEAPON_IDS].filter((id) => grpdEndgameWeaponEarned(id, savedTotalKills, endgameReached({ clearedAreaIds })));
+  const activeGrpdIds = idList(parsed.grpdActiveWeaponIds, new Set([...fabricatedGrpdIds, ...earnedEndgameGrpdIds]), []);
 
   return {
     version: META_VERSION,
@@ -1296,7 +1301,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     selectedCharacterId,
     characterSkinByCharacterId,
     unlockedCharacterIds,
-    clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
+    clearedAreaIds,
     rescuedAllyIds,
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
@@ -1309,10 +1314,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     visitingLokCards: normalizeVisitingLokCards(parsed.visitingLokCards),
     ...recoveredElixirs,
     bestiary,
-    totalKills: counter(parsed.totalKills),
+    totalKills: savedTotalKills,
     grpdSpentSeals: counter(parsed.grpdSpentSeals),
-    grpdUnlockedWeaponIds: idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []),
-    grpdActiveWeaponIds: idList(parsed.grpdActiveWeaponIds, new Set(idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, [])), []),
+    grpdUnlockedWeaponIds: fabricatedGrpdIds,
+    grpdActiveWeaponIds: activeGrpdIds,
     grpdSpawnTierByWeaponId: Object.fromEntries(
       Object.entries(parsed.grpdSpawnTierByWeaponId ?? {})
         .filter(([id]) => GRPD_PLAYABLE_WEAPON_IDS.has(id))
@@ -2788,6 +2793,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'unlockGrpdWeapon': {
       const weaponId = action.weaponId;
       if (!GRPD_PLAYABLE_WEAPON_IDS.has(weaponId) || state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (isGrpdEndgameWeapon(weaponId)) return state;
       if (grpdAvailableSeals(state.meta.totalKills, state.meta.grpdSpentSeals) < GRPD_UNLOCK_SEAL_COST) return state;
       return { ...state, meta: {
         ...state.meta,
@@ -2799,7 +2805,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'toggleGrpdWeapon': {
       const weaponId = action.weaponId;
-      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId) && !grpdEndgameWeaponEarned(weaponId, state.meta.totalKills, endgameReached(state.meta))) return state;
       const active = state.meta.grpdActiveWeaponIds;
       return { ...state, meta: {
         ...state.meta,
@@ -2809,7 +2815,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'buyGrpdSpawnTier': {
       const weaponId = action.weaponId;
-      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId) && !grpdEndgameWeaponEarned(weaponId, state.meta.totalKills, endgameReached(state.meta))) return state;
       const current = state.meta.grpdSpawnTierByWeaponId[weaponId] ?? 1;
       if (current >= GRPD_MAX_SPAWN_MULTIPLIER) return state;
       const cost = grpdNextTierCost(current);
@@ -3712,6 +3718,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (result.cleared && result.discoveryId) {
         discoveryIds = addUnique(discoveryIds, result.discoveryId);
       }
+      for (const findId of result.mapFindIds ?? []) {
+        if (findId === 'breach-616-plate' || findId === 'transit-coil-found') discoveryIds = addUnique(discoveryIds, findId);
+      }
       const discoveredRelic = result.cleared && result.discoveryId
         ? RELIC_BY_DISCOVERY_ID[result.discoveryId]
         : undefined;
@@ -3768,6 +3777,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
       const next: MetaState = {
         ...prev,
+        ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
         rescuedAllyIds,
         discoveryIds,

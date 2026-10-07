@@ -20,7 +20,7 @@ export default defineConfig({
       : {}),
   },
   webServer: {
-    command: `PORT=${port} BASE_PATH=/ pnpm exec vite --config vite.config.ts --host 127.0.0.1`,
+    command: `pnpm exec vite --config vite.config.ts --host 127.0.0.1 --port ${port}`,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: true,
     timeout: 120_000,
