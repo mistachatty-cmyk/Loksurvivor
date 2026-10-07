@@ -1921,9 +1921,19 @@ export interface AmbientKindDef {
   fleeRadius: number;
 }
 
+/**
+ * Where a room sits relative to the hideout. `hideout` rooms are part of the
+ * safe base and never trigger a travel ambush; `travel` rooms are out in the
+ * city, so walking there can pull the player into a travel encounter (see
+ * `TRAVEL_ENCOUNTER_TRIGGERS`).
+ */
+export type HubRoomKind = 'hideout' | 'travel';
+
 export interface HubRoomDef {
   id: string;
   name: string;
+  /** Hideout rooms are safe; travel rooms can be ambushed on arrival. */
+  kind: HubRoomKind;
   subtitle: string;
   description: string;
   backdrop: string;

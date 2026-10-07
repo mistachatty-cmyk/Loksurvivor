@@ -57,6 +57,7 @@ import { FeedbackPanel } from '@/ui/FeedbackPanel';
 import { CardShopPanel } from '@/ui/CardShopPanel';
 import { WeaponBansScreen } from '@/ui/WeaponBansScreen';
 import { GrpdArmoryScreen } from '@/ui/GrpdArmoryScreen';
+import { grpdArmoryLocation } from '@/game/data/grpdArmory';
 import { ThreatMatrixScreen } from '@/ui/ThreatMatrixScreen';
 import { LokPetBattleScreen } from '@/ui/LokPetBattleScreen';
 import { DustMiteRancherPanel } from '@/ui/DustMiteRancherPanel';
@@ -193,7 +194,7 @@ function initialScreen(): Screen {
 }
 
 function Game() {
-  const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas } = useMeta();
+  const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas, unlockedRooms } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen());
   const [roomId, setRoomId] = useState('main-floor');
   const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
@@ -447,8 +448,10 @@ function Game() {
               return;
             }
             if (nextRoomId === 'studio-28') {
-              sfx.play('uiNav');
-              setScreen({ name: 'weapon-bans' });
+              attemptTravelEncounter('hub-room', nextRoomId, () => {
+                sfx.play('uiNav');
+                setScreen({ name: 'weapon-bans' });
+              });
               return;
             }
             attemptTravelEncounter('hub-room', nextRoomId, () => { sfx.play('uiNav'); setRoomId(nextRoomId); });
@@ -568,7 +571,7 @@ function Game() {
       return <WeaponBansScreen onBack={goHub} />;
 
     case 'grpd-armory':
-      return <GrpdArmoryScreen onBack={() => { setRoomId(meta.grpdArmoryAnchor === 'hideout' ? 'main-floor' : 'grpd-station'); goHub(); }} />;
+      return <GrpdArmoryScreen onBack={() => { setRoomId(grpdArmoryLocation(meta.grpdArmoryAnchor, unlockedRooms.some((room) => room.id === 'grpd-station')) === 'hideout' ? 'main-floor' : 'grpd-station'); goHub(); }} />;
 
     case 'settings':
       return <SettingsPanel onBack={goHub} onOpenLooksAndLokPets={() => setScreen({ name: 'run-setup', destination: 'hub' })} />;

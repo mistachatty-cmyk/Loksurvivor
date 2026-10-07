@@ -6,6 +6,9 @@
  * a fight never drags. The opponent's next move is shown before you pick, so
  * every choice is readable.
  *
+ * `quick` stays one LokPet a side; Duo and Arena can bring the selected team and
+ * swap the active pet mid-fight (see `switchQuickFight`).
+ *
  * Two depths share this file. `quick` is the trimmed version above. `deep`
  * is the full arena treatment (all moves including the finisher, trinkets,
  * Cheer, a 20-round cap) for the Arena fight style. Either depth can also take
@@ -21,6 +24,7 @@ import {
   createBattle,
   executeCheer,
   executeMove,
+  executeSwitch,
   generateOpponentPet,
 } from '@/game/engine/lokPetBattle';
 import type { BattlePet, BattleState, LokPetBattleMove } from '@/game/engine/lokPetBattleTypes';
@@ -128,7 +132,12 @@ export function buildQuickOpponent(
 }
 
 export function createQuickFight(options: {
+  /** One lead pet. Kept for callers that never bring a team. */
   playerPet?: SavedLokPet;
+  /** The selected team, lead first. Only used when `maxTeam` is above 1. */
+  playerPets?: SavedLokPet[];
+  /** How many pets the player may bring (Duo and Arena pass the loadout size). Defaults to 1. */
+  maxTeam?: number;
   opponent: ResolvedTravelEncounterOpponent;
   enemyElement?: LokPetElement;
   depth?: FightDepth;
@@ -136,25 +145,28 @@ export function createQuickFight(options: {
 }): QuickFightState {
   const rand = options.rand ?? Math.random;
   const depth = options.depth ?? 'quick';
+  const roster = options.playerPets ?? (options.playerPet ? [options.playerPet] : []);
   // createBattle supplies the starter companion when the kennel is empty.
   const base = createBattle({
     gameMode: 'quick-fight',
-    playerPets: options.playerPet ? [options.playerPet] : [],
+    playerPets: roster.slice(0, Math.max(1, options.maxTeam ?? 1)),
   });
-  const player = base.playerTeam[0]!;
-  player.energy = Math.max(player.energy, QUICK_START_ENERGY);
-  if (depth === 'quick') {
-    player.moves = trimQuickMoves(player.moves);
-    // Trinket stats stay baked into the pet; only the label goes.
-    player.equippedTrinket = undefined;
+  for (const member of base.playerTeam) {
+    member.energy = Math.max(member.energy, QUICK_START_ENERGY);
+    if (depth === 'quick') {
+      member.moves = trimQuickMoves(member.moves);
+      // Trinket stats stay baked into the pet; only the label goes.
+      member.equippedTrinket = undefined;
+    }
   }
+  const player = base.playerTeam[0]!;
 
   const enemy = buildQuickOpponent(options.opponent, player.level, options.enemyElement, depth);
   const enemyGoesFirst = enemy.speed > player.speed;
 
   let battle: BattleState = {
     ...base,
-    playerTeam: [player],
+    playerTeam: base.playerTeam,
     activePlayerIndex: 0,
     enemyTeam: [enemy],
     activeEnemyIndex: 0,
@@ -197,7 +209,11 @@ export function createQuickFight(options: {
   };
 }
 
-/** Marks a pet that burned or shocked down to 0 HP as out, and ends the fight. */
+/**
+ * Ends the fight when a side is out of pets. The engine already sends in the
+ * next teammate when the active pet faints in a move or a status tick; this
+ * catches an operator assist that drops an enemy and an active pet left at 0 HP.
+ */
 function settle(state: BattleState): BattleState {
   if (state.phase === 'victory' || state.phase === 'defeat') return state;
   const player = state.playerTeam[state.activePlayerIndex]!;
@@ -209,7 +225,15 @@ function settle(state: BattleState): BattleState {
   }
   if (player.hp <= 0) {
     player.fainted = true;
-    return { ...state, phase: 'defeat' };
+    const nextIndex = state.playerTeam.findIndex((member) => !member.fainted);
+    if (nextIndex === -1) return { ...state, phase: 'defeat' };
+    state.combatLog.unshift({
+      id: `log-switch-quick-${Date.now()}`,
+      text: `Go, ${state.playerTeam[nextIndex]!.name}!`,
+      type: 'switch',
+      timestamp: Date.now(),
+    });
+    return { ...state, activePlayerIndex: nextIndex };
   }
   return state;
 }
@@ -218,7 +242,9 @@ function settle(state: BattleState): BattleState {
 function judgeAtCap(state: BattleState): BattleState {
   const player = state.playerTeam[state.activePlayerIndex]!;
   const enemy = state.enemyTeam[state.activeEnemyIndex]!;
-  const playerShare = player.hp / player.maxHp;
+  // The whole team's HP counts, so a swapped-in reserve is not punished for the lead's damage.
+  const playerShare = state.playerTeam.reduce((sum, pet) => sum + Math.max(0, pet.hp), 0)
+    / state.playerTeam.reduce((sum, pet) => sum + pet.maxHp, 0);
   const enemyShare = enemy.hp / enemy.maxHp;
   const won = playerShare >= enemyShare;
   const log = [
@@ -277,10 +303,21 @@ export function stepQuickFight(
       if (move) battle = executeMove(battle, move.id, 'enemy');
     }
   }
-  battle = settle(battle);
+  return closeRound(state, battle, before, rand, assist?.kind === 'cover');
+}
+
+/** Judges the round just played and recomputes the recap and the opponent's next telegraph. */
+function closeRound(
+  state: QuickFightState,
+  played: BattleState,
+  logLengthBefore: number,
+  rand: () => number,
+  coverCalled: boolean,
+): QuickFightState {
+  let battle = settle(played);
   if (battle.phase === 'select-action' && battle.turn > state.turnCap) battle = judgeAtCap(battle);
 
-  const added = battle.combatLog.length - before;
+  const added = battle.combatLog.length - logLengthBefore;
   const lastRoundLog = battle.combatLog.slice(0, Math.max(0, added)).map((entry) => entry.text).reverse();
   const intent = battle.phase === 'select-action' ? chooseEnemyMove(battle, rand) ?? null : null;
   return {
@@ -288,8 +325,33 @@ export function stepQuickFight(
     battle,
     intent,
     lastRoundLog,
-    coverUsed: state.coverUsed || assist?.kind === 'cover',
+    coverUsed: state.coverUsed || coverCalled,
   };
+}
+
+/** Pets the player could still swap to: alive and not already out. */
+export function switchTargets(state: QuickFightState): number[] {
+  return state.battle.playerTeam
+    .map((pet, index) => (pet.fainted || index === state.battle.activePlayerIndex ? -1 : index))
+    .filter((index) => index >= 0);
+}
+
+/**
+ * Swaps the active LokPet. It costs the player's turn, so the opponent still
+ * plays the move it telegraphed -- now against the pet that just came in.
+ */
+export function switchQuickFight(
+  state: QuickFightState,
+  targetIndex: number,
+  rand: () => number = Math.random,
+): QuickFightState {
+  if (state.battle.phase !== 'select-action') return state;
+  if (!switchTargets(state).includes(targetIndex)) return state;
+  const before = state.battle.combatLog.length;
+  let battle = executeSwitch(structuredClone(state.battle), targetIndex);
+  const move = state.intent ?? chooseEnemyMove(battle, rand);
+  if (move) battle = executeMove(battle, move.id, 'enemy');
+  return closeRound(state, battle, before, rand, false);
 }
 
 /** Arena style only: the handler's once-per-fight Cheer. It is free, so the round does not advance. */

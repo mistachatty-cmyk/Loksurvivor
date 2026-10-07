@@ -75,3 +75,15 @@ export function grpdOfferWeight(baseWeight: number, totalKills: number, multipli
 export function isGrpdPlayableWeapon(id: string): boolean {
   return GRPD_PLAYABLE_WEAPON_IDS.has(id);
 }
+
+export type GrpdArmoryAnchor = 'station' | 'hideout';
+
+/**
+ * Where the Armory entrance actually is right now. The saved anchor defaults to
+ * the GRPD Station, but the station is a travel room that stays locked until the
+ * player clears Division St. -- so until it is found, the keeper holds the
+ * entrance in the hideout instead of leaving the Armory unreachable.
+ */
+export function grpdArmoryLocation(anchor: GrpdArmoryAnchor, stationFound: boolean): GrpdArmoryAnchor {
+  return stationFound ? anchor : 'hideout';
+}

@@ -7,6 +7,30 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 47,
+      "version": "0.15.2",
+      "date": "2026-10-06",
+      "kind": "hotfix",
+      "title": "Your LokPet Travels With You",
+      "body": [
+        "Your lead LokPet now comes along on every travel ambush. It steps in beside you with the same entrance it got on your first night in the hideout.",
+        "In Duo and Arena fights you bring your whole selected team and can switch LokPets mid-fight. A switch costs your turn, and the next LokPet steps in with the entrance, including after one is knocked out.",
+        "Arena combat is a travel fight style you can pick in Settings. The classic popup is still the default, and its Send button now replays the entrance."
+      ]
+    },
+    {
+      "number": 46,
+      "version": "0.15.1",
+      "date": "2026-10-06",
+      "kind": "hotfix",
+      "title": "Hideout and Travel, Armory Found",
+      "body": [
+        "The GRPD Armory was stuck behind GRPD Station, which only opens after clearing Division St. Until the station is found, the Luvitnot keeper now holds the Armory entrance on the Sanctum main floor.",
+        "The room list is split in two. Hideout rooms (the Sanctum, the Perch, the Cellar, the Alley Annex, the Back Room and the Sound Booth) are safe. Travel rooms (The Neon Sleeve, Studio 28, GRPD Station, the Vault and Rapid Shelter) are out in the city and are marked with an Ambush risk badge.",
+        "You can only be ambushed when you travel. Studio 28, the Vault and Rapid Shelter now count, and the Perch, Cellar and Alley Annex no longer do. The Travel setting still switches ambushes off."
+      ]
+    },
+    {
       "number": 45,
       "version": "0.15.0",
       "date": "2026-10-06",

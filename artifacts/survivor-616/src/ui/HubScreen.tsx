@@ -44,6 +44,8 @@ import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { useT, useLocale } from '@/lib/i18n';
+import { grpdArmoryLocation } from '@/game/data/grpdArmory';
+import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
@@ -287,7 +289,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     }
   };
 
-  const roomNavRef = useRef<HTMLElement>(null);
+  const roomNavRef = useRef<HTMLDivElement>(null);
   useStaggeredEntrance(roomNavRef, '[data-nav-item]');
 
   const enterRoom = (nextRoomId: string) => {
@@ -296,6 +298,13 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   };
 
   const activeRoom = unlockedRooms.find(r => r.id === roomId) || unlockedRooms[0];
+  const stationFound = unlockedRooms.some((room) => room.id === 'grpd-station');
+  const armoryAnchor = grpdArmoryLocation(meta.grpdArmoryAnchor, stationFound);
+  // Hideout rooms are the safe base; travel rooms are out in the city and can be ambushed on arrival.
+  const hideoutRooms = unlockedRooms.filter((room) => room.kind === 'hideout');
+  const travelRooms = unlockedRooms.filter((room) => room.kind === 'travel');
+  const lockedHideoutRooms = lockedRooms.filter((room) => room.kind === 'hideout');
+  const lockedTravelRooms = lockedRooms.filter((room) => room.kind === 'travel');
   const roomAllies = rescuedAllies.filter(ally => ally.room === activeRoom?.id);
   const newlyRescuedAlly = lastRun?.rescuedAllyId
     ? roomAllies.find((ally) => ally.id === lastRun.rescuedAllyId)
@@ -322,7 +331,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     setSceneLook(id);
     try { localStorage.setItem(SCENE_LOOK_KEY, id); } catch { /* Device storage may be unavailable. */ }
   };
-  const companion = meta.savedLokPets.find((pet) => meta.selectedLokPetIds.includes(pet.id));
+  const companion = travelLeadPet(meta);
   const legendaryPoliceDog = meta.savedLokPets.find((pet) => pet.roll.variantId === 'blue-616');
   const blue616 = LOKPET_VARIANTS_BY_ID['blue-616'];
 
@@ -708,50 +717,66 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </CollapsibleSection>
           </div>
 
-          <nav ref={roomNavRef} className="flex flex-wrap gap-2 mb-6">
-            {unlockedRooms.map((room) => {
-              const isActive = room.id === roomId;
-              return (
-                <button
-                  key={room.id}
-                  type="button"
-                  data-nav-item
-                  onClick={() => enterRoom(room.id)}
-                  className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-white'
-                  }`}
-                  data-active={isActive}
-                  data-testid={`button-room-${room.id}`}
-                >
-                  {room.name}
-                </button>
-              );
-            })}
-          </nav>
-
-          {lockedRooms.length > 0 && (
-            <div
-              className="mb-6 flex flex-wrap gap-2"
-              data-testid="hideout-locked-rooms"
-            >
-              {lockedRooms.map((room) => (
-                <div
-                  key={room.id}
-                  className="flex items-center gap-2 border border-dashed border-border px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground/70"
-                  title={describeUnlock(room.unlock)}
-                  data-testid={`locked-room-${room.id}`}
-                >
-                  <Lock className="h-3 w-3" />
-                  <span>{room.name}</span>
-                  <span className="hidden font-normal normal-case tracking-normal text-muted-foreground/60 sm:inline">
-                    — {describeUnlock(room.unlock)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div ref={roomNavRef} className="mb-6 grid gap-4 lg:grid-cols-2">
+            {([
+              { kind: 'hideout', title: t('hub.nav.hideout.title'), note: t('hub.nav.hideout.note'), rooms: hideoutRooms, locked: lockedHideoutRooms },
+              { kind: 'travel', title: t('hub.nav.travel.title'), note: meta.travelEncountersEnabled ? t('hub.nav.travel.note') : t('hub.nav.travel.noteOff'), rooms: travelRooms, locked: lockedTravelRooms },
+            ] as const).map((group) => (
+              <section
+                key={group.kind}
+                aria-label={group.title}
+                className={`border p-3 ${group.kind === 'travel' ? 'border-amber-400/30 bg-amber-950/10' : 'border-emerald-400/30 bg-emerald-950/10'}`}
+                data-testid={`room-group-${group.kind}`}
+              >
+                <h2 className={`font-mono text-[10px] font-black uppercase tracking-[0.25em] ${group.kind === 'travel' ? 'text-amber-300' : 'text-emerald-300'}`}>{group.title}</h2>
+                <p className="mb-3 mt-1 text-[11px] text-muted-foreground">{group.note}</p>
+                <nav className="flex flex-wrap gap-2" aria-label={group.title}>
+                  {group.rooms.map((room) => {
+                    const isActive = room.id === roomId;
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        data-nav-item
+                        onClick={() => enterRoom(room.id)}
+                        className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all border ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-white'
+                        }`}
+                        data-active={isActive}
+                        data-room-kind={room.kind}
+                        data-testid={`button-room-${room.id}`}
+                      >
+                        {room.name}
+                        {room.kind === 'travel' && meta.travelEncountersEnabled && (
+                          <span className="ml-2 border border-amber-400/50 px-1 py-0.5 font-mono text-[8px] tracking-wider text-amber-300" data-testid={`badge-ambush-${room.id}`}>{t('hub.nav.travel.badge')}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
+                {group.locked.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2" data-testid={`hideout-locked-rooms-${group.kind}`}>
+                    {group.locked.map((room) => (
+                      <div
+                        key={room.id}
+                        className="flex items-center gap-2 border border-dashed border-border px-4 py-3 text-xs uppercase tracking-wider text-muted-foreground/70"
+                        title={describeUnlock(room.unlock)}
+                        data-testid={`locked-room-${room.id}`}
+                      >
+                        <Lock className="h-3 w-3" />
+                        <span>{room.name}</span>
+                        <span className="hidden font-normal normal-case tracking-normal text-muted-foreground/60 sm:inline">
+                          — {describeUnlock(room.unlock)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
 
           <div className="p-4 bg-card border border-border">
             <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
@@ -858,11 +883,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                     <ArrowRight className="h-3.5 w-3.5 text-emerald-300/80" />
                   </button>
                 )}
-                {activeRoom.id === 'main-floor' && meta.grpdArmoryAnchor === 'hideout' && (
+                {activeRoom.id === 'main-floor' && armoryAnchor === 'hideout' && (
                   <button type="button" onClick={() => onOpen('grpd-armory')} data-testid="button-hideout-grpd-armory"
                     className="group flex items-center gap-3 border border-sky-200/50 bg-sky-950/50 px-3 py-2 text-left transition hover:border-amber-200 hover:bg-sky-950/80">
                     <ShieldCheck className="h-5 w-5 text-amber-200" />
-                    <span><span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100">Relocated GRPD Armory</span><span className="block text-[10px] text-sky-100/70">The Luvitnot keeper holds a safe entrance here</span></span>
+                    <span><span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100">{stationFound ? t('hub.armory.relocatedEntrance') : t('hub.armory.hideoutEntrance')}</span><span className="block text-[10px] text-sky-100/70">{t('hub.armory.hideoutEntranceBlurb')}</span></span>
                     <ArrowRight className="h-3.5 w-3.5 text-sky-200/80" />
                   </button>
                 )}
@@ -890,8 +915,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         {activeRoom.id === 'grpd-station' && (
           <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{meta.grpdArmoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
-              {meta.grpdArmoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
+              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{armoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
+              {armoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
             </div>
           </section>
         )}

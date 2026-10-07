@@ -4,6 +4,8 @@ import test from 'node:test';
 import { LORE_CHRONICLES } from './lore';
 import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER } from './npcCast';
 import { createInitialMeta, normalizeMeta } from '@/game/state/metaStore';
+import { grpdArmoryLocation } from './grpdArmory';
+import { HUB_ROOMS } from './progression';
 
 test('new room hosts have distinct complete sprite rigs and saved lore', () => {
   const cast = [JEREMEY_FROGSTER, JERAMY_FROGSTER, LUVITNOT_KEEPER];
@@ -25,4 +27,15 @@ test('Armory anchor defaults to the station and preserves a hideout move', () =>
   assert.equal(initial.grpdArmoryAnchor, 'station');
   assert.equal(normalizeMeta({ ...initial, grpdArmoryAnchor: 'hideout' }).grpdArmoryAnchor, 'hideout');
   assert.equal(normalizeMeta({ ...initial, grpdArmoryAnchor: undefined }).grpdArmoryAnchor, 'station');
+});
+
+test('the Armory is reachable before the GRPD Station is found', () => {
+  const station = HUB_ROOMS.find((room) => room.id === 'grpd-station');
+  assert.equal(station?.kind, 'travel');
+  assert.notEqual(station?.unlock.kind, 'default');
+  // Fresh save: the station is still locked, so the entrance must be in the hideout.
+  assert.equal(grpdArmoryLocation(createInitialMeta().grpdArmoryAnchor, false), 'hideout');
+  // Once found, the saved anchor decides again.
+  assert.equal(grpdArmoryLocation('station', true), 'station');
+  assert.equal(grpdArmoryLocation('hideout', true), 'hideout');
 });
