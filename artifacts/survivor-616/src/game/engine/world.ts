@@ -9,6 +9,7 @@
  * snapshots out of it.
  */
 
+import { rollEnemyQuirk } from '@/game/data/enemyQuirks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
@@ -258,6 +259,8 @@ export interface EnemyActor extends Actor {
   fightX?: number;
   fightY?: number;
   fightPhase?: number;
+  /** Random spawn quirk id from `data/enemyQuirks.ts`. */
+  quirk?: string;
   /** Set once `traits.enrage` has triggered. */
   enraged?: boolean;
   /** Firefly spiker pulse sequence tracking */
@@ -2510,6 +2513,23 @@ function spawnEnemy(
     selectedForCommand: false,
     capturableUntil: 0,
   };
+  const quirk = rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid);
+  if (quirk) {
+    enemy.quirk = quirk;
+    if (quirk === 'oversized') {
+      enemy.radius *= 1.35; enemy.baseRadius = enemy.radius;
+      enemy.hp = enemy.maxHp = Math.round(enemy.maxHp * 1.4);
+      enemy.mass *= 1.5; enemy.xp = Math.round(enemy.xp * 1.5);
+    } else if (quirk === 'shrunken') {
+      enemy.radius *= 0.72; enemy.baseRadius = enemy.radius;
+      enemy.hp = enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * 0.7));
+      enemy.speed *= 1.3;
+    } else if (quirk === 'gilded') {
+      enemy.hp = enemy.maxHp = Math.round(enemy.maxHp * 1.3);
+    } else if (quirk === 'spawn-shield') {
+      enemy.shieldedUntil = w.now + 1500;
+    }
+  }
   w.enemies.push(enemy);
   w.enemiesByUid.set(enemy.uid, enemy);
 
@@ -4046,6 +4066,23 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
     });
   }
 
+  if (enemy.quirk === 'gilded') {
+    for (let coin = 0; coin < 3; coin += 1) {
+      w.pickups.push({
+        uid: uid(w), kind: 'cred', x: enemy.x + randRange(w.rng, -18, 18), y: enemy.y + randRange(w.rng, -18, 18),
+        vx: randRange(w.rng, -34, 34), vy: randRange(w.rng, -34, 34),
+        value: Math.max(2, Math.round(enemy.xp / 2)), bornAt: w.now,
+      });
+    }
+    w.popups.push({ x: enemy.x, y: enemy.y - 16, text: 'GILDED', color: '#facc15', bornAt: w.now, vy: 28 });
+  }
+  if (enemy.quirk === 'volatile' && canSpawnEnemyEffect(w)) {
+    w.effects.push({
+      uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: 84, angle: 0, spread: Math.PI * 2,
+      bornAt: w.now + 450, expiresAt: w.now + 800, color: '#f87171', damage: 12, impactIntensity: 1,
+      hitUids: new Set(), followPlayer: false,
+    });
+  }
   for (const drop of enemy.def.drops ?? []) {
     if (w.rng() >= drop.chance) continue;
     w.pickups.push({
@@ -7475,6 +7512,25 @@ function updateEnemies(w: World, dt: number) {
     }
     if (enemy.enraged && enrageTrait) speed *= enrageTrait.speedMult;
     const styleCd = (ms: number) => w.now + ms * (enemy.enraged && enrageTrait ? enrageTrait.cooldownMult : 1);
+    if (enemy.quirk) {
+      const phase = (w.now + enemy.uid * 977) / 1000;
+      if (enemy.quirk === 'adrenaline' && phase % 5 < 1) speed *= 2.4;
+      else if (enemy.quirk === 'regenerating' && enemy.hp < enemy.maxHp) {
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.03 * dt);
+      } else if (enemy.quirk === 'flicker' && phase % 4 < 0.5) {
+        enemy.shieldedUntil = Math.max(enemy.shieldedUntil, w.now + 80);
+      } else if (enemy.quirk === 'frame-skip' && w.now >= enemy.specialReadyAt) {
+        enemy.specialReadyAt = w.now + 3600;
+        spawnParticles(w, enemy.x, enemy.y, '#38bdf8', 5, 60);
+        enemy.x += dirX * 70;
+        enemy.y += dirY * 70;
+        spawnParticles(w, enemy.x, enemy.y, '#38bdf8', 5, 60);
+      } else if (enemy.quirk === 'jitterbug') {
+        const jolt = Math.sin(phase * 9) * Math.sin(phase * 3.7);
+        enemy.x += -dirY * jolt * enemy.speed * 1.4 * dt;
+        enemy.y += dirX * jolt * enemy.speed * 1.4 * dt;
+      }
+    }
     if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;

@@ -6,6 +6,7 @@ import { ENEMIES } from '@/game/data/enemies';
 import { CHARACTERS } from '@/game/data/characters';
 import { FACTIONS } from '@/game/data/factions';
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { QuirkChart } from './QuirkChart';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
@@ -424,7 +425,7 @@ function EnemyIntelModal({
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
   const isListView = meta.uiDensity === 'list';
-  const [view, setView] = useState<'threats' | 'factions'>('threats');
+  const [view, setView] = useState<'threats' | 'factions' | 'effects'>('threats');
   const [selectedEnemy, setSelectedEnemy] = useState<(typeof ENEMIES)[number] | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [threatFilter, setThreatFilter] = useState<'all' | 'discovered' | 'apex'>('all');
@@ -562,7 +563,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         <div className="flex items-center gap-3">
           <Users className="h-4 w-4 text-primary" />
           <h2 className="text-xl font-black uppercase tracking-tight text-white">
-            {view === 'threats' ? 'Known threats' : 'Factions'}
+            {view === 'threats' ? 'Known threats' : view === 'effects' ? 'Random effects' : 'Factions'}
           </h2>
         </div>
         <div className="flex gap-2">
@@ -593,6 +594,19 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
             <Users className="h-3.5 w-3.5" />
             Factions
             <span className="font-mono text-[10px] opacity-75">{discoveredFactionCount} / {FACTIONS.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('effects')}
+            className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+              view === 'effects'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+            }`}
+            data-testid="button-bestiary-view-effects"
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Effects
           </button>
         </div>
       </div>
@@ -658,7 +672,9 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         )}
       </div>
 
-      {view === 'factions' ? (
+      {view === 'effects' ? (
+        <QuirkChart />
+      ) : view === 'factions' ? (
         filteredFactions.length === 0 ? (
           <div className="border border-border/60 bg-card/40 p-8 text-center font-mono">
             <p className="text-sm uppercase tracking-wider text-muted-foreground">No factions match current search criteria</p>

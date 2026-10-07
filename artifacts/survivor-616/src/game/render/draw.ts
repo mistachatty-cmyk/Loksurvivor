@@ -6,6 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Popup, type World } from '@/game/engine/world';
 import { DAMAGE_TIERS, GLOW_FROM_TIER } from '@/game/data/damageNumbers';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
@@ -5891,6 +5892,25 @@ function drawActors(
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    }
+    if (enemy.quirk && !enemy.dying) {
+      const quirkDef = ENEMY_QUIRKS_BY_ID[enemy.quirk];
+      if (quirkDef) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 + Math.sin(w.now / 160 + enemy.uid) * 0.2;
+        ctx.strokeStyle = quirkDef.color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = quirkDef.color;
+        ctx.font = 'bold 6px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(quirkDef.name.toUpperCase(), enemy.x, enemy.y + enemy.radius + 12);
+        ctx.restore();
+      }
     }
     if (enemy.isVeteran && !enemy.dying) {
       const affixColors: Record<string, string> = {

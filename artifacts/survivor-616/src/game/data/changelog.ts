@@ -677,6 +677,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The tougher Fitters now enrage below 40% health: faster, quicker attacks, and bigger versions of their moves (a fourth beam on the Color Wheel, a seven-way Fan Sampler, wider landings and mines). Several also detonate a delayed ring where they fall, so do not stand on the body.',
     ],
   },
+  {
+    version: '0.20.3',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:59:45Z',
+    kind: 'update',
+    title: 'Enemy Quirks',
+    body: [
+      'Regular enemies can now spawn with a random quirk: Frame Skip, Oversized, Shrunken, Volatile, Gilded, Regenerating, Spawn Shield, Adrenaline, Flicker or Jitterbug. Quirked enemies wear a dashed ring and their quirk name.',
+      'About 6% of spawns carry one at the start of a run, rising to 14% by minute ten. Bosses and giants never do. The new Effects tab in the Bestiary has a chart with every quirk, what it does, and its odds.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
