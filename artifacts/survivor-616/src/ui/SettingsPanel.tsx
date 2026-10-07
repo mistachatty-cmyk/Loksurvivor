@@ -401,7 +401,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
           </section>
-          <section id="settings-scrollbar" className="scroll-mt-24 ="border border-border bg-card p-5 sm:p-6">
+          <section id="settings-scrollbar" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>
             <ScrollbarSetting />
           </section>
