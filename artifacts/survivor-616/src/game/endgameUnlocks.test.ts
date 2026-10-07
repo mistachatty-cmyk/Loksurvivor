@@ -96,9 +96,13 @@ describe('end-game store: toggles, slots and the roster', () => {
     assert.equal(saveForgedOperator(makeOp('a')), false);
   });
 
-  it('earned features start switched off and can be toggled on and off', () => {
+  it('endgame weapon evolutions start on; other earned features start off and all can be toggled', () => {
     recordEarnedEndgame(earnedEndgame(maxed));
-    for (const f of ENDGAME_FEATURES) { assert.equal(isFeatureAvailable(f.id), true); assert.equal(isFeatureEnabled(f.id), false); }
+    for (const f of ENDGAME_FEATURES) { assert.equal(isFeatureAvailable(f.id), true); assert.equal(isFeatureEnabled(f.id), f.id === 'weaponEvolutions'); }
+    setFeatureEnabled('weaponEvolutions', false);
+    assert.equal(isFeatureEnabled('weaponEvolutions'), false);
+    setFeatureEnabled('weaponEvolutions', true);
+    assert.equal(isFeatureEnabled('weaponEvolutions'), true);
     setFeatureEnabled('inspector', true);
     assert.equal(isFeatureEnabled('inspector'), true);
     setFeatureEnabled('inspector', false);

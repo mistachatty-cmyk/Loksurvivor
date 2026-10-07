@@ -154,7 +154,7 @@ export function isFeatureAvailable(id: EndgameFeatureId): boolean {
   return id === 'forge' && state.unlocked;
 }
 
-/** Whether the player has it switched on. Earned features default to off, except a Forge found before this change. */
+/** Whether the player has it switched on. Endgame weapon evolutions default to on when earned. */
 export function isFeatureEnabled(id: EndgameFeatureId): boolean {
   if (id === 'forge' && devModeForgeAccess()) return true;
   const state = read();
@@ -162,7 +162,7 @@ export function isFeatureEnabled(id: EndgameFeatureId): boolean {
   if (!available) return false;
   const choice = state.toggles[id];
   if (typeof choice === 'boolean') return choice;
-  return id === 'forge' && state.unlocked;
+  return (id === 'forge' && state.unlocked) || id === 'weaponEvolutions';
 }
 
 export function setFeatureEnabled(id: EndgameFeatureId, enabled: boolean): void {

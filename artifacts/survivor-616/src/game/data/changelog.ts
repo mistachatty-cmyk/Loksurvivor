@@ -531,6 +531,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Arena combat is a travel fight style you can pick in Settings. The classic popup is still the default, and its Send button now replays the entrance.',
     ],
   },
+  {
+    version: '0.16.0',
+    date: '2026-10-07',
+    kind: 'update',
+    title: 'Ten Scores Leave the Armory',
+    body: [
+      'DigiFrog Lance, the three legendary Digi-Tanas, and six more Volume I weapons now unlock after Victory Lap at alternating 750,000 and 1,000,000 lifetime-kill steps.',
+      'Each weapon stays off until you activate it in the GRPD Armory. Every design has its own combat pattern, pixel model, and three-part evolution recipe.',
+      'The Endgame weapon evolution switch starts on when Victory Lap opens and can be turned off without sealing the base weapons.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

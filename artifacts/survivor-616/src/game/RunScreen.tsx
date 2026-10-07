@@ -17,6 +17,9 @@ import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
+import { grpdEndgameWeaponEarned } from '@/game/data/grpdArmory';
+import { endgameReached } from '@/game/data/endgameUnlocks';
+import { isFeatureEnabled } from '@/game/state/operatorForgeStore';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { activeCardEffects } from '@/game/data/passiveCards';
@@ -436,7 +439,8 @@ export function RunScreen({
         cardEffects: activeCardEffects(meta),
         disabledEnemyIds: meta.disabledEnemyIds,
         disabledWeaponIds: meta.disabledWeaponIds,
-        grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id)),
+        grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id) || grpdEndgameWeaponEarned(id, meta.totalKills, endgameReached(meta))),
+        endgameEvolutionsEnabled: isFeatureEnabled('weaponEvolutions'),
         grpdSpawnTierByWeaponId: meta.grpdSpawnTierByWeaponId,
         grpdCareerKills: meta.totalKills,
         grpdAutoIncreaseEnabled: meta.grpdAutoIncreaseEnabled,

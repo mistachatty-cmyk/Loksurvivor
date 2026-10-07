@@ -646,6 +646,8 @@ export interface EvolutionDef {
   name: string;
   description: string;
   baseWeaponId: string;
+  /** Can be offered only when the earned Victory Lap evolution switch is on. */
+  endgameOnly?: boolean;
   /** Evolution partner weapon requirement: requires owning this weapon maxed (level 8). */
   requiredWeaponId?: string;
   requiredWeaponLevel?: number;

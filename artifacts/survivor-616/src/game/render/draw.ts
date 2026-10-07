@@ -11,7 +11,7 @@ import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
-import { lokPetSpritePalette } from '@/game/data/lokPets';
+import { LOKPET_VARIANTS_BY_ID, lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
@@ -3402,6 +3402,7 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
     // of them even when they are well beyond the camera was a quiet cost in
     // dense/endless runs; gameplay still updates every instance in world.ts.
     if (!isNearView(effect.x, effect.y, bounds, effect.radius + 48)) continue;
+    if (w.now < effect.bornAt) continue;
     const gameplayReadable = effect.kind === 'laser' || effect.kind === 'hazard' || effect.kind === 'nova' || effect.kind === 'ring' || effect.kind === 'wave';
     if (!gameplayReadable) {
       if (cosmeticDrawn >= cosmeticLimit || effect.uid % cosmeticStride !== 0) continue;
@@ -3421,11 +3422,56 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.radius * (0.55 + life * 0.5), effect.angle - sweep, effect.angle + sweep);
         ctx.stroke();
+        if (effect.weaponId?.startsWith('firewall-') || effect.weaponId?.startsWith('rewind-') || effect.weaponId?.startsWith('eclipse-')) {
+          ctx.shadowColor = effect.color;
+          ctx.shadowBlur = 16 * fade;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2 + 3 * fade;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.radius * (0.55 + life * 0.5), effect.angle - sweep, effect.angle + sweep);
+          ctx.stroke();
+          if (effect.weaponId.startsWith('eclipse-')) {
+            ctx.setLineDash([12, 7]);
+            ctx.strokeStyle = '#7c3aed';
+            ctx.lineWidth = 5 * fade;
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, effect.radius * (0.69 + life * 0.5), effect.angle - sweep, effect.angle + sweep);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+        if (effect.weaponId === 'breakpoint-hands' || effect.weaponId === 'breakpoint-finale') {
+          const tipX = effect.x + Math.cos(effect.angle) * effect.radius * 0.8;
+          const tipY = effect.y + Math.sin(effect.angle) * effect.radius * 0.8;
+          ctx.save();
+          ctx.translate(tipX, tipY);
+          ctx.rotate(effect.angle);
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = effect.color;
+          ctx.shadowBlur = 16;
+          ctx.fillRect(-13, -9, 26, 18);
+          ctx.fillStyle = effect.color;
+          ctx.fillRect(-8, -5, 16, 10);
+          ctx.restore();
+        }
         break;
       }
       case 'nova':
       case 'ring': {
         const visualRadius = effect.radius * (0.2 + life * 0.9);
+        if (effect.weaponId === 'commentstorm-crown' || effect.weaponId === 'crown-of-replies') {
+          ctx.strokeStyle = effect.color;
+          ctx.lineWidth = 4 * fade + 1;
+          ctx.shadowColor = effect.color;
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, visualRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 18px monospace';
+          ctx.fillText(effect.weaponId === 'crown-of-replies' ? '!!' : '?!', effect.x - 10, effect.y + 6);
+          break;
+        }
         if (effect.weaponId === 'spray-can') {
           // Paint ejects in uneven wedges and droplets, not a clean pulse.
           ctx.strokeStyle = effect.color;
@@ -3653,6 +3699,16 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         ctx.arc(effect.x, effect.y, effect.radius * (0.45 + life * 0.55),
           effect.angle - effect.spread, effect.angle + effect.spread);
         ctx.stroke();
+        if (effect.weaponId === 'pitch-reaper' || effect.weaponId === 'requiem-return') {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2 + 2 * fade;
+          ctx.setLineDash([11, 7, 3, 7]);
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.radius * (0.4 + life * 0.55),
+            effect.angle - effect.spread, effect.angle + effect.spread);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
         break;
       }
       case 'laser': {
@@ -3677,6 +3733,21 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         ctx.moveTo(effect.x, effect.y);
         ctx.lineTo(endX, endY);
         ctx.stroke();
+
+        if (effect.weaponId === 'subwoofer-railstaff' || effect.weaponId === 'bassline-overdrive' || effect.weaponId === 'cipher-cathedral' || effect.weaponId === 'cipher-sanctuary') {
+          ctx.strokeStyle = effect.color;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 12]);
+          ctx.beginPath();
+          ctx.moveTo(effect.x, effect.y);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(endX, endY, 4 + 3 * fade, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         if (effect.weaponId === 'inspect-element') {
           // DevTools CSS Box Model Inspection Reticle at target endpoint
@@ -3723,7 +3794,28 @@ function drawEffects(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds
         ctx.lineWidth = 2.5;
         ctx.setLineDash([]);
 
-        if (effect.weaponId === 'emberback') {
+        if (effect.weaponId === 'cipher-cathedral' || effect.weaponId === 'cipher-sanctuary') {
+          ctx.shadowColor = effect.color;
+          ctx.shadowBlur = 12;
+          for (let i = 0; i < 3; i += 1) {
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, radius * (0.48 + i * 0.2), i * 0.35 + phase * 0.08, i * 0.35 + phase * 0.08 + Math.PI * 1.35);
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(effect.x - 3, effect.y - 3, 6, 6);
+        } else if (effect.weaponId === 'cache-of-lost-hooks' || effect.weaponId === 'chorus-cache') {
+          ctx.shadowColor = effect.color;
+          ctx.shadowBlur = 14;
+          for (let i = 0; i < 3; i += 1) {
+            ctx.beginPath();
+            ctx.arc(effect.x, effect.y, radius * (0.32 + i * 0.28), 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 16px monospace';
+          ctx.fillText('♫', effect.x - 8, effect.y + 5);
+        } else if (effect.weaponId === 'emberback') {
           // An uneven firebreak with independently licking flame points.
           ctx.beginPath();
           for (let i = 0; i < 20; i += 1) {
@@ -4245,7 +4337,18 @@ function drawOrbiters(ctx: CanvasRenderingContext2D, w: World) {
     ctx.shadowColor = color;
     ctx.shadowBlur = 12;
 
-    if (weapon?.def.id === 'orbit-rings') {
+    if (weapon?.def.id === 'commentstorm-crown' || weapon?.def.id === 'crown-of-replies') {
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(weapon.def.id === 'crown-of-replies' ? '!' : '?', x - 5, y + 5);
+    } else if (weapon?.def.id === 'orbit-rings') {
       // A thin gold-violet annulus rather than a blade -- reads as a ring, not a rectangle.
       ctx.strokeStyle = color;
       ctx.lineWidth = 3.5;
@@ -5813,13 +5916,15 @@ function drawActors(
     ctx.save();
     ctx.globalAlpha = hidden ? 0.05 : ghosting ? 0.22 : shadowed ? 0.4 : 1;
     const enemyPalette = withHueShift(enemy.def, enemy.uid, resolveEnemyPalette(enemy.def));
+    const grossed = enemy.activeEffects.some((effect) => effect.id === 'grossed-out' && effect.expiresAt > w.now);
+    const squirmX = grossed ? Math.sin(w.now / 42 + enemy.uid) * 5 : 0;
     drawRig(
       ctx,
       enemy.def.rig,
       enemyPalette,
       enemy.anim,
       stoned ? 0 : w.now - enemy.animStartedAt,
-      enemy.x,
+      enemy.x + squirmX,
       enemy.y + 2 + fallProgress * 10,
       enemy.facing,
       SPRITE_SCALE * sizeClassScale(enemy.def) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
@@ -5835,6 +5940,16 @@ function drawActors(
       },
     );
     ctx.restore();
+    if (grossed) {
+      ctx.save();
+      ctx.strokeStyle = '#d5f77e';
+      ctx.globalAlpha = 0.75;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 8, -0.8, 2.8);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (!hidden && !enemy.dying && enemy.def.faction === 'Data Goblins') {
       const fleeing = w.area.id === 'rapid-pressure-rooms'
@@ -6337,6 +6452,28 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   }
   drawArtisteTrail(ctx, w);
   drawActors(ctx, w, { left, top, right, bottom });
+  if (w.frogSwing) {
+    const caught = w.enemies.find((enemy) => enemy.uid === w.frogSwing!.targetUid && !enemy.dying);
+    if (caught) {
+      ctx.save();
+      const digiFrog = LOKPET_VARIANTS_BY_ID['circuit-frog']!;
+      drawRig(ctx, evolvedRig('circuit-frog', []), lokPetSpritePalette(digiFrog.palette), 'idle', w.now - w.frogSwing.startedAt, w.player.x + w.player.facing * 13, w.player.y - 8, w.player.facing, LOKPET_SPRITE_SCALE * 0.66);
+      ctx.strokeStyle = '#f28dbd';
+      ctx.shadowColor = '#7ee787';
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = w.frogSwing.evolved ? 8 : 6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(w.player.x, w.player.y - 6);
+      ctx.quadraticCurveTo((w.player.x + caught.x) / 2, (w.player.y + caught.y) / 2 - 20, caught.x, caught.y);
+      ctx.stroke();
+      ctx.fillStyle = '#b5f59d';
+      ctx.beginPath();
+      ctx.arc(caught.x, caught.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
   drawRunningMan(ctx, w);
   drawPlayerConeMark(ctx, w);
   drawStormCloud(ctx, w);

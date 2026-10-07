@@ -36,7 +36,7 @@ export function EndgameSettings() {
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
         {meta.devModeAllUnlocks
           ? 'Dev Mode opens the Operator Forge and all five design slots. Your created operators stay saved when Dev Mode is off.'
-          : 'Earned by clearing every standard map. Each one is off until you turn it on, and none of them change the operators you already have.'}
+          : 'Earned by clearing every standard map. Endgame weapon evolutions start on and can be switched off; the other extras wait for you to enable them.'}
       </p>
 
       <ul className="mt-4 space-y-2">
