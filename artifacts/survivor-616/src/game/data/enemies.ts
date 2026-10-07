@@ -2693,6 +2693,7 @@ export const ENEMIES: EnemyDef[] = [
     traits: { hueShiftMs: 2600, wobbleMs: 900, wobbleAmp: 5 },
     palette: palette({ ink: '#12061a', body: '#c026d3', bodyDark: '#701a75', accent: '#f0abfc', glow: '#fae8ff' }),
     rig: blobRig({ height: 9, width: 8, tendrils: true }),
+    drops: [{ kind: 'cred', chance: 0.1 }],
     lore: 'A paint-chip that fell off a palette card and kept moving. Its color never settles on the same shade twice.',
   },
   {
@@ -2711,6 +2712,7 @@ export const ENEMIES: EnemyDef[] = [
     traits: { swayRadius: 135, hueShiftMs: 3200 },
     palette: palette({ ink: '#041016', body: '#0891b2', bodyDark: '#155e75', accent: '#67e8f9', glow: '#cffafe' }),
     rig: blobRig({ height: 12, width: 10, tendrils: true, wings: true }),
+    drops: [{ kind: 'silicon-alloy', chance: 0.06 }, { kind: 'cred', chance: 0.08 }],
     lore: 'A loose run aura that never found a character to follow, so it orbits whoever stands still longest.',
   },
   {
@@ -2729,6 +2731,7 @@ export const ENEMIES: EnemyDef[] = [
     traits: { teleportMs: 3800, ghostMs: 520, hueShiftMs: 4200 },
     palette: palette({ ink: '#0a0614', body: '#7c3aed', bodyDark: '#4c1d95', accent: '#fbbf24', glow: '#fef3c7' }),
     rig: humanoidRig({ height: 17, width: 9, hood: true }),
+    drops: [{ kind: 'prism-quartz', chance: 0.04 }, { kind: 'cred', chance: 0.1 }],
     lore: 'Wears one of your seven skins and swaps to another the moment you look straight at it. Which one is the real fit is never answered.',
   },
   {
@@ -2747,6 +2750,7 @@ export const ENEMIES: EnemyDef[] = [
     ranged: { cooldownMs: 1700, projectileSpeed: 210, damage: 9 },
     palette: palette({ ink: '#170a06', body: '#b45309', bodyDark: '#78350f', accent: '#fcd34d', glow: '#fef3c7' }),
     rig: humanoidRig({ height: 19, width: 10, cap: true }),
+    drops: [{ kind: 'cred', chance: 0.15 }, { kind: 'health', chance: 0.06 }],
     lore: 'Skims spare hats off a rack behind its back. Every one is a flat disc with a brim and a very bad attitude.',
   },
   {
@@ -2763,8 +2767,11 @@ export const ENEMIES: EnemyDef[] = [
     sizeClass: 'elite',
     faction: 'Gen Fitters',
     role: 'carrier',
+    traits: { enrage: { belowHpPct: 0.4, speedMult: 1.25, cooldownMult: 0.8 } },
     palette: palette({ ink: '#0a1210', body: '#475569', bodyDark: '#1e293b', accent: '#34d399', glow: '#a7f3d0' }),
     rig: giantRig(18),
+    drops: [{ kind: 'silicon-alloy', chance: 0.5 }, { kind: 'cyber-resin', chance: 0.4 }, { kind: 'health', chance: 0.1 }],
+    deathBurst: { radius: 70, damage: 12 },
     lore: 'A grouped prefab nobody ungrouped: a shelter, two pylons and a cache cart that agreed to move as one very heavy piece.',
   },
   {
@@ -2784,6 +2791,7 @@ export const ENEMIES: EnemyDef[] = [
     traits: { revealMs: 1400, swayRadius: 170, swayMs: 3200 },
     palette: palette({ ink: '#06100a', body: '#15803d', bodyDark: '#14532d', accent: '#bef264', glow: '#ecfccb' }),
     rig: humanoidRig({ height: 17, width: 8, hood: true }),
+    drops: [{ kind: 'cyber-resin', chance: 0.18 }, { kind: 'rootglass-cell', chance: 0.05 }],
     lore: 'A seeded remix with the seed filed off. It rearranges the room around you, then stands somewhere new and watches how you cope.',
   },
   {
@@ -2802,6 +2810,7 @@ export const ENEMIES: EnemyDef[] = [
     traits: { shiftMs: 1800, shiftScale: 1.5, ghostMs: 700 },
     palette: palette({ ink: '#0b0b12', body: '#64748b', bodyDark: '#334155', accent: '#e2e8f0', glow: '#f8fafc' }),
     rig: humanoidRig({ height: 18, width: 10 }),
+    drops: [{ kind: 'phosphor-ore', chance: 0.15 }, { kind: 'health', chance: 0.08 }],
     lore: 'The step you just took back. It steps forward in your place, flickers once, and forgets it was ever redone.',
   },
   {
@@ -2819,9 +2828,11 @@ export const ENEMIES: EnemyDef[] = [
     impactResistance: 0.6,
     faction: 'Gen Fitters',
     role: 'anchor',
-    traits: { hueShiftMs: 5200 },
+    traits: { enrage: { belowHpPct: 0.35, speedMult: 1.3, cooldownMult: 0.7 }, hueShiftMs: 5200 },
     palette: palette({ ink: '#060814', body: '#1d4ed8', bodyDark: '#1e3a8a', accent: '#fb7185', glow: '#fde68a' }),
     rig: giantRig(26),
+    drops: [{ kind: 'prism-quartz', chance: 1 }, { kind: 'prism-quartz', chance: 0.5 }, { kind: 'silicon-alloy', chance: 1 }, { kind: 'rootglass-cell', chance: 1 }, { kind: 'glitch-cache', chance: 0.6 }, { kind: 'health', chance: 1 }],
+    deathBurst: { radius: 120, damage: 18 },
     lore: 'The floor itself, repainted in every zone treatment at once. It guards the fitting room until someone breaks its seams.',
   },
   // --- Gen Fitting Floor: new fighting styles (each has its own movement and attack) ---
@@ -2838,8 +2849,10 @@ export const ENEMIES: EnemyDef[] = [
     mass: 1.3,
     faction: 'Gen Fitters',
     role: 'flanker',
+    traits: { enrage: { belowHpPct: 0.4, speedMult: 1.25, cooldownMult: 0.75 } },
     palette: palette({ ink: '#14070f', body: '#be185d', bodyDark: '#831843', accent: '#f9a8d4', glow: '#fce7f3' }),
     rig: humanoidRig({ height: 19, width: 9, cap: true }),
+    drops: [{ kind: 'phosphor-ore', chance: 0.12 }, { kind: 'cred', chance: 0.12 }],
     lore: 'Judges your outfit from a dozen steps away, circling slowly. The verdict arrives as a lunge.',
   },
   {
@@ -2855,8 +2868,11 @@ export const ENEMIES: EnemyDef[] = [
     mass: 1.1,
     faction: 'Gen Fitters',
     role: 'flanker',
+    traits: { enrage: { belowHpPct: 0.4, speedMult: 1.2, cooldownMult: 0.75 } },
     palette: palette({ ink: '#1a0e03', body: '#ea580c', bodyDark: '#9a3412', accent: '#fdba74', glow: '#ffedd5' }),
     rig: quadrupedRig({ height: 12, length: 15, ears: true }),
+    drops: [{ kind: 'cyber-resin', chance: 0.12 }, { kind: 'health', chance: 0.07 }],
+    deathBurst: { radius: 60, damage: 9 },
     lore: 'Drops a pin where you stand, then lands on it. Staying put is the only losing move.',
   },
   {
@@ -2872,9 +2888,11 @@ export const ENEMIES: EnemyDef[] = [
     mass: 2.2,
     faction: 'Gen Fitters',
     role: 'anchor',
-    traits: { hueShiftMs: 1800 },
+    traits: { enrage: { belowHpPct: 0.45, speedMult: 1.3, cooldownMult: 0.7 }, hueShiftMs: 1800 },
     palette: palette({ ink: '#06091a', body: '#2563eb', bodyDark: '#1e3a8a', accent: '#a5b4fc', glow: '#e0e7ff' }),
     rig: blobRig({ height: 17, width: 16, tendrils: true }),
+    drops: [{ kind: 'prism-quartz', chance: 0.2 }, { kind: 'silicon-alloy', chance: 0.35 }],
+    deathBurst: { radius: 90, damage: 12 },
     lore: 'A swatch picker that planted itself and started to spin, three spokes at a time.',
   },
   {
@@ -2890,8 +2908,11 @@ export const ENEMIES: EnemyDef[] = [
     mass: 0.9,
     faction: 'Gen Fitters',
     role: 'disruptor',
+    traits: { enrage: { belowHpPct: 0.4, speedMult: 1.25, cooldownMult: 0.7 } },
     palette: palette({ ink: '#0f0a02', body: '#ca8a04', bodyDark: '#713f12', accent: '#fde047', glow: '#fef9c3' }),
     rig: arachnidRig({ height: 13, span: 16, legPairs: 3 }),
+    drops: [{ kind: 'silicon-alloy', chance: 0.14 }, { kind: 'cred', chance: 0.1 }],
+    deathBurst: { radius: 50, damage: 8 },
     lore: 'Snaps to the builder grid, zigzagging and leaving tiny snap-points behind that go off when stepped on.',
   },
   {
@@ -2907,8 +2928,10 @@ export const ENEMIES: EnemyDef[] = [
     mass: 1,
     faction: 'Gen Fitters',
     role: 'sniper',
+    traits: { enrage: { belowHpPct: 0.4, speedMult: 1.2, cooldownMult: 0.7 } },
     palette: palette({ ink: '#031210', body: '#0d9488', bodyDark: '#115e59', accent: '#5eead4', glow: '#ccfbf1' }),
     rig: humanoidRig({ height: 18, width: 10, hood: true }),
+    drops: [{ kind: 'phosphor-ore', chance: 0.2 }, { kind: 'health', chance: 0.06 }],
     lore: 'Hands out free samples in a fan of five. None of them are free.',
   },
   {
@@ -2924,8 +2947,11 @@ export const ENEMIES: EnemyDef[] = [
     mass: 1.4,
     faction: 'Gen Fitters',
     role: 'disruptor',
+    traits: { enrage: { belowHpPct: 0.4, speedMult: 1.25, cooldownMult: 0.7 } },
     palette: palette({ ink: '#0a0a16', body: '#4f46e5', bodyDark: '#312e81', accent: '#c7d2fe', glow: '#eef2ff' }),
     rig: humanoidRig({ height: 18, width: 10 }),
+    drops: [{ kind: 'prism-quartz', chance: 0.12 }, { kind: 'rootglass-cell', chance: 0.08 }],
+    deathBurst: { radius: 64, damage: 10 },
     lore: 'Saves its place before it walks up to you, then loads the save. Both the exit and the arrival hurt.',
   },
 ];

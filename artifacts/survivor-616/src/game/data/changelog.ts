@@ -666,6 +666,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Gen Fitting Floor adds six new enemies, each with its own fighting style: a strafing Duelist that lunges, a Pouncer that marks your spot and lands on it, a Color Wheel that spins beams, a Stitcher that zigzags and lays mines, a Sampler that fires five-way fans, and a Rewinder that snaps back to a saved spot.',
     ],
   },
+  {
+    version: '0.20.2',
+    date: '2026-10-07',
+    publishedAt: '2026-10-08T00:30:00Z',
+    kind: 'update',
+    title: 'Next-Gen Fitters and Their Drops',
+    body: [
+      'Every Gen Fitter now drops real crafting resources: Silicon Alloy, Phosphor Ore, Cyber Resin, Prism Quartz, Rootglass Cells, plus extra cred and health. The Bestiary lists each enemy\'s confirmed drops and chances. The Tile Warden always pays out.',
+      'The tougher Fitters now enrage below 40% health: faster, quicker attacks, and bigger versions of their moves (a fourth beam on the Color Wheel, a seven-way Fan Sampler, wider landings and mines). Several also detonate a delayed ring where they fall, so do not stand on the body.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

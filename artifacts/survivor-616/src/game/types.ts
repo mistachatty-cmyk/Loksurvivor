@@ -997,6 +997,13 @@ export type EnemyBehavior =
   /** Gen Fitters: saves its position, then rewinds to it with a burst at both ends. */
   | 'rewinder';
 
+export interface EnemyDrop {
+  kind: 'health' | 'cred' | 'phosphor-ore' | 'silicon-alloy' | 'cyber-resin' | 'prism-quartz' | 'rootglass-cell' | 'glitch-cache';
+  /** 0..1 chance per defeat. */
+  chance: number;
+  value?: number;
+}
+
 export interface EnemyDef {
   id: string;
   name: string;
@@ -1017,6 +1024,13 @@ export interface EnemyDef {
   palette: SpritePalette;
   rig: SpriteRig;
   lore: string;
+  /**
+   * Authored resource drops, rolled independently on defeat on top of the
+   * standard XP / health / cred rolls. `value` only matters for health and cred.
+   */
+  drops?: EnemyDrop[];
+  /** A delayed ring that detonates where this enemy fell. */
+  deathBurst?: { radius: number; damage: number };
   /** Spitter-only tuning. */
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
   faction?: string;
@@ -1032,6 +1046,9 @@ export interface EnemyDef {
   /** Ambient bioluminescent light radius in darkness or fog. */
   glowRadius?: number;
   traits?: {
+    /** Once at or below `belowHpPct` of max HP it moves faster, shortens its
+     *  attack cooldowns (Gen Fitters styles) and flares. */
+    enrage?: { belowHpPct: number; speedMult: number; cooldownMult: number };
     teleportMs?: number;
     ghostMs?: number;
     shiftMs?: number;

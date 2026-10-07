@@ -258,6 +258,8 @@ export interface EnemyActor extends Actor {
   fightX?: number;
   fightY?: number;
   fightPhase?: number;
+  /** Set once `traits.enrage` has triggered. */
+  enraged?: boolean;
   /** Firefly spiker pulse sequence tracking */
   spikerPulseCount?: number;
   spikerPulseCooldown?: number;
@@ -4044,6 +4046,25 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
     });
   }
 
+  for (const drop of enemy.def.drops ?? []) {
+    if (w.rng() >= drop.chance) continue;
+    w.pickups.push({
+      uid: uid(w), kind: drop.kind,
+      x: enemy.x + randRange(w.rng, -16, 16), y: enemy.y + randRange(w.rng, -16, 16),
+      vx: randRange(w.rng, -28, 28), vy: randRange(w.rng, -28, 28),
+      value: drop.value ?? (drop.kind === 'cred' ? Math.max(1, Math.round(enemy.xp / 2)) : drop.kind === 'health' ? 22 : 1),
+      bornAt: w.now,
+    });
+  }
+  if (enemy.def.deathBurst && canSpawnEnemyEffect(w)) {
+    w.effects.push({
+      uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: enemy.def.deathBurst.radius, angle: 0, spread: Math.PI * 2,
+      bornAt: w.now + 450, expiresAt: w.now + 800, color: enemy.def.palette.accent, damage: enemy.def.deathBurst.damage, impactIntensity: 1,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 8, 70);
+  }
+
   const collector = w.character.lokPetCollector;
   const packChance = 0.0015 + (collector?.floorPackChance ?? 0) + w.cardEffects.packDropBonus;
   if (enemy.def.family !== 'Boss' && w.rng() < packChance) {
@@ -7446,6 +7467,14 @@ function updateEnemies(w: World, dt: number) {
     let speed = enemy.speed * statusSpeedMultiplier(enemy) * fluidOilBoostAt(w, enemy.x, enemy.y);
     speed *= musicMultiplier(w, enemy.def.react, 'speed');
     if (dataGobFleeing) speed *= 1.55;
+    const enrageTrait = traits?.enrage;
+    if (enrageTrait && !enemy.enraged && enemy.hp <= enemy.maxHp * enrageTrait.belowHpPct) {
+      enemy.enraged = true;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 14, 120);
+      pushAlert(w, `${enemy.def.name.toUpperCase()} ENRAGED`);
+    }
+    if (enemy.enraged && enrageTrait) speed *= enrageTrait.speedMult;
+    const styleCd = (ms: number) => w.now + ms * (enemy.enraged && enrageTrait ? enrageTrait.cooldownMult : 1);
     if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;
@@ -8205,7 +8234,7 @@ function updateEnemies(w: World, dt: number) {
           if (w.now >= enemy.telegraphUntil) {
             enemy.telegraphUntil = 0;
             enemy.chargeUntil = w.now + 420;
-            enemy.chargeReadyAt = w.now + randRange(w.rng, 2600, 3600);
+            enemy.chargeReadyAt = styleCd(randRange(w.rng, 2600, 3600));
             enemy.fightX = dirX;
             enemy.fightY = dirY;
             enemy.anim = 'attack';
@@ -8250,14 +8279,14 @@ function updateEnemies(w: World, dt: number) {
             spawnParticles(w, lx, ly, enemy.def.palette.accent, 12, 110);
             if (canSpawnEnemyEffect(w)) {
               w.effects.push({
-                uid: uid(w), kind: 'ring', x: lx, y: ly, radius: 78, angle: 0, spread: Math.PI * 2,
+                uid: uid(w), kind: 'ring', x: lx, y: ly, radius: enemy.enraged ? 104 : 78, angle: 0, spread: Math.PI * 2,
                 bornAt: w.now, expiresAt: w.now + 380, color: enemy.def.palette.accent, damage: 15, impactIntensity: 2,
                 hitUids: new Set(), followPlayer: false,
               });
             }
           }
         } else if (w.now >= enemy.chargeReadyAt && distance < 440 && distance > 120) {
-          enemy.chargeReadyAt = w.now + randRange(w.rng, 3200, 4400);
+          enemy.chargeReadyAt = styleCd(randRange(w.rng, 3200, 4400));
           enemy.telegraphUntil = w.now + 650;
           enemy.fightX = p.x;
           enemy.fightY = p.y;
@@ -8279,10 +8308,11 @@ function updateEnemies(w: World, dt: number) {
           if (w.now >= enemy.fireReadyAt) {
             enemy.fireReadyAt = w.now + 170;
             if (canSpawnEnemyEffect(w)) {
-              for (let spoke = 0; spoke < 3; spoke += 1) {
+              const spokes = enemy.enraged ? 4 : 3;
+              for (let spoke = 0; spoke < spokes; spoke += 1) {
                 w.effects.push({
                   uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 210,
-                  angle: (enemy.fightPhase ?? 0) + (spoke * Math.PI * 2) / 3, spread: 0.07,
+                  angle: (enemy.fightPhase ?? 0) + (spoke * Math.PI * 2) / spokes, spread: 0.07,
                   bornAt: w.now, expiresAt: w.now + 190, color: enemy.def.palette.accent, damage: 7, impactIntensity: 1,
                   hitUids: new Set(), followPlayer: false,
                 });
@@ -8291,7 +8321,7 @@ function updateEnemies(w: World, dt: number) {
           }
         } else if (distance < 330 && w.now >= enemy.chargeReadyAt) {
           enemy.chargeUntil = w.now + 2600;
-          enemy.chargeReadyAt = w.now + 6200;
+          enemy.chargeReadyAt = styleCd(6200);
           enemy.fightPhase = w.rng() * Math.PI * 2;
           pushAlert(w, 'COLOR WHEEL!');
           spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 10, 80);
@@ -8308,10 +8338,10 @@ function updateEnemies(w: World, dt: number) {
         enemy.y += (dirX * zig) * enemy.speed * dt;
         if (distance < 120) speed *= 0.4;
         if (w.now >= enemy.fireReadyAt) {
-          enemy.fireReadyAt = w.now + 1500;
+          enemy.fireReadyAt = styleCd(1500);
           if (canSpawnEnemyEffect(w)) {
             w.effects.push({
-              uid: uid(w), kind: 'hazard', x: enemy.x, y: enemy.y, radius: 32, angle: 0, spread: Math.PI * 2,
+              uid: uid(w), kind: 'hazard', x: enemy.x, y: enemy.y, radius: enemy.enraged ? 42 : 32, angle: 0, spread: Math.PI * 2,
               bornAt: w.now + 500, expiresAt: w.now + 5200, color: enemy.def.palette.accent, damage: 7, impactIntensity: 1,
               hitUids: new Set(), followPlayer: false,
             });
@@ -8325,11 +8355,12 @@ function updateEnemies(w: World, dt: number) {
         else if (distance > 340) speed = enemy.speed;
         else speed = 0;
         if (w.now >= enemy.fireReadyAt && distance < 520) {
-          enemy.fireReadyAt = w.now + 3000;
+          enemy.fireReadyAt = styleCd(3000);
           enemy.anim = 'attack';
           enemy.animStartedAt = w.now;
           const base = Math.atan2(dirY, dirX);
-          for (let shot = -2; shot <= 2; shot += 1) {
+          const half = enemy.enraged ? 3 : 2;
+          for (let shot = -half; shot <= half; shot += 1) {
             if (!canSpawnEnemyProjectile(w)) break;
             const a = base + shot * 0.28;
             w.projectiles.push({
@@ -8366,7 +8397,7 @@ function updateEnemies(w: World, dt: number) {
           enemy.x = enemy.fightX;
           enemy.y = enemy.fightY;
           burst(enemy.x, enemy.y);
-          enemy.fireReadyAt = w.now + 3600;
+          enemy.fireReadyAt = styleCd(3600);
           enemy.fightX = undefined;
         } else if (w.now >= enemy.chargeReadyAt && w.now < enemy.fireReadyAt - 400) {
           // Re-save only early in each cycle so the rewind always reaches back.

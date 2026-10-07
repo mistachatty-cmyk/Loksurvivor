@@ -33,6 +33,36 @@ const BEHAVIOR_GUIDES: Record<
   string,
   { desc: string; tip: string; threatTier: string; weakVs: string; soundSignature: string; dropProfile: string }
 > = {
+  'strafe-duelist': {
+    desc: 'Circle-strafes at mid range, telegraphs, then lunges through you in a slash arc.',
+    tip: 'Dash across its lunge line as the telegraph ends; it is open after every lunge.',
+    threatTier: 'Skirmisher', weakVs: 'Area damage while it circles', soundSignature: 'Quick shoe squeaks', dropProfile: '',
+  },
+  pouncer: {
+    desc: 'Marks the spot where you stand, leaps there and lands in a shockwave ring.',
+    tip: 'Leave the marked ring before the landing; strike it after it lands.',
+    threatTier: 'Ambusher', weakVs: 'Moving targets and ranged hits', soundSignature: 'Soft crouch, hard landing', dropProfile: '',
+  },
+  'beam-wheel': {
+    desc: 'Plants itself and spins a wheel of short beams around it.',
+    tip: 'Stay outside its beam range or circle against the spin direction.',
+    threatTier: 'Zone Anchor', weakVs: 'Burst damage while it is walking in', soundSignature: 'Rising wheel hum', dropProfile: '',
+  },
+  'mine-stitcher': {
+    desc: 'Zigzags toward you, dropping lingering mines along its path.',
+    tip: 'Do not retreat over its trail. Kill it early before the floor fills.',
+    threatTier: 'Area Denial', weakVs: 'Piercing shots down its zigzag', soundSignature: 'Tick, tick, snap', dropProfile: '',
+  },
+  'fan-sampler': {
+    desc: 'Kites at range and fires a wide fan of projectiles.',
+    tip: 'Step between shots in the fan, or close in; it backs away slowly.',
+    threatTier: 'Ranged Support', weakVs: 'Dashes and cover', soundSignature: 'Fan of paper snaps', dropProfile: '',
+  },
+  rewinder: {
+    desc: 'Saves its position, then snaps back to it, bursting at both ends.',
+    tip: 'Do not stand on its saved spot, and do not chase it when it vanishes.',
+    threatTier: 'Disruptor', weakVs: 'Delayed area attacks', soundSignature: 'Tape rewinding', dropProfile: '',
+  },
   charger: {
     desc: 'Rapid linear acceleration bull-rush when target enters line-of-sight.',
     tip: 'Sidestep perpendicular as charge begins; punish sluggish turn recovery.',
@@ -351,7 +381,18 @@ function EnemyIntelModal({
             )}
 
             {/* Salvage Drop Profile */}
-            {guide.dropProfile && (
+            {enemy.drops?.length ? (
+              <div className="border-t border-white/10 pt-2 font-mono text-[8.5px] uppercase">
+                <span className="text-white/40 flex items-center gap-1.5 mb-1">
+                  <Target className="h-3 w-3 text-amber-400" /> Confirmed drops:
+                </span>
+                <ul className="text-amber-200 space-y-0.5">
+                  {enemy.drops.map((drop, index) => (
+                    <li key={`${drop.kind}-${index}`}>{drop.kind.replace(/-/g, ' ')} · {Math.round(drop.chance * 100)}%</li>
+                  ))}
+                </ul>
+              </div>
+            ) : guide.dropProfile && (
               <div className="border-t border-white/10 pt-2 flex items-center justify-between font-mono text-[8.5px] uppercase">
                 <span className="text-white/40 flex items-center gap-1.5">
                   <Target className="h-3 w-3 text-amber-400" /> Field Salvage:
