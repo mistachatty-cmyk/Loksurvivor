@@ -46,7 +46,7 @@ Run from the repo root unless noted:
   to the game; if you just need the game to build, run the survivor-616
   commands directly instead (below).
 - `pnpm test` (from `artifacts/survivor-616/`) runs the game's `node:test`
-  suites — engine, data and audio-studio tests, ~174 cases. Run it alongside
+  suites — engine, data and audio-studio tests, ~776 cases. Run it alongside
   `typecheck` after any engine or data change. The script globs
   `src/**/*.test.ts` (see `package.json`), so **a new `*.test.ts` file is
   picked up automatically** — nothing else to wire up. (This used to be a

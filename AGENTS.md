@@ -8,6 +8,7 @@ When the user says **“Pullcheck,” read `docs/PULLCHECK.md` first**. It recor
 
 1. Read `COLLABORATION.md`.
 2. Read the relevant notes in `.agents/memory/`, and the latest handoff in `docs/` (currently `docs/ai-handoff-2026-10-04.md`).
+   Start with `docs/DOCUMENT.md`; economy rules are in `docs/ECONOMY.md`, open issues in `docs/PROBLEMS.md`, hideout UI plans in `docs/HIDEOUT-UI.md`.
 3. Check open GitHub issues and pull requests before choosing a task.
 4. Claim one issue or create one before making a substantial change.
 
