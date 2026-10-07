@@ -8,6 +8,7 @@
  *   pnpm exec tsx scripts/export-public-updates.ts public/lok-updates.json
  */
 import { CHANGELOG, STUDIO_NAME, updateNumber } from './changelog';
+import { CHANGELOG_KIND_META, type ChangelogKind } from './changelogKinds';
 
 export const PUBLIC_UPDATES_SCHEMA = 'lok.public-updates';
 
@@ -15,7 +16,10 @@ export interface PublicUpdateEntry {
   number: number;
   version: string;
   date: string;
-  kind: 'update' | 'hotfix';
+  kind: ChangelogKind;
+  categoryLabel: string;
+  categoryColor: string;
+  categoryLore: string;
   title: string;
   body: string[];
 }
@@ -44,6 +48,9 @@ export function buildPublicUpdates(): PublicUpdates {
       version: entry.version,
       date: entry.date,
       kind: entry.kind,
+      categoryLabel: CHANGELOG_KIND_META[entry.kind].label,
+      categoryColor: CHANGELOG_KIND_META[entry.kind].color,
+      categoryLore: CHANGELOG_KIND_META[entry.kind].lore,
       title: entry.title,
       body: [...entry.body],
     })),

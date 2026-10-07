@@ -10,12 +10,14 @@
  * (bug-only), and just append a new entry -- `CURRENT_VERSION` and the
  * "Update #" counter both derive from this array, nothing else to update.
  */
+import type { ChangelogKind } from './changelogKinds';
+
 export const STUDIO_NAME = 'Kinetic Souls';
 
 export interface ChangelogEntry {
   version: string;
   date: string;
-  kind: 'update' | 'hotfix';
+  kind: ChangelogKind;
   title: string;
   body: string[];
 }
@@ -551,6 +553,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Survive Floodline Breach and Glassroot Annex, two finite arenas built with new street and Null scenery.',
       'Restore relays, destroy root anchors, open the transit cache, and find the 616 Plate and Transit Coil. The coil unlocks the Catenary Harpoon.',
       'The map builder now supports pickups, interactables, ambiance, grouped prefabs, seeded remix, editable templates, encounter timing, zoom, undo and redo, and playtesting through the game renderer.',
+    ],
+  },
+  {
+    version: '0.18.0',
+    date: '2026-10-07',
+    kind: 'update',
+    title: 'Four Ways the Block Changes',
+    body: [
+      'Release notes now have four distinct looks: green Bugfixes, amber Hotfixes, vibrant cyan Major Updates, and red Expansions. Each carries a short piece of 616 lore.',
+      'Choose which kinds may open an automatic popup in Settings. Every note stays in the Updates history, even when its popup is off.',
     ],
   },
 ];
