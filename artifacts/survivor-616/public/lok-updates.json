@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 55,
+      "version": "0.20.1",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:59:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Six New Ways to Fight",
+      "body": [
+        "Gen Fitting Floor adds six new enemies, each with its own fighting style: a strafing Duelist that lunges, a Pouncer that marks your spot and lands on it, a Color Wheel that spins beams, a Stitcher that zigzags and lays mines, a Sampler that fires five-way fans, and a Rewinder that snaps back to a saved spot."
+      ]
+    },
+    {
       "number": 54,
       "version": "0.20.0",
       "date": "2026-10-07",

@@ -656,6 +656,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Meet the Gen Fitters: Swatch Mites, Aura Ringers, Skin Shedders, Hat Hurlers, Prefab Brutes, Remix Seeds and Undo Echoes, led by the Tile Warden. Each is built from a customization or map-builder idea.',
     ],
   },
+  {
+    version: '0.20.1',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:59:00Z',
+    kind: 'update',
+    title: 'Six New Ways to Fight',
+    body: [
+      'Gen Fitting Floor adds six new enemies, each with its own fighting style: a strafing Duelist that lunges, a Pouncer that marks your spot and lands on it, a Color Wheel that spins beams, a Stitcher that zigzags and lays mines, a Sampler that fires five-way fans, and a Rewinder that snaps back to a saved spot.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

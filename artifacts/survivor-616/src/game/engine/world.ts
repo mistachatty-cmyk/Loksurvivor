@@ -254,6 +254,10 @@ export interface EnemyActor extends Actor {
   veteranAffix?: 'armored' | 'overclocked' | 'incendiary' | 'vampiric' | 'magnetic';
   veteranTitle?: string;
   veteranColor?: string;
+  /** Gen Fitters per-style scratch state: a saved or landing point and a phase timer. */
+  fightX?: number;
+  fightY?: number;
+  fightPhase?: number;
   /** Firefly spiker pulse sequence tracking */
   spikerPulseCount?: number;
   spikerPulseCooldown?: number;
@@ -8186,6 +8190,189 @@ function updateEnemies(w: World, dt: number) {
             spawnParticles(w, enemy.x, enemy.y, '#dc2626', 14, 110);
           }
           speed = enemy.speed * 1.5;
+        }
+        break;
+      }
+      case 'strafe-duelist': {
+        // Circle-strafes at mid range, then telegraphs and lunges through the player.
+        const side = enemy.uid % 2 === 0 ? 1 : -1;
+        if (w.now < enemy.chargeUntil) {
+          enemy.x += (enemy.fightX ?? dirX) * enemy.speed * 3.4 * dt;
+          enemy.y += (enemy.fightY ?? dirY) * enemy.speed * 3.4 * dt;
+          speed = 0;
+        } else if (enemy.telegraphUntil > 0) {
+          speed = 0;
+          if (w.now >= enemy.telegraphUntil) {
+            enemy.telegraphUntil = 0;
+            enemy.chargeUntil = w.now + 420;
+            enemy.chargeReadyAt = w.now + randRange(w.rng, 2600, 3600);
+            enemy.fightX = dirX;
+            enemy.fightY = dirY;
+            enemy.anim = 'attack';
+            enemy.animStartedAt = w.now;
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 150, angle: Math.atan2(dirY, dirX), spread: 0.35,
+                bornAt: w.now, expiresAt: w.now + 260, color: enemy.def.palette.accent, damage: 11, impactIntensity: 1,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          }
+        } else {
+          const ring = 175;
+          const pull = (distance - ring) / ring;
+          enemy.x += (-dirY * side + dirX * pull * 0.9) * enemy.speed * dt;
+          enemy.y += (dirX * side + dirY * pull * 0.9) * enemy.speed * dt;
+          speed = 0;
+          if (w.now >= enemy.chargeReadyAt && distance < 260) {
+            enemy.telegraphUntil = w.now + 520;
+            spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 6, 60);
+          }
+        }
+        break;
+      }
+      case 'pouncer': {
+        // Marks where the player stands, crouches, then leaps there and lands in a ring.
+        speed *= 0.8;
+        if (enemy.telegraphUntil > 0) {
+          speed = 0;
+          if (w.now >= enemy.telegraphUntil) {
+            enemy.telegraphUntil = 0;
+            enemy.fightPhase = 0;
+            const lx = enemy.fightX ?? enemy.x;
+            const ly = enemy.fightY ?? enemy.y;
+            spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 8, 70);
+            enemy.x = lx;
+            enemy.y = ly;
+            enemy.anim = 'attack';
+            enemy.animStartedAt = w.now;
+            w.shake = Math.max(w.shake, 2.5);
+            spawnParticles(w, lx, ly, enemy.def.palette.accent, 12, 110);
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'ring', x: lx, y: ly, radius: 78, angle: 0, spread: Math.PI * 2,
+                bornAt: w.now, expiresAt: w.now + 380, color: enemy.def.palette.accent, damage: 15, impactIntensity: 2,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          }
+        } else if (w.now >= enemy.chargeReadyAt && distance < 440 && distance > 120) {
+          enemy.chargeReadyAt = w.now + randRange(w.rng, 3200, 4400);
+          enemy.telegraphUntil = w.now + 650;
+          enemy.fightX = p.x;
+          enemy.fightY = p.y;
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'ring', x: p.x, y: p.y, radius: 78, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now, expiresAt: w.now + 650, color: enemy.def.palette.glow, damage: 0, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'beam-wheel': {
+        // Walks into range, plants, then sweeps a rotating wheel of short beams.
+        if (w.now < enemy.chargeUntil) {
+          speed = 0;
+          enemy.fightPhase = (enemy.fightPhase ?? 0) + dt * 1.7;
+          if (w.now >= enemy.fireReadyAt) {
+            enemy.fireReadyAt = w.now + 170;
+            if (canSpawnEnemyEffect(w)) {
+              for (let spoke = 0; spoke < 3; spoke += 1) {
+                w.effects.push({
+                  uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 210,
+                  angle: (enemy.fightPhase ?? 0) + (spoke * Math.PI * 2) / 3, spread: 0.07,
+                  bornAt: w.now, expiresAt: w.now + 190, color: enemy.def.palette.accent, damage: 7, impactIntensity: 1,
+                  hitUids: new Set(), followPlayer: false,
+                });
+              }
+            }
+          }
+        } else if (distance < 330 && w.now >= enemy.chargeReadyAt) {
+          enemy.chargeUntil = w.now + 2600;
+          enemy.chargeReadyAt = w.now + 6200;
+          enemy.fightPhase = w.rng() * Math.PI * 2;
+          pushAlert(w, 'COLOR WHEEL!');
+          spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 10, 80);
+        } else {
+          speed *= distance > 260 ? 1 : 0.4;
+        }
+        break;
+      }
+      case 'mine-stitcher': {
+        // Zigzags toward the player, dropping lingering mines along the stitch line.
+        enemy.weave += dt * 4.2;
+        const zig = Math.sign(Math.sin(enemy.weave)) * 0.9;
+        enemy.x += (-dirY * zig) * enemy.speed * dt;
+        enemy.y += (dirX * zig) * enemy.speed * dt;
+        if (distance < 120) speed *= 0.4;
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = w.now + 1500;
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'hazard', x: enemy.x, y: enemy.y, radius: 32, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now + 500, expiresAt: w.now + 5200, color: enemy.def.palette.accent, damage: 7, impactIntensity: 1,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'fan-sampler': {
+        // Kites at range and fires a five-way fan; backs off as the player closes.
+        if (distance < 230) speed = -enemy.speed * 0.9;
+        else if (distance > 340) speed = enemy.speed;
+        else speed = 0;
+        if (w.now >= enemy.fireReadyAt && distance < 520) {
+          enemy.fireReadyAt = w.now + 3000;
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+          const base = Math.atan2(dirY, dirX);
+          for (let shot = -2; shot <= 2; shot += 1) {
+            if (!canSpawnEnemyProjectile(w)) break;
+            const a = base + shot * 0.28;
+            w.projectiles.push({
+              uid: uid(w), x: enemy.x, y: enemy.y,
+              vx: Math.cos(a) * 230, vy: Math.sin(a) * 230,
+              radius: 6, damage: 7, impactIntensity: 0, fromPlayer: false,
+              expiresAt: w.now + 2400, targetUid: null, turnRate: 0,
+              color: enemy.def.palette.accent, trail: [], pierce: 0, hitUids: new Set(),
+            });
+          }
+        }
+        break;
+      }
+      case 'rewinder': {
+        // Saves a point, wanders on, then snaps back to it with a burst at each end.
+        if (enemy.fightX === undefined || enemy.fightY === undefined) {
+          enemy.fightX = enemy.x;
+          enemy.fightY = enemy.y;
+          enemy.chargeReadyAt = w.now + 1700;
+          enemy.fireReadyAt = w.now + 3600;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          const burst = (bx: number, by: number) => {
+            spawnParticles(w, bx, by, enemy.def.palette.glow, 10, 90);
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'ring', x: bx, y: by, radius: 58, angle: 0, spread: Math.PI * 2,
+                bornAt: w.now, expiresAt: w.now + 320, color: enemy.def.palette.accent, damage: 9, impactIntensity: 1,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          };
+          burst(enemy.x, enemy.y);
+          enemy.x = enemy.fightX;
+          enemy.y = enemy.fightY;
+          burst(enemy.x, enemy.y);
+          enemy.fireReadyAt = w.now + 3600;
+          enemy.fightX = undefined;
+        } else if (w.now >= enemy.chargeReadyAt && w.now < enemy.fireReadyAt - 400) {
+          // Re-save only early in each cycle so the rewind always reaches back.
+          enemy.fightX = enemy.x;
+          enemy.fightY = enemy.y;
+          enemy.chargeReadyAt = enemy.fireReadyAt + 1700;
         }
         break;
       }

@@ -983,7 +983,19 @@ export type EnemyBehavior =
   /** Firefly Wranglers: dual-wielding boss firing twin incendiary streams that leave fire trails. */
   | 'firefly-pyro-duelist'
   /** Sub-Terra / Digiverse: disguised mimic chest that attacks when approached. */
-  | 'mimic-chest';
+  | 'mimic-chest'
+  /** Gen Fitters: circle-strafes at mid range, telegraphs, then lunges in a slash. */
+  | 'strafe-duelist'
+  /** Gen Fitters: marks the player's spot, leaps there and lands in a shockwave ring. */
+  | 'pouncer'
+  /** Gen Fitters: plants itself and spins a wheel of short beams around it. */
+  | 'beam-wheel'
+  /** Gen Fitters: zigzags toward the player, stitching a trail of lingering mines. */
+  | 'mine-stitcher'
+  /** Gen Fitters: kites at range and fires five-way projectile fans. */
+  | 'fan-sampler'
+  /** Gen Fitters: saves its position, then rewinds to it with a burst at both ends. */
+  | 'rewinder';
 
 export interface EnemyDef {
   id: string;

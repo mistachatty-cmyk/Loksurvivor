@@ -216,7 +216,7 @@ export const FACTIONS: FactionDef[] = [
     name: 'Gen Fitters',
     description: 'Walking customization: loose paint chips, orphaned auras, shed skins, thrown hats, ungrouped prefabs and undone edits that took over the Fitting Floor.',
     accent: '#e879f9',
-    roster: ['gen-swatch-mite', 'gen-aura-ringer', 'gen-skin-shedder', 'gen-hat-hurler', 'gen-prefab-brute', 'gen-remix-seed', 'gen-undo-echo', 'gen-tile-warden'],
+    roster: ['gen-swatch-mite', 'gen-aura-ringer', 'gen-skin-shedder', 'gen-hat-hurler', 'gen-prefab-brute', 'gen-remix-seed', 'gen-undo-echo', 'gen-tile-warden', 'gen-fit-check-duelist', 'gen-pin-pouncer', 'gen-color-wheel', 'gen-grid-stitcher', 'gen-fan-sampler', 'gen-checkpoint-rewinder'],
   },
 ];
 
