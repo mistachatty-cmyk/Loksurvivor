@@ -286,7 +286,7 @@ export function LokDeckCardView({
               {owned ? card.name : 'Unknown Card'}
             </p>
             <span className="shrink-0 font-mono text-[8px] font-bold text-rose-300">
-              {profile.stats.hp} <span className="text-[6px] text-white/40">HP</span>
+              {owned ? profile.stats.hp : '??'} <span className="text-[6px] text-white/40">HP</span>
             </span>
           </div>
 
@@ -377,7 +377,7 @@ export function LokDeckCardView({
 
           <div className="flex items-center gap-1 shrink-0">
             <span className="font-mono text-[8px] font-black text-rose-300">
-              {profile.stats.hp} <span className="text-[6px] text-white/50">HP</span>
+              {owned ? profile.stats.hp : '??'} <span className="text-[6px] text-white/50">HP</span>
             </span>
             <span
               className="grid h-3.5 w-3.5 place-items-center rounded-full text-[7px] font-bold"
@@ -430,9 +430,9 @@ export function LokDeckCardView({
 
         {/* Combat Stats Ticker */}
         <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-1 font-mono text-[7px] uppercase text-white/60">
-          <span>ATK: <strong className="text-amber-200">{profile.stats.attack}</strong></span>
-          <span>DEF: <strong className="text-sky-200">{profile.stats.defense}</strong></span>
-          <span className="truncate max-w-[65px]">{styleMeta.label}</span>
+          <span>ATK: <strong className="text-amber-200">{owned ? profile.stats.attack : '??'}</strong></span>
+          <span>DEF: <strong className="text-sky-200">{owned ? profile.stats.defense : '??'}</strong></span>
+          <span className="truncate max-w-[65px]">{owned ? styleMeta.label : '???'}</span>
           <span className={`font-bold ${rarity.ink}`}>{profile.stars}</span>
         </div>
       </div>

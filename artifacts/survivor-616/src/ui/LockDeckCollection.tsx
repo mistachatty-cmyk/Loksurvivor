@@ -176,6 +176,7 @@ export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; o
 
         {/* Right: Rich Variable Classification & Combat Breakdown */}
         <div className="flex flex-col p-5 md:max-h-[85dvh] md:overflow-y-auto">
+          {owned ? (
           <div className="flex flex-wrap items-center gap-1.5">
             <span
               className="px-2 py-0.5 font-mono text-[8.5px] font-black uppercase text-black rounded shadow-sm"
@@ -205,18 +206,26 @@ export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; o
               {profile.evolutionStage}
             </span>
           </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-[8.5px] font-black uppercase text-white/50">??? Element</span>
+              <span className="rounded bg-white/10 px-2 py-0.5 font-mono text-[8.5px] font-black uppercase text-white/50">??? Type</span>
+            </div>
+          )}
 
           <h3 className="mt-2.5 font-display text-2xl font-black uppercase leading-none text-white">
             {owned ? card.name : 'Unknown Card'}
           </h3>
           <p className="mt-1 font-mono text-[8.5px] uppercase tracking-widest text-white/40">
-            {profile.collectorNumber} · {profile.stars} · {profile.bodySilhouette} · {cardPackFor(card).name}
+            {owned ? `${profile.collectorNumber} · ${profile.stars} · ${profile.bodySilhouette} · ${cardPackFor(card).name}` : `${profile.collectorNumber} · ${cardPackFor(card).name}`}
           </p>
 
           <p className="mt-2.5 text-xs leading-relaxed text-white/65">
             {owned ? card.description : 'This slot is sealed. Find or buy a Lock Pack to reveal a copy.'}
           </p>
 
+          {owned ? (
+            <>
           <p className="mt-2 text-[10px] italic text-amber-200/80 border-l-2 border-amber-300/40 pl-2">
             "{profile.flavorText}"
           </p>
@@ -296,6 +305,14 @@ export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; o
               <span>Vulnerable: <strong className="text-rose-300">{weakAgainst}</strong></span>
             </div>
           </div>
+            </>
+          ) : (
+            <div className="mt-4 grid place-items-center gap-2 border border-dashed border-white/15 bg-white/[.02] px-4 py-8 text-center">
+              <Lock className="h-6 w-6 text-white/45" />
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-white/60">Stats and abilities sealed</p>
+              <p className="text-[11px] text-white/45">Unlock this card to reveal its stats, abilities, moves and matchups.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

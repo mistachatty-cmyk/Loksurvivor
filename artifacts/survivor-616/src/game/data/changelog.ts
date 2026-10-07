@@ -666,6 +666,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Scrollbar, Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout.',
     ],
   },
+  {
+    version: '0.19.4',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:50:00Z',
+    kind: 'hotfix',
+    title: 'Sealed Card Secrets',
+    body: [
+      'Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
