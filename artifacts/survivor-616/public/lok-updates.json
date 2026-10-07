@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 54,
+      "version": "0.19.2",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:30:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Sealed Card Secrets",
+      "body": [
+        "Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it."
+      ]
+    },
+    {
       "number": 53,
       "version": "0.19.1",
       "date": "2026-10-07",

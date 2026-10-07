@@ -645,6 +645,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone.',
     ],
   },
+  {
+    version: '0.19.2',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'hotfix',
+    title: 'Sealed Card Secrets',
+    body: [
+      'Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
