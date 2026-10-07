@@ -22,6 +22,7 @@ import { drawRig, drawShadow } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
 import { clamp, dist2 } from '@/game/engine/math';
 import { drawForgeFiveProjectile } from './forgeFiveVfx';
+import { drawMapPackProp } from './mapPackArt';
 
 /** World units of sprite height per rig pixel. */
 export const SPRITE_SCALE = 2.05;
@@ -1525,8 +1526,8 @@ function drawLightPool(ctx: CanvasRenderingContext2D, w: World) {
 function drawLandmark(ctx: CanvasRenderingContext2D, w: World) {
   const landmark = w.area.landmark;
   if (!landmark) return;
-  const x = 0;
-  const y = -150;
+  const x = landmark.position?.x ?? 0;
+  const y = landmark.position?.y ?? -150;
   ctx.save();
   ctx.globalAlpha = 0.88;
   ctx.strokeStyle = landmark.accent;
@@ -1975,6 +1976,7 @@ function drawDungeonRoomBorder(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 const OBSTACLE_COLORS: Record<ObstacleDef['kind'], { top: string; side: string; trim: string }> = {
+  'map-prop': { top: '#579d9c', side: '#244960', trim: '#b6fbef' },
   dumpster: { top: '#2f5d4a', side: '#1c3a2e', trim: '#48876c' },
   car: { top: '#57324a', side: '#331d2c', trim: '#8a4f74' },
   crate: { top: '#6b4a2c', side: '#3f2b19', trim: '#94693e' },
@@ -2145,7 +2147,7 @@ function drawObstacles(
   // same authored silhouette and profile. Culled to the camera viewport --
   // endless mode can have a full 5x5 chunk window's worth of breakables
   // loaded at once, and this ran unfiltered every frame before.
-  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind'] }> = [];
+  const obstacleList: Array<{ x: number; y: number; w: number; h: number; kind: ObstacleDef['kind']; artAssetId?: string; damage?: number }> = [];
   const closedBuildings = w.endless?.buildingEntryStyle === 'seamless' && !w.endless.inDungeon
     ? w.endless.buildings.filter((building) =>
         building.id !== w.endless!.walkInBuildingId &&
@@ -2156,18 +2158,26 @@ function drawObstacles(
       )
     : [];
   for (const o of w.breakables) {
-    if (o.broken) continue;
+    if (o.broken && o.kind !== 'map-prop') continue;
     if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin
       || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
     if (closedBuildings.some((building) =>
         Math.abs(o.x - building.x) < building.w / 2 - 12 &&
         Math.abs(o.y - building.y) < building.h / 2 - 12,
       )) continue;
-    obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind });
+    obstacleList.push({ x: o.x, y: o.y, w: o.w, h: o.h, kind: o.kind, artAssetId: o.artAssetId, damage: o.broken ? 1 : Number.isFinite(o.maxHp) ? 1 - o.hp / o.maxHp : 0 });
+  }
+  for (const o of w.area.decorations ?? []) {
+    if (o.x < viewBounds.left - margin || o.x > viewBounds.right + margin || o.y < viewBounds.top - margin || o.y > viewBounds.bottom + margin) continue;
+    obstacleList.push(o);
   }
 
   const worldTint = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
   for (const obstacle of obstacleList) {
+    if (obstacle.kind === 'map-prop' && obstacle.artAssetId) {
+      drawMapPackProp(ctx, obstacle.artAssetId, obstacle.x, obstacle.y, obstacle.w, obstacle.h, w.now, obstacle.damage);
+      continue;
+    }
     const baseColors = OBSTACLE_COLORS[obstacle.kind] ?? OBSTACLE_COLORS.crate;
     const colors = worldTint
       ? { top: mixHex(baseColors.top, worldTint.accent, 0.25), side: mixHex(baseColors.side, worldTint.bodyDark, 0.25), trim: mixHex(baseColors.trim, worldTint.accentBright, 0.3) }
@@ -3240,6 +3250,18 @@ function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
         ctx.beginPath();
         ctx.arc(x - 1.5, y - 1.5, 2.5, 0, Math.PI * 2);
         ctx.fill();
+        break;
+      }
+      case 'rootglass-cell': {
+        const pulse = 0.7 + Math.sin((w.now - pickup.bornAt) / 180) * 0.3;
+        ctx.shadowColor = '#5eead4';
+        ctx.shadowBlur = 18 * pulse;
+        ctx.fillStyle = '#0f766e';
+        ctx.fillRect(x - 8, y - 10, 16, 20);
+        ctx.fillStyle = '#99f6e4';
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 5, y); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#fef3c7'; ctx.fillRect(x - 1, y - 4, 2, 8);
         break;
       }
       case 'prism-quartz': {
@@ -6176,10 +6198,10 @@ function drawElectricChains(ctx: CanvasRenderingContext2D, w: World) {
     const progress = age / Math.max(1, dur);
     const alpha = Math.max(0, 1 - progress);
 
-    ctx.strokeStyle = '#38bdf8';
-    ctx.shadowColor = '#0284c7';
-    ctx.shadowBlur = 10;
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = chain.style === 'catenary' ? '#fbbf24' : '#38bdf8';
+    ctx.shadowColor = chain.style === 'catenary' ? '#f59e0b' : '#0284c7';
+    ctx.shadowBlur = chain.style === 'catenary' ? 16 : 10;
+    ctx.lineWidth = chain.style === 'catenary' ? 4 : 2.5;
     ctx.globalAlpha = alpha;
 
     const dx = chain.x2 - chain.x1;
@@ -6194,7 +6216,7 @@ function drawElectricChains(ctx: CanvasRenderingContext2D, w: World) {
 
     for (let i = 1; i < segments; i += 1) {
       const t = i / segments;
-      const jitter = (Math.sin(w.now / 30 + i * 3) * 7) + (Math.random() - 0.5) * 5;
+      const jitter = (Math.sin(w.now / 30 + i * 3) * 7) + Math.sin(i * 11.7 + chain.bornAt) * 2.5;
       const sx = chain.x1 + dx * t + normalX * jitter;
       const sy = chain.y1 + dy * t + normalY * jitter;
       ctx.lineTo(sx, sy);
@@ -6203,11 +6225,99 @@ function drawElectricChains(ctx: CanvasRenderingContext2D, w: World) {
     ctx.stroke();
 
     // Hot white inner lightning core
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = chain.style === 'catenary' ? '#67e8f9' : '#ffffff';
     ctx.lineWidth = 1;
     ctx.stroke();
+    if (chain.style === 'catenary') {
+      ctx.fillStyle = '#e0f2fe';
+      for (let i = 1; i < 4; i += 1) {
+        const t = i / 4;
+        ctx.beginPath(); ctx.arc(chain.x1 + dx * t, chain.y1 + dy * t, 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
   }
   ctx.restore();
+}
+
+function drawMapSetPieces(ctx: CanvasRenderingContext2D, w: World) {
+  if (!w.area.mapFeature && !w.area.mapInteractables?.length) return;
+  ctx.save();
+  if (w.area.mapFeature === 'fractured-616') {
+    ctx.translate(-70, -80);
+    ctx.rotate(-0.045);
+    ctx.font = '900 154px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#fbbf24'; ctx.fillText('616', 0, 0);
+    ctx.lineWidth = 5; ctx.strokeStyle = '#67e8f9'; ctx.strokeText('616', 0, 0);
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = '#0b1724'; ctx.lineWidth = 8;
+    for (const offset of [-54, 0, 53]) {
+      ctx.beginPath(); ctx.moveTo(offset - 18, -73); ctx.lineTo(offset + 7, -17); ctx.lineTo(offset - 10, 65); ctx.stroke();
+    }
+  } else if (w.area.mapFeature === 'glassroot-shrine') {
+    ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 4; ctx.globalAlpha = 0.4;
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath(); ctx.ellipse(0, 0, 110 + i * 39, 79 + i * 29, i * 0.25, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  const relays = w.area.mapInteractables?.filter((entry) => entry.kind === 'relay') ?? [];
+  const anchors = w.area.mapInteractables?.filter((entry) => entry.kind === 'root-anchor') ?? [];
+  const sporesQuiet = anchors.length > 0 && anchors.every((entry) => w.mapActivated.has(entry.id));
+  for (const entry of w.area.mapInteractables ?? []) {
+    if (entry.kind === 'plate' && !relays.every((relay) => w.mapActivated.has(relay.id))) continue;
+    const active = w.mapActivated.has(entry.id);
+    if (entry.kind === 'relay') {
+      ctx.save();
+      ctx.fillStyle = '#10232e'; ctx.strokeStyle = active ? '#5eead4' : '#fbbf24'; ctx.lineWidth = 3;
+      ctx.fillRect(entry.x - 21, entry.y - 17, 42, 34); ctx.strokeRect(entry.x - 21, entry.y - 17, 42, 34);
+      ctx.fillStyle = active ? '#5eead4' : '#fbbf24'; ctx.fillRect(entry.x - 14, entry.y - 9, 28, 5);
+      ctx.fillStyle = active ? '#34d399' : '#fb7185'; ctx.beginPath(); ctx.arc(entry.x, entry.y + 7, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    if (entry.kind === 'root-anchor' && sporesQuiet) continue;
+    if (entry.kind === 'root-anchor' || entry.kind === 'relay') {
+      if (active) continue;
+      const color = entry.kind === 'relay' ? '#fbbf24' : '#5eead4';
+      ctx.save(); ctx.globalAlpha = 0.28; ctx.strokeStyle = color; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(entry.x, entry.y, 45 + Math.sin(w.now / 380) * 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    if (!active && (entry.kind === 'cache' || entry.kind === 'plate' || entry.kind === 'coil')) {
+      ctx.save(); ctx.strokeStyle = entry.kind === 'plate' ? '#fbbf24' : '#67e8f9'; ctx.fillStyle = '#071116';
+      ctx.lineWidth = 3; ctx.fillRect(entry.x - 17, entry.y - 17, 34, 34); ctx.strokeRect(entry.x - 17, entry.y - 17, 34, 34);
+      ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#e0f2fe'; ctx.fillText(entry.kind === 'plate' ? '616' : entry.kind === 'coil' ? '⚡' : '▣', entry.x, entry.y);
+      ctx.restore();
+    }
+  }
+  if (w.area.mapFeature === 'fractured-616' && !sporesQuiet && w.graphicsQuality !== 'performance') {
+    ctx.save(); ctx.fillStyle = '#6ee7b7';
+    for (let i = 0; i < 24; i += 1) {
+      const px = 250 + (i * 149) % 850;
+      const py = -720 + ((i * 227 + w.now / 35) % 1390);
+      ctx.globalAlpha = 0.12 + (i % 3) * 0.06;
+      ctx.beginPath(); ctx.arc(px, py, 2 + i % 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (w.area.mapFeature === 'fractured-616' && w.graphicsQuality === 'high') {
+    ctx.save();
+    for (const [drainX, drainY] of [[-820, 95], [-340, 410], [-610, -415]]) {
+      ctx.fillStyle = '#cbd5e1';
+      for (let plume = 0; plume < 5; plume += 1) {
+        const phase = ((w.now / 85 + plume * 17) % 90) / 90;
+        ctx.globalAlpha = 0.12 * (1 - phase);
+        ctx.beginPath();
+        ctx.ellipse(drainX + Math.sin(w.now / 680 + plume) * 9, drainY - phase * 85, 6 + phase * 13, 3 + phase * 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
 }
 
 function drawBubbleWash(ctx: CanvasRenderingContext2D, w: World) {
@@ -6418,6 +6528,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     drawEndlessRouteEvent(ctx, w);
     drawBuildingInterior(ctx, w);
     drawStreetDressing(ctx, { ...w, area: { ...w.area, ground } }, left, top, right, bottom);
+    drawMapSetPieces(ctx, w);
     drawMillionHordeDensity(ctx, w, viewBounds);
     drawLightPool(ctx, w);
     drawLandmark(ctx, w);

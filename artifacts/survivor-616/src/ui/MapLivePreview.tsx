@@ -29,7 +29,10 @@ export function MapLivePreview({ map }: { map: CustomMap }) {
     ground: map.groundAssetId,
     landmark: map.landmarkAssetId,
     backdrop: map.backdrop,
-    placements: map.placements.map((p) => [p.assetId, p.x, p.y, p.w, p.h]),
+    sky: map.sky,
+    ambiance: map.ambiance,
+    feature: map.mapFeature,
+    placements: map.placements.map((p) => [p.assetId, p.x, p.y, p.w, p.h, p.mode, p.fromSec, p.toSec, p.ratePerSec, p.burst]),
   });
 
   const world = useMemo(() => {
@@ -78,7 +81,7 @@ export function MapLivePreview({ map }: { map: CustomMap }) {
     return () => observer.disconnect();
   }, [world, map.bounds.w, map.bounds.h]);
 
-  if (!world) return null;
+  if (!world) return <div role="alert" className="pointer-events-none absolute inset-x-4 top-14 z-20 border border-red-300/60 bg-[#231316] p-3 text-xs text-red-100">Live preview could not render this draft. Check the route settings and save again.</div>;
   return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 z-0 h-full w-full" aria-hidden="true" />;
 }
 
