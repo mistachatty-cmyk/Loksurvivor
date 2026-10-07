@@ -635,6 +635,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Display only. It never changes how much damage you deal.',
     ],
   },
+  {
+    version: '0.19.1',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T22:30:00Z',
+    kind: 'update',
+    title: 'Longer Notes, Crew in Every Room',
+    body: [
+      'Settings now has a Note duration choice for the corner notes in the hideout: 6, 12, 20 or 30 seconds before they fade.',
+      'When you walk your operator into a room, the crew you rescued who hang out there now stand in it, so every room has someone to meet. Walk up to one to hear from them.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -58,6 +58,7 @@ import {
 import type { BondRankId } from '@/game/engine/petGrowth';
 import { drawProp, PROP_HALF_WIDTH_UNITS, PROP_HEIGHT_UNITS } from '@/ui/hideoutPropArt';
 import { drawRig } from '@/game/render/sprite';
+import { hideoutNoticeMs } from '@/game/state/hideoutNoticeSetting';
 import type { EvolutionOverlayId, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
@@ -188,7 +189,7 @@ export function HideoutPreview({
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = window.setTimeout(() => setToast(null), 6500);
+    const timer = window.setTimeout(() => setToast(null), hideoutNoticeMs());
     return () => window.clearTimeout(timer);
   }, [toast]);
 

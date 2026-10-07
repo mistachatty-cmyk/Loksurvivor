@@ -50,6 +50,7 @@ import { MotionSetting } from './MotionToggle';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
+import { HIDEOUT_NOTICE_SECONDS, getHideoutNoticeSeconds, setHideoutNoticeSeconds, type HideoutNoticeSeconds } from '@/game/state/hideoutNoticeSetting';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import {
   AUTO_LANGUAGE,
@@ -215,6 +216,7 @@ function BuildingEntrySetting() {
 }
 
 export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
+  const [noticeSeconds, setNoticeSeconds] = useState<HideoutNoticeSeconds>(getHideoutNoticeSeconds);
   const t = useT();
   const {
     meta,
@@ -932,6 +934,22 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                       </div>
                     </div>
                   ))}
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.notice.title')}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.notice.description')}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.notice.title')}>
+                    {HIDEOUT_NOTICE_SECONDS.map((seconds) => (
+                      <button
+                        key={seconds}
+                        type="button"
+                        onClick={() => { setHideoutNoticeSeconds(seconds); setNoticeSeconds(seconds); }}
+                        aria-pressed={noticeSeconds === seconds}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${noticeSeconds === seconds ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-notice-${seconds}`}
+                      >
+                        {t('settings.hideout.notice.seconds', { n: seconds })}
+                      </button>
+                    ))}
+                  </div>
                   <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.choice.title')}</h3>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.choice.description')}</p>
                   <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.choice.title')}>
