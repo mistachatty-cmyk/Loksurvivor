@@ -648,6 +648,17 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.19.2',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T22:45:00Z',
+    kind: 'hotfix',
+    title: 'A Quieter Scrollbar',
+    body: [
+      'The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.',
+      'Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral.',
+    ],
+  },
+  {
+    version: '0.19.3',
+    date: '2026-10-07',
     publishedAt: '2026-10-07T23:30:00Z',
     kind: 'hotfix',
     title: 'Sealed Card Secrets',
