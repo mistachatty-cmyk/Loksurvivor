@@ -211,6 +211,13 @@ export const FACTIONS: FactionDef[] = [
     accent: '#f59e0b',
     roster: ['firefly-miner', 'firefly-evoker', 'firefly-spiker', 'firefly-cannon', 'firefly-pyro-duelist'],
   },
+  {
+    id: 'gen-fitters',
+    name: 'Gen Fitters',
+    description: 'Walking customization: loose paint chips, orphaned auras, shed skins, thrown hats, ungrouped prefabs and undone edits that took over the Fitting Floor.',
+    accent: '#e879f9',
+    roster: ['gen-swatch-mite', 'gen-aura-ringer', 'gen-skin-shedder', 'gen-hat-hurler', 'gen-prefab-brute', 'gen-remix-seed', 'gen-undo-echo', 'gen-tile-warden'],
+  },
 ];
 
 export const FACTIONS_BY_ID: Record<string, FactionDef> = Object.fromEntries(

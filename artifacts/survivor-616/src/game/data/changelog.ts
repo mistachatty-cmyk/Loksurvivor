@@ -645,6 +645,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone.',
     ],
   },
+  {
+    version: '0.20.0',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'update',
+    title: 'Gen Fitting Floor',
+    body: [
+      'A new finite level, Gen Fitting Floor, opens after Glassroot Annex. Four ground zones are painted in different palettes, with stamped prefab clusters like the ones the map builder makes.',
+      'Meet the Gen Fitters: Swatch Mites, Aura Ringers, Skin Shedders, Hat Hurlers, Prefab Brutes, Remix Seeds and Undo Echoes, led by the Tile Warden. Each is built from a customization or map-builder idea.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

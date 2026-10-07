@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 54,
+      "version": "0.20.0",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Gen Fitting Floor",
+      "body": [
+        "A new finite level, Gen Fitting Floor, opens after Glassroot Annex. Four ground zones are painted in different palettes, with stamped prefab clusters like the ones the map builder makes.",
+        "Meet the Gen Fitters: Swatch Mites, Aura Ringers, Skin Shedders, Hat Hurlers, Prefab Brutes, Remix Seeds and Undo Echoes, led by the Tile Warden. Each is built from a customization or map-builder idea."
+      ]
+    },
+    {
       "number": 53,
       "version": "0.19.1",
       "date": "2026-10-07",
