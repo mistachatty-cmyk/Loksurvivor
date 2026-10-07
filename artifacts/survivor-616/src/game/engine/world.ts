@@ -4486,12 +4486,19 @@ function fireLegendaryWeapon(w: World, runWeapon: RunWeapon, damage: number, rea
 
 function fireArchiveWeapon(w: World, runWeapon: RunWeapon, damage: number, reach: number): boolean {
   const weapon = runWeapon.def;
-  const evolved = ['tongue-tether-typhoon', 'firewall-last-bar', 'rewind-encore', 'eclipse-closed-circuit'].includes(weapon.id);
+  const evolved = ['tongue-tether-typhoon', 'firewall-last-bar', 'rewind-encore', 'eclipse-closed-circuit', 'cipher-sanctuary', 'bassline-overdrive', 'crown-of-replies', 'requiem-return', 'chorus-cache', 'breakpoint-finale'].includes(weapon.id);
   const frog = weapon.id === 'digifrog-lance' || weapon.id === 'tongue-tether-typhoon';
   const firewall = weapon.id === 'firewall-verse' || weapon.id === 'firewall-last-bar';
   const rewind = weapon.id === 'rewind-mercy' || weapon.id === 'rewind-encore';
   const eclipse = weapon.id === 'eclipse-severance' || weapon.id === 'eclipse-closed-circuit';
-  if (!frog && !firewall && !rewind && !eclipse) return false;
+  const cipher = weapon.id === 'cipher-cathedral' || weapon.id === 'cipher-sanctuary';
+  const railstaff = weapon.id === 'subwoofer-railstaff' || weapon.id === 'bassline-overdrive';
+  const crown = weapon.id === 'commentstorm-crown' || weapon.id === 'crown-of-replies';
+  const pitch = weapon.id === 'pitch-reaper' || weapon.id === 'requiem-return';
+  const cache = weapon.id === 'cache-of-lost-hooks' || weapon.id === 'chorus-cache';
+  const breakpoint = weapon.id === 'breakpoint-hands' || weapon.id === 'breakpoint-finale';
+  if (!frog && !firewall && !rewind && !eclipse && !cipher && !railstaff && !crown && !pitch && !cache && !breakpoint) return false;
+  if (crown) return true; // Orbiters handle every contact continuously.
   const p = w.player;
   const target = nearestEnemy(w, p.x, p.y, reach + 25);
   const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.facing > 0 ? 0 : Math.PI;
@@ -4509,6 +4516,87 @@ function fireArchiveWeapon(w: World, runWeapon: RunWeapon, damage: number, reach
       spawnParticles(w, target.x, target.y, color, 9, 85);
       pushAlert(w, evolved ? 'DIGIFROG · TYPHOON CATCH' : 'DIGIFROG · TONGUE CATCH');
     }
+    return true;
+  }
+
+  if (cipher) {
+    const cx = target?.x ?? p.x + Math.cos(angle) * reach * 0.65;
+    const cy = target?.y ?? p.y + Math.sin(angle) * reach * 0.65;
+    const glyphRadius = reach * (evolved ? 0.65 : 0.55);
+    const nodeCount = evolved ? 6 : 3;
+    const points = Array.from({ length: nodeCount }, (_, index) => {
+      const glyphAngle = -Math.PI / 2 + (index % 3) * Math.PI * 2 / 3;
+      const layerRadius = glyphRadius * (index < 3 ? 1 : 0.62);
+      return { x: cx + Math.cos(glyphAngle) * layerRadius, y: cy + Math.sin(glyphAngle) * layerRadius };
+    });
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i]!;
+      const next = points[Math.floor(i / 3) * 3 + (i + 1) % 3]!;
+      const edgeAngle = Math.atan2(next.y - point.y, next.x - point.x);
+      w.effects.push({ uid: uid(w), kind: 'laser', weaponId: weapon.id, x: point.x, y: point.y,
+        radius: Math.hypot(next.x - point.x, next.y - point.y), angle: edgeAngle, spread: 0.09,
+        bornAt: w.now + i * 60, expiresAt: w.now + 480 + i * 60, color,
+        damage: damage * 0.55, impactIntensity: 2, hitUids: new Set(), followPlayer: false, statusEffectId: 'slow' });
+      w.effects.push({ uid: uid(w), kind: 'hazard', weaponId: weapon.id, x: point.x, y: point.y,
+        radius: 28, angle: 0, spread: 0, bornAt: w.now, expiresAt: w.now + (evolved ? 2600 : 1800),
+        color, damage: damage * 0.13, impactIntensity: 1, hitUids: new Set(), followPlayer: false,
+        nextTickAt: w.now, hurtsPlayer: false, statusEffectId: 'slow' });
+    }
+    pushAlert(w, evolved ? 'CIPHER SANCTUARY' : 'CIPHER CATHEDRAL');
+  } else if (railstaff) {
+    const railCount = evolved ? 5 : 3;
+    const normalX = -Math.sin(angle);
+    const normalY = Math.cos(angle);
+    for (let i = 0; i < railCount; i += 1) {
+      const offset = (i - (railCount - 1) / 2) * 26;
+      w.effects.push({ uid: uid(w), kind: 'laser', weaponId: weapon.id,
+        x: p.x + normalX * offset, y: p.y + normalY * offset, radius: reach, angle, spread: 0.07,
+        bornAt: w.now + i * 85, expiresAt: w.now + i * 85 + 480, color,
+        damage: damage * 0.72, impactIntensity: 3, hitUids: new Set(), followPlayer: false, statusEffectId: 'slow' });
+    }
+    spawnParticles(w, p.x, p.y, color, 14, 110);
+  } else if (pitch) {
+    const returnX = p.x + Math.cos(angle) * reach * 0.82;
+    const returnY = p.y + Math.sin(angle) * reach * 0.82;
+    w.effects.push({ uid: uid(w), kind: 'wave', weaponId: weapon.id, x: p.x, y: p.y,
+      radius: reach, angle, spread: 0.52, bornAt: w.now, expiresAt: w.now + 440,
+      color, damage, impactIntensity: 3, hitUids: new Set(), followPlayer: false });
+    w.effects.push({ uid: uid(w), kind: 'wave', weaponId: weapon.id, x: returnX, y: returnY,
+      radius: reach * (evolved ? 0.95 : 0.75), angle: angle + Math.PI, spread: evolved ? 0.7 : 0.52,
+      bornAt: w.now + 380, expiresAt: w.now + 820, color,
+      damage: damage * (evolved ? 0.95 : 0.65), impactIntensity: 3, hitUids: new Set(), followPlayer: false });
+    spawnParticles(w, returnX, returnY, color, 9, 100);
+  } else if (cache) {
+    const cx = target?.x ?? p.x + Math.cos(angle) * reach * 0.65;
+    const cy = target?.y ?? p.y + Math.sin(angle) * reach * 0.65;
+    const count = evolved ? 4 : 3;
+    for (let i = 0; i < count; i += 1) {
+      const beat = w.now + i * 320;
+      const drift = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1) * reach * 0.35;
+      w.effects.push({ uid: uid(w), kind: 'hazard', weaponId: weapon.id,
+        x: cx + Math.cos(angle + Math.PI / 2) * drift, y: cy + Math.sin(angle + Math.PI / 2) * drift,
+        radius: reach * 0.43, angle: 0, spread: 0, bornAt: beat, expiresAt: beat + 1450,
+        color, damage: damage * 0.3, impactIntensity: 2, hitUids: new Set(), followPlayer: false,
+        nextTickAt: beat, hurtsPlayer: false, statusEffectId: 'slow' });
+    }
+    pushAlert(w, evolved ? 'CHORUS CACHE · FOURTH HOOK' : 'CACHE OF LOST HOOKS');
+  } else if (breakpoint) {
+    const blows = evolved ? 3 : 2;
+    for (let i = 0; i < blows; i += 1) {
+      w.effects.push({ uid: uid(w), kind: 'slash', weaponId: weapon.id, x: p.x, y: p.y,
+        radius: reach * (0.75 + i * 0.1), angle: angle + (i % 2 === 0 ? -0.18 : 0.18), spread: 0.43,
+        bornAt: w.now + i * 125, expiresAt: w.now + i * 125 + 260, color,
+        damage: damage * (i === blows - 1 ? 1 : 0.65), impactIntensity: 4,
+        hitUids: new Set(), followPlayer: true, statusEffectId: 'freeze' });
+    }
+    if (target) {
+      applyStatusEffect(w, target, 'freeze');
+      spawnParticles(w, target.x, target.y, color, 12, 95);
+    }
+  }
+
+  if (cipher || railstaff || pitch || cache || breakpoint) {
+    w.shake = Math.max(w.shake, evolved ? 5 : 3);
     return true;
   }
 
@@ -5205,6 +5293,16 @@ function updateOrbiters(w: World, dt: number) {
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
         damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy);
+        if (weapon.id === 'commentstorm-crown' || weapon.id === 'crown-of-replies') {
+          const burstRadius = weapon.id === 'crown-of-replies' ? 62 : 38;
+          novaDamage(w, ox, oy, burstRadius, damage * 0.32, 1, 'slow');
+          w.effects.push({ uid: uid(w), kind: 'ring', weaponId: weapon.id,
+            x: ox, y: oy, radius: burstRadius, angle: 0, spread: 0,
+            bornAt: w.now, expiresAt: w.now + 230, color: weapon.color ?? '#ffe38d',
+            damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false });
+          w.popups.push({ x: ox, y: oy - 20, text: weapon.id === 'crown-of-replies' ? '!!' : '?!',
+            color: weapon.color ?? '#ffe38d', bornAt: w.now, vy: 28 });
+        }
         const behavior = weaponEvolutionBehavior(w, weapon);
         if (behavior?.kind === 'orbit-burst') {
           const burstRadius = behavior.radius ?? 56;

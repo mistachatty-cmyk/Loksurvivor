@@ -263,7 +263,7 @@ export const LORE_CHRONICLES: LoreEntry[] = [
     ],
     keyIntel: [
       'Firewall Verse burns a guard arc; Rewind Mercy returns a marked threat; Eclipse Severance cuts a slowing breach seam.',
-      'The four endgame Armory weapons open in alternating 750,000 and 1,000,000 lifetime-kill steps after Victory Lap.',
+      'The ten Volume I endgame Armory weapons open in alternating 750,000 and 1,000,000 lifetime-kill steps after Victory Lap.',
       'Their evolution offers can be switched off in Endgame settings without sealing the base blades.',
     ],
   },
@@ -285,6 +285,27 @@ export const LORE_CHRONICLES: LoreEntry[] = [
       'DigiFrog Lance is the first endgame Armory milestone at 750,000 lifetime kills.',
       'Sticky slows enemies; Grossed Out interrupts nearby witnesses for a moment.',
       'Max the lance and Chain Whip, then take Street Map to offer Tongue-Tether Typhoon when endgame evolutions are on.',
+    ],
+  },
+  {
+    id: 'volume-one-six',
+    chapterNumber: 14,
+    title: 'The Six Sealed Scores',
+    subtitle: 'Shelter, Bass, Replies, Return, Memory, Interruption',
+    codename: 'VOLUME_ONE_SECOND_SHELF',
+    classifiedLevel: 'CONFIDENTIAL',
+    timestamp: 'CYCLE 616.99 // GRPD ARMORY',
+    summary: 'The Armory keeper opened six more Volume I designs after survivors proved the first four could be carried safely.',
+    content: [
+      'Cipher Cathedral was drawn by shelter crews who needed a bright place to stand while the streets moved. Three glyphs make its first walls; mastery nests another enclosure inside them.',
+      'Subwoofer Railstaff borrows the rail yard’s straight lines and the studio’s low end. Pitch Reaper takes a sampled note out and brings it home. Neither needs a singer’s voice to be heard.',
+      'Commentstorm Crown turns hostile chatter into orbiting punctuation. Cache of Lost Hooks replays a phrase where a crowd thought it had escaped. Breakpoint Hands stops a dangerous push long enough to make room for the next survivor.',
+      'The keeper keeps their switches separate. Earning a blueprint means it can be used, never that it must be. Every new shelf item waits for a survivor to activate it in the Armory.',
+    ],
+    keyIntel: [
+      'All six open in alternating 750,000 and 1,000,000 lifetime-kill steps after the Digi-Tana Trinity.',
+      'Each evolution needs its base and partner weapon at level 8 plus a passive.',
+      'Armory activation still controls whether any of these weapons can enter a run.',
     ],
   },
 ];

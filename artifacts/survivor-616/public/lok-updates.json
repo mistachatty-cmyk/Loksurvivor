@@ -7,6 +7,18 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 44,
+      "version": "0.15.0",
+      "date": "2026-10-06",
+      "kind": "update",
+      "title": "Six More Scores Leave the Armory",
+      "body": [
+        "Cipher Cathedral, Subwoofer Railstaff, Commentstorm Crown, Pitch Reaper, Cache of Lost Hooks, and Breakpoint Hands now join the endgame Armory shelf.",
+        "Their lifetime-kill milestones continue the alternating 750,000 and 1,000,000 step pattern. Each stays out of runs until switched on in the Armory.",
+        "Each weapon has its own combat pattern, pixel model, and three-part evolution recipe. The Endgame evolution switch controls all ten Volume I offers."
+      ]
+    },
+    {
       "number": 43,
       "version": "0.14.1",
       "date": "2026-10-06",

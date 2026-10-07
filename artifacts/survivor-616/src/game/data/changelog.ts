@@ -486,6 +486,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Each has a weapon-and-passive evolution recipe. Endgame weapon evolutions start on when Victory Lap opens and can be switched off in Endgame settings.',
     ],
   },
+  {
+    version: '0.15.0',
+    date: '2026-10-06',
+    kind: 'update',
+    title: 'Six More Scores Leave the Armory',
+    body: [
+      'Cipher Cathedral, Subwoofer Railstaff, Commentstorm Crown, Pitch Reaper, Cache of Lost Hooks, and Breakpoint Hands now join the endgame Armory shelf.',
+      'Their lifetime-kill milestones continue the alternating 750,000 and 1,000,000 step pattern. Each stays out of runs until switched on in the Armory.',
+      'Each weapon has its own combat pattern, pixel model, and three-part evolution recipe. The Endgame evolution switch controls all ten Volume I offers.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

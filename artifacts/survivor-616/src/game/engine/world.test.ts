@@ -265,6 +265,46 @@ test('the Digi-Tana Trinity has three distinct combat paths', () => {
   assert.ok(eclipse.effects.some((effect) => effect.weaponId === 'eclipse-severance' && effect.kind === 'laser'));
 });
 
+test('six Volume I archive weapons create their intended combat patterns', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const expectations = [
+    ['cipher-cathedral', 'hazard', 3],
+    ['subwoofer-railstaff', 'laser', 3],
+    ['pitch-reaper', 'wave', 2],
+    ['cache-of-lost-hooks', 'hazard', 3],
+    ['breakpoint-hands', 'slash', 2],
+  ] as const;
+  for (const [id, kind, count] of expectations) {
+    const world = createWorld(area, testCharacter(id), CHARACTERS[0]!.stats, 620);
+    addEnemy(world, 'nightcrawler', 80, 0);
+    world.weapons[0]!.readyAt = 0;
+    stepWorld(world, 1 / 30, neutralInput);
+    assert.equal(world.effects.filter((effect) => effect.weaponId === id && effect.kind === kind).length, count, id);
+  }
+
+  const crown = createWorld(area, testCharacter('commentstorm-crown'), CHARACTERS[0]!.stats, 621);
+  assert.ok(crown.weapons[0]!.def.kind === 'orbit');
+  assert.ok(crown.orbiters.some((orb) => orb.weaponId === 'commentstorm-crown'));
+});
+
+test('new Volume I evolutions add visible combat layers', () => {
+  const area = { ...testArea({ x: 900, y: 900, w: 20, h: 20, kind: 'cover' as const }), obstacles: [] };
+  const cases = [
+    ['cipher-cathedral', 'cipher-sanctuary', 'hazard', 6],
+    ['subwoofer-railstaff', 'bassline-overdrive', 'laser', 5],
+    ['cache-of-lost-hooks', 'chorus-cache', 'hazard', 4],
+    ['breakpoint-hands', 'breakpoint-finale', 'slash', 3],
+  ] as const;
+  for (const [baseId, evolutionId, kind, count] of cases) {
+    const world = createWorld(area, testCharacter(baseId), CHARACTERS[0]!.stats, 622);
+    world.weapons[0]!.def = EVOLUTIONS_BY_ID[evolutionId]!.result;
+    world.weapons[0]!.readyAt = 0;
+    addEnemy(world, 'nightcrawler', 80, 0);
+    stepWorld(world, 1 / 30, neutralInput);
+    assert.equal(world.effects.filter((effect) => effect.weaponId === evolutionId && effect.kind === kind).length, count, evolutionId);
+  }
+});
+
 test('impact travel respects authored force, mass, and resistance', () => {
   const light = resolveImpactTravel(3, 0.6);
   const heavy = resolveImpactTravel(3, 3.2);
