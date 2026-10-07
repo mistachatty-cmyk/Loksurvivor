@@ -656,6 +656,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral.',
     ],
   },
+  {
+    version: '0.19.3',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'hotfix',
+    title: 'Settings Jump Menu Complete',
+    body: [
+      'The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Scrollbar, Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
