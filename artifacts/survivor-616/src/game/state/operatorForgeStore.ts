@@ -9,8 +9,9 @@
  * corrupt data, and never throws.
  */
 import {
-  MAX_FORGED_OPERATORS, normalizeForgedOperator, type ForgedOperator,
+  HEX, MAX_FORGED_OPERATORS, PALETTE_KEYS, normalizeForgedOperator, type ForgedOperator,
 } from '@/game/data/operatorForge';
+import type { SpritePalette } from '@/game/types';
 import { CUSTOM_SLOT_IDS, ENDGAME_FEATURE_IDS, type EndgameFeatureId } from '@/game/data/endgameUnlocks';
 
 export const FORGE_STORAGE_KEY = 'survivor616.forge.v1';
@@ -27,6 +28,53 @@ export interface ForgeState {
   earned: string[];
   /** Explicit on/off choices; a missing key means "use the default". */
   toggles: Partial<Record<EndgameFeatureId, boolean>>;
+  /** Cosmetic recolors of classic enemies. Never change stats or behavior. */
+  customEnemies: CustomVariant[];
+  /** Cosmetic recolors of LokPet variants. */
+  customPets: CustomVariant[];
+}
+
+export type CustomVariantKind = 'enemy' | 'pet';
+
+/** A saved recolor of an existing enemy or LokPet (the base keeps its rig, stats and behavior). */
+export interface CustomVariant {
+  id: string;
+  baseId: string;
+  name: string;
+  palette: SpritePalette;
+  createdAt: number;
+}
+
+export const MAX_CUSTOM_VARIANTS = 60;
+
+function normalizeVariants(input: unknown): CustomVariant[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: CustomVariant[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Record<string, unknown>;
+    if (typeof raw.id !== 'string' || typeof raw.baseId !== 'string' || seen.has(raw.id)) continue;
+    const pal = (raw.palette && typeof raw.palette === 'object' ? raw.palette : {}) as Record<string, unknown>;
+    const palette = {} as SpritePalette;
+    let valid = true;
+    for (const key of PALETTE_KEYS) {
+      const value = pal[key];
+      if (typeof value === 'string' && HEX.test(value)) palette[key] = value;
+      else valid = false;
+    }
+    if (!valid) continue;
+    seen.add(raw.id);
+    out.push({
+      id: raw.id.slice(0, 64),
+      baseId: raw.baseId.slice(0, 64),
+      name: (typeof raw.name === 'string' && raw.name.trim() ? raw.name : 'Custom').slice(0, 40),
+      palette,
+      createdAt: typeof raw.createdAt === 'number' && Number.isFinite(raw.createdAt) ? raw.createdAt : 0,
+    });
+    if (out.length >= MAX_CUSTOM_VARIANTS) break;
+  }
+  return out;
 }
 
 function storage(): Storage | null {
@@ -53,7 +101,7 @@ function devModeForgeAccess(): boolean {
 
 function normalizeForgeState(input: unknown): ForgeState | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
-  const parsed = input as { unlocked?: unknown; operators?: unknown; earned?: unknown; toggles?: unknown };
+  const parsed = input as { unlocked?: unknown; operators?: unknown; earned?: unknown; toggles?: unknown; customEnemies?: unknown; customPets?: unknown };
   try {
     const seen = new Set<string>();
     const operators: ForgedOperator[] = [];
@@ -76,14 +124,14 @@ function normalizeForgeState(input: unknown): ForgeState | null {
         if (typeof value === 'boolean') toggles[id] = value;
       }
     }
-    return { unlocked: parsed.unlocked === true, operators, earned, toggles };
+    return { unlocked: parsed.unlocked === true, operators, earned, toggles, customEnemies: normalizeVariants(parsed.customEnemies), customPets: normalizeVariants(parsed.customPets) };
   } catch {
     return null;
   }
 }
 
 function read(): ForgeState {
-  const empty: ForgeState = { unlocked: false, operators: [], earned: [], toggles: {} };
+  const empty: ForgeState = { unlocked: false, operators: [], earned: [], toggles: {}, customEnemies: [], customPets: [] };
   const store = storage();
   if (!store) return empty;
   try {
@@ -208,4 +256,31 @@ export function saveForgedOperator(op: ForgedOperator): boolean {
 export function deleteForgedOperator(id: string): void {
   const state = read();
   write({ ...state, operators: state.operators.filter((o) => o.id !== id) });
+}
+
+/* ------------------------------------------------------------------ */
+/* Classic enemy and LokPet recolors                                   */
+
+const variantKey = (kind: CustomVariantKind) => (kind === 'enemy' ? 'customEnemies' : 'customPets') as 'customEnemies' | 'customPets';
+
+export function loadCustomVariants(kind: CustomVariantKind): CustomVariant[] {
+  return read()[variantKey(kind)];
+}
+
+/** Adds or replaces (same id) a recolor. Returns false when full or storage is unavailable. */
+export function saveCustomVariant(kind: CustomVariantKind, variant: CustomVariant): boolean {
+  const state = read();
+  const key = variantKey(kind);
+  const list = [...state[key]];
+  const at = list.findIndex((v) => v.id === variant.id);
+  if (at >= 0) list[at] = variant;
+  else if (list.length >= MAX_CUSTOM_VARIANTS) return false;
+  else list.push(variant);
+  return write({ ...state, [key]: list });
+}
+
+export function deleteCustomVariant(kind: CustomVariantKind, id: string): void {
+  const state = read();
+  const key = variantKey(kind);
+  write({ ...state, [key]: state[key].filter((v) => v.id !== id) });
 }

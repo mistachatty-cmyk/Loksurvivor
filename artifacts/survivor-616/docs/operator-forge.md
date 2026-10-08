@@ -147,3 +147,9 @@ This is meant to grow. Everything is a data entry:
 - Using the generator for hideout visitors and rescued allies.
 - Player-imported art as custom parts (designed in `docs/lokpet-creature-design.md`, not built).
 - Live registration without a reload.
+
+## Three screens and the Classic look (0.19.12)
+
+- The Forge has a top nav: **Operators**, **Enemies**, **LokPets** (`OperatorForgePanel`). All screens stay mounted and are only hidden, so switching is instant and keeps each screen's state. The last screen is remembered in `survivor616.forge.tab`.
+- **Classic v1** is a per-design option (`OperatorDesign.style === 'classic'`): `buildOperatorRig` returns the bare `humanoidRig` and skips the feature stack. The detailed look stays in the design, so switching back loses nothing. Only `'classic'` is stored; a missing `style` means detailed, so old saves and share codes are unchanged. Authored operators are still never re-rigged.
+- **Enemies** and **LokPets** are classic galleries (`VariantStudio`): browse the real rigs, recolor, save a cosmetic custom look (`customEnemies`/`customPets` in the forge store, included in the save archive). Stats and behavior never change. Not yet drawn in runs or the Bestiary. Full part-by-part forges for both are the next step.

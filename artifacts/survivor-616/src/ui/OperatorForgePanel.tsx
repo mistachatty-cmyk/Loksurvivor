@@ -22,6 +22,9 @@ import { CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
 import { useMeta } from '@/game/state/metaStore';
 import type { AnimName } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
+import { ClassicEnemiesTab } from './ClassicEnemiesTab';
+import { ClassicLokPetsTab } from './ClassicLokPetsTab';
+import { t } from '@/lib/i18n';
 
 const BUTTON =
   'min-h-10 border border-border bg-background px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary disabled:opacity-40';
@@ -34,6 +37,19 @@ let seedCounter = 0;
 function freshSeed(): string {
   seedCounter += 1;
   return `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}${seedCounter}`;
+}
+
+type ForgeTab = 'operators' | 'enemies' | 'lokpets';
+const FORGE_TABS: ForgeTab[] = ['operators', 'enemies', 'lokpets'];
+const TAB_KEY = 'survivor616.forge.tab';
+
+function readTab(): ForgeTab {
+  try {
+    const value = localStorage.getItem(TAB_KEY);
+    return FORGE_TABS.includes(value as ForgeTab) ? (value as ForgeTab) : 'operators';
+  } catch {
+    return 'operators';
+  }
 }
 
 type ForgeDraft = { design: OperatorDesign; identity: ReturnType<typeof generateOperatorIdentity>; kitId: string };
@@ -50,6 +66,11 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     [meta.unlockedCharacterIds, meta.devModeAllUnlocks],
   );
 
+  const [tab, setTabState] = useState<ForgeTab>(readTab);
+  const setTab = (next: ForgeTab) => {
+    setTabState(next);
+    try { localStorage.setItem(TAB_KEY, next); } catch { /* storage is optional */ }
+  };
   const factionRaces = useMemo(() => isFeatureEnabled('factionRaces'), []);
   const [seed, setSeed] = useState(() => freshSeed());
   const [genSpecies, setGenSpecies] = useState('');
@@ -117,7 +138,8 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       setPast([]);
       setFuture([]);
       const options = { species: preset ? undefined : genSpecies || undefined, flavor: preset ?? (genFlavor || undefined) as OperatorFlavor | undefined, coreOnly: !factionRaces };
-      const nextDesign = generateOperatorDesign(nextSeed, options);
+      const generated = generateOperatorDesign(nextSeed, options);
+      const nextDesign: OperatorDesign = design.style === 'classic' ? { ...generated, style: 'classic' } : generated;
       baseDesign.current = nextDesign;
       if (preset) { setGenFlavor(preset); setGenSpecies(''); }
       setSeed(nextSeed);
@@ -126,7 +148,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       setEditingId(null);
       setDirty(true);
     },
-    [genFlavor, genSpecies, factionRaces, dirty],
+    [genFlavor, genSpecies, factionRaces, dirty, design.style],
   );
 
   const reroll = (target: RerollTarget) => {
@@ -354,6 +376,28 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
           </div>
         ) : null}
 
+        <nav className="mt-4 flex gap-2 border-b border-border pb-2" role="tablist" aria-label={t('forge.nav.aria')} data-testid="forge-nav">
+          {FORGE_TABS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`forge-tab-${id}`}
+              aria-selected={tab === id}
+              aria-controls={`forge-screen-${id}`}
+              onClick={() => setTab(id)}
+              className={`min-h-10 flex-1 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest sm:flex-none ${tab === id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-white'}`}
+              data-testid={`forge-tab-${id}`}
+            >
+              {t(`forge.nav.${id}` as const)}
+            </button>
+          ))}
+        </nav>
+
+        <div id="forge-screen-enemies" role="tabpanel" aria-labelledby="forge-tab-enemies" hidden={tab !== 'enemies'}><ClassicEnemiesTab /></div>
+        <div id="forge-screen-lokpets" role="tabpanel" aria-labelledby="forge-tab-lokpets" hidden={tab !== 'lokpets'}><ClassicLokPetsTab /></div>
+
+        <div id="forge-screen-operators" role="tabpanel" aria-labelledby="forge-tab-operators" hidden={tab !== 'operators'}>
         <div className="sticky top-0 z-20 mt-4 flex items-center gap-3 border border-primary/40 bg-card p-2 shadow-lg lg:hidden" data-testid="forge-mobile-preview">
           <RigPortrait rig={rig} palette={design.palette} anim={anim} size={88} animated={false} />
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-black uppercase">{identity.name || 'New operator'}</p><p className="text-xs text-muted-foreground">{species.label} · {dirty ? 'Unsaved changes' : editingId ? 'Saved' : 'New design'}</p></div>
@@ -490,6 +534,28 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
 
+            <section className="border border-border bg-card p-4" data-testid="section-forge-style">
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('forge.style.label')}>
+                <span className={LABEL}>{t('forge.style.label')}</span>
+                {(['classic', 'detailed'] as const).map((id) => {
+                  const active = (design.style ?? 'detailed') === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => { setDesign((current) => { const { style: _drop, ...rest } = current; return id === 'classic' ? { ...rest, style: 'classic' } : rest; }); setDirty(true); }}
+                      className={`min-h-10 border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${active ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:text-white'}`}
+                      data-testid={`button-forge-style-${id}`}
+                    >
+                      {t(`forge.style.${id}` as const)}
+                    </button>
+                  );
+                })}
+              </div>
+              {design.style === 'classic' ? <p className="mt-2 text-xs text-muted-foreground">{t('forge.style.classicHint')}</p> : null}
+            </section>
+
             <section id="forge-body" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-body">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-black uppercase tracking-wide">Body</h2>
@@ -574,7 +640,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
 
-            {FORGE_GROUPS.map((group) => (
+            {design.style === 'classic' ? null : FORGE_GROUPS.map((group) => (
               <section key={group} id={`forge-${group.toLowerCase().replace(/\s+/g, '-')}`} className="scroll-mt-36 border border-border bg-card p-4" data-testid={`section-forge-${group.toLowerCase()}`}>
                 <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-black uppercase tracking-wide">{group}</h2><button type="button" className={BUTTON} onClick={() => resetSection(group)}>Reset section</button></div>
                 <div className="mt-3 space-y-2">
@@ -685,6 +751,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
           </div>
+        </div>
         </div>
       </div>
     </div>,

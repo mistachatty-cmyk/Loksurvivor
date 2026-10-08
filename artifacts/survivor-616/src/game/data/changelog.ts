@@ -759,6 +759,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A .616project backup carries the song and its local sounds. WAV exports and To Soundtrack remain available; Studio songs carry their authored BPM into the game.',
     ],
   },
+  {
+    version: '0.19.12',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T21:30:00Z',
+    kind: 'update',
+    title: 'Forge Gets Three Screens',
+    body: [
+      'The Forge now has a top bar with Operators, Enemies and LokPets. Switching is instant and each screen keeps where you left it.',
+      'Operators can use the Classic v1 look: the original plain build, with your detailed v2 features kept for when you switch back.',
+      'Enemies and LokPets open as classic galleries. Recolor any of them and keep it as a custom look. Stats and behavior never change; full part-by-part forging for both comes next.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
