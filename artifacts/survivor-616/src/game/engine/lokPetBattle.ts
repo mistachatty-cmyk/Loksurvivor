@@ -165,6 +165,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   const stageMult = stage === 3 ? 1.3 : stage === 2 ? 1.15 : 1.0;
   // A chosen branch renames and re-dresses the later forms; stats still follow the stage only.
   const look = petEvolvedLook(savedPet);
+  const superCharged = savedPet.superCharged === true ? true : undefined;
 
   // Scaled stats
   const baseHp = roll.stats?.health || 100;
@@ -201,6 +202,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
 
   return {
     id: `battle-${savedPet.id}-${Date.now()}`,
+    superCharged,
     originalSavedPetId: savedPet.id,
     // The battle name (slot 2) when earned, otherwise the call name, otherwise the species.
     name: petBattleName(savedPet),
@@ -853,7 +855,7 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
 
   for (const pet of state.playerTeam) {
     const oldLevel = pet.level;
-    const grown = applyPetExp({ level: oldLevel, exp: pet.exp, starter: pet.starter }, baseExp);
+    const grown = applyPetExp({ level: oldLevel, exp: pet.exp, starter: pet.starter, superCharged: pet.superCharged }, baseExp);
     const newLevel = grown.level;
     pet.exp = grown.exp;
     pet.expToNext = getExpForLevel(newLevel);

@@ -26,6 +26,7 @@ import {
   stepHideoutPet,
   stepOperatorWalk,
   tapPet,
+  checkSpinJackpot,
 } from '@/game/engine/hideoutPets';
 import { BOND_RANKS } from '@/game/engine/petGrowth';
 import { createInitialMeta, normalizeMeta, reducer } from '@/game/state/metaStore';
@@ -270,5 +271,31 @@ describe('hideout reducers', () => {
     assert.equal(loaded[0]!.careDay, '2026-06-01');
     assert.equal(loaded[1]!.hideoutEvents, undefined);
     assert.equal(loaded[1]!.careDay, undefined);
+  });
+});
+
+describe('hideout spin streaks', () => {
+  it('gets dizzy at 6 quick taps and sick at 14, and a sick pet ignores taps', () => {
+    const p = createHideoutPetState('p1', 300);
+    let now = 1000;
+    const results: string[] = [];
+    for (let i = 0; i < 14; i += 1) { results.push(tapPet(p, now)); now += 200; }
+    assert.notEqual(results[4], 'dizzy');
+    assert.equal(results[5], 'dizzy');
+    assert.equal(results[13], 'sick');
+    assert.equal(p.emote?.kind, 'sick');
+    assert.equal(tapPet(p, now), 'sick');
+  });
+
+  it('super charges only when left on exactly 249 spins', () => {
+    const exact = createHideoutPetState('p1', 300);
+    let now = 1000;
+    for (let i = 0; i < 249; i += 1) { exact.sickUntil = 0; tapPet(exact, now); now += 1000; }
+    assert.equal(checkSpinJackpot(exact, now - 1000 + 100), false, 'still tapping');
+    assert.equal(checkSpinJackpot(exact, now + 2000), true);
+    assert.equal(checkSpinJackpot(exact, now + 4000), false, 'only once');
+    const over = createHideoutPetState('p2', 300);
+    for (let i = 0; i < 250; i += 1) { over.sickUntil = 0; tapPet(over, now); now += 1000; }
+    assert.equal(checkSpinJackpot(over, now + 2000), false);
   });
 });

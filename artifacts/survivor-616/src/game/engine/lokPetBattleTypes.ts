@@ -39,6 +39,8 @@ export interface LokPetBattleMove {
 
 export interface BattlePet {
   id: string;
+  /** Super charged in the hideout: +2% XP. */
+  superCharged?: boolean;
   originalSavedPetId?: string;
   name: string;
   variantId: string;

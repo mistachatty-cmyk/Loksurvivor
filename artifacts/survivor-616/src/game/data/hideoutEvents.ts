@@ -54,10 +54,10 @@ export function temperamentFor(petId: string): HideoutTemperament {
 
 export type HideoutTimeOfDay = 'dawn' | 'day' | 'dusk' | 'night';
 export type HideoutMove = 'hop' | 'spin' | 'sit' | 'nap' | 'dash' | 'sway' | 'splash' | 'sniff' | 'bow';
-export type HideoutEmote = 'heart' | 'note' | 'zzz' | 'spark' | 'bang' | 'drop' | 'star';
+export type HideoutEmote = 'heart' | 'note' | 'zzz' | 'spark' | 'bang' | 'drop' | 'star' | 'dizzy' | 'sick' | 'charge';
 
 export const HIDEOUT_MOVES: HideoutMove[] = ['hop', 'spin', 'sit', 'nap', 'dash', 'sway', 'splash', 'sniff', 'bow'];
-export const HIDEOUT_EMOTES: HideoutEmote[] = ['heart', 'note', 'zzz', 'spark', 'bang', 'drop', 'star'];
+export const HIDEOUT_EMOTES: HideoutEmote[] = ['heart', 'note', 'zzz', 'spark', 'bang', 'drop', 'star', 'dizzy', 'sick', 'charge'];
 
 export function timeOfDayFor(hour: number): HideoutTimeOfDay {
   if (hour >= 5 && hour < 9) return 'dawn';

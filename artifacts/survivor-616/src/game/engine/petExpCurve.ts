@@ -14,6 +14,9 @@ export const PET_EXP_SCALE = 10;
 
 export const scalePetExp = (base: number): number => Math.max(0, Math.round(base * PET_EXP_SCALE));
 
+/** A super charged pet (exactly 249 hideout spins) earns 2% more XP. */
+export const SUPER_CHARGE_EXP_MULT = 1.02;
+
 /** Starter partners cap at 99, every other pet at 50 (Limit Break raises these later). */
 export const petMaxLevel = (starter?: boolean): number => (starter === true ? 99 : 50);
 
@@ -25,7 +28,8 @@ export interface PetExpResult {
 }
 
 /** Adds XP, rolling the remainder into the next level. At the cap the bar sits full, never overflowing. */
-export function applyPetExp(pet: { level?: number; exp?: number; starter?: boolean }, gained: number): PetExpResult {
+export function applyPetExp(pet: { level?: number; exp?: number; starter?: boolean; superCharged?: boolean }, rawGained: number): PetExpResult {
+  const gained = pet.superCharged === true ? Math.round(rawGained * SUPER_CHARGE_EXP_MULT) : rawGained;
   const max = petMaxLevel(pet.starter);
   let level = Math.max(1, Math.min(max, Math.floor(pet.level ?? 1)));
   let exp = Math.max(0, Math.floor(pet.exp ?? 0)) + Math.max(0, Math.floor(gained));

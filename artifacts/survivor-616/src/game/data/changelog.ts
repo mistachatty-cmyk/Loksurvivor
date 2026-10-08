@@ -957,6 +957,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Hideout notes like "Already done today" now sit small in the top corner of the strip, capped to two lines, instead of covering your pets and the use prompt.',
     ],
   },
+  {
+    version: '0.21.8',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T01:00:00Z',
+    kind: 'update',
+    title: 'Spin Cycle',
+    body: [
+      'LokPets now spin when a song starts in the hideout. In Settings you choose every song or every other song, a short burst or the whole song, and whether closer pets join in more often (strangers rarely, partners always). It can be switched off.',
+      'Tap a LokPet quickly: after 6 taps it gets dizzy and stumbles around, and after 14 it gets sick and needs a rest. Stop on exactly 249 spins and it super charges for 2% more XP, for good.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

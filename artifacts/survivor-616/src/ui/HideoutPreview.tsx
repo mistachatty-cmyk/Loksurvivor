@@ -45,6 +45,7 @@ import {
   startMove,
   stepHideoutPet,
   tapPet,
+  checkSpinJackpot,
   type HideoutPetState,
 } from '@/game/engine/hideoutPets';
 import {
@@ -59,6 +60,7 @@ import type { BondRankId } from '@/game/engine/petGrowth';
 import { drawProp, PROP_HALF_WIDTH_UNITS, PROP_HEIGHT_UNITS } from '@/ui/hideoutPropArt';
 import { drawRig } from '@/game/render/sprite';
 import { hideoutNoticeMs } from '@/game/state/hideoutNoticeSetting';
+import { SONG_SPIN_BURST_MS, getSongSpinSettings, songSpinChance, songSpinsOn } from '@/game/state/songSpinSetting';
 import type { EvolutionOverlayId, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
@@ -123,6 +125,8 @@ export interface HideoutPreviewProps {
   onPetCare?: (petId: string) => void;
   /** An event played for a pet. The parent saves the reward and cooldown. */
   onPetEvent?: (petId: string, eventId: string) => void;
+  /** A pet was left on exactly 249 spins: it is super charged for good. */
+  onPetSuperCharge?: (petId: string) => void;
   /** Delay before the first event, ms. */
   firstEventDelayMs?: number;
   /** Props in the room. Empty when Walk and props is off. */
@@ -150,6 +154,9 @@ const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
   bang: '!',
   drop: '•',
   star: '★',
+  dizzy: '@',
+  sick: '~',
+  charge: '⚡',
 };
 
 const DANCE_EMOTES: HideoutEmote[] = ['note', 'spark', 'note', 'star'];
@@ -161,7 +168,7 @@ const MAX_PETS = 4;
 
 export function HideoutPreview({
   rig, palette, height = 176, className = '', pets = [], weather = 'clear', eventsMode = 'on',
-  onPetCare, onPetEvent, firstEventDelayMs = 9000,
+  onPetCare, onPetEvent, onPetSuperCharge, firstEventDelayMs = 9000,
   props: roomProps = [], interactive = false, keyboardActive = true, cue, notice,
   onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip,
 }: HideoutPreviewProps) {
@@ -174,11 +181,11 @@ export function HideoutPreview({
   // The effect below keeps one canvas loop alive for as long as the operator's look is
   // unchanged, so everything else reaches it through this ref instead of restarting it.
   const live = useRef({
-    pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
+    pets, weather, eventsMode, onPetCare, onPetEvent, onPetSuperCharge, firstEventDelayMs,
     roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat,
   });
   live.current = {
-    pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
+    pets, weather, eventsMode, onPetCare, onPetEvent, onPetSuperCharge, firstEventDelayMs,
     roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat,
   };
 
@@ -269,6 +276,10 @@ export function HideoutPreview({
     const ripples: Ripple[] = [];
     let nextEventAt = live.current.firstEventDelayMs;
     let lastBeatIndex = -1;
+    let songWasActive = false;
+    let songNumber = 0;
+    let lastSongBeat = -1;
+    const songSpinUntil = new Map<string, number>();
     let raf = 0;
 
     const burst = (x: number, y: number, color: string, count: number, now: number) => {
@@ -388,6 +399,31 @@ export function HideoutPreview({
       // Music: a quiet strip when nothing plays, a bouncing one when something does.
       const audio = beatBus.read();
       const groove = { active: audio.source !== 'none' && audio.energy > 0.04, phase: audio.phase, energy: audio.energy };
+      // A song starts when the music goes from quiet to playing, or the beat count jumps back (a new track).
+      const songStarted = groove.active && (!songWasActive || audio.beatIndex < lastSongBeat - 8);
+      if (groove.active) lastSongBeat = audio.beatIndex;
+      songWasActive = groove.active;
+      if (!groove.active) songSpinUntil.clear();
+      if (songStarted && !reduceMotion) {
+        songNumber += 1;
+        const spin = getSongSpinSettings();
+        songSpinUntil.clear();
+        if (spin.enabled && songSpinsOn(songNumber, spin.cadence)) {
+          wanted.forEach((info) => {
+            if (rng() < songSpinChance(info.bondRank, spin.byBond)) {
+              songSpinUntil.set(info.id, spin.length === 'song' ? Infinity : now + SONG_SPIN_BURST_MS);
+            }
+          });
+        }
+      }
+      songSpinUntil.forEach((until, id) => {
+        const state = states.get(id);
+        if (!state || now >= until) { if (now >= until) songSpinUntil.delete(id); return; }
+        if (!state.move && now >= state.sickUntil) {
+          startMove(state, 'spin', now, 900);
+          if (!state.emote) setEmote(state, 'note', now, 900);
+        }
+      });
       if (groove.active && !reduceMotion && audio.beatIndex !== lastBeatIndex) {
         lastBeatIndex = audio.beatIndex;
         if (audio.beatIndex % 4 === 0) {
@@ -402,6 +438,16 @@ export function HideoutPreview({
           });
         }
       }
+
+      // Left on exactly 249 spins: super charged.
+      wanted.forEach((info) => {
+        const state = states.get(info.id);
+        if (state && checkSpinJackpot(state, now)) {
+          burst(state.x, groundY - petLook(info).height, '#fde047', 14, now);
+          setToast({ key: Date.now(), title: 'Super charged', line: `${info.name} stopped on exactly 249 spins. It now earns +2% XP.` });
+          settings.onPetSuperCharge?.(info.id);
+        }
+      });
 
       // Events: now and then one pet plays a short scene, with a one-line prompt.
       if (settings.eventsMode !== 'off' && !reduceMotion && wanted.length > 0 && now >= nextEventAt) {
@@ -546,9 +592,10 @@ export function HideoutPreview({
         }
       }
       if (hit && hitState) {
-        tapPet(hitState, now);
-        burst(hitState.x, groundY - petLook(hit).height, hit.palette.glow, 5, now);
-        settings.onPetCare?.(hit.id);
+        const tapped = tapPet(hitState, now);
+        burst(hitState.x, groundY - petLook(hit).height, hit.palette.glow, tapped === 'sick' ? 1 : 5, now);
+        // A sick pet needs a rest: no care credit until it recovers.
+        if (tapped !== 'sick') settings.onPetCare?.(hit.id);
         settings.onFocusPet?.(hit.id);
         return;
       }

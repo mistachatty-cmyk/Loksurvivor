@@ -154,7 +154,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, superChargeLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const locale = useLocale();
@@ -607,6 +607,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             weather={scene.weather}
             eventsMode={meta.hideoutEvents}
             onPetCare={careForLokPet}
+            onPetSuperCharge={superChargeLokPet}
             onPetEvent={completeHideoutEvent}
             firstEventDelayMs={import.meta.env.DEV && new URLSearchParams(window.location.search).has('fastPetEvents') ? 600 : undefined}
             props={hideoutPropInfos}

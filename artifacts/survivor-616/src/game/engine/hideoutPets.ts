@@ -76,13 +76,19 @@ export interface HideoutPetState {
   emote: { kind: HideoutEmote; start: number; until: number } | null;
   /** Strip time it was last tapped (for the double-tap trick). */
   lastTapAt: number;
+  /** Rapid taps in the current streak, and every tap this visit. */
+  spinStreak: number;
+  spinTotal: number;
+  /** Strip time the dizzy or sick spell ends (0 when neither). */
+  dizzyUntil: number;
+  sickUntil: number;
   temperamentId: HideoutTemperament['id'];
 }
 
 export function createHideoutPetState(id: string, x: number): HideoutPetState {
   return {
     id, x, facing: 1, mode: 'follow', idleKind: 'sit', modeUntil: 0, targetX: x, walking: false,
-    operatorRestingSince: null, move: null, emote: null, lastTapAt: -10_000, temperamentId: temperamentFor(id).id,
+    operatorRestingSince: null, move: null, emote: null, lastTapAt: -10_000, spinStreak: 0, spinTotal: 0, dizzyUntil: 0, sickUntil: 0, temperamentId: temperamentFor(id).id,
   };
 }
 
@@ -130,6 +136,14 @@ export function stepHideoutPet(pet: HideoutPetState, input: PetStepInput): void 
   const t = HIDEOUT_TEMPERAMENTS_BY_ID[pet.temperamentId];
 
   if (pet.emote && now >= pet.emote.until) pet.emote = null;
+
+  // Too many spins: it reels around dizzy, or lies still while sick.
+  if (now < pet.sickUntil) { pet.walking = false; pet.move = null; return; }
+  if (now < pet.dizzyUntil && !pet.move) {
+    if (!pet.walking || Math.abs(pet.targetX - pet.x) < 2) pet.targetX = clampRange(pet.x + (rng() - 0.5) * 120, range);
+    moveToward(pet, pet.targetX, dt, t.speed * 0.5, 0.01);
+    return;
+  }
 
   // A scripted move owns the pet until it ends (a dash runs, the others stay put).
   if (pet.move) {
@@ -187,6 +201,27 @@ export function stepHideoutPet(pet: HideoutPetState, input: PetStepInput): void 
   }
 }
 
+/** Rapid taps chain into a streak when each lands within this gap of the last. */
+export const SPIN_STREAK_GAP_MS = 700;
+export const SPIN_DIZZY_AT = 6;
+export const SPIN_SICK_AT = 14;
+export const SPIN_JACKPOT = 249;
+const DIZZY_MS = 4500;
+const SICK_MS = 9000;
+const SPIN_REST_MS = 1200;
+
+/**
+ * Call once per frame. When a streak has been quiet for a moment and the visit's spin total is exactly 249,
+ * the pet is super charged (returns true once). Overshooting 249 loses the chance for this visit.
+ */
+export function checkSpinJackpot(pet: HideoutPetState, now: number): boolean {
+  if (pet.spinTotal !== SPIN_JACKPOT || now - pet.lastTapAt < SPIN_REST_MS) return false;
+  pet.spinTotal += 1;
+  startMove(pet, 'hop', now, 1400);
+  setEmote(pet, 'charge', now, 2600);
+  return true;
+}
+
 /* ------------------------------ Moves and emotes ---------------------------- */
 
 export function startMove(pet: HideoutPetState, kind: HideoutMove, now: number, durationMs: number): void {
@@ -198,9 +233,26 @@ export function setEmote(pet: HideoutPetState, kind: HideoutEmote, now: number, 
 }
 
 /** You tapped the pet: a happy hop and a heart. A quick second tap does a spin. */
-export function tapPet(pet: HideoutPetState, now: number): 'pet' | 'trick' {
+export function tapPet(pet: HideoutPetState, now: number): 'pet' | 'trick' | 'dizzy' | 'sick' {
+  if (now < pet.sickUntil) return 'sick';
   const trick = now - pet.lastTapAt < 450;
+  pet.spinStreak = now - pet.lastTapAt < SPIN_STREAK_GAP_MS ? pet.spinStreak + 1 : 1;
+  pet.spinTotal += 1;
   pet.lastTapAt = now;
+  if (pet.spinStreak >= SPIN_SICK_AT) {
+    pet.sickUntil = now + SICK_MS;
+    pet.dizzyUntil = 0;
+    pet.spinStreak = 0;
+    startMove(pet, 'nap', now, SICK_MS);
+    setEmote(pet, 'sick', now, SICK_MS);
+    return 'sick';
+  }
+  if (pet.spinStreak >= SPIN_DIZZY_AT) {
+    pet.dizzyUntil = now + DIZZY_MS;
+    startMove(pet, 'spin', now, 900);
+    setEmote(pet, 'dizzy', now, DIZZY_MS);
+    return 'dizzy';
+  }
   startMove(pet, trick ? 'spin' : 'hop', now, trick ? 900 : 700);
   setEmote(pet, trick ? 'star' : 'heart', now);
   return trick ? 'trick' : 'pet';
@@ -250,6 +302,13 @@ export function petPose(pet: HideoutPetState, now: number, groove: GrooveInput, 
     pose.emoteAge = Math.min(1, (now - pet.emote.start) / Math.max(1, pet.emote.until - pet.emote.start));
   }
   if (still) return pose;
+
+  if (now < pet.sickUntil) { pose.scaleY = 0.8; pose.alpha = 0.8; return pose; }
+  if (now < pet.dizzyUntil) {
+    pose.scaleX = 1 + Math.sin(now / 90) * 0.1;
+    pose.lift += Math.abs(Math.sin(now / 140)) * 4;
+    pose.facing = Math.sin(now / 260) >= 0 ? 1 : -1;
+  }
 
   // Base: a little bob while walking, a sit or nap squash while resting.
   if (pet.walking) pose.lift = Math.abs(Math.sin(now / 95)) * 3.5;

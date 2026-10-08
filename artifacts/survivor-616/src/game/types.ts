@@ -215,6 +215,8 @@ export interface LokPetRoll {
 /** A captured, repeatable LokPet blueprint stored in the player's kennel. */
 export interface SavedLokPet {
   id: string;
+  /** Super charged by stopping a spin streak on exactly 249 spins: +2% XP from every source. */
+  superCharged?: boolean;
   roll: LokPetRoll;
   /** One charge is spent when the pet joins a run; elixirs restore it. */
   stamina: number;

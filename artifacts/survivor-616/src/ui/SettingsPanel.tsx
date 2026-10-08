@@ -51,6 +51,7 @@ import { MotionSetting } from './MotionToggle';
 import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
+import { SongSpinSetting } from './SongSpinSetting';
 import { SettingsPager } from './SettingsPager';
 import { CREW_TALK_MODES, CREW_TALK_TONES, getCrewTalkMode, getCrewTalkTone, setCrewTalkMode, setCrewTalkTone, type CrewTalkMode } from '@/game/state/crewTalkSetting';
 import type { Tone } from '@/game/engine/crewTalk';
@@ -995,6 +996,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     </div>
                   ))}
                   <CrewTalkSetting />
+                  <SongSpinSetting />
                   <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.notice.title')}</h3>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.notice.description')}</p>
                   <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.notice.title')}>

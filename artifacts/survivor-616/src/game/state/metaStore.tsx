@@ -942,6 +942,7 @@ function normalizeSavedLokPets(value: unknown): SavedLokPet[] {
       battlesWon: counter(candidate.battlesWon),
       battlesFought: counter(candidate.battlesFought),
       favorite: candidate.favorite === true,
+      superCharged: candidate.superCharged === true ? true : undefined,
       equippedTrinket: typeof candidate.equippedTrinket === 'string' ? candidate.equippedTrinket : undefined,
       starter: candidate.starter === true,
       lastFreeRefreshAt: typeof candidate.lastFreeRefreshAt === 'number' && Number.isFinite(candidate.lastFreeRefreshAt)
@@ -2024,6 +2025,7 @@ type Action =
   | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
   | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
+  | { type: 'superChargeLokPet'; id: string }
   | { type: 'chooseLokPetBranch'; id: string; branchId: string; now: number }
   | { type: 'undoLokPetBranch'; id: string; now: number }
   | { type: 'completeHideoutEvent'; petId: string; eventId: string; now: number }
@@ -3413,6 +3415,11 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       };
     }
 
+    case 'superChargeLokPet': {
+      const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
+      if (!pet || pet.superCharged) return state;
+      return { ...state, meta: { ...state.meta, savedLokPets: state.meta.savedLokPets.map((candidate) => (candidate.id === action.id ? { ...candidate, superCharged: true } : candidate)) } };
+    }
     case 'careForLokPet': {
       // Petting a companion in the hideout: it always plays, but only the first of the day counts for bond.
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
@@ -4153,6 +4160,7 @@ export interface MetaContextValue {
   playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
   resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
+  superChargeLokPet: (id: string) => void;
   chooseLokPetBranch: (id: string, branchId: string) => void;
   undoLokPetBranch: (id: string) => void;
   completeHideoutEvent: (petId: string, eventId: string) => void;
@@ -4389,6 +4397,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
   const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
   const activateHideoutProp = useCallback((propId: string, seed: number) => dispatch({ type: 'activateHideoutProp', propId, seed, now: Date.now() }), []);
+  const superChargeLokPet = useCallback((id: string) => dispatch({ type: 'superChargeLokPet', id }), []);
   const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
   const chooseLokPetBranch = useCallback((id: string, branchId: string) => dispatch({ type: 'chooseLokPetBranch', id, branchId, now: Date.now() }), []);
   const undoLokPetBranch = useCallback((id: string) => dispatch({ type: 'undoLokPetBranch', id, now: Date.now() }), []);
@@ -4667,6 +4676,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       playWithLokPet,
       resolveChoiceEvent,
       careForLokPet,
+      superChargeLokPet,
       chooseLokPetBranch,
       undoLokPetBranch,
       completeHideoutEvent,
