@@ -755,6 +755,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Reach the end game and the Surge comes every run, with its own switch to go back to the chance. Clear 14 maps to read the field note in the Bestiary Effects tab. Nobody knows much about it yet, only that it is one heck of a boost for someone.',
     ],
   },
+  {
+    version: '0.21.0',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T02:45:00Z',
+    kind: 'hotfix',
+    title: 'Rarer Surges',
+    body: [
+      'Before the end game, a Quirk Surge now comes to about 1 run in 4 instead of 2 in 5. Once Victory Lap opens it still comes every run.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

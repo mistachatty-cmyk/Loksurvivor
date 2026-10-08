@@ -125,7 +125,7 @@ export function quirkSurgeStart(seed: number): number {
 /** Maps cleared before a Quirk Surge can start happening. */
 export const QUIRK_SURGE_UNLOCK_MAPS = 14;
 /** Chance a run has a surge before the end game fully unlocks it. */
-export const QUIRK_SURGE_CHANCE = 0.4;
+export const QUIRK_SURGE_CHANCE = 0.25;
 
 export type QuirkSurgeMode = 'off' | 'chance' | 'always';
 

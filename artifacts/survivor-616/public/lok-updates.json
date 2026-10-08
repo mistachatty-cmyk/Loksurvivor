@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 64,
+      "version": "0.21.0",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T02:45:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Rarer Surges",
+      "body": [
+        "Before the end game, a Quirk Surge now comes to about 1 run in 4 instead of 2 in 5. Once Victory Lap opens it still comes every run."
+      ]
+    },
+    {
       "number": 63,
       "version": "0.20.9",
       "date": "2026-10-08",
