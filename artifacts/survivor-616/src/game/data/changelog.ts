@@ -722,6 +722,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Play with the quirk options to earn the rest: finish a run with Everywhere on, or with a quirk taken on, then do it ten times.',
     ],
   },
+  {
+    version: '0.20.7',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T01:40:00Z',
+    kind: 'update',
+    title: 'Quirks You Can See',
+    body: [
+      'Each quirk now looks different in the field: Gilded enemies glow gold, Volatile ones pulse red and faster as they weaken, Regenerating ones shed green plus signs, Adrenaline leaves speed streaks, and Spawn Shield and Flicker show a bubble while they cannot be hurt.',
+      'The first time a quirk shows up in a run, an alert tells you what it does. The run summary lists every quirk you defeated.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

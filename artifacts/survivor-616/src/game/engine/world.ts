@@ -9,7 +9,7 @@
  * snapshots out of it.
  */
 
-import { quirkHash, rollEnemyQuirk } from '@/game/data/enemyQuirks';
+import { ENEMY_QUIRKS_BY_ID, quirkHash, rollEnemyQuirk } from '@/game/data/enemyQuirks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
@@ -1177,6 +1177,8 @@ export interface World {
   killsByEnemy: Record<string, number>;
   /** Kills of quirked enemies this run, by quirk id. */
   killsByQuirk: Record<string, number>;
+  /** Quirks already announced this run, so each is explained once. */
+  quirkAnnounced: Record<string, true>;
   /** Next time the taken Spawn Shield quirk can block a hit. */
   quirkShieldReadyAt: number;
   /** Next time the taken Frame Skip quirk can hop. */
@@ -1744,6 +1746,7 @@ export function createWorld(
     kills: 0,
     killsByEnemy: {},
     killsByQuirk: {},
+    quirkAnnounced: {},
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
     cred: 0,
@@ -2538,6 +2541,11 @@ function spawnEnemy(
   const quirk = w.enemyQuirks.enabled ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, w.enemyQuirks.disabled, w.enemyQuirks.everywhere) : undefined;
   if (quirk) {
     enemy.quirk = quirk;
+    if (!w.quirkAnnounced[quirk]) {
+      w.quirkAnnounced[quirk] = true;
+      const quirkDef = ENEMY_QUIRKS_BY_ID[quirk];
+      if (quirkDef) pushAlert(w, `${quirkDef.name.toUpperCase()}: ${quirkDef.description}`);
+    }
     if (quirk === 'oversized') {
       enemy.radius *= 1.35; enemy.baseRadius = enemy.radius;
       enemy.hp = enemy.maxHp = Math.round(enemy.maxHp * 1.4);
