@@ -232,7 +232,15 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   };
   const buyCosmetic = (id: string, kind: 'hat' | 'celebration') => {
     sfx.play('purchase');
-    if (kind === 'hat') buyHat(id); else buyCelebration(id);
+    if (kind === 'hat') {
+      const hat = HATS.find((entry) => entry.id === id);
+      buyHat(id);
+      if (hat) triggerReaction(`${hat.name} purchased for ${hat.cost} loot token${hat.cost === 1 ? '' : 's'}.`);
+    } else {
+      const celebration = CELEBRATIONS.find((entry) => entry.id === id);
+      buyCelebration(id);
+      if (celebration) triggerReaction(`${celebration.name} purchased for ${celebration.cost} loot token${celebration.cost === 1 ? '' : 's'}.`);
+    }
   };
 
   const previewWorldPalette = previewPaletteId === 'default' ? undefined : THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette;
@@ -393,7 +401,10 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                       if (isHat) setPreviewHatId(item.id);
                       else { setPreviewCelebrationId(item.id); setCelebrationKey((key) => key + 1); }
                     };
-                    const equip = () => isHat ? equipHat(item.id) : equipCelebration(item.id);
+                    const equip = () => {
+                      if (isHat) equipHat(item.id); else equipCelebration(item.id);
+                      setNotice(`${item.name} equipped.`);
+                    };
                     return (
                       <article key={item.id} className={`border p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}>
                         <h3 className="text-sm font-black uppercase tracking-wide text-white">{item.name}</h3>
