@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 62,
+      "version": "0.19.10",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T05:31:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A Clearer Hideout",
+      "body": [
+        "The hideout puts Mission Briefing, Looks & LokPets, your companion, and music in a dock above the walking scene. The expanded player stays within that dock. Classic corner positions remain available in Settings.",
+        "Looks & LokPets is available throughout the menus and includes a direct game interface theme picker. A quiet Back control sits at the top of menu screens.",
+        "The Scene & Sanctum links have a clearer grid on narrow and wide screens."
+      ]
+    },
+    {
       "number": 61,
       "version": "0.19.9",
       "date": "2026-10-08",

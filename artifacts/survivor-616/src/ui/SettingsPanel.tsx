@@ -34,6 +34,7 @@ import { DAMAGE_NUMBER_STYLES } from '@/game/data/damageNumbers';
 import { importForgeState } from '@/game/state/operatorForgeStore';
 import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
+import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { CHANGELOG_KIND_META, CHANGELOG_KIND_ORDER } from '@/game/data/changelogKinds';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
@@ -74,6 +75,7 @@ export interface SettingsPanelProps {
 const SETTINGS_DESTINATIONS = [
   { id: 'settings-language', label: 'Language', terms: 'translation device' },
   { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom fullscreen' },
+  { id: 'settings-ui-layout', label: 'UI layout', terms: 'new dock classic corners music mission briefing looks companion' },
   { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
   { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode' },
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
@@ -263,6 +265,7 @@ function BuildingEntrySetting() {
 export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
   const [noticeSeconds, setNoticeSeconds] = useState<HideoutNoticeSeconds>(getHideoutNoticeSeconds);
   const t = useT();
+  const chromeLayout = useUiChromeLayout();
   const {
     meta,
     setUpdatePopupKind,
@@ -403,6 +406,13 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     <SettingsPager endgame={<EndgameSettings />} standard={
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
         <SettingsJumpNav />
+        <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-ui-layout">
+          <h2 className="text-xl font-black uppercase text-white">Hideout control layout</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">The new dock keeps Mission Briefing, Looks & LokPets, your companion, and music above the walking scene. Classic keeps the original corner positions.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
+          </div>
+        </section>
         <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-update-notices">
           <h2 className="text-xl font-black uppercase text-white">Update notices</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">

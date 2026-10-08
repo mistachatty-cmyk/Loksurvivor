@@ -27,7 +27,7 @@ export function NotificationToasts() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex flex-col items-center gap-2 px-4"
+      className="pointer-events-none fixed inset-x-0 top-48 z-[100] flex max-h-[40vh] flex-col items-center gap-2 overflow-y-auto px-4 sm:top-40 lg:top-24"
       data-testid="notification-toast-stack"
     >
       {notifications.map((notification) => (

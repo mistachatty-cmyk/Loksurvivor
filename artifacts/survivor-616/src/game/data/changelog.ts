@@ -733,6 +733,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings has a new Crew chatter choice: fresh lines or the original intro only, plus a Family or Wry tone. Wry is drier and more grown-up, and both stay fine for a child to read.',
     ],
   },
+  {
+    version: '0.19.10',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T05:31:00Z',
+    kind: 'update',
+    title: 'A Clearer Hideout',
+    body: [
+      'The hideout puts Mission Briefing, Looks & LokPets, your companion, and music in a dock above the walking scene. The expanded player stays within that dock. Classic corner positions remain available in Settings.',
+      'Looks & LokPets is available throughout the menus and includes a direct game interface theme picker. A quiet Back control sits at the top of menu screens.',
+      'The Scene & Sanctum links have a clearer grid on narrow and wide screens.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

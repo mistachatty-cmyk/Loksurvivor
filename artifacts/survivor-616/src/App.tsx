@@ -5,6 +5,8 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { MusicProvider } from '@/game/audio/musicPlayer';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
+import { useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
+import { Sparkles } from 'lucide-react';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { AuthProvider } from '@/state/authStore';
 import { CloudSyncProvider } from '@/state/cloudSyncStore';
@@ -196,6 +198,8 @@ function initialScreen(): Screen {
 function Game() {
   const { meta, markOnboarded, selectedCharacter, completeRun, completeSectorMission, enterHideout, unlockedAreas, unlockedRooms } = useMeta();
   const [screen, setScreen] = useState<Screen>(() => initialScreen());
+  const chromeLayout = useUiChromeLayout();
+  const looksReturnRef = useRef<Screen | null>(null);
   const [roomId, setRoomId] = useState('main-floor');
   const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
   const [choiceEvent, setChoiceEvent] = useState<PendingChoiceEvent | null>(null);
@@ -211,6 +215,18 @@ function Game() {
     earnLokTokens('daily_login', { refType: 'day', refId: new Date().toISOString().slice(0, 10) });
     setScreen({ name: 'hub' });
   }, [enterHideout, sfx, earnLokTokens]);
+
+  const openLooks = useCallback(() => {
+    looksReturnRef.current = screen;
+    setScreen({ name: 'run-setup', destination: 'hub' });
+  }, [screen]);
+
+  const returnFromLooks = useCallback(() => {
+    const previous = looksReturnRef.current;
+    looksReturnRef.current = null;
+    if (previous) setScreen(previous);
+    else goHub();
+  }, [goHub]);
 
   const prepareRun = useCallback((run: Omit<Extract<Screen, { name: 'run' }>, 'name'>) => {
     // Looks & LokPets is a persistent preference surface, not a mandatory
@@ -461,7 +477,7 @@ function Game() {
           onOpenSectorCommand={() => setScreen({ name: 'sector-command' })}
           onOpenLokPetBattle={() => setScreen({ name: 'lokpet-battle' })}
           onOpenArena={() => setScreen({ name: 'arena-setup' })}
-          onOpenRunSetup={() => setScreen({ name: 'run-setup', destination: 'hub' })}
+          onOpenRunSetup={openLooks}
           onStartChoiceEvent={(eventId, propId) => {
             lastChoiceEventAtRef.current = Date.now();
             setChoiceEvent({ eventId, propId, petId: eventPetFor(meta)?.id, onResolved: () => undefined });
@@ -528,10 +544,10 @@ function Game() {
       return (
         <RunSetupScreen
           intent={screen.destination === 'run' ? 'launch' : 'manage'}
-          onBack={goHub}
+          onBack={screen.destination === 'hub' ? returnFromLooks : goHub}
           onComplete={() => {
             if (screen.destination === 'hub' || !screen.areaId) {
-              goHub();
+              returnFromLooks();
               return;
             }
             setScreen({ name: 'run', areaId: screen.areaId, challengeIds: screen.challengeIds, episodeId: screen.episodeId, missionId: screen.missionId });
@@ -574,7 +590,7 @@ function Game() {
       return <GrpdArmoryScreen onBack={() => { setRoomId(grpdArmoryLocation(meta.grpdArmoryAnchor, unlockedRooms.some((room) => room.id === 'grpd-station')) === 'hideout' ? 'main-floor' : 'grpd-station'); goHub(); }} />;
 
     case 'settings':
-      return <SettingsPanel onBack={goHub} onOpenLooksAndLokPets={() => setScreen({ name: 'run-setup', destination: 'hub' })} />;
+      return <SettingsPanel onBack={goHub} />;
 
     case 'palette-store':
       return <PaletteGalleryPanel onBack={goHub} />;
@@ -658,6 +674,10 @@ function Game() {
   return (
     <>
       {renderScreen()}
+      {!(screen.name === 'hub' && chromeLayout === 'new') && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
+      {!['hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter'].includes(screen.name) && (
+        <button type="button" onClick={openLooks} className="fixed right-3 top-3 z-[110] inline-flex min-h-10 items-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" />Looks & LokPets</button>
+      )}
       {choiceEvent && (
         <ChoiceEventOverlay
           eventId={choiceEvent.eventId}
@@ -709,7 +729,6 @@ function Providers({ children }: { children: ReactNode }) {
             <LokEconomyProvider>
               <MusicProvider>
                 {children}
-                <MusicNowPlaying />
                 <FocusWidgetMount />
               </MusicProvider>
             </LokEconomyProvider>

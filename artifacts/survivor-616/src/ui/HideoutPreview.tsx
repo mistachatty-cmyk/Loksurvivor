@@ -703,7 +703,7 @@ export function HideoutPreview({
           key={toast.key}
           role="status"
           aria-live="polite"
-          className="pointer-events-none absolute bottom-2 left-3 z-30 max-w-[min(26rem,calc(100%-12.5rem))] sm:max-w-[min(26rem,calc(100%-1.5rem))] border border-white/15 bg-black/70 px-3 py-1.5 text-white backdrop-blur-sm"
+          className={`pointer-events-none absolute left-3 z-30 max-w-[calc(100%-1.5rem)] border border-white/15 bg-black/85 px-3 py-1.5 text-white backdrop-blur-sm ${(interactive && nearProp) || eventChip ? 'bottom-16' : 'bottom-2'}`}
           data-testid="hideout-pet-event"
         >
           <p className="font-mono text-[9px] font-bold uppercase tracking-[.2em] text-pink-200">{toast.title}</p>
