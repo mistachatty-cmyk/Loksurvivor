@@ -85,6 +85,20 @@ test('the hideout arrival scene defaults on, migrates safely, and is toggleable'
   assert.equal(updated.meta.hideoutArrivalEnabled, false);
 });
 
+test('update notice choices persist independently and old saves enable all four', () => {
+  assert.deepEqual(createInitialMeta().updatePopupKinds, {
+    bugfix: true, hotfix: true, update: true, expansion: true,
+  });
+  assert.deepEqual(normalizeMeta({ version: 1 }).updatePopupKinds, createInitialMeta().updatePopupKinds);
+  assert.equal(normalizeMeta({ version: 1, updatePopupKinds: { expansion: false } }).updatePopupKinds.expansion, false);
+
+  const initial = { meta: createInitialMeta(), lastRun: null };
+  const updated = reducer(initial, { type: 'setUpdatePopupKind', kind: 'hotfix', enabled: false });
+  assert.equal(updated.meta.updatePopupKinds.hotfix, false);
+  assert.equal(updated.meta.updatePopupKinds.update, true);
+  assert.equal(initial.meta.updatePopupKinds.hotfix, true);
+});
+
 test('soundtrack objective progress safely defaults for older saves', () => {
   assert.equal(createInitialMeta().soundtrackObjectiveCompletions, 0);
   assert.equal(normalizeMeta({ version: 1 }).soundtrackObjectiveCompletions, 0);

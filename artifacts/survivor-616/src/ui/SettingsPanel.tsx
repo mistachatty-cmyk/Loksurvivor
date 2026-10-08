@@ -34,6 +34,7 @@ import { importForgeState } from '@/game/state/operatorForgeStore';
 import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
 import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
+import { CHANGELOG_KIND_META, CHANGELOG_KIND_ORDER } from '@/game/data/changelogKinds';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
   DEV_RUN_TOOL_REGISTRY,
@@ -74,6 +75,7 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode' },
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
   { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
+  { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
   { id: 'settings-customization', label: 'Customization', terms: 'theme palette looks skins' },
   { id: 'settings-data', label: 'Save data', terms: 'backup export import progress forge' },
   { id: 'settings-advanced', label: 'Advanced', terms: 'developer dev mode' },
@@ -218,6 +220,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
   const chromeLayout = useUiChromeLayout();
   const {
     meta,
+    setUpdatePopupKind,
     setPhysicsObjectClicks,
     setLiveMode,
     setLootPresentation,
@@ -358,6 +361,37 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">The new dock keeps Mission Briefing, Looks & LokPets, your companion, and music above the walking scene. Classic keeps the original corner positions.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
+          </div>
+        </section>
+        <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-update-notices">
+          <h2 className="text-xl font-black uppercase text-white">Update notices</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Choose which releases open a popup when you return to the hideout. Every release remains in Updates and the Archive, even when its popup is off.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {CHANGELOG_KIND_ORDER.map((kind) => {
+              const category = CHANGELOG_KIND_META[kind];
+              const enabled = meta.updatePopupKinds[kind];
+              return (
+                <div key={kind} className="flex items-start justify-between gap-4 border bg-background/50 p-4" style={{ borderColor: `${category.color}66` }}>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide" style={{ color: category.color }}>{category.label}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{category.lore}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUpdatePopupKind(kind, !enabled)}
+                    aria-pressed={enabled}
+                    aria-label={`${category.label} popups`}
+                    className="min-h-10 shrink-0 border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-opacity hover:opacity-80"
+                    style={{ borderColor: enabled ? category.color : '#52525b', backgroundColor: enabled ? `${category.color}26` : 'transparent', color: enabled ? category.color : '#a1a1aa' }}
+                    data-testid={`button-toggle-${kind}-popup`}
+                  >
+                    {enabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
         <LanguageSetting />
