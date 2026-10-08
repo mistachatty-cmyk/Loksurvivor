@@ -8,6 +8,8 @@ import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { allyRig } from '@/game/data/progression';
+import { crewSpeak } from '@/game/engine/crewSpeak';
+import { getCrewTalkMode, getCrewTalkTone } from '@/game/state/crewTalkSetting';
 import { RigPortrait } from './RigPortrait';
 import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
@@ -203,6 +205,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
   const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
   const noticeSeqRef = useRef(0);
+  const crewRecentRef = useRef(new Map<string, string[]>());
   const showStripNotice = (title: string, line: string) => {
     noticeSeqRef.current += 1;
     setStripNotice({ seq: noticeSeqRef.current, title, line });
@@ -213,7 +216,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const hideoutPropInfos = useMemo<HideoutPropInfo[]>(() => {
     if (!meta.hideoutInteractive || !meta.hideoutPreviewEnabled) return [];
     const now = Date.now();
-    return propsForRoom(activeRoomId).map((def) => {
+    // Rescued crew stand in the room they hang out in, so every room has someone to meet.
+    const crewHere = rescuedAllies.filter((ally) => ally.room === activeRoomId);
+    const crewInfos: HideoutPropInfo[] = crewHere.map((ally, i) => ({
+      id: `ally:${ally.id}`,
+      x: Math.min(0.9, 0.2 + ((i + 1) / (crewHere.length + 1)) * 0.6),
+      art: 'npc',
+      accent: ally.palette.accent,
+      label: ally.name,
+      ready: false,
+      npc: { rig: allyRig(ally), palette: ally.palette },
+    }));
+    return [...propsForRoom(activeRoomId).map((def) => {
       const npc = def.npcId ? NPC_PROP_CAST[def.npcId] : undefined;
       return {
         id: def.id,
@@ -224,10 +238,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         ready: def.action.kind !== 'talk' && def.action.kind !== 'panel' ? propReady(def, meta.hideoutClaims, now) : false,
         npc: npc ? { rig: npc.rig, palette: npc.palette } : undefined,
       };
-    });
+    }), ...crewInfos];
   // `t` never changes identity, so the locale is what relabels the props.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutClaims, locale]);
+  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutClaims, rescuedAllies, locale]);
 
   // The pet the play bar is about: the one you last tapped on the strip, else the first walker.
   const focusPet = meta.savedLokPets.find((pet) => pet.id === (hideoutPets.some((p) => p.id === focusPetId) ? focusPetId : hideoutPets[0]?.id));
@@ -251,6 +265,24 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   };
 
   const handlePropUse = (propId: string) => {
+    if (propId.startsWith('ally:')) {
+      const ally = rescuedAllies.find((candidate) => candidate.id === propId.slice(5));
+      if (!ally) return;
+      if (getCrewTalkMode() === 'blurb') { showStripNotice(ally.name, ally.blurb); return; }
+      const seen = crewRecentRef.current.get(ally.id) ?? [];
+      const line = crewSpeak({
+        allyId: ally.id,
+        roomName: activeRoom?.name ?? '',
+        weather: getHideoutScene(activeRoomId).weather,
+        crewNames: rescuedAllies.filter((other) => other.id !== ally.id).map((other) => other.name),
+        tone: getCrewTalkTone(),
+        rng: Math.random,
+        recent: seen,
+      });
+      crewRecentRef.current.set(ally.id, [...seen, line].slice(-12));
+      showStripNotice(ally.name, line);
+      return;
+    }
     const def = HIDEOUT_PROPS_BY_ID[propId];
     if (!def) return;
     const title = t(def.labelKey);

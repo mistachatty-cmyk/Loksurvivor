@@ -52,6 +52,9 @@ import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
+import { CREW_TALK_MODES, CREW_TALK_TONES, getCrewTalkMode, getCrewTalkTone, setCrewTalkMode, setCrewTalkTone, type CrewTalkMode } from '@/game/state/crewTalkSetting';
+import type { Tone } from '@/game/engine/crewTalk';
+import { HIDEOUT_NOTICE_SECONDS, getHideoutNoticeSeconds, setHideoutNoticeSeconds, type HideoutNoticeSeconds } from '@/game/state/hideoutNoticeSetting';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import {
   AUTO_LANGUAGE,
@@ -163,6 +166,40 @@ function LanguageSetting() {
   );
 }
 
+function CrewTalkSetting() {
+  const t = useT();
+  const [mode, setMode] = useState<CrewTalkMode>(getCrewTalkMode);
+  const [tone, setTone] = useState<Tone>(getCrewTalkTone);
+  const btn = (active: boolean) => `border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${active ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`;
+  return (
+    <div data-testid="settings-crew-talk">
+      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.crewTalk.title')}</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.crewTalk.description')}</p>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.crewTalk.title')}>
+        {CREW_TALK_MODES.map((entry) => (
+          <button key={entry} type="button" aria-pressed={mode === entry} className={btn(mode === entry)}
+            onClick={() => { setCrewTalkMode(entry); setMode(entry); }} data-testid={`button-crewtalk-mode-${entry}`}>
+            {t(`settings.crewTalk.mode.${entry}`)}
+          </button>
+        ))}
+      </div>
+      {mode === 'generated' ? (
+        <>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.crewTalk.toneDescription')}</p>
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={t('settings.crewTalk.toneTitle')}>
+            {CREW_TALK_TONES.map((entry) => (
+              <button key={entry} type="button" aria-pressed={tone === entry} className={btn(tone === entry)}
+                onClick={() => { setCrewTalkTone(entry); setTone(entry); }} data-testid={`button-crewtalk-tone-${entry}`}>
+                {t(`settings.crewTalk.tone.${entry}`)}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function FightStyleSetting() {
   const t = useT();
   const [style, setStyle] = useState<FightStyle>(getFightStyle);
@@ -226,6 +263,7 @@ function BuildingEntrySetting() {
 }
 
 export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
+  const [noticeSeconds, setNoticeSeconds] = useState<HideoutNoticeSeconds>(getHideoutNoticeSeconds);
   const t = useT();
   const chromeLayout = useUiChromeLayout();
   const {
@@ -956,6 +994,23 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                       </div>
                     </div>
                   ))}
+                  <CrewTalkSetting />
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.notice.title')}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.notice.description')}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.notice.title')}>
+                    {HIDEOUT_NOTICE_SECONDS.map((seconds) => (
+                      <button
+                        key={seconds}
+                        type="button"
+                        onClick={() => { setHideoutNoticeSeconds(seconds); setNoticeSeconds(seconds); }}
+                        aria-pressed={noticeSeconds === seconds}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${noticeSeconds === seconds ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-notice-${seconds}`}
+                      >
+                        {t('settings.hideout.notice.seconds', { n: seconds })}
+                      </button>
+                    ))}
+                  </div>
                   <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.choice.title')}</h3>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.choice.description')}</p>
                   <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.choice.title')}>
