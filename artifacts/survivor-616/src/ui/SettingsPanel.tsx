@@ -233,7 +233,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
-    setDropStyle,
     setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
@@ -454,24 +453,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     ))}
                   </div>
                   <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{t('settings.damageNumbers.description')}</p>
-                </div>
-                <div>
-                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">{t('settings.dropStyle.title')}</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {(['enhanced', 'classic'] as const).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setDropStyle(value)}
-                        aria-pressed={meta.dropStyle === value}
-                        className={`border p-2 uppercase ${meta.dropStyle === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
-                        data-testid={`button-drop-style-${value}`}
-                      >
-                        {t(`settings.dropStyle.${value}`)}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{t('settings.dropStyle.description')}</p>
                 </div>
                 <div>
                   <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>

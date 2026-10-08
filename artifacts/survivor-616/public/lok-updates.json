@@ -15,10 +15,10 @@
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",
       "categoryLore": "The city finds a brighter rhythm.",
-      "title": "Shinier Drops",
+      "title": "Drop Packs",
       "body": [
-        "Every drop got a new look. Gems are faceted and catch the light, coins spin, chests have lids that rattle and seams that creak, and crystals, flasks and resin glow and shimmer. Drops now bounce out when they spawn, cast a small shadow, streak toward you when the magnet pulls them, and pop when collected.",
-        "Prefer the old look? Settings has a new Drop style choice: Enhanced or Classic. Performance graphics always uses Classic. Display only; nothing about drops or rewards changed."
+        "Drops now come in packs. Your current gems, coins, chests and materials are the free Potato Pack, and everyone starts on it, so nothing about the way drops look has changed unless you pick something new.",
+        "The Customization Shop has a new Drop packs tab with four more looks, each sold for LokTokens: Pop Cut (bright and cartoon-clean), Pixel Stash (hand-pixeled sprites), Salvage Grit (worn metal, glass and stone) and Dark Circuit (matte hardware with glowing lines). Packs add a spawn bounce, a soft shadow, idle animation and a streak when the magnet pulls a drop in. Display only; drops and rewards never change, and Performance graphics always uses Potato."
       ]
     },
     {

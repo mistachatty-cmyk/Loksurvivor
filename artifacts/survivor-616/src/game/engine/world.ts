@@ -9,6 +9,7 @@
  * snapshots out of it.
  */
 
+import type { DropStyle } from '@/game/data/dropPacks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
@@ -1306,7 +1307,7 @@ export interface World {
    */
   graphicsQuality: 'high' | 'balanced' | 'performance';
   /** Settings: enhanced (default) or classic drop art. Render-only. */
-  dropStyle: 'enhanced' | 'classic';
+  dropStyle: DropStyle;
   /** Settings: which damage-number style to draw. Render-only; never affects damage. */
   damageNumberStyle: DamageNumberStyle;
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
@@ -1496,7 +1497,7 @@ export function createWorld(
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
     graphicsQuality?: 'high' | 'balanced' | 'performance';
-    dropStyle?: 'enhanced' | 'classic';
+    dropStyle?: DropStyle;
     damageNumberStyle?: DamageNumberStyle;
     runtimePerformanceTier?: RuntimePerformanceTier;
     worldColorPalette?: SpritePalette;
@@ -1832,7 +1833,7 @@ export function createWorld(
     hordeView: { hold: 520, ky: 1.4, drawHalfW: 580, drawHalfH: 380 },
     hordeFedThisStep: 0,
     graphicsQuality: setup.graphicsQuality ?? 'high',
-    dropStyle: setup.dropStyle ?? 'enhanced',
+    dropStyle: setup.dropStyle ?? 'classic',
     damageNumberStyle: setup.damageNumberStyle ?? 'classic',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {

@@ -66,6 +66,7 @@ import { DEFAULT_SOUND_PACK_ID, SOUND_PACKS_BY_ID } from '@/game/data/soundPacks
 import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
 import { DEFAULT_HAT_ID, HATS, HATS_BY_ID } from '@/game/data/hats';
 import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game/data/celebrations';
+import { DROP_PACKS, DROP_PACKS_BY_ID, DEFAULT_DROP_PACK_ID } from '@/game/data/dropPacks';
 import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
@@ -278,7 +279,8 @@ export function createInitialMeta(): MetaState {
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
     graphicsQuality: 'high',
-    dropStyle: 'enhanced',
+    ownedDropPackIds: [DEFAULT_DROP_PACK_ID],
+    activeDropPackId: DEFAULT_DROP_PACK_ID,
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -1152,6 +1154,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const ownedRunAuraIds = normalizeOwnedRunAuraIds(parsed.ownedRunAuraIds);
   const ownedHatIds = normalizeOwnedIds(parsed.ownedHatIds, HATS.map((hat) => hat.id), DEFAULT_HAT_ID);
   const ownedCelebrationIds = normalizeOwnedIds(parsed.ownedCelebrationIds, CELEBRATIONS.map((entry) => entry.id), DEFAULT_CELEBRATION_ID);
+  const ownedDropPackIds = normalizeOwnedIds(parsed.ownedDropPackIds, DROP_PACKS.map((pack) => pack.id), DEFAULT_DROP_PACK_ID);
   const today = contractDayKey();
   const savedContractDay = typeof parsed.dailyContractDayKey === 'string' ? parsed.dailyContractDayKey : today;
   const dailyContractDayKey = savedContractDay === today ? savedContractDay : today;
@@ -1218,7 +1221,6 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
         ? parsed.graphicsQuality
         : 'high',
-    dropStyle: parsed.dropStyle === 'classic' ? 'classic' : 'enhanced',
     damageNumberStyle: isDamageNumberStyle(parsed.damageNumberStyle) ? parsed.damageNumberStyle : 'classic',
     companionRevealStyle: parsed.companionRevealStyle === 'classic' ? 'classic' : 'ambush',
     frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
@@ -1404,6 +1406,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     activeHatId: normalizeOwnedCosmeticId(parsed.activeHatId, ownedHatIds, DEFAULT_HAT_ID),
     ownedCelebrationIds,
     activeCelebrationId: normalizeOwnedCosmeticId(parsed.activeCelebrationId, ownedCelebrationIds, DEFAULT_CELEBRATION_ID),
+    ownedDropPackIds,
+    activeDropPackId: normalizeOwnedCosmeticId(parsed.activeDropPackId, ownedDropPackIds, DEFAULT_DROP_PACK_ID),
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
@@ -1959,7 +1963,8 @@ type Action =
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
-  | { type: 'setDropStyle'; style: MetaState['dropStyle'] }
+  | { type: 'grantDropPack'; id: string }
+  | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
   | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
@@ -3246,8 +3251,15 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'setDamageNumberStyle':
       return { ...state, meta: { ...state.meta, damageNumberStyle: action.style } };
-    case 'setDropStyle':
-      return { ...state, meta: { ...state.meta, dropStyle: action.style } };
+    // Drop packs are sold for LokTokens only, so the server-verified purchase
+    // grants them here with no local currency moving. Idempotent.
+    case 'grantDropPack': {
+      if (!DROP_PACKS_BY_ID[action.id] || state.meta.ownedDropPackIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, ownedDropPackIds: [...state.meta.ownedDropPackIds, action.id] } };
+    }
+    case 'equipDropPack':
+      if (!hasCatalogItem(state.meta, 'dropPacks', action.id, state.meta.ownedDropPackIds)) return state;
+      return { ...state, meta: { ...state.meta, activeDropPackId: action.id } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -4063,7 +4075,8 @@ export interface MetaContextValue {
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
-  setDropStyle: (style: MetaState['dropStyle']) => void;
+  grantDropPack: (id: string) => void;
+  equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
   setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
@@ -4276,7 +4289,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLootPresentation = useCallback((value: MetaState['lootPresentation']) => dispatch({ type: 'setLootPresentation', value }), []);
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
-  const setDropStyle = useCallback((style: MetaState['dropStyle']) => dispatch({ type: 'setDropStyle', style }), []);
+  const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
+  const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
   const setCompanionRevealStyle = useCallback((style: MetaState['companionRevealStyle']) => dispatch({ type: 'setCompanionRevealStyle', style }), []);
@@ -4569,7 +4583,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPresentation,
       setPauseMapVisible,
       setGraphicsQuality,
-      setDropStyle,
+      grantDropPack,
+      equipDropPack,
       setDamageNumberStyle,
       setCompanionRevealStyle,
       setFrameRateMode,
@@ -4732,7 +4747,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
-    setDropStyle,
+    grantDropPack,
+    equipDropPack,
     setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,

@@ -2259,8 +2259,6 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: GraphicsQuality;
-  /** Drop art: 'enhanced' (default) or the original 'classic' look. Render-only. */
-  dropStyle: 'enhanced' | 'classic';
   /** How hit numbers look. 'classic' (default) is the original popup; see `data/damageNumbers.ts`. */
   damageNumberStyle: DamageNumberStyle;
   /**
@@ -2541,6 +2539,9 @@ export interface MetaState {
   /** Reward celebrations are selected independently from auras. */
   ownedCelebrationIds: string[];
   activeCelebrationId: string;
+  /** Drop art packs (render-only). The free Potato Pack is the original look. */
+  ownedDropPackIds: string[];
+  activeDropPackId: string;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */

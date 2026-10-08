@@ -6,8 +6,6 @@
  */
 import type { Pickup, PickupKind } from '../engine/world';
 
-export type DropStyle = 'enhanced' | 'classic';
-
 const TAU = Math.PI * 2;
 const SPAWN_MS = 380;
 
