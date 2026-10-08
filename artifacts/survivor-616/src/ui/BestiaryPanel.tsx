@@ -6,6 +6,7 @@ import { ENEMIES } from '@/game/data/enemies';
 import { CHARACTERS } from '@/game/data/characters';
 import { FACTIONS } from '@/game/data/factions';
 import { describeUnlock, useMeta } from '@/game/state/metaStore';
+import { QuirkChart } from './QuirkChart';
 import { ScreenLayout } from './ScreenLayout';
 import { RigPortrait } from './RigPortrait';
 import { WeaponIcon } from './WeaponIcon';
@@ -33,6 +34,36 @@ const BEHAVIOR_GUIDES: Record<
   string,
   { desc: string; tip: string; threatTier: string; weakVs: string; soundSignature: string; dropProfile: string }
 > = {
+  'strafe-duelist': {
+    desc: 'Circle-strafes at mid range, telegraphs, then lunges through you in a slash arc.',
+    tip: 'Dash across its lunge line as the telegraph ends; it is open after every lunge.',
+    threatTier: 'Skirmisher', weakVs: 'Area damage while it circles', soundSignature: 'Quick shoe squeaks', dropProfile: '',
+  },
+  pouncer: {
+    desc: 'Marks the spot where you stand, leaps there and lands in a shockwave ring.',
+    tip: 'Leave the marked ring before the landing; strike it after it lands.',
+    threatTier: 'Ambusher', weakVs: 'Moving targets and ranged hits', soundSignature: 'Soft crouch, hard landing', dropProfile: '',
+  },
+  'beam-wheel': {
+    desc: 'Plants itself and spins a wheel of short beams around it.',
+    tip: 'Stay outside its beam range or circle against the spin direction.',
+    threatTier: 'Zone Anchor', weakVs: 'Burst damage while it is walking in', soundSignature: 'Rising wheel hum', dropProfile: '',
+  },
+  'mine-stitcher': {
+    desc: 'Zigzags toward you, dropping lingering mines along its path.',
+    tip: 'Do not retreat over its trail. Kill it early before the floor fills.',
+    threatTier: 'Area Denial', weakVs: 'Piercing shots down its zigzag', soundSignature: 'Tick, tick, snap', dropProfile: '',
+  },
+  'fan-sampler': {
+    desc: 'Kites at range and fires a wide fan of projectiles.',
+    tip: 'Step between shots in the fan, or close in; it backs away slowly.',
+    threatTier: 'Ranged Support', weakVs: 'Dashes and cover', soundSignature: 'Fan of paper snaps', dropProfile: '',
+  },
+  rewinder: {
+    desc: 'Saves its position, then snaps back to it, bursting at both ends.',
+    tip: 'Do not stand on its saved spot, and do not chase it when it vanishes.',
+    threatTier: 'Disruptor', weakVs: 'Delayed area attacks', soundSignature: 'Tape rewinding', dropProfile: '',
+  },
   charger: {
     desc: 'Rapid linear acceleration bull-rush when target enters line-of-sight.',
     tip: 'Sidestep perpendicular as charge begins; punish sluggish turn recovery.',
@@ -351,7 +382,18 @@ function EnemyIntelModal({
             )}
 
             {/* Salvage Drop Profile */}
-            {guide.dropProfile && (
+            {enemy.drops?.length ? (
+              <div className="border-t border-white/10 pt-2 font-mono text-[8.5px] uppercase">
+                <span className="text-white/40 flex items-center gap-1.5 mb-1">
+                  <Target className="h-3 w-3 text-amber-400" /> Confirmed drops:
+                </span>
+                <ul className="text-amber-200 space-y-0.5">
+                  {enemy.drops.map((drop, index) => (
+                    <li key={`${drop.kind}-${index}`}>{drop.kind.replace(/-/g, ' ')} · {Math.round(drop.chance * 100)}%</li>
+                  ))}
+                </ul>
+              </div>
+            ) : guide.dropProfile && (
               <div className="border-t border-white/10 pt-2 flex items-center justify-between font-mono text-[8.5px] uppercase">
                 <span className="text-white/40 flex items-center gap-1.5">
                   <Target className="h-3 w-3 text-amber-400" /> Field Salvage:
@@ -383,7 +425,7 @@ function EnemyIntelModal({
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
   const isListView = meta.uiDensity === 'list';
-  const [view, setView] = useState<'threats' | 'factions'>('threats');
+  const [view, setView] = useState<'threats' | 'factions' | 'effects'>('threats');
   const [selectedEnemy, setSelectedEnemy] = useState<(typeof ENEMIES)[number] | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [threatFilter, setThreatFilter] = useState<'all' | 'discovered' | 'apex'>('all');
@@ -521,7 +563,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         <div className="flex items-center gap-3">
           <Users className="h-4 w-4 text-primary" />
           <h2 className="text-xl font-black uppercase tracking-tight text-white">
-            {view === 'threats' ? 'Known threats' : 'Factions'}
+            {view === 'threats' ? 'Known threats' : view === 'effects' ? 'Random effects' : 'Factions'}
           </h2>
         </div>
         <div className="flex gap-2">
@@ -552,6 +594,19 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
             <Users className="h-3.5 w-3.5" />
             Factions
             <span className="font-mono text-[10px] opacity-75">{discoveredFactionCount} / {FACTIONS.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('effects')}
+            className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+              view === 'effects'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+            }`}
+            data-testid="button-bestiary-view-effects"
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Effects
           </button>
         </div>
       </div>
@@ -617,7 +672,9 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         )}
       </div>
 
-      {view === 'factions' ? (
+      {view === 'effects' ? (
+        <QuirkChart mapsCleared={meta.clearedAreaIds.length} />
+      ) : view === 'factions' ? (
         filteredFactions.length === 0 ? (
           <div className="border border-border/60 bg-card/40 p-8 text-center font-mono">
             <p className="text-sm uppercase tracking-wider text-muted-foreground">No factions match current search criteria</p>

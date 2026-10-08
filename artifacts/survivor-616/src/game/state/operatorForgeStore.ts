@@ -162,7 +162,7 @@ export function isFeatureEnabled(id: EndgameFeatureId): boolean {
   if (!available) return false;
   const choice = state.toggles[id];
   if (typeof choice === 'boolean') return choice;
-  return (id === 'forge' && state.unlocked) || id === 'weaponEvolutions';
+  return (id === 'forge' && state.unlocked) || id === 'weaponEvolutions' || id === 'enemyQuirks' || id === 'quirkSurge';
 }
 
 export function setFeatureEnabled(id: EndgameFeatureId, enabled: boolean): void {

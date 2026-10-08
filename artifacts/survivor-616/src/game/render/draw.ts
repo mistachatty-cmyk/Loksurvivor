@@ -6,6 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { drawStyledPickup } from './pickupArtStyles';
 import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Pickup, type Popup, type World } from '@/game/engine/world';
 import { DAMAGE_TIERS, GLOW_FROM_TIER } from '@/game/data/damageNumbers';
@@ -5931,6 +5932,72 @@ function drawActors(
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    }
+    if (enemy.quirk && !enemy.dying) {
+      const quirkDef = ENEMY_QUIRKS_BY_ID[enemy.quirk];
+      if (quirkDef) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 + Math.sin(w.now / 160 + enemy.uid) * 0.2;
+        ctx.strokeStyle = quirkDef.color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = quirkDef.color;
+        ctx.font = 'bold 6px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(quirkDef.name.toUpperCase(), enemy.x, enemy.y + enemy.radius + 12);
+        ctx.restore();
+        // Per-quirk flair so each one reads at a glance, not only by its label.
+        ctx.save();
+        const flairR = enemy.radius + 2;
+        if (enemy.quirk === 'gilded') {
+          const glow = ctx.createRadialGradient(enemy.x, enemy.y, 1, enemy.x, enemy.y, flairR * 2);
+          glow.addColorStop(0, 'rgba(250,204,21,0.38)');
+          glow.addColorStop(1, 'rgba(250,204,21,0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, flairR * 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (enemy.quirk === 'volatile') {
+          const hurt = 1 - Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
+          const blink = Math.sin(w.now / (260 - hurt * 190) + enemy.uid) * 0.5 + 0.5;
+          ctx.fillStyle = `rgba(248,113,113,${0.12 + blink * (0.12 + hurt * 0.4)})`;
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, flairR + 3 + blink * 3, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (enemy.quirk === 'regenerating' && enemy.hp < enemy.maxHp) {
+          ctx.fillStyle = '#4ade80';
+          ctx.font = 'bold 7px monospace';
+          ctx.textAlign = 'center';
+          const rise = (w.now / 40 + enemy.uid * 7) % 14;
+          ctx.globalAlpha = 1 - rise / 14;
+          ctx.fillText('+', enemy.x + Math.sin(enemy.uid) * 6, enemy.y - enemy.radius - rise);
+        } else if (enemy.quirk === 'adrenaline' && ((w.now + enemy.uid * 977) / 1000) % 5 < 1) {
+          ctx.strokeStyle = '#f472b6';
+          ctx.lineWidth = 1.5;
+          for (let streak = 0; streak < 3; streak += 1) {
+            ctx.globalAlpha = 0.7 - streak * 0.2;
+            ctx.beginPath();
+            ctx.moveTo(enemy.x - enemy.facing * (flairR + 2 + streak * 5), enemy.y - 3 + streak * 3);
+            ctx.lineTo(enemy.x - enemy.facing * (flairR + 12 + streak * 5), enemy.y - 3 + streak * 3);
+            ctx.stroke();
+          }
+        }
+        if ((enemy.quirk === 'spawn-shield' || enemy.quirk === 'flicker') && w.now < enemy.shieldedUntil) {
+          ctx.strokeStyle = quirkDef.color;
+          ctx.fillStyle = 'rgba(147,197,253,0.18)';
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = 0.6 + Math.sin(w.now / 70) * 0.25;
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, flairR + 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
     }
     if (enemy.isVeteran && !enemy.dying) {
       const affixColors: Record<string, string> = {
