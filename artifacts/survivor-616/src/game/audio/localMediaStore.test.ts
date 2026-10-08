@@ -41,6 +41,13 @@ async function deleteDatabase(): Promise<void> {
 
 beforeEach(deleteDatabase);
 
+test('Studio soundtrack timing survives device library reopen', async () => {
+  await saveLocalTrack({ id: 'authored', title: 'Beat', file: new File(['beat'], 'beat.wav', { type: 'audio/wav' }), isVideoContainer: false, addedAt: 616, authoredBpm: 142, downbeatSeconds: 0 });
+  const [restored] = await loadLocalTracks();
+  assert.equal(restored?.authoredBpm, 142);
+  assert.equal(restored?.downbeatSeconds, 0);
+});
+
 test('version one soundtrack files migrate without losing their bytes', async () => {
   const legacyFile = new File(['legacy audio bytes'], 'legacy.wav', {
     type: 'audio/wav',

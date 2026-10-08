@@ -8,7 +8,7 @@
  * line is how studio UIs end up dropping audio.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import * as Tone from 'tone';
 
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
@@ -20,6 +20,7 @@ import { startStudioClock, stopStudioClock, tickStudioClock } from '@/game/audio
 import {
   adoptImportedBufferId,
   clipLengthInBeats,
+  getBuffer,
   importAudioFile,
   ImportError,
   releaseBuffer,
@@ -32,6 +33,7 @@ import {
   importStudioProjectWorkspace,
   referencedStudioAssetIds,
   listStudioProjects,
+  listReusableStudioKits,
   loadStudioAudioAssets,
   loadStudioWorkspace,
   openStudioProject,
@@ -47,24 +49,38 @@ import { isMediaAssetId, LocalMediaStorageError } from '@/game/audio/localMediaS
 const MIC_MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4'];
 import {
   addClip,
+  addDrumClip,
   addEffect,
   addNote,
   addTrack,
   clampBpm,
+  createPattern,
+  duplicatePattern,
+  duplicateClip,
   loadStoredProject,
   moveClip,
   projectLengthBeats,
+  secondsPerBeat,
   moveNote,
   removeClip,
   removeEffect,
   removeNote,
   removeTrack,
+  patchAudioClip,
+  patchNote,
+  quantizeTrackNotes,
   setEffectParam,
+  setPatternHit,
+  studioId,
   setTrackInstrument,
   storeProject,
+  splitAudioClip,
+  trimAudioClip,
   toggleSolo,
   updateTrack,
   type StudioNote,
+  type StudioDrumPad,
+  type StudioDrumKit,
   type StudioProject,
   type StudioTrack,
 } from '@/game/audio/studio/project';
@@ -88,8 +104,24 @@ export interface StudioController {
   persistenceState: 'loading' | 'saving' | 'saved' | 'session-only';
   lastSavedAt: number | null;
   restoredAssetCount: number;
+  masterPeak: number;
+  inputPeak: number;
+  metronomeEnabled: boolean;
+  setMetronomeEnabled: (enabled: boolean) => void;
+  countInBars: number;
+  setCountInBars: (bars: number) => void;
+  countingIn: boolean;
+  recordOffsetMs: number;
+  setRecordOffsetMs: (ms: number) => void;
+  loopEnabled: boolean;
+  setLoopEnabled: (enabled: boolean) => void;
   projects: StudioProjectSummary[];
+  reusableKits: Array<{ projectName: string; kit: StudioDrumKit }>;
   activeProjectId: string | null;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
   dismissError: () => void;
   dismissNotice: () => void;
 
@@ -106,6 +138,10 @@ export interface StudioController {
   importFiles: (files: FileList | File[]) => Promise<void>;
   placeClip: (bufferId: string, trackId: string, startBeat: number) => void;
   dropClip: (clipId: string) => void;
+  duplicateClip: (clipId: string) => void;
+  splitClip: (clipId: string, atBeat: number) => void;
+  trimClip: (clipId: string, edge: 'start' | 'end', amountBeats: number) => void;
+  patchClip: (clipId: string, patch: { gain?: number; fadeInSeconds?: number; fadeOutSeconds?: number }) => void;
   relocateClip: (clipId: string, startBeat: number, trackId?: string) => void;
   discardImport: (bufferId: string) => void;
 
@@ -123,7 +159,19 @@ export interface StudioController {
   placeNote: (trackId: string, note: Omit<StudioNote, 'id'>) => void;
   relocateNote: (trackId: string, noteId: string, pitch: number, startBeat: number) => void;
   dropNote: (trackId: string, noteId: string) => void;
+  patchNote: (trackId: string, noteId: string, patch: { lengthBeats?: number; velocity?: number }) => void;
+  quantizeNotes: (trackId: string) => void;
   dropTrack: (trackId: string) => void;
+  setDrumHit: (patternId: string, step: number, pad: number, velocity: number) => void;
+  patchPattern: (patternId: string, patch: { name?: string; bars?: number; swing?: number }) => void;
+  newPattern: () => void;
+  copyPattern: (patternId: string) => void;
+  placePattern: (patternId: string, kitId: string) => void;
+  copyKit: (kitId: string) => void;
+  renameKit: (kitId: string, name: string) => void;
+  patchPad: (kitId: string, padIndex: number, patch: Partial<StudioDrumPad>) => void;
+  importPadSample: (kitId: string, padIndex: number, file: File) => Promise<void>;
+  reuseKit: (kitId: string) => Promise<void>;
 
   /** The track pad taps write notes into, or a mic recording captures onto. */
   armedTrackId: string | null;
@@ -141,7 +189,7 @@ export interface StudioController {
 
 export function useStudio(): StudioController {
   const { getAudioContext, addFiles } = useMusicPlayer();
-  const [project, setProject] = useState<StudioProject>(loadStoredProject);
+  const [project, setProjectState] = useState<StudioProject>(loadStoredProject);
   const [clips, setClips] = useState<ImportedBuffer[]>([]);
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -150,7 +198,15 @@ export function useStudio(): StudioController {
   const [persistenceState, setPersistenceState] = useState<StudioController['persistenceState']>('loading');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [restoredAssetCount, setRestoredAssetCount] = useState(0);
+  const [masterPeak, setMasterPeak] = useState(0);
+  const [inputPeak, setInputPeak] = useState(0);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+  const [countInBars, setCountInBars] = useState(1);
+  const [countingIn, setCountingIn] = useState(false);
+  const [recordOffsetMs, setRecordOffsetMs] = useState(0);
+  const [loopEnabled, setLoopEnabled] = useState(false);
   const [projects, setProjects] = useState<StudioProjectSummary[]>([]);
+  const [reusableKits, setReusableKits] = useState<Array<{ projectName: string; kit: StudioDrumKit }>>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const playheadRef = useRef(0);
   const persistenceReadyRef = useRef(false);
@@ -166,6 +222,13 @@ export function useStudio(): StudioController {
   const armedTrackIdRef = useRef<string | null>(null);
   armedTrackIdRef.current = armedTrackId;
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const micMeterSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micMeterRef = useRef<AnalyserNode | null>(null);
+  const micMeterSinkRef = useRef<GainNode | null>(null);
+  const micMeterTimerRef = useRef<number | null>(null);
+  const countInTokenRef = useRef(0);
+  const clickVoiceRef = useRef<Tone.Synth | null>(null);
+  const clickEventRef = useRef<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   /** Snapshotted at record-start, so arming a different track mid-take can't retarget it. */
@@ -182,6 +245,43 @@ export function useStudio(): StudioController {
   /** Latest project, for callbacks that must not re-bind on every edit. */
   const projectRef = useRef(project);
   projectRef.current = project;
+  const undoRef = useRef<StudioProject[]>([]);
+  const redoRef = useRef<StudioProject[]>([]);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const setProject = useCallback((action: SetStateAction<StudioProject>) => {
+    const before = projectRef.current;
+    const after = typeof action === 'function' ? action(before) : action;
+    if (after === before) return;
+    undoRef.current.push(before);
+    if (undoRef.current.length > 100) undoRef.current.shift();
+    redoRef.current = [];
+    projectRef.current = after;
+    setProjectState(after);
+    setHistoryVersion((version) => version + 1);
+  }, []);
+  const replaceProject = useCallback((next: StudioProject) => {
+    undoRef.current = [];
+    redoRef.current = [];
+    projectRef.current = next;
+    setProjectState(next);
+    setHistoryVersion((version) => version + 1);
+  }, []);
+  const undo = useCallback(() => {
+    const previous = undoRef.current.pop();
+    if (!previous) return;
+    redoRef.current.push(projectRef.current);
+    projectRef.current = previous;
+    setProjectState(previous);
+    setHistoryVersion((version) => version + 1);
+  }, []);
+  const redo = useCallback(() => {
+    const next = redoRef.current.pop();
+    if (!next) return;
+    undoRef.current.push(projectRef.current);
+    projectRef.current = next;
+    setProjectState(next);
+    setHistoryVersion((version) => version + 1);
+  }, []);
   const clipsRef = useRef(clips);
   clipsRef.current = clips;
   activeProjectIdRef.current = activeProjectId;
@@ -192,15 +292,16 @@ export function useStudio(): StudioController {
       ...new Set(
         [
           ...currentClips.map((clip) => clip.id),
-          ...currentProject.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)),
+          ...referencedStudioAssetIds(currentProject),
         ].filter(isMediaAssetId),
       ),
     ];
   }, []);
 
   const refreshProjectSummaries = useCallback(async () => {
-    const summaries = await listStudioProjects();
+    const [summaries, kits] = await Promise.all([listStudioProjects(), listReusableStudioKits()]);
     setProjects(summaries);
+    setReusableKits(kits);
   }, []);
 
   /** Rebuilds decoded runtime buffers when the active document changes. */
@@ -209,7 +310,7 @@ export function useStudio(): StudioController {
       const assets = await loadStudioAudioAssets(workspace.assetIds);
       // Release before decoding. Equal content-addressed ids can appear in two
       // projects; releasing afterwards would remove the newly restored buffer.
-      for (const source of clipsRef.current) releaseBuffer(source.id);
+      for (const id of new Set([...clipsRef.current.map((source) => source.id), ...referencedStudioAssetIds(projectRef.current)])) releaseBuffer(id);
       const restored: ImportedBuffer[] = [];
       let unreadable = 0;
       for (const asset of assets) {
@@ -226,7 +327,7 @@ export function useStudio(): StudioController {
 
       sessionOnlySourceIdsRef.current.clear();
       setArmedTrackId(null);
-      setProject(workspace.project);
+      replaceProject(workspace.project);
       setClips(restored);
       setRestoredAssetCount(restored.length);
       activeProjectIdRef.current = workspace.id;
@@ -235,7 +336,7 @@ export function useStudio(): StudioController {
       setPersistenceState('saved');
       return Math.max(0, workspace.assetIds.length - assets.length) + unreadable;
     },
-    [engineInstance],
+    [engineInstance, replaceProject],
   );
 
   // Keep the audio graph and the saved copy in step with the model.
@@ -245,6 +346,18 @@ export function useStudio(): StudioController {
     // Tempo is live: dragging the BPM field while playing should be audible.
     Tone.getTransport().bpm.value = project.bpm;
   }, [project]);
+
+  useEffect(() => {
+    if (!playing) { setMasterPeak(0); return; }
+    const samples = new Float32Array(engineInstance.analyser.fftSize);
+    const timer = window.setInterval(() => {
+      engineInstance.analyser.getFloatTimeDomainData(samples);
+      let peak = 0;
+      for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+      setMasterPeak(peak);
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [playing, engineInstance]);
 
   // Restore the active project and rebuild decoded runtime buffers from the
   // original player-owned files. A broken source is skipped; the rest of the
@@ -371,14 +484,33 @@ export function useStudio(): StudioController {
   }, [playing]);
 
   const stop = useCallback(() => {
+    countInTokenRef.current += 1;
+    setCountingIn(false);
     const transport = Tone.getTransport();
     transport.stop();
     transport.position = 0;
+    transport.loop = false;
     engine().graph.clearSchedule();
     stopStudioClock();
     playheadRef.current = 0;
     setPlaying(false);
   }, []);
+
+  useEffect(() => {
+    if (!playing || !metronomeEnabled) return;
+    const voice = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 } });
+    const level = new Tone.Gain(0.12).connect(engineInstance.master);
+    voice.connect(level);
+    clickVoiceRef.current = voice;
+    clickEventRef.current = Tone.getTransport().scheduleRepeat((time) => voice.triggerAttackRelease('C6', '32n', time), '4n');
+    return () => {
+      if (clickEventRef.current !== null) Tone.getTransport().clear(clickEventRef.current);
+      clickEventRef.current = null;
+      clickVoiceRef.current = null;
+      voice.dispose();
+      level.dispose();
+    };
+  }, [playing, metronomeEnabled, engineInstance]);
 
   const persistCurrentWorkspace = useCallback(async () => {
     if (persistenceDisabledRef.current) {
@@ -478,7 +610,6 @@ export function useStudio(): StudioController {
       const operation = pendingProjectWriteRef.current.then(async () => {
         if (projectId === activeProjectIdRef.current) {
           const renamed = { ...projectRef.current, name: nextName };
-          projectRef.current = renamed;
           setProject(renamed);
           setProjects((current) =>
             current.map((project) => (project.id === projectId ? { ...project, name: nextName } : project)),
@@ -588,23 +719,32 @@ export function useStudio(): StudioController {
       const transport = Tone.getTransport();
       transport.bpm.value = current.bpm;
       transport.position = 0;
+      transport.loop = loopEnabled;
+      transport.loopStart = 0;
+      transport.loopEnd = projectLengthBeats(current) * secondsPerBeat(current.bpm);
       graph.sync(current);
       graph.schedule(current);
       startStudioClock(current.beatsPerBar);
       transport.start();
       setPlaying(true);
     })();
-  }, [playing, stop]);
+  }, [playing, stop, loopEnabled]);
 
   // Stop at the end of the arrangement rather than looping forever over silence.
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || loopEnabled) return;
     const end = projectLengthBeats(project);
     const check = setInterval(() => {
       if (playheadRef.current >= end) stop();
     }, 200);
     return () => clearInterval(check);
-  }, [playing, project, stop]);
+  }, [playing, project, stop, loopEnabled]);
+
+  useEffect(() => {
+    const transport = Tone.getTransport();
+    transport.loop = playing && loopEnabled;
+    if (loopEnabled) transport.loopEnd = projectLengthBeats(project) * secondsPerBeat(project.bpm);
+  }, [playing, loopEnabled, project]);
 
   const importFiles = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files);
@@ -678,7 +818,7 @@ export function useStudio(): StudioController {
         clips: track.clips.filter((clip) => clip.bufferId !== bufferId),
       })),
     }));
-    releaseBuffer(bufferId);
+    if (!referencedStudioAssetIds(projectRef.current).includes(bufferId)) releaseBuffer(bufferId);
     sessionOnlySourceIdsRef.current.delete(bufferId);
     if (sessionOnlySourceIdsRef.current.size === 0 && !persistenceDisabledRef.current) {
       setPersistenceState('saved');
@@ -722,7 +862,7 @@ export function useStudio(): StudioController {
         const withoutDuplicate = previous.filter((clip) => clip.id !== imported.id);
         return [...withoutDuplicate, imported];
       });
-      const startBeat = Math.max(0, Math.round(recordStartBeatRef.current));
+      const startBeat = Math.max(0, Math.round((recordStartBeatRef.current - recordOffsetMs / 1000 / secondsPerBeat(projectRef.current.bpm)) * 4) / 4);
       setProject((current) =>
         addClip(current, trackId, {
           bufferId: imported.id,
@@ -736,7 +876,7 @@ export function useStudio(): StudioController {
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [recordOffsetMs]);
 
   const startMicRecording = useCallback(async () => {
     const trackId = armedTrackIdRef.current;
@@ -776,9 +916,26 @@ export function useStudio(): StudioController {
     const mimeType = MIC_MIME_CANDIDATES.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? '';
     const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
+    const meterSource = engineInstance.context.createMediaStreamSource(stream);
+    const meter = engineInstance.context.createAnalyser();
+    meter.fftSize = 1024;
+    const meterSink = engineInstance.context.createGain();
+    meterSink.gain.value = 0;
+    meterSource.connect(meter);
+    meter.connect(meterSink).connect(engineInstance.context.destination);
+    micMeterSourceRef.current = meterSource;
+    micMeterRef.current = meter;
+    micMeterSinkRef.current = meterSink;
+    const meterSamples = new Float32Array(meter.fftSize);
+    micMeterTimerRef.current = window.setInterval(() => {
+      meter.getFloatTimeDomainData(meterSamples);
+      let peak = 0;
+      for (const sample of meterSamples) peak = Math.max(peak, Math.abs(sample));
+      setInputPeak(peak);
+    }, 100);
+
     recordedChunksRef.current = [];
     recordTrackIdRef.current = track.id;
-    recordStartBeatRef.current = playheadRef.current;
     mediaStreamRef.current = stream;
     mediaRecorderRef.current = recorder;
 
@@ -789,15 +946,52 @@ export function useStudio(): StudioController {
       stream.getTracks().forEach((mediaTrack) => mediaTrack.stop());
       mediaStreamRef.current = null;
       mediaRecorderRef.current = null;
+      if (micMeterTimerRef.current !== null) window.clearInterval(micMeterTimerRef.current);
+      micMeterTimerRef.current = null;
+      micMeterSourceRef.current?.disconnect();
+      micMeterRef.current?.disconnect();
+      micMeterSinkRef.current?.disconnect();
+      micMeterSourceRef.current = null;
+      micMeterRef.current = null;
+      micMeterSinkRef.current = null;
+      setInputPeak(0);
       void finishMicRecording(recorder.mimeType || mimeType || 'audio/webm');
     };
 
+    if (countInBars > 0) {
+      const token = ++countInTokenRef.current;
+      setCountingIn(true);
+      const click = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 } }).connect(engineInstance.master);
+      const beatSeconds = secondsPerBeat(projectRef.current.bpm);
+      for (let beat = 0; beat < countInBars * 4; beat += 1) click.triggerAttackRelease(beat % 4 === 0 ? 'E6' : 'C6', '32n', Tone.now() + beat * beatSeconds);
+      await new Promise<void>((resolve) => window.setTimeout(resolve, countInBars * 4 * beatSeconds * 1000));
+      click.dispose();
+      if (token !== countInTokenRef.current) {
+        stream.getTracks().forEach((mediaTrack) => mediaTrack.stop());
+        meterSource.disconnect();
+        meter.disconnect();
+        meterSink.disconnect();
+        if (micMeterTimerRef.current !== null) window.clearInterval(micMeterTimerRef.current);
+        micMeterTimerRef.current = null;
+        micMeterSourceRef.current = null;
+        micMeterRef.current = null;
+        micMeterSinkRef.current = null;
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setInputPeak(0);
+        return;
+      }
+      setCountingIn(false);
+    }
+    recordStartBeatRef.current = playheadRef.current;
+    if (!playing) togglePlay();
     recorder.start();
     setRecordingMic(true);
-  }, [finishMicRecording]);
+  }, [countInBars, engineInstance, finishMicRecording, playing, togglePlay]);
 
   const stopMicRecording = useCallback(() => {
-    mediaRecorderRef.current?.stop();
+    countInTokenRef.current += 1;
+    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
   }, []);
 
   /**
@@ -807,7 +1001,7 @@ export function useStudio(): StudioController {
   const renderCurrent = useCallback(async (busyLabel: string): Promise<Blob | null> => {
     const current = projectRef.current;
     const hasAudio = current.tracks.some(
-      (track) => track.clips.length > 0 || (track.instrumentId && track.notes.length > 0),
+      (track) => track.clips.length > 0 || track.drumClips.length > 0 || (track.instrumentId && (track.notes.length > 0 || track.midiClips.length > 0)),
     );
     if (!hasAudio) {
       setError('Nothing to render yet -- add a clip or write some notes first.');
@@ -846,7 +1040,7 @@ export function useStudio(): StudioController {
     const filename = exportFilename(current, 'wav');
     // `addFiles` takes Files, so the render is wrapped as one -- no new player
     // API, and the track behaves exactly like anything else the player added.
-    const added = addFiles([new File([blob], filename, { type: 'audio/wav' })]);
+    const added = addFiles([new File([blob], filename, { type: 'audio/wav' })], { authoredBpm: current.bpm, downbeatSeconds: 0 });
     setNotice(
       added > 0
         ? `Added to your soundtrack and saved on this device. Play it from the Soundtrack panel and the game will move to it. Use WAV or a project backup for a portable copy.`
@@ -864,7 +1058,7 @@ export function useStudio(): StudioController {
       const current = projectRef.current;
       const sourceIds = [
         ...clipsRef.current.map((clip) => clip.id),
-        ...current.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)),
+        ...referencedStudioAssetIds(current),
       ];
       const bundle = await createProjectBundle(current, sourceIds);
       downloadBlob(bundle, exportFilename(current, '616project'));
@@ -886,12 +1080,16 @@ export function useStudio(): StudioController {
         ? await readProjectBundle(file)
         : { project: await readProjectFile(file), assetIds: [] as string[] };
       if (!portable) imported.assetIds = referencedStudioAssetIds(imported.project);
+      const legacyUnavailable = portable ? 0 : [
+        ...imported.project.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)),
+        ...imported.project.kits.flatMap((kit) => kit.pads.flatMap((pad) => pad.sourceId ? [pad.sourceId] : [])),
+      ].filter((id) => !isMediaAssetId(id)).length;
       await pendingProjectWriteRef.current;
       await persistCurrentWorkspace();
       workspaceGenerationRef.current += 1;
       stop();
       const record = await importStudioProjectWorkspace(imported.project, imported.assetIds);
-      const missing = await restoreWorkspace(record);
+      const missing = (await restoreWorkspace(record)) + legacyUnavailable;
       await refreshProjectSummaries();
       setNotice(
         missing > 0
@@ -905,6 +1103,64 @@ export function useStudio(): StudioController {
     }
   }, [persistCurrentWorkspace, projectChangeBlocked, refreshProjectSummaries, reportProjectOperationError, restoreWorkspace, stop]);
 
+  const importPadSample = useCallback(async (kitId: string, padIndex: number, file: File) => {
+    setBusy(`Loading ${file.name}...`);
+    setError(null);
+    try {
+      let decoded = await importAudioFile(file, engineInstance.context);
+      const asset = await saveStudioAudioFile(file);
+      decoded = adoptImportedBufferId(decoded, asset.id);
+      setProject((current) => ({
+        ...current,
+        kits: current.kits.map((kit) => kit.id === kitId ? {
+          ...kit,
+          pads: kit.pads.map((pad, index) => index === padIndex ? { ...pad, name: file.name.replace(/\.[^.]+$/, ''), sourceId: decoded.id } : pad),
+        } : kit),
+      }));
+      setNotice(`${file.name} is ready on pad ${padIndex + 1}.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not load that pad sample.');
+    } finally {
+      setBusy(null);
+    }
+  }, [engineInstance, setProject]);
+
+  const reuseKit = useCallback(async (kitId: string) => {
+    const source = reusableKits.find((entry) => entry.kit.id === kitId)?.kit;
+    if (!source) return;
+    setBusy(`Loading ${source.name}...`);
+    setError(null);
+    const generation = workspaceGenerationRef.current;
+    try {
+      const ids = [...new Set(source.pads.flatMap((pad) => pad.sourceId && !getBuffer(pad.sourceId) ? [pad.sourceId] : []))];
+      const assets = await loadStudioAudioAssets(ids);
+      if (assets.length !== ids.length) throw new Error('A saved kit sound is missing from device storage. Restore its project backup first.');
+      for (const asset of assets) {
+        await importAudioFile(new File([asset.blob], asset.fileName, { type: asset.mimeType }), engineInstance.context, asset.id);
+      }
+      if (generation !== workspaceGenerationRef.current) return;
+      setProject((current) => ({ ...current, kits: [...current.kits, { ...source, id: studioId('kit'), name: source.name, pads: source.pads.map((pad) => ({ ...pad })) }] }));
+      setNotice(`${source.name} is ready in this project.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not reuse that kit.');
+    } finally {
+      setBusy(null);
+    }
+  }, [engineInstance, reusableKits, setProject]);
+
+  useEffect(() => {
+    const handleHistoryKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+      event.preventDefault();
+      if (event.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener('keydown', handleHistoryKey);
+    return () => window.removeEventListener('keydown', handleHistoryKey);
+  }, [undo, redo]);
+
   return {
     project,
     clips,
@@ -916,8 +1172,51 @@ export function useStudio(): StudioController {
     persistenceState,
     lastSavedAt,
     restoredAssetCount,
+    masterPeak,
+    inputPeak,
+    metronomeEnabled,
+    setMetronomeEnabled,
+    countInBars,
+    setCountInBars,
+    countingIn,
+    recordOffsetMs,
+    setRecordOffsetMs,
+    loopEnabled,
+    setLoopEnabled,
     projects,
+    reusableKits,
     activeProjectId,
+    canUndo: historyVersion >= 0 && undoRef.current.length > 0,
+    canRedo: historyVersion >= 0 && redoRef.current.length > 0,
+    undo,
+    redo,
+    setDrumHit: (patternId, step, pad, velocity) => setProject((current) => setPatternHit(current, patternId, step, pad, velocity)),
+    patchPattern: (patternId, patch) => setProject((current) => ({
+      ...current,
+      patterns: current.patterns.map((pattern) => pattern.id === patternId ? {
+        ...pattern,
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.bars !== undefined ? { bars: Math.max(1, Math.min(4, Math.round(patch.bars))), hits: pattern.hits.filter((hit) => hit.step < patch.bars! * 16) } : {}),
+        ...(patch.swing !== undefined ? { swing: Math.max(0, Math.min(0.75, patch.swing)) } : {}),
+      } : pattern),
+    })),
+    newPattern: () => setProject((current) => ({ ...current, patterns: [...current.patterns, createPattern(`Pattern ${current.patterns.length + 1}`)] })),
+    copyPattern: (patternId) => setProject((current) => duplicatePattern(current, patternId)),
+    placePattern: (patternId, kitId) => setProject((current) => {
+      const trackId = armedTrackIdRef.current ?? current.tracks[0]?.id;
+      return trackId ? addDrumClip(current, trackId, patternId, kitId, Math.ceil(playheadRef.current / 4) * 4) : current;
+    }),
+    copyKit: (kitId) => setProject((current) => {
+      const kit = current.kits.find((item) => item.id === kitId);
+      return kit ? { ...current, kits: [...current.kits, { ...kit, id: studioId('kit'), name: `${kit.name} Copy`, palette: 'custom' as const, pads: kit.pads.map((pad) => ({ ...pad })) }] } : current;
+    }),
+    reuseKit,
+    renameKit: (kitId, name) => setProject((current) => ({ ...current, kits: current.kits.map((kit) => kit.id === kitId ? { ...kit, name } : kit) })),
+    patchPad: (kitId, padIndex, patch) => setProject((current) => ({
+      ...current,
+      kits: current.kits.map((kit) => kit.id === kitId ? { ...kit, pads: kit.pads.map((pad, index) => index === padIndex ? { ...pad, ...patch } : pad) } : kit),
+    })),
+    importPadSample,
     dismissError: useCallback(() => setError(null), []),
     dismissNotice: useCallback(() => setNotice(null), []),
 
@@ -933,6 +1232,10 @@ export function useStudio(): StudioController {
 
     importFiles,
     placeClip,
+    duplicateClip: (clipId) => setProject((current) => duplicateClip(current, clipId)),
+    splitClip: (clipId, atBeat) => setProject((current) => splitAudioClip(current, clipId, atBeat)),
+    trimClip: (clipId, edge, amountBeats) => setProject((current) => trimAudioClip(current, clipId, edge, amountBeats)),
+    patchClip: (clipId, patch) => setProject((current) => patchAudioClip(current, clipId, patch)),
     dropClip: useCallback(
       (clipId: string) => {
         const current = projectRef.current;
@@ -987,6 +1290,8 @@ export function useStudio(): StudioController {
       [],
     ),
     dropNote: useCallback((trackId, noteId) => setProject((c) => removeNote(c, trackId, noteId)), []),
+    patchNote: (trackId, noteId, patch) => setProject((current) => patchNote(current, trackId, noteId, patch)),
+    quantizeNotes: (trackId) => setProject((current) => quantizeTrackNotes(current, trackId)),
     dropTrack: useCallback((trackId) => {
       // A deleted track can't stay armed -- nothing left to record into.
       setArmedTrackId((current) => (current === trackId ? null : current));

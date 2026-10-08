@@ -531,6 +531,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Arena combat is a travel fight style you can pick in Settings. The classic popup is still the default, and its Send button now replays the entrance.',
     ],
   },
+  {
+    version: '0.16.0',
+    date: '2026-10-08',
+    kind: 'update',
+    title: 'Build a Beat in Gorilla Studios',
+    body: [
+      'Studio now keeps multiple local projects. Create, open, rename, duplicate, and delete them from the project browser; undo and redo edits as you work.',
+      'The new 16-step drum sequencer has three original kits, swing, velocity, custom sample pads, and patterns you can place on the song timeline.',
+      'Audio clips gain waveforms, zoom, trim, split, duplication, gain, and fades. Melodies live in movable MIDI clips with note length, velocity, and quantize controls.',
+      'Add EQ or compression to tracks, watch input and master levels, and record with a click and count-in. Studio renders now pass through a master limiter.',
+      'A .616project backup carries the song and its local sounds. WAV exports and To Soundtrack remain available; Studio songs carry their authored BPM into the game.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

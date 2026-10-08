@@ -21,10 +21,14 @@ import {
 } from './persistence';
 import {
   addClip,
+  addDrumClip,
   addNote,
   addTrack,
   clampBpm,
   createProject,
+  drumEvents,
+  flattenTrackNotes,
+  duplicatePattern,
   moveClip,
   moveNote,
   parseProject,
@@ -32,8 +36,11 @@ import {
   removeClip,
   removeNote,
   removeTrack,
+  splitAudioClip,
+  trimAudioClip,
   serializeProject,
   setTrackInstrument,
+  setPatternHit,
   toggleSolo,
   trackAudible,
   updateTrack,
@@ -52,6 +59,56 @@ test('a project round-trips through serialisation unchanged', () => {
   assert.equal(restored.name, project.name);
   assert.equal(restored.bpm, project.bpm);
   assert.deepEqual(restored.tracks, project.tracks);
+});
+
+test('v1 songs migrate to version two with original kits and their notes intact', () => {
+  const old = { version: 1, name: 'Old Beat', bpm: 96, tracks: [{
+    id: 'keys', name: 'Keys', notes: [{ id: 'n', pitch: 60, startBeat: 2, lengthBeats: 1, velocity: 0.7 }], clips: [], effects: [],
+  }] };
+  const migrated = parseProject(old);
+  assert.equal(migrated.version, 2);
+  assert.equal(flattenTrackNotes(migrated.tracks[0]!)[0]!.pitch, 60);
+  assert.equal(migrated.kits.length, 3);
+  assert.equal(migrated.kits[0]!.pads.length, 16);
+});
+
+test('drum patterns repeat clips with per-hit velocity and swing', () => {
+  let project = createProject();
+  const patternId = project.patterns[0]!.id;
+  project = setPatternHit(project, patternId, 0, 0, 1);
+  project = setPatternHit(project, patternId, 1, 2, 0.4);
+  project = { ...project, patterns: project.patterns.map((pattern) => ({ ...pattern, swing: 0.5 })) };
+  project = addDrumClip(project, project.tracks[0]!.id, patternId, project.kits[0]!.id, 4);
+  project = { ...project, tracks: project.tracks.map((track, index) => index === 0 ? { ...track, drumClips: track.drumClips.map((clip) => ({ ...clip, lengthBeats: 8 })) } : track) };
+  assert.deepEqual(drumEvents(project).map(({ beat, velocity }) => [beat, velocity]), [[4, 1], [4.3125, 0.4], [8, 1], [8.3125, 0.4]]);
+  const copied = duplicatePattern(project, patternId);
+  assert.equal(copied.patterns.length, 2);
+  assert.notEqual(copied.patterns[0]!.id, copied.patterns[1]!.id);
+});
+
+test('a kit pad keeps its shared sample in the project asset references', () => {
+  const project = createProject();
+  const id = 'sha256:' + 'b'.repeat(64);
+  const updated = { ...project, kits: project.kits.map((kit, index) => index === 0 ? {
+    ...kit, pads: kit.pads.map((pad, padIndex) => padIndex === 0 ? { ...pad, sourceId: id } : pad),
+  } : kit) };
+  assert.deepEqual(referencedStudioAssetIds(updated), [id]);
+  assert.deepEqual(createStudioWorkspaceRecord(updated, []).assetIds, [id]);
+});
+
+test('audio trim and split keep the source intact', () => {
+  let project = createProject();
+  project = addClip(project, project.tracks[0]!.id, { bufferId: 'source', name: 'Take', startBeat: 0, lengthBeats: 8 });
+  const id = project.tracks[0]!.clips[0]!.id;
+  project = trimAudioClip(project, id, 'start', 2);
+  assert.equal(project.tracks[0]!.clips[0]!.startBeat, 2);
+  assert.equal(project.tracks[0]!.clips[0]!.sourceOffsetSeconds, 1);
+  project = splitAudioClip(project, id, 4);
+  const [first, second] = project.tracks[0]!.clips;
+  assert.equal(first?.lengthBeats, 2);
+  assert.equal(second?.startBeat, 4);
+  assert.equal(second?.sourceOffsetSeconds, 2);
+  assert.equal(second?.bufferId, 'source');
 });
 
 test('parsing repairs a corrupt project instead of throwing', () => {
@@ -296,15 +353,15 @@ test('notes snap to the grid and cannot start before zero', () => {
     lengthBeats: 1,
     velocity: 0.8,
   });
-  const noteId = project.tracks[0]!.notes[0]!.id;
+  const noteId = flattenTrackNotes(project.tracks[0]!)[0]!.id;
 
   project = moveNote(project, trackId, noteId, 64, 1.31);
-  const moved = project.tracks[0]!.notes[0]!;
+  const moved = flattenTrackNotes(project.tracks[0]!)[0]!;
   assert.equal(moved.pitch, 64);
   assert.equal(moved.startBeat, 1.25, 'snapped to the nearest sixteenth');
 
   project = moveNote(project, trackId, noteId, 64, -5);
-  assert.equal(project.tracks[0]!.notes[0]!.startBeat, 0);
+  assert.equal(flattenTrackNotes(project.tracks[0]!)[0]!.startBeat, 0);
 });
 
 test('a note is clamped to the MIDI range rather than wrapping', () => {
@@ -316,9 +373,9 @@ test('a note is clamped to the MIDI range rather than wrapping', () => {
     lengthBeats: 1,
     velocity: 0.8,
   });
-  const noteId = project.tracks[0]!.notes[0]!.id;
+  const noteId = flattenTrackNotes(project.tracks[0]!)[0]!.id;
   project = moveNote(project, trackId, noteId, 999, 0);
-  assert.equal(project.tracks[0]!.notes[0]!.pitch, 127);
+  assert.equal(flattenTrackNotes(project.tracks[0]!)[0]!.pitch, 127);
 });
 
 test('a corrupt note is dropped without taking the track with it', () => {
@@ -331,8 +388,8 @@ test('a corrupt note is dropped without taking the track with it', () => {
       },
     ],
   });
-  assert.equal(repaired.tracks[0]!.notes.length, 1);
-  assert.equal(repaired.tracks[0]!.notes[0]!.pitch, 62);
+  assert.equal(flattenTrackNotes(repaired.tracks[0]!).length, 1);
+  assert.equal(flattenTrackNotes(repaired.tracks[0]!)[0]!.pitch, 62);
 });
 
 test('project length accounts for notes as well as clips', () => {
@@ -358,10 +415,10 @@ test('removing a note leaves the others alone', () => {
       velocity: 0.8,
     });
   }
-  const target = project.tracks[0]!.notes[1]!.id;
+  const target = flattenTrackNotes(project.tracks[0]!)[1]!.id;
   project = removeNote(project, trackId, target);
   assert.deepEqual(
-    project.tracks[0]!.notes.map((note) => note.pitch),
+    flattenTrackNotes(project.tracks[0]!).map((note) => note.pitch),
     [60, 64],
   );
 });

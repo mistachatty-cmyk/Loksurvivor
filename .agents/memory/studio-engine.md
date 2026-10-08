@@ -91,6 +91,17 @@ recovery/migration fallback. It is not the authoritative media store and cannot
 carry audio. A quota or IndexedDB failure must leave the current session usable,
 show a visible session-only warning, and recommend exporting a backup.
 
+Project documents now use version 2. Tracks can hold audio, MIDI, and drum-pattern
+clips. Older track-wide notes are moved into MIDI clips when loaded. Kits reference
+shared media asset ids for imported pad sounds; the three built-in palettes are
+generated locally. Portable `.616project` backups include the document and every
+owned source. Keep legacy `.616song` import available and report missing audio.
+
+The authored BPM and downbeat offset for a Studio render are stored with its
+Soundtrack entry. The soundtrack analyser uses those values for the beat grid
+while continuing to read actual frequency energy from playback. Other local
+tracks continue using tempo detection.
+
 ## Never hard-wire a connection
 
 Nothing calls `a.connect(b)` between a source and the master. Every track owns

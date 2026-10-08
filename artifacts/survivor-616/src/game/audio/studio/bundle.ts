@@ -1,8 +1,8 @@
 /** A portable Studio project with every player-owned source needed to reopen it. */
 import { strFromU8, strToU8, unzip, zip } from 'fflate';
 
-import { isMediaAssetId } from '../localMediaStore';
-import { loadStudioAudioAssets, saveStudioAudioFile } from './persistence';
+import { hashBlob, isMediaAssetId } from '../localMediaStore';
+import { loadStudioAudioAssets, referencedStudioAssetIds, saveStudioAudioFile } from './persistence';
 import { parseProject, type StudioProject } from './project';
 
 const FORMAT = 'survivor616-project';
@@ -49,6 +49,13 @@ function unzipAsync(bytes: Uint8Array): Promise<Record<string, Uint8Array>> {
 
 export async function createProjectBundle(project: StudioProject, sourceIds: Iterable<string>): Promise<Blob> {
   const ids = [...new Set(sourceIds)];
+  const required = [
+    ...project.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)),
+    ...project.kits.flatMap((kit) => kit.pads.flatMap((pad) => pad.sourceId ? [pad.sourceId] : [])),
+  ];
+  if (required.some((id) => !isMediaAssetId(id) || !ids.includes(id))) {
+    throw new Error('This song uses a missing or session-only source. Re-import it before backing up.');
+  }
   if (ids.some((id) => !isMediaAssetId(id))) {
     throw new Error('Some sounds are available only for this session. Free device storage and re-import them before backing up.');
   }
@@ -105,7 +112,11 @@ export async function readProjectBundle(file: File): Promise<{ project: StudioPr
       throw new Error('The project backup contains a missing or invalid source reference.');
     }
   }
-  const requiredIds = new Set(project.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)));
+  for (const asset of manifest.assets) {
+    const hash = await hashBlob(new Blob([files[asset.path]!.slice().buffer]));
+    if (`sha256:${hash}` !== asset.id) throw new Error(`The project backup contains altered audio: ${asset.fileName || 'source'}.`);
+  }
+  const requiredIds = new Set(referencedStudioAssetIds(project));
   for (const id of requiredIds) {
     if (!manifest.assets.some((asset) => asset.id === id)) {
       throw new Error('The project backup omits audio used by the song.');

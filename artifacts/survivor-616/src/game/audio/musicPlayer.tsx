@@ -68,6 +68,8 @@ export interface Track {
   /** Device-only file identity used for duplicate protection and favorites. */
   fingerprint?: string;
   favorite?: boolean;
+  authoredBpm?: number;
+  downbeatSeconds?: number;
   /**
    * True for a video container (mp4/mov/webm/mkv) added for its audio track.
    * Gates the "Convert to MP3" affordance -- there is no reason to offer it
@@ -148,7 +150,7 @@ export interface MusicPlayerValue {
   progressSec: number;
   durationSec: number;
   error: string | null;
-  addFiles: (files: FileList | File[]) => number;
+  addFiles: (files: FileList | File[], timing?: { authoredBpm: number; downbeatSeconds: number }) => number;
   lastImport: { added: number; duplicates: number; rejected: number } | null;
   dismissImportReport: () => void;
   toggleTrackFavorite: (id: string) => void;
@@ -470,6 +472,7 @@ function loadStoredPlaylists(): StoredPlaylists {
 export function MusicProvider({ children }: { children: ReactNode }) {
   const { meta } = useMeta();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currentTrackRef = useRef<Track | null>(null);
   const tracksRef = useRef<Track[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -570,6 +573,13 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         onEnergy: (energy) => {
           reactiveRootRef.current?.style.setProperty('--music-energy', String(energy));
         },
+        authoredTiming: () => {
+          const track = currentTrackRef.current;
+          const audio = audioRef.current;
+          return track?.authoredBpm && audio
+            ? { bpm: track.authoredBpm * audio.playbackRate, beat: Math.max(0, (audio.currentTime - (track.downbeatSeconds ?? 0)) * track.authoredBpm / 60) }
+            : null;
+        },
       });
     }
     analysisRef.current.start();
@@ -667,6 +677,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
         return;
       }
       setCurrentIndex(index);
+      currentTrackRef.current = track;
       audio.src = track.url;
       audio.currentTime = 0;
       void audio
@@ -768,6 +779,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
               restoredFromLibrary: true,
               fingerprint,
               favorite: favoriteFingerprints.has(fingerprint),
+              authoredBpm: entry.authoredBpm,
+              downbeatSeconds: entry.downbeatSeconds,
             },
             trackCredits,
             albumCredits,
@@ -936,7 +949,7 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   /* --------------------------------------------------------------- */
 
   const addFiles = useCallback(
-    (files: FileList | File[]): number => {
+    (files: FileList | File[], timing?: { authoredBpm: number; downbeatSeconds: number }): number => {
       const incoming = Array.from(files);
       const accepted: Track[] = [];
       const acceptedFiles: Array<{ track: Track; file: File }> = [];
@@ -966,6 +979,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             isVideoContainer: looksLikeVideoContainer(file),
             fingerprint,
             favorite: favoriteFingerprints.has(fingerprint),
+            authoredBpm: timing?.authoredBpm,
+            downbeatSeconds: timing?.downbeatSeconds,
           },
           trackCredits,
           albumCredits,
@@ -1022,6 +1037,8 @@ export function MusicProvider({ children }: { children: ReactNode }) {
             fingerprint: track.fingerprint,
             isVideoContainer: Boolean(track.isVideoContainer),
             addedAt: Date.now(),
+            authoredBpm: track.authoredBpm,
+            downbeatSeconds: track.downbeatSeconds,
           })
             .then(refreshLocalLibrary)
             .catch(() => {

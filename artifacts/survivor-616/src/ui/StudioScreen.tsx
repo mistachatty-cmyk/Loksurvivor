@@ -34,6 +34,7 @@ import {
 import { ScreenLayout } from './ScreenLayout';
 import { ArrangeView } from './studio/ArrangeView';
 import { PadGrid } from './studio/PadGrid';
+import { StepSequencer } from './studio/StepSequencer';
 import { PianoRoll } from './studio/PianoRoll';
 import { PluginRack } from './studio/PluginRack';
 import { StudioProjectBrowser } from './studio/StudioProjectBrowser';
@@ -77,6 +78,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
   const targetTrackId = studio.project.tracks[0]?.id;
   const hasInstrumentTrack = studio.project.tracks.some((track) => track.instrumentId);
   const armedTrack = studio.project.tracks.find((track) => track.id === studio.armedTrackId) ?? null;
+  const selectedAudioClip = studio.project.tracks.flatMap((track) => track.clips).find((clip) => clip.id === selectedClipId);
 
   // 'auto' follows the device's own viewport; 'mobile'/'desktop' force a
   // layout regardless of it, so a phone can opt into the full mixer and a
@@ -174,6 +176,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
 
   const arrangePanel = (
     <div className="flex min-w-0 flex-col gap-6">
+      <StepSequencer studio={studio} />
       <div className="min-w-0 overflow-x-auto">
         <ArrangeView
           project={studio.project}
@@ -195,6 +198,19 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
         >
           <Plus className="h-4 w-4" /> Track
         </button>
+        {selectedClipId && (
+          <button type="button" onClick={() => studio.duplicateClip(selectedClipId)} className="border border-border bg-card px-3 py-2 text-xs font-bold uppercase text-white">Duplicate clip</button>
+        )}
+        {selectedAudioClip && (
+          <>
+            <button type="button" onClick={() => studio.splitClip(selectedAudioClip.id, Math.max(selectedAudioClip.startBeat + 0.25, Math.min(selectedAudioClip.startBeat + selectedAudioClip.lengthBeats - 0.25, studio.playheadRef.current)))} className="border border-border bg-card px-3 py-2 text-xs font-bold uppercase text-white">Split at playhead</button>
+            <button type="button" onClick={() => studio.trimClip(selectedAudioClip.id, 'start', 0.25)} className="border border-border bg-card px-3 py-2 text-xs font-bold uppercase text-white">Trim start +¼</button>
+            <button type="button" onClick={() => studio.trimClip(selectedAudioClip.id, 'end', -0.25)} className="border border-border bg-card px-3 py-2 text-xs font-bold uppercase text-white">Trim end −¼</button>
+            <label className="text-xs text-white">Clip gain <input type="range" min="0" max="2" step="0.05" value={selectedAudioClip.gain ?? 1} onChange={(event) => studio.patchClip(selectedAudioClip.id, { gain: Number(event.target.value) })} /></label>
+            <label className="text-xs text-white">Fade in <input type="number" min="0" step="0.05" value={selectedAudioClip.fadeInSeconds ?? 0} onChange={(event) => studio.patchClip(selectedAudioClip.id, { fadeInSeconds: Number(event.target.value) })} className="w-16 border border-border bg-background px-1" />s</label>
+            <label className="text-xs text-white">Fade out <input type="number" min="0" step="0.05" value={selectedAudioClip.fadeOutSeconds ?? 0} onChange={(event) => studio.patchClip(selectedAudioClip.id, { fadeOutSeconds: Number(event.target.value) })} className="w-16 border border-border bg-background px-1" />s</label>
+          </>
+        )}
         {selectedClipId && (
           <button
             type="button"
@@ -421,6 +437,8 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
             onAddNote={(note) => studio.placeNote(track.id, note)}
             onMoveNote={(noteId, pitch, startBeat) => studio.relocateNote(track.id, noteId, pitch, startBeat)}
             onRemoveNote={(noteId) => studio.dropNote(track.id, noteId)}
+            onPatchNote={(noteId, patch) => studio.patchNote(track.id, noteId, patch)}
+            onQuantize={() => studio.quantizeNotes(track.id)}
           />
         ))}
     </div>
@@ -488,9 +506,13 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           >
             <Square className="h-4 w-4" />
           </button>
+          <button type="button" onClick={studio.undo} disabled={!studio.canUndo} aria-label="Undo edit" title="Undo (Ctrl+Z)" className="border border-border px-3 py-2 text-xs text-white disabled:opacity-30">Undo</button>
+          <button type="button" onClick={studio.redo} disabled={!studio.canRedo} aria-label="Redo edit" title="Redo (Ctrl+Shift+Z)" className="border border-border px-3 py-2 text-xs text-white disabled:opacity-30">Redo</button>
+          <div className="flex w-20 flex-col gap-1" title="Master input level before limiter"><span className="text-[9px] uppercase text-muted-foreground">Master</span><div className="h-2 border border-border bg-background"><div className={`h-full ${studio.masterPeak >= 0.99 ? 'bg-destructive' : 'bg-primary'}`} style={{ width: `${Math.min(100, studio.masterPeak * 100)}%` }} /></div><span className="text-[9px] text-muted-foreground">{studio.masterPeak >= 0.99 ? 'Clip' : `${Math.round(studio.masterPeak * 100)}%`}</span></div>
           <button
             type="button"
             onClick={() => (studio.recordingMic ? studio.stopMicRecording() : void studio.startMicRecording())}
+            disabled={studio.countingIn}
             className={`flex h-11 w-11 items-center justify-center border transition-colors ${
               studio.recordingMic
                 ? 'animate-pulse border-destructive bg-destructive/20 text-destructive'
@@ -503,6 +525,12 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           >
             {studio.micSupported ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
           </button>
+          <label className="flex items-center gap-1 text-xs text-white"><input type="checkbox" checked={studio.metronomeEnabled} onChange={(event) => studio.setMetronomeEnabled(event.target.checked)} /> Click</label>
+          <label className="flex items-center gap-1 text-xs text-white"><input type="checkbox" checked={studio.loopEnabled} onChange={(event) => studio.setLoopEnabled(event.target.checked)} /> Loop</label>
+          <label className="text-xs text-muted-foreground">Count in <select value={studio.countInBars} onChange={(event) => studio.setCountInBars(Number(event.target.value))} className="border border-border bg-background px-1 text-white"><option value={0}>Off</option><option value={1}>1 bar</option><option value={2}>2 bars</option></select></label>
+          {studio.countingIn && <span className="text-xs font-bold text-primary">Counting in…</span>}
+          <div className="flex w-20 flex-col gap-1" title="Microphone input level"><span className="text-[9px] uppercase text-muted-foreground">Input</span><div className="h-2 border border-border bg-background"><div className={`h-full ${studio.inputPeak >= 0.99 ? 'bg-destructive' : 'bg-primary'}`} style={{ width: `${Math.min(100, studio.inputPeak * 100)}%` }} /></div><span className="text-[9px] text-muted-foreground">{studio.inputPeak >= 0.99 ? 'Clip' : `${Math.round(studio.inputPeak * 100)}%`}</span></div>
+          <label className="text-xs text-muted-foreground" title="If a take lands late, enter a positive offset to move it earlier">Mic offset <input type="number" min="-500" max="500" step="10" value={studio.recordOffsetMs} onChange={(event) => studio.setRecordOffsetMs(Number(event.target.value))} className="w-16 border border-border bg-background px-1 text-white" /> ms</label>
 
           <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
             BPM

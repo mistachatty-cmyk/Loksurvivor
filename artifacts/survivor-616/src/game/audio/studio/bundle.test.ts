@@ -32,3 +32,18 @@ test('a project backup with a missing sound is rejected before import', async ()
   await assert.rejects(() => readProjectBundle(new File([bytes.slice().buffer], 'missing.616project')), /omits audio/);
   assert.ok(unzipSync(bytes)['manifest.json']);
 });
+
+test('portable project includes a custom drum pad sample', async () => {
+  const asset = await saveStudioAudioFile(new File(['pad sample'], 'kick.wav', { type: 'audio/wav' }));
+  const blank = createProject('Sample Kit');
+  const project = {
+    ...blank,
+    kits: blank.kits.map((kit, index) => index === 0
+      ? { ...kit, palette: 'custom' as const, pads: kit.pads.map((pad, padIndex) => padIndex === 0 ? { ...pad, sourceId: asset.id } : pad) }
+      : kit),
+  };
+  const bundle = await createProjectBundle(project, [asset.id]);
+  const restored = await readProjectBundle(new File([bundle], 'kit.616project'));
+  assert.equal(restored.project.kits[0]!.pads[0]!.sourceId, asset.id);
+  assert.deepEqual(restored.assetIds, [asset.id]);
+});

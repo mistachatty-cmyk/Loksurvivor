@@ -21,7 +21,7 @@ import {
   saveMediaAsset,
   type MediaAssetRecord,
 } from '../localMediaStore';
-import { createProject, parseProject, type StudioProject } from './project';
+import { createProject, parseProject, type StudioDrumKit, type StudioProject } from './project';
 
 export const STUDIO_WORKSPACE_VERSION = 1;
 /** The id used by the single-project release. Kept only for migration tests. */
@@ -73,7 +73,10 @@ function projectId(): string {
 
 export function referencedStudioAssetIds(project: StudioProject): string[] {
   return uniqueStrings(
-    project.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)).filter(isMediaAssetId),
+    [
+      ...project.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)),
+      ...project.kits.flatMap((kit) => kit.pads.map((pad) => pad.sourceId ?? '')),
+    ].filter(isMediaAssetId),
   );
 }
 
@@ -212,7 +215,7 @@ export async function listStudioProjects(): Promise<StudioProjectSummary[]> {
       name: record.project.name,
       updatedAt: record.updatedAt,
       trackCount: record.project.tracks.length,
-      clipCount: record.project.tracks.reduce((total, track) => total + track.clips.length, 0),
+      clipCount: record.project.tracks.reduce((total, track) => total + track.clips.length + track.midiClips.length + track.drumClips.length, 0),
       sourceCount: record.assetIds.length,
       missingSourceCount: record.assetIds.reduce((total, id) => total + (available.has(id) ? 0 : 1), 0),
     }))
@@ -257,6 +260,13 @@ export async function createStudioProjectWorkspace(name = 'Untitled'): Promise<S
     } satisfies StudioWorkspaceIndexRecord);
     return record;
   });
+}
+
+export async function listReusableStudioKits(): Promise<Array<{ projectName: string; kit: StudioDrumKit }>> {
+  const projects = await withProjectStore(async (store) => (await readProjectState(store)).projects);
+  return projects.flatMap((record) => record.project.kits
+    .filter((kit) => kit.palette === 'custom')
+    .map((kit) => ({ projectName: record.project.name, kit })));
 }
 
 /** Opens a portable backup as a new local project, retaining its shared assets. */
