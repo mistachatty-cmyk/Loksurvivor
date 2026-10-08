@@ -58,10 +58,6 @@
   "settings.damageNumbers.title": "Schadenszahlen",
   "settings.damageNumbers.classic": "Klassisch",
   "settings.damageNumbers.cascade": "Kaskade",
-  "settings.dropStyle.title": "Drop-Stil",
-  "settings.dropStyle.enhanced": "Verbessert",
-  "settings.dropStyle.classic": "Klassisch",
-  "settings.dropStyle.description": "Verbessert: Edelsteine, Truhen und Materialien erhalten schattierte Grafiken, Spawn-Sprünge, Leerlaufanimationen und Aufnahmepfade. Klassisch ist der ursprüngliche Look. Performance-Grafiken verwenden immer Classic. Nur Anzeige.",
   "settings.damageNumbers.description": "Klassisch ist die ursprüngliche kurze gelbe Nummer. Cascade hält die Anzahl länger aufrecht, stapelt sie über jedem Feind und ändert Farbe und Größe, wenn die Treffer größer werden. Nur Anzeige; ändert nie den Schaden.",
   "settings.title": "Einstellungen",
   "settings.subtitle": "Kontrollen und Zugänglichkeit",
@@ -376,5 +372,9 @@
   "hideout.event.ui.lockedBond": "Benötigt {{rank}}-Anleihe",
   "hideout.event.ui.fizzle": "Fast hätte man etwas Besonderes gefunden, aber der Moment vergeht. Du hast immer noch ein wenig davon.",
   "hideout.event.ui.gone": "Dieser Moment ist bereits vergangen.",
-  "hideout.event.ui.fallbackPet": "Ihr LokPet"
+  "hideout.event.ui.fallbackPet": "Ihr LokPet",
+  "settings.dropStyle.title": "Drop-Stil",
+  "settings.dropStyle.enhanced": "Verbessert",
+  "settings.dropStyle.classic": "Klassisch",
+  "settings.dropStyle.description": "Verbessert: Edelsteine, Truhen und Materialien erhalten schattierte Grafiken, Spawn-Sprünge, Leerlaufanimationen und Aufnahmepfade. Klassisch ist der ursprüngliche Look. Performance-Grafiken verwenden immer Classic. Nur Anzeige."
 }

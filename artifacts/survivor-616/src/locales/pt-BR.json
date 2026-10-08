@@ -58,10 +58,6 @@
   "settings.damageNumbers.title": "Números de danos",
   "settings.damageNumbers.classic": "Clássico",
   "settings.damageNumbers.cascade": "Cascata",
-  "settings.dropStyle.title": "Estilo de queda",
-  "settings.dropStyle.enhanced": "Aprimorado",
-  "settings.dropStyle.classic": "Clássico",
-  "settings.dropStyle.description": "Aprimorado oferece arte sombreada para gemas, baús e materiais, saltos de spawn, animação ociosa e trilhas de coleta. Clássico é o visual original. Os gráficos de desempenho sempre usam Classic. Somente exibição.",
   "settings.damageNumbers.description": "Clássico é o número curto amarelo original. Cascade mantém os números altos por mais tempo, empilha-os acima de cada inimigo e muda de cor e tamanho conforme os acertos aumentam. Somente exibição; nunca muda o dano.",
   "settings.title": "Configurações",
   "settings.subtitle": "Controles e acessibilidade",
@@ -376,5 +372,9 @@
   "hideout.event.ui.lockedBond": "Precisa de vínculo {{rank}}",
   "hideout.event.ui.fizzle": "Você quase encontrou algo especial, mas o momento passa. Você ainda sai com um pouco.",
   "hideout.event.ui.gone": "Este momento já passou.",
-  "hideout.event.ui.fallbackPet": "seu LokPet"
+  "hideout.event.ui.fallbackPet": "seu LokPet",
+  "settings.dropStyle.title": "Estilo de queda",
+  "settings.dropStyle.enhanced": "Aprimorado",
+  "settings.dropStyle.classic": "Clássico",
+  "settings.dropStyle.description": "Aprimorado oferece arte sombreada para gemas, baús e materiais, saltos de spawn, animação ociosa e trilhas de coleta. Clássico é o visual original. Os gráficos de desempenho sempre usam Classic. Somente exibição."
 }

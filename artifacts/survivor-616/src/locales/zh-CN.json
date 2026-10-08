@@ -58,10 +58,6 @@
   "settings.damageNumbers.title": "伤害数字",
   "settings.damageNumbers.classic": "经典的",
   "settings.damageNumbers.cascade": "级联",
-  "settings.dropStyle.title": "水滴式",
-  "settings.dropStyle.enhanced": "增强型",
-  "settings.dropStyle.classic": "经典的",
-  "settings.dropStyle.description": "增强版提供宝石、宝箱和材质阴影艺术、生成弹跳、闲置动画和拾取轨迹。经典就是原来的样子。性能图形始终使用经典。仅显示。",
   "settings.damageNumbers.description": "经典就是原来的短黄号。级联可以让数字保持更长的时间，将它们堆叠在每个敌人上方，并随着命中的增加而改变颜色和大小。仅显示；永远不会改变伤害。",
   "settings.title": "设置",
   "settings.subtitle": "控制和辅助功能",
@@ -376,5 +372,9 @@
   "hideout.event.ui.lockedBond": "需要 {{rank}} 债券",
   "hideout.event.ui.fizzle": "你几乎发现一些特别的东西, 但那一刻溜走了。 你还是带了一点出来",
   "hideout.event.ui.gone": "这一时刻已经过去。",
-  "hideout.event.ui.fallbackPet": "您的 LokPet 密码"
+  "hideout.event.ui.fallbackPet": "您的 LokPet 密码",
+  "settings.dropStyle.title": "水滴式",
+  "settings.dropStyle.enhanced": "增强型",
+  "settings.dropStyle.classic": "经典的",
+  "settings.dropStyle.description": "增强版提供宝石、宝箱和材质阴影艺术、生成弹跳、闲置动画和拾取轨迹。经典就是原来的样子。性能图形始终使用经典。仅显示。"
 }

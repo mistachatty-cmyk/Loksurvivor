@@ -58,10 +58,6 @@
   "settings.damageNumbers.title": "Numéros de dégâts",
   "settings.damageNumbers.classic": "Classique",
   "settings.damageNumbers.cascade": "Cascade",
-  "settings.dropStyle.title": "Style de chute",
-  "settings.dropStyle.enhanced": "Amélioré",
-  "settings.dropStyle.classic": "Classique",
-  "settings.dropStyle.description": "L'amélioration donne des gemmes, des coffres et des matériaux, des illustrations ombragées, des rebonds d'apparition, une animation inactive et des pistes de ramassage. Le classique est le look original. Les graphiques de performances utilisent toujours Classic. Affichage uniquement.",
   "settings.damageNumbers.description": "Classic est le numéro jaune court original. Cascade maintient les chiffres plus longtemps, les empile au-dessus de chaque ennemi et change de couleur et de taille à mesure que les coups deviennent plus importants. Affichage uniquement ; ne change jamais les dégâts.",
   "settings.title": "Paramètres",
   "settings.subtitle": "Contrôles et accessibilité",
@@ -376,5 +372,9 @@
   "hideout.event.ui.lockedBond": "Nécessite une caution {{rank}}",
   "hideout.event.ui.fizzle": "Vous avez presque trouvé quelque chose de spécial, mais le moment vous échappe. Vous en repartez quand même avec un peu.",
   "hideout.event.ui.gone": "Ce moment est déjà passé.",
-  "hideout.event.ui.fallbackPet": "votre LokPet"
+  "hideout.event.ui.fallbackPet": "votre LokPet",
+  "settings.dropStyle.title": "Style de chute",
+  "settings.dropStyle.enhanced": "Amélioré",
+  "settings.dropStyle.classic": "Classique",
+  "settings.dropStyle.description": "L'amélioration donne des gemmes, des coffres et des matériaux, des illustrations ombragées, des rebonds d'apparition, une animation inactive et des pistes de ramassage. Le classique est le look original. Les graphiques de performances utilisent toujours Classic. Affichage uniquement."
 }
