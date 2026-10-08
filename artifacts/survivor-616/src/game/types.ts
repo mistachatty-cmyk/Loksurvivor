@@ -2170,7 +2170,8 @@ export type RunAuraStyle =
   | 'rain-signal'
   | 'glitch-echo'
   | 'mothlight'
-  | 'tile-bloom';
+  | 'tile-bloom'
+  | 'comet-trail';
 
 export interface RunAuraDef {
   id: string;
@@ -2183,7 +2184,7 @@ export interface RunAuraDef {
 }
 
 /** Floating headwear is deliberately presentation-only and does not change collision. */
-export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap' | 'antenna' | 'vinyl-disc';
+export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap' | 'antenna' | 'vinyl-disc' | 'paper-visor';
 export interface HatDef {
   id: string;
   name: string;

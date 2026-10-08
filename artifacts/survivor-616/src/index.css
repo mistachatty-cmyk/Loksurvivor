@@ -184,6 +184,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .cosmetic-aura-glitch-echo::before { box-shadow: -10px 5px 0 -7px var(--accent), 10px -5px 0 -7px var(--aura); animation: cosmetic-glitch 1s steps(2) infinite; }
 .cosmetic-aura-mothlight::after { border-style: dotted; animation: cosmetic-spin 4s linear infinite; }
 .cosmetic-aura-tile-bloom::before { border-radius: 4px; animation: cosmetic-float 1.1s ease-in-out infinite; }
+.cosmetic-aura-comet-trail::after { border-style: dotted; border-color: var(--accent); animation: cosmetic-spin 1.8s linear infinite; }
 .cosmetic-hat-top-hat { top: 8px; transform: scaleX(1.5); color: #16131c; text-shadow: 0 0 3px var(--primary); }
 .cosmetic-hat-halo { top: 5px; color: #fde68a; animation: cosmetic-float 1.8s ease-in-out infinite; }
 .cosmetic-hat-crown { top: 6px; color: #fbbf24; animation: cosmetic-float 1.6s ease-in-out infinite; }
@@ -193,6 +194,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .cosmetic-hat-moth-cap { top: 8px; color: #f0abfc; animation: cosmetic-float 1.5s ease-in-out infinite; }
 .cosmetic-hat-antenna { top: 2px; color: #fda4af; animation: cosmetic-float 1.4s ease-in-out infinite; }
 .cosmetic-hat-vinyl-disc { top: 6px; color: #d1d5db; animation: cosmetic-spin 2.6s linear infinite; }
+.cosmetic-hat-paper-visor { top: 6px; color: #e7dcc4; animation: cosmetic-float 1.6s ease-in-out infinite; }
 .cosmetic-celebration { top: 28%; animation: cosmetic-celebrate 900ms ease-out both; }
 @keyframes cosmetic-spin { to { transform: rotate(360deg); } }
 @keyframes cosmetic-float { 50% { transform: translateY(-7px); } }
@@ -340,7 +342,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
    layer instead, which has no descendants to capture. */
 [data-ui-theme='midnight-reliquary']::before, [data-ui-theme='mirror-carnival']::before,
 [data-ui-theme='aurora-transit']::before, [data-ui-theme='chrome-vespers']::before,
-[data-ui-theme='paper-lantern']::before {
+[data-ui-theme='paper-lantern']::before, [data-ui-theme='greenhouse-glass']::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
 }
 [data-ui-theme='midnight-reliquary']::before { background-image: radial-gradient(circle at 50% 100%, hsl(196 100% 68% / .16), transparent 48%); animation: reliquary-breathe 5.5s ease-in-out infinite; }
@@ -348,6 +350,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='aurora-transit']::before { background-image: conic-gradient(from 200deg at 50% 0%, hsl(168 90% 55% / .1), hsl(275 85% 60% / .1), hsl(190 60% 70% / .1), hsl(168 90% 55% / .1)); animation: aurora-drift-bg 12s linear infinite; }
 [data-ui-theme='chrome-vespers']::before { background-image: linear-gradient(160deg, hsl(35 90% 55% / .07), transparent 45%, hsl(255 55% 45% / .08)); animation: vespers-breathe 6s ease-in-out infinite; }
 [data-ui-theme='paper-lantern']::before { background-image: radial-gradient(circle at 50% 0%, hsl(28 90% 60% / .1), transparent 40%); animation: lantern-flicker 4.2s ease-in-out infinite; }
+[data-ui-theme='greenhouse-glass']::before { background-image: radial-gradient(circle at 30% 20%, hsl(150 60% 55% / .12), transparent 42%); animation: greenhouse-fog 7s ease-in-out infinite; }
 
 /* Night Drive: a cool, cinematic chrome that still uses the same UI tokens. */
 [data-ui-theme='night-drive'] {
@@ -614,9 +617,24 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='paper-lantern'][data-ui-swatch='paper-cream'] { --primary: 42 60% 88%; --accent-foreground: 42 60% 88%; --ring: 42 60% 88%; }
 [data-ui-theme='paper-lantern'][data-ui-swatch='ember-red'] { --primary: 8 85% 62%; --accent-foreground: 8 85% 62%; --ring: 8 85% 62%; }
 
+/* Greenhouse Glass: a humid conservatory behind slow-fogging panes. */
+[data-ui-theme='greenhouse-glass'] {
+  --background: 150 24% 6%; --foreground: 140 28% 94%;
+  --card: 150 22% 10%; --card-foreground: 140 28% 94%; --card-border: 150 40% 28%;
+  --popover: 150 22% 10%; --popover-foreground: 140 28% 94%; --popover-border: 150 40% 28%;
+  --primary: 150 60% 55%; --primary-foreground: 150 24% 6%;
+  --secondary: 150 20% 16%; --secondary-foreground: 140 28% 94%;
+  --muted: 150 20% 13%; --muted-foreground: 140 16% 63%;
+  --accent: 150 50% 15%; --accent-foreground: 150 60% 55%;
+  --border: 150 40% 28%; --input: 150 40% 28%; --ring: 150 60% 55%;
+}
+[data-ui-theme='greenhouse-glass'][data-ui-swatch='condensation-blue'] { --primary: 195 55% 70%; --accent-foreground: 195 55% 70%; --ring: 195 55% 70%; }
+[data-ui-theme='greenhouse-glass'][data-ui-swatch='terracotta-pot'] { --primary: 18 65% 58%; --accent-foreground: 18 65% 58%; --ring: 18 65% 58%; }
+
 @keyframes aurora-drift-bg { to { filter: hue-rotate(30deg); } }
 @keyframes vespers-breathe { 50% { filter: brightness(1.1) saturate(1.08); } }
 @keyframes lantern-flicker { 0%, 100% { filter: brightness(1); } 38% { filter: brightness(0.94); } 52% { filter: brightness(1.08); } 70% { filter: brightness(0.97); } }
+@keyframes greenhouse-fog { 50% { opacity: 0.55; } }
 
 /* Small shop previews for palettes whose in-run glow is animated by Canvas2D. */
 @keyframes palette-preview-glow { 50% { filter: brightness(1.45); box-shadow: 0 0 10px currentColor; } }

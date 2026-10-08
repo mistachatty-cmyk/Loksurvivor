@@ -187,6 +187,12 @@ export const UI_THEMES: UIThemeDef[] = [
     cost: 6000,
     swatches: [{ id: 'lantern-orange', name: 'Lantern Orange', primaryHsl: '28 90% 62%' }, { id: 'paper-cream', name: 'Paper Cream', primaryHsl: '42 60% 88%' }, { id: 'ember-red', name: 'Ember Red', primaryHsl: '8 85% 62%' }],
   },
+  {
+    id: 'greenhouse-glass', name: 'Greenhouse Glass',
+    description: 'A humid conservatory behind fogged glass: slow condensation beads down every panel edge.',
+    cost: 6400,
+    swatches: [{ id: 'fern-green', name: 'Fern Green', primaryHsl: '150 60% 55%' }, { id: 'condensation-blue', name: 'Condensation Blue', primaryHsl: '195 55% 70%' }, { id: 'terracotta-pot', name: 'Terracotta Pot', primaryHsl: '18 65% 58%' }],
+  },
 ];
 
 export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(

@@ -5464,6 +5464,21 @@ function drawActors(
         ctx.fillRect(-size, -size, size * 2, size * 2);
         ctx.restore();
       }
+    } else if (w.runAuraStyle === 'comet-trail') {
+      const orbitRadius = p.radius + 15;
+      const headAngle = phase * 2.6;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 9;
+      for (let i = 0; i < 6; i += 1) {
+        const trailAngle = headAngle - i * 0.22;
+        const x = p.x + Math.cos(trailAngle) * orbitRadius;
+        const y = p.y + 2 + Math.sin(trailAngle) * (orbitRadius * 0.42);
+        ctx.globalAlpha = (1 - i / 6) * 0.7;
+        ctx.fillStyle = i === 0 ? accent : glow;
+        ctx.beginPath();
+        ctx.arc(x, y, i === 0 ? 3 : 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else if (w.runAuraStyle === 'tile-bloom') {
       const tileSize = 12;
       for (let ix = -1; ix <= 1; ix += 1) {
@@ -5624,6 +5639,15 @@ function drawActors(
         ctx.fillRect(-2, -1, 4, 2);
         ctx.restore();
       }
+    } else if (w.runAuraStyle === 'comet-trail') {
+      const headAngle = phase * 3 + Math.PI;
+      for (let i = 0; i < 4; i += 1) {
+        const trailAngle = headAngle - i * 0.25;
+        ctx.globalAlpha = (1 - i / 4) * 0.55;
+        ctx.beginPath();
+        ctx.arc(p.x + Math.cos(trailAngle) * overheadRadius, headY + Math.sin(trailAngle) * (overheadRadius * 0.55), i === 0 ? 2.4 : 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else if (w.runAuraStyle === 'tile-bloom') {
       ctx.globalAlpha = 0.5 + Math.sin(phase * 2.2) * 0.18;
       ctx.lineWidth = 1.4;
@@ -5674,6 +5698,9 @@ function drawActors(
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
+      } else if (w.hatStyle === 'paper-visor') {
+        ctx.beginPath(); ctx.moveTo(-8, 0); ctx.quadraticCurveTo(0, -6, 8, 0); ctx.quadraticCurveTo(0, -2, -8, 0); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-10, 2); ctx.lineTo(8, 2); ctx.lineTo(8, 0); ctx.closePath(); ctx.fill();
       }
       ctx.restore();
     }
