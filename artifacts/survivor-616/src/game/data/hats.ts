@@ -17,6 +17,7 @@ export const HATS: HatDef[] = [
   { id: 'feudal-cone', name: 'Feudal Traffic Cone', description: 'The crew asked for a castle. Theo built a cone and announced the feudal age anyway.', cost: 2, tier: 'uncommon', style: 'cone' },
   { id: 'garlic-satellite', name: 'Garlic Satellite', description: 'Its orbit is technically a build. The vampires are technically unimpressed.', cost: 3, tier: 'rare', style: 'satellite' },
   { id: 'last-crown', name: 'One More Crown', description: 'Just one more run before bed, said the monarch at dawn.', cost: 4, tier: 'legendary', style: 'crown' },
+  { id: 'newsstand-visor', name: 'Newsstand Visor', description: 'A bent paper visor still smelling faintly of fresh ink.', cost: 2, tier: 'uncommon', style: 'paper-visor' },
 ];
 export const HATS_BY_ID: Record<string, HatDef> = Object.fromEntries(HATS.map((hat) => [hat.id, hat]));
 export const DEFAULT_HAT_ID = 'no-hat';

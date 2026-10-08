@@ -4,7 +4,7 @@
  */
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Palette, X, ShieldAlert, Sparkles, Megaphone, Wrench } from 'lucide-react';
+import { X, ShieldAlert, Sparkles, Megaphone } from 'lucide-react';
 
 import { useAuth } from '@/state/authStore';
 import { useMeta } from '@/game/state/metaStore';
@@ -12,14 +12,16 @@ import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { pickSplashText } from '@/game/data/splashText';
 import { LORE_CHRONICLES } from '@/game/data/lore';
 import { LorePopup } from '@/ui/LorePopup';
-import { CHANGELOG, CURRENT_VERSION, updateNumber } from '@/game/data/changelog';
+import { CHANGELOG, CURRENT_VERSION } from '@/game/data/changelog';
+import { CHANGELOG_KIND_META } from '@/game/data/changelogKinds';
 import { pickCreditName } from '@/game/data/creditRotation';
 import { IntroTitle } from '@/ui/IntroTitle';
 import { useT } from '@/lib/i18n';
 import { FireflyEasterEgg } from '@/ui/FireflyEasterEgg';
 import { MotionNotice } from '@/ui/MotionToggle';
-import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset, useIntroPhysicsResetVisible } from '@/ui/introPhysics';
+import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset } from '@/ui/introPhysics';
 import { introPhysicsForTheme, resolveIntroEvent } from '@/ui/introPresentation';
+import { UpdateEntryCard } from '@/ui/UpdateEntryCard';
 
 // Pulls in the full simulation engine (createWorld/stepWorld/renderWorld),
 // which is otherwise only paid for once a real run starts. Lazy-loading it
@@ -49,7 +51,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
   const t = useT();
   const { available, session } = useAuth();
   const showSignIn = Boolean(onSignIn) && available && !session;
-  const { meta, cycleStarterUiLook, checkHiddenThemeReload } = useMeta();
+  const { meta, checkHiddenThemeReload } = useMeta();
   const player = useMusicPlayer();
   // Picked once per mount, not per render -- a fresh one shows up whenever
   // the title screen loads, Minecraft-main-menu-splash style.
@@ -220,14 +222,13 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
           </a>
           {meta.attractModeEnabled ? <MotionNotice /> : null}
         </motion.div>
-        {/* Both of these use `position: fixed`, which must escape to the
-            viewport -- kept as siblings of motion.div, not nested inside it,
-            because motion.div carries a Framer Motion filter: blur(0px) that
+        {/* Uses `position: fixed`, which must escape to the viewport --
+            kept as a sibling of motion.div, not nested inside it, because
+            motion.div carries a Framer Motion filter: blur(0px) that
             (despite doing nothing visually) creates a CSS containing block
-            for fixed descendants, same as a transform would. Nesting either
-            one inside motion.div anchors it to that div's box instead of the
-            screen corner. */}
-        <ThemeCycleButton theme={meta.uiTheme} onCycle={cycleStarterUiLook} />
+            for fixed descendants, same as a transform would. Nesting it
+            inside motion.div would anchor it to that div's box instead of
+            the screen corner. */}
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
       <FireflyEasterEgg />
@@ -252,7 +253,8 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
-              className="relative w-full max-w-lg border-2 border-cyan-300/50 bg-gradient-to-b from-cyan-950/40 to-black p-5 shadow-[0_0_60px_rgba(103,232,249,0.15)] text-left"
+              className="relative w-full max-w-lg border-2 bg-black p-5 text-left"
+              style={{ borderColor: `${CHANGELOG_KIND_META[CHANGELOG[CHANGELOG.length - 1]!.kind].color}99`, backgroundImage: `linear-gradient(to bottom, ${CHANGELOG_KIND_META[CHANGELOG[CHANGELOG.length - 1]!.kind].color}33, #000)` }}
             >
               <button
                 type="button"
@@ -278,33 +280,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
               </p>
 
               <div className="mt-4 max-h-[55vh] space-y-3 overflow-y-auto pr-1">
-                {[...CHANGELOG].reverse().map((entry) => (
-                  <div
-                    key={entry.version}
-                    className={`border p-3 ${entry.kind === 'hotfix' ? 'border-amber-400/40 bg-amber-400/5' : 'border-cyan-300/25 bg-cyan-300/5'}`}
-                    data-testid={`intro-update-entry-${entry.version}`}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest ${
-                          entry.kind === 'hotfix'
-                            ? 'border-amber-400/60 bg-amber-400/15 text-amber-300'
-                            : 'border-cyan-300/60 bg-cyan-300/15 text-cyan-200'
-                        }`}
-                      >
-                        {entry.kind === 'hotfix' ? <Wrench className="h-2.5 w-2.5" /> : <Megaphone className="h-2.5 w-2.5" />}
-                        {entry.kind === 'hotfix' ? 'Hotfix' : 'Update'} #{updateNumber(entry)}
-                      </span>
-                      <span className="font-mono text-[9px] text-muted-foreground">v{entry.version} · {entry.date}</span>
-                    </div>
-                    <h3 className="mt-1.5 text-sm font-black uppercase text-white">{entry.title}</h3>
-                    <ul className="mt-1.5 space-y-1">
-                      {entry.body.map((line) => (
-                        <li key={line} className="text-xs leading-snug text-muted-foreground">{line}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                {[...CHANGELOG].reverse().map((entry) => <UpdateEntryCard key={entry.version} entry={entry} testId={`intro-update-entry-${entry.version}`} />)}
               </div>
 
               <button
@@ -320,31 +296,6 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-/**
- * Shares IntroPhysicsReset's exact bottom-left slot (same
- * bottom-4/left-4 sm:bottom-6/sm:left-6 anchor) rather than sitting
- * somewhere else on screen. Normally parked right there; when Reset needs
- * that spot -- the title is off its resting spot -- this slides out of the
- * way to the right, then slides back the moment Reset disappears.
- */
-function ThemeCycleButton({ theme, onCycle }: { theme: string; onCycle: () => void }) {
-  const resetVisible = useIntroPhysicsResetVisible();
-  return (
-    <motion.button
-      type="button"
-      onClick={onCycle}
-      title={`Theme: ${theme.replace(/-/g, ' ')} · tap to switch`}
-      aria-label={`Switch starter look (current theme: ${theme.replace(/-/g, ' ')})`}
-      animate={{ x: resetVisible ? 88 : 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-      className="fixed bottom-4 left-4 z-20 grid h-8 w-8 place-items-center rounded-full border border-white/20 bg-black/35 text-white/80 backdrop-blur-sm transition-colors hover:border-primary hover:text-primary sm:bottom-6 sm:left-6"
-      data-testid="button-intro-cycle-theme"
-    >
-      <Palette className="h-3.5 w-3.5" aria-hidden="true" />
-    </motion.button>
   );
 }
 

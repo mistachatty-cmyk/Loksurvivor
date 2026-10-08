@@ -31,7 +31,7 @@ import {
   useMeta,
 } from '@/game/state/metaStore';
 import { characterRankTitle } from '@/game/data/characterMastery';
-import { CHANGELOG, updateNumber } from '@/game/data/changelog';
+import { CHANGELOG } from '@/game/data/changelog';
 import { LORE_CHRONICLES } from '@/game/data/lore';
 import { pickCreditName } from '@/game/data/creditRotation';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -48,8 +48,9 @@ import {
   VISITING_CARD_SILHOUETTE,
 } from '@/lib/lokCardExchange';
 import { motion } from 'framer-motion';
-import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Wrench, Scroll, type LucideIcon } from 'lucide-react';
+import { Trash2, Users, MapPin, User, Search, Sparkles, History, ChevronDown, ChevronUp, BookOpen, Hammer, Trophy, Gift, Globe, CreditCard, TrendingUp, Zap, Skull, Swords, Clock, DoorOpen, Milestone, Layers, Award, Megaphone, Scroll, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { UpdateEntryCard } from './UpdateEntryCard';
 
 export interface ArchivePanelProps {
   onBack: () => void;
@@ -998,33 +999,7 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
           </div>
 
           <div className="space-y-3">
-            {[...CHANGELOG].reverse().map((entry) => (
-              <div
-                key={entry.version}
-                className={`border p-4 ${entry.kind === 'hotfix' ? 'border-amber-400/40 bg-amber-400/5' : 'border-border bg-card'}`}
-                data-testid={`archive-update-${entry.version}`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-1 border px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest ${
-                      entry.kind === 'hotfix'
-                        ? 'border-amber-400/60 bg-amber-400/15 text-amber-300'
-                        : 'border-cyan-300/60 bg-cyan-300/15 text-cyan-200'
-                    }`}
-                  >
-                    {entry.kind === 'hotfix' ? <Wrench className="h-2.5 w-2.5" /> : <Megaphone className="h-2.5 w-2.5" />}
-                    {entry.kind === 'hotfix' ? 'Hotfix' : 'Update'} #{updateNumber(entry)}
-                  </span>
-                  <span className="font-mono text-[9px] text-muted-foreground">v{entry.version} · {entry.date}</span>
-                </div>
-                <h3 className="mt-1.5 text-sm font-black uppercase text-white">{entry.title}</h3>
-                <ul className="mt-1.5 space-y-1">
-                  {entry.body.map((line) => (
-                    <li key={line} className="text-xs leading-snug text-muted-foreground">{line}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            {[...CHANGELOG].reverse().map((entry) => <UpdateEntryCard key={entry.version} entry={entry} testId={`archive-update-${entry.version}`} roomy />)}
           </div>
         </motion.section>
       )}

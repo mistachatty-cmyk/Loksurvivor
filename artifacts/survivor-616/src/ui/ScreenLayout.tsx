@@ -50,19 +50,13 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
         </div>
       )}
 
-      {onBack && (
-        <button type="button" onClick={onBack} className="fixed bottom-4 left-4 z-50 flex min-h-11 items-center gap-2 border border-white/25 bg-black/85 px-4 font-mono text-[10px] font-bold uppercase tracking-widest text-white shadow-xl backdrop-blur hover:border-primary hover:text-primary sm:hidden" data-testid="button-back-floating">
-          <ArrowLeft className="h-4 w-4" /> {t('common.back')}
-        </button>
-      )}
-
-      <header className="relative z-20 px-6 pt-10 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <header className={`relative z-20 px-6 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 ${onBack ? 'pt-20' : 'pt-10'}`}>
         <div>
           {onBack && (
             <button 
               type="button"
               onClick={onBack} 
-              className="group flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-6 uppercase text-xs tracking-widest font-bold" 
+              className="group fixed left-3 top-3 z-[110] inline-flex min-h-10 items-center gap-1 border border-white/15 bg-black/65 px-2.5 text-white/60 opacity-75 backdrop-blur transition hover:border-primary hover:text-white hover:opacity-100 uppercase text-[10px] tracking-widest font-bold"
               data-testid="button-back"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

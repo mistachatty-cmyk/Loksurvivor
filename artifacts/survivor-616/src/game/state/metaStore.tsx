@@ -17,6 +17,7 @@ import {
 } from 'react';
 
 import { AREAS, getArea } from '@/game/data/areas';
+import { isDamageNumberStyle } from '@/game/data/damageNumbers';
 import { CHARACTERS, getCharacter } from '@/game/data/characters';
 import { CHARACTER_EPISODES, CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
 import { getCharacterSkins, isCharacterSkinUnlocked } from '@/game/data/characterSkins';
@@ -44,6 +45,7 @@ import {
 import { VENDOR_CATALOG, VENDOR_CATALOG_BY_ID, vendorPurchaseCount } from '@/game/data/vendor';
 import { CHARACTER_MASTERY_STAT_EFFECTS, characterRankTitle } from '@/game/data/characterMastery';
 import { CURRENT_VERSION } from '@/game/data/changelog';
+import { DEFAULT_UPDATE_POPUP_KINDS, normalizeUpdatePopupKinds, type ChangelogKind } from '@/game/data/changelogKinds';
 import {
   advanceDailyContracts,
   contractDayKey,
@@ -64,6 +66,7 @@ import { DEFAULT_SOUND_PACK_ID, SOUND_PACKS_BY_ID } from '@/game/data/soundPacks
 import { DEFAULT_RUN_AURA_ID, RUN_AURAS, RUN_AURAS_BY_ID } from '@/game/data/runAuras';
 import { DEFAULT_HAT_ID, HATS, HATS_BY_ID } from '@/game/data/hats';
 import { CELEBRATIONS, CELEBRATIONS_BY_ID, DEFAULT_CELEBRATION_ID } from '@/game/data/celebrations';
+import { DROP_PACKS, DROP_PACKS_BY_ID, DEFAULT_DROP_PACK_ID } from '@/game/data/dropPacks';
 import { effectiveCatalogIds, hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { ENDLESS_BANDS } from '@/game/data/endlessBands';
 import { MAX_CUSTOM_MAPS, normalizeCustomMap, normalizeCustomMaps } from '@/game/data/customMaps';
@@ -87,13 +90,14 @@ import { chooseBranch, normalizeEvolutionPath, undoBranch } from '@/game/engine/
 import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDayKey, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
+import { CARD_COSMETICS_BY_ID, equipCardCosmetic, grantCardCosmetic, isCardCosmeticOwned, normalizeCardCosmetics } from '@/game/data/cardCosmetics';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
-import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
-import { earnedEndgame, featureById, slotById } from '@/game/data/endgameUnlocks';
+import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
 import type {
@@ -276,6 +280,9 @@ export function createInitialMeta(): MetaState {
     levelUpPresentation: 'pause-focus',
     pauseMapVisible: true,
     graphicsQuality: 'high',
+    ownedDropPackIds: [DEFAULT_DROP_PACK_ID],
+    activeDropPackId: DEFAULT_DROP_PACK_ID,
+    damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
     soundtrackObjectiveCompletions: 0,
@@ -362,6 +369,11 @@ export function createInitialMeta(): MetaState {
     eclipseMonocleOwned: false,
     cardFrameSleeves: ['frame-classic'],
     selectedCardFrame: 'frame-classic',
+    ownedCardBackIds: ['back-default'],
+    selectedCardBack: 'back-default',
+    ownedPackSkinIds: ['pack-classic'],
+    selectedPackSkin: 'pack-classic',
+    cardMotion: 'subtle',
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     lokPetLeagueTier: 0,
@@ -432,6 +444,7 @@ export function createInitialMeta(): MetaState {
     dvdEasterEggUnlocked: false,
     pendingNotifications: [],
     lastSeenChangelogVersion: CURRENT_VERSION,
+    updatePopupKinds: { ...DEFAULT_UPDATE_POPUP_KINDS },
     relicMaterials: { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
     craftedRelicIds: [],
     ownedKeyItemIds: ['digiscope'],
@@ -1147,6 +1160,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
   const ownedRunAuraIds = normalizeOwnedRunAuraIds(parsed.ownedRunAuraIds);
   const ownedHatIds = normalizeOwnedIds(parsed.ownedHatIds, HATS.map((hat) => hat.id), DEFAULT_HAT_ID);
   const ownedCelebrationIds = normalizeOwnedIds(parsed.ownedCelebrationIds, CELEBRATIONS.map((entry) => entry.id), DEFAULT_CELEBRATION_ID);
+  const ownedDropPackIds = normalizeOwnedIds(parsed.ownedDropPackIds, DROP_PACKS.map((pack) => pack.id), DEFAULT_DROP_PACK_ID);
   const today = contractDayKey();
   const savedContractDay = typeof parsed.dailyContractDayKey === 'string' ? parsed.dailyContractDayKey : today;
   const dailyContractDayKey = savedContractDay === today ? savedContractDay : today;
@@ -1190,6 +1204,11 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ownedGeneratorIds,
     generatorAccrualAt: Math.max(0, typeof parsed.generatorAccrualAt === 'number' ? parsed.generatorAccrualAt : Date.now()),
   });
+  const clearedAreaIds = idList(parsed.clearedAreaIds, areaIds, []);
+  const savedTotalKills = counter(parsed.totalKills);
+  const fabricatedGrpdIds = idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []).filter((id) => !isGrpdEndgameWeapon(id));
+  const earnedEndgameGrpdIds = [...GRPD_PLAYABLE_WEAPON_IDS].filter((id) => grpdEndgameWeaponEarned(id, savedTotalKills, endgameReached({ clearedAreaIds })));
+  const activeGrpdIds = idList(parsed.grpdActiveWeaponIds, new Set([...fabricatedGrpdIds, ...earnedEndgameGrpdIds]), []);
 
   return {
     version: META_VERSION,
@@ -1208,6 +1227,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
       parsed.graphicsQuality === 'balanced' || parsed.graphicsQuality === 'performance'
         ? parsed.graphicsQuality
         : 'high',
+    damageNumberStyle: isDamageNumberStyle(parsed.damageNumberStyle) ? parsed.damageNumberStyle : 'classic',
     companionRevealStyle: parsed.companionRevealStyle === 'classic' ? 'classic' : 'ambush',
     frameRateMode: parsed.frameRateMode === 120 ? 120 : 60,
     soundtrackObjectiveCompletions: counter(parsed.soundtrackObjectiveCompletions),
@@ -1294,7 +1314,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     selectedCharacterId,
     characterSkinByCharacterId,
     unlockedCharacterIds,
-    clearedAreaIds: idList(parsed.clearedAreaIds, areaIds, []),
+    clearedAreaIds,
     rescuedAllyIds,
     discoveryIds: idList(parsed.discoveryIds, discoveryIds, []),
     lokPetCatalog: normalizeLokPetCatalog(parsed.lokPetCatalog),
@@ -1307,10 +1327,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     visitingLokCards: normalizeVisitingLokCards(parsed.visitingLokCards),
     ...recoveredElixirs,
     bestiary,
-    totalKills: counter(parsed.totalKills),
+    totalKills: savedTotalKills,
     grpdSpentSeals: counter(parsed.grpdSpentSeals),
-    grpdUnlockedWeaponIds: idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, []),
-    grpdActiveWeaponIds: idList(parsed.grpdActiveWeaponIds, new Set(idList(parsed.grpdUnlockedWeaponIds, GRPD_PLAYABLE_WEAPON_IDS, [])), []),
+    grpdUnlockedWeaponIds: fabricatedGrpdIds,
+    grpdActiveWeaponIds: activeGrpdIds,
     grpdSpawnTierByWeaponId: Object.fromEntries(
       Object.entries(parsed.grpdSpawnTierByWeaponId ?? {})
         .filter(([id]) => GRPD_PLAYABLE_WEAPON_IDS.has(id))
@@ -1334,8 +1354,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     miningHelmetOwned: parsed.miningHelmetOwned === true,
     rancherWhistleOwned: parsed.rancherWhistleOwned === true,
     eclipseMonocleOwned: parsed.eclipseMonocleOwned === true,
-    cardFrameSleeves: Array.isArray(parsed.cardFrameSleeves) && parsed.cardFrameSleeves.length > 0 ? (parsed.cardFrameSleeves as string[]) : ['frame-classic'],
-    selectedCardFrame: typeof parsed.selectedCardFrame === 'string' ? parsed.selectedCardFrame : 'frame-classic',
+    ...normalizeCardCosmetics(parsed),
+    cardMotion: parsed.cardMotion === 'full' || parsed.cardMotion === 'off' ? parsed.cardMotion : 'subtle',
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     lokPetLeagueTier: counter(parsed.lokPetLeagueTier),
@@ -1392,6 +1412,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     activeHatId: normalizeOwnedCosmeticId(parsed.activeHatId, ownedHatIds, DEFAULT_HAT_ID),
     ownedCelebrationIds,
     activeCelebrationId: normalizeOwnedCosmeticId(parsed.activeCelebrationId, ownedCelebrationIds, DEFAULT_CELEBRATION_ID),
+    ownedDropPackIds,
+    activeDropPackId: normalizeOwnedCosmeticId(parsed.activeDropPackId, ownedDropPackIds, DEFAULT_DROP_PACK_ID),
     dailyContractDayKey,
     dailyContractProgressById,
     completedDailyContractIds: [...new Set(completedDailyContractIds)],
@@ -1441,6 +1463,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // "older than every real version," so those players see the update
     // popup summarizing everything they missed, once.
     lastSeenChangelogVersion: typeof parsed.lastSeenChangelogVersion === 'string' ? parsed.lastSeenChangelogVersion : '0.0.0',
+    updatePopupKinds: normalizeUpdatePopupKinds(parsed.updatePopupKinds),
     relicMaterials: typeof parsed.relicMaterials === 'object' && parsed.relicMaterials !== null
       ? (parsed.relicMaterials as Record<string, number>)
       : { 'phosphor-ore': 6, 'silicon-alloy': 8, 'cyber-resin': 6, 'prism-quartz': 2 },
@@ -1882,8 +1905,9 @@ type Action =
   | { type: 'consumeThrownCard'; cardId: string }
   | { type: 'buyCardSalvageProtocol' }
   | { type: 'buyHandheldDigiScope' }
-  | { type: 'buyCardFrameSleeve'; frameId: string; cardCreditsCost: number }
-  | { type: 'equipCardFrameSleeve'; frameId: string }
+  | { type: 'buyCardCosmetic'; id: string }
+  | { type: 'equipCardCosmetic'; id: string }
+  | { type: 'setCardMotion'; motion: 'full' | 'subtle' | 'off' }
   | { type: 'buyKeyItem'; itemId: 'miningHelmet' | 'rancherWhistle' | 'eclipseMonocle'; credCost: number }
   | { type: 'craftRelic'; relicId: string }
   | { type: 'buyKeyItemAction'; keyItemId: string; credCost: number }
@@ -1946,6 +1970,9 @@ type Action =
   | { type: 'setLevelUpPresentation'; value: MetaState['levelUpPresentation'] }
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
+  | { type: 'grantDropPack'; id: string }
+  | { type: 'equipDropPack'; id: string }
+  | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
   | { type: 'setFrameRateMode'; mode: MetaState['frameRateMode'] }
   | { type: 'setFogAmbianceMode'; mode: MetaState['fogAmbianceMode'] }
@@ -1995,6 +2022,7 @@ type Action =
   | { type: 'dismissNotifications'; ids: string[] }
   | { type: 'announceEndgame'; ids: string[]; now: number }
   | { type: 'acknowledgeChangelog' }
+  | { type: 'setUpdatePopupKind'; kind: ChangelogKind; enabled: boolean }
   | { type: 'buyGenerator'; id: string; now: number }
   | { type: 'refreshGeneratorIncome'; now: number }
   | { type: 'setUiDensity'; density: 'grid' | 'list' }
@@ -2784,6 +2812,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'unlockGrpdWeapon': {
       const weaponId = action.weaponId;
       if (!GRPD_PLAYABLE_WEAPON_IDS.has(weaponId) || state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (isGrpdEndgameWeapon(weaponId)) return state;
       if (grpdAvailableSeals(state.meta.totalKills, state.meta.grpdSpentSeals) < GRPD_UNLOCK_SEAL_COST) return state;
       return { ...state, meta: {
         ...state.meta,
@@ -2795,7 +2824,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'toggleGrpdWeapon': {
       const weaponId = action.weaponId;
-      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId) && !grpdEndgameWeaponEarned(weaponId, state.meta.totalKills, endgameReached(state.meta))) return state;
       const active = state.meta.grpdActiveWeaponIds;
       return { ...state, meta: {
         ...state.meta,
@@ -2805,7 +2834,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'buyGrpdSpawnTier': {
       const weaponId = action.weaponId;
-      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId)) return state;
+      if (!state.meta.grpdUnlockedWeaponIds.includes(weaponId) && !grpdEndgameWeaponEarned(weaponId, state.meta.totalKills, endgameReached(state.meta))) return state;
       const current = state.meta.grpdSpawnTierByWeaponId[weaponId] ?? 1;
       if (current >= GRPD_MAX_SPAWN_MULTIPLIER) return state;
       const cost = grpdNextTierCost(current);
@@ -3227,6 +3256,17 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'setPauseMapVisible':
       return { ...state, meta: { ...state.meta, pauseMapVisible: action.enabled } };
 
+    case 'setDamageNumberStyle':
+      return { ...state, meta: { ...state.meta, damageNumberStyle: action.style } };
+    // Drop packs are sold for LokTokens only, so the server-verified purchase
+    // grants them here with no local currency moving. Idempotent.
+    case 'grantDropPack': {
+      if (!DROP_PACKS_BY_ID[action.id] || state.meta.ownedDropPackIds.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, ownedDropPackIds: [...state.meta.ownedDropPackIds, action.id] } };
+    }
+    case 'equipDropPack':
+      if (!hasCatalogItem(state.meta, 'dropPacks', action.id, state.meta.ownedDropPackIds)) return state;
+      return { ...state, meta: { ...state.meta, activeDropPackId: action.id } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -3457,6 +3497,19 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         },
       };
 
+    case 'buyCardCosmetic': {
+      const item = CARD_COSMETICS_BY_ID[action.id];
+      if (!item || item.cost <= 0 || isCardCosmeticOwned(state.meta, item) || state.meta.cardCredits < item.cost) return state;
+      return { ...state, meta: { ...grantCardCosmetic(state.meta, item), cardCredits: state.meta.cardCredits - item.cost } };
+    }
+    case 'equipCardCosmetic': {
+      const item = CARD_COSMETICS_BY_ID[action.id];
+      if (!item || !isCardCosmeticOwned(state.meta, item)) return state;
+      return { ...state, meta: equipCardCosmetic(state.meta, item) };
+    }
+    case 'setCardMotion':
+      return { ...state, meta: { ...state.meta, cardMotion: action.motion } };
+
     case 'setUiDensity':
       return {
         ...state,
@@ -3532,6 +3585,15 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return {
         ...state,
         meta: { ...state.meta, lastSeenChangelogVersion: CURRENT_VERSION },
+      };
+
+    case 'setUpdatePopupKind':
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          updatePopupKinds: { ...state.meta.updatePopupKinds, [action.kind]: action.enabled },
+        },
       };
 
     case 'refreshGeneratorIncome':
@@ -3699,6 +3761,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       if (result.cleared && result.discoveryId) {
         discoveryIds = addUnique(discoveryIds, result.discoveryId);
       }
+      for (const findId of result.mapFindIds ?? []) {
+        if (findId === 'breach-616-plate' || findId === 'transit-coil-found') discoveryIds = addUnique(discoveryIds, findId);
+      }
       const discoveredRelic = result.cleared && result.discoveryId
         ? RELIC_BY_DISCOVERY_ID[result.discoveryId]
         : undefined;
@@ -3755,6 +3820,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
       const next: MetaState = {
         ...prev,
+        ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
         rescuedAllyIds,
         discoveryIds,
@@ -4029,6 +4095,9 @@ export interface MetaContextValue {
   setLevelUpPresentation: (value: MetaState['levelUpPresentation']) => void;
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
+  grantDropPack: (id: string) => void;
+  equipDropPack: (id: string) => void;
+  setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
   setFrameRateMode: (mode: MetaState['frameRateMode']) => void;
   setFogAmbianceMode: (mode: MetaState['fogAmbianceMode']) => void;
@@ -4077,9 +4146,13 @@ export interface MetaContextValue {
   toggleRunModifier: (key: keyof RunModifiers) => void;
   dismissNotifications: (ids: string[]) => void;
   acknowledgeChangelog: () => void;
+  setUpdatePopupKind: (kind: ChangelogKind, enabled: boolean) => void;
   buyGenerator: (id: string) => void;
   refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
+  buyCardCosmetic: (id: string) => void;
+  equipCardCosmetic: (id: string) => void;
+  setCardMotion: (motion: 'full' | 'subtle' | 'off') => void;
   setLokPetArtStyle: (style: MetaState['lokPetArtStyle']) => void;
   setUiBorderStyle: (style: MetaState['uiBorderStyle']) => void;
   setLokPetBorderStyle: (style: MetaState['lokPetBorderStyle']) => void;
@@ -4239,7 +4312,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLootPresentation = useCallback((value: MetaState['lootPresentation']) => dispatch({ type: 'setLootPresentation', value }), []);
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
+  const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
+  const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
+  const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
   const setCompanionRevealStyle = useCallback((style: MetaState['companionRevealStyle']) => dispatch({ type: 'setCompanionRevealStyle', style }), []);
   const setFrameRateMode = useCallback((mode: MetaState['frameRateMode']) => dispatch({ type: 'setFrameRateMode', mode }), []);
   const setFogAmbianceMode = useCallback((mode: MetaState['fogAmbianceMode']) => dispatch({ type: 'setFogAmbianceMode', mode }), []);
@@ -4364,8 +4440,12 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const toggleRunModifier = useCallback((key: keyof RunModifiers) => dispatch({ type: 'toggleRunModifier', key }), []);
   const dismissNotifications = useCallback((ids: string[]) => dispatch({ type: 'dismissNotifications', ids }), []);
   const acknowledgeChangelog = useCallback(() => dispatch({ type: 'acknowledgeChangelog' }), []);
+  const setUpdatePopupKind = useCallback((kind: ChangelogKind, enabled: boolean) => dispatch({ type: 'setUpdatePopupKind', kind, enabled }), []);
   const buyGenerator = useCallback((id: string) => dispatch({ type: 'buyGenerator', id, now: Date.now() }), []);
   const refreshGeneratorIncome = useCallback(() => dispatch({ type: 'refreshGeneratorIncome', now: Date.now() }), []);
+  const buyCardCosmetic = useCallback((id: string) => dispatch({ type: 'buyCardCosmetic', id }), []);
+  const equipCardCosmetic = useCallback((id: string) => dispatch({ type: 'equipCardCosmetic', id }), []);
+  const setCardMotion = useCallback((motion: 'full' | 'subtle' | 'off') => dispatch({ type: 'setCardMotion', motion }), []);
   const setUiDensity = useCallback(
     (density: 'grid' | 'list') => dispatch({ type: 'setUiDensity', density }),
     [],
@@ -4529,6 +4609,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setLevelUpPresentation,
       setPauseMapVisible,
       setGraphicsQuality,
+      grantDropPack,
+      equipDropPack,
+      setDamageNumberStyle,
       setCompanionRevealStyle,
       setFrameRateMode,
       setFogAmbianceMode,
@@ -4577,9 +4660,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleRunModifier,
       dismissNotifications,
       acknowledgeChangelog,
+      setUpdatePopupKind,
       buyGenerator,
       refreshGeneratorIncome,
       setUiDensity,
+      buyCardCosmetic,
+      equipCardCosmetic,
+      setCardMotion,
       setLokPetArtStyle,
       setUiBorderStyle,
       setLokPetBorderStyle,
@@ -4689,6 +4776,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    grantDropPack,
+    equipDropPack,
+    setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
     setFogAmbianceMode,
@@ -4736,9 +4826,13 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleRunModifier,
     dismissNotifications,
     acknowledgeChangelog,
+    setUpdatePopupKind,
     buyGenerator,
     refreshGeneratorIncome,
     setUiDensity,
+    buyCardCosmetic,
+    equipCardCosmetic,
+    setCardMotion,
     setLokPetArtStyle,
     setUiBorderStyle,
     setLokPetBorderStyle,

@@ -9,7 +9,9 @@
  * snapshots out of it.
  */
 
+import type { DropStyle } from '@/game/data/dropPacks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
+import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
 import { DUNGEON_ERAS } from '@/game/data/dungeonEras';
 import { EVOLUTIONS, EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
@@ -46,7 +48,9 @@ import type { SfxCueId, SfxEvent } from '@/game/audio/sfxCues';
 import { reactionIntensity, reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type { MusicEventEffect } from '@/game/data/musicEvents';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
-import { millionHordeActorCap } from '@/game/performanceProfile';
+import { CellGrid } from '@/game/engine/cellGrid';
+import { millionHordeActorCap, millionHordePopulationCap, millionHordeSweepBudget } from '@/game/performanceProfile';
+import { HordeField } from '@/game/engine/hordeField';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -224,6 +228,8 @@ export interface EnemyActor extends Actor {
   frozenUntil: number;
   /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
   selectedForThrow: boolean;
+  /** Temporarily carried by the DigiFrog tongue; other weapons can still hit it. */
+  frogHeldUntil?: number;
   /**
    * Sector Command: permanently captured and fighting for the player. Distinct
    * from the legacy `convertedUntil` timer (the allymaker weapon), which stays
@@ -450,7 +456,8 @@ export type PickupKind =
   | 'silicon-alloy'
   | 'cyber-resin'
   | 'prism-quartz'
-  | 'water-flask';
+  | 'water-flask'
+  | 'rootglass-cell';
 
 export interface Pickup {
   uid: number;
@@ -470,6 +477,12 @@ export interface Popup {
   color: string;
   bornAt: number;
   vy: number;
+  /** Cascade style only: damage tier (see `data/damageNumbers.ts`), which sets size and glow. */
+  tier?: number;
+  /** Cascade style only: how long the number lives. Classic popups last 700 ms. */
+  lifeMs?: number;
+  /** Cascade style only: the enemy that was hit, so its numbers stack. */
+  ownerUid?: number;
 }
 
 export interface Particle {
@@ -572,6 +585,7 @@ export const IMPACT_MIN_RADIUS = 24;
 export interface BreakableObstacle extends Aabb {
   uid: number;
   kind: ObstacleDef['kind'];
+  artAssetId?: string;
   propVariant: PropVariant | undefined;
   /** Page overlay only: copied from the ObstacleDef so the host can find its DOM element. */
   domId?: number;
@@ -932,10 +946,10 @@ interface PropPhysicsProfile {
   movable: boolean;
 }
 
-function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant'>): PropPhysicsProfile {
+function propProfile(obstacle: Pick<ObstacleDef, 'kind' | 'propVariant' | 'hp'>): PropPhysicsProfile {
   const entry = OBSTACLE_WEIGHT_PROFILES[obstacle.kind];
   const variant = obstacle.propVariant ?? entry?.variant ?? 'fixed-bench';
-  const breakable = entry?.hp !== undefined;
+  const breakable = entry?.hp !== undefined || (obstacle.kind === 'map-prop' && obstacle.hp !== undefined);
   if (variant === 'light-breakable') {
     return { variant, mass: 0.8, friction: 0.82, breakable, movable: true };
   }
@@ -983,6 +997,34 @@ function weaponImpact(weapon: Pick<WeaponDef, 'impactIntensity'>): ImpactIntensi
 /* ------------------------------------------------------------------ */
 /* World                                                               */
 /* ------------------------------------------------------------------ */
+
+interface FrogSwing {
+  targetUid: number;
+  startedAt: number;
+  releaseAt: number;
+  angle: number;
+  reach: number;
+  damage: number;
+  level: number;
+  evolved: boolean;
+}
+
+interface FrogThrow {
+  targetUid: number;
+  expiresAt: number;
+  damage: number;
+  level: number;
+  hitUids: Set<number>;
+}
+
+interface RewindMark {
+  targetUid: number;
+  x: number;
+  y: number;
+  readyAt: number;
+  damage: number;
+  evolved: boolean;
+}
 
 export interface World {
   area: AreaDef;
@@ -1048,6 +1090,9 @@ export interface World {
   musicColorOverride?: SpritePalette;
   orbiters: Orbiter[];
   weapons: RunWeapon[];
+  frogSwing: FrogSwing | null;
+  frogThrows: FrogThrow[];
+  rewindMarks: RewindMark[];
   /** Runtime bookkeeping for the character's dash skill, when it has one. */
   dashSkill: DashSkillRuntime | null;
   /** Account-wide signature evolution active for the selected character. */
@@ -1059,6 +1104,10 @@ export interface World {
   appliedRelicRecipeIds: Set<string>;
   passives: RunPassive[];
   pickups: Pickup[];
+  mapActivated: Set<string>;
+  mapFindIds: Set<string>;
+  unlockedMapFindIds: string[];
+  rootglassUntil: number;
   popups: Popup[];
   particles: Particle[];
   followers: Follower[];
@@ -1146,9 +1195,9 @@ export interface World {
    */
   ambientRng: () => number;
   /** Rebuilt every frame for enemy separation. */
-  grid: Map<number, EnemyActor[]>;
+  grid: CellGrid<EnemyActor>;
   /** Rebuilt every frame from `obstacles` so per-actor collision only tests nearby boxes. */
-  obstacleGrid: Map<number, Aabb[]>;
+  obstacleGrid: CellGrid<Aabb>;
   /** True once `obstacleGrid` needs rebuilding (obstacles are static, so this only flips on add/break). */
   obstacleGridDirty: boolean;
   /** Page overlay hit feedback: see `PropHit` / `ImpactEvent`. Drained by the host each frame. */
@@ -1240,18 +1289,27 @@ export interface World {
   modifiers: RunModifiers;
   /** Capability tier detected once at launch; only bounds Million Horde's fully simulated near field. */
   runtimePerformanceTier: RuntimePerformanceTier;
-  /** Aggregated population that replaces millions of individual actor allocations. */
+  /** Million Horde run totals; the crowd itself lives in `hordeField`. */
   millionHorde: {
-    virtualPopulation: number;
     peakPopulation: number;
     defeatedPopulation: number;
   } | null;
+  /** Millions of real crowd members as typed arrays; null outside Million Horde. */
+  hordeField: HordeField | null;
+  /** Camera-derived radii the crowd layer works to; the run loop refines them via `setHordeView`. */
+  hordeView: { hold: number; ky: number; drawHalfW: number; drawHalfH: number };
+  /** Crowd members added so far this step, to bound spawn cost per step. */
+  hordeFedThisStep: number;
   /**
    * Player's persistent graphics preference (Settings), read once at
    * creation. Render-only -- affects decorative density (particles, damage
    * popups, enemy outlines/shadows), never difficulty or rewards.
    */
   graphicsQuality: 'high' | 'balanced' | 'performance';
+  /** Settings: enhanced (default) or classic drop art. Render-only. */
+  dropStyle: DropStyle;
+  /** Settings: which damage-number style to draw. Render-only; never affects damage. */
+  damageNumberStyle: DamageNumberStyle;
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
   wheelSpin: WheelSpinState | null;
   /** Director escalation state (see `data/directors.ts`); always present, one encounter per run. */
@@ -1298,6 +1356,7 @@ export interface World {
   grpdSpawnTierByWeaponId: Record<string, number>;
   grpdCareerKills: number;
   grpdAutoIncreaseEnabled: boolean;
+  endgameEvolutionsEnabled: boolean;
   disabledPassiveIds?: string[];
   threatCalibrations?: ThreatCalibrations;
   threatEventTimers?: {
@@ -1339,6 +1398,7 @@ export interface ElectricChain {
   y2: number;
   bornAt: number;
   expiresAt: number;
+  style?: 'catenary';
 }
 
 export const NORMAL_ENEMY_CAP = 190;
@@ -1437,6 +1497,8 @@ export function createWorld(
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
     graphicsQuality?: 'high' | 'balanced' | 'performance';
+    dropStyle?: DropStyle;
+    damageNumberStyle?: DamageNumberStyle;
     runtimePerformanceTier?: RuntimePerformanceTier;
     worldColorPalette?: SpritePalette;
     worldColorFullRecolor?: boolean;
@@ -1444,6 +1506,7 @@ export function createWorld(
     activeDirectorPersonalityId?: string | null;
     /** Grants this weapon at run start, once, from the SWAT Sauna's reward hole -- see `MetaState.pendingSaunaReward`. */
     bonusWeaponId?: string;
+    unlockedMapFindIds?: string[];
     extraLifeAvailable?: boolean;
     /** Sector Command: squad cap for this mission. Presence of this enables the mode. */
     sectorSquadCap?: number;
@@ -1461,6 +1524,7 @@ export function createWorld(
     grpdSpawnTierByWeaponId?: Record<string, number>;
     grpdCareerKills?: number;
     grpdAutoIncreaseEnabled?: boolean;
+    endgameEvolutionsEnabled?: boolean;
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
@@ -1484,8 +1548,8 @@ export function createWorld(
     uid: 1,
     // Sector Command missions start you on the map's authored player spawn
     // point; every other mode starts at the origin as it always has.
-    x: setup.playerStart?.x ?? 0,
-    y: setup.playerStart?.y ?? 0,
+    x: setup.playerStart?.x ?? area.playerStart?.x ?? 0,
+    y: setup.playerStart?.y ?? area.playerStart?.y ?? 0,
     vx: 0,
     vy: 0,
     kx: 0,
@@ -1615,6 +1679,9 @@ export function createWorld(
     activeDirectorPersonalityId: setup.activeDirectorPersonalityId ?? null,
     orbiters: [],
     weapons: [{ def: signatureWeapon, level: startingWeaponLevel, count: signatureWeapon.count ?? 1, readyAt: 400 }],
+    frogSwing: null,
+    frogThrows: [],
+    rewindMarks: [],
     dashSkill: createDashSkillRuntime(character.dashSkill),
     activeEvolution: evolved,
     knownRelicIds: [...new Set(setup.knownRelicIds ?? [])],
@@ -1622,6 +1689,10 @@ export function createWorld(
     appliedRelicRecipeIds: new Set(),
     passives: [],
     pickups: [],
+    mapActivated: new Set(),
+    mapFindIds: new Set(),
+    unlockedMapFindIds: setup.unlockedMapFindIds ?? [],
+    rootglassUntil: 0,
     popups: [],
     particles: [],
     followers: [],
@@ -1679,8 +1750,8 @@ export function createWorld(
     nextUid: 100,
     rng,
     ambientRng: createRng(seed + 0x5eed),
-    grid: new Map(),
-    obstacleGrid: new Map(),
+    grid: new CellGrid<EnemyActor>(),
+    obstacleGrid: new CellGrid<Aabb>(),
     obstacleGridDirty: true,
     propHits: [],
     impacts: [],
@@ -1754,9 +1825,16 @@ export function createWorld(
     modifiers,
     runtimePerformanceTier: setup.runtimePerformanceTier ?? 'high-mobile',
     millionHorde: modifiers.millionHordeMode
-      ? { virtualPopulation: 0, peakPopulation: 0, defeatedPopulation: 0 }
+      ? { peakPopulation: 0, defeatedPopulation: 0 }
       : null,
+    hordeField: modifiers.millionHordeMode
+      ? new HordeField(millionHordePopulationCap(setup.runtimePerformanceTier ?? 'high-mobile'))
+      : null,
+    hordeView: { hold: 520, ky: 1.4, drawHalfW: 580, drawHalfH: 380 },
+    hordeFedThisStep: 0,
     graphicsQuality: setup.graphicsQuality ?? 'high',
+    dropStyle: setup.dropStyle ?? 'classic',
+    damageNumberStyle: setup.damageNumberStyle ?? 'classic',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
           phase: 'idle',
@@ -1808,6 +1886,7 @@ export function createWorld(
     grpdSpawnTierByWeaponId: setup.grpdSpawnTierByWeaponId ?? {},
     grpdCareerKills: setup.grpdCareerKills ?? 0,
     grpdAutoIncreaseEnabled: setup.grpdAutoIncreaseEnabled ?? true,
+    endgameEvolutionsEnabled: setup.endgameEvolutionsEnabled ?? false,
     disabledPassiveIds: setup.disabledPassiveIds ?? [],
     threatCalibrations: setup.threatCalibrations,
     threatEventTimers: {
@@ -1852,6 +1931,10 @@ export function createWorld(
 
   world.breakables = obstacleDefs.filter((o) => o.kind !== 'pothole').map((o) => createBreakable(world, o));
   world.potholes = obstacleDefs.filter((o) => o.kind === 'pothole').map((o) => createPothole(world, o));
+  for (const placed of area.mapPickups ?? []) {
+    if (!['health', 'cred', 'cyber-resin', 'rootglass-cell'].includes(placed.kind)) continue;
+    world.pickups.push({ uid: uid(world), kind: placed.kind as PickupKind, x: placed.x, y: placed.y, vx: 0, vy: 0, value: placed.value ?? 1, bornAt: 0 });
+  }
 
   if (area.endless) {
     const initialBand = getEndlessBand(0, area.endlessTheme);
@@ -2149,7 +2232,7 @@ function isDenseForQuality(w: World): boolean {
 
 function cooldownMult(w: World): number {
   const ult = ultActive(w) ? (w.character.ultimate.effect.cooldownMult ?? 1) : 1;
-  return w.stats.haste * ult;
+  return w.stats.haste * ult * (w.now < w.rootglassUntil ? 0.85 : 1);
 }
 
 function weaponDamage(w: World): number {
@@ -2184,10 +2267,7 @@ function rebuildGrid(w: World) {
   for (const enemy of w.enemies) {
     w.enemiesByUid.set(enemy.uid, enemy);
     if (enemy.dying) continue;
-    const key = cellKey(enemy.x, enemy.y);
-    const bucket = w.grid.get(key);
-    if (bucket) bucket.push(enemy);
-    else w.grid.set(key, [enemy]);
+    w.grid.add(cellKey(enemy.x, enemy.y), enemy);
   }
 }
 
@@ -2207,10 +2287,7 @@ function rebuildObstacleGrid(w: World) {
     const maxCy = Math.floor((box.y + box.h / 2) / CELL);
     for (let cx = minCx; cx <= maxCx; cx += 1) {
       for (let cy = minCy; cy <= maxCy; cy += 1) {
-        const key = (cx + 512) * 4096 + (cy + 512);
-        const bucket = w.obstacleGrid.get(key);
-        if (bucket) bucket.push(box);
-        else w.obstacleGrid.set(key, [box]);
+        w.obstacleGrid.add((cx + 512) * 4096 + (cy + 512), box);
       }
     }
   }
@@ -2255,17 +2332,88 @@ function computeSpawnAngle(w: World): number {
   return w.rng() * Math.PI * 2;
 }
 
-function addMillionHordeVirtualPopulation(w: World, amount: number, pendingActors = 0) {
-  if (!w.millionHorde || amount <= 0) return;
-  const maxVirtualPopulation = Math.max(0, MILLION_HORDE_MAX_POPULATION - w.enemies.length - pendingActors);
-  w.millionHorde.virtualPopulation = Math.min(
-    maxVirtualPopulation,
-    w.millionHorde.virtualPopulation + amount,
+/** Crowd members one step may add, so a huge spawn rate cannot spike a single frame. */
+const HORDE_FEED_BUDGET_PER_STEP = 40_960;
+/** Live actors promoted out of the crowd per step. */
+const HORDE_PROMOTIONS_PER_STEP = 48;
+
+/**
+ * Add `perTick` real crowd members of `def` just outside the camera (or around
+ * a wave's fixed spawn point). Returns how many fit in the field.
+ */
+function feedHorde(w: World, def: EnemyDef, hpMult: number, perTick: number, at?: { x: number; y: number }): number {
+  const field = w.hordeField;
+  if (!field) return 0;
+  const speed = def.speed * (w.modifiers.speedMode ? 1.25 : 1);
+  const kind = field.registerKind(def, hpMult, speed);
+  const view = w.hordeView;
+  let cx: number;
+  let cy: number;
+  if (at) {
+    cx = at.x;
+    cy = at.y;
+  } else {
+    const angle = computeSpawnAngle(w);
+    const distance = view.hold + field.shellDepth(view.hold) + 180;
+    // Deliberately not clamped to the arena: in a small arena the waiting
+    // shell sits past the walls (the crowd pressing in from outside) rather
+    // than being squeezed inside the camera where nothing could hit it.
+    cx = w.player.x + Math.cos(angle) * distance;
+    cy = w.player.y + (Math.sin(angle) * distance) / view.ky;
+  }
+  const added = field.addBatch(kind, perTick, cx, cy, 320, 320, Math.floor(w.rng() * 0x7fffffff), w.now);
+  w.hordeFedThisStep += added;
+  return added;
+}
+
+/**
+ * Million Horde per-step upkeep: advance the crowd's fixed sweep budget, then
+ * promote members that reached the waiting shell into live actors while there
+ * are actor slots. Combat only ever sees the promoted actors.
+ */
+function updateHorde(w: World) {
+  const field = w.hordeField;
+  if (!field || !w.millionHorde) return;
+  const view = w.hordeView;
+  field.sweep(
+    w.now,
+    { px: w.player.x, py: w.player.y, hold: view.hold, ky: view.ky, drawHalfW: view.drawHalfW, drawHalfH: view.drawHalfH },
+    millionHordeSweepBudget(w.runtimePerformanceTier),
   );
-  w.millionHorde.peakPopulation = Math.max(
-    w.millionHorde.peakPopulation,
-    w.millionHorde.virtualPopulation + w.enemies.length,
-  );
+  const free = enemyCap(w) - w.enemies.length;
+  const promote = Math.min(free, HORDE_PROMOTIONS_PER_STEP, field.candidateCount);
+  if (promote > 0) {
+    field.sortCandidatesDescending();
+    for (let k = 0; k < promote; k += 1) {
+      const i = field.candidates[k]!;
+      if (i >= field.count) continue;
+      const kind = field.kinds[field.kind[i]!]!;
+      const dx = field.x[i]! - w.player.x;
+      const dy = (field.y[i]! - w.player.y) * view.ky;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      // Keep the member's bearing but enter at the shell's inner edge, never mid-screen.
+      const r = Math.min(d, view.hold + 50);
+      field.removeAt(i);
+      spawnEnemy(w, kind.def, kind.hpMult, { x: w.player.x + (dx / d) * r, y: w.player.y + ((dy / d) * r) / view.ky });
+    }
+  }
+  const live = field.count + w.enemies.length;
+  if (live > w.millionHorde.peakPopulation) w.millionHorde.peakPopulation = live;
+}
+
+/**
+ * The run loop reports the camera's half extents (world units) so the waiting
+ * shell always sits just outside what the player can see.
+ */
+export function setHordeView(w: World, halfW: number, halfH: number) {
+  if (!Number.isFinite(halfW) || !Number.isFinite(halfH) || halfW <= 0 || halfH <= 0) return;
+  // The shell's inner edge sits a hair inside the camera box on every side,
+  // so the crowd is visibly massed at the screen edge rather than all hidden
+  // beyond it; the +/-ARRIVE slack keeps a walking player from re-stepping it.
+  w.hordeView.hold = halfW - 12;
+  w.hordeView.ky = halfW / halfH;
+  w.hordeView.drawHalfW = halfW + 90;
+  w.hordeView.drawHalfH = halfH + 90;
 }
 
 function spawnEnemy(
@@ -2273,17 +2421,8 @@ function spawnEnemy(
   incomingDef: EnemyDef,
   hpMult: number,
   position?: { x: number; y: number },
-  representedCount = 1,
 ) {
-  const hasActorSlot = w.enemies.length < enemyCap(w);
-  if (w.millionHorde && representedCount > 0) {
-    const virtualAdded = Math.max(0, representedCount - (hasActorSlot ? 1 : 0));
-    addMillionHordeVirtualPopulation(w, virtualAdded, hasActorSlot ? 1 : 0);
-    if (hasActorSlot) {
-      w.millionHorde.peakPopulation = Math.max(w.millionHorde.peakPopulation, w.millionHorde.virtualPopulation + w.enemies.length + 1);
-    }
-  }
-  if (!hasActorSlot) return;
+  if (w.enemies.length >= enemyCap(w)) return;
 
   let def = incomingDef;
   if (w.disabledEnemyIds && w.disabledEnemyIds.includes(incomingDef.id)) {
@@ -2573,33 +2712,50 @@ function updateSpawning(w: World, dt: number) {
     const densityMult = w.threatCalibrations?.densityMult ?? 1;
     const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult * directorWaveSpawnMult(w, wave.faction);
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
-    while ((w.spawnCredit[i] ?? 0) >= 1 && (!w.millionHorde || w.enemies.length < enemyCap(w))) {
+    if (w.hordeField) {
+      // Million Horde: each spawn tick adds real crowd members. They are
+      // promoted into live actors by `updateHorde` as slots open up.
+      const ids = [wave.enemyId, ...(wave.group ?? [])];
+      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
+      while ((w.spawnCredit[i] ?? 0) >= 1 && w.hordeFedThisStep < HORDE_FEED_BUDGET_PER_STEP) {
+        w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
+        let added = 0;
+        for (let b = 0; b < wave.burst; b += 1) {
+          for (const id of ids) added += feedHorde(w, getEnemy(id), hpMult, MILLION_HORDE_REPRESENTATION_PER_SPAWN, wave.spawnAt);
+        }
+        if (added === 0) {
+          // The field is full: discard the backlog instead of spinning on it.
+          w.spawnCredit[i] = Math.min(w.spawnCredit[i] ?? 0, 1);
+          break;
+        }
+      }
+      // Backlog beyond this step's budget is throttled, never hoarded.
+      w.spawnCredit[i] = Math.min(w.spawnCredit[i] ?? 0, 64);
+      continue;
+    }
+    while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
       const def = getEnemy(wave.enemyId);
       const ids = [wave.enemyId, ...(wave.group ?? [])];
       const total = wave.burst * ids.length;
-      const positions = wave.formation ? formationPositions(w, wave.formation, total) : [];
+      const positions = wave.spawnAt
+        ? Array.from({ length: total }, (_, index) => ({ x: wave.spawnAt!.x + (index % 3 - 1) * 28, y: wave.spawnAt!.y + Math.floor(index / 3) * 28 }))
+        : w.area.hostileEntries?.length
+          ? Array.from({ length: total }, (_, index) => {
+              const entry = w.area.hostileEntries![(i + index) % w.area.hostileEntries!.length]!;
+              return { x: entry.x + (index % 3 - 1) * 28, y: entry.y + Math.floor(index / 3) * 28 };
+            })
+          : wave.formation ? formationPositions(w, wave.formation, total) : [];
       let positionIndex = 0;
       // modifierHpMult isn't applied here -- spawnEnemy applies it to every
       // caller uniformly (see its own comment for why).
       const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
-      const representedCount = w.millionHorde ? MILLION_HORDE_REPRESENTATION_PER_SPAWN : 1;
       for (let b = 0; b < wave.burst; b += 1) {
-        spawnEnemy(w, def, hpMult, positions[positionIndex++], representedCount);
+        spawnEnemy(w, def, hpMult, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
-          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++], representedCount);
+          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++]);
         }
       }
-    }
-    if (w.millionHorde && (w.spawnCredit[i] ?? 0) >= 1) {
-      // Once the live near field is full, consume all whole spawn cycles in
-      // one operation. Extreme custom rates therefore stay constant-cost.
-      const aggregateCycles = Math.floor(w.spawnCredit[i] ?? 0);
-      w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - aggregateCycles;
-      addMillionHordeVirtualPopulation(
-        w,
-        aggregateCycles * wave.burst * (1 + (wave.group?.length ?? 0)) * MILLION_HORDE_REPRESENTATION_PER_SPAWN,
-      );
     }
   }
 }
@@ -3583,7 +3739,7 @@ function emitEnemyImpactBurst(
   w.shake = Math.max(w.shake, 6);
 }
 
-function damageEnemy(
+export function damageEnemy(
   w: World,
   enemy: EnemyActor,
   amount: number,
@@ -3672,7 +3828,9 @@ function damageEnemy(
   }
 
   const denseUnleashed = isDenseForQuality(w);
-  if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
+  if (w.damageNumberStyle === 'cascade') {
+    pushCascadeNumber(w, enemy, dealt, isCrit, denseUnleashed);
+  } else if (!denseUnleashed || isCrit || enemy.uid % 8 === 0) {
     w.popups.push({
       x: enemy.x + randRange(w.rng, -5, 5),
       y: enemy.y + enemy.radius + 10,
@@ -3692,6 +3850,41 @@ function damageEnemy(
   if (enemy.hp <= 0) {
     killEnemy(w, enemy, killerId);
   }
+}
+
+/**
+ * Cascade damage numbers: a longer-lived number above the enemy that stacks
+ * with that enemy's recent numbers and takes its color and size from the hit.
+ * Decorative only. In a dense swarm only bigger hits, crits and a third of the
+ * rest are shown so the screen still reads.
+ */
+function pushCascadeNumber(w: World, enemy: EnemyActor, dealt: number, isCrit: boolean, dense: boolean) {
+  const tier = damageTier(dealt, isCrit);
+  if (dense && !isCrit && tier < 3 && enemy.uid % 3 !== 0) return;
+  let mine = 0;
+  for (let i = w.popups.length - 1; i >= 0; i -= 1) {
+    const older = w.popups[i]!;
+    if (older.ownerUid !== enemy.uid) continue;
+    mine += 1;
+    if (mine >= CASCADE_STACK_PER_ENEMY) {
+      w.popups.splice(i, 1);
+    } else {
+      older.y -= CASCADE_STACK_STEP;
+    }
+  }
+  w.popups.push({
+    x: enemy.x + randRange(w.rng, -6, 6),
+    y: enemy.y - enemy.radius - 6,
+    text: isCrit ? `${dealt}!` : String(dealt),
+    color: DAMAGE_TIERS[tier]!.color,
+    bornAt: w.now,
+    vy: -30,
+    tier,
+    lifeMs: cascadeLifeMs(tier),
+    ownerUid: enemy.uid,
+  });
+  const budget = dense ? 60 : 110;
+  if (w.popups.length > budget) w.popups.splice(0, w.popups.length - budget);
 }
 
 /** Apply a metadata-defined effect, refreshing duration and stacking safely. */
@@ -3819,10 +4012,12 @@ function coneEffectColor(kind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock'): st
 }
 
 function statusSpeedMultiplier(enemy: EnemyActor): number {
-  return enemy.activeEffects.reduce((multiplier, effect) => {
-    const def = STATUS_EFFECTS_BY_ID[effect.id];
-    return multiplier * (def?.speedMultiplier ?? 1);
-  }, 1);
+  const effects = enemy.activeEffects;
+  let multiplier = 1;
+  for (let i = 0; i < effects.length; i += 1) {
+    multiplier *= STATUS_EFFECTS_BY_ID[effects[i]!.id]?.speedMultiplier ?? 1;
+  }
+  return multiplier;
 }
 
 function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
@@ -3835,17 +4030,7 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
-  if (w.millionHorde) {
-    // Each defeated near-field actor breaks a matching aggregate crowd cell.
-    // This lets area damage visibly cut into the represented horde without
-    // creating loot, XP, or achievement rewards for enemies never simulated.
-    const virtualDefeated = Math.min(
-      w.millionHorde.virtualPopulation,
-      MILLION_HORDE_REPRESENTATION_PER_SPAWN - 1,
-    );
-    w.millionHorde.virtualPopulation -= virtualDefeated;
-    w.millionHorde.defeatedPopulation += virtualDefeated + 1;
-  }
+  if (w.millionHorde) w.millionHorde.defeatedPopulation += 1;
   // LokSurvivorArena: a guest kill also counts toward `kills`/`killsByEnemy`
   // above (so campaign-style read models keep working unmodified) *and*
   // toward its own attributed counter for the arena scoreboard.
@@ -4445,6 +4630,249 @@ function fireLegendaryWeapon(w: World, runWeapon: RunWeapon, damage: number, rea
   return true;
 }
 
+function fireArchiveWeapon(w: World, runWeapon: RunWeapon, damage: number, reach: number): boolean {
+  const weapon = runWeapon.def;
+  const evolved = ['tongue-tether-typhoon', 'firewall-last-bar', 'rewind-encore', 'eclipse-closed-circuit', 'cipher-sanctuary', 'bassline-overdrive', 'crown-of-replies', 'requiem-return', 'chorus-cache', 'breakpoint-finale'].includes(weapon.id);
+  const frog = weapon.id === 'digifrog-lance' || weapon.id === 'tongue-tether-typhoon';
+  const firewall = weapon.id === 'firewall-verse' || weapon.id === 'firewall-last-bar';
+  const rewind = weapon.id === 'rewind-mercy' || weapon.id === 'rewind-encore';
+  const eclipse = weapon.id === 'eclipse-severance' || weapon.id === 'eclipse-closed-circuit';
+  const cipher = weapon.id === 'cipher-cathedral' || weapon.id === 'cipher-sanctuary';
+  const railstaff = weapon.id === 'subwoofer-railstaff' || weapon.id === 'bassline-overdrive';
+  const crown = weapon.id === 'commentstorm-crown' || weapon.id === 'crown-of-replies';
+  const pitch = weapon.id === 'pitch-reaper' || weapon.id === 'requiem-return';
+  const cache = weapon.id === 'cache-of-lost-hooks' || weapon.id === 'chorus-cache';
+  const breakpoint = weapon.id === 'breakpoint-hands' || weapon.id === 'breakpoint-finale';
+  if (!frog && !firewall && !rewind && !eclipse && !cipher && !railstaff && !crown && !pitch && !cache && !breakpoint) return false;
+  if (crown) return true; // Orbiters handle every contact continuously.
+  const p = w.player;
+  const target = nearestEnemy(w, p.x, p.y, reach + 25);
+  const angle = target ? Math.atan2(target.y - p.y, target.x - p.x) : p.facing > 0 ? 0 : Math.PI;
+  p.facing = Math.cos(angle) >= 0 ? 1 : -1;
+  p.anim = 'attack';
+  p.animStartedAt = w.now;
+  const color = weapon.color ?? '#ffffff';
+
+  if (frog) {
+    if (target && !w.frogSwing && !target.commanded) {
+      const level = Math.max(1, runWeapon.level);
+      const sweepMs = Math.max(340, (evolved ? 650 : 520) - (level - 1) * 20);
+      w.frogSwing = { targetUid: target.uid, startedAt: w.now, releaseAt: w.now + sweepMs, angle, reach, damage, level, evolved };
+      target.frogHeldUntil = w.frogSwing.releaseAt;
+      spawnParticles(w, target.x, target.y, color, 9, 85);
+      pushAlert(w, evolved ? 'DIGIFROG · TYPHOON CATCH' : 'DIGIFROG · TONGUE CATCH');
+    }
+    return true;
+  }
+
+  if (cipher) {
+    const cx = target?.x ?? p.x + Math.cos(angle) * reach * 0.65;
+    const cy = target?.y ?? p.y + Math.sin(angle) * reach * 0.65;
+    const glyphRadius = reach * (evolved ? 0.65 : 0.55);
+    const nodeCount = evolved ? 6 : 3;
+    const points = Array.from({ length: nodeCount }, (_, index) => {
+      const glyphAngle = -Math.PI / 2 + (index % 3) * Math.PI * 2 / 3;
+      const layerRadius = glyphRadius * (index < 3 ? 1 : 0.62);
+      return { x: cx + Math.cos(glyphAngle) * layerRadius, y: cy + Math.sin(glyphAngle) * layerRadius };
+    });
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i]!;
+      const next = points[Math.floor(i / 3) * 3 + (i + 1) % 3]!;
+      const edgeAngle = Math.atan2(next.y - point.y, next.x - point.x);
+      w.effects.push({ uid: uid(w), kind: 'laser', weaponId: weapon.id, x: point.x, y: point.y,
+        radius: Math.hypot(next.x - point.x, next.y - point.y), angle: edgeAngle, spread: 0.09,
+        bornAt: w.now + i * 60, expiresAt: w.now + 480 + i * 60, color,
+        damage: damage * 0.55, impactIntensity: 2, hitUids: new Set(), followPlayer: false, statusEffectId: 'slow' });
+      w.effects.push({ uid: uid(w), kind: 'hazard', weaponId: weapon.id, x: point.x, y: point.y,
+        radius: 28, angle: 0, spread: 0, bornAt: w.now, expiresAt: w.now + (evolved ? 2600 : 1800),
+        color, damage: damage * 0.13, impactIntensity: 1, hitUids: new Set(), followPlayer: false,
+        nextTickAt: w.now, hurtsPlayer: false, statusEffectId: 'slow' });
+    }
+    pushAlert(w, evolved ? 'CIPHER SANCTUARY' : 'CIPHER CATHEDRAL');
+  } else if (railstaff) {
+    const railCount = evolved ? 5 : 3;
+    const normalX = -Math.sin(angle);
+    const normalY = Math.cos(angle);
+    for (let i = 0; i < railCount; i += 1) {
+      const offset = (i - (railCount - 1) / 2) * 26;
+      w.effects.push({ uid: uid(w), kind: 'laser', weaponId: weapon.id,
+        x: p.x + normalX * offset, y: p.y + normalY * offset, radius: reach, angle, spread: 0.07,
+        bornAt: w.now + i * 85, expiresAt: w.now + i * 85 + 480, color,
+        damage: damage * 0.72, impactIntensity: 3, hitUids: new Set(), followPlayer: false, statusEffectId: 'slow' });
+    }
+    spawnParticles(w, p.x, p.y, color, 14, 110);
+  } else if (pitch) {
+    const returnX = p.x + Math.cos(angle) * reach * 0.82;
+    const returnY = p.y + Math.sin(angle) * reach * 0.82;
+    w.effects.push({ uid: uid(w), kind: 'wave', weaponId: weapon.id, x: p.x, y: p.y,
+      radius: reach, angle, spread: 0.52, bornAt: w.now, expiresAt: w.now + 440,
+      color, damage, impactIntensity: 3, hitUids: new Set(), followPlayer: false });
+    w.effects.push({ uid: uid(w), kind: 'wave', weaponId: weapon.id, x: returnX, y: returnY,
+      radius: reach * (evolved ? 0.95 : 0.75), angle: angle + Math.PI, spread: evolved ? 0.7 : 0.52,
+      bornAt: w.now + 380, expiresAt: w.now + 820, color,
+      damage: damage * (evolved ? 0.95 : 0.65), impactIntensity: 3, hitUids: new Set(), followPlayer: false });
+    spawnParticles(w, returnX, returnY, color, 9, 100);
+  } else if (cache) {
+    const cx = target?.x ?? p.x + Math.cos(angle) * reach * 0.65;
+    const cy = target?.y ?? p.y + Math.sin(angle) * reach * 0.65;
+    const count = evolved ? 4 : 3;
+    for (let i = 0; i < count; i += 1) {
+      const beat = w.now + i * 320;
+      const drift = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1) * reach * 0.35;
+      w.effects.push({ uid: uid(w), kind: 'hazard', weaponId: weapon.id,
+        x: cx + Math.cos(angle + Math.PI / 2) * drift, y: cy + Math.sin(angle + Math.PI / 2) * drift,
+        radius: reach * 0.43, angle: 0, spread: 0, bornAt: beat, expiresAt: beat + 1450,
+        color, damage: damage * 0.3, impactIntensity: 2, hitUids: new Set(), followPlayer: false,
+        nextTickAt: beat, hurtsPlayer: false, statusEffectId: 'slow' });
+    }
+    pushAlert(w, evolved ? 'CHORUS CACHE · FOURTH HOOK' : 'CACHE OF LOST HOOKS');
+  } else if (breakpoint) {
+    const blows = evolved ? 3 : 2;
+    for (let i = 0; i < blows; i += 1) {
+      w.effects.push({ uid: uid(w), kind: 'slash', weaponId: weapon.id, x: p.x, y: p.y,
+        radius: reach * (0.75 + i * 0.1), angle: angle + (i % 2 === 0 ? -0.18 : 0.18), spread: 0.43,
+        bornAt: w.now + i * 125, expiresAt: w.now + i * 125 + 260, color,
+        damage: damage * (i === blows - 1 ? 1 : 0.65), impactIntensity: 4,
+        hitUids: new Set(), followPlayer: true, statusEffectId: 'freeze' });
+    }
+    if (target) {
+      applyStatusEffect(w, target, 'freeze');
+      spawnParticles(w, target.x, target.y, color, 12, 95);
+    }
+  }
+
+  if (cipher || railstaff || pitch || cache || breakpoint) {
+    w.shake = Math.max(w.shake, evolved ? 5 : 3);
+    return true;
+  }
+
+  const slash = (arcAngle: number, offset: number, spread: number, slashDamage: number) => {
+    w.effects.push({
+      uid: uid(w), kind: 'slash', weaponId: weapon.id, x: p.x, y: p.y, radius: reach,
+      angle: arcAngle, spread, bornAt: w.now + offset, expiresAt: w.now + offset + 260,
+      color, damage: slashDamage, impactIntensity: weaponImpact(weapon),
+      hitUids: new Set(), followPlayer: true, statusEffectId: weapon.statusEffectId,
+    });
+  };
+  if (firewall) {
+    slash(angle, 0, 0.85, damage);
+    if (evolved) slash(angle + 0.4, 160, 0.85, damage * 0.7);
+    w.effects.push({
+      uid: uid(w), kind: 'hazard', weaponId: weapon.id,
+      x: p.x + Math.cos(angle) * reach * 0.68, y: p.y + Math.sin(angle) * reach * 0.68,
+      radius: reach * 0.52, angle, spread: 0, bornAt: w.now, expiresAt: w.now + (evolved ? 1800 : 1150),
+      color, damage: damage * 0.22, impactIntensity: 1, hitUids: new Set(), followPlayer: false, statusEffectId: 'burning',
+    });
+  } else if (rewind) {
+    slash(angle, 0, 0.68, damage);
+    if (target) {
+      w.rewindMarks.push({ targetUid: target.uid, x: target.x, y: target.y, readyAt: w.now + (evolved ? 620 : 420), damage: damage * (evolved ? 0.85 : 0.55), evolved });
+      spawnParticles(w, target.x, target.y, color, 7, 65);
+    }
+  } else {
+    slash(angle, 0, 0.48, damage);
+    const seamCount = evolved ? 2 : 1;
+    for (let i = 0; i < seamCount; i += 1) {
+      const seamAngle = angle + (i === 0 ? -0.22 : 0.22);
+      w.effects.push({
+        uid: uid(w), kind: 'laser', weaponId: weapon.id, x: p.x, y: p.y,
+        radius: reach, angle: seamAngle, spread: 0.16, bornAt: w.now + i * 130,
+        expiresAt: w.now + i * 130 + 420, color, damage: damage * 0.65,
+        impactIntensity: weaponImpact(weapon), hitUids: new Set(), followPlayer: false, statusEffectId: 'slow',
+      });
+    }
+  }
+  w.shake = Math.max(w.shake, evolved ? 4 : 2);
+  return true;
+}
+
+function applyFrogStatus(w: World, enemy: EnemyActor, id: 'sticky' | 'grossed-out', level: number) {
+  applyStatusEffect(w, enemy, id);
+  const effect = enemy.activeEffects.find((entry) => entry.id === id);
+  if (effect) effect.expiresAt = Math.max(effect.expiresAt, w.now + (id === 'sticky' ? 2400 + (level - 1) * 160 : 650 + (level - 1) * 60));
+}
+
+function updateArchiveCombat(w: World) {
+  const swing = w.frogSwing;
+  if (swing) {
+    const caught = w.enemies.find((enemy) => enemy.uid === swing.targetUid && !enemy.dying);
+    if (!caught) w.frogSwing = null;
+    else if (w.now < swing.releaseAt) {
+      const progress = clamp((w.now - swing.startedAt) / (swing.releaseAt - swing.startedAt), 0, 1);
+      const angle = swing.angle - 1.15 + progress * 2.3;
+      caught.x = w.player.x + Math.cos(angle) * swing.reach * 0.7;
+      caught.y = w.player.y + Math.sin(angle) * swing.reach * 0.7;
+      caught.kx = 0;
+      caught.ky = 0;
+      applyFrogStatus(w, caught, 'sticky', swing.level);
+    } else {
+      caught.frogHeldUntil = 0;
+      const throwAngle = swing.angle + 1.05;
+      const force = (swing.evolved ? 780 : 570) + (swing.level - 1) * 26;
+      caught.kx = Math.cos(throwAngle) * force;
+      caught.ky = Math.sin(throwAngle) * force;
+      damageEnemy(w, caught, swing.damage, 3, w.player.x, w.player.y, 'sticky');
+      applyFrogStatus(w, caught, 'sticky', swing.level);
+      if (!caught.dying) w.frogThrows.push({ targetUid: caught.uid, expiresAt: w.now + 1050 + (swing.level - 1) * 80, damage: swing.damage * (swing.evolved ? 0.9 : 0.55), level: swing.level, hitUids: new Set([caught.uid]) });
+      w.frogSwing = null;
+      w.shake = Math.max(w.shake, swing.evolved ? 6 : 4);
+    }
+  }
+  for (let i = w.frogThrows.length - 1; i >= 0; i -= 1) {
+    const thrown = w.frogThrows[i]!;
+    const source = w.enemies.find((enemy) => enemy.uid === thrown.targetUid && !enemy.dying);
+    if (!source || w.now >= thrown.expiresAt) { w.frogThrows.splice(i, 1); continue; }
+    forEachNearby(w, source.x, source.y, source.radius + 34, (enemy) => {
+      if (enemy.dying || enemy.uid === source.uid || thrown.hitUids.has(enemy.uid)) return;
+      if (dist2(source.x, source.y, enemy.x, enemy.y) > (source.radius + enemy.radius + 16) ** 2) return;
+      thrown.hitUids.add(enemy.uid);
+      damageEnemy(w, enemy, thrown.damage, 4, source.x, source.y, 'sticky');
+      applyFrogStatus(w, enemy, 'sticky', thrown.level);
+      source.kx *= -(0.66 + (thrown.level - 1) * 0.025);
+      source.ky *= -(0.66 + (thrown.level - 1) * 0.025);
+      forEachNearby(w, enemy.x, enemy.y, 92, (witness) => {
+        if (!witness.dying && witness.uid !== source.uid) applyFrogStatus(w, witness, 'grossed-out', thrown.level);
+      });
+      spawnParticles(w, enemy.x, enemy.y, '#9afa99', 11, 100);
+    });
+  }
+  for (let i = w.rewindMarks.length - 1; i >= 0; i -= 1) {
+    const mark = w.rewindMarks[i]!;
+    if (w.now < mark.readyAt) continue;
+    const enemy = w.enemies.find((entry) => entry.uid === mark.targetUid && !entry.dying);
+    if (enemy && !enemy.commanded) {
+      spawnParticles(w, enemy.x, enemy.y, '#c8e8ef', 9, 95);
+      enemy.x = mark.x;
+      enemy.y = mark.y;
+      enemy.kx = 0;
+      enemy.ky = 0;
+      damageEnemy(w, enemy, mark.damage, 2, w.player.x, w.player.y, 'slow');
+      if (mark.evolved) novaDamage(w, mark.x, mark.y, 62, mark.damage * 0.45, 1, 'slow');
+      spawnParticles(w, mark.x, mark.y, '#e0f7ff', 13, 100);
+    }
+    w.rewindMarks.splice(i, 1);
+  }
+}
+
+export function arcTetherTargets(enemies: readonly EnemyActor[], origin: { x: number; y: number }, firstRange: number): Array<{ target: EnemyActor; fromX: number; fromY: number }> {
+  const hits: Array<{ target: EnemyActor; fromX: number; fromY: number }> = [];
+  const struck = new Set<number>();
+  let fromX = origin.x;
+  let fromY = origin.y;
+  for (let link = 0; link < 3; link += 1) {
+    const maxDistance = link === 0 ? firstRange : 180;
+    const target = enemies
+      .filter((enemy) => !enemy.dying && !struck.has(enemy.uid) && dist2(enemy.x, enemy.y, fromX, fromY) <= maxDistance * maxDistance)
+      .sort((a, b) => dist2(a.x, a.y, fromX, fromY) - dist2(b.x, b.y, fromX, fromY))[0];
+    if (!target) break;
+    hits.push({ target, fromX, fromY });
+    struck.add(target.uid);
+    fromX = target.x;
+    fromY = target.y;
+  }
+  return hits;
+}
+
 function fireWeapon(w: World, runWeapon: RunWeapon) {
   const weapon = runWeapon.def;
   const p = w.player;
@@ -4454,8 +4882,20 @@ function fireWeapon(w: World, runWeapon: RunWeapon) {
   const behavior = weaponEvolutionBehavior(w, weapon);
 
   if (fireLegendaryWeapon(w, runWeapon, damage, reach)) return;
+  if (fireArchiveWeapon(w, runWeapon, damage, reach)) return;
 
   switch (weapon.kind) {
+    case 'arc-tether': {
+      for (const [link, hit] of arcTetherTargets(w.enemies, { x: p.x, y: p.y }, reach).entries()) {
+        const { target, fromX: originX, fromY: originY } = hit;
+        w.electricChains ??= [];
+        w.electricChains.push({ x1: originX, y1: originY, x2: target.x, y2: target.y, bornAt: w.now, expiresAt: w.now + 320, style: 'catenary' });
+        damageEnemy(w, target, damage * (link === 0 ? 1 : 0.64), weaponImpact(weapon), originX, originY, weapon.statusEffectId);
+        spawnParticles(w, target.x, target.y, '#fbbf24', 7, 90);
+      }
+      p.anim = 'attack'; p.animStartedAt = w.now;
+      break;
+    }
     case 'follower': {
       spawnFollowers(w, weapon);
       p.anim = 'attack';
@@ -5029,6 +5469,16 @@ function updateOrbiters(w: World, dt: number) {
       if (dist2(enemy.x, enemy.y, ox, oy) <= reach * reach) {
         orb.cooldowns.set(enemy.uid, w.now + 420);
         damageEnemy(w, enemy, damage, weaponImpact(weapon), ox, oy);
+        if (weapon.id === 'commentstorm-crown' || weapon.id === 'crown-of-replies') {
+          const burstRadius = weapon.id === 'crown-of-replies' ? 62 : 38;
+          novaDamage(w, ox, oy, burstRadius, damage * 0.32, 1, 'slow');
+          w.effects.push({ uid: uid(w), kind: 'ring', weaponId: weapon.id,
+            x: ox, y: oy, radius: burstRadius, angle: 0, spread: 0,
+            bornAt: w.now, expiresAt: w.now + 230, color: weapon.color ?? '#ffe38d',
+            damage: 0, impactIntensity: 0, hitUids: new Set(), followPlayer: false });
+          w.popups.push({ x: ox, y: oy - 20, text: weapon.id === 'crown-of-replies' ? '!!' : '?!',
+            color: weapon.color ?? '#ffe38d', bornAt: w.now, vy: 28 });
+        }
         const behavior = weaponEvolutionBehavior(w, weapon);
         if (behavior?.kind === 'orbit-burst') {
           const burstRadius = behavior.radius ?? 56;
@@ -5203,7 +5653,7 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
     for (const weapon of Object.values(WEAPONS_BY_ID)) {
       if (!grpdWeaponEligible(w, weapon.id)) continue;
       if (w.disabledWeaponIds && w.disabledWeaponIds.includes(weapon.id)) continue;
-      if (!isWeaponUnlockedForLoot(weapon, w.unlockedCharacterIds)) continue;
+      if (!isWeaponUnlockedForLoot(weapon, w.unlockedCharacterIds, [...w.unlockedMapFindIds, ...w.mapFindIds])) continue;
       if (!w.weapons.some((entry) => entry.def.id === weapon.id)) {
         pool.push({ id: `weapon-${weapon.id}`, name: weapon.name, description: weapon.description, weight: grpdWeaponOfferWeight(w, weapon.id, weaponLootWeight(weapon)), maxStacks: 1, effects: [], cardKind: 'weapon', weaponId: weapon.id });
       }
@@ -5217,6 +5667,7 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
     }
   }
   for (const evolution of EVOLUTIONS) {
+    if (evolution.endgameOnly && !w.endgameEvolutionsEnabled) continue;
     if (w.disabledWeaponIds && w.disabledWeaponIds.includes(evolution.id)) continue;
     const weapon = w.weapons.find((entry) => entry.def.id === evolution.baseWeaponId);
     if (!weapon || weapon.def.id === evolution.id) continue;
@@ -5275,8 +5726,9 @@ export function rollUpgradeChoices(w: World, count = 3): UpgradeDef[] {
   return picks;
 }
 
-export function isWeaponUnlockedForLoot(weapon: WeaponDef, unlockedCharacterIds: readonly string[]): boolean {
-  return !weapon.lootUnlockCharacterId || unlockedCharacterIds.includes(weapon.lootUnlockCharacterId);
+export function isWeaponUnlockedForLoot(weapon: WeaponDef, unlockedCharacterIds: readonly string[], findIds: readonly string[] = []): boolean {
+  return (!weapon.lootUnlockCharacterId || unlockedCharacterIds.includes(weapon.lootUnlockCharacterId))
+    && (!weapon.lootUnlockDiscoveryId || findIds.includes(weapon.lootUnlockDiscoveryId));
 }
 
 export function weaponLootWeight(weapon: WeaponDef): number {
@@ -5561,6 +6013,7 @@ function clampToArena(w: World, actor: Actor) {
 }
 
 function collideObstacles(w: World, actor: Actor) {
+  if (w.obstacleGrid.size === 0) return;
   // Only the cells within reach of the actor's radius can hold a box it
   // might overlap -- was a scan of every obstacle for every actor, which
   // dominated frame time once enemy counts climbed into the hundreds
@@ -5959,6 +6412,7 @@ function fluidSpeedMultiplierAt(w: World, x: number, y: number): number {
  * speed boost is this separate immediate check, reused for both actors.
  */
 function fluidOilBoostAt(w: World, x: number, y: number): number {
+  if (w.fluids.length === 0) return 1;
   for (const tile of w.fluids) {
     if (tile.kind !== 'oil' && tile.kind !== 'burning-oil') continue;
     if (dist2(x, y, tile.x, tile.y) <= tile.radius ** 2) return FLUID_SPEED_MULTIPLIERS.oil!;
@@ -5967,10 +6421,12 @@ function fluidOilBoostAt(w: World, x: number, y: number): number {
 }
 
 function statusDamageMultiplier(enemy: EnemyActor): number {
-  return enemy.activeEffects.reduce((multiplier, effect) => {
-    const def = STATUS_EFFECTS_BY_ID[effect.id];
-    return multiplier * (def?.damageMultiplier ?? 1);
-  }, 1);
+  const effects = enemy.activeEffects;
+  let multiplier = 1;
+  for (let i = 0; i < effects.length; i += 1) {
+    multiplier *= STATUS_EFFECTS_BY_ID[effects[i]!.id]?.damageMultiplier ?? 1;
+  }
+  return multiplier;
 }
 
 function updateFluids(w: World) {
@@ -6610,10 +7066,18 @@ function nearestDataChewTarget(w: World, x: number, y: number, range: number): B
   return closest;
 }
 
+let knockbackDecayDt = -1;
+let knockbackDecay = 1;
+
 function applyKnockback(actor: Actor, dt: number) {
   actor.x += actor.kx * dt;
   actor.y += actor.ky * dt;
-  const decay = Math.pow(0.0009, dt);
+  // One pow per step, not one per actor: every actor shares the step's dt.
+  if (dt !== knockbackDecayDt) {
+    knockbackDecayDt = dt;
+    knockbackDecay = Math.pow(0.0009, dt);
+  }
+  const decay = knockbackDecay;
   actor.kx *= decay;
   actor.ky *= decay;
   if (Math.abs(actor.kx) < 1) actor.kx = 0;
@@ -6958,6 +7422,91 @@ function updateStealth(w: World) {
   w.stealthAnchorY = w.player.y;
 }
 
+/**
+ * Enemies up to this radius are "small": two of them can only overlap within
+ * one grid cell's reach, so small/small pairs are resolved by sweeping each
+ * occupied cell against itself and four forward neighbours (each pair visited
+ * once, five map lookups per cell instead of nine per enemy). Larger actors
+ * (bosses, giants) take the wider per-actor scan below.
+ */
+const SEPARATION_SMALL_RADIUS = CELL / 2 - 2;
+const separationBigScratch: EnemyActor[] = [];
+
+function pushApart(a: EnemyActor, b: EnemyActor) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const minDist = a.radius + b.radius;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= minDist * minDist || d2 < 1e-4) return;
+  const d = Math.sqrt(d2);
+  const overlap = (minDist - d) * 0.5;
+  const ox = (dx / d) * overlap;
+  const oy = (dy / d) * overlap;
+  const total = a.mass + b.mass;
+  a.x -= ox * (b.mass / total) * 2;
+  a.y -= oy * (b.mass / total) * 2;
+  b.x += ox * (a.mass / total) * 2;
+  b.y += oy * (a.mass / total) * 2;
+}
+
+function separateEnemies(w: World) {
+  const bigs = separationBigScratch;
+  bigs.length = 0;
+  const grid = w.grid;
+  const cellCount = grid.size;
+  for (let c = 0; c < cellCount; c += 1) {
+    const key = grid.cellKeyAt(c);
+    const bucket = grid.cellBucketAt(c);
+    const n = bucket.length;
+    for (let i = 0; i < n; i += 1) {
+      const a = bucket[i]!;
+      if (a.radius > SEPARATION_SMALL_RADIUS) {
+        bigs.push(a);
+        continue;
+      }
+      for (let j = i + 1; j < n; j += 1) {
+        const b = bucket[j]!;
+        if (b.radius <= SEPARATION_SMALL_RADIUS) pushApart(a, b);
+      }
+    }
+    // Forward neighbours: E, NE-in-key-order, SE and S. Together with the
+    // in-cell pass every adjacent pair is visited exactly once.
+    for (let k = 0; k < 4; k += 1) {
+      const neighbour = grid.get(key + (k === 0 ? 4096 - 1 : k === 1 ? 4096 : k === 2 ? 4096 + 1 : 1));
+      if (!neighbour) continue;
+      const m = neighbour.length;
+      for (let i = 0; i < n; i += 1) {
+        const a = bucket[i]!;
+        if (a.radius > SEPARATION_SMALL_RADIUS) continue;
+        for (let j = 0; j < m; j += 1) {
+          const b = neighbour[j]!;
+          if (b.radius <= SEPARATION_SMALL_RADIUS) pushApart(a, b);
+        }
+      }
+    }
+  }
+  for (let i = 0; i < bigs.length; i += 1) {
+    const big = bigs[i]!;
+    const cells = Math.ceil((big.radius + SEPARATION_SMALL_RADIUS) / CELL);
+    const baseX = Math.floor(big.x / CELL);
+    const baseY = Math.floor(big.y / CELL);
+    for (let ix = -cells; ix <= cells; ix += 1) {
+      for (let iy = -cells; iy <= cells; iy += 1) {
+        const bucket = grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+        if (!bucket) continue;
+        for (let j = 0; j < bucket.length; j += 1) {
+          const other = bucket[j]!;
+          if (other === big) continue;
+          // Big/big pairs are visited from both sides; keep one.
+          if (other.radius > SEPARATION_SMALL_RADIUS && other.uid < big.uid) continue;
+          pushApart(big, other);
+        }
+      }
+    }
+  }
+  bigs.length = 0;
+}
+
 function updateEnemies(w: World, dt: number) {
   const p = w.player;
   const stealthed = w.now < w.stealthUntil;
@@ -6976,6 +7525,11 @@ function updateEnemies(w: World, dt: number) {
   const enemyMoveBreakables = w.breakables.filter((b) => !b.broken && b.movable);
   for (const enemy of w.enemies) {
     if (enemy.dying) continue;
+    if (enemy.frogHeldUntil && w.now < enemy.frogHeldUntil) {
+      enemy.vx = 0;
+      enemy.vy = 0;
+      continue;
+    }
     // Zero Day: frozen "stone" enemies are fully inert -- no AI, no attacks,
     // no contact damage (the contact check further down never runs since we
     // skip the rest of the loop body for them entirely).
@@ -7051,8 +7605,10 @@ function updateEnemies(w: World, dt: number) {
     const targetY = dataGobFleeing ? enemy.y + (enemy.y - trackY) * 2 : chewTarget?.y ?? trackY;
     const dx = targetX - enemy.x;
     const dy = targetY - enemy.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    const playerDistance = Math.hypot(trackX - enemy.x, trackY - enemy.y) || 1;
+    const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+    const pdx = trackX - enemy.x;
+    const pdy = trackY - enemy.y;
+    const playerDistance = dataGobFleeing || chewTarget ? Math.sqrt(pdx * pdx + pdy * pdy) || 1 : distance;
     const dirX = dx / distance;
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
@@ -7890,44 +8446,8 @@ function updateEnemies(w: World, dt: number) {
   }
 
   // Separation so enemies form a crowd instead of a single stacked sprite.
-  // Inlined rather than routed through `forEachNearby`'s callback: this is
-  // the one grid query that runs once per enemy (every other caller runs
-  // once per event -- a projectile, an effect tick), so at hundreds of
-  // enemies the per-enemy closure allocation and indirect call it would
-  // otherwise need were themselves a measurable share of frame time.
   rebuildGrid(w);
-  for (const enemy of w.enemies) {
-    if (enemy.dying) continue;
-    const radius = enemy.radius * 2;
-    const cells = Math.ceil(radius / CELL);
-    const baseX = Math.floor(enemy.x / CELL);
-    const baseY = Math.floor(enemy.y / CELL);
-    for (let ix = -cells; ix <= cells; ix += 1) {
-      for (let iy = -cells; iy <= cells; iy += 1) {
-        const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
-        if (!bucket) continue;
-        for (const other of bucket) {
-          // Every pair only needs one symmetric resolution. The previous
-          // loop processed A/B and B/A, doubling the hottest crowd-work path.
-          if (other.uid <= enemy.uid) continue;
-          const dx = other.x - enemy.x;
-          const dy = other.y - enemy.y;
-          const minDist = enemy.radius + other.radius;
-          const d2 = dx * dx + dy * dy;
-          if (d2 >= minDist * minDist || d2 < 1e-4) continue;
-          const d = Math.sqrt(d2);
-          const overlap = (minDist - d) * 0.5;
-          const ox = (dx / d) * overlap;
-          const oy = (dy / d) * overlap;
-          const total = enemy.mass + other.mass;
-          enemy.x -= ox * (other.mass / total) * 2;
-          enemy.y -= oy * (other.mass / total) * 2;
-          other.x += ox * (enemy.mass / total) * 2;
-          other.y += oy * (enemy.mass / total) * 2;
-        }
-      }
-    }
-  }
+  separateEnemies(w);
 
   // Retire finished death animations.
   for (let i = w.enemies.length - 1; i >= 0; i -= 1) {
@@ -9928,15 +10448,24 @@ function updateAmbientDrops(w: World) {
   spawnParticles(w, x, y, '#ffe8a3', 6, 60);
 }
 
+/** Kinds whose collect branch spawns no particles of its own get a small burst. */
+const PICKUP_BURST_COLOR: Partial<Record<PickupKind, string>> = {
+  xp: '#9aefff',
+  health: '#7dffb2',
+  cred: '#ffd166',
+  coin: '#e8d48a',
+};
+
 function updatePickups(w: World, dt: number) {
   const p = w.player;
   const magnet = w.stats.magnet;
+  const pickupDrag = Math.pow(0.02, dt);
 
   for (let i = w.pickups.length - 1; i >= 0; i -= 1) {
     const pickup = w.pickups[i]!;
     const dx = p.x - pickup.x;
     const dy = p.y - pickup.y;
-    const distance = Math.hypot(dx, dy) || 1;
+    const distance = Math.sqrt(dx * dx + dy * dy) || 1;
 
     if (distance < magnet) {
       // Accelerate toward the player once inside the magnet radius.
@@ -9947,8 +10476,8 @@ function updatePickups(w: World, dt: number) {
 
     pickup.x += pickup.vx * dt;
     pickup.y += pickup.vy * dt;
-    pickup.vx *= Math.pow(0.02, dt);
-    pickup.vy *= Math.pow(0.02, dt);
+    pickup.vx *= pickupDrag;
+    pickup.vy *= pickupDrag;
 
     if (distance < p.radius + (pickup.kind === 'loot-box' || pickup.kind === 'card-pack' ? 18 : 10)) {
       switch (pickup.kind) {
@@ -10128,7 +10657,16 @@ function updatePickups(w: World, dt: number) {
           pushSfx(w, 'heal');
           break;
         }
+        case 'rootglass-cell': {
+          w.rootglassUntil = Math.max(w.rootglassUntil, w.now) + 20_000;
+          w.popups.push({ x: p.x, y: p.y - 18, text: 'ROOTGLASS / FASTER WEAPONS', color: '#5eead4', bornAt: w.now, vy: 26 });
+          spawnParticles(w, p.x, p.y, '#5eead4', 12, 90);
+          pushSfx(w, 'gemPickup');
+          break;
+        }
       }
+      const burstColor = PICKUP_BURST_COLOR[pickup.kind];
+      if (burstColor) spawnParticles(w, pickup.x, pickup.y, burstColor, pickup.kind === 'xp' && pickup.value >= 10 ? 7 : 4, 55);
       w.pickups.splice(i, 1);
     }
   }
@@ -10250,20 +10788,34 @@ export function episodeSnapshot(w: World): NonNullable<HudSnapshot['episode']> |
 }
 
 function updateParticles(w: World, dt: number) {
-  for (let i = w.particles.length - 1; i >= 0; i -= 1) {
-    const particle = w.particles[i]!;
+  // Order-preserving compaction (one pass) instead of a splice per expired
+  // item, and the drag factors computed once per step rather than per particle.
+  const particles = w.particles;
+  const drag = Math.pow(0.05, dt);
+  let keep = 0;
+  for (let i = 0; i < particles.length; i += 1) {
+    const particle = particles[i]!;
     particle.x += particle.vx * dt;
     particle.y += particle.vy * dt;
-    particle.vx *= Math.pow(0.05, dt);
-    particle.vy *= Math.pow(0.05, dt);
-    if (w.now - particle.bornAt > particle.lifeMs) w.particles.splice(i, 1);
+    particle.vx *= drag;
+    particle.vy *= drag;
+    if (w.now - particle.bornAt > particle.lifeMs) continue;
+    particles[keep++] = particle;
   }
-  for (let i = w.popups.length - 1; i >= 0; i -= 1) {
-    const popup = w.popups[i]!;
+  particles.length = keep;
+
+  const popups = w.popups;
+  const popupDrag = Math.pow(0.25, dt);
+  keep = 0;
+  for (let i = 0; i < popups.length; i += 1) {
+    const popup = popups[i]!;
     popup.y += popup.vy * dt;
-    popup.vy *= Math.pow(0.25, dt);
-    if (w.now - popup.bornAt > 700) w.popups.splice(i, 1);
+    popup.vy *= popupDrag;
+    if (w.now - popup.bornAt > (popup.lifeMs ?? 700)) continue;
+    popups[keep++] = popup;
   }
+  popups.length = keep;
+
   for (let i = w.alerts.length - 1; i >= 0; i -= 1) {
     if (w.now - w.alerts[i]!.bornAt > 2600) w.alerts.splice(i, 1);
   }
@@ -10906,7 +11458,11 @@ function updateEndlessSpawning(w: World, dt: number) {
   while (e.spawnBudget >= 1) {
     e.spawnBudget -= 1;
     const enemyId = pool[Math.floor(w.rng() * pool.length)]!;
-    spawnEnemy(w, getEnemy(enemyId), hpMult, undefined, w.millionHorde ? MILLION_HORDE_REPRESENTATION_PER_SPAWN : 1);
+    if (w.hordeField) {
+      if (w.hordeFedThisStep < HORDE_FEED_BUDGET_PER_STEP) feedHorde(w, getEnemy(enemyId), hpMult, MILLION_HORDE_REPRESENTATION_PER_SPAWN);
+    } else {
+      spawnEnemy(w, getEnemy(enemyId), hpMult);
+    }
   }
 
   // Periodic multi-enemy surge -- the "wave" endless mode is otherwise
@@ -11005,6 +11561,7 @@ export interface StepInput {
   moveX: number;
   moveY: number;
   ultimate: boolean;
+  interact?: boolean;
   /**
    * The music frame for this rendered frame. Optional so tests and any caller
    * that does not care about audio can omit it and get silence.
@@ -11145,6 +11702,61 @@ function updateLlamaMamaPassive(w: World) {
   }
 }
 
+export function nearbyMapInteractable(w: World) {
+  const relays = w.area.mapInteractables?.filter((entry) => entry.kind === 'relay') ?? [];
+  return (w.area.mapInteractables ?? [])
+    .filter((entry) => entry.kind !== 'root-anchor' && !w.mapActivated.has(entry.id))
+    .filter((entry) => entry.kind !== 'plate' || relays.every((relay) => w.mapActivated.has(relay.id)))
+    .filter((entry) => dist2(w.player.x, w.player.y, entry.x, entry.y) <= 92 * 92)
+    .sort((a, b) => dist2(w.player.x, w.player.y, a.x, a.y) - dist2(w.player.x, w.player.y, b.x, b.y))[0] ?? null;
+}
+
+export function interactWithMap(w: World): boolean {
+  const entry = nearbyMapInteractable(w);
+  if (!entry) return false;
+  w.mapActivated.add(entry.id);
+  if (entry.kind === 'relay') {
+    pushAlert(w, 'Relay restored');
+    pushSfx(w, 'pickupCred');
+    const relays = w.area.mapInteractables?.filter((candidate) => candidate.kind === 'relay') ?? [];
+    if (relays.every((relay) => w.mapActivated.has(relay.id))) {
+      const gate = w.breakables.find((prop) => prop.kind === 'map-prop' && prop.artAssetId === 'barricade' && Math.abs(prop.x) < 20 && Math.abs(prop.y + 490) < 20);
+      if (gate && !gate.broken) { gate.broken = true; gate.brokenAt = w.now; syncObstacleAabbs(w); }
+      pushAlert(w, 'Floodline shortcut opened');
+    }
+  } else if (entry.kind === 'cache') {
+    w.pickups.push(
+      { uid: uid(w), kind: 'health', x: entry.x - 25, y: entry.y + 38, vx: 0, vy: 0, value: 25, bornAt: w.now },
+      { uid: uid(w), kind: 'cred', x: entry.x + 25, y: entry.y + 38, vx: 0, vy: 0, value: 45, bornAt: w.now },
+    );
+    pushAlert(w, 'Transit cache opened');
+    pushSfx(w, 'lootBox');
+  } else if (entry.kind === 'plate') {
+    w.mapFindIds.add('breach-616-plate');
+    pushAlert(w, 'Breach 616 theme found');
+    pushSfx(w, 'lootBox');
+  } else if (entry.kind === 'coil') {
+    w.mapFindIds.add('transit-coil-found');
+    const def = WEAPONS_BY_ID['catenary-harpoon'];
+    if (def && !w.weapons.some((weapon) => weapon.def.id === def.id)) w.weapons.push({ def, level: 1, count: 1, readyAt: w.now + 300 });
+    pushAlert(w, 'Catenary Harpoon acquired');
+    pushSfx(w, 'lootBox');
+  }
+  return true;
+}
+
+function updateMapAnchors(w: World) {
+  for (const entry of w.area.mapInteractables ?? []) {
+    if (entry.kind !== 'root-anchor' || w.mapActivated.has(entry.id)) continue;
+    const anchor = w.breakables.find((prop) => prop.artAssetId === 'node-pylon' && Math.abs(prop.x - entry.x) < 8 && Math.abs(prop.y - entry.y) < 8);
+    if (anchor?.broken) {
+      w.mapActivated.add(entry.id);
+      pushAlert(w, 'Root anchor destroyed');
+      pushSfx(w, 'pickupCred');
+    }
+  }
+}
+
 export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (w.outcome !== 'running') return;
 
@@ -11169,6 +11781,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   if (input.ultimate) activateUltimate(w);
 
   updatePlayer(w, dt, input.moveX, input.moveY);
+  if (input.interact) interactWithMap(w);
   if (w.arenaMode) {
     for (let i = 0; i < w.guests.length; i += 1) {
       const gi = input.guestInputs?.[i];
@@ -11190,6 +11803,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateLlamaMamaPassive(w);
   updateDistrictIncursion(w, dt);
 
+  w.hordeFedThisStep = 0;
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
     updateEndlessRoute(w);
@@ -11200,6 +11814,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   } else {
     updateSpawning(w, dt);
   }
+  updateHorde(w);
 
   updateStatusEffects(w);
   updatePlayerConeEffects(w);
@@ -11212,8 +11827,10 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateRunningMan(w);
   updateRawDataBreakage(w, dt);
   updateEnemies(w, dt);
+  updateArchiveCombat(w);
   updateRoamingDetectors(w, dt);
   updateBreakables(w, dt);
+  updateMapAnchors(w);
   updateFluids(w);
   updateDustMites(w, dt);
   updateBubbleWash(w, dt);
@@ -11314,7 +11931,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     kills: w.kills,
     millionHorde: w.millionHorde
       ? {
-          population: w.millionHorde.virtualPopulation + w.enemies.filter((enemy) => !enemy.dying).length,
+          population: (w.hordeField?.count ?? 0) + w.enemies.filter((enemy) => !enemy.dying).length,
           peakPopulation: w.millionHorde.peakPopulation,
           defeatedPopulation: w.millionHorde.defeatedPopulation,
           liveActors: w.enemies.length,
@@ -11547,6 +12164,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     killsByEnemy: { ...w.killsByEnemy },
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
+    mapFindIds: [...w.mapFindIds],
     newlyUnlockedCharacterIds: [],
     loadout: {
       weapons: w.weapons.map((weapon) => ({ id: weapon.def.id, name: weapon.def.name, level: weapon.level, kind: weapon.def.kind, color: weapon.def.color })),

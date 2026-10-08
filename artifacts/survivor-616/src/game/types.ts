@@ -10,6 +10,7 @@ import type { BeatReaction } from '@/game/data/reactivity';
 import type { MusicSpawnEvent } from '@/game/data/musicEvents';
 import type { RunHighlight } from '@/game/data/runHighlights';
 import type { SfxStyleDef } from '@/game/audio/sfxCues';
+import type { ChangelogKind } from '@/game/data/changelogKinds';
 
 export interface Vec2 {
   x: number;
@@ -510,7 +511,8 @@ export type WeaponKind =
   /** 4th-wall breaking / system error attack: drags selection marquees, blue-screens, and corrupts memory. */
   | 'glitch'
   /** Easter egg weapon: classic DVD bouncing screensaver icon that ricochets and explodes on corner hits. */
-  | 'dvd-bounce';
+  | 'dvd-bounce'
+  | 'arc-tether';
 
 /**
  * Shared physical-impact spectrum for authored attacks.
@@ -560,6 +562,8 @@ export interface WeaponDef {
   impactTrigger?: PotholeTrigger;
   /** Optional tint used when this weapon is not a character signature. */
   color?: string;
+  /** Discovery required before a map-find weapon joins normal level-up rolls. */
+  lootUnlockDiscoveryId?: string;
   /** How this projectile behaves when it meets reflective cover. */
   obstacleInteraction?: 'block' | 'reflect';
   /** Optional crowd-control effect applied by this weapon's hits. */
@@ -646,6 +650,8 @@ export interface EvolutionDef {
   name: string;
   description: string;
   baseWeaponId: string;
+  /** Can be offered only when the earned Victory Lap evolution switch is on. */
+  endgameOnly?: boolean;
   /** Evolution partner weapon requirement: requires owning this weapon maxed (level 8). */
   requiredWeaponId?: string;
   requiredWeaponLevel?: number;
@@ -1158,6 +1164,8 @@ export interface WaveDef {
   hpMult?: number;
   formation?: 'ring' | 'wedge' | 'wall' | 'escort' | 'pincer' | 'file' | 'bait' | 'spiral' | 'phalanx' | 'crossfire' | 'vortex';
   faction?: string;
+  /** Authored finite-map entry; omitted waves keep their usual spawn ring. */
+  spawnAt?: { x: number; y: number };
 }
 
 export interface ObstacleDef {
@@ -1197,7 +1205,9 @@ export interface ObstacleDef {
      /** Rapid pressure wing: reinforced emergency-pressure room seal. */
      | 'pressure-door'
      /** Page overlay only: a DOM element on a live web page, standing in as a fixed, breakable block. */
-     | 'page-block';
+     | 'page-block' | 'map-prop';
+  /** Detailed map-pack artwork shared by the editor and live renderer. */
+  artAssetId?: string;
   /** Optional authored prop physics profile; omitted props use kind defaults. */
   propVariant?: PropVariant;
   /** Per-instance hit points; overrides the kind's table value (page overlay blocks scale with element area). */
@@ -1257,6 +1267,15 @@ export interface AreaDef {
     seam: string;
     glow: string;
   }>;
+  /** Art-only objects do not enter the collision or damage simulation. */
+  decorations?: ObstacleDef[];
+  /** Authored finite-map entry locations. */
+  playerStart?: { x: number; y: number };
+  hostileEntries?: Array<{ x: number; y: number }>;
+  /** Placed supplies and interactive set pieces. */
+  mapPickups?: Array<{ id: string; kind: string; x: number; y: number; value?: number }>;
+  mapInteractables?: Array<{ id: string; kind: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil'; x: number; y: number; w: number; h: number }>;
+  mapFeature?: 'fractured-616' | 'glassroot-shrine';
   /** Overhead conditions; defaults to 'clear' when omitted. */
   sky?: AreaSky;
   obstacles: ObstacleDef[];
@@ -1266,6 +1285,7 @@ export interface AreaDef {
     description: string;
     kind: 'market' | 'rail-yard' | 'plaza' | 'floodgate' | 'pressure-rooms';
     accent: string;
+    position?: { x: number; y: number };
   };
   /** Slow environmental corruption that Data-Gobs accelerate by chewing. */
   rawDataBreakage?: {
@@ -1324,7 +1344,10 @@ export type CustomMapAssetCategory =
   /** Where the player (or a Sector Command faction) enters the map. */
   | 'spawn-point'
   /** A named point a mission objective can reference (hold, escort, destroy). */
-  | 'objective-marker';
+  | 'objective-marker'
+  | 'pickup'
+  | 'interactable'
+  | 'ambiance';
 
 export interface CustomMapPlacement {
   id: string;
@@ -1334,18 +1357,29 @@ export interface CustomMapPlacement {
   y: number;
   w: number;
   h: number;
+  mode?: 'permanent' | 'breakable' | 'cosmetic';
+  groupId?: string;
+  fromSec?: number;
+  toSec?: number;
+  ratePerSec?: number;
+  burst?: number;
 }
 
 export interface CustomMap {
+  mapFeature?: 'fractured-616' | 'glassroot-shrine';
+  version?: 2;
   id: string;
   name: string;
   bounds: { w: number; h: number };
   groundAssetId: string;
   landmarkAssetId: string | null;
+  landmarkPosition?: { x: number; y: number };
   placements: CustomMapPlacement[];
   durationSec: number;
   threat: AreaDef['threat'];
   backdrop: string;
+  sky?: AreaSky;
+  ambiance?: 'street-rain' | 'null-spores' | 'breach' | 'clear';
   updatedAt: number;
 }
 
@@ -1368,6 +1402,11 @@ export interface CustomMapAsset {
   markerRole?: 'hold' | 'destroy' | 'escort' | 'extract';
   /** beacon only: which `SectorStructureDef` this placement builds. */
   beaconId?: string;
+  /** Map pack props use one physics kind and choose artwork by this id. */
+  artAssetId?: string;
+  pickupKind?: string;
+  interactableKind?: 'relay' | 'root-anchor' | 'cache' | 'plate' | 'coil';
+  defaultMode?: CustomMapPlacement['mode'];
 }
 
 export type DistrictIncursionKind = 'flood-surge' | 'market-bell' | 'freight-arrival' | 'fountain-ritual';
@@ -1466,6 +1505,8 @@ export interface RunModifiers {
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';
+import type { DamageNumberStyle } from './data/damageNumbers';
+export type { DamageNumberStyle };
 export type CompanionRevealStyle = 'ambush' | 'classic';
 export type RuntimePerformanceTier = 'constrained-mobile' | 'standard-mobile' | 'high-mobile' | 'desktop';
 
@@ -2069,6 +2110,8 @@ export interface UIThemeDef {
   starter?: boolean;
   /** Secret until earned through a rare reload takeover or Dev Mode. */
   hidden?: boolean;
+  /** Reward from an authored in-world find, excluded from random cold-open reveals. */
+  findOnly?: true;
   /** Selectable accent recolors within this theme. Themes without swatches use their own fixed palette. */
   swatches?: UIThemeSwatchDef[];
 }
@@ -2127,7 +2170,8 @@ export type RunAuraStyle =
   | 'rain-signal'
   | 'glitch-echo'
   | 'mothlight'
-  | 'tile-bloom';
+  | 'tile-bloom'
+  | 'comet-trail';
 
 export interface RunAuraDef {
   id: string;
@@ -2140,7 +2184,7 @@ export interface RunAuraDef {
 }
 
 /** Floating headwear is deliberately presentation-only and does not change collision. */
-export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap' | 'antenna' | 'vinyl-disc';
+export type HatStyle = 'none' | 'top-hat' | 'halo' | 'crown' | 'satellite' | 'rain-cloud' | 'cone' | 'orbital-eye' | 'moth-cap' | 'antenna' | 'vinyl-disc' | 'paper-visor';
 export interface HatDef {
   id: string;
   name: string;
@@ -2216,6 +2260,8 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: GraphicsQuality;
+  /** How hit numbers look. 'classic' (default) is the original popup; see `data/damageNumbers.ts`. */
+  damageNumberStyle: DamageNumberStyle;
   /**
    * How the starter LokPet encounter reveals your first companion.
    * 'ambush' (default) has the companion leap in and strike alongside you
@@ -2396,6 +2442,16 @@ export interface MetaState {
   cardFrameSleeves: string[];
   /** Currently equipped card frame style. */
   selectedCardFrame: string;
+  /** Purchased card backs (see data/cardCosmetics.ts). `back-default` is always owned. */
+  ownedCardBackIds: string[];
+  /** Card back shown face-down while a pack is opened. */
+  selectedCardBack: string;
+  /** Purchased pack skins. `pack-classic` is always owned. */
+  ownedPackSkinIds: string[];
+  /** How the shop's pack tiles are drawn. */
+  selectedPackSkin: string;
+  /** How much the pack and card cosmetics move: tilt and shimmer (`full`), hover only (`subtle`) or still (`off`). */
+  cardMotion: 'full' | 'subtle' | 'off';
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */
@@ -2494,6 +2550,9 @@ export interface MetaState {
   /** Reward celebrations are selected independently from auras. */
   ownedCelebrationIds: string[];
   activeCelebrationId: string;
+  /** Drop art packs (render-only). The free Potato Pack is the original look. */
+  ownedDropPackIds: string[];
+  activeDropPackId: string;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */
@@ -2542,6 +2601,8 @@ export interface MetaState {
   pendingNotifications: PendingNotification[];
   /** Highest changelog version (see `data/changelog.ts`) the player has acknowledged via the update popup. */
   lastSeenChangelogVersion: string;
+  /** Which update categories may open an automatic notice on the hub. */
+  updatePopupKinds: Record<ChangelogKind, boolean>;
   /** Relic crafting materials gathered from runs, chests, and deep mines. */
   relicMaterials: Record<string, number>;
   /** Real relics crafted at the Workshop Forge that grant permanent/toggled run perks. */
@@ -2597,6 +2658,8 @@ export interface RunResult {
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;
   discoveryId?: string;
+  /** Finds are kept even when the player falls before the area clear. */
+  mapFindIds?: string[];
   newlyUnlockedCharacterIds: string[];
   loadout: {
     weapons: Array<{ id: string; name: string; level: number; kind: WeaponKind; color?: string }>;

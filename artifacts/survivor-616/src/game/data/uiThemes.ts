@@ -12,6 +12,11 @@ export interface UiLook {
  */
 export const UI_THEMES: UIThemeDef[] = [
   {
+    id: 'breach-616', name: 'Breach 616', tier: 'legendary', hidden: true, findOnly: true,
+    description: 'A fractured amber 616 plate floats beneath rain-blue panels and fine Null-root filaments.', cost: 0,
+    swatches: [{ id: 'rail-amber', name: 'Rail Amber', primaryHsl: '42 96% 63%' }, { id: 'root-cyan', name: 'Root Cyan', primaryHsl: '184 88% 67%' }, { id: 'spore-violet', name: 'Spore Violet', primaryHsl: '272 86% 74%' }],
+  },
+  {
     id: 'starter-beacon', name: 'Starter Beacon', tier: 'starter', starter: true,
     description: 'The welcoming 616 terminal: warm amber, clean cyan and a gentle broadcast glow.', cost: 0,
     swatches: [{ id: 'amber-boot', name: 'Amber Boot', primaryHsl: '32 95% 55%' }, { id: 'cyan-ping', name: 'Cyan Ping', primaryHsl: '188 96% 65%' }, { id: 'rose-key', name: 'Rose Key', primaryHsl: '344 90% 68%' }],
@@ -182,6 +187,12 @@ export const UI_THEMES: UIThemeDef[] = [
     cost: 6000,
     swatches: [{ id: 'lantern-orange', name: 'Lantern Orange', primaryHsl: '28 90% 62%' }, { id: 'paper-cream', name: 'Paper Cream', primaryHsl: '42 60% 88%' }, { id: 'ember-red', name: 'Ember Red', primaryHsl: '8 85% 62%' }],
   },
+  {
+    id: 'greenhouse-glass', name: 'Greenhouse Glass',
+    description: 'A humid conservatory behind fogged glass: slow condensation beads down every panel edge.',
+    cost: 6400,
+    swatches: [{ id: 'fern-green', name: 'Fern Green', primaryHsl: '150 60% 55%' }, { id: 'condensation-blue', name: 'Condensation Blue', primaryHsl: '195 55% 70%' }, { id: 'terracotta-pot', name: 'Terracotta Pot', primaryHsl: '18 65% 58%' }],
+  },
 ];
 
 export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(
@@ -191,7 +202,7 @@ export const UI_THEMES_BY_ID: Record<string, UIThemeDef> = Object.fromEntries(
 export const DEFAULT_UI_THEME_ID = 'house';
 
 export const STARTER_UI_THEME_IDS = UI_THEMES.filter((theme) => theme.starter).map((theme) => theme.id);
-export const HIDDEN_UI_THEME_IDS = UI_THEMES.filter((theme) => theme.hidden).map((theme) => theme.id);
+export const HIDDEN_UI_THEME_IDS = UI_THEMES.filter((theme) => theme.hidden && !theme.findOnly).map((theme) => theme.id);
 
 export function defaultSwatchId(themeId: string): string | undefined {
   return UI_THEMES_BY_ID[themeId]?.swatches?.[0]?.id;

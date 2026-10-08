@@ -184,6 +184,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .cosmetic-aura-glitch-echo::before { box-shadow: -10px 5px 0 -7px var(--accent), 10px -5px 0 -7px var(--aura); animation: cosmetic-glitch 1s steps(2) infinite; }
 .cosmetic-aura-mothlight::after { border-style: dotted; animation: cosmetic-spin 4s linear infinite; }
 .cosmetic-aura-tile-bloom::before { border-radius: 4px; animation: cosmetic-float 1.1s ease-in-out infinite; }
+.cosmetic-aura-comet-trail::after { border-style: dotted; border-color: var(--accent); animation: cosmetic-spin 1.8s linear infinite; }
 .cosmetic-hat-top-hat { top: 8px; transform: scaleX(1.5); color: #16131c; text-shadow: 0 0 3px var(--primary); }
 .cosmetic-hat-halo { top: 5px; color: #fde68a; animation: cosmetic-float 1.8s ease-in-out infinite; }
 .cosmetic-hat-crown { top: 6px; color: #fbbf24; animation: cosmetic-float 1.6s ease-in-out infinite; }
@@ -193,6 +194,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 .cosmetic-hat-moth-cap { top: 8px; color: #f0abfc; animation: cosmetic-float 1.5s ease-in-out infinite; }
 .cosmetic-hat-antenna { top: 2px; color: #fda4af; animation: cosmetic-float 1.4s ease-in-out infinite; }
 .cosmetic-hat-vinyl-disc { top: 6px; color: #d1d5db; animation: cosmetic-spin 2.6s linear infinite; }
+.cosmetic-hat-paper-visor { top: 6px; color: #e7dcc4; animation: cosmetic-float 1.6s ease-in-out infinite; }
 .cosmetic-celebration { top: 28%; animation: cosmetic-celebrate 900ms ease-out both; }
 @keyframes cosmetic-spin { to { transform: rotate(360deg); } }
 @keyframes cosmetic-float { 50% { transform: translateY(-7px); } }
@@ -321,6 +323,9 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='crown-static'][data-ui-swatch='ice-static'] { --primary: 192 100% 72%; --accent-foreground: 192 100% 72%; --ring: 192 100% 72%; }
 [data-ui-theme='midnight-reliquary'] { --background: 224 48% 5%; --foreground: 213 48% 96%; --card: 225 42% 9%; --card-foreground: 213 48% 96%; --primary: 196 100% 70%; --primary-foreground: 224 48% 5%; --secondary: 226 34% 14%; --secondary-foreground: 213 48% 96%; --muted: 226 28% 12%; --muted-foreground: 215 22% 66%; --accent: 196 65% 15%; --accent-foreground: 196 100% 70%; --border: 207 58% 35%; --input: 207 58% 35%; --ring: 196 100% 70%;  }
 [data-ui-theme='mirror-carnival'] { --background: 294 37% 6%; --foreground: 330 58% 97%; --card: 295 32% 11%; --card-foreground: 330 58% 97%; --primary: 337 100% 72%; --primary-foreground: 294 37% 6%; --secondary: 292 28% 16%; --secondary-foreground: 330 58% 97%; --muted: 292 22% 13%; --muted-foreground: 293 22% 68%; --accent: 337 65% 16%; --accent-foreground: 337 100% 72%; --border: 306 58% 36%; --input: 306 58% 36%; --ring: 337 100% 72%;  }
+[data-ui-theme='breach-616'] { --background: 216 39% 6%; --foreground: 190 42% 96%; --card: 213 34% 10%; --card-foreground: 190 42% 96%; --primary: 42 96% 63%; --primary-foreground: 216 39% 6%; --secondary: 210 29% 15%; --secondary-foreground: 190 42% 96%; --muted: 210 22% 13%; --muted-foreground: 190 19% 67%; --accent: 178 56% 15%; --accent-foreground: 184 88% 67%; --border: 186 43% 31%; --input: 186 43% 31%; --ring: 42 96% 63%; background-image: radial-gradient(circle at 78% 9%, hsl(171 80% 50% / .1), transparent 36%), linear-gradient(145deg, hsl(42 96% 63% / .035), transparent 46%); }
+[data-ui-theme='breach-616']::before { content: '616'; position: fixed; inset: 7% -4% auto auto; z-index: 0; pointer-events: none; font: 900 clamp(12rem, 42vw, 44rem)/1 sans-serif; letter-spacing: -.12em; color: hsl(42 96% 63% / .055); transform: rotate(-8deg); }
+[data-ui-theme='breach-616'][data-ui-swatch='root-cyan'] { --primary: 184 88% 67%; --ring: 184 88% 67%; }
 [data-ui-theme='midnight-reliquary'][data-ui-swatch='moon-violet'] { --primary: 267 100% 76%; --accent-foreground: 267 100% 76%; --ring: 267 100% 76%; }
 [data-ui-theme='midnight-reliquary'][data-ui-swatch='relic-gold'] { --primary: 45 100% 68%; --accent-foreground: 45 100% 68%; --ring: 45 100% 68%; }
 [data-ui-theme='mirror-carnival'][data-ui-swatch='electric-mint'] { --primary: 167 100% 67%; --accent-foreground: 167 100% 67%; --ring: 167 100% 67%; }
@@ -337,7 +342,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
    layer instead, which has no descendants to capture. */
 [data-ui-theme='midnight-reliquary']::before, [data-ui-theme='mirror-carnival']::before,
 [data-ui-theme='aurora-transit']::before, [data-ui-theme='chrome-vespers']::before,
-[data-ui-theme='paper-lantern']::before {
+[data-ui-theme='paper-lantern']::before, [data-ui-theme='greenhouse-glass']::before {
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
 }
 [data-ui-theme='midnight-reliquary']::before { background-image: radial-gradient(circle at 50% 100%, hsl(196 100% 68% / .16), transparent 48%); animation: reliquary-breathe 5.5s ease-in-out infinite; }
@@ -345,6 +350,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='aurora-transit']::before { background-image: conic-gradient(from 200deg at 50% 0%, hsl(168 90% 55% / .1), hsl(275 85% 60% / .1), hsl(190 60% 70% / .1), hsl(168 90% 55% / .1)); animation: aurora-drift-bg 12s linear infinite; }
 [data-ui-theme='chrome-vespers']::before { background-image: linear-gradient(160deg, hsl(35 90% 55% / .07), transparent 45%, hsl(255 55% 45% / .08)); animation: vespers-breathe 6s ease-in-out infinite; }
 [data-ui-theme='paper-lantern']::before { background-image: radial-gradient(circle at 50% 0%, hsl(28 90% 60% / .1), transparent 40%); animation: lantern-flicker 4.2s ease-in-out infinite; }
+[data-ui-theme='greenhouse-glass']::before { background-image: radial-gradient(circle at 30% 20%, hsl(150 60% 55% / .12), transparent 42%); animation: greenhouse-fog 7s ease-in-out infinite; }
 
 /* Night Drive: a cool, cinematic chrome that still uses the same UI tokens. */
 [data-ui-theme='night-drive'] {
@@ -611,9 +617,24 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 [data-ui-theme='paper-lantern'][data-ui-swatch='paper-cream'] { --primary: 42 60% 88%; --accent-foreground: 42 60% 88%; --ring: 42 60% 88%; }
 [data-ui-theme='paper-lantern'][data-ui-swatch='ember-red'] { --primary: 8 85% 62%; --accent-foreground: 8 85% 62%; --ring: 8 85% 62%; }
 
+/* Greenhouse Glass: a humid conservatory behind slow-fogging panes. */
+[data-ui-theme='greenhouse-glass'] {
+  --background: 150 24% 6%; --foreground: 140 28% 94%;
+  --card: 150 22% 10%; --card-foreground: 140 28% 94%; --card-border: 150 40% 28%;
+  --popover: 150 22% 10%; --popover-foreground: 140 28% 94%; --popover-border: 150 40% 28%;
+  --primary: 150 60% 55%; --primary-foreground: 150 24% 6%;
+  --secondary: 150 20% 16%; --secondary-foreground: 140 28% 94%;
+  --muted: 150 20% 13%; --muted-foreground: 140 16% 63%;
+  --accent: 150 50% 15%; --accent-foreground: 150 60% 55%;
+  --border: 150 40% 28%; --input: 150 40% 28%; --ring: 150 60% 55%;
+}
+[data-ui-theme='greenhouse-glass'][data-ui-swatch='condensation-blue'] { --primary: 195 55% 70%; --accent-foreground: 195 55% 70%; --ring: 195 55% 70%; }
+[data-ui-theme='greenhouse-glass'][data-ui-swatch='terracotta-pot'] { --primary: 18 65% 58%; --accent-foreground: 18 65% 58%; --ring: 18 65% 58%; }
+
 @keyframes aurora-drift-bg { to { filter: hue-rotate(30deg); } }
 @keyframes vespers-breathe { 50% { filter: brightness(1.1) saturate(1.08); } }
 @keyframes lantern-flicker { 0%, 100% { filter: brightness(1); } 38% { filter: brightness(0.94); } 52% { filter: brightness(1.08); } 70% { filter: brightness(0.97); } }
+@keyframes greenhouse-fog { 50% { opacity: 0.55; } }
 
 /* Small shop previews for palettes whose in-run glow is animated by Canvas2D. */
 @keyframes palette-preview-glow { 50% { filter: brightness(1.45); box-shadow: 0 0 10px currentColor; } }
@@ -656,6 +677,20 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
   pointer-events: none;
   background: repeating-linear-gradient(rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.16) 3px);
 }
+
+/*
+ * Low-profile scrollbar. Slim by default and tinted from --primary, so every
+ * data-ui-theme recolors it with no per-theme rules. Preferences live on
+ * <html data-scrollbar / data-scrollbar-tint> (see lib/scrollbar.ts).
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.35) transparent;
+}
+:root[data-scrollbar-tint='neutral'] * { scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent; }
+:root[data-scrollbar='standard'] * { scrollbar-width: auto; scrollbar-color: auto; }
+:root[data-scrollbar='hidden'] * { scrollbar-width: none; }
+:root[data-scrollbar='hidden'] *::-webkit-scrollbar { display: none; }
 
 @layer base {
   * {

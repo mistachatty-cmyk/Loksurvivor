@@ -30,9 +30,12 @@ import { toast } from '@/hooks/use-toast';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { DAMAGE_NUMBER_STYLES } from '@/game/data/damageNumbers';
 import { importForgeState } from '@/game/state/operatorForgeStore';
 import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
+import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
+import { CHANGELOG_KIND_META, CHANGELOG_KIND_ORDER } from '@/game/data/changelogKinds';
 import {
   DEV_ACCESS_TAPS_REQUIRED,
   DEV_RUN_TOOL_REGISTRY,
@@ -45,9 +48,13 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
+import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
+import { CREW_TALK_MODES, CREW_TALK_TONES, getCrewTalkMode, getCrewTalkTone, setCrewTalkMode, setCrewTalkTone, type CrewTalkMode } from '@/game/state/crewTalkSetting';
+import type { Tone } from '@/game/engine/crewTalk';
+import { HIDEOUT_NOTICE_SECONDS, getHideoutNoticeSeconds, setHideoutNoticeSeconds, type HideoutNoticeSeconds } from '@/game/state/hideoutNoticeSetting';
 import { FIGHT_STYLES, getFightStyle, setFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import {
   AUTO_LANGUAGE,
@@ -68,10 +75,20 @@ export interface SettingsPanelProps {
 const SETTINGS_DESTINATIONS = [
   { id: 'settings-language', label: 'Language', terms: 'translation device' },
   { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom fullscreen' },
+  { id: 'settings-ui-layout', label: 'UI layout', terms: 'new dock classic corners music mission briefing looks companion' },
   { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
   { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode' },
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
   { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
+  { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
+  { id: 'settings-scrollbar', label: 'Scrollbar', terms: 'scroll bar slim hidden' },
+  { id: 'settings-minimap', label: 'Minimap', terms: 'endless map radar' },
+  { id: 'settings-prop-launches', label: 'Prop launches', terms: 'physics clickable props' },
+  { id: 'settings-chaos', label: 'Chaos toggles', terms: 'invert mirror world palette cheat' },
+  { id: 'settings-wildlife', label: 'Wildlife', terms: 'birds fireflies weather' },
+  { id: 'settings-card-layout', label: 'Card layout', terms: 'grid list density' },
+  { id: 'settings-card-motion', label: 'Card motion', terms: 'pack wrapper card back frame tilt shimmer animation' },
+  { id: 'settings-panel-layout', label: 'Panel layout', terms: 'detail panel side bottom' },
   { id: 'settings-customization', label: 'Customization', terms: 'theme palette looks skins' },
   { id: 'settings-data', label: 'Save data', terms: 'backup export import progress forge' },
   { id: 'settings-advanced', label: 'Advanced', terms: 'developer dev mode' },
@@ -149,6 +166,40 @@ function LanguageSetting() {
   );
 }
 
+function CrewTalkSetting() {
+  const t = useT();
+  const [mode, setMode] = useState<CrewTalkMode>(getCrewTalkMode);
+  const [tone, setTone] = useState<Tone>(getCrewTalkTone);
+  const btn = (active: boolean) => `border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${active ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`;
+  return (
+    <div data-testid="settings-crew-talk">
+      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.crewTalk.title')}</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.crewTalk.description')}</p>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.crewTalk.title')}>
+        {CREW_TALK_MODES.map((entry) => (
+          <button key={entry} type="button" aria-pressed={mode === entry} className={btn(mode === entry)}
+            onClick={() => { setCrewTalkMode(entry); setMode(entry); }} data-testid={`button-crewtalk-mode-${entry}`}>
+            {t(`settings.crewTalk.mode.${entry}`)}
+          </button>
+        ))}
+      </div>
+      {mode === 'generated' ? (
+        <>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.crewTalk.toneDescription')}</p>
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={t('settings.crewTalk.toneTitle')}>
+            {CREW_TALK_TONES.map((entry) => (
+              <button key={entry} type="button" aria-pressed={tone === entry} className={btn(tone === entry)}
+                onClick={() => { setCrewTalkTone(entry); setTone(entry); }} data-testid={`button-crewtalk-tone-${entry}`}>
+                {t(`settings.crewTalk.tone.${entry}`)}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function FightStyleSetting() {
   const t = useT();
   const [style, setStyle] = useState<FightStyle>(getFightStyle);
@@ -212,15 +263,19 @@ function BuildingEntrySetting() {
 }
 
 export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelProps) {
+  const [noticeSeconds, setNoticeSeconds] = useState<HideoutNoticeSeconds>(getHideoutNoticeSeconds);
   const t = useT();
+  const chromeLayout = useUiChromeLayout();
   const {
     meta,
+    setUpdatePopupKind,
     setPhysicsObjectClicks,
     setLiveMode,
     setLootPresentation,
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
     setFogAmbianceMode,
@@ -230,6 +285,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setMinimapVisible,
     setMinimapExpanded,
     setUiDensity,
+    setCardMotion,
     setUiPanelLayout,
     buyUiTheme,
     equipUiTheme,
@@ -350,12 +406,54 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     <SettingsPager endgame={<EndgameSettings />} standard={
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
         <SettingsJumpNav />
+        <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-ui-layout">
+          <h2 className="text-xl font-black uppercase text-white">Hideout control layout</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">The new dock keeps Mission Briefing, Looks & LokPets, your companion, and music above the walking scene. Classic keeps the original corner positions.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
+          </div>
+        </section>
+        <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-update-notices">
+          <h2 className="text-xl font-black uppercase text-white">Update notices</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Choose which releases open a popup when you return to the hideout. Every release remains in Updates and the Archive, even when its popup is off.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {CHANGELOG_KIND_ORDER.map((kind) => {
+              const category = CHANGELOG_KIND_META[kind];
+              const enabled = meta.updatePopupKinds[kind];
+              return (
+                <div key={kind} className="flex items-start justify-between gap-4 border bg-background/50 p-4" style={{ borderColor: `${category.color}66` }}>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide" style={{ color: category.color }}>{category.label}</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{category.lore}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUpdatePopupKind(kind, !enabled)}
+                    aria-pressed={enabled}
+                    aria-label={`${category.label} popups`}
+                    className="min-h-10 shrink-0 border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-opacity hover:opacity-80"
+                    style={{ borderColor: enabled ? category.color : '#52525b', backgroundColor: enabled ? `${category.color}26` : 'transparent', color: enabled ? category.color : '#a1a1aa' }}
+                    data-testid={`button-toggle-${kind}-popup`}
+                  >
+                    {enabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
         <LanguageSetting />
         <div id="settings-accessibility" className="space-y-4 scroll-mt-24 lg:col-span-2">
           <UiTransparencyControls />
           <section className="border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
+          </section>
+          <section id="settings-scrollbar" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6">
+            <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>
+            <ScrollbarSetting />
           </section>
         </div>
         <section id="settings-display" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
@@ -388,6 +486,24 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
                 <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">{t('settings.damageNumbers.title')}</p>
+                  <div className="grid grid-cols-2 gap-1" role="group" aria-label={t('settings.damageNumbers.title')}>
+                    {DAMAGE_NUMBER_STYLES.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setDamageNumberStyle(option.id)}
+                        aria-pressed={meta.damageNumberStyle === option.id}
+                        className={`border p-2 uppercase ${meta.damageNumberStyle === option.id ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-damage-numbers-${option.id}`}
+                      >
+                        {t(`settings.damageNumbers.${option.id}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{t('settings.damageNumbers.description')}</p>
+                </div>
                 <div>
                   <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
                   <div className="grid grid-cols-3 gap-1">
@@ -878,6 +994,23 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                       </div>
                     </div>
                   ))}
+                  <CrewTalkSetting />
+                  <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.notice.title')}</h3>
+                  <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.notice.description')}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.notice.title')}>
+                    {HIDEOUT_NOTICE_SECONDS.map((seconds) => (
+                      <button
+                        key={seconds}
+                        type="button"
+                        onClick={() => { setHideoutNoticeSeconds(seconds); setNoticeSeconds(seconds); }}
+                        aria-pressed={noticeSeconds === seconds}
+                        className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${noticeSeconds === seconds ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'}`}
+                        data-testid={`button-hideout-notice-${seconds}`}
+                      >
+                        {t('settings.hideout.notice.seconds', { n: seconds })}
+                      </button>
+                    ))}
+                  </div>
                   <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.choice.title')}</h3>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.choice.description')}</p>
                   <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.choice.title')}>
@@ -1130,7 +1263,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
+        <section id="settings-minimap" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-cyan-200/40 bg-cyan-300/10 text-cyan-200">
               <Map className="h-5 w-5" />
@@ -1193,7 +1326,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
+        <section id="settings-prop-launches" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <MousePointer2 className="h-5 w-5" />
@@ -1237,7 +1370,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         </section>
 
         {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 || vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
-          <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
+          <section id="settings-chaos" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
                 <FlipVertical2 className="h-5 w-5" />
@@ -1318,7 +1451,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </section>
         ) : null}
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
+        <section id="settings-wildlife" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
               <Bird className="h-5 w-5" />
@@ -1351,7 +1484,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
+        <section id="settings-card-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-300/10 text-emerald-200">
               <LayoutDashboard className="h-5 w-5" />
@@ -1401,7 +1534,37 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
+        <section id="settings-card-motion" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-card-motion-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-300/10 text-fuchsia-200">
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-black uppercase text-white">{t('settings.cardMotion.title')}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.cardMotion.body')}</p>
+              <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label={t('settings.cardMotion.title')}>
+                {(['full', 'subtle', 'off'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setCardMotion(option)}
+                    aria-pressed={meta.cardMotion === option}
+                    className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.cardMotion === option
+                        ? 'border-fuchsia-300/60 bg-fuchsia-300/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid={`button-settings-card-motion-${option}`}
+                  >
+                    {t(`sleeve.motion.${option}` as const)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-panel-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <PanelRight className="h-5 w-5" />
