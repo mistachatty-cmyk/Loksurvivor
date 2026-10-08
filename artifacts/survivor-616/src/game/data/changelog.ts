@@ -935,6 +935,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'When music plays in the hideout, your LokPets now float little music emotes above their heads as they dance to the beat.',
     ],
   },
+  {
+    version: '0.21.6',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T00:10:00Z',
+    kind: 'update',
+    title: 'Forge, Smoother',
+    body: [
+      'The Forge no longer throws browser popups. Replace, discard, delete and restore prompts now appear as a bar inside the panel.',
+      'A new switch turns the replace and discard prompt off, so you can hammer Surprise me as fast as you like. Deleting and restoring always ask.',
+      'The Classic v1 / Detailed v2 switch moved to the top of the controls and is much bigger.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

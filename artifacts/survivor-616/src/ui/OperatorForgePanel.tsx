@@ -27,6 +27,8 @@ import { ClassicLokPetsTab } from './ClassicLokPetsTab';
 import { t } from '@/lib/i18n';
 import { CustomsRunSwitch, Switch } from './EndgameControls';
 
+const CONFIRM_KEY = 'survivor616.forge.confirm';
+
 const BUTTON =
   'min-h-10 border border-border bg-background px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary disabled:opacity-40';
 const PRIMARY =
@@ -88,6 +90,13 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const [codeText, setCodeText] = useState('');
   const [message, setMessage] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [confirmOn, setConfirmOnState] = useState(() => { try { return localStorage.getItem(CONFIRM_KEY) !== 'off'; } catch { return true; } });
+  const setConfirmOn = (next: boolean) => {
+    setConfirmOnState(next);
+    try { localStorage.setItem(CONFIRM_KEY, next ? 'on' : 'off'); } catch { /* storage is optional */ }
+    if (!next) setPending(null);
+  };
+  const [pending, setPending] = useState<{ text: string; ok: string; run: () => void } | null>(null);
   const [past, setPast] = useState<ForgeDraft[]>([]);
   const [future, setFuture] = useState<ForgeDraft[]>([]);
   const lastDraft = useRef<ForgeDraft>({ design, identity, kitId });
@@ -131,12 +140,18 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
   const notify = useCallback((text: string) => setMessage(text), []);
 
-  const confirmDiscard = () => !dirty || window.confirm('Discard unsaved Forge changes?');
-  const close = () => { if (confirmDiscard()) onClose(); };
+  /** Replacing unsaved work: runs now when there is nothing to lose or the prompt is switched off, else asks in-panel. */
+  const guardDirty = (text: string, ok: string, run: () => void) => {
+    if (!dirty || !confirmOn) { run(); return; }
+    setPending({ text, ok, run });
+  };
+  /** Deleting or restoring saved work always asks, whatever the toggle says. */
+  const askAlways = (text: string, ok: string, run: () => void) => setPending({ text, ok, run });
+  const close = () => guardDirty('Close the Forge and discard your unsaved changes?', 'Discard', onClose);
 
   const loadSeed = useCallback(
     (nextSeed: string, preset?: OperatorFlavor) => {
-      if (dirty && !window.confirm('Replace your unsaved Forge changes with a generated design?')) return;
+      const apply = () => {
       skipHistory.current = true;
       setPast([]);
       setFuture([]);
@@ -150,8 +165,10 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       setIdentity(generateOperatorIdentity(nextSeed, nextDesign));
       setEditingId(null);
       setDirty(true);
+      };
+      guardDirty('Replace your unsaved Forge changes with a generated design?', 'Replace', apply);
     },
-    [genFlavor, genSpecies, factionRaces, dirty, design.style],
+    [genFlavor, genSpecies, factionRaces, dirty, confirmOn, design.style],
   );
 
   const reroll = (target: RerollTarget) => {
@@ -266,8 +283,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     notify(made > 0 ? `Forged ${made} new operators with random kits. Reload to add them to your roster.` : 'Could not save any operators.');
   };
 
-  const edit = (op: ForgedOperator) => {
-    if (!confirmDiscard()) return;
+  const edit = (op: ForgedOperator) => guardDirty(`Load ${op.name} and discard your unsaved changes?`, 'Load', () => {
     skipHistory.current = true;
     setPast([]);
     setFuture([]);
@@ -279,15 +295,14 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     setSeed(op.id.replace(/^forge-/, ''));
     setDirty(false);
     notify(`Editing ${op.name}. Save to keep changes, or Save as new to make a copy. Reload afterwards to apply.`);
-  };
+  });
 
-  const remove = (op: ForgedOperator) => {
-    if (!window.confirm(`Delete ${op.name}? This removes the forged operator from this device.`)) return;
+  const remove = (op: ForgedOperator) => askAlways(`Delete ${op.name}? This removes the forged operator from this device.`, 'Delete', () => {
     deleteForgedOperator(op.id);
     if (editingId === op.id) setEditingId(null);
     refreshSaved();
     notify(`${op.name} deleted. Reload to update your roster.`);
-  };
+  });
 
   const duplicate = (op: ForgedOperator) => {
     const existing = new Set(loadForgedOperators().map((item) => item.id));
@@ -302,7 +317,8 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
   const revertEditing = () => {
     const original = saved.find((op) => op.id === editingId);
-    if (!original || !window.confirm(`Restore ${original.name} to its last saved design?`)) return;
+    if (!original) return;
+    askAlways(`Restore ${original.name} to its last saved design?`, 'Restore', () => {
     skipHistory.current = true;
     setPast([]);
     setFuture([]);
@@ -312,6 +328,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     setKitId(original.kitId);
     setDirty(false);
     notify(`${original.name} restored to the last saved version.`);
+    });
   };
 
   const copyCode = async (op: ForgedOperator) => {
@@ -371,6 +388,21 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
             <button type="button" onClick={close} className={BUTTON} data-testid="button-forge-close">Close</button>
           </div>
         </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground" data-testid="label-forge-confirm">
+            <input type="checkbox" checked={confirmOn} onChange={(e) => setConfirmOn(e.target.checked)} data-testid="toggle-forge-confirm" />
+            Ask before replacing unsaved changes (turn off to spam Surprise me)
+          </label>
+        </div>
+
+        {pending ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3 border border-amber-400/60 bg-amber-400/10 px-4 py-3 text-sm" role="alertdialog" aria-label="Confirm" data-testid="forge-confirm-bar">
+            <span className="min-w-0 flex-1">{pending.text}</span>
+            <button type="button" className={PRIMARY} onClick={() => { const run = pending.run; setPending(null); run(); }} data-testid="button-forge-confirm-ok">{pending.ok}</button>
+            <button type="button" className={BUTTON} onClick={() => setPending(null)} data-testid="button-forge-confirm-cancel">Cancel</button>
+          </div>
+        ) : null}
 
         {message ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 border border-primary/50 bg-primary/10 px-4 py-3 text-sm" role="status" data-testid="text-forge-message">
@@ -490,6 +522,27 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
           {/* Controls */}
           <div className="space-y-5">
+            <section className="border-2 border-primary bg-primary/10 p-4 shadow-lg" data-testid="section-forge-style">
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('forge.style.label')}>
+                <span className={LABEL}>{t('forge.style.label')}</span>
+                {(['classic', 'detailed'] as const).map((id) => {
+                  const active = (design.style ?? 'detailed') === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => { setDesign((current) => { const { style: _drop, ...rest } = current; return id === 'classic' ? { ...rest, style: 'classic' } : rest; }); setDirty(true); }}
+                      className={`min-h-12 border-2 px-5 py-2 font-mono text-sm font-bold uppercase tracking-widest ${active ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:text-white'}`}
+                      data-testid={`button-forge-style-${id}`}
+                    >
+                      {t(`forge.style.${id}` as const)}
+                    </button>
+                  );
+                })}
+              </div>
+              {design.style === 'classic' ? <p className="mt-2 text-xs text-muted-foreground">{t('forge.style.classicHint')}</p> : null}
+            </section>
             <nav className="flex flex-wrap gap-2 border border-border bg-card p-3" aria-label="Forge sections">
               {[['forge-generate', 'Generate'], ['forge-body', 'Body'], ['forge-palette', 'Palette'], ...FORGE_GROUPS.map((group) => [`forge-${group.toLowerCase().replace(/\s+/g, '-')}`, group]), ['forge-saved', 'Saved operators']].map(([id, label]) => (
                 <a key={id} href={`#${id}`} className="inline-flex min-h-10 items-center border border-border px-3 text-xs font-bold uppercase text-white hover:border-primary">{label}</a>
@@ -539,27 +592,6 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               </div>
             </section>
 
-            <section className="border border-border bg-card p-4" data-testid="section-forge-style">
-              <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('forge.style.label')}>
-                <span className={LABEL}>{t('forge.style.label')}</span>
-                {(['classic', 'detailed'] as const).map((id) => {
-                  const active = (design.style ?? 'detailed') === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => { setDesign((current) => { const { style: _drop, ...rest } = current; return id === 'classic' ? { ...rest, style: 'classic' } : rest; }); setDirty(true); }}
-                      className={`min-h-10 border px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest ${active ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:text-white'}`}
-                      data-testid={`button-forge-style-${id}`}
-                    >
-                      {t(`forge.style.${id}` as const)}
-                    </button>
-                  );
-                })}
-              </div>
-              {design.style === 'classic' ? <p className="mt-2 text-xs text-muted-foreground">{t('forge.style.classicHint')}</p> : null}
-            </section>
 
             <section id="forge-body" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-body">
               <div className="flex items-center justify-between gap-2">
