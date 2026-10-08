@@ -14,10 +14,14 @@
 import * as Tone from 'tone';
 
 import { findEffect } from './effects';
+import { DrumRack } from './drums';
+import { DEFAULT_MASTER_GAIN } from './engine';
 import { getBuffer } from './importer';
 import { findInstrument, triggerInstrument } from './instruments';
 import {
   parseProject,
+  drumEvents,
+  flattenTrackNotes,
   projectLengthBeats,
   secondsPerBeat,
   serializeProject,
@@ -49,15 +53,18 @@ export async function renderProjectToWav(project: StudioProject): Promise<Blob> 
 
   const rendered = await Tone.Offline(
     ({ transport }) => {
+      const hits = drumEvents(project);
+      const limiter = new Tone.Limiter(-1).toDestination();
+      const master = new Tone.Gain(DEFAULT_MASTER_GAIN).connect(limiter);
       for (const track of project.tracks) {
         if (!trackAudible(project, track)) continue;
 
-        const gain = new Tone.Gain(track.gain).toDestination();
-        const panner = new Tone.Panner(track.pan).connect(gain);
+        const panner = new Tone.Panner(track.pan).connect(master);
+        const gain = new Tone.Gain(track.gain).connect(panner);
 
         // Rebuild the insert chain in the same order the live graph uses, or
         // the export would not be the mix the player just heard.
-        let head: Tone.ToneAudioNode = panner;
+        let head: Tone.ToneAudioNode = gain;
         for (const effect of [...track.effects].reverse()) {
           const def = findEffect(effect.effectId);
           if (!def) continue;
@@ -74,7 +81,7 @@ export async function renderProjectToWav(project: StudioProject): Promise<Blob> 
           const instrument = findInstrument(track.instrumentId);
           const voice = instrument.create();
           voice.connect(head);
-          for (const note of track.notes) {
+          for (const note of flattenTrackNotes(track)) {
             const at = note.startBeat * beatSeconds;
             const duration = note.lengthBeats * beatSeconds;
             transport.schedule((time) => {
@@ -87,9 +94,20 @@ export async function renderProjectToWav(project: StudioProject): Promise<Blob> 
           const buffer = getBuffer(clip.bufferId);
           if (!buffer) continue;
           const player = new Tone.Player(buffer).connect(head);
+          player.volume.value = clip.gain === 0 ? -Infinity : 20 * Math.log10(clip.gain ?? 1);
+          player.fadeIn = clip.fadeInSeconds ?? 0;
+          player.fadeOut = clip.fadeOutSeconds ?? 0;
           const at = clip.startBeat * beatSeconds;
-          const length = Math.min(clip.lengthBeats * beatSeconds, buffer.duration);
-          transport.schedule((time) => player.start(time, 0, length), at);
+          const offset = Math.min(clip.sourceOffsetSeconds ?? 0, buffer.duration);
+          const length = Math.min(clip.lengthBeats * beatSeconds, buffer.duration - offset);
+          if (length > 0) transport.schedule((time) => player.start(time, offset, length), at);
+        }
+
+        const racks = new Map(project.kits.filter((kit) => track.drumClips.some((clip) => clip.kitId === kit.id)).map((kit) => [kit.id, new DrumRack(kit, head)]));
+        for (const hit of hits) {
+          if (hit.trackId !== track.id) continue;
+          const rack = racks.get(hit.kit.id);
+          if (rack) transport.schedule((time) => rack.trigger(hit.pad, time, hit.velocity), hit.beat * beatSeconds);
         }
       }
       transport.start(0);

@@ -126,3 +126,14 @@ test('Surge achievements complete at their thresholds and a survived Surge is co
   world.quirkSurgePhase = 1;
   assert.equal(buildResult(world).quirkSurgeSurvived, false);
 });
+
+test('drop pack achievements track owned and equipped packs', () => {
+  const fresh = createInitialMeta();
+  const byId = (id: string) => ACHIEVEMENTS.find((a) => a.id === id)!;
+  const packs = fresh.ownedDropPackIds;
+  assert.deepEqual(packs, ['potato']);
+  const some = { ...fresh, ownedDropPackIds: ['potato', 'pop-cut', 'blueprint'], activeDropPackId: 'blueprint' };
+  assert.equal(byId('pack-rat').isComplete(some), true);
+  assert.equal(byId('new-loot-look').isComplete(some), true);
+  assert.equal(byId('full-stash').isComplete(some), false);
+});

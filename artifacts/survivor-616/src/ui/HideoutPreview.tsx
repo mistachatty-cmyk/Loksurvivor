@@ -58,6 +58,7 @@ import {
 import type { BondRankId } from '@/game/engine/petGrowth';
 import { drawProp, PROP_HALF_WIDTH_UNITS, PROP_HEIGHT_UNITS } from '@/ui/hideoutPropArt';
 import { drawRig } from '@/game/render/sprite';
+import { hideoutNoticeMs } from '@/game/state/hideoutNoticeSetting';
 import type { EvolutionOverlayId, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
@@ -188,7 +189,7 @@ export function HideoutPreview({
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = window.setTimeout(() => setToast(null), 6500);
+    const timer = window.setTimeout(() => setToast(null), hideoutNoticeMs());
     return () => window.clearTimeout(timer);
   }, [toast]);
 
@@ -702,7 +703,7 @@ export function HideoutPreview({
           key={toast.key}
           role="status"
           aria-live="polite"
-          className="pointer-events-none absolute bottom-2 left-3 z-30 max-w-[min(26rem,calc(100%-12.5rem))] sm:max-w-[min(26rem,calc(100%-1.5rem))] border border-white/15 bg-black/70 px-3 py-1.5 text-white backdrop-blur-sm"
+          className={`pointer-events-none absolute left-3 z-30 max-w-[calc(100%-1.5rem)] border border-white/15 bg-black/85 px-3 py-1.5 text-white backdrop-blur-sm ${(interactive && nearProp) || eventChip ? 'bottom-16' : 'bottom-2'}`}
           data-testid="hideout-pet-event"
         >
           <p className="font-mono text-[9px] font-bold uppercase tracking-[.2em] text-pink-200">{toast.title}</p>

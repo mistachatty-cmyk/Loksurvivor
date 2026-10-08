@@ -18,7 +18,7 @@ import * as Tone from 'tone';
 import { TrackGraph } from './tracks';
 
 /** Master output level, before the analyser tap. */
-const DEFAULT_MASTER_GAIN = 0.85;
+export const DEFAULT_MASTER_GAIN = 0.85;
 /**
  * Matches `analysis.ts` so studio playback and soundtrack playback are analysed
  * identically -- the game must not react differently to the same audio.
@@ -31,6 +31,7 @@ export interface StudioEngine {
   readonly master: Tone.Gain;
   /** Tap for visualisers and for the shared beat analysis. */
   readonly analyser: AnalyserNode;
+  readonly limiter: Tone.Limiter;
   /** Owns the live nodes behind the project model. */
   readonly graph: TrackGraph;
   dispose(): void;
@@ -55,13 +56,16 @@ export function getStudioEngine(existing?: AudioContext | null): StudioEngine {
 
   const context = Tone.getContext().rawContext as unknown as AudioContext;
   const master = new Tone.Gain(DEFAULT_MASTER_GAIN);
+  const limiter = new Tone.Limiter(-1).toDestination();
   const analyser = context.createAnalyser();
   analyser.fftSize = ANALYSER_FFT_SIZE;
+  const meterSink = context.createGain();
+  meterSink.gain.value = 0;
 
-  // master -> analyser -> speakers. The analyser is a pass-through, so the tap
-  // costs nothing audible.
-  master.connect(Tone.getDestination());
+  // The analyser reads the input to the limiter, including overload peaks.
+  master.connect(limiter);
   Tone.connect(master, analyser);
+  analyser.connect(meterSink).connect(context.destination);
 
   const graph = new TrackGraph(master);
 
@@ -69,11 +73,14 @@ export function getStudioEngine(existing?: AudioContext | null): StudioEngine {
     context,
     master,
     analyser,
+    limiter,
     graph,
     dispose() {
       graph.dispose();
       master.dispose();
+      limiter.dispose();
       analyser.disconnect();
+      meterSink.disconnect();
       engine = null;
     },
   };

@@ -12,6 +12,7 @@ import { ENEMY_QUIRKS, QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } from './ene
 import { LOKPET_VARIANTS } from './lokPets';
 import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
 import { RENTABLE_GENERATORS } from './generators';
+import { DEFAULT_DROP_PACK_ID, DROP_PACKS } from './dropPacks';
 
 export interface AchievementReward {
   kind: 'cred' | 'lootTokens' | 'cardCredits';
@@ -242,6 +243,32 @@ const RAW_ACHIEVEMENTS: RawAchievement[] = [
     isComplete: (meta) => RENTABLE_GENERATORS.length > 0 && meta.ownedGeneratorIds.length >= RENTABLE_GENERATORS.length,
     progress: (meta) => ratio(meta.ownedGeneratorIds.length, RENTABLE_GENERATORS.length),
     reward: { kind: 'cred', amount: 300 },
+  },
+  {
+    id: 'new-loot-look',
+    name: 'New Loot Look',
+    description: 'Equip any drop pack other than the Potato Pack.',
+    tier: 'bronze',
+    isComplete: (meta) => meta.activeDropPackId !== DEFAULT_DROP_PACK_ID,
+    reward: { kind: 'cred', amount: 50 },
+  },
+  {
+    id: 'pack-rat',
+    name: 'Pack Rat',
+    description: 'Own three drop packs.',
+    tier: 'silver',
+    isComplete: (meta) => meta.ownedDropPackIds.length >= 3,
+    progress: (meta) => ratio(meta.ownedDropPackIds.length, 3),
+    reward: { kind: 'cred', amount: 200 },
+  },
+  {
+    id: 'full-stash',
+    name: 'Full Stash',
+    description: 'Own every drop pack.',
+    tier: 'gold',
+    isComplete: (meta) => meta.ownedDropPackIds.length >= DROP_PACKS.length,
+    progress: (meta) => ratio(meta.ownedDropPackIds.length, DROP_PACKS.length),
+    reward: { kind: 'cred', amount: 500 },
   },
   {
     id: 'sealed-no-more',
@@ -654,7 +681,7 @@ const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'soulbound': 'lokpet', 'five-names': 'lokpet', 'pet-level-20': 'lokpet', 'pet-level-50': 'lokpet',
   'sealed-no-more': 'cards', 'triple-stamped': 'cards', 'first-holo': 'cards', 'passive-powerhouse': 'cards',
   'half-the-deck': 'cards', 'complete-collector': 'cards', 'director-cut': 'combat',
-  'passive-income': 'economy',
+  'passive-income': 'economy', 'new-loot-look': 'economy', 'pack-rat': 'economy', 'full-stash': 'economy',
   'surge-glyph-reader': 'world', 'surge-first': 'combat', 'surge-10': 'combat', 'surge-50': 'combat', 'victory-lap-reached': 'world',
   'gen-floor-cleared': 'world', 'gen-warden-down': 'combat', 'gen-six-styles': 'bestiary', 'gen-full-roster': 'bestiary',
   'quirk-everywhere-run': 'combat', 'quirk-everywhere-run-10': 'combat', 'quirk-taken-run': 'combat', 'quirk-taken-run-10': 'combat',

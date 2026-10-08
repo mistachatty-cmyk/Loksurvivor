@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CloudRain, Flame, LayoutGrid, Lock, Palette, Radar, ScanLine, Sparkles } from 'lucide-react';
+import { Check, CloudRain, Gem, Flame, LayoutGrid, Lock, Palette, Radar, ScanLine, Sparkles, Star } from 'lucide-react';
 
 import { RUN_AURAS } from '@/game/data/runAuras';
 import { HATS, getHatStyle } from '@/game/data/hats';
 import { CELEBRATIONS, getCelebrationStyle } from '@/game/data/celebrations';
+import { DROP_PACKS } from '@/game/data/dropPacks';
+import { DropPackPreview } from './DropPackPreview';
 import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
 import { getCharacter } from '@/game/data/characters';
@@ -52,6 +54,7 @@ const AURA_ICONS = {
   'glitch-echo': ScanLine,
   mothlight: Sparkles,
   'tile-bloom': LayoutGrid,
+  'comet-trail': Star,
 } satisfies Record<RunAuraStyle, typeof Sparkles>;
 
 const EFFECT_PREVIEW_CLASSES = {
@@ -69,7 +72,7 @@ const TIER_BADGE_CLASS = {
   legendary: 'border-amber-400/50 text-amber-300',
 } satisfies Record<CosmeticTier, string>;
 
-type ShopCategory = 'palettes' | 'auras' | 'hats' | 'celebrations';
+type ShopCategory = 'palettes' | 'auras' | 'hats' | 'celebrations' | 'drops';
 
 interface Props { onBack: () => void }
 
@@ -81,6 +84,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
         ['auras', 'Run auras', Sparkles],
         ['hats', 'Floating hats', Sparkles],
         ['celebrations', 'Celebrations', Sparkles],
+        ['drops', 'Drop packs', Gem],
       ] as const).map(([id, label, Icon]) => (
         <button
           key={id}
@@ -99,7 +103,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
 }
 
 export function PaletteGalleryPanel({ onBack }: Props) {
-  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
+  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
   // LokToken-only applies per palette, and only once the live catalog actually lists it. Until then
@@ -140,6 +144,13 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     }
   }, [ownedSkus, meta.ownedPaletteIds, grantPalette]);
 
+  // A drop pack bought on another device follows the account too.
+  useEffect(() => {
+    for (const pack of DROP_PACKS) {
+      if (ownedSkus.has(catalogSku('dropPack', pack.id)) && !meta.ownedDropPackIds.includes(pack.id)) grantDropPack(pack.id);
+    }
+  }, [ownedSkus, meta.ownedDropPackIds, grantDropPack]);
+
   const primeShowing = takeoverActive || flickerActive;
   const vendorRig = primeShowing ? PRIME.rig : ARTISAN_VALOR_RIG;
   const vendorName = primeShowing ? PRIME.name : 'Artisan Valor';
@@ -166,6 +177,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
         if (result.ok || result.error === 'already_owned') {
           grantPalette(palette.id);
           sfx.play('purchase');
+          setPreviewPaletteId(palette.id);
           triggerReaction(`${palette.name} purchased for ${result.price ?? price} LokTokens.`);
         } else if (result.error === 'insufficient') {
           setNotice(`Not enough LokTokens -- ${result.need ?? price} more needed.`);
@@ -182,19 +194,59 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     if (meta.lootTokens < palette.cost) return;
     buyPalette(palette.id);
     sfx.play('purchase');
+    setPreviewPaletteId(palette.id);
     triggerReaction(`${palette.name} purchased for ${palette.cost} loot token${palette.cost === 1 ? '' : 's'}.`);
   };
+
+  const handleBuyDropPack = (packId: string) => {
+    const pack = DROP_PACKS.find((entry) => entry.id === packId);
+    if (!pack || meta.ownedDropPackIds.includes(pack.id)) return;
+    if (!signedIn) {
+      setNotice('Drop packs are sold for LokTokens. Sign in from the Account room to earn and spend them.');
+      return;
+    }
+    const price = dropPackPrice(pack);
+    void spend(catalogSku('dropPack', pack.id)).then((result) => {
+      if (result.ok || result.error === 'already_owned') {
+        grantDropPack(pack.id);
+        sfx.play('purchase');
+        triggerReaction(`${pack.name} purchased for ${result.price ?? price} LokTokens.`);
+      } else if (result.error === 'insufficient') {
+        setNotice(`Not enough LokTokens -- ${result.need ?? price} more needed.`);
+      } else if (result.error === 'rank_locked') {
+        setNotice(`${pack.name} needs the ${result.requires} rank.`);
+      } else if (result.error === 'unknown_item') {
+        setNotice(`${pack.name} is not on sale yet.`);
+      } else {
+        setNotice("Couldn't complete the purchase. You were not charged.");
+      }
+    });
+  };
+  const dropPackPrice = (pack: (typeof DROP_PACKS)[number]) =>
+    priceOf(catalogSku('dropPack', pack.id)) ?? LOKTOKEN_PRICE_BY_TIER[pack.tier] ?? LOKTOKEN_PRICE_BY_TIER.standard!;
 
   const handleBuyAura = (auraId: string) => {
     const aura = RUN_AURAS.find((entry) => entry.id === auraId);
     if (!aura || meta.ownedRunAuraIds.includes(aura.id) || meta.lootTokens < aura.cost) return;
     buyRunAura(aura.id);
     sfx.play('purchase');
+    setPreviewAuraId(aura.id);
     triggerReaction(`${aura.name} purchased for ${aura.cost} loot token${aura.cost === 1 ? '' : 's'}.`);
   };
   const buyCosmetic = (id: string, kind: 'hat' | 'celebration') => {
     sfx.play('purchase');
-    if (kind === 'hat') buyHat(id); else buyCelebration(id);
+    if (kind === 'hat') {
+      const hat = HATS.find((entry) => entry.id === id);
+      buyHat(id);
+      setPreviewHatId(id);
+      if (hat) triggerReaction(`${hat.name} purchased for ${hat.cost} loot token${hat.cost === 1 ? '' : 's'}.`);
+    } else {
+      const celebration = CELEBRATIONS.find((entry) => entry.id === id);
+      buyCelebration(id);
+      setPreviewCelebrationId(id);
+      setCelebrationKey((key) => key + 1);
+      if (celebration) triggerReaction(`${celebration.name} purchased for ${celebration.cost} loot token${celebration.cost === 1 ? '' : 's'}.`);
+    }
   };
 
   const previewWorldPalette = previewPaletteId === 'default' ? undefined : THEMED_PALETTES.find((palette) => palette.id === previewPaletteId)?.palette;
@@ -212,7 +264,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);
-  const categoryLength = category === 'palettes' ? THEMED_PALETTES.length : category === 'auras' ? RUN_AURAS.length : category === 'hats' ? HATS.length : CELEBRATIONS.length;
+  const categoryLength = category === 'palettes' ? THEMED_PALETTES.length : category === 'auras' ? RUN_AURAS.length : category === 'hats' ? HATS.length : category === 'drops' ? DROP_PACKS.length : CELEBRATIONS.length;
 
   return (
     <ScreenLayout title="Customization Shop" subtitle={`${vendorName} — Paint Gallery`} onBack={onBack}>
@@ -242,12 +294,12 @@ export function PaletteGalleryPanel({ onBack }: Props) {
               {category === 'palettes' ? <Palette className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">{category === 'palettes' ? 'World & character colors' : category === 'auras' ? 'Procedural run effects' : category === 'hats' ? 'Floating headwear' : 'Reward reveal effects'}</p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Run auras' : category === 'hats' ? 'Hover hats' : 'Celebrations'}</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">{category === 'palettes' ? 'World & character colors' : category === 'auras' ? 'Procedural run effects' : category === 'hats' ? 'Floating headwear' : category === 'drops' ? 'Gems, coins, chests & materials' : 'Reward reveal effects'}</p>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Run auras' : category === 'hats' ? 'Hover hats' : category === 'drops' ? 'Drop packs' : 'Celebrations'}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                 {category === 'palettes'
                   ? 'Recolor your fighter, weapon effects, and world accents. Palettes are sold for LokTokens where the store is open (earned by playing, shared across every LOK game). Nothing here changes combat power.'
-                  : category === 'auras' ? 'Add a lightweight Canvas2D effect around your fighter. Auras use your active palette and never alter hitboxes or stats.' : category === 'hats' ? 'Equip a hovering cosmetic above your fighter. It stays visual-only and never blocks the arena.' : 'Choose the burst that plays when you open a reward. Tap a card to play it on Valor before equipping it.'}
+                  : category === 'auras' ? 'Add a lightweight Canvas2D effect around your fighter. Auras use your active palette and never alter hitboxes or stats.' : category === 'hats' ? 'Equip a hovering cosmetic above your fighter. It stays visual-only and never blocks the arena.' : category === 'drops' ? 'Change how every drop looks in a run. Potato Pack is the original look and is free; the rest are sold for LokTokens. Display only: drops, rewards and the magnet never change. Performance graphics always uses Potato.' : 'Choose the burst that plays when you open a reward. Tap a card to play it on Valor before equipping it.'}
               </p>
 
               {category === 'palettes' ? (
@@ -274,7 +326,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                         <p className="mt-2 min-h-12 text-xs leading-relaxed text-muted-foreground">{palette.description}</p>
                         <button type="button" onClick={() => setPreviewPaletteId(palette.id)} aria-pressed={previewPaletteId === palette.id} className={`mt-3 w-full border px-3 py-1.5 font-mono text-[8px] font-bold uppercase tracking-widest ${previewPaletteId === palette.id ? 'border-white/50 bg-white/10 text-white' : 'border-white/15 text-white/70 hover:border-white/40'}`} data-testid={`button-preview-palette-${palette.id}`}>{previewPaletteId === palette.id ? 'Previewing on Valor' : 'Preview on Valor'}</button>
                         {owned ? (
-                          <button type="button" onClick={() => { equipPalette(palette.id); setNotice(`${palette.name} equipped.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-palette-${palette.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
+                          <button type="button" onClick={() => { equipPalette(palette.id); setPreviewPaletteId(palette.id); setNotice(`${palette.name} equipped.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-palette-${palette.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
                         ) : (
                           <button type="button" onClick={() => handleBuyPalette(palette.id)} disabled={lokOnly ? signedIn && !affordable : !affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable || (lokOnly && !signedIn) ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-palette-${palette.id}`}>
                             {!affordable ? <Lock className="h-3 w-3" /> : null}
@@ -305,10 +357,38 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                         <p className="mt-2 min-h-12 text-xs leading-relaxed text-muted-foreground">{aura.description}</p>
                         <button type="button" onClick={() => setPreviewAuraId(aura.id)} className="mt-3 w-full border border-white/20 px-3 py-1.5 font-mono text-[8px] uppercase tracking-widest text-white/80">Preview on Valor</button>
                         {owned ? (
-                          <button type="button" onClick={() => { equipRunAura(aura.id); setNotice(`${aura.name} equipped for your next run.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-aura-${aura.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
+                          <button type="button" onClick={() => { equipRunAura(aura.id); setPreviewAuraId(aura.id); setNotice(`${aura.name} equipped for your next run.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-aura-${aura.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
                         ) : (
                           <button type="button" onClick={() => handleBuyAura(aura.id)} disabled={!affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-aura-${aura.id}`}>
                             {!affordable ? <Lock className="h-3 w-3" /> : null}{affordable ? `Buy · ${aura.cost} token${aura.cost === 1 ? '' : 's'}` : `Need ${aura.cost} tokens`}
+                          </button>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : category === 'drops' ? (
+                <div className="mt-5 grid grid-cols-1 gap-2 sm:gap-3 xl:grid-cols-2" data-testid="shop-drops-grid">
+                  {DROP_PACKS.map((pack) => {
+                    const owned = hasCatalogItem(meta, 'dropPacks', pack.id, meta.ownedDropPackIds);
+                    const equipped = meta.activeDropPackId === pack.id;
+                    const price = dropPackPrice(pack);
+                    const affordable = signedIn && (lokBalance ?? 0) >= price;
+                    return (
+                      <article key={pack.id} className={`border p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`} data-testid={`card-drop-pack-${pack.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-sm font-black uppercase tracking-wide text-white">{pack.name}</h3>
+                          {equipped ? <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Equipped" /> : null}
+                        </div>
+                        <span className={`mt-2 inline-block border px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest ${pack.id === 'potato' ? 'border-white/15 text-white/65' : TIER_BADGE_CLASS[pack.tier]}`}>{pack.id === 'potato' ? 'free' : pack.tier}</span>
+                        <div className="mt-3"><DropPackPreview style={pack.style} label={`${pack.name} sample drops`} /></div>
+                        <p className="mt-2 min-h-12 text-xs leading-relaxed text-muted-foreground">{pack.description}</p>
+                        {owned ? (
+                          <button type="button" onClick={() => { equipDropPack(pack.id); setNotice(`${pack.name} equipped for your next run.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-drop-pack-${pack.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
+                        ) : (
+                          <button type="button" onClick={() => handleBuyDropPack(pack.id)} disabled={signedIn && !affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable || !signedIn ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-drop-pack-${pack.id}`}>
+                            {signedIn && !affordable ? <Lock className="h-3 w-3" /> : null}
+                            {!signedIn ? `${price} LokTokens · sign in` : affordable ? `Buy · ${price} LokTokens` : `Need ${price} LokTokens`}
                           </button>
                         )}
                       </article>
@@ -327,7 +407,11 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                       if (isHat) setPreviewHatId(item.id);
                       else { setPreviewCelebrationId(item.id); setCelebrationKey((key) => key + 1); }
                     };
-                    const equip = () => isHat ? equipHat(item.id) : equipCelebration(item.id);
+                    const equip = () => {
+                      if (isHat) { equipHat(item.id); setPreviewHatId(item.id); }
+                      else { equipCelebration(item.id); setPreviewCelebrationId(item.id); setCelebrationKey((key) => key + 1); }
+                      setNotice(`${item.name} equipped.`);
+                    };
                     return (
                       <article key={item.id} className={`border p-4 ${equipped ? 'border-primary bg-primary/5' : 'border-border bg-background'}`}>
                         <h3 className="text-sm font-black uppercase tracking-wide text-white">{item.name}</h3>
@@ -340,7 +424,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                   })}
                 </div>
               )}
-              {visibleCount < categoryLength ? <button type="button" onClick={() => setVisibleCount((count) => Math.min(categoryLength, count + 8))} className="mt-4 w-full border border-primary/40 bg-primary/5 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Show 8 more · {categoryLength - visibleCount} remaining</button> : null}
+              {category !== 'drops' && visibleCount < categoryLength ? <button type="button" onClick={() => setVisibleCount((count) => Math.min(categoryLength, count + 8))} className="mt-4 w-full border border-primary/40 bg-primary/5 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Show 8 more · {categoryLength - visibleCount} remaining</button> : null}
             </div>
           </div>
         </section>

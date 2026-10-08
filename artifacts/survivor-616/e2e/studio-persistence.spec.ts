@@ -28,6 +28,8 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test.setTimeout(90_000);
+
 test('migrates the legacy project document into IndexedDB', async ({ page }) => {
   await page.addInitScript((storageKey) => {
     localStorage.setItem(
@@ -54,18 +56,18 @@ test('migrates the legacy project document into IndexedDB', async ({ page }) => 
     );
   }, STUDIO_STORAGE_KEY);
 
-  await page.goto('/?screen=studio');
+  await page.goto('/?screen=studio', { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('input-studio-name')).toHaveValue('Legacy basement beat');
   await expect(page.getByTestId('text-studio-persistence')).toContainText('saved on this device');
 
   await page.evaluate((storageKey) => localStorage.removeItem(storageKey), STUDIO_STORAGE_KEY);
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('input-studio-name')).toHaveValue('Legacy basement beat');
   await expect(page.getByTestId('text-studio-persistence')).toContainText('saved on this device');
 });
 
 test('restores an imported owned source and its arrangement after reload', async ({ page }) => {
-  await page.goto('/?screen=studio');
+  await page.goto('/?screen=studio', { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('text-studio-persistence')).toContainText('saved on this device');
 
   await page.getByTestId('input-studio-audio').setInputFiles({
@@ -90,7 +92,45 @@ test('restores an imported owned source and its arrangement after reload', async
   });
   expect(stores).toEqual(expect.arrayContaining(['tracks', 'media-assets', 'studio-projects']));
 
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('list-studio-clips')).toContainText('restore me');
   await expect(page.getByTestId('text-studio-persistence')).toContainText('1 sources restored');
+});
+
+test('creates, renames, duplicates, deletes, and reopens local projects', async ({ page }) => {
+  await page.goto('/?screen=studio', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('text-studio-persistence')).toContainText('saved on this device');
+
+  await page.getByTestId('input-studio-name').fill('Original beat');
+  await page.waitForTimeout(450);
+  await page.getByTestId('button-studio-projects').click();
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(1);
+
+  await page.getByTestId('button-studio-new-project').click();
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Untitled');
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(2);
+
+  await page.getByLabel('Rename Original beat').locator('..').getByRole('button', { name: 'Open' }).click();
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Original beat');
+
+  await page.getByLabel('Duplicate Original beat').click();
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Original beat Copy');
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(3);
+
+  const duplicateName = page.getByLabel('Rename Original beat Copy');
+  await duplicateName.fill('Remix branch');
+  await duplicateName.press('Enter');
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Remix branch');
+
+  await page.getByLabel('Delete Original beat').click();
+  await page
+    .getByRole('group', { name: 'Confirm deletion of Original beat' })
+    .getByRole('button', { name: 'Delete' })
+    .click();
+  await expect(page.getByTestId('list-studio-projects').locator('article')).toHaveCount(2);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('input-studio-name')).toHaveValue('Remix branch');
+  await page.getByTestId('button-studio-projects').click();
+  await expect(page.getByLabel('Rename Remix branch')).toHaveValue('Remix branch');
 });

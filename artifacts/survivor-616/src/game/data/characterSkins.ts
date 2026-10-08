@@ -1,6 +1,6 @@
 import type { CharacterDef, SpritePalette } from '@/game/types';
 
-export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'cel-broadcast' | 'episode' | 'ember-guard' | 'moon-runner';
+export type CharacterSkinStyle = 'original' | 'nocturne' | 'countertone' | 'cel-broadcast' | 'riso-print' | 'episode' | 'ember-guard' | 'moon-runner';
 
 export interface CharacterSkinDef {
   id: string;
@@ -61,6 +61,18 @@ function paletteVariant(base: SpritePalette, style: CharacterSkinStyle, seed: nu
     skin: mixColor(base.skin, '#fff4e0', 0.35),
     glow: mixColor(hot, '#ffffff', 0.25),
   };
+  if (style === 'riso-print') return {
+    // Risograph poster print: two flat offset-ink layers (cool + hot) over
+    // a warm paper ground, with no true black and a slightly misregistered
+    // accent standing in for a printer's registration drift.
+    ink: mixColor(base.ink, hot, 0.3),
+    body: mixColor('#f3ead6', cool, 0.45),
+    bodyDark: mixColor(base.bodyDark, cool, 0.4),
+    accent: mixColor(hot, '#f3ead6', 0.2),
+    accentBright: mixColor(hot, '#ffffff', 0.3),
+    skin: mixColor(base.skin, '#f3ead6', 0.4),
+    glow: mixColor(cool, hot, 0.5),
+  };
   if (style === 'ember-guard') return {
     ink: mixColor(base.ink, '#1c0806', 0.5), body: mixColor(base.body, '#8e301e', 0.55),
     bodyDark: mixColor(base.bodyDark, '#301015', 0.55), accent: mixColor(base.accent, '#ffae51', 0.75),
@@ -93,6 +105,7 @@ export function getCharacterSkins(character: CharacterDef): CharacterSkinDef[] {
     { style: 'nocturne', name: 'Nocturne', description: 'A cool late-night version of the original look.', episodeRequired: false },
     { style: 'countertone', name: 'Countertone', description: 'A loud complementary remix unique to this fighter.', episodeRequired: false },
     { style: 'cel-broadcast', name: 'Cel Broadcast', description: 'A hand-inked anime rebroadcast — flat saturated color and a blown-out rim light.', episodeRequired: false },
+    { style: 'riso-print', name: 'Riso Print', description: 'A two-color risograph poster run on warm paper, slightly misregistered.', episodeRequired: false },
     { style: 'episode', name: 'Afterstory', description: 'The personal colorway earned by completing this character’s episode.', episodeRequired: true },
     { style: 'ember-guard', name: 'Ember Guard', description: 'Earned by rescuing three crew. Warm copper and firelight.', episodeRequired: false, crewRequired: 3 },
     { style: 'moon-runner', name: 'Moon Runner', description: 'Earned by rescuing eight crew. Cool midnight and moonlight.', episodeRequired: false, crewRequired: 8 },

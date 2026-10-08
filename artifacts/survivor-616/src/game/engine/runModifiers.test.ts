@@ -5,7 +5,7 @@ import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { HORDE_SPIN_TIERS } from '@/game/data/hordeSpin';
 import { DISTRICT_INCURSIONS_BY_ID } from '@/game/data/incursions';
-import { createWorld, hudSnapshot, MILLION_HORDE_MAX_POPULATION, NORMAL_ENEMY_CAP, stepWorld, UNLEASHED_ENEMY_CAP } from '@/game/engine/world';
+import { createWorld, damageEnemy, hudSnapshot, MILLION_HORDE_MAX_POPULATION, NORMAL_ENEMY_CAP, stepWorld, UNLEASHED_ENEMY_CAP } from '@/game/engine/world';
 import { normalizeMeta } from '@/game/state/metaStore';
 import type { AreaDef, WaveDef } from '@/game/types';
 
@@ -90,7 +90,7 @@ test('unleashedMode survives save normalization and rejects non-boolean lookalik
   assert.equal(normalizeMeta({ version: 15, runModifiers: { unleashedMode: 'true' } }).runModifiers.unleashedMode, undefined);
 });
 
-test('millionHordeMode represents millions while bounding allocated actors to the device tier', () => {
+test('millionHordeMode holds millions of real members while bounding allocated actors to the device tier', () => {
   const area = areaWithWave(immediateWave);
   const character = CHARACTERS[0]!;
   const world = createWorld(area, character, character.stats, 1, [], 1, true, null, {
@@ -100,13 +100,15 @@ test('millionHordeMode represents millions while bounding allocated actors to th
   });
   world.player.invulnUntil = Number.POSITIVE_INFINITY;
   world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < 10; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  for (let i = 0; i < 60; i += 1) stepWorld(world, 1 / 30, neutralInput);
 
   const horde = hudSnapshot(world).millionHorde;
-  assert.ok(horde, 'Million Horde should publish its represented population');
+  assert.ok(horde, 'Million Horde should publish its population');
   assert.equal(world.enemies.length, 120, 'a compatibility phone must never allocate beyond its actor budget');
   assert.equal(horde.liveActors, 120);
-  assert.ok(horde.population > 1_000_000, 'the mode should cross a million represented enemies without a million actor objects');
+  assert.ok(world.hordeField, 'the crowd lives in a real per-member field');
+  assert.equal(horde.population, world.hordeField.count + 120, 'every counted enemy is a real member or a live actor');
+  assert.ok(horde.population > 1_000_000, 'the mode should cross a million enemies without a million actor objects');
 });
 
 test('millionHordeMode survives save normalization and rejects non-boolean lookalikes', () => {
@@ -114,7 +116,7 @@ test('millionHordeMode survives save normalization and rejects non-boolean looka
   assert.equal(normalizeMeta({ version: 15, runModifiers: { millionHordeMode: 'true' } }).runModifiers.millionHordeMode, undefined);
 });
 
-test('millionHordeMode collapses extreme custom spawn rates into one bounded aggregate', () => {
+test('millionHordeMode bounds spawn cost per step and fills the field to its device-tier capacity', () => {
   const area = areaWithWave({ ...immediateWave, ratePerSec: 1_000_000 });
   const character = CHARACTERS[0]!;
   const world = createWorld(area, character, character.stats, 1, [], 1, true, null, {
@@ -125,9 +127,75 @@ test('millionHordeMode collapses extreme custom spawn rates into one bounded agg
   world.player.invulnUntil = Number.POSITIVE_INFINITY;
   world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
   stepWorld(world, 1 / 30, neutralInput);
+  assert.ok(world.hordeField!.count <= 40_960 + 2048, 'one step may only add a bounded batch of members');
 
+  for (let i = 0; i < 120; i += 1) stepWorld(world, 1 / 30, neutralInput);
   assert.equal(world.enemies.length, 120);
-  assert.equal(hudSnapshot(world).millionHorde?.population, MILLION_HORDE_MAX_POPULATION);
+  assert.equal(world.hordeField!.count, world.hordeField!.capacity, 'the field fills to capacity and no further');
+  assert.ok(world.hordeField!.capacity <= MILLION_HORDE_MAX_POPULATION);
+});
+
+test('millionHordeMode members are individually placed, converge on the player and wait outside the camera', () => {
+  const area = areaWithWave({ ...immediateWave, toSec: 1 });
+  const character = CHARACTERS[0]!;
+  const world = createWorld(area, character, character.stats, 3, [], 1, true, null, {
+    graphicsQuality: 'high',
+    runtimePerformanceTier: 'desktop',
+    modifiers: { millionHordeMode: true },
+  });
+  world.player.invulnUntil = Number.POSITIVE_INFINITY;
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < 40; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  const field = world.hordeField!;
+  assert.ok(field.count > 100_000);
+  const distinct = new Set<string>();
+  for (let i = 0; i < 200; i += 1) distinct.add(`${field.x[i]!.toFixed(2)}|${field.y[i]!.toFixed(2)}`);
+  assert.ok(distinct.size > 150, 'members must have their own positions, not share a point');
+
+  // Let every block be swept many times with nothing left to spawn.
+  for (let i = 0; i < 900; i += 1) {
+    // Live actors shove the player around; pin them so the shell is measured against a fixed centre.
+    world.player.x = 0;
+    world.player.y = 0;
+    stepWorld(world, 1 / 30, neutralInput);
+  }
+  const { hold } = world.hordeView;
+  const depth = field.shellDepth(hold);
+  let nearest = Infinity;
+  let farthest = 0;
+  for (let i = 0; i < field.count; i += 1) {
+    const d = Math.hypot(field.x[i]! - world.player.x, (field.y[i]! - world.player.y) * world.hordeView.ky);
+    nearest = Math.min(nearest, d);
+    farthest = Math.max(farthest, d);
+  }
+  assert.ok(nearest >= hold - 41, `no waiting member may stand inside the camera (nearest ${nearest.toFixed(1)}, hold ${hold.toFixed(1)})`);
+  assert.ok(farthest <= hold + depth + 90, 'the crowd packs into a bounded shell instead of trailing off');
+});
+
+test('millionHordeMode promotes members into live actors one-for-one and counts kills singly', () => {
+  const area = areaWithWave({ ...immediateWave, toSec: 1 });
+  const character = CHARACTERS[0]!;
+  const world = createWorld(area, character, character.stats, 5, [], 1, true, null, {
+    graphicsQuality: 'high',
+    runtimePerformanceTier: 'desktop',
+    modifiers: { millionHordeMode: true },
+  });
+  world.player.invulnUntil = Number.POSITIVE_INFINITY;
+  world.weapons[0]!.readyAt = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < 40; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  for (let i = 0; i < 600; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  const field = world.hordeField!;
+  assert.ok(world.enemies.length > 0, 'arrived members become live actors');
+
+  const before = field.count + world.enemies.length;
+  for (let i = 0; i < 5; i += 1) stepWorld(world, 1 / 30, neutralInput);
+  assert.equal(field.count + world.enemies.length, before, 'promotion moves a member to an actor without creating or losing one');
+
+  const killsBefore = world.kills;
+  const defeatedBefore = world.millionHorde!.defeatedPopulation;
+  damageEnemy(world, world.enemies[0]!, 1e9, 0, world.player.x, world.player.y);
+  assert.equal(world.kills - killsBefore, 1);
+  assert.equal(world.millionHorde!.defeatedPopulation - defeatedBefore, 1, 'a kill is one enemy, not a represented thousand');
 });
 
 test('scalerMode raises enemy hp with the player level, capped', () => {

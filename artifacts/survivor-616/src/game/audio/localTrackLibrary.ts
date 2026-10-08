@@ -24,6 +24,8 @@ export interface StoredLocalTrack {
   fingerprint?: string;
   isVideoContainer: boolean;
   addedAt: number;
+  authoredBpm?: number;
+  downbeatSeconds?: number;
 }
 
 export interface LocalLibrarySummary {
@@ -38,6 +40,8 @@ interface StoredLocalTrackReference {
   fingerprint?: string;
   isVideoContainer: boolean;
   addedAt: number;
+  authoredBpm?: number;
+  downbeatSeconds?: number;
 }
 
 async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
@@ -65,6 +69,8 @@ export async function saveLocalTrack(track: StoredLocalTrack): Promise<void> {
     fingerprint: track.fingerprint,
     isVideoContainer: track.isVideoContainer,
     addedAt: track.addedAt,
+    authoredBpm: track.authoredBpm,
+    downbeatSeconds: track.downbeatSeconds,
   };
   await withStore('readwrite', (store) => store.put(reference));
 }
@@ -89,6 +95,8 @@ async function migrateLegacyTrack(track: StoredLocalTrack): Promise<void> {
     fingerprint: track.fingerprint,
     isVideoContainer: track.isVideoContainer,
     addedAt: track.addedAt,
+    authoredBpm: track.authoredBpm,
+    downbeatSeconds: track.downbeatSeconds,
   };
 
   // Move the legacy inline File and its reference in one transaction. This
@@ -121,6 +129,8 @@ export async function loadLocalTracks(): Promise<StoredLocalTrack[]> {
       isVideoContainer?: unknown;
       addedAt?: unknown;
       fingerprint?: unknown;
+      authoredBpm?: unknown;
+      downbeatSeconds?: unknown;
     };
     if (
       typeof candidate.id !== 'string' ||
@@ -143,6 +153,8 @@ export async function loadLocalTracks(): Promise<StoredLocalTrack[]> {
         fingerprint: typeof candidate.fingerprint === 'string' ? candidate.fingerprint : undefined,
         isVideoContainer: candidate.isVideoContainer,
         addedAt: typeof candidate.addedAt === 'number' ? candidate.addedAt : Date.now(),
+        authoredBpm: typeof candidate.authoredBpm === 'number' ? candidate.authoredBpm : undefined,
+        downbeatSeconds: typeof candidate.downbeatSeconds === 'number' ? candidate.downbeatSeconds : undefined,
       };
       restored.push(migrated);
       // Version 1 stored the File directly on the track. The migration keeps
@@ -169,6 +181,8 @@ export async function loadLocalTracks(): Promise<StoredLocalTrack[]> {
       fingerprint: typeof candidate.fingerprint === 'string' ? candidate.fingerprint : undefined,
       isVideoContainer: candidate.isVideoContainer,
       addedAt: typeof candidate.addedAt === 'number' ? candidate.addedAt : asset.createdAt,
+      authoredBpm: typeof candidate.authoredBpm === 'number' ? candidate.authoredBpm : undefined,
+      downbeatSeconds: typeof candidate.downbeatSeconds === 'number' ? candidate.downbeatSeconds : undefined,
     });
   }
 

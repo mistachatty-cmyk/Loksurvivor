@@ -8,6 +8,8 @@ import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
 import { getHideoutScene, weatherClass } from '@/game/data/hideout';
 import { allyRig } from '@/game/data/progression';
+import { crewSpeak } from '@/game/engine/crewSpeak';
+import { getCrewTalkMode, getCrewTalkTone } from '@/game/state/crewTalkSetting';
 import { RigPortrait } from './RigPortrait';
 import { HideoutVignette } from './HideoutVignette';
 import { FirstNightBoard } from './FirstNightBoard';
@@ -16,6 +18,8 @@ import { NotificationToasts } from './NotificationToasts';
 import { CollapsibleSection } from './CollapsibleSection';
 import { HideoutPreview, type HideoutPetInfo, type HideoutPropInfo, type PlayCue, type StripNotice } from './HideoutPreview';
 import { HideoutPlayBar } from './HideoutPlayBar';
+import { MusicNowPlaying } from './MusicNowPlaying';
+import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { describeReward } from './hideoutRewardText';
 import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
 import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER, type NpcCastMember } from '@/game/data/npcCast';
@@ -148,6 +152,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
+  const chromeLayout = useUiChromeLayout();
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
@@ -200,6 +205,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
   const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
   const noticeSeqRef = useRef(0);
+  const crewRecentRef = useRef(new Map<string, string[]>());
   const showStripNotice = (title: string, line: string) => {
     noticeSeqRef.current += 1;
     setStripNotice({ seq: noticeSeqRef.current, title, line });
@@ -210,7 +216,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const hideoutPropInfos = useMemo<HideoutPropInfo[]>(() => {
     if (!meta.hideoutInteractive || !meta.hideoutPreviewEnabled) return [];
     const now = Date.now();
-    return propsForRoom(activeRoomId).map((def) => {
+    // Rescued crew stand in the room they hang out in, so every room has someone to meet.
+    const crewHere = rescuedAllies.filter((ally) => ally.room === activeRoomId);
+    const crewInfos: HideoutPropInfo[] = crewHere.map((ally, i) => ({
+      id: `ally:${ally.id}`,
+      x: Math.min(0.9, 0.2 + ((i + 1) / (crewHere.length + 1)) * 0.6),
+      art: 'npc',
+      accent: ally.palette.accent,
+      label: ally.name,
+      ready: false,
+      npc: { rig: allyRig(ally), palette: ally.palette },
+    }));
+    return [...propsForRoom(activeRoomId).map((def) => {
       const npc = def.npcId ? NPC_PROP_CAST[def.npcId] : undefined;
       return {
         id: def.id,
@@ -221,10 +238,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         ready: def.action.kind !== 'talk' && def.action.kind !== 'panel' ? propReady(def, meta.hideoutClaims, now) : false,
         npc: npc ? { rig: npc.rig, palette: npc.palette } : undefined,
       };
-    });
+    }), ...crewInfos];
   // `t` never changes identity, so the locale is what relabels the props.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutClaims, locale]);
+  }, [activeRoomId, meta.hideoutInteractive, meta.hideoutPreviewEnabled, meta.hideoutClaims, rescuedAllies, locale]);
 
   // The pet the play bar is about: the one you last tapped on the strip, else the first walker.
   const focusPet = meta.savedLokPets.find((pet) => pet.id === (hideoutPets.some((p) => p.id === focusPetId) ? focusPetId : hideoutPets[0]?.id));
@@ -248,6 +265,24 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   };
 
   const handlePropUse = (propId: string) => {
+    if (propId.startsWith('ally:')) {
+      const ally = rescuedAllies.find((candidate) => candidate.id === propId.slice(5));
+      if (!ally) return;
+      if (getCrewTalkMode() === 'blurb') { showStripNotice(ally.name, ally.blurb); return; }
+      const seen = crewRecentRef.current.get(ally.id) ?? [];
+      const line = crewSpeak({
+        allyId: ally.id,
+        roomName: activeRoom?.name ?? '',
+        weather: getHideoutScene(activeRoomId).weather,
+        crewNames: rescuedAllies.filter((other) => other.id !== ally.id).map((other) => other.name),
+        tone: getCrewTalkTone(),
+        rng: Math.random,
+        recent: seen,
+      });
+      crewRecentRef.current.set(ally.id, [...seen, line].slice(-12));
+      showStripNotice(ally.name, line);
+      return;
+    }
     const def = HIDEOUT_PROPS_BY_ID[propId];
     if (!def) return;
     const title = t(def.labelKey);
@@ -423,15 +458,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   }, [meta.hideoutAmbienceEnabled, isPageVisible, scene, ensureAudioContext, showArrival]);
 
   const weatherIcon = WEATHER_ICONS[scene.weather];
-  const sceneLinks: Array<{ testId: string; title: string; blurb: string; icon: typeof Radio; tone: string; onClick: () => void }> = [
-    { testId: 'button-hideout-computer', title: 'Sanctum computer', blurb: 'Open map builder', icon: MonitorDot, tone: 'border-cyan-200/35 bg-cyan-950/30 text-cyan-200 hover:border-cyan-200/80 hover:bg-cyan-950/60', onClick: onOpenMapEditor },
-    { testId: 'button-hideout-sector-command', title: 'Sector Command', blurb: 'Direct captured units · campaign', icon: Radio, tone: 'border-amber-200/35 bg-amber-950/30 text-amber-200 hover:border-amber-200/80 hover:bg-amber-950/60', onClick: onOpenSectorCommand },
-    ...(onOpenLokPetBattle ? [{ testId: 'button-hideout-lokpet-battle', title: 'Lit Corner Battle Arena', blurb: 'Experimental · LokPet Battles · Sparring & League', icon: Swords, tone: 'border-pink-400/40 bg-pink-950/40 text-pink-300 hover:border-pink-300 hover:bg-pink-950/70', onClick: onOpenLokPetBattle }] : []),
-    { testId: 'button-hideout-dust-mite-rancher', title: 'Dust Mite Rancher', blurb: 'Barnaby’s pure data-pet ranch · adopt & feed', icon: Bug, tone: 'border-amber-400/40 bg-amber-950/40 text-amber-400 hover:border-amber-300 hover:bg-amber-950/70', onClick: () => onOpen('dust-mite-rancher') },
-    { testId: 'button-hideout-frog-ranch', title: 'Circuit Frog Ranch', blurb: 'Meet Jeremey Frogster · adopt and train frogs', icon: Zap, tone: 'border-emerald-300/40 bg-emerald-950/40 text-emerald-300 hover:border-emerald-200 hover:bg-emerald-950/70', onClick: () => onOpen('frog-ranch') },
-    ...(armoryAnchor === 'hideout' ? [{ testId: 'button-hideout-grpd-armory', title: stationFound ? t('hub.armory.relocatedEntrance') : t('hub.armory.hideoutEntrance'), blurb: t('hub.armory.hideoutEntranceBlurb'), icon: ShieldCheck, tone: 'border-sky-200/50 bg-sky-950/50 text-amber-200 hover:border-amber-200 hover:bg-sky-950/80', onClick: () => onOpen('grpd-armory') }] : []),
-    { testId: 'button-hideout-arena', title: 'LokSurvivorArena', blurb: 'Experimental · 2-4 players · most kills wins', icon: Users, tone: 'border-violet-200/35 bg-violet-950/30 text-violet-200 hover:border-violet-200/80 hover:bg-violet-950/60', onClick: onOpenArena },
-  ];
   const crewMoment = useMemo(
     () => scene.flavorLines[(roomAllies.length + (selectedCharacter.id.length % scene.flavorLines.length)) % scene.flavorLines.length],
     [roomAllies.length, scene.flavorLines, selectedCharacter.id],
@@ -462,7 +488,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
-      {/* Mission Briefing / Lore Dossier Button */}
+      {chromeLayout === 'classic' ? <>
+      {/* Classic corner controls remain available in Settings. */}
       <button
         type="button"
         onClick={() => setShowLorePopup(true)}
@@ -484,22 +511,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <Sparkles className="h-4 w-4 text-cyan-200" />
         <span>{t('common.looksLokpets')}</span>
       </button>
-      {/* Mobile-only: the full Head Out tile lives at the bottom of a screen
-          that can scroll several pages on a phone -- this keeps the primary
-          action reachable without hunting for it. Hidden at sm+ where the
-          desktop layout is short enough that this would be redundant.
-          Optional -- meta.hideoutStickyHeadOutEnabled, Settings > Hideout. */}
-      {meta.hideoutStickyHeadOutEnabled && (
-        <button
-          type="button"
-          onClick={() => onOpen('runs')}
-          className="fixed inset-x-3 bottom-3 z-50 flex min-h-12 items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden"
-          data-testid="button-open-runs-sticky"
-        >
-          Head out
-          <ArrowRight className="h-4 w-4" />
-        </button>
-      )}
       {companion && (
         <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
           <LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={42} />
@@ -510,6 +521,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </p>
           </div>
         </div>
+      )}
+      </> : null}
+      {meta.hideoutStickyHeadOutEnabled && (
+        <button type="button" onClick={() => onOpen('runs')} className="fixed inset-x-3 bottom-3 z-50 flex min-h-12 items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden" data-testid="button-open-runs-sticky">Head out <ArrowRight className="h-4 w-4" /></button>
       )}
       <AnimatePresence mode="wait">
         <motion.div 
@@ -568,6 +583,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       </AnimatePresence>
 
       <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
+        {chromeLayout === 'new' ? (
+          <div className="mb-4 flex flex-col gap-2 border border-white/15 bg-black/75 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
+            <div className="flex flex-wrap items-center gap-2">
+              {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
+              <button type="button" onClick={() => setShowLorePopup(true)} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
+              <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+              {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
+              <MusicNowPlaying placement="inline" />
+            </div>
+          </div>
+        ) : null}
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
             rig={selectedCharacter.rig}
@@ -605,6 +633,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         ) : null}
         <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-primary">Hideout scene</span>
+          <button type="button" onClick={() => setUiChromeLayout(chromeLayout === 'new' ? 'classic' : 'new')} className="ml-auto border border-white/20 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wide text-white/65 hover:border-primary hover:text-white" data-testid="button-toggle-hub-layout">{chromeLayout === 'new' ? 'Classic corners' : 'New control dock'}</button>
           {SCENE_LOOKS.map((look) => {
             const earned = rescuedAllies.length >= look.crew;
             return <button key={look.id} type="button" disabled={!earned} title={earned ? look.note : `Rescue ${look.crew} crew to earn`} aria-pressed={earnedSceneLook.id === look.id} onClick={() => chooseSceneLook(look.id)} className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${earnedSceneLook.id === look.id ? 'bg-primary text-primary-foreground' : earned ? 'bg-white/10 text-white hover:bg-white/20' : 'cursor-not-allowed bg-white/5 text-white/35'}`}>{look.name}{!earned && ` · ${look.crew} crew`}</button>;
@@ -613,7 +642,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <header className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
-              {onBack && (
+              {onBack && chromeLayout === 'classic' && (
                 <button
                   type="button"
                   onClick={onBack}
@@ -798,50 +827,125 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
               testId="hideout-scene"
             >
-            <div className="flex flex-col gap-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex items-center gap-3 border border-border/60 bg-black/20 p-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-                    {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{scene.weatherLabel}</p>
-                    <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 border border-border/60 bg-black/20 p-3">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-                    <Building2 className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
+            <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+             <div className="flex min-w-0 items-center gap-3 border border-white/10 bg-black/30 p-3">
+               <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
+                 {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
+               </span>
+               <div>
+                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{scene.weatherLabel}</p>
+                 <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
+               </div>
+             </div>
+                <div className="flex min-w-0 items-center gap-2 border border-white/10 bg-black/30 p-3">
+                  <Building2 className="hidden h-4 w-4 text-primary sm:block" />
+                  <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
-                    <p className="text-xs text-muted-foreground">{scene.homeDescription}</p>
+                    <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
                   </div>
                 </div>
+            </div>
+              <div className="grid min-w-0 gap-2 text-left sm:grid-cols-2 xl:grid-cols-3 [&>button]:min-w-0 [&>button]:w-full [&>button>span]:min-w-0 [&>button>svg]:shrink-0">
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenMapEditor}
+                    data-testid="button-hideout-computer"
+                    className="group flex items-center gap-3 border border-cyan-200/35 bg-cyan-950/30 px-3 py-2 text-left transition hover:border-cyan-200/80 hover:bg-cyan-950/60"
+                  >
+                    <MonitorDot className="h-5 w-5 text-cyan-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-100">Sanctum computer</span>
+                      <span className="block text-[10px] text-cyan-100/60">Open map builder</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-cyan-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenSectorCommand}
+                    data-testid="button-hideout-sector-command"
+                    className="group flex items-center gap-3 border border-amber-200/35 bg-amber-950/30 px-3 py-2 text-left transition hover:border-amber-200/80 hover:bg-amber-950/60"
+                  >
+                    <Radio className="h-5 w-5 text-amber-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-100">Sector Command</span>
+                      <span className="block text-[10px] text-amber-100/60">Direct captured units · campaign</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-200/70" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && onOpenLokPetBattle && (
+                  <button
+                    type="button"
+                    onClick={onOpenLokPetBattle}
+                    data-testid="button-hideout-lokpet-battle"
+                    className="group flex items-center gap-3 border border-pink-400/40 bg-pink-950/40 px-3 py-2 text-left transition hover:border-pink-300 hover:bg-pink-950/70"
+                  >
+                    <Swords className="h-5 w-5 text-pink-300 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-pink-200">Lit Corner Battle Arena</span>
+                      <span className="block text-[10px] text-pink-200/70">Experimental · LokPet Battles · Sparring & League</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-pink-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={() => onOpen('dust-mite-rancher')}
+                    data-testid="button-hideout-dust-mite-rancher"
+                    className="group flex items-center gap-3 border border-amber-400/40 bg-amber-950/40 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-amber-950/70"
+                  >
+                    <Bug className="h-5 w-5 text-amber-400 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-amber-200">Dust Mite Rancher</span>
+                      <span className="block text-[10px] text-amber-200/70">Barnaby’s pure data-pet ranch · adopt & feed</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-amber-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={() => onOpen('frog-ranch')}
+                    data-testid="button-hideout-frog-ranch"
+                    className="group flex items-center gap-3 border border-emerald-300/40 bg-emerald-950/40 px-3 py-2 text-left transition hover:border-emerald-200 hover:bg-emerald-950/70"
+                  >
+                    <Zap className="h-5 w-5 text-emerald-300 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-100">Circuit Frog Ranch</span>
+                      <span className="block text-[10px] text-emerald-100/70">Meet Jeremey Frogster · adopt and train frogs</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-emerald-300/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && armoryAnchor === 'hideout' && (
+                  <button type="button" onClick={() => onOpen('grpd-armory')} data-testid="button-hideout-grpd-armory"
+                    className="group flex items-center gap-3 border border-sky-200/50 bg-sky-950/50 px-3 py-2 text-left transition hover:border-amber-200 hover:bg-sky-950/80">
+                    <ShieldCheck className="h-5 w-5 text-amber-200" />
+                    <span><span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-sky-100">{stationFound ? t('hub.armory.relocatedEntrance') : t('hub.armory.hideoutEntrance')}</span><span className="block text-[10px] text-sky-100/70">{t('hub.armory.hideoutEntranceBlurb')}</span></span>
+                    <ArrowRight className="h-3.5 w-3.5 text-sky-200/80" />
+                  </button>
+                )}
+                {activeRoom.id === 'main-floor' && (
+                  <button
+                    type="button"
+                    onClick={onOpenArena}
+                    data-testid="button-hideout-arena"
+                    className="group flex items-center gap-3 border border-violet-200/35 bg-violet-950/30 px-3 py-2 text-left transition hover:border-violet-200/80 hover:bg-violet-950/60"
+                  >
+                    <Users className="h-5 w-5 text-violet-200 transition group-hover:text-white" />
+                    <span>
+                      <span className="block font-mono text-[10px] font-bold uppercase tracking-widest text-violet-100">LokSurvivorArena</span>
+                      <span className="block text-[10px] text-violet-100/60">Experimental · 2-4 players · most kills wins</span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-violet-200/70" />
+                  </button>
+                )}
               </div>
-              {activeRoom.id === 'main-floor' && (
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" data-testid="hideout-scene-links">
-                  {sceneLinks.map((link) => {
-                    const Icon = link.icon;
-                    return (
-                      <button
-                        key={link.testId}
-                        type="button"
-                        onClick={link.onClick}
-                        data-testid={link.testId}
-                        className={`group flex min-h-14 items-center gap-3 border px-3 py-2 text-left transition active:scale-[0.98] ${link.tone}`}
-                      >
-                        <Icon className="h-5 w-5 shrink-0 transition group-hover:scale-110 group-hover:text-white" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-mono text-[10px] font-bold uppercase tracking-widest text-white">{link.title}</span>
-                          <span className="block text-[10px] leading-snug text-white/60">{link.blurb}</span>
-                        </span>
-                        <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
             </CollapsibleSection>
             </div>

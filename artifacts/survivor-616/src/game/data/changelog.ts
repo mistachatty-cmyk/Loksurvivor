@@ -646,9 +646,123 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.20.0',
+    version: '0.19.2',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T22:45:00Z',
+    kind: 'hotfix',
+    title: 'A Quieter Scrollbar',
+    body: [
+      'The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.',
+      'Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral.',
+    ],
+  },
+  {
+    version: '0.19.3',
     date: '2026-10-07',
     publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'hotfix',
+    title: 'Settings Jump Menu Complete',
+    body: [
+      'The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Scrollbar, Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout.',
+    ],
+  },
+  {
+    version: '0.19.4',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:50:00Z',
+    kind: 'hotfix',
+    title: 'Sealed Card Secrets',
+    body: [
+      'Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it.',
+    ],
+  },
+  {
+    version: '0.19.5',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T00:10:00Z',
+    kind: 'update',
+    title: 'A Real Million',
+    body: [
+      'Million Horde now holds real millions. Every one of the up to ten million enemies has its own place in the crowd, walks in toward you, waits in a mass just past the edge of the screen, and steps into the fight as room opens up. It used to be a counter standing in for the crowd; kills now count one enemy at a time. Weaker phones hold a smaller crowd, and the cost per frame stays flat whatever its size.',
+      'Big fights run lighter everywhere. Crowd collisions, the death dissolve, sprite drawing and loot trimming were all rebuilt to do less work, so mass wipes should stay smooth. Nothing about the way anything looks or plays changed.',
+    ],
+  },
+  {
+    version: '0.19.6',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T03:00:00Z',
+    kind: 'update',
+    title: 'The Sleeve Counter',
+    body: [
+      'The Neon Sleeve has a new Sleeve Counter tab where you can dress up your LokPacks with Card Credits. Pack wrappers: a crimped Foil Wrapper for every pack, a printed Fighter Print booster that puts a real fighter or LokPet from the game on the front with their attack, and a lift-lid Collector Box.',
+      'Eight district card backs, from Furniture City Walnut to the Null Sector Rack, each with a real fighter in the hub, show while you flip through a pack. Two new card frames lay your collection out like real cards: Printed Stock, with a halftone art window and a real attack box, and Spellbook Layout, with a cost line, type line, rules text, flavor and an attack/HP box. The old colored frames now work on the default card too. Everything is cosmetic only: pack odds, prices and card stats never change.',
+      'Settings has a new Card motion option: Full tilts cards toward your cursor and lets foil shimmer, Subtle only reacts on hover, Off keeps everything still. Classic tiles and the classic card stay free and are the default.',
+    ],
+  },
+  {
+    version: '0.19.7',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T04:00:00Z',
+    kind: 'update',
+    title: 'Drop Packs',
+    body: [
+      'Drops now come in packs. Your current gems, coins, chests and materials are the free Potato Pack, and everyone starts on it, so nothing about the way drops look has changed unless you pick something new.',
+      'The Customization Shop has a new Drop packs tab with seven more looks, each sold for LokTokens: Pop Cut (bright and cartoon-clean), Paper Cut (layered craft paper), Pixel Stash (hand-pixeled sprites), Blueprint (drafting-table schematics), Salvage Grit (worn metal, glass and stone), Neon Arcade (tube-light outlines) and Dark Circuit (matte hardware with glowing lines). Packs add a spawn bounce, a soft shadow, idle animation and a streak when the magnet pulls a drop in. Display only; drops and rewards never change, and Performance graphics always uses Potato.',
+      'Three new Economy achievements go with it: New Loot Look, Pack Rat and Full Stash.',
+    ],
+  },
+  {
+    version: '0.19.8',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T05:00:00Z',
+    kind: 'update',
+    title: 'Longer Notes, Crew in Every Room',
+    body: [
+      'Settings now has a Note duration choice for the corner notes in the hideout: 6, 12, 20 or 30 seconds before they fade.',
+      'When you walk your operator into a room, the crew you rescued who hang out there now stand in it, so every room has someone to meet. Walk up to one to hear from them.',
+    ],
+  },
+  {
+    version: '0.19.9',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T05:30:00Z',
+    kind: 'update',
+    title: 'The Crew Have a Lot to Say',
+    body: [
+      'Rescued crew in the hideout now say something new every time you walk up to them, in their own voice. Vee talks shop, Mama Jo feeds you, Nyx talks paint, Deacon counts the hour.',
+      'Settings has a new Crew chatter choice: fresh lines or the original intro only, plus a Family or Wry tone. Wry is drier and more grown-up, and both stay fine for a child to read.',
+    ],
+  },
+  {
+    version: '0.19.10',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T05:31:00Z',
+    kind: 'update',
+    title: 'A Clearer Hideout',
+    body: [
+      'The hideout puts Mission Briefing, Looks & LokPets, your companion, and music in a dock above the walking scene. The expanded player stays within that dock. Classic corner positions remain available in Settings.',
+      'Looks & LokPets is available throughout the menus and includes a direct game interface theme picker. A quiet Back control sits at the top of menu screens.',
+      'The Scene & Sanctum links have a clearer grid on narrow and wide screens.',
+    ],
+  },
+  {
+    version: '0.19.11',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T11:52:00Z',
+    kind: 'update',
+    title: 'Build a Beat in Gorilla Studios',
+    body: [
+      'Studio now keeps multiple local projects. Create, open, rename, duplicate, and delete them from the project browser; undo and redo edits as you work.',
+      'The new 16-step drum sequencer has three original kits, swing, velocity, custom sample pads, and patterns you can place on the song timeline.',
+      'Audio clips gain waveforms, zoom, trim, split, duplication, gain, and fades. Melodies live in movable MIDI clips with note length, velocity, and quantize controls.',
+      'Add EQ or compression to tracks, watch input and master levels, and record with a click and count-in. Studio renders now pass through a master limiter.',
+      'A .616project backup carries the song and its local sounds. WAV exports and To Soundtrack remain available; Studio songs carry their authored BPM into the game.',
+    ],
+  },
+  {
+    version: '0.20.0',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T12:05:00Z',
     kind: 'update',
     title: 'Gen Fitting Floor',
     body: [
@@ -658,8 +772,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.20.1',
-    date: '2026-10-07',
-    publishedAt: '2026-10-07T23:59:00Z',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T12:10:00Z',
     kind: 'update',
     title: 'Six New Ways to Fight',
     body: [
@@ -668,8 +782,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.20.2',
-    date: '2026-10-07',
-    publishedAt: '2026-10-07T23:59:30Z',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T12:15:00Z',
     kind: 'update',
     title: 'Next-Gen Fitters and Their Drops',
     body: [
@@ -679,8 +793,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.20.3',
-    date: '2026-10-07',
-    publishedAt: '2026-10-07T23:59:45Z',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T12:20:00Z',
     kind: 'update',
     title: 'Enemy Quirks',
     body: [
@@ -691,7 +805,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.20.4',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T00:30:00Z',
+    publishedAt: '2026-10-08T12:25:00Z',
     kind: 'update',
     title: 'Quirks Join the End Game',
     body: [
@@ -702,7 +816,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.20.5',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T01:00:00Z',
+    publishedAt: '2026-10-08T12:30:00Z',
     kind: 'update',
     title: 'Everywhere and Take It On',
     body: [
@@ -714,7 +828,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.20.6',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T01:20:00Z',
+    publishedAt: '2026-10-08T12:35:00Z',
     kind: 'update',
     title: 'Fitting Floor Achievements',
     body: [
@@ -725,7 +839,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.20.7',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T01:40:00Z',
+    publishedAt: '2026-10-08T12:40:00Z',
     kind: 'update',
     title: 'Quirks You Can See',
     body: [
@@ -736,7 +850,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.20.8',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T02:00:00Z',
+    publishedAt: '2026-10-08T12:45:00Z',
     kind: 'update',
     title: 'Quirk Surge',
     body: [
@@ -747,7 +861,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.20.9',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T02:30:00Z',
+    publishedAt: '2026-10-08T12:50:00Z',
     kind: 'update',
     title: 'The Surge Has a History',
     body: [
@@ -758,7 +872,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.21.0',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T02:45:00Z',
+    publishedAt: '2026-10-08T12:55:00Z',
     kind: 'hotfix',
     title: 'Rarer Surges',
     body: [
@@ -768,7 +882,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.21.1',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T03:00:00Z',
+    publishedAt: '2026-10-08T13:00:00Z',
     kind: 'update',
     title: 'Surge Records',
     body: [
