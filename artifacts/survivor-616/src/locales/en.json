@@ -385,5 +385,23 @@
   "hideout.event.ui.lockedBond": "Needs {{rank}} bond",
   "hideout.event.ui.fizzle": "You almost found something special, but the moment slips away. You still come away with a little.",
   "hideout.event.ui.gone": "This moment has already passed.",
-  "hideout.event.ui.fallbackPet": "your LokPet"
+  "hideout.event.ui.fallbackPet": "your LokPet",
+
+  "sleeve.title": "Sleeve Counter",
+  "sleeve.intro": "Dress up your LokPacks. Wrappers, card backs and card frames are cosmetic only: they never change pack odds, prices or card stats.",
+  "sleeve.motion.label": "Card motion",
+  "sleeve.motion.full": "Full",
+  "sleeve.motion.subtle": "Subtle",
+  "sleeve.motion.off": "Off",
+  "sleeve.kind.packSkin": "Pack wrappers",
+  "sleeve.kind.packSkin.hint": "How the packs on the counter look.",
+  "sleeve.kind.cardBack": "Card backs",
+  "sleeve.kind.cardBack.hint": "Shown face-down while you open a pack.",
+  "sleeve.kind.cardFrame": "Card frames",
+  "sleeve.kind.cardFrame.hint": "How your collected cards are laid out and bordered.",
+  "sleeve.equip": "Equip",
+  "sleeve.equipped": "Equipped",
+  "sleeve.buy": "Buy · {{cost}} CC",
+  "settings.cardMotion.title": "Card motion",
+  "settings.cardMotion.body": "Pack wrappers, card backs and card frames can tilt toward your cursor and shimmer. Full does both, Subtle only reacts when you hover, Off keeps everything still. Devices set to reduce motion stay still automatically."
 }

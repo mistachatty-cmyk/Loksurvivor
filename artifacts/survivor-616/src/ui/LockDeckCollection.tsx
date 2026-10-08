@@ -36,6 +36,7 @@ import type { MetaState } from '@/game/types';
 import { LokPetIcon } from './LokPetVariantSheet';
 import { RigPortrait } from './RigPortrait';
 import { LokDeckCardView, CardStyleToggle, type CardViewMode } from './LokDeckCardView';
+import type { CardMotion } from '@/game/data/cardCosmetics';
 import { CardMatrixChartModal } from './CardMatrixChartModal';
 import {
   getCardVariableProfile,
@@ -120,7 +121,7 @@ function PackTile({ pack, selected, owned, onSelect }: { pack: LokDeckSet; selec
   );
 }
 
-export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; owned: boolean; onClose: () => void }) {
+export function CardDetail({ card, owned, onClose, frame, motion }: { card: LokAssetManifest; owned: boolean; onClose: () => void; frame?: string; motion?: CardMotion }) {
   const rarity = RARITY_STYLE[card.rarity] ?? RARITY_STYLE.common;
   const info = cardMetadata(card);
   const profile = getCardVariableProfile(card);
@@ -166,7 +167,7 @@ export function CardDetail({ card, owned, onClose }: { card: LokAssetManifest; o
           style={{ '--card-glow': rarity.glow } as React.CSSProperties}
         >
           <div className="w-full max-w-[200px] md:max-w-none">
-            <LokDeckCardView card={card} owned={owned} size="standard" mode={previewMode} />
+            <LokDeckCardView card={card} owned={owned} size="standard" mode={previewMode} customFrame={frame} motion={motion} />
           </div>
           <div className="mt-3"><CardStyleToggle value={previewMode} onChange={setPreviewMode} compact /></div>
           <p className="mt-1 text-center font-mono text-[8px] text-white/40 uppercase tracking-widest">
@@ -565,6 +566,8 @@ export function LockDeckCollection({
                 variant={record?.bestVariant}
                 mode={cardViewMode}
                 size="standard"
+                customFrame={meta.selectedCardFrame}
+                motion={meta.cardMotion}
                 onClick={() => {
                   setDetailCard(card);
                   sfx?.play('uiClick');
@@ -589,6 +592,8 @@ export function LockDeckCollection({
         <CardDetail
           card={detailCard}
           owned={ownedIds.has(detailCard.id)}
+          frame={meta.selectedCardFrame}
+          motion={meta.cardMotion}
           onClose={() => setDetailCard(null)}
         />
       )}

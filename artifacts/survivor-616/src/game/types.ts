@@ -2441,6 +2441,16 @@ export interface MetaState {
   cardFrameSleeves: string[];
   /** Currently equipped card frame style. */
   selectedCardFrame: string;
+  /** Purchased card backs (see data/cardCosmetics.ts). `back-default` is always owned. */
+  ownedCardBackIds: string[];
+  /** Card back shown face-down while a pack is opened. */
+  selectedCardBack: string;
+  /** Purchased pack skins. `pack-classic` is always owned. */
+  ownedPackSkinIds: string[];
+  /** How the shop's pack tiles are drawn. */
+  selectedPackSkin: string;
+  /** How much the pack and card cosmetics move: tilt and shimmer (`full`), hover only (`subtle`) or still (`off`). */
+  cardMotion: 'full' | 'subtle' | 'off';
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */

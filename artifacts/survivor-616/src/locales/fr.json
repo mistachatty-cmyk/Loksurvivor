@@ -372,5 +372,22 @@
   "hideout.event.ui.lockedBond": "Nécessite une caution {{rank}}",
   "hideout.event.ui.fizzle": "Vous avez presque trouvé quelque chose de spécial, mais le moment vous échappe. Vous en repartez quand même avec un peu.",
   "hideout.event.ui.gone": "Ce moment est déjà passé.",
-  "hideout.event.ui.fallbackPet": "votre LokPet"
+  "hideout.event.ui.fallbackPet": "votre LokPet",
+  "sleeve.title": "Compteur de manches",
+  "sleeve.intro": "Habillez vos LokPacks. Les emballages, dos de cartes et cadres de cartes sont uniquement cosmétiques : ils ne modifient jamais les cotes des packs, les prix ou les statistiques des cartes.",
+  "sleeve.motion.label": "Mouvement de la carte",
+  "sleeve.motion.full": "Plein",
+  "sleeve.motion.subtle": "Subtil",
+  "sleeve.motion.off": "Désactivé",
+  "sleeve.kind.packSkin": "Emballages de paquets",
+  "sleeve.kind.packSkin.hint": "À quoi ressemblent les paquets sur le comptoir.",
+  "sleeve.kind.cardBack": "Dos de cartes",
+  "sleeve.kind.cardBack.hint": "Affiché face cachée lorsque vous ouvrez un pack.",
+  "sleeve.kind.cardFrame": "Cadres de cartes",
+  "sleeve.kind.cardFrame.hint": "Comment vos cartes collectées sont disposées et bordées.",
+  "sleeve.equip": "Équiper",
+  "sleeve.equipped": "Équipé",
+  "sleeve.buy": "Acheter · {{cost}} CC",
+  "settings.cardMotion.title": "Mouvement de la carte",
+  "settings.cardMotion.body": "Les emballages de paquets, les dos de cartes et les cadres de cartes peuvent s'incliner vers votre curseur et scintiller. Full fait les deux, Subtle ne réagit que lorsque vous survolez, Off maintient tout immobile. Les appareils configurés pour réduire les mouvements restent automatiquement immobiles."
 }
