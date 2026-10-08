@@ -8,7 +8,7 @@ clean code** (per the data-driven rule in `CLAUDE.md`: new content is a record, 
 Rules that apply to all of it:
 - Every hideout payout goes through `engine/hideoutRewards.ts` (daily caps, rare limits) -
   see `.agents/memory/hideout-interactables.md`. Idle events stay a chip, never a pop-up.
-- Never use the word "signal" (see `CLAUDE.md` naming rule). Use beacon / pulse / relay / static / frequency.
+- Follow the `CLAUDE.md` naming rule (the prohibited word listed there). Use beacon / pulse / relay / static / frequency.
 - Player-facing text goes in `src/locales/en.json`; invented nouns go in the `glossary` of `l10n.config.json`.
 - Every update bumps `CHANGELOG` and re-exports `public/lok-updates.json`.
 - Lore changes need the `export-public-lore.ts` sync; store changes need the `export-lok-registry.ts` sync.
