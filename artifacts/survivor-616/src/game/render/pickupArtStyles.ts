@@ -7,8 +7,10 @@
 import type { Pickup, PickupKind } from '../engine/world';
 import type { DropStyle } from '../data/dropPacks';
 import { drawEnhancedPickup, PICKUP_COLOR } from './pickupArt';
+import { BODY_COLOR, shapesFor, type Shape } from './pickupArtShapes';
 
 const TAU = Math.PI * 2;
+type StyleFn = (ctx: CanvasRenderingContext2D, e: Entry, x: number, y: number, t: number, lite: boolean, uid: number) => void;
 interface Entry { k: string; c: string; a: string; n: string }
 
 function hx(c:string){const n=parseInt(c.slice(1),16);return[n>>16,(n>>8)&255,n&255]}
@@ -108,6 +110,97 @@ function pix(ctx:CanvasRenderingContext2D,e:Entry,x:number,y:number,t:number){
  m.forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch==='.')return;ctx.fillStyle=pal[ch]||base;ctx.fillRect(Math.round(x-w*sc/2+i*sc),Math.round(y-m.length*sc/2+j*sc),Math.ceil(sc),Math.ceil(sc))}));
 }
 
+
+/* ---------- SHAPE-DRIVEN PACKS: Blueprint, Neon Arcade, Paper Cut ---------- */
+function trace(ctx: CanvasRenderingContext2D, pts: number[][], close: boolean) {
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  if (close) ctx.closePath();
+}
+const toneColor = (tone: Shape['tone'], base: string, accent: string) =>
+  tone === 'm' ? base : tone === 'l' ? lt(base, 0.35) : tone === 'd' ? dk(base, 0.4) : tone === 'a' ? accent : '#0a0c10';
+
+function blueprint(ctx: CanvasRenderingContext2D, e: Entry, x: number, y: number, t: number, _lite: boolean, _uid: number) {
+  const base = mix('#cfe3ff', e.c, 0.3);
+  const shapes = shapesFor(e.a, e.k);
+  // Faint drafting sheet behind the part.
+  ctx.fillStyle = 'rgba(30,70,140,0.55)';
+  ctx.fillRect(x - 13, y - 13, 26, 26);
+  ctx.strokeStyle = 'rgba(160,200,255,0.25)';
+  ctx.lineWidth = 0.4;
+  ctx.strokeRect(x - 13, y - 13, 26, 26);
+  ctx.beginPath(); ctx.moveTo(x - 13, y); ctx.lineTo(x - 10, y); ctx.moveTo(x + 10, y); ctx.lineTo(x + 13, y); ctx.moveTo(x, y - 13); ctx.lineTo(x, y - 10); ctx.moveTo(x, y + 10); ctx.lineTo(x, y + 13); ctx.stroke();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineJoin = 'round';
+  for (const sh of shapes) {
+    trace(ctx, sh.pts, !sh.line);
+    if (!sh.line && sh.tone !== 'k') { ctx.fillStyle = sh.tone === 'a' ? 'rgba(160,210,255,0.35)' : sh.tone === 'm' ? 'rgba(140,190,255,0.10)' : 'rgba(140,190,255,0.06)'; ctx.fill(); }
+    ctx.strokeStyle = sh.tone === 'm' ? base : 'rgba(207,227,255,0.7)';
+    ctx.lineWidth = sh.tone === 'm' ? 0.9 : 0.55;
+    if (sh.tone === 'l' || sh.tone === 'd') ctx.setLineDash([2, 1.5]);
+    ctx.lineDashOffset = -t * 6;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+  // Dimension tick under the part.
+  ctx.strokeStyle = 'rgba(207,227,255,0.6)';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(x - 9, y + 12); ctx.lineTo(x + 9, y + 12); ctx.moveTo(x - 9, y + 10.5); ctx.lineTo(x - 9, y + 13.5); ctx.moveTo(x + 9, y + 10.5); ctx.lineTo(x + 9, y + 13.5); ctx.stroke();
+}
+
+function neon(ctx: CanvasRenderingContext2D, e: Entry, x: number, y: number, t: number, lite: boolean, uid: number) {
+  const shapes = shapesFor(e.a, e.k);
+  const flick = Math.sin(t * 31 + uid) > 0.93 ? 0.45 : 1;
+  const hot = lt(e.c, 0.55);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineJoin = 'round';
+  ctx.globalAlpha = flick;
+  if (!lite) { ctx.shadowColor = e.c; ctx.shadowBlur = 7 + Math.sin(t * 4 + uid) * 2; }
+  for (const sh of shapes) {
+    trace(ctx, sh.pts, !sh.line);
+    if (!sh.line) { ctx.fillStyle = sh.tone === 'a' ? A(e.c, 0.85) : sh.tone === 'l' ? A(e.c, 0.18) : '#0b0d16'; ctx.fill(); }
+    ctx.strokeStyle = e.c;
+    ctx.lineWidth = sh.tone === 'm' ? 1.3 : 0.8;
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  for (const sh of shapes) {
+    if (sh.tone !== 'm') continue;
+    trace(ctx, sh.pts, !sh.line);
+    ctx.strokeStyle = hot; ctx.lineWidth = 0.45; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function paper(ctx: CanvasRenderingContext2D, e: Entry, x: number, y: number, t: number, _lite: boolean, uid: number) {
+  const base = mix(BODY_COLOR[e.k] ?? e.c, '#e9dcc3', 0.12);
+  const accent = lt(e.c, 0.25);
+  const shapes = shapesFor(e.a, e.k);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(((uid % 7) - 3) * 0.03 + Math.sin(t * 1.4) * 0.05);
+  ctx.lineJoin = 'round';
+  // Each paper layer casts a short hard shadow onto the layer below.
+  for (const sh of shapes) {
+    if (sh.line) continue;
+    trace(ctx, sh.pts, true);
+    ctx.save();
+    ctx.translate(0.9, 1.4);
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = toneColor(sh.tone, base, accent);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,248,232,0.55)';
+    ctx.lineWidth = 0.55;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 const ARCH: Record<PickupKind, { a: string; c: string }> = {
   xp: { a: 'gem', c: '#6ee7ff' },
   health: { a: 'plus', c: '#4ade80' },
@@ -182,8 +275,8 @@ export function drawStyledPickup(ctx: CanvasRenderingContext2D, p: Pickup, now: 
   ctx.scale(pop, pop);
   // Coins turn on their edge; everything else keeps its facing.
   if (arch.a === 'coin' && style !== 'pixel') ctx.scale(0.3 + 0.7 * Math.abs(Math.cos(t * 2.6)), 1);
-  const fn = style === 'realistic' ? real : style === 'tech' ? tech : pix;
-  fn(ctx, e, 0, 0, t);
+  const fn: StyleFn = style === 'realistic' ? real : style === 'tech' ? tech : style === 'blueprint' ? blueprint : style === 'neon' ? neon : style === 'paper' ? paper : pix;
+  fn(ctx, e, 0, 0, t, lite, p.uid);
   if (style === 'realistic' && tier > 0 || style === 'realistic' && p.kind !== 'xp' && (arch.a === 'gem' || arch.a === 'quartz' || arch.a === 'ingot')) {
     const u = (t * 0.5) % 1;
     if (u < 0.3) {
