@@ -3,6 +3,7 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
+import { getDropStyle } from '@/game/data/dropPacks';
 import { ChevronDown, ChevronUp, Eye, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -60,6 +61,7 @@ import {
   selectCommandedUnitByUid,
   selectControlGroup,
   setCommandMode,
+  setHordeView,
   updateCommandSelection,
   updateArtisteDraw,
   primePhysicsObject,
@@ -429,6 +431,8 @@ export function RunScreen({
         startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0)).map((pet) => ({ ...pet.roll, level: pet.level ?? 1, ...(pet.evolutionPath ? { evolutionBranchId: pet.evolutionPath.branchId } : {}) })),
         modifiers: meta.runModifiers,
         graphicsQuality: meta.graphicsQuality,
+        dropStyle: getDropStyle(meta.activeDropPackId),
+        damageNumberStyle: meta.damageNumberStyle,
         runtimePerformanceTier: detectRuntimePerformanceTier(),
         worldColorPalette: activeWorldPalette,
         worldColorFullRecolor: meta.worldColorFullRecolorEnabled,
@@ -872,7 +876,16 @@ export function RunScreen({
       return { width, height, dpr: backingW / width };
     };
 
+    // Million Horde keeps its waiting crowd just outside the camera; tell the
+    // engine how much of the world this screen shows.
+    const reportHordeView = (v: { width: number; height: number }) => {
+      if (!world.hordeField) return;
+      const target = targetViewForWidth(v.width);
+      const zoom = Math.max(0.001, v.width / target);
+      setHordeView(world, v.width / 2 / zoom, v.height / 2 / zoom);
+    };
     let view = resize();
+    reportHordeView(view);
 
     clipRecorderRef.current.start(world.now);
 
@@ -884,6 +897,7 @@ export function RunScreen({
       if (time - sizeCheckedAt > 250) {
         sizeCheckedAt = time;
         view = resize();
+        reportHordeView(view);
       }
 
       if (phaseRef.current === 'countdown') {

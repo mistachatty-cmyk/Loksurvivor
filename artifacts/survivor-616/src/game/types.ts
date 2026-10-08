@@ -1505,6 +1505,8 @@ export interface RunModifiers {
 }
 
 export type GraphicsQuality = 'high' | 'balanced' | 'performance';
+import type { DamageNumberStyle } from './data/damageNumbers';
+export type { DamageNumberStyle };
 export type CompanionRevealStyle = 'ambush' | 'classic';
 export type RuntimePerformanceTier = 'constrained-mobile' | 'standard-mobile' | 'high-mobile' | 'desktop';
 
@@ -2257,6 +2259,8 @@ export interface MetaState {
    * lower enemy counts, useful on a slower device or a very dense swarm run.
    */
   graphicsQuality: GraphicsQuality;
+  /** How hit numbers look. 'classic' (default) is the original popup; see `data/damageNumbers.ts`. */
+  damageNumberStyle: DamageNumberStyle;
   /**
    * How the starter LokPet encounter reveals your first companion.
    * 'ambush' (default) has the companion leap in and strike alongside you
@@ -2437,6 +2441,16 @@ export interface MetaState {
   cardFrameSleeves: string[];
   /** Currently equipped card frame style. */
   selectedCardFrame: string;
+  /** Purchased card backs (see data/cardCosmetics.ts). `back-default` is always owned. */
+  ownedCardBackIds: string[];
+  /** Card back shown face-down while a pack is opened. */
+  selectedCardBack: string;
+  /** Purchased pack skins. `pack-classic` is always owned. */
+  ownedPackSkinIds: string[];
+  /** How the shop's pack tiles are drawn. */
+  selectedPackSkin: string;
+  /** How much the pack and card cosmetics move: tilt and shimmer (`full`), hover only (`subtle`) or still (`off`). */
+  cardMotion: 'full' | 'subtle' | 'off';
   /** Completed runs made with any LokPet Collector; unlocks higher collector ranks. */
   lokCollectorRuns: number;
   /** Chest-origin LokPets caught during collector runs. */
@@ -2535,6 +2549,9 @@ export interface MetaState {
   /** Reward celebrations are selected independently from auras. */
   ownedCelebrationIds: string[];
   activeCelebrationId: string;
+  /** Drop art packs (render-only). The free Potato Pack is the original look. */
+  ownedDropPackIds: string[];
+  activeDropPackId: string;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */

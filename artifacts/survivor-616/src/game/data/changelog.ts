@@ -16,7 +16,10 @@ export const STUDIO_NAME = 'Kinetic Souls';
 
 export interface ChangelogEntry {
   version: string;
+  /** UTC calendar day (`YYYY-MM-DD`) the update landed; always the day part of `publishedAt` when that is set. */
   date: string;
+  /** UTC instant the update landed on main (`YYYY-MM-DDTHH:MM:SSZ`). Absent only for the pre-import 0.1.x-0.5.x notes. */
+  publishedAt?: string;
   kind: ChangelogKind;
   title: string;
   body: string[];
@@ -87,6 +90,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.6.0',
     date: '2026-09-21',
+    publishedAt: '2026-09-21T03:49:15Z',
     kind: 'update',
     title: 'Looks, LokPets, and a Hideout That Makes Sense',
     body: [
@@ -103,6 +107,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.7.0',
     date: '2026-09-21',
+    publishedAt: '2026-09-21T12:58:38Z',
     kind: 'update',
     title: 'Your Frame, Your Soundtrack',
     body: [
@@ -114,6 +119,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.8.0',
     date: '2026-09-27',
+    publishedAt: '2026-09-27T02:06:21Z',
     kind: 'update',
     title: 'The Defector Reaches the Spire',
     body: [
@@ -125,6 +131,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.9.0',
     date: '2026-09-28',
+    publishedAt: '2026-09-28T14:37:48Z',
     kind: 'update',
     title: 'Hazards Get Their Own Identity',
     body: [
@@ -137,6 +144,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.0',
     date: '2026-09-28',
+    publishedAt: '2026-09-28T16:13:35Z',
     kind: 'update',
     title: 'The Horde Hits Seven Digits',
     body: [
@@ -149,6 +157,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.1',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'update',
     title: 'The Underground Update',
     body: [
@@ -162,6 +171,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.2',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'update',
     title: 'Card Style Choice',
     body: [
@@ -171,6 +181,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.3',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'hotfix',
     title: 'Soundtrack Wake-Up',
     body: [
@@ -181,6 +192,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.4',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'hotfix',
     title: 'Motion Override',
     body: [
@@ -190,6 +202,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.5',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:10:35Z',
     kind: 'update',
     title: 'Studio 28 Filters',
     body: [
@@ -199,6 +212,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.6',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:27:39Z',
     kind: 'update',
     title: 'Clearer Fights',
     body: [
@@ -209,6 +223,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.7',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T19:35:18Z',
     kind: 'update',
     title: 'Travel Fight Styles',
     body: [
@@ -220,6 +235,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.8',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T20:09:36Z',
     kind: 'update',
     title: 'The Operator Forge',
     body: [
@@ -232,6 +248,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.10.9',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T20:43:20Z',
     kind: 'update',
     title: 'End Game: Victory Lap',
     body: [
@@ -244,6 +261,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.0',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T22:02:41Z',
     kind: 'update',
     title: 'Bond and Growth',
     body: [
@@ -257,6 +275,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.1',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T22:26:35Z',
     kind: 'update',
     title: 'Hideout Companions',
     body: [
@@ -269,6 +288,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.2',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T22:51:41Z',
     kind: 'update',
     title: 'Evolution Paths',
     body: [
@@ -280,6 +300,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.3',
     date: '2026-10-04',
+    publishedAt: '2026-10-04T23:10:50Z',
     kind: 'update',
     title: 'Language Support',
     body: [
@@ -290,6 +311,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.4',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T03:17:16Z',
     kind: 'update',
     title: 'Your LokDex Follows You',
     body: [
@@ -300,6 +322,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.5',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T03:53:34Z',
     kind: 'update',
     title: 'Universe Hookups',
     body: [
@@ -310,6 +333,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.6',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T03:53:34Z',
     kind: 'update',
     title: 'Universe Binder',
     body: [
@@ -320,6 +344,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.7',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T04:04:07Z',
     kind: 'update',
     title: 'Lokifed Everywhere',
     body: [
@@ -332,6 +357,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.8',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T04:20:18Z',
     kind: 'update',
     title: 'Where the Songs Come From',
     body: [
@@ -342,6 +368,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.11.9',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T04:31:03Z',
     kind: 'hotfix',
     title: 'Sign In Inside The Arcade',
     body: [
@@ -352,6 +379,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.0',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T05:17:50Z',
     kind: 'update',
     title: 'The Digi-Verse On The Web',
     body: [
@@ -362,6 +390,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.1',
     date: '2026-10-05',
+    publishedAt: '2026-10-05T22:47:59Z',
     kind: 'update',
     title: 'The Block Stays Alive',
     body: [
@@ -373,6 +402,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.2',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T00:30:56Z',
     kind: 'update',
     title: 'Demo Day On The Web',
     body: [
@@ -383,6 +413,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.3',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T03:49:26Z',
     kind: 'update',
     title: 'Experimental Map Playlist',
     body: [
@@ -392,7 +423,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.12.4',
-    date: '2026-10-04',
+    date: '2026-10-06',
+    publishedAt: '2026-10-06T04:18:52Z',
     kind: 'update',
     title: 'The Crew After Hours',
     body: [
@@ -403,7 +435,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.12.5',
-    date: '2026-10-05',
+    date: '2026-10-06',
+    publishedAt: '2026-10-06T04:20:47Z',
     kind: 'hotfix',
     title: 'Back To The Arcade',
     body: [
@@ -413,6 +446,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.12.6',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T04:22:14Z',
     kind: 'update',
     title: 'Demo Day Breaks Through',
     body: [
@@ -427,6 +461,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.0',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T12:00:10Z',
     kind: 'update',
     title: 'Forge and Settings Tune-Up',
     body: [
@@ -438,6 +473,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.1',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T12:13:10Z',
     kind: 'update',
     title: 'Faster Forge Starts',
     body: [
@@ -448,6 +484,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.2',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T21:04:32Z',
     kind: 'update',
     title: 'The GRPD Armory Opens',
     body: [
@@ -459,6 +496,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.13.3',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T21:04:32Z',
     kind: 'update',
     title: 'Armory Spawn Control',
     body: [
@@ -469,6 +507,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.14.0',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T21:04:32Z',
     kind: 'update',
     title: 'The Frogsters and the Armory Keeper',
     body: [
@@ -480,6 +519,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.14.1',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T22:53:52Z',
     kind: 'hotfix',
     title: 'Popups Stay on Screen',
     body: [
@@ -491,6 +531,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.14.2',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T23:20:13Z',
     kind: 'hotfix',
     title: 'Studio Takes Stop Hogging Memory',
     body: [
@@ -501,6 +542,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.15.0',
     date: '2026-10-06',
+    publishedAt: '2026-10-06T23:33:39Z',
     kind: 'update',
     title: 'Walk the Hideout',
     body: [
@@ -513,7 +555,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.15.1',
-    date: '2026-10-06',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T02:42:28Z',
     kind: 'hotfix',
     title: 'Hideout and Travel, Armory Found',
     body: [
@@ -524,7 +567,8 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.15.2',
-    date: '2026-10-06',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T02:42:28Z',
     kind: 'hotfix',
     title: 'Your LokPet Travels With You',
     body: [
@@ -536,6 +580,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.16.0',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T20:29:46Z',
     kind: 'update',
     title: 'Ten Scores Leave the Armory',
     body: [
@@ -547,6 +592,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.17.0',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T20:38:30Z',
     kind: 'update',
     title: 'Floodline Breach and the Map Builder',
     body: [
@@ -558,6 +604,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.18.0',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T20:57:33Z',
     kind: 'update',
     title: 'Four Ways the Block Changes',
     body: [
@@ -566,13 +613,113 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: '0.18.1',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T21:10:00Z',
+    kind: 'hotfix',
+    title: 'Every Update Wears Its Own Date',
+    body: [
+      'Patch notes used to pile up under a handful of shared dates. Each note now carries the exact day and time it reached the game, in the Updates history and on gsix.online.',
+      'A few notes that were filed under the wrong day have been corrected.',
+    ],
+  },
+  {
     version: '0.19.0',
     date: '2026-10-07',
+    publishedAt: '2026-10-07T21:15:41Z',
+    kind: 'update',
+    title: 'Damage Numbers, Cascade Style',
+    body: [
+      'Settings now has a Damage numbers choice. Classic is the same short yellow number as always. Cascade keeps numbers on screen longer and stacks them above each enemy you hit.',
+      'In Cascade, the bigger the hit the bigger and brighter the number: white, yellow, orange, red, pink, violet, cyan, and a glowing gold for the biggest hits. Crits count as one step higher.',
+      'Display only. It never changes how much damage you deal.',
+    ],
+  },
+  {
+    version: '0.19.1',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T22:30:00Z',
+    kind: 'hotfix',
+    title: 'Tidier Hideout Links',
+    body: [
+      'The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone.',
+    ],
+  },
+  {
+    version: '0.19.2',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T22:45:00Z',
+    kind: 'hotfix',
+    title: 'A Quieter Scrollbar',
+    body: [
+      'The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.',
+      'Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral.',
+    ],
+  },
+  {
+    version: '0.19.3',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:30:00Z',
+    kind: 'hotfix',
+    title: 'Settings Jump Menu Complete',
+    body: [
+      'The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Scrollbar, Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout.',
+    ],
+  },
+  {
+    version: '0.19.4',
+    date: '2026-10-07',
+    publishedAt: '2026-10-07T23:50:00Z',
+    kind: 'hotfix',
+    title: 'Sealed Card Secrets',
+    body: [
+      'Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it.',
+    ],
+  },
+  {
+    version: '0.19.5',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T00:10:00Z',
+    kind: 'update',
+    title: 'A Real Million',
+    body: [
+      'Million Horde now holds real millions. Every one of the up to ten million enemies has its own place in the crowd, walks in toward you, waits in a mass just past the edge of the screen, and steps into the fight as room opens up. It used to be a counter standing in for the crowd; kills now count one enemy at a time. Weaker phones hold a smaller crowd, and the cost per frame stays flat whatever its size.',
+      'Big fights run lighter everywhere. Crowd collisions, the death dissolve, sprite drawing and loot trimming were all rebuilt to do less work, so mass wipes should stay smooth. Nothing about the way anything looks or plays changed.',
+    ],
+  },
+  {
+    version: '0.19.6',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T03:00:00Z',
+    kind: 'update',
+    title: 'The Sleeve Counter',
+    body: [
+      'The Neon Sleeve has a new Sleeve Counter tab where you can dress up your LokPacks with Card Credits. Pack wrappers: a crimped Foil Wrapper for every pack, a printed Fighter Print booster that puts a real fighter or LokPet from the game on the front with their attack, and a lift-lid Collector Box.',
+      'Eight district card backs, from Furniture City Walnut to the Null Sector Rack, each with a real fighter in the hub, show while you flip through a pack. Two new card frames lay your collection out like real cards: Printed Stock, with a halftone art window and a real attack box, and Spellbook Layout, with a cost line, type line, rules text, flavor and an attack/HP box. The old colored frames now work on the default card too. Everything is cosmetic only: pack odds, prices and card stats never change.',
+      'Settings has a new Card motion option: Full tilts cards toward your cursor and lets foil shimmer, Subtle only reacts on hover, Off keeps everything still. Classic tiles and the classic card stay free and are the default.',
+    ],
+  },
+  {
+    version: '0.19.7',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T04:00:00Z',
+    kind: 'update',
+    title: 'Drop Packs',
+    body: [
+      'Drops now come in packs. Your current gems, coins, chests and materials are the free Potato Pack, and everyone starts on it, so nothing about the way drops look has changed unless you pick something new.',
+      'The Customization Shop has a new Drop packs tab with seven more looks, each sold for LokTokens: Pop Cut (bright and cartoon-clean), Paper Cut (layered craft paper), Pixel Stash (hand-pixeled sprites), Blueprint (drafting-table schematics), Salvage Grit (worn metal, glass and stone), Neon Arcade (tube-light outlines) and Dark Circuit (matte hardware with glowing lines). Packs add a spawn bounce, a soft shadow, idle animation and a streak when the magnet pulls a drop in. Display only; drops and rewards never change, and Performance graphics always uses Potato.',
+      'Three new Economy achievements go with it: New Loot Look, Pack Rat and Full Stash.',
+    ],
+  },
+  {
+    version: '0.19.8',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T04:01:00Z',
     kind: 'update',
     title: 'A Clearer Hideout',
     body: [
-      'The hideout now puts Mission Briefing, Looks & LokPets, your companion, and music in a dock above the walking scene. The expanded player stays within that dock. Classic corner positions remain available in Settings.',
-      'Looks & LokPets is available throughout the menus and now includes a direct game interface theme picker. A quiet Back control sits at the top of menu screens.',
+      'The hideout puts Mission Briefing, Looks & LokPets, your companion, and music in a dock above the walking scene. The expanded player stays within that dock. Classic corner positions remain available in Settings.',
+      'Looks & LokPets is available throughout the menus and includes a direct game interface theme picker. A quiet Back control sits at the top of menu screens.',
       'The Scene & Sanctum links have a clearer grid on narrow and wide screens.',
     ],
   },

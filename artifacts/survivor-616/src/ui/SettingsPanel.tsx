@@ -30,6 +30,7 @@ import { toast } from '@/hooks/use-toast';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { gyroNeedsPermission, gyroSupported, requestGyroPermission } from '@/game/input/gyro';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
+import { DAMAGE_NUMBER_STYLES } from '@/game/data/damageNumbers';
 import { importForgeState } from '@/game/state/operatorForgeStore';
 import { parseSaveArchive, serializeSaveArchive } from '@/game/state/saveArchive';
 import { UI_THEMES, uiLooksForOwnedThemeIds } from '@/game/data/uiThemes';
@@ -47,6 +48,7 @@ import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
+import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
@@ -76,6 +78,14 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
   { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
   { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
+  { id: 'settings-scrollbar', label: 'Scrollbar', terms: 'scroll bar slim hidden' },
+  { id: 'settings-minimap', label: 'Minimap', terms: 'endless map radar' },
+  { id: 'settings-prop-launches', label: 'Prop launches', terms: 'physics clickable props' },
+  { id: 'settings-chaos', label: 'Chaos toggles', terms: 'invert mirror world palette cheat' },
+  { id: 'settings-wildlife', label: 'Wildlife', terms: 'birds fireflies weather' },
+  { id: 'settings-card-layout', label: 'Card layout', terms: 'grid list density' },
+  { id: 'settings-card-motion', label: 'Card motion', terms: 'pack wrapper card back frame tilt shimmer animation' },
+  { id: 'settings-panel-layout', label: 'Panel layout', terms: 'detail panel side bottom' },
   { id: 'settings-customization', label: 'Customization', terms: 'theme palette looks skins' },
   { id: 'settings-data', label: 'Save data', terms: 'backup export import progress forge' },
   { id: 'settings-advanced', label: 'Advanced', terms: 'developer dev mode' },
@@ -227,6 +237,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setLevelUpPresentation,
     setPauseMapVisible,
     setGraphicsQuality,
+    setDamageNumberStyle,
     setCompanionRevealStyle,
     setFrameRateMode,
     setFogAmbianceMode,
@@ -236,6 +247,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setMinimapVisible,
     setMinimapExpanded,
     setUiDensity,
+    setCardMotion,
     setUiPanelLayout,
     buyUiTheme,
     equipUiTheme,
@@ -401,6 +413,10 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
           </section>
+          <section id="settings-scrollbar" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6">
+            <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>
+            <ScrollbarSetting />
+          </section>
         </div>
         <section id="settings-display" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-level-up-settings">
           <div className="flex items-start gap-4">
@@ -432,6 +448,24 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Level ups</p><div className="grid grid-cols-3 gap-1">{(['pause-focus','compact-live','random-live'] as const).map((value) => <button key={value} type="button" onClick={() => setLevelUpPresentation(value)} disabled={meta.liveModeEnabled && value === 'pause-focus'} aria-pressed={meta.levelUpPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.levelUpPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'pause-focus' ? 'Focus' : value === 'compact-live' ? 'Compact' : 'Random reel'}</button>)}</div></div>
                 <div><p className="mb-2 font-mono uppercase tracking-widest text-white/70">Loot boxes</p><div className="grid grid-cols-2 gap-1">{(['auto-pause','queue'] as const).map((value) => <button key={value} type="button" onClick={() => setLootPresentation(value)} disabled={meta.liveModeEnabled && value === 'auto-pause'} aria-pressed={meta.lootPresentation === value} className={`border p-2 uppercase disabled:opacity-35 ${meta.lootPresentation === value ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}>{value === 'queue' ? 'HUD tray' : 'Auto reveal'}</button>)}</div></div>
                 <button type="button" onClick={() => setPauseMapVisible(!meta.pauseMapVisible)} aria-pressed={meta.pauseMapVisible} className="flex w-full items-center justify-between border border-border p-3"><span>Tactical map shown on pause</span><span className="text-primary">{meta.pauseMapVisible ? 'On' : 'Off'}</span></button>
+                <div>
+                  <p className="mb-2 font-mono uppercase tracking-widest text-white/70">{t('settings.damageNumbers.title')}</p>
+                  <div className="grid grid-cols-2 gap-1" role="group" aria-label={t('settings.damageNumbers.title')}>
+                    {DAMAGE_NUMBER_STYLES.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setDamageNumberStyle(option.id)}
+                        aria-pressed={meta.damageNumberStyle === option.id}
+                        className={`border p-2 uppercase ${meta.damageNumberStyle === option.id ? 'border-primary bg-primary/15 text-primary' : 'border-border'}`}
+                        data-testid={`button-damage-numbers-${option.id}`}
+                      >
+                        {t(`settings.damageNumbers.${option.id}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{t('settings.damageNumbers.description')}</p>
+                </div>
                 <div>
                   <p className="mb-2 font-mono uppercase tracking-widest text-white/70">Graphics quality</p>
                   <div className="grid grid-cols-3 gap-1">
@@ -1174,7 +1208,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
+        <section id="settings-minimap" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-minimap-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-cyan-200/40 bg-cyan-300/10 text-cyan-200">
               <Map className="h-5 w-5" />
@@ -1237,7 +1271,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
+        <section id="settings-prop-launches" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-physics-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <MousePointer2 className="h-5 w-5" />
@@ -1281,7 +1315,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         </section>
 
         {vendorPurchaseCount(meta, 'invert-world') > 0 || vendorPurchaseCount(meta, 'invert-palette') > 0 || vendorPurchaseCount(meta, 'mirror-mode') > 0 ? (
-          <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
+          <section id="settings-chaos" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-cheat-settings">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-400/40 bg-fuchsia-400/10 text-fuchsia-300">
                 <FlipVertical2 className="h-5 w-5" />
@@ -1362,7 +1396,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </section>
         ) : null}
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
+        <section id="settings-wildlife" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-wildlife-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-300/10 text-amber-200">
               <Bird className="h-5 w-5" />
@@ -1395,7 +1429,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
+        <section id="settings-card-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-ui-density-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-300/10 text-emerald-200">
               <LayoutDashboard className="h-5 w-5" />
@@ -1445,7 +1479,37 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section className="border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
+        <section id="settings-card-motion" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-card-motion-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-300/10 text-fuchsia-200">
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-black uppercase text-white">{t('settings.cardMotion.title')}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.cardMotion.body')}</p>
+              <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label={t('settings.cardMotion.title')}>
+                {(['full', 'subtle', 'off'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setCardMotion(option)}
+                    aria-pressed={meta.cardMotion === option}
+                    className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.cardMotion === option
+                        ? 'border-fuchsia-300/60 bg-fuchsia-300/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid={`button-settings-card-motion-${option}`}
+                  >
+                    {t(`sleeve.motion.${option}` as const)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-panel-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-panel-layout-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <PanelRight className="h-5 w-5" />
