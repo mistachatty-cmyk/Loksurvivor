@@ -4458,7 +4458,7 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
     // Zero Day: a thrown frozen enemy renders as its own rig in flight
     // instead of a normal weapon-projectile sprite.
     if (proj.carriedEnemyUid !== undefined) {
-      const carried = w.enemies.find((e) => e.uid === proj.carriedEnemyUid);
+      const carried = w.enemiesByUid.get(proj.carriedEnemyUid);
       ctx.save();
       if (carried) {
         drawRig(ctx, carried.def.rig, carried.def.palette, 'idle', 0, proj.x, proj.y, proj.vx >= 0 ? 1 : -1,
