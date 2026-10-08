@@ -4,7 +4,7 @@ import type { AnimName, CelebrationStyle, HatStyle, PaletteEffectKind, RunAuraSt
 import { RigPortrait } from './RigPortrait';
 
 const HAT_MARK: Record<HatStyle, string> = {
-  none: '', 'top-hat': '▰', halo: '◌', crown: '♛', satellite: '◉', 'rain-cloud': '☁', cone: '▲', 'orbital-eye': '◉', 'moth-cap': '⌁', antenna: '📡', 'vinyl-disc': '◎',
+  none: '', 'top-hat': '▰', halo: '◌', crown: '♛', satellite: '◉', 'rain-cloud': '☁', cone: '▲', 'orbital-eye': '◉', 'moth-cap': '⌁', antenna: '📡', 'vinyl-disc': '◎', 'paper-visor': '◗',
 };
 const CELEBRATION_MARKS: Record<CelebrationStyle, string[]> = {
   'paper-stars': ['✦', '✧', '★', '✦', '✧'],

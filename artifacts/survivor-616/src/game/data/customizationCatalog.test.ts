@@ -23,17 +23,17 @@ test('the customization shop has twenty new palettes and a deep animated collect
   }
 });
 
-test('run auras cover six paid styles across multiple cosmetic tiers', () => {
-  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 6);
+test('run auras cover seven paid styles across multiple cosmetic tiers', () => {
+  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 7);
   assert.equal(new Set(RUN_AURAS.map((aura) => aura.id)).size, RUN_AURAS.length);
   assert.deepEqual(new Set(RUN_AURAS.map((aura) => aura.tier)), new Set(['standard', 'uncommon', 'rare', 'legendary']));
 });
 
-test('every fighter has seven distinct personal skins with episode and crew earnables', () => {
+test('every fighter has eight distinct personal skins with episode and crew earnables', () => {
   for (const character of CHARACTERS) {
     const skins = getCharacterSkins(character);
-    assert.equal(skins.length, 7);
-    assert.equal(new Set(skins.map((skin) => skin.id)).size, 7);
+    assert.equal(skins.length, 8);
+    assert.equal(new Set(skins.map((skin) => skin.id)).size, 8);
     assert.equal(skins.filter((skin) => skin.episodeRequired).length, 1);
     assert.deepEqual(skins.filter((skin) => skin.crewRequired).map((skin) => skin.crewRequired), [3, 8]);
   }

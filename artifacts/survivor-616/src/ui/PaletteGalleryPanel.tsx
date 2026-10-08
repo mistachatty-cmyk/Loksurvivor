@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, CloudRain, Gem, Flame, LayoutGrid, Lock, Palette, Radar, ScanLine, Sparkles } from 'lucide-react';
+import { Check, CloudRain, Gem, Flame, LayoutGrid, Lock, Palette, Radar, ScanLine, Sparkles, Star } from 'lucide-react';
 
 import { RUN_AURAS } from '@/game/data/runAuras';
 import { HATS, getHatStyle } from '@/game/data/hats';
@@ -54,6 +54,7 @@ const AURA_ICONS = {
   'glitch-echo': ScanLine,
   mothlight: Sparkles,
   'tile-bloom': LayoutGrid,
+  'comet-trail': Star,
 } satisfies Record<RunAuraStyle, typeof Sparkles>;
 
 const EFFECT_PREVIEW_CLASSES = {

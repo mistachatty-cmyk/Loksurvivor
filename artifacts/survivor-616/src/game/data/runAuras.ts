@@ -61,6 +61,14 @@ export const RUN_AURAS: RunAuraDef[] = [
     tier: 'rare',
     style: 'tile-bloom',
   },
+  {
+    id: 'comet-trail',
+    name: 'Comet Trail',
+    description: 'A small bright comet orbits you with a fading six-point tail.',
+    cost: 4,
+    tier: 'legendary',
+    style: 'comet-trail',
+  },
 ];
 
 export const RUN_AURAS_BY_ID: Record<string, RunAuraDef> = Object.fromEntries(
