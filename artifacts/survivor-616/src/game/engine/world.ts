@@ -9,7 +9,8 @@
  * snapshots out of it.
  */
 
-import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeStart, rollEnemyQuirk } from '@/game/data/enemyQuirks';
+import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
+import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
@@ -1179,6 +1180,8 @@ export interface World {
   killsByQuirk: Record<string, number>;
   /** Quirk Surge progress: 0 waiting, 1 running, 2 paid out. */
   quirkSurgePhase: 0 | 1 | 2;
+  /** How often this run gets a Quirk Surge, decided by the player's progress. */
+  quirkSurgeMode: QuirkSurgeMode;
   /** Quirks already announced this run, so each is explained once. */
   quirkAnnounced: Record<string, true>;
   /** Next time the taken Spawn Shield quirk can block a hit. */
@@ -1535,6 +1538,7 @@ export function createWorld(
     grpdCareerKills?: number;
     grpdAutoIncreaseEnabled?: boolean;
     endgameEvolutionsEnabled?: boolean;
+    quirkSurgeMode?: QuirkSurgeMode;
     enemyQuirks?: { enabled: boolean; disabledIds: string[]; everywhereIds?: string[]; takenIds?: string[] };
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
@@ -1750,6 +1754,7 @@ export function createWorld(
     killsByQuirk: {},
     quirkAnnounced: {},
     quirkSurgePhase: 0,
+    quirkSurgeMode: setup.quirkSurgeMode ?? 'off',
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
     cred: 0,
@@ -2541,7 +2546,13 @@ function spawnEnemy(
     selectedForCommand: false,
     capturableUntil: 0,
   };
-  const quirk = w.enemyQuirks.enabled ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, w.enemyQuirks.disabled, w.enemyQuirks.everywhere.length > 0 ? w.enemyQuirks.everywhere : quirkSurgeActive(w) ? ENEMY_QUIRKS.map((q) => q.id) : undefined) : undefined;
+  const surgeOn = quirkSurgeActive(w);
+  const featureOn = w.enemyQuirks.enabled;
+  const surgeIds = ENEMY_QUIRKS.map((q) => q.id).filter((id) => !(featureOn && w.enemyQuirks.disabled.has(id)));
+  const forcedIds = featureOn && w.enemyQuirks.everywhere.length > 0 ? w.enemyQuirks.everywhere : surgeOn ? surgeIds : undefined;
+  const quirk = featureOn || surgeOn
+    ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, featureOn ? w.enemyQuirks.disabled : undefined, forcedIds)
+    : undefined;
   if (quirk) {
     enemy.quirk = quirk;
     if (!w.quirkAnnounced[quirk]) {
@@ -3995,18 +4006,18 @@ function statusSpeedMultiplier(enemy: EnemyActor): number {
 }
 
 function quirkSurgeActive(w: World): boolean {
-  if (!w.enemyQuirks.enabled) return false;
+  if (!quirkSurgeScheduled(w.quirkSurgeMode, w.rngSeed)) return false;
   const start = quirkSurgeStart(w.rngSeed);
   return w.now >= start && w.now < start + QUIRK_SURGE_MS;
 }
 
 /** Quirk Surge: announces itself, lasts 20s, then pays out once if the player is still standing. */
 function updateQuirkSurge(w: World) {
-  if (!w.enemyQuirks.enabled || w.outcome !== 'running') return;
+  if (w.outcome !== 'running' || !quirkSurgeScheduled(w.quirkSurgeMode, w.rngSeed)) return;
   const start = quirkSurgeStart(w.rngSeed);
   if (w.quirkSurgePhase === 0 && w.now >= start && w.now < start + QUIRK_SURGE_MS) {
     w.quirkSurgePhase = 1;
-    pushAlert(w, 'QUIRK SURGE! Every enemy is quirked for 20 seconds');
+    pushAlert(w, `QUIRK SURGE! Every enemy is quirked for 20 seconds. ${QUIRK_SURGE_LORE.alertTail}`);
     pushSfx(w, 'ultimate');
     w.shake = Math.max(w.shake, 6);
   } else if (w.quirkSurgePhase === 1 && w.now >= start + QUIRK_SURGE_MS) {

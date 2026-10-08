@@ -121,3 +121,27 @@ export const QUIRK_SURGE_MS = 20_000;
 export function quirkSurgeStart(seed: number): number {
   return 90_000 + Math.floor(quirkHash(seed, 0, 77) * 120_000);
 }
+
+/** Maps cleared before a Quirk Surge can start happening. */
+export const QUIRK_SURGE_UNLOCK_MAPS = 14;
+/** Chance a run has a surge before the end game fully unlocks it. */
+export const QUIRK_SURGE_CHANCE = 0.4;
+
+export type QuirkSurgeMode = 'off' | 'chance' | 'always';
+
+/**
+ * How often the player's runs get a Quirk Surge:
+ *  - fewer than 14 maps cleared: never
+ *  - 14 maps cleared: a chance each run
+ *  - end game reached and the surge switch on: every run
+ */
+export function quirkSurgeMode(mapsCleared: number, endgame: boolean, switchOn: boolean): QuirkSurgeMode {
+  if (endgame && switchOn) return 'always';
+  return mapsCleared >= QUIRK_SURGE_UNLOCK_MAPS ? 'chance' : 'off';
+}
+
+/** Whether this run's seed has a surge at all under the given mode. */
+export function quirkSurgeScheduled(mode: QuirkSurgeMode, seed: number): boolean {
+  if (mode === 'always') return true;
+  return mode === 'chance' && quirkHash(seed, 0, 78) < QUIRK_SURGE_CHANCE;
+}

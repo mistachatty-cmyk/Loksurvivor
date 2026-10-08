@@ -1,9 +1,11 @@
+import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
+import { QUIRK_SURGE_CHANCE, QUIRK_SURGE_UNLOCK_MAPS } from '@/game/data/enemyQuirks';
 import { ENEMY_QUIRKS, QUIRK_BASE_CHANCE, QUIRK_MAX_CHANCE, quirkChart } from '@/game/data/enemyQuirks';
 
 const KIND_LABEL: Record<string, string> = { stat: 'Stats', movement: 'Movement', defense: 'Defense', death: 'On death' };
 
 /** Odds chart for every random enemy quirk, built from the same records the engine rolls from. */
-export function QuirkChart() {
+export function QuirkChart({ mapsCleared = 0 }: { mapsCleared?: number }) {
   const rows = quirkChart();
   const topShare = Math.max(...rows.map((row) => row.sharePct));
   return (
@@ -46,6 +48,22 @@ export function QuirkChart() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="mt-4 border border-border/70 bg-background/50 p-3" data-testid="section-surge-lore">
+        <h4 className="text-sm font-black uppercase tracking-wide text-fuchsia-200">{QUIRK_SURGE_LORE.title}</h4>
+        {mapsCleared >= QUIRK_SURGE_UNLOCK_MAPS ? (
+          <>
+            {QUIRK_SURGE_LORE.paragraphs.map((paragraph) => (
+              <p key={paragraph} className="mt-2 text-xs leading-relaxed text-muted-foreground">{paragraph}</p>
+            ))}
+            <p className="mt-3 border-l-2 border-fuchsia-300/60 pl-3 font-mono text-[11px] uppercase tracking-widest text-fuchsia-100/80">{QUIRK_SURGE_LORE.glyphs}</p>
+            <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+              {Math.round(QUIRK_SURGE_CHANCE * 100)}% of runs until the end game; every run after.
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">Clear {QUIRK_SURGE_UNLOCK_MAPS} maps to learn what the glyphs say. {mapsCleared} / {QUIRK_SURGE_UNLOCK_MAPS} so far.</p>
+        )}
       </div>
     </section>
   );

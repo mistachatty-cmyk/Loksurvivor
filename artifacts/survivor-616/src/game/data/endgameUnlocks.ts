@@ -28,7 +28,7 @@ export interface EndgameProgress {
   lokPetBattleWins: number;
 }
 
-export type EndgameFeatureId = 'forge' | 'inspector' | 'factionRaces' | 'foil' | 'aura' | 'weaponEvolutions' | 'enemyQuirks';
+export type EndgameFeatureId = 'forge' | 'inspector' | 'factionRaces' | 'foil' | 'aura' | 'weaponEvolutions' | 'enemyQuirks' | 'quirkSurge';
 
 export interface EndgameFeature {
   id: EndgameFeatureId;
@@ -50,6 +50,12 @@ export const ENDGAME_FEATURES: EndgameFeature[] = [
     id: 'enemyQuirks',
     label: 'Enemy quirks',
     blurb: 'Regular enemies can spawn with a random quirk, such as Frame Skip, Volatile or Gilded. On by default once Victory Lap opens; each quirk has its own switch below.',
+    needsReload: false,
+  },
+  {
+    id: 'quirkSurge',
+    label: 'Quirk Surge every run',
+    blurb: 'Before the end game the Surge only sometimes comes. Now it comes every run, 1:30 to 3:30 in, and pays out if you outlast it. Switch off to go back to the chance.',
     needsReload: false,
   },
   {

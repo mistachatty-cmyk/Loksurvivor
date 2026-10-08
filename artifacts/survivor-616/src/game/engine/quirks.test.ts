@@ -128,7 +128,7 @@ test('a Quirk Surge quirks every spawn for 20 seconds, then pays out once', asyn
   const seed = 21;
   const start = quirkSurgeStart(seed);
   assert.ok(start >= 90_000 && start < 210_000);
-  const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed, [], 1, true, null, { enemyQuirks: { enabled: true, disabledIds: [] } });
+  const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed, [], 1, true, null, { quirkSurgeMode: 'always', enemyQuirks: { enabled: false, disabledIds: [] } });
   world.player.hp = world.player.maxHp = 1_000_000;
   world.now = start - 500;
   const spawnedInSurge: boolean[] = [];
@@ -147,4 +147,18 @@ test('a Quirk Surge quirks every spawn for 20 seconds, then pays out once', asyn
   off.now = start + 1000;
   stepWorld(off, 1 / 30, IDLE);
   assert.equal(off.quirkSurgePhase, 0);
+});
+
+test('with a chance-mode Surge, some seeds surge and some never do, even with quirks off', () => {
+  const area = { ...AREAS[0]!, id: 'surge-chance', obstacles: [], musicEvents: undefined, rescueAllyId: undefined, durationSec: 900, waves: [] };
+  let surged = 0;
+  let quiet = 0;
+  for (let seed = 100; seed < 140; seed += 1) {
+    const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed, [], 1, true, null, { quirkSurgeMode: 'chance' });
+    world.player.hp = world.player.maxHp = 1_000_000;
+    world.now = 80_000;
+    for (let frame = 0; frame < 30 * 140; frame += 1) stepWorld(world, 1 / 30, IDLE);
+    if (world.quirkSurgePhase === 2) surged += 1; else quiet += 1;
+  }
+  assert.ok(surged > 0 && quiet > 0, `surged ${surged}, quiet ${quiet}`);
 });

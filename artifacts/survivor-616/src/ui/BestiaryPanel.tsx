@@ -673,7 +673,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
       </div>
 
       {view === 'effects' ? (
-        <QuirkChart />
+        <QuirkChart mapsCleared={meta.clearedAreaIds.length} />
       ) : view === 'factions' ? (
         filteredFactions.length === 0 ? (
           <div className="border border-border/60 bg-card/40 p-8 text-center font-mono">

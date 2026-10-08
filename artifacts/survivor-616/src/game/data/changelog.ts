@@ -744,6 +744,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Survive it and a bonus drops at your feet: health, cred and a Prism Quartz.',
     ],
   },
+  {
+    version: '0.20.9',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T02:30:00Z',
+    kind: 'update',
+    title: 'The Surge Has a History',
+    body: [
+      'The Quirk Surge now opens after you have cleared 14 maps. Until the end game it only comes to some runs, and it works even before Enemy quirks are unlocked.',
+      'Reach the end game and the Surge comes every run, with its own switch to go back to the chance. Clear 14 maps to read the field note in the Bestiary Effects tab. Nobody knows much about it yet, only that it is one heck of a boost for someone.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
