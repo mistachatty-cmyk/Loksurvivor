@@ -711,6 +711,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New achievements: Odd One Out, Quirk Collector, an Everywhere and a Become achievement for each of the ten quirks, plus Nothing Is Normal and The Whole Weird Set.',
     ],
   },
+  {
+    version: '0.20.6',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T01:20:00Z',
+    kind: 'update',
+    title: 'Fitting Floor Achievements',
+    body: [
+      'Eight new achievements for the Gen content: survive Gen Fitting Floor, defeat the Tile Warden, beat each of the six new fighting styles, and defeat every Gen Fitter.',
+      'Play with the quirk options to earn the rest: finish a run with Everywhere on, or with a quirk taken on, then do it ten times.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

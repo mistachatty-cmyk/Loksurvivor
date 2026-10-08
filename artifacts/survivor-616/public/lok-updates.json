@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 60,
+      "version": "0.20.6",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T01:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Fitting Floor Achievements",
+      "body": [
+        "Eight new achievements for the Gen content: survive Gen Fitting Floor, defeat the Tile Warden, beat each of the six new fighting styles, and defeat every Gen Fitter.",
+        "Play with the quirk options to earn the rest: finish a run with Everywhere on, or with a quirk taken on, then do it ten times."
+      ]
+    },
+    {
       "number": 59,
       "version": "0.20.5",
       "date": "2026-10-08",

@@ -12343,6 +12343,8 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     cred: finalCred,
     killsByEnemy: { ...w.killsByEnemy },
     killsByQuirk: { ...w.killsByQuirk },
+    quirkEverywhereRun: w.enemyQuirks.everywhere.some((id) => !w.enemyQuirks.disabled.has(id)),
+    quirkTakenRun: w.enemyQuirks.taken.size > 0,
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
     mapFindIds: [...w.mapFindIds],

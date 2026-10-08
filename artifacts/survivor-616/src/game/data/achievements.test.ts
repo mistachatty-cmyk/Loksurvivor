@@ -69,3 +69,37 @@ test('a finished run adds its quirk kills to the save and ignores unknown quirks
   const again = reducer(next, { type: 'completeRun', result: buildResult(world) });
   assert.deepEqual(again.meta.quirkKills, { volatile: 4, gilded: 2 });
 });
+
+test('Gen Fitting Floor and quirk-option achievements complete from the save', async () => {
+  const { ACHIEVEMENTS_BY_ID } = await import('@/game/data/achievements');
+  const { FACTIONS_BY_ID } = await import('@/game/data/factions');
+  const fresh = createInitialMeta();
+  const roster = FACTIONS_BY_ID['gen-fitters']!.roster;
+  const met = (id: string, patch: object) => ACHIEVEMENTS_BY_ID[id]!.isComplete({ ...fresh, ...patch });
+  for (const id of ['gen-floor-cleared', 'gen-warden-down', 'gen-six-styles', 'gen-full-roster', 'quirk-everywhere-run', 'quirk-everywhere-run-10', 'quirk-taken-run', 'quirk-taken-run-10']) {
+    assert.ok(ACHIEVEMENTS_BY_ID[id], id);
+    assert.equal(ACHIEVEMENTS_BY_ID[id]!.isComplete(fresh), false, id);
+  }
+  assert.equal(met('gen-floor-cleared', { clearedAreaIds: ['gen-fitting-floor'] }), true);
+  assert.equal(met('gen-warden-down', { bestiary: { 'gen-tile-warden': 1 } }), true);
+  assert.equal(met('gen-full-roster', { bestiary: Object.fromEntries(roster.map((id) => [id, 1])) }), true);
+  assert.equal(met('gen-full-roster', { bestiary: Object.fromEntries(roster.slice(1).map((id) => [id, 1])) }), false);
+  assert.equal(met('gen-six-styles', { bestiary: Object.fromEntries(roster.slice(8).map((id) => [id, 1])) }), true);
+  assert.equal(met('quirk-everywhere-run-10', { quirkEverywhereRuns: 9 }), false);
+  assert.equal(met('quirk-everywhere-run-10', { quirkEverywhereRuns: 10 }), true);
+  assert.equal(met('quirk-taken-run', { quirkTakenRuns: 1 }), true);
+});
+
+test('a run that used Everywhere or Take it on is counted once on the save', async () => {
+  const { AREAS } = await import('@/game/data/areas');
+  const { CHARACTERS } = await import('@/game/data/characters');
+  const { buildResult, createWorld } = await import('@/game/engine/world');
+  const world = createWorld(AREAS[0]!, CHARACTERS[0]!, CHARACTERS[0]!.stats, 1, [], 1, true, null, { enemyQuirks: { enabled: true, disabledIds: [], everywhereIds: ['gilded'], takenIds: ['flicker'] } });
+  const next = reducer({ meta: createInitialMeta(), lastRun: null }, { type: 'completeRun', result: buildResult(world) });
+  assert.equal(next.meta.quirkEverywhereRuns, 1);
+  assert.equal(next.meta.quirkTakenRuns, 1);
+  const plain = createWorld(AREAS[0]!, CHARACTERS[0]!, CHARACTERS[0]!.stats, 1);
+  const after = reducer(next, { type: 'completeRun', result: buildResult(plain) });
+  assert.equal(after.meta.quirkEverywhereRuns, 1);
+  assert.equal(after.meta.quirkTakenRuns, 1);
+});

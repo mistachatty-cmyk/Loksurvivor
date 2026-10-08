@@ -5,6 +5,7 @@ import { CARD_MANIFESTS, cardCollectionSummary } from './cards';
 import { CHARACTERS } from './characters';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
+import { FACTIONS_BY_ID } from './factions';
 import { ENEMY_QUIRKS, QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } from './enemyQuirks';
 import { LOKPET_VARIANTS } from './lokPets';
 import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
@@ -512,6 +513,83 @@ const QUIRK_ACHIEVEMENTS: RawAchievement[] = [
 ];
 RAW_ACHIEVEMENTS.push(...QUIRK_ACHIEVEMENTS);
 
+/** Gen Fitting Floor, its enemies, and actually playing with the quirk options. */
+const GEN_FITTER_IDS = FACTIONS_BY_ID['gen-fitters']!.roster;
+const GEN_STYLE_IDS = ['gen-fit-check-duelist', 'gen-pin-pouncer', 'gen-color-wheel', 'gen-grid-stitcher', 'gen-fan-sampler', 'gen-checkpoint-rewinder'];
+const defeated = (meta: MetaState, ids: readonly string[]) => ids.filter((id) => (meta.bestiary[id] ?? 0) > 0).length;
+
+const GEN_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'gen-floor-cleared',
+    name: 'Fitted for Survival',
+    description: 'Survive Gen Fitting Floor.',
+    tier: 'silver',
+    isComplete: (meta) => meta.clearedAreaIds.includes('gen-fitting-floor'),
+    reward: { kind: 'cred', amount: 400 },
+  },
+  {
+    id: 'gen-warden-down',
+    name: 'Seams Broken',
+    description: 'Defeat the Tile Warden.',
+    tier: 'gold',
+    isComplete: (meta) => (meta.bestiary['gen-tile-warden'] ?? 0) > 0,
+    reward: { kind: 'cred', amount: 600 },
+  },
+  {
+    id: 'gen-six-styles',
+    name: 'Six Ways to Lose',
+    description: 'Defeat each of the six new fighting styles: the Duelist, Pouncer, Color Wheel, Stitcher, Sampler and Rewinder.',
+    tier: 'silver',
+    isComplete: (meta) => defeated(meta, GEN_STYLE_IDS) >= GEN_STYLE_IDS.length,
+    progress: (meta) => ratio(defeated(meta, GEN_STYLE_IDS), GEN_STYLE_IDS.length),
+    reward: { kind: 'cred', amount: 350 },
+  },
+  {
+    id: 'gen-full-roster',
+    name: 'Every Fit on the Rack',
+    description: 'Defeat every Gen Fitter at least once.',
+    tier: 'gold',
+    isComplete: (meta) => defeated(meta, GEN_FITTER_IDS) >= GEN_FITTER_IDS.length,
+    progress: (meta) => ratio(defeated(meta, GEN_FITTER_IDS), GEN_FITTER_IDS.length),
+    reward: { kind: 'lootTokens', amount: 5 },
+  },
+  {
+    id: 'quirk-everywhere-run',
+    name: 'Nobody Is Normal Today',
+    description: 'Finish a run with a quirk set to Everywhere.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkEverywhereRuns >= 1,
+    reward: { kind: 'cred', amount: 750 },
+  },
+  {
+    id: 'quirk-everywhere-run-10',
+    name: 'Weird Weather',
+    description: 'Finish 10 runs with a quirk set to Everywhere.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkEverywhereRuns >= 10,
+    progress: (meta) => ratio(meta.quirkEverywhereRuns, 10),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+  {
+    id: 'quirk-taken-run',
+    name: 'Wearing the Weird',
+    description: 'Finish a run with a quirk taken on.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkTakenRuns >= 1,
+    reward: { kind: 'cred', amount: 750 },
+  },
+  {
+    id: 'quirk-taken-run-10',
+    name: 'Quirk by Nature',
+    description: 'Finish 10 runs with a quirk taken on.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkTakenRuns >= 10,
+    progress: (meta) => ratio(meta.quirkTakenRuns, 10),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...GEN_ACHIEVEMENTS);
+
 const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'first-blood': 'combat', 'body-count-1000': 'combat', 'body-count-10000': 'combat', 'fourth-wall-breaker': 'combat',
   'glitch-hunter': 'combat', 'stack-smasher': 'combat', 'null-terminator': 'combat',
@@ -526,6 +604,8 @@ const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'sealed-no-more': 'cards', 'triple-stamped': 'cards', 'first-holo': 'cards', 'passive-powerhouse': 'cards',
   'half-the-deck': 'cards', 'complete-collector': 'cards', 'director-cut': 'combat',
   'passive-income': 'economy',
+  'gen-floor-cleared': 'world', 'gen-warden-down': 'combat', 'gen-six-styles': 'bestiary', 'gen-full-roster': 'bestiary',
+  'quirk-everywhere-run': 'combat', 'quirk-everywhere-run-10': 'combat', 'quirk-taken-run': 'combat', 'quirk-taken-run-10': 'combat',
 };
 
 export const ACHIEVEMENTS: AchievementDef[] = RAW_ACHIEVEMENTS.map((achievement) => ({
