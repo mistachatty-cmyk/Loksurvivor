@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 79,
+      "version": "0.21.5",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T23:50:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Dance Floor",
+      "body": [
+        "When music plays in the hideout, your LokPets now float little music emotes above their heads as they dance to the beat."
+      ]
+    },
+    {
       "number": 78,
       "version": "0.21.4",
       "date": "2026-10-08",

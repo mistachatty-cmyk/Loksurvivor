@@ -925,6 +925,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The hideout now has a Resources panel above Passive income that counts everything you are holding: cred, loot tokens, skeleton keys, card credits, pet treats, pet elixirs, GRPD seals and LokTokens.',
     ],
   },
+  {
+    version: '0.21.5',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T23:50:00Z',
+    kind: 'update',
+    title: 'Dance Floor',
+    body: [
+      'When music plays in the hideout, your LokPets now float little music emotes above their heads as they dance to the beat.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

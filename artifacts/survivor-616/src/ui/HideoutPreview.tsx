@@ -152,6 +152,8 @@ const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
   star: '★',
 };
 
+const DANCE_EMOTES: HideoutEmote[] = ['note', 'spark', 'note', 'star'];
+
 interface Spark { x: number; y: number; vx: number; vy: number; born: number; life: number; color: string }
 interface Ripple { x: number; born: number }
 
@@ -389,9 +391,14 @@ export function HideoutPreview({
       if (groove.active && !reduceMotion && audio.beatIndex !== lastBeatIndex) {
         lastBeatIndex = audio.beatIndex;
         if (audio.beatIndex % 4 === 0) {
-          wanted.forEach((info) => {
+          wanted.forEach((info, index) => {
             const state = states.get(info.id);
-            if (state) burst(state.x, groundY - petLook(info).height * 0.9, info.palette.glow, 3, now);
+            if (!state) return;
+            burst(state.x, groundY - petLook(info).height * 0.9, info.palette.glow, 3, now);
+            // Dancing pets float a music emote, unless a scene's emote is already showing.
+            if (!state.emote || state.emote.until <= now) {
+              setEmote(state, DANCE_EMOTES[(Math.floor(audio.beatIndex / 4) + index) % DANCE_EMOTES.length]!, now, 1500);
+            }
           });
         }
       }
