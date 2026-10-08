@@ -582,11 +582,11 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           </button>
           <button
             type="button"
-            onClick={studio.exportProject}
+            onClick={() => void studio.exportProject()}
             className="flex items-center gap-2 border border-border bg-card px-3 py-2 text-xs font-bold uppercase tracking-widest text-white transition-colors hover:border-primary hover:text-primary"
             data-testid="button-studio-export-project"
           >
-            <FileJson className="h-4 w-4" /> Save
+            <FileJson className="h-4 w-4" /> Backup
           </button>
           <button
             type="button"
@@ -675,7 +675,7 @@ export function StudioScreen({ onBack }: StudioScreenProps) {
           <input
             ref={projectInputRef}
             type="file"
-            accept=".616song,application/json"
+            accept=".616project,.616song,application/zip,application/json"
             className="hidden"
             data-testid="input-studio-project"
             onChange={(event) => {

@@ -259,6 +259,25 @@ export async function createStudioProjectWorkspace(name = 'Untitled'): Promise<S
   });
 }
 
+/** Opens a portable backup as a new local project, retaining its shared assets. */
+export async function importStudioProjectWorkspace(
+  project: StudioProject,
+  assetIds: Iterable<string>,
+): Promise<StudioWorkspaceRecord> {
+  return withProjectStore(async (store) => {
+    await readProjectState(store);
+    const record = createStudioWorkspaceRecord(project, assetIds);
+    store.put(record);
+    store.put({
+      id: STUDIO_PROJECT_INDEX_ID,
+      kind: 'index',
+      version: STUDIO_WORKSPACE_VERSION,
+      activeProjectId: record.id,
+    } satisfies StudioWorkspaceIndexRecord);
+    return record;
+  });
+}
+
 export async function openStudioProject(projectId: string): Promise<StudioWorkspaceRecord> {
   return withProjectStore(async (store) => {
     const state = await readProjectState(store);

@@ -13,6 +13,7 @@ import * as Tone from 'tone';
 
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { findEffect } from '@/game/audio/studio/effects';
+import { createProjectBundle, readProjectBundle } from '@/game/audio/studio/bundle';
 import { getStudioEngine, unlockStudioAudio } from '@/game/audio/studio/engine';
 import type { TrackGraph } from '@/game/audio/studio/tracks';
 import { startStudioClock, stopStudioClock, tickStudioClock } from '@/game/audio/studio/clock';
@@ -28,6 +29,8 @@ import {
   createStudioProjectWorkspace,
   deleteStudioProject,
   duplicateStudioProject,
+  importStudioProjectWorkspace,
+  referencedStudioAssetIds,
   listStudioProjects,
   loadStudioAudioAssets,
   loadStudioWorkspace,
@@ -68,7 +71,6 @@ import {
 import {
   downloadBlob,
   exportFilename,
-  exportProjectFile,
   readProjectFile,
   renderProjectToWav,
 } from '@/game/audio/studio/exporter';
@@ -133,7 +135,7 @@ export interface StudioController {
 
   exportWav: () => Promise<void>;
   sendToSoundtrack: () => Promise<void>;
-  exportProject: () => void;
+  exportProject: () => Promise<void>;
   openProject: (file: File) => Promise<void>;
 }
 
@@ -852,17 +854,56 @@ export function useStudio(): StudioController {
     );
   }, [addFiles, renderCurrent]);
 
-  const openProject = useCallback(async (file: File) => {
+  const exportProject = useCallback(async () => {
+    setBusy('Packing project and sounds...');
+    setError(null);
     try {
-      const loaded = await readProjectFile(file);
-      setProject(loaded);
-      // Clips reference buffers by id, and ids are per-session -- a project
-      // opened in a fresh session needs its audio re-imported to be heard.
-      setNotice('Project loaded. Re-import its audio files to hear the clips.');
+      if (sessionOnlySourceIdsRef.current.size > 0) {
+        throw new Error('Some sounds are session only. Free device storage and re-import them before backing up.');
+      }
+      const current = projectRef.current;
+      const sourceIds = [
+        ...clipsRef.current.map((clip) => clip.id),
+        ...current.tracks.flatMap((track) => track.clips.map((clip) => clip.bufferId)),
+      ];
+      const bundle = await createProjectBundle(current, sourceIds);
+      downloadBlob(bundle, exportFilename(current, '616project'));
+      setNotice('Portable project backup downloaded with its sounds.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not open that project.');
+      reportProjectOperationError(cause);
+    } finally {
+      setBusy(null);
     }
-  }, []);
+  }, [reportProjectOperationError]);
+
+  const openProject = useCallback(async (file: File) => {
+    if (projectChangeBlocked()) return;
+    setBusy('Opening project backup...');
+    setError(null);
+    try {
+      const portable = file.name.toLowerCase().endsWith('.616project');
+      const imported = portable
+        ? await readProjectBundle(file)
+        : { project: await readProjectFile(file), assetIds: [] as string[] };
+      if (!portable) imported.assetIds = referencedStudioAssetIds(imported.project);
+      await pendingProjectWriteRef.current;
+      await persistCurrentWorkspace();
+      workspaceGenerationRef.current += 1;
+      stop();
+      const record = await importStudioProjectWorkspace(imported.project, imported.assetIds);
+      const missing = await restoreWorkspace(record);
+      await refreshProjectSummaries();
+      setNotice(
+        missing > 0
+          ? `Project opened with ${missing} unavailable source${missing === 1 ? '' : 's'}. Re-import those sounds to hear every clip.`
+          : `Opened “${record.project.name}” as a new local project.`,
+      );
+    } catch (cause) {
+      reportProjectOperationError(cause);
+    } finally {
+      setBusy(null);
+    }
+  }, [persistCurrentWorkspace, projectChangeBlocked, refreshProjectSummaries, reportProjectOperationError, restoreWorkspace, stop]);
 
   return {
     project,
@@ -961,10 +1002,7 @@ export function useStudio(): StudioController {
 
     exportWav,
     sendToSoundtrack,
-    exportProject: useCallback(() => {
-      const current = projectRef.current;
-      downloadBlob(exportProjectFile(current), exportFilename(current, '616song'));
-    }, []),
+    exportProject,
     openProject,
   };
 }
