@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 62,
+      "version": "0.20.8",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T02:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Quirk Surge",
+      "body": [
+        "With Enemy quirks on, every run now has one surprise: somewhere between 1:30 and 3:30 a Quirk Surge hits. For 20 seconds every enemy that spawns carries a random quirk.",
+        "Survive it and a bonus drops at your feet: health, cred and a Prism Quartz."
+      ]
+    },
+    {
       "number": 61,
       "version": "0.20.7",
       "date": "2026-10-08",

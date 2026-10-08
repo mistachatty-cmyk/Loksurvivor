@@ -9,7 +9,7 @@
  * snapshots out of it.
  */
 
-import { ENEMY_QUIRKS_BY_ID, quirkHash, rollEnemyQuirk } from '@/game/data/enemyQuirks';
+import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeStart, rollEnemyQuirk } from '@/game/data/enemyQuirks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
@@ -1177,6 +1177,8 @@ export interface World {
   killsByEnemy: Record<string, number>;
   /** Kills of quirked enemies this run, by quirk id. */
   killsByQuirk: Record<string, number>;
+  /** Quirk Surge progress: 0 waiting, 1 running, 2 paid out. */
+  quirkSurgePhase: 0 | 1 | 2;
   /** Quirks already announced this run, so each is explained once. */
   quirkAnnounced: Record<string, true>;
   /** Next time the taken Spawn Shield quirk can block a hit. */
@@ -1747,6 +1749,7 @@ export function createWorld(
     killsByEnemy: {},
     killsByQuirk: {},
     quirkAnnounced: {},
+    quirkSurgePhase: 0,
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
     cred: 0,
@@ -2538,7 +2541,7 @@ function spawnEnemy(
     selectedForCommand: false,
     capturableUntil: 0,
   };
-  const quirk = w.enemyQuirks.enabled ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, w.enemyQuirks.disabled, w.enemyQuirks.everywhere) : undefined;
+  const quirk = w.enemyQuirks.enabled ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, w.enemyQuirks.disabled, w.enemyQuirks.everywhere.length > 0 ? w.enemyQuirks.everywhere : quirkSurgeActive(w) ? ENEMY_QUIRKS.map((q) => q.id) : undefined) : undefined;
   if (quirk) {
     enemy.quirk = quirk;
     if (!w.quirkAnnounced[quirk]) {
@@ -3989,6 +3992,31 @@ function statusSpeedMultiplier(enemy: EnemyActor): number {
     const def = STATUS_EFFECTS_BY_ID[effect.id];
     return multiplier * (def?.speedMultiplier ?? 1);
   }, 1);
+}
+
+function quirkSurgeActive(w: World): boolean {
+  if (!w.enemyQuirks.enabled) return false;
+  const start = quirkSurgeStart(w.rngSeed);
+  return w.now >= start && w.now < start + QUIRK_SURGE_MS;
+}
+
+/** Quirk Surge: announces itself, lasts 20s, then pays out once if the player is still standing. */
+function updateQuirkSurge(w: World) {
+  if (!w.enemyQuirks.enabled || w.outcome !== 'running') return;
+  const start = quirkSurgeStart(w.rngSeed);
+  if (w.quirkSurgePhase === 0 && w.now >= start && w.now < start + QUIRK_SURGE_MS) {
+    w.quirkSurgePhase = 1;
+    pushAlert(w, 'QUIRK SURGE! Every enemy is quirked for 20 seconds');
+    pushSfx(w, 'ultimate');
+    w.shake = Math.max(w.shake, 6);
+  } else if (w.quirkSurgePhase === 1 && w.now >= start + QUIRK_SURGE_MS) {
+    w.quirkSurgePhase = 2;
+    pushAlert(w, 'SURGE SURVIVED! Bonus drop');
+    const p = w.player;
+    w.pickups.push({ uid: uid(w), kind: 'health', x: p.x + 30, y: p.y, vx: 0, vy: 0, value: 35, bornAt: w.now });
+    w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x - 30, y: p.y, vx: 0, vy: 0, value: 60, bornAt: w.now });
+    w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x, y: p.y + 30, vx: 0, vy: 0, value: 1, bornAt: w.now });
+  }
 }
 
 /** Guards the taken Volatile quirk so its bursts cannot chain into each other. */
@@ -11953,6 +11981,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   const dt = Math.min(dtSeconds, 1 / 30);
   w.time += dt;
   w.now += dt * 1000;
+  updateQuirkSurge(w);
   w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);

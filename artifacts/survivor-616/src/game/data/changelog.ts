@@ -733,6 +733,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The first time a quirk shows up in a run, an alert tells you what it does. The run summary lists every quirk you defeated.',
     ],
   },
+  {
+    version: '0.20.8',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T02:00:00Z',
+    kind: 'update',
+    title: 'Quirk Surge',
+    body: [
+      'With Enemy quirks on, every run now has one surprise: somewhere between 1:30 and 3:30 a Quirk Surge hits. For 20 seconds every enemy that spawns carries a random quirk.',
+      'Survive it and a bonus drops at your feet: health, cred and a Prism Quartz.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

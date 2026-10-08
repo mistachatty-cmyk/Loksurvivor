@@ -121,3 +121,30 @@ test('taken quirks change the player: bigger or smaller body, regeneration and a
   const off = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, 3, [], 1, true, null, { enemyQuirks: { enabled: false, disabledIds: [], takenIds: ['oversized'] } });
   assert.equal(off.player.maxHp, base.player.maxHp);
 });
+
+test('a Quirk Surge quirks every spawn for 20 seconds, then pays out once', async () => {
+  const { QUIRK_SURGE_MS, quirkSurgeStart } = await import('@/game/data/enemyQuirks');
+  const area = { ...AREAS[0]!, id: 'surge', obstacles: [], musicEvents: undefined, rescueAllyId: undefined, durationSec: 900, waves: [{ fromSec: 0, toSec: 900, enemyId: 'nightcrawler', ratePerSec: 6, burst: 2 }] };
+  const seed = 21;
+  const start = quirkSurgeStart(seed);
+  assert.ok(start >= 90_000 && start < 210_000);
+  const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed, [], 1, true, null, { enemyQuirks: { enabled: true, disabledIds: [] } });
+  world.player.hp = world.player.maxHp = 1_000_000;
+  world.now = start - 500;
+  const spawnedInSurge: boolean[] = [];
+  const seen = new Set<number>();
+  for (let frame = 0; frame < 30 * 30; frame += 1) {
+    stepWorld(world, 1 / 30, IDLE);
+    if (world.now >= start + 1000 && world.now < start + QUIRK_SURGE_MS) {
+      for (const enemy of world.enemies) if (!seen.has(enemy.uid)) { seen.add(enemy.uid); spawnedInSurge.push(Boolean(enemy.quirk)); }
+    }
+  }
+  assert.equal(world.quirkSurgePhase, 2);
+  assert.ok(spawnedInSurge.length > 20);
+  const quirked = spawnedInSurge.filter(Boolean).length / spawnedInSurge.length;
+  assert.ok(quirked > 0.9, `surge spawns quirked: ${quirked}`);
+  const off = createWorld(area, CHARACTERS[0]!, CHARACTERS[0]!.stats, seed);
+  off.now = start + 1000;
+  stepWorld(off, 1 / 30, IDLE);
+  assert.equal(off.quirkSurgePhase, 0);
+});

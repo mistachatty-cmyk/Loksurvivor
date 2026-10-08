@@ -113,3 +113,11 @@ export function quirkChart(): QuirkChartRow[] {
     };
   });
 }
+
+/** Quirk Surge: once per run every spawn is quirked for a short window. */
+export const QUIRK_SURGE_MS = 20_000;
+
+/** Deterministic start of this run's surge, 90-210s in. */
+export function quirkSurgeStart(seed: number): number {
+  return 90_000 + Math.floor(quirkHash(seed, 0, 77) * 120_000);
+}
