@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 78,
+      "version": "0.21.4",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Everything You Hold",
+      "body": [
+        "The hideout now has a Resources panel above Passive income that counts everything you are holding: cred, loot tokens, skeleton keys, card credits, pet treats, pet elixirs, GRPD seals and LokTokens."
+      ]
+    },
+    {
       "number": 77,
       "version": "0.21.3",
       "date": "2026-10-08",

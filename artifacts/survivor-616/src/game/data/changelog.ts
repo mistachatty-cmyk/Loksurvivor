@@ -915,6 +915,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Ten Forge achievements join the Archive.',
     ],
   },
+  {
+    version: '0.21.4',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T23:30:00Z',
+    kind: 'update',
+    title: 'Everything You Hold',
+    body: [
+      'The hideout now has a Resources panel above Passive income that counts everything you are holding: cred, loot tokens, skeleton keys, card credits, pet treats, pet elixirs, GRPD seals and LokTokens.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

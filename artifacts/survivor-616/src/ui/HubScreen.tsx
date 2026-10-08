@@ -48,7 +48,7 @@ import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { useT, useLocale } from '@/lib/i18n';
-import { grpdArmoryLocation } from '@/game/data/grpdArmory';
+import { grpdArmoryLocation, grpdAvailableSeals } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
 import { HideoutEndgameDock } from './HideoutEndgameDock';
@@ -712,6 +712,33 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               )}
               {showCurrencyGlossary && <CurrencyGlossary />}
             </div>
+          </div>
+
+          <div className="mb-6">
+            <CollapsibleSection
+              title="Resources"
+              subtitle="Everything you're holding"
+              defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+              testId="section-resources"
+            >
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="resource-list">
+                {([
+                  { id: 'cred', name: 'Cred', value: meta.cred, color: 'text-amber-300' },
+                  { id: 'lootTokens', name: 'Loot tokens', value: meta.lootTokens, color: 'text-amber-400' },
+                  { id: 'skeletonKeys', name: 'Skeleton keys', value: meta.skeletonKeys, color: 'text-sky-400' },
+                  { id: 'cardCredits', name: 'Card credits', value: meta.cardCredits, color: 'text-emerald-300' },
+                  { id: 'lokPetTreats', name: 'Pet treats', value: meta.lokPetTreats, color: 'text-pink-300' },
+                  { id: 'petElixirs', name: 'Pet elixirs', value: meta.petElixirs, color: 'text-fuchsia-300' },
+                  { id: 'grpdSeals', name: 'GRPD seals', value: grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals), color: 'text-blue-300' },
+                  ...(session && lokBalance !== null ? [{ id: 'lokTokens', name: 'LokTokens', value: lokBalance, color: 'text-violet-300' }] : []),
+                ]).map((r) => (
+                  <div key={r.id} className="border border-border bg-black/20 p-2" data-testid={`resource-${r.id}`}>
+                    <p className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{r.name}</p>
+                    <p className={`font-mono text-sm font-black ${r.color}`}>{r.value}</p>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
           </div>
 
           <div className="mb-6">
