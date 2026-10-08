@@ -28,7 +28,7 @@ export interface EndgameProgress {
   lokPetBattleWins: number;
 }
 
-export type EndgameFeatureId = 'forge' | 'inspector' | 'factionRaces' | 'foil' | 'aura' | 'weaponEvolutions';
+export type EndgameFeatureId = 'forge' | 'inspector' | 'factionRaces' | 'foil' | 'aura' | 'weaponEvolutions' | 'enemyQuirks';
 
 export interface EndgameFeature {
   id: EndgameFeatureId;
@@ -44,6 +44,12 @@ export const ENDGAME_FEATURES: EndgameFeature[] = [
     id: 'weaponEvolutions',
     label: 'Endgame weapon evolutions',
     blurb: 'Allow the DigiFrog Lance and Digi-Tana Trinity to evolve when their weapon and passive recipes are complete. On by default once Victory Lap opens.',
+    needsReload: false,
+  },
+  {
+    id: 'enemyQuirks',
+    label: 'Enemy quirks',
+    blurb: 'Regular enemies can spawn with a random quirk, such as Frame Skip, Volatile or Gilded. On by default once Victory Lap opens; each quirk has its own switch below.',
     needsReload: false,
   },
   {

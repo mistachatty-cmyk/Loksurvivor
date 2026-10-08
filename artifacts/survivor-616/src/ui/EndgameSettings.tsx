@@ -9,6 +9,8 @@ import { CUSTOM_SLOTS, ENDGAME_FEATURES, endgameReached, isSlotEarned, type Endg
 import { isFeatureAvailable, isFeatureEnabled, setFeatureEnabled } from '@/game/state/operatorForgeStore';
 import { useMeta } from '@/game/state/metaStore';
 import { OperatorForgePanel } from './OperatorForgePanel';
+import { ENEMY_QUIRKS } from '@/game/data/enemyQuirks';
+import { disabledQuirkIds, setAllQuirksEnabled, setQuirkEnabled } from '@/game/state/quirkStore';
 
 export function EndgameSettings() {
   const { meta } = useMeta();
@@ -43,7 +45,7 @@ export function EndgameSettings() {
         {available.map((feature) => {
           const on = (feature.id === 'forge' && meta.devModeAllUnlocks) || isFeatureEnabled(feature.id);
           return (
-            <li key={feature.id} className={`relative flex items-start gap-3 border p-3 transition-shadow ${on ? 'endgame-card-on border-fuchsia-300/60 bg-fuchsia-400/10' : 'border-border/70 bg-background/50'}`}>
+            <li key={feature.id} className={`relative flex flex-wrap items-start gap-3 border p-3 transition-shadow ${on ? 'endgame-card-on border-fuchsia-300/60 bg-fuchsia-400/10' : 'border-border/70 bg-background/50'}`}>
               {burst?.id === feature.id ? <Sparks key={burst.n} /> : null}
               <button
                 type="button"
@@ -61,6 +63,9 @@ export function EndgameSettings() {
                 <p className="text-sm font-black uppercase text-white">{feature.label}</p>
                 <p className="text-xs leading-relaxed text-muted-foreground">{feature.id === 'forge' && meta.devModeAllUnlocks ? 'On while Dev Mode is active. Open the Forge below to create up to five operators.' : feature.blurb}</p>
               </div>
+              {feature.id === 'enemyQuirks' && on ? (
+                <QuirkSwitches onChange={() => bump((n) => n + 1)} />
+              ) : null}
             </li>
           );
         })}
@@ -136,5 +141,42 @@ function Sparks() {
         );
       })}
     </span>
+  );
+}
+
+/** One switch per quirk, plus all-on / all-off. Read live from the quirk store. */
+function QuirkSwitches({ onChange }: { onChange: () => void }) {
+  const off = new Set(disabledQuirkIds());
+  return (
+    <div className="mt-2 w-full basis-full" data-testid="list-quirk-switches">
+      <div className="mb-2 flex gap-2 font-mono text-[10px] uppercase tracking-widest">
+        <button type="button" className="border border-border px-2 py-1 hover:text-white" onClick={() => { setAllQuirksEnabled(true); onChange(); }} data-testid="button-quirks-all-on">All on</button>
+        <button type="button" className="border border-border px-2 py-1 hover:text-white" onClick={() => { setAllQuirksEnabled(false); onChange(); }} data-testid="button-quirks-all-off">All off</button>
+      </div>
+      <ul className="grid gap-1.5 sm:grid-cols-2">
+        {ENEMY_QUIRKS.map((quirk) => {
+          const quirkOn = !off.has(quirk.id);
+          return (
+            <li key={quirk.id} className="flex items-start gap-2 border border-border/60 bg-background/40 p-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={quirkOn}
+                aria-label={quirk.name}
+                onClick={() => { setQuirkEnabled(quirk.id, !quirkOn); onChange(); }}
+                className={`mt-0.5 h-5 w-9 shrink-0 border transition-colors ${quirkOn ? 'border-primary bg-primary' : 'border-border bg-background'}`}
+                data-testid={`switch-quirk-${quirk.id}`}
+              >
+                <span className={`block h-3 w-3 bg-white transition-transform ${quirkOn ? 'translate-x-5' : 'translate-x-1'}`} />
+              </button>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase" style={{ color: quirk.color }}>{quirk.name}</p>
+                <p className="text-[11px] leading-snug text-muted-foreground">{quirk.description}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

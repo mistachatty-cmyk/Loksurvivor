@@ -1356,6 +1356,8 @@ export interface World {
   grpdCareerKills: number;
   grpdAutoIncreaseEnabled: boolean;
   endgameEvolutionsEnabled: boolean;
+  /** End-game Enemy quirks feature: off unless the run is set up with it. */
+  enemyQuirks: { enabled: boolean; disabled: ReadonlySet<string> };
   disabledPassiveIds?: string[];
   threatCalibrations?: ThreatCalibrations;
   threatEventTimers?: {
@@ -1523,6 +1525,7 @@ export function createWorld(
     grpdCareerKills?: number;
     grpdAutoIncreaseEnabled?: boolean;
     endgameEvolutionsEnabled?: boolean;
+    enemyQuirks?: { enabled: boolean; disabledIds: string[] };
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
@@ -1879,6 +1882,7 @@ export function createWorld(
     grpdCareerKills: setup.grpdCareerKills ?? 0,
     grpdAutoIncreaseEnabled: setup.grpdAutoIncreaseEnabled ?? true,
     endgameEvolutionsEnabled: setup.endgameEvolutionsEnabled ?? false,
+    enemyQuirks: { enabled: setup.enemyQuirks?.enabled ?? false, disabled: new Set(setup.enemyQuirks?.disabledIds ?? []) },
     disabledPassiveIds: setup.disabledPassiveIds ?? [],
     threatCalibrations: setup.threatCalibrations,
     threatEventTimers: {
@@ -2513,7 +2517,7 @@ function spawnEnemy(
     selectedForCommand: false,
     capturableUntil: 0,
   };
-  const quirk = rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid);
+  const quirk = w.enemyQuirks.enabled ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, w.enemyQuirks.disabled) : undefined;
   if (quirk) {
     enemy.quirk = quirk;
     if (quirk === 'oversized') {

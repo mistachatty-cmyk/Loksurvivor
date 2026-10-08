@@ -10,7 +10,7 @@ export function QuirkChart() {
     <section className="border border-border bg-card p-4" data-testid="section-quirk-chart">
       <h3 className="text-lg font-black uppercase tracking-tight text-white">Enemy quirk chart</h3>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        Any non-boss enemy can spawn with one random quirk: {Math.round(QUIRK_BASE_CHANCE * 100)}% of spawns at the start
+        An end-game feature (turn it on, and pick which quirks are allowed, in Settings once Victory Lap opens). Any non-boss enemy can spawn with one random quirk: {Math.round(QUIRK_BASE_CHANCE * 100)}% of spawns at the start
         of a run, rising to {Math.round(QUIRK_MAX_CHANCE * 100)}% by minute ten. A quirked enemy shows a dashed ring and its
         quirk name. {ENEMY_QUIRKS.length} quirks exist.
       </p>

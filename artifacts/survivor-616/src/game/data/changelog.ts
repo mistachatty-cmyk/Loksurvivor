@@ -688,6 +688,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'About 6% of spawns carry one at the start of a run, rising to 14% by minute ten. Bosses and giants never do. The new Effects tab in the Bestiary has a chart with every quirk, what it does, and its odds.',
     ],
   },
+  {
+    version: '0.20.4',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T00:30:00Z',
+    kind: 'update',
+    title: 'Quirks Join the End Game',
+    body: [
+      'Enemy quirks are now a Victory Lap feature. Clear every standard map and they switch on by default; before that, enemies spawn without them.',
+      'Settings, End game now has an Enemy quirks switch and one switch for each of the ten quirks, plus All on and All off. A quirk you turn off never spawns, and the rest keep their relative odds.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

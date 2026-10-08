@@ -64,16 +64,20 @@ export function rollEnemyQuirk(
   nowMs: number,
   seed: number,
   uid: number,
+  /** Quirks the player has switched off; the rest keep their relative odds. */
+  disabled?: ReadonlySet<string>,
 ): string | undefined {
   if (!canHaveQuirk(def)) return undefined;
+  const pool = disabled && disabled.size > 0 ? ENEMY_QUIRKS.filter((quirk) => !disabled.has(quirk.id)) : ENEMY_QUIRKS;
+  if (pool.length === 0) return undefined;
   if (quirkHash(seed, uid, 1) >= quirkChance(nowMs)) return undefined;
-  const total = ENEMY_QUIRKS.reduce((sum, quirk) => sum + quirk.weight, 0);
+  const total = pool.reduce((sum, quirk) => sum + quirk.weight, 0);
   let pick = quirkHash(seed, uid, 2) * total;
-  for (const quirk of ENEMY_QUIRKS) {
+  for (const quirk of pool) {
     pick -= quirk.weight;
     if (pick < 0) return quirk.id;
   }
-  return ENEMY_QUIRKS[ENEMY_QUIRKS.length - 1]!.id;
+  return pool[pool.length - 1]!.id;
 }
 
 export interface QuirkChartRow {

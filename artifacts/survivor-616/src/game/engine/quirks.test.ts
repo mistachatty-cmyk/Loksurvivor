@@ -15,7 +15,7 @@ test('quirked enemies spawn in a real run, behave, and every quirk can be seen',
   };
   const seen = new Set<string>();
   for (const seed of [1, 2, 3, 4, 5, 6]) {
-    const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed);
+    const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed, [], 1, true, null, { enemyQuirks: { enabled: true, disabledIds: [] } });
     world.now = 300_000;
     world.player.hp = world.player.maxHp = 1_000_000;
     for (let frame = 0; frame < 600; frame += 1) {
@@ -36,4 +36,37 @@ test('quirked enemies spawn in a real run, behave, and every quirk can be seen',
     }
   }
   assert.ok(seen.size >= ENEMY_QUIRKS.length - 2, `saw ${[...seen].join(', ')}`);
+});
+
+function quirkedRun(setup: { enemyQuirks?: { enabled: boolean; disabledIds: string[] } }) {
+  const area = {
+    ...AREAS[0]!, id: 'quirk-toggle-test', obstacles: [], musicEvents: undefined, rescueAllyId: undefined, durationSec: 600,
+    waves: [{ fromSec: 0, toSec: 600, enemyId: 'nightcrawler', ratePerSec: 8, burst: 3 }],
+  };
+  const seen = new Set<string>();
+  for (const seed of [11, 12, 13]) {
+    const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed, [], 1, true, null, setup);
+    world.now = 300_000;
+    world.player.hp = world.player.maxHp = 1_000_000;
+    for (let frame = 0; frame < 450; frame += 1) {
+      stepWorld(world, 1 / 30, IDLE);
+      for (const enemy of world.enemies) if (enemy.quirk) seen.add(enemy.quirk);
+    }
+  }
+  return seen;
+}
+
+test('quirks are off unless the end-game feature enables them', () => {
+  assert.equal(quirkedRun({}).size, 0);
+  assert.equal(quirkedRun({ enemyQuirks: { enabled: false, disabledIds: [] } }).size, 0);
+  assert.ok(quirkedRun({ enemyQuirks: { enabled: true, disabledIds: [] } }).size > 0);
+});
+
+test('a switched-off quirk never spawns while the rest still do', () => {
+  const off = ['volatile', 'oversized', 'shrunken'];
+  const seen = quirkedRun({ enemyQuirks: { enabled: true, disabledIds: off } });
+  assert.ok(seen.size > 0);
+  for (const id of off) assert.ok(!seen.has(id), `${id} stays off`);
+  const all = ENEMY_QUIRKS.map((quirk) => quirk.id);
+  assert.equal(quirkedRun({ enemyQuirks: { enabled: true, disabledIds: all } }).size, 0);
 });

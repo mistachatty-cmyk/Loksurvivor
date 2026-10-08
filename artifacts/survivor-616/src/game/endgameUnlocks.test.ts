@@ -98,7 +98,7 @@ describe('end-game store: toggles, slots and the roster', () => {
 
   it('endgame weapon evolutions start on; other earned features start off and all can be toggled', () => {
     recordEarnedEndgame(earnedEndgame(maxed));
-    for (const f of ENDGAME_FEATURES) { assert.equal(isFeatureAvailable(f.id), true); assert.equal(isFeatureEnabled(f.id), f.id === 'weaponEvolutions'); }
+    for (const f of ENDGAME_FEATURES) { assert.equal(isFeatureAvailable(f.id), true); assert.equal(isFeatureEnabled(f.id), f.id === 'weaponEvolutions' || f.id === 'enemyQuirks'); }
     setFeatureEnabled('weaponEvolutions', false);
     assert.equal(isFeatureEnabled('weaponEvolutions'), false);
     setFeatureEnabled('weaponEvolutions', true);
