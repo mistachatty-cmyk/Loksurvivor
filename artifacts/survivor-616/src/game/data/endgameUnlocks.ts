@@ -157,3 +157,95 @@ export function featureById(id: string): EndgameFeature | undefined {
 export function slotById(id: string): CustomSlot | undefined {
   return CUSTOM_SLOTS.find((s) => s.id === id);
 }
+
+/* ------------------------------------------------------------------ */
+/* The table of everything the end game opens                          */
+
+export type EndgameUnlockCategory = 'gate' | 'feature' | 'slot' | 'weapons' | 'forge' | 'bestiary' | 'hideout';
+
+export interface EndgameUnlockRow {
+  id: string;
+  name: string;
+  category: EndgameUnlockCategory;
+  /** How it is earned, in player words. */
+  how: string;
+  /** Why it is part of the end game. */
+  why: string;
+  /** Progress toward this row, when it has a number to show. */
+  progress?: (p: EndgameProgress) => { have: number; need: number };
+  /** Whether the row is open for this save. */
+  open: (p: EndgameProgress) => boolean;
+}
+
+const gateRow: EndgameUnlockRow = {
+  id: 'gate',
+  name: 'Victory Lap',
+  category: 'gate',
+  how: 'Clear every standard map once (timed maps; not the endless modes and not the extreme 2x and 4x versions).',
+  why: 'Proof you have seen the whole game. Everything below stays out of the way until then, so the early game is never crowded.',
+  progress: (p) => mapsCleared(p),
+  open: (p) => endgameReached(p),
+};
+
+/** Single source for the Endgame settings table and docs/endgame-unlocks.md. */
+export const ENDGAME_UNLOCK_TABLE: EndgameUnlockRow[] = [
+  gateRow,
+  ...ENDGAME_FEATURES.map((f): EndgameUnlockRow => ({
+    id: f.id,
+    name: f.label,
+    category: 'feature',
+    how: 'Opens with Victory Lap. You switch it on or off in Endgame settings or the hideout Endgame dock.',
+    why: f.blurb,
+    open: (p) => endgameReached(p),
+  })),
+  ...CUSTOM_SLOTS.map((s): EndgameUnlockRow => ({
+    id: s.id,
+    name: `Custom slot: ${s.label}`,
+    category: 'slot',
+    how: s.id === 'slot-circuit' ? s.how : `${s.how} (after Victory Lap)`,
+    why: 'Each slot keeps one operator you made. A slot is earned its own way, so a full roster of custom operators takes real play.',
+    progress: s.goal,
+    open: (p) => isSlotEarned(s, p),
+  })),
+  {
+    id: 'grpd-endgame-weapons',
+    name: 'Ten GRPD endgame weapons',
+    category: 'weapons',
+    how: 'Reach Victory Lap, then lifetime kills of 750,000 and 1,000,000 in turn for each weapon. Each stays off until you switch it on in the GRPD Armory.',
+    why: 'A long tail of goals for players who have finished the map list, without raising anything for new players.',
+    progress: (p) => ({ have: p.totalKills, need: 750000 }),
+    open: (p) => endgameReached(p) && p.totalKills >= 750000,
+  },
+  {
+    id: 'classic-look',
+    name: 'Classic v1 look',
+    category: 'forge',
+    how: 'Open with the Operator Forge. Pick "Classic v1" on any design.',
+    why: 'Lets a custom operator use the original plain build instead of the detailed v2 features.',
+    open: (p) => endgameReached(p),
+  },
+  {
+    id: 'custom-looks',
+    name: 'Custom enemy and LokPet looks',
+    category: 'forge',
+    how: 'Open with the Operator Forge. Recolor an enemy or LokPet on its screen and save it.',
+    why: 'Cosmetic only: stats, behavior and abilities never change. Each look has its own run switch plus one master switch.',
+    open: (p) => endgameReached(p),
+  },
+  {
+    id: 'custom-bestiary',
+    name: 'Custom Bestiary',
+    category: 'bestiary',
+    how: 'Opens with Victory Lap as a second view in the Bestiary.',
+    why: 'One place to see and switch your custom enemy and LokPet looks next to the real threats.',
+    open: (p) => endgameReached(p),
+  },
+  {
+    id: 'hideout-dock',
+    name: 'Hideout Endgame dock',
+    category: 'hideout',
+    how: 'Opens with Victory Lap. Hide it with "Show Endgame dock in the hideout" in Endgame settings.',
+    why: 'Quick switches and shortcuts without digging through Settings.',
+    open: (p) => endgameReached(p),
+  },
+];

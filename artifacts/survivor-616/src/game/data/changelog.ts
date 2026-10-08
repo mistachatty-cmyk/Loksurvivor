@@ -771,6 +771,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Enemies and LokPets open as classic galleries. Recolor any of them and keep it as a custom look. Stats and behavior never change; full part-by-part forging for both comes next.',
     ],
   },
+  {
+    version: '0.19.13',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T23:00:00Z',
+    kind: 'update',
+    title: 'Endgame, Within Reach',
+    body: [
+      'After Victory Lap the Bestiary gets a Custom Bestiary view for your recolored enemies and LokPets, and the hideout gets an Endgame dock with your switches and shortcuts. Hide the dock in Endgame settings.',
+      'Endgame settings now has a table of everything the end game unlocks, how to earn it and why. Every custom operator and look has its own "use in runs" switch, plus one master switch with All on and All off.',
+      'Custom looks now show up in your runs. Customs stay out of card packs for now.',
+      'Ten Forge achievements join the Archive.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

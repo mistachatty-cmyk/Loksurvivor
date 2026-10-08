@@ -8,12 +8,13 @@ import { useMemo, useState } from 'react';
 
 import { PALETTE_KEYS } from '@/game/data/operatorForge';
 import {
-  MAX_CUSTOM_VARIANTS, deleteCustomVariant, loadCustomVariants, saveCustomVariant,
+  MAX_CUSTOM_VARIANTS, bumpForgeStat, deleteCustomVariant, isCustomActive, loadCustomVariants, saveCustomVariant, setCustomActive,
   type CustomVariant, type CustomVariantKind,
 } from '@/game/state/operatorForgeStore';
 import type { SpritePalette, SpriteRig } from '@/game/types';
 import { t } from '@/lib/i18n';
 import { RigPortrait } from './RigPortrait';
+import { Switch } from './EndgameControls';
 
 const BUTTON =
   'min-h-10 border border-border bg-background px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary disabled:opacity-40';
@@ -47,8 +48,9 @@ const newVariantId = (kind: CustomVariantKind, baseId: string) => {
 };
 
 export function VariantStudio({ kind, entries, intro, testId }: VariantStudioProps) {
+  const group = kind === 'enemy' ? 'enemies' : 'pets';
   const [query, setQuery] = useState('');
-  const [group, setGroup] = useState('');
+  const [groupFilter, setGroup] = useState('');
   const [selectedId, setSelectedId] = useState(entries[0]?.id ?? '');
   const [palette, setPalette] = useState<SpritePalette | null>(null);
   const [name, setName] = useState('');
@@ -60,8 +62,8 @@ export function VariantStudio({ kind, entries, intro, testId }: VariantStudioPro
   const byId = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return entries.filter((e) => (!group || e.group === group) && (!q || e.name.toLowerCase().includes(q) || e.id.includes(q)));
-  }, [entries, group, query]);
+    return entries.filter((e) => (!groupFilter || e.group === groupFilter) && (!q || e.name.toLowerCase().includes(q) || e.id.includes(q)));
+  }, [entries, groupFilter, query]);
 
   const selected = byId.get(selectedId) ?? entries[0];
   const activePalette = palette ?? selected?.palette;
@@ -95,6 +97,7 @@ export function VariantStudio({ kind, entries, intro, testId }: VariantStudioPro
       setMessage(t('forge.variants.full'));
       return;
     }
+    if (!editingId) bumpForgeStat('recolored');
     setSaved(loadCustomVariants(kind));
     setEditingId(variant.id);
     setMessage(`${variant.name} saved.`);
@@ -139,7 +142,7 @@ export function VariantStudio({ kind, entries, intro, testId }: VariantStudioPro
           <p className="text-sm text-muted-foreground">{intro}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <input className={FIELD} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('forge.variants.search')} aria-label={t('forge.variants.search')} />
-            <select className={FIELD} value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Filter">
+            <select className={FIELD} value={groupFilter} onChange={(e) => setGroup(e.target.value)} aria-label="Filter">
               <option value="">{t('forge.variants.all')}</option>
               {groups.map((g) => (<option key={g} value={g}>{g}</option>))}
             </select>
@@ -174,6 +177,10 @@ export function VariantStudio({ kind, entries, intro, testId }: VariantStudioPro
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-black uppercase">{v.name}</p>
                       <p className="truncate text-xs text-muted-foreground">{base.name}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <Switch on={isCustomActive(group, v.id)} label={t('bestiary.custom.active')} onClick={() => { setCustomActive(group, v.id, !isCustomActive(group, v.id)); setSaved(loadCustomVariants(kind)); }} testId={`switch-custom-${v.id}`} />
+                        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{t('bestiary.custom.active')}</span>
+                      </div>
                       <div className="mt-2 flex gap-1.5">
                         <button type="button" className={BUTTON} onClick={() => edit(v)}>{t('forge.variants.edit')}</button>
                         <button type="button" className={BUTTON} onClick={() => { deleteCustomVariant(kind, v.id); setSaved(loadCustomVariants(kind)); if (editingId === v.id) setEditingId(null); }}>{t('forge.variants.delete')}</button>

@@ -293,3 +293,8 @@ test('classic (v1) designs build the plain rig and round-trip', () => {
   const back = importForgedOperator(exportForgedOperator(op), NONE, 2);
   assert.equal(back?.design.style, 'classic');
 });
+
+test('forged operators never enter the card manifests', async () => {
+  const { CARD_MANIFESTS } = await import('./data/cards');
+  assert.ok(CARD_MANIFESTS.every((card) => !card.slug.includes(FORGE_ID_PREFIX)));
+});

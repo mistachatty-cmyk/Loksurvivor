@@ -5,7 +5,10 @@
  */
 import { useState } from 'react';
 
-import { CUSTOM_SLOTS, ENDGAME_FEATURES, endgameReached, isSlotEarned, type EndgameFeatureId } from '@/game/data/endgameUnlocks';
+import { CUSTOM_SLOTS, ENDGAME_FEATURES, ENDGAME_UNLOCK_TABLE, endgameReached, isSlotEarned, type EndgameFeatureId } from '@/game/data/endgameUnlocks';
+import { CustomsRunSwitch, Switch } from './EndgameControls';
+import { isHideoutDockEnabled, setHideoutDockEnabled } from '@/game/state/operatorForgeStore';
+import { t } from '@/lib/i18n';
 import { isFeatureAvailable, isFeatureEnabled, setFeatureEnabled } from '@/game/state/operatorForgeStore';
 import { useMeta } from '@/game/state/metaStore';
 import { OperatorForgePanel } from './OperatorForgePanel';
@@ -66,6 +69,18 @@ export function EndgameSettings() {
         })}
       </ul>
 
+      <div className="mt-4 space-y-2">
+        <CustomsRunSwitch />
+        <div className="flex items-center gap-3 border border-border/70 bg-background/50 p-3">
+          <Switch on={isHideoutDockEnabled()} label={t('endgame.dock.setting')} onClick={() => { setHideoutDockEnabled(!isHideoutDockEnabled()); bump((n) => n + 1); }} testId="switch-hideout-dock" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-black uppercase text-white">{t('endgame.dock.setting')}</p>
+            <p className="text-xs text-muted-foreground">{t('endgame.dock.settingBody')}</p>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">{t('endgame.runs.reload')}</p>
+      </div>
+
       {needsReload ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 border border-primary/50 bg-primary/10 px-4 py-3 text-sm" role="status">
           <span className="min-w-0 flex-1">Reload to add or hide custom operators on the roster.</span>
@@ -102,6 +117,37 @@ export function EndgameSettings() {
           );
         })}
       </ul>
+
+      <h3 className="mt-8 text-sm font-black uppercase tracking-wide text-white">{t('endgame.table.title')}</h3>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left text-xs" data-testid="table-endgame-unlocks">
+          <thead>
+            <tr className="border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground">
+              <th scope="col" className="p-2">{t('endgame.table.unlock')}</th>
+              <th scope="col" className="p-2">{t('endgame.table.how')}</th>
+              <th scope="col" className="p-2">{t('endgame.table.why')}</th>
+              <th scope="col" className="p-2">{t('endgame.table.status')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ENDGAME_UNLOCK_TABLE.map((row) => {
+              const open = meta.devModeAllUnlocks || row.open(meta);
+              const goal = row.progress?.(meta);
+              return (
+                <tr key={row.id} className="border-b border-border/50 align-top" data-testid={`row-endgame-${row.id}`}>
+                  <th scope="row" className="p-2 font-black uppercase text-white">{row.name}</th>
+                  <td className="p-2 text-muted-foreground">{row.how}</td>
+                  <td className="p-2 text-muted-foreground">{row.why}</td>
+                  <td className={`p-2 font-mono ${open ? 'text-emerald-300' : 'text-muted-foreground'}`}>
+                    {open ? t('endgame.table.open') : t('endgame.table.locked')}
+                    {goal ? <span className="block text-[10px]">{Math.min(goal.have, goal.need).toLocaleString()}/{goal.need.toLocaleString()}</span> : null}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {forgeOpen ? <OperatorForgePanel onClose={() => setForgeOpen(false)} /> : null}
     </section>

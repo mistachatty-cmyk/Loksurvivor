@@ -17,7 +17,7 @@ import {
   minWidthFor, newForgedId, rerollDesign, speciesById, type FeatureField, type ForgedOperator, type OperatorDesign,
   type OperatorFlavor, type PaletteSpec, type RerollTarget,
 } from '@/game/data/operatorForge';
-import { deleteForgedOperator, earnedEndgameIds, earnedSlotCount, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
+import { bumpForgeStat, deleteForgedOperator, isCustomActive, recordForgeTab, setCustomActive, earnedEndgameIds, earnedSlotCount, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
 import { CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
 import { useMeta } from '@/game/state/metaStore';
 import type { AnimName } from '@/game/types';
@@ -25,6 +25,7 @@ import { RigPortrait } from './RigPortrait';
 import { ClassicEnemiesTab } from './ClassicEnemiesTab';
 import { ClassicLokPetsTab } from './ClassicLokPetsTab';
 import { t } from '@/lib/i18n';
+import { CustomsRunSwitch, Switch } from './EndgameControls';
 
 const BUTTON =
   'min-h-10 border border-border bg-background px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary disabled:opacity-40';
@@ -69,8 +70,10 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const [tab, setTabState] = useState<ForgeTab>(readTab);
   const setTab = (next: ForgeTab) => {
     setTabState(next);
+    recordForgeTab(next);
     try { localStorage.setItem(TAB_KEY, next); } catch { /* storage is optional */ }
   };
+  useEffect(() => { recordForgeTab(tab); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const factionRaces = useMemo(() => isFeatureEnabled('factionRaces'), []);
   const [seed, setSeed] = useState(() => freshSeed());
   const [genSpecies, setGenSpecies] = useState('');
@@ -235,6 +238,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
       notify('Could not save. Every custom slot you have earned is full (delete one to make room), or this device is out of storage.');
       return;
     }
+    if (!editingId || asNew) bumpForgeStat(design.style === 'classic' ? 'classicSaved' : 'detailedSaved');
     setEditingId(id);
     setDirty(false);
     baseDesign.current = design;
@@ -312,6 +316,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
   const copyCode = async (op: ForgedOperator) => {
     const code = exportForgedOperator(op);
+    bumpForgeStat('shareCodes');
     try {
       await navigator.clipboard.writeText(code);
       notify(`Share code for ${op.name} copied.`);
@@ -680,6 +685,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
                 <h2 className="text-sm font-black uppercase tracking-wide">Custom slots ({Math.min(saved.length, slotsEarned)}/{slotsEarned} used, {CUSTOM_SLOTS.length} total)</h2>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">Each slot holds one operator you made, built on a copy of a premade operator&apos;s kit. Your premade operators are never replaced.</p>
+              <div className="mt-3"><CustomsRunSwitch onChange={refreshSaved} /></div>
               <ul className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="list-forge-saved">
                 {(() => {
                   let cursor = 0;
@@ -710,6 +716,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
                           <p className="truncate text-sm font-black uppercase">{op.name}</p>
                           <p className="truncate text-xs text-muted-foreground">{op.handle} - kit: {CHARACTERS_BY_ID[op.kitId]?.name ?? 'missing'}</p>
                           <div className="mt-2 flex flex-wrap gap-1.5">
+                            <Switch on={isCustomActive('operators', op.id)} label={`Use ${op.name} in runs`} onClick={() => { setCustomActive('operators', op.id, !isCustomActive('operators', op.id)); refreshSaved(); }} testId={`switch-operator-${op.id}`} />
                             <button type="button" className={BUTTON} onClick={() => edit(op)}>Edit</button>
                             <button type="button" className={BUTTON} onClick={() => duplicate(op)}>Duplicate</button>
                             <button type="button" className={BUTTON} onClick={() => void copyCode(op)}>Copy code</button>

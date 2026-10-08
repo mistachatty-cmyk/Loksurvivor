@@ -51,6 +51,7 @@ import { useT, useLocale } from '@/lib/i18n';
 import { grpdArmoryLocation } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
+import { HideoutEndgameDock } from './HideoutEndgameDock';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
@@ -596,6 +597,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </div>
         ) : null}
+        <HideoutEndgameDock onOpen={onOpen} />
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
             rig={selectedCharacter.rig}

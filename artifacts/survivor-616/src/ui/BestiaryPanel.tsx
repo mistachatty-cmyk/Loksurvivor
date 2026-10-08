@@ -2,6 +2,10 @@
  * Bestiary. Entries reveal themselves as the player defeats each enemy.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import { endgameReached } from '@/game/data/endgameUnlocks';
+import { isFeatureAvailable } from '@/game/state/operatorForgeStore';
+import { t } from '@/lib/i18n';
+import { CustomBestiaryView } from './CustomBestiaryView';
 import { ENEMIES } from '@/game/data/enemies';
 import { CHARACTERS } from '@/game/data/characters';
 import { FACTIONS } from '@/game/data/factions';
@@ -383,13 +387,14 @@ function EnemyIntelModal({
 export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
   const { meta, unlockedCharacters } = useMeta();
   const isListView = meta.uiDensity === 'list';
-  const [view, setView] = useState<'threats' | 'factions'>('threats');
+  const [view, setView] = useState<'threats' | 'factions' | 'custom'>('threats');
   const [selectedEnemy, setSelectedEnemy] = useState<(typeof ENEMIES)[number] | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [threatFilter, setThreatFilter] = useState<'all' | 'discovered' | 'apex'>('all');
 
   // Enemies excluded from the ratio (e.g. Choir Wraith's HP is intentionally
   // beyond a run's reach) so 100% stays a reachable goal.
+  const customBestiaryOpen = meta.devModeAllUnlocks || (endgameReached(meta) && isFeatureAvailable('forge'));
   const catalogueEnemies = ENEMIES.filter((e) => !e.excludeFromBestiary);
   const discovered = catalogueEnemies.filter((e) => (meta.bestiary[e.id] ?? 0) > 0).length;
   const unlockedIds = new Set(unlockedCharacters.map((character) => character.id));
@@ -521,7 +526,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         <div className="flex items-center gap-3">
           <Users className="h-4 w-4 text-primary" />
           <h2 className="text-xl font-black uppercase tracking-tight text-white">
-            {view === 'threats' ? 'Known threats' : 'Factions'}
+            {view === 'threats' ? 'Known threats' : view === 'factions' ? 'Factions' : t('bestiary.custom.tab')}
           </h2>
         </div>
         <div className="flex gap-2">
@@ -553,11 +558,28 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
             Factions
             <span className="font-mono text-[10px] opacity-75">{discoveredFactionCount} / {FACTIONS.length}</span>
           </button>
+          {customBestiaryOpen ? (
+            <button
+              type="button"
+              onClick={() => setView('custom')}
+              className={`flex items-center gap-2 border px-3 py-2 text-xs font-bold uppercase tracking-wide transition-colors ${
+                view === 'custom'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-white'
+              }`}
+              data-testid="button-bestiary-view-custom"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {t('bestiary.custom.tab')}
+            </button>
+          ) : null}
         </div>
       </div>
 
+      {view === 'custom' && customBestiaryOpen ? <CustomBestiaryView kills={meta.bestiary} /> : null}
+
       {/* Search and Filters Bar */}
-      <div className="mb-5 flex flex-wrap items-center gap-2.5 border-b border-border/60 pb-3">
+      <div hidden={view === 'custom'} className="mb-5 flex flex-wrap items-center gap-2.5 border-b border-border/60 pb-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
@@ -617,7 +639,7 @@ export function BestiaryPanel({ onBack }: BestiaryPanelProps) {
         )}
       </div>
 
-      {view === 'factions' ? (
+      {view === 'custom' ? null : view === 'factions' ? (
         filteredFactions.length === 0 ? (
           <div className="border border-border/60 bg-card/40 p-8 text-center font-mono">
             <p className="text-sm uppercase tracking-wider text-muted-foreground">No factions match current search criteria</p>
