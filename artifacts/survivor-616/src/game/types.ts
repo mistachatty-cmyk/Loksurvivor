@@ -2549,6 +2549,9 @@ export interface MetaState {
   /** Reward celebrations are selected independently from auras. */
   ownedCelebrationIds: string[];
   activeCelebrationId: string;
+  /** Drop art packs (render-only). The free Potato Pack is the original look. */
+  ownedDropPackIds: string[];
+  activeDropPackId: string;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */
