@@ -177,6 +177,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
         if (result.ok || result.error === 'already_owned') {
           grantPalette(palette.id);
           sfx.play('purchase');
+          setPreviewPaletteId(palette.id);
           triggerReaction(`${palette.name} purchased for ${result.price ?? price} LokTokens.`);
         } else if (result.error === 'insufficient') {
           setNotice(`Not enough LokTokens -- ${result.need ?? price} more needed.`);
@@ -193,6 +194,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     if (meta.lootTokens < palette.cost) return;
     buyPalette(palette.id);
     sfx.play('purchase');
+    setPreviewPaletteId(palette.id);
     triggerReaction(`${palette.name} purchased for ${palette.cost} loot token${palette.cost === 1 ? '' : 's'}.`);
   };
 
@@ -228,6 +230,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     if (!aura || meta.ownedRunAuraIds.includes(aura.id) || meta.lootTokens < aura.cost) return;
     buyRunAura(aura.id);
     sfx.play('purchase');
+    setPreviewAuraId(aura.id);
     triggerReaction(`${aura.name} purchased for ${aura.cost} loot token${aura.cost === 1 ? '' : 's'}.`);
   };
   const buyCosmetic = (id: string, kind: 'hat' | 'celebration') => {
@@ -235,10 +238,13 @@ export function PaletteGalleryPanel({ onBack }: Props) {
     if (kind === 'hat') {
       const hat = HATS.find((entry) => entry.id === id);
       buyHat(id);
+      setPreviewHatId(id);
       if (hat) triggerReaction(`${hat.name} purchased for ${hat.cost} loot token${hat.cost === 1 ? '' : 's'}.`);
     } else {
       const celebration = CELEBRATIONS.find((entry) => entry.id === id);
       buyCelebration(id);
+      setPreviewCelebrationId(id);
+      setCelebrationKey((key) => key + 1);
       if (celebration) triggerReaction(`${celebration.name} purchased for ${celebration.cost} loot token${celebration.cost === 1 ? '' : 's'}.`);
     }
   };
@@ -320,7 +326,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                         <p className="mt-2 min-h-12 text-xs leading-relaxed text-muted-foreground">{palette.description}</p>
                         <button type="button" onClick={() => setPreviewPaletteId(palette.id)} aria-pressed={previewPaletteId === palette.id} className={`mt-3 w-full border px-3 py-1.5 font-mono text-[8px] font-bold uppercase tracking-widest ${previewPaletteId === palette.id ? 'border-white/50 bg-white/10 text-white' : 'border-white/15 text-white/70 hover:border-white/40'}`} data-testid={`button-preview-palette-${palette.id}`}>{previewPaletteId === palette.id ? 'Previewing on Valor' : 'Preview on Valor'}</button>
                         {owned ? (
-                          <button type="button" onClick={() => { equipPalette(palette.id); setNotice(`${palette.name} equipped.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-palette-${palette.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
+                          <button type="button" onClick={() => { equipPalette(palette.id); setPreviewPaletteId(palette.id); setNotice(`${palette.name} equipped.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-palette-${palette.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
                         ) : (
                           <button type="button" onClick={() => handleBuyPalette(palette.id)} disabled={lokOnly ? signedIn && !affordable : !affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable || (lokOnly && !signedIn) ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-palette-${palette.id}`}>
                             {!affordable ? <Lock className="h-3 w-3" /> : null}
@@ -351,7 +357,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                         <p className="mt-2 min-h-12 text-xs leading-relaxed text-muted-foreground">{aura.description}</p>
                         <button type="button" onClick={() => setPreviewAuraId(aura.id)} className="mt-3 w-full border border-white/20 px-3 py-1.5 font-mono text-[8px] uppercase tracking-widest text-white/80">Preview on Valor</button>
                         {owned ? (
-                          <button type="button" onClick={() => { equipRunAura(aura.id); setNotice(`${aura.name} equipped for your next run.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-aura-${aura.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
+                          <button type="button" onClick={() => { equipRunAura(aura.id); setPreviewAuraId(aura.id); setNotice(`${aura.name} equipped for your next run.`); }} disabled={equipped} className={`mt-3 w-full border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${equipped ? 'cursor-default border-primary/40 text-primary/70' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} data-testid={`button-equip-aura-${aura.id}`}>{equipped ? 'Equipped' : 'Equip'}</button>
                         ) : (
                           <button type="button" onClick={() => handleBuyAura(aura.id)} disabled={!affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-aura-${aura.id}`}>
                             {!affordable ? <Lock className="h-3 w-3" /> : null}{affordable ? `Buy · ${aura.cost} token${aura.cost === 1 ? '' : 's'}` : `Need ${aura.cost} tokens`}
@@ -402,7 +408,8 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                       else { setPreviewCelebrationId(item.id); setCelebrationKey((key) => key + 1); }
                     };
                     const equip = () => {
-                      if (isHat) equipHat(item.id); else equipCelebration(item.id);
+                      if (isHat) { equipHat(item.id); setPreviewHatId(item.id); }
+                      else { equipCelebration(item.id); setPreviewCelebrationId(item.id); setCelebrationKey((key) => key + 1); }
                       setNotice(`${item.name} equipped.`);
                     };
                     return (
