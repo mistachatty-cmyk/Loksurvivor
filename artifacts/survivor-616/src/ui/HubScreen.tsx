@@ -818,6 +818,141 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             ))}
           </div>
 
+        <section className="mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-px bg-border flex-1" />
+            <p className="text-xs uppercase tracking-widest text-primary font-bold">Playing as <span className="text-white">{selectedCharacter.name}</span></p>
+            <div className="h-px bg-border flex-1" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {activeRoom.features.map(feature => {
+              // 'allies' is rendered separately below, skip it here
+              if (feature === 'allies') return null;
+              
+              const config = PANEL_CONFIG[feature as HubPanel];
+              if (!config) return null;
+              
+              const Icon = config.icon;
+              const isPrimary = feature === 'runs';
+
+              return (
+                <button 
+                  key={feature}
+                  type="button" 
+                  onClick={() => onOpen(feature as HubPanel)} 
+                  className={`group relative p-6 text-left border flex flex-col gap-4 transition-all overflow-hidden ${
+                    isPrimary 
+                      ? 'bg-primary text-primary-foreground border-primary hover:bg-white' 
+                      : 'bg-card border-border hover:border-primary'
+                  }`}
+                  data-testid={config.testId}
+                >
+                  {isPrimary && (
+                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:250%_250%,100%_100%] animate-[shimmer_2s_infinite] pointer-events-none" />
+                  )}
+                  <Icon className={`w-8 h-8 ${isPrimary ? 'text-primary-foreground' : 'text-primary group-hover:text-white transition-colors'}`} />
+                  <div className="relative z-10">
+                    <h3 className={`text-2xl font-black uppercase tracking-tight ${isPrimary ? 'text-primary-foreground' : 'text-white'}`}>{t(`hub.room.${feature as HubPanel}.label`)}</h3>
+                    <p className={`text-xs uppercase tracking-wider mt-1 ${isPrimary ? 'text-primary-foreground/80' : 'text-muted-foreground group-hover:text-gray-300'}`}>
+                      {t(`hub.room.${feature as HubPanel}.description`)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {(meta.threatMatrixUnlocked || (meta.vendorPurchases?.['threat-matrix-console'] ?? 0) > 0) && (
+          <section className="mb-8 border border-cyan-500/40 bg-cyan-950/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg shadow-lg" data-testid="section-threat-matrix-banner">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded border border-cyan-400/50 bg-cyan-900/40 text-cyan-300">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">Security Override Terminal</span>
+                  <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-200">ONLINE</span>
+                </div>
+                <h3 className="text-base font-black uppercase text-white tracking-wide">Threat Matrix Quarantine Console</h3>
+                <p className="text-xs text-cyan-200/70">
+                  Override spawn tables, quarantine enemy specimens, or trigger Universal Cross-Map Incursions.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpen('threat-matrix')}
+              className="flex shrink-0 items-center justify-center gap-2 rounded border border-cyan-400 bg-cyan-500/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/35 transition-all shadow-md"
+            >
+              Access Terminal
+            </button>
+          </section>
+        )}
+
+        {activeRoom.id === 'grpd-station' && (
+          <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{armoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
+              {armoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
+            </div>
+          </section>
+        )}
+
+        {activeRoom.id === 'grpd-vault' && blue616 && (
+          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
+                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
+                </div>
+                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
+                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
+              </div>
+              {legendaryPoliceDog ? (
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
+                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
+                    <ShieldCheck className="h-4 w-4" /> Recovered
+                  </div>
+                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
+                    Equip LokPet
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
+                  <Dog className="h-5 w-5" /> Claim Blue 616
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+         {newlyRescuedAlly && (
+           <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
+             <div className="mb-3 flex items-center gap-2">
+               <PartyPopper className="h-5 w-5 text-emerald-300" />
+               <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Welcome home</p>
+             </div>
+             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+               <HideoutVignette
+                 left={{ name: selectedCharacter.name, rig: selectedCharacter.rig, palette: selectedCharacterPalette }}
+                 right={{ name: newlyRescuedAlly.name, rig: allyRig(newlyRescuedAlly), palette: newlyRescuedAlly.palette }}
+                 size={110}
+               />
+               <p className="text-sm text-white/80">
+                 <span className="font-black uppercase text-white">{newlyRescuedAlly.name}</span> made it back with {selectedCharacter.name}.
+                 {' '}{newlyRescuedAlly.boostLabel}
+               </p>
+             </div>
+           </section>
+         )}
+
           <div className="p-4 bg-card border border-border">
             <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
             <p className="text-sm text-muted-foreground">{activeRoom.description}</p>
@@ -953,48 +1088,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
         </header>
 
-        {activeRoom.id === 'grpd-station' && (
-          <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{armoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
-              {armoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
-            </div>
-          </section>
-        )}
-
-        {activeRoom.id === 'grpd-vault' && blue616 && (
-          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
-                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
-                </div>
-                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
-                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
-              </div>
-              {legendaryPoliceDog ? (
-                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
-                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
-                    <ShieldCheck className="h-4 w-4" /> Recovered
-                  </div>
-                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
-                    Equip LokPet
-                  </button>
-                </div>
-              ) : (
-                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
-                  <Dog className="h-5 w-5" /> Claim Blue 616
-                </button>
-              )}
-            </div>
-          </section>
-        )}
-
         <div className="mb-8">
         <CollapsibleSection
           title="Rumor for the road"
@@ -1066,99 +1159,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           </div>
         </CollapsibleSection>
         </div>
-
-        <section className="mb-10 flex-1">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-px bg-border flex-1" />
-            <p className="text-xs uppercase tracking-widest text-primary font-bold">Playing as <span className="text-white">{selectedCharacter.name}</span></p>
-            <div className="h-px bg-border flex-1" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {activeRoom.features.map(feature => {
-              // 'allies' is rendered separately below, skip it here
-              if (feature === 'allies') return null;
-              
-              const config = PANEL_CONFIG[feature as HubPanel];
-              if (!config) return null;
-              
-              const Icon = config.icon;
-              const isPrimary = feature === 'runs';
-
-              return (
-                <button 
-                  key={feature}
-                  type="button" 
-                  onClick={() => onOpen(feature as HubPanel)} 
-                  className={`group relative p-6 text-left border flex flex-col gap-4 transition-all overflow-hidden ${
-                    isPrimary 
-                      ? 'bg-primary text-primary-foreground border-primary hover:bg-white' 
-                      : 'bg-card border-border hover:border-primary'
-                  }`}
-                  data-testid={config.testId}
-                >
-                  {isPrimary && (
-                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:250%_250%,100%_100%] animate-[shimmer_2s_infinite] pointer-events-none" />
-                  )}
-                  <Icon className={`w-8 h-8 ${isPrimary ? 'text-primary-foreground' : 'text-primary group-hover:text-white transition-colors'}`} />
-                  <div className="relative z-10">
-                    <h3 className={`text-2xl font-black uppercase tracking-tight ${isPrimary ? 'text-primary-foreground' : 'text-white'}`}>{t(`hub.room.${feature as HubPanel}.label`)}</h3>
-                    <p className={`text-xs uppercase tracking-wider mt-1 ${isPrimary ? 'text-primary-foreground/80' : 'text-muted-foreground group-hover:text-gray-300'}`}>
-                      {t(`hub.room.${feature as HubPanel}.description`)}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {(meta.threatMatrixUnlocked || (meta.vendorPurchases?.['threat-matrix-console'] ?? 0) > 0) && (
-          <section className="mb-8 border border-cyan-500/40 bg-cyan-950/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg shadow-lg" data-testid="section-threat-matrix-banner">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded border border-cyan-400/50 bg-cyan-900/40 text-cyan-300">
-                <ShieldAlert className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">Security Override Terminal</span>
-                  <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-200">ONLINE</span>
-                </div>
-                <h3 className="text-base font-black uppercase text-white tracking-wide">Threat Matrix Quarantine Console</h3>
-                <p className="text-xs text-cyan-200/70">
-                  Override spawn tables, quarantine enemy specimens, or trigger Universal Cross-Map Incursions.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpen('threat-matrix')}
-              className="flex shrink-0 items-center justify-center gap-2 rounded border border-cyan-400 bg-cyan-500/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/35 transition-all shadow-md"
-            >
-              Access Terminal
-            </button>
-          </section>
-        )}
-
-         {newlyRescuedAlly && (
-           <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
-             <div className="mb-3 flex items-center gap-2">
-               <PartyPopper className="h-5 w-5 text-emerald-300" />
-               <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Welcome home</p>
-             </div>
-             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-               <HideoutVignette
-                 left={{ name: selectedCharacter.name, rig: selectedCharacter.rig, palette: selectedCharacterPalette }}
-                 right={{ name: newlyRescuedAlly.name, rig: allyRig(newlyRescuedAlly), palette: newlyRescuedAlly.palette }}
-                 size={110}
-               />
-               <p className="text-sm text-white/80">
-                 <span className="font-black uppercase text-white">{newlyRescuedAlly.name}</span> made it back with {selectedCharacter.name}.
-                 {' '}{newlyRescuedAlly.boostLabel}
-               </p>
-             </div>
-           </section>
-         )}
 
          {activeRoom.features.includes('allies') && (
           <section className="mt-auto">
