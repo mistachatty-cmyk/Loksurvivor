@@ -16,6 +16,8 @@ import { NotificationToasts } from './NotificationToasts';
 import { CollapsibleSection } from './CollapsibleSection';
 import { HideoutPreview, type HideoutPetInfo, type HideoutPropInfo, type PlayCue, type StripNotice } from './HideoutPreview';
 import { HideoutPlayBar } from './HideoutPlayBar';
+import { MusicNowPlaying } from './MusicNowPlaying';
+import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { describeReward } from './hideoutRewardText';
 import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
 import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER, type NpcCastMember } from '@/game/data/npcCast';
@@ -148,6 +150,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 };
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
+  const chromeLayout = useUiChromeLayout();
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
@@ -453,7 +456,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       className="min-h-[100dvh] bg-background text-foreground flex flex-col relative overflow-hidden"
     >
       <NotificationToasts />
-      {/* Mission Briefing / Lore Dossier Button */}
+      {chromeLayout === 'classic' ? <>
+      {/* Classic corner controls remain available in Settings. */}
       <button
         type="button"
         onClick={() => setShowLorePopup(true)}
@@ -475,22 +479,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <Sparkles className="h-4 w-4 text-cyan-200" />
         <span>{t('common.looksLokpets')}</span>
       </button>
-      {/* Mobile-only: the full Head Out tile lives at the bottom of a screen
-          that can scroll several pages on a phone -- this keeps the primary
-          action reachable without hunting for it. Hidden at sm+ where the
-          desktop layout is short enough that this would be redundant.
-          Optional -- meta.hideoutStickyHeadOutEnabled, Settings > Hideout. */}
-      {meta.hideoutStickyHeadOutEnabled && (
-        <button
-          type="button"
-          onClick={() => onOpen('runs')}
-          className="fixed inset-x-3 bottom-3 z-50 flex min-h-12 items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden"
-          data-testid="button-open-runs-sticky"
-        >
-          Head out
-          <ArrowRight className="h-4 w-4" />
-        </button>
-      )}
       {companion && (
         <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
           <LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={42} />
@@ -501,6 +489,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </p>
           </div>
         </div>
+      )}
+      </> : null}
+      {meta.hideoutStickyHeadOutEnabled && (
+        <button type="button" onClick={() => onOpen('runs')} className="fixed inset-x-3 bottom-3 z-50 flex min-h-12 items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden" data-testid="button-open-runs-sticky">Head out <ArrowRight className="h-4 w-4" /></button>
       )}
       <AnimatePresence mode="wait">
         <motion.div 
@@ -559,6 +551,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       </AnimatePresence>
 
       <div className={`relative z-20 flex-1 flex flex-col p-6 ${meta.hideoutStickyHeadOutEnabled ? 'pb-24 sm:pb-6' : 'pb-6'}`}>
+        {chromeLayout === 'new' ? (
+          <div className="mb-4 flex flex-col gap-2 border border-white/15 bg-black/75 p-3 shadow-xl backdrop-blur sm:p-4 lg:flex-row lg:items-center" data-testid="hub-control-dock">
+            <div className="flex flex-wrap items-center gap-2">
+              {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
+              <button type="button" onClick={() => setShowLorePopup(true)} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
+              <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+              {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
+              <MusicNowPlaying placement="inline" />
+            </div>
+          </div>
+        ) : null}
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
             rig={selectedCharacter.rig}
@@ -596,6 +601,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         ) : null}
         <div className="mb-5 flex flex-wrap items-center gap-2 rounded border border-white/10 bg-black/50 px-3 py-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-primary">Hideout scene</span>
+          <button type="button" onClick={() => setUiChromeLayout(chromeLayout === 'new' ? 'classic' : 'new')} className="ml-auto border border-white/20 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wide text-white/65 hover:border-primary hover:text-white" data-testid="button-toggle-hub-layout">{chromeLayout === 'new' ? 'Classic corners' : 'New control dock'}</button>
           {SCENE_LOOKS.map((look) => {
             const earned = rescuedAllies.length >= look.crew;
             return <button key={look.id} type="button" disabled={!earned} title={earned ? look.note : `Rescue ${look.crew} crew to earn`} aria-pressed={earnedSceneLook.id === look.id} onClick={() => chooseSceneLook(look.id)} className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${earnedSceneLook.id === look.id ? 'bg-primary text-primary-foreground' : earned ? 'bg-white/10 text-white hover:bg-white/20' : 'cursor-not-allowed bg-white/5 text-white/35'}`}>{look.name}{!earned && ` · ${look.crew} crew`}</button>;
@@ -604,7 +610,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <header className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
-              {onBack && (
+              {onBack && chromeLayout === 'classic' && (
                 <button
                   type="button"
                   onClick={onBack}
@@ -789,8 +795,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
               testId="hideout-scene"
             >
-            <div className="grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-             <div className="flex items-center gap-3">
+            <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+             <div className="flex min-w-0 items-center gap-3 border border-white/10 bg-black/30 p-3">
                <span className="grid h-10 w-10 place-items-center border border-primary/40 bg-primary/10 text-primary">
                  {(() => { const Icon = weatherIcon; return <Icon className="h-5 w-5" />; })()}
                </span>
@@ -799,15 +806,15 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                  <p className="text-xs text-muted-foreground">{scene.weatherDescription}</p>
                </div>
              </div>
-             <div className="hidden h-px bg-border sm:block" />
-              <div className="flex flex-col gap-3 text-right sm:items-end">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2 border border-white/10 bg-black/30 p-3">
                   <Building2 className="hidden h-4 w-4 text-primary sm:block" />
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">{scene.homeName}</p>
                     <p className="text-[11px] text-muted-foreground">{scene.homeDescription}</p>
                   </div>
                 </div>
+            </div>
+              <div className="grid min-w-0 gap-2 text-left sm:grid-cols-2 xl:grid-cols-3 [&>button]:min-w-0 [&>button]:w-full [&>button>span]:min-w-0 [&>button>svg]:shrink-0">
                 {activeRoom.id === 'main-floor' && (
                   <button
                     type="button"

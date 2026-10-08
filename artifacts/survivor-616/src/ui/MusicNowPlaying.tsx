@@ -6,15 +6,14 @@ import { useMusicPlayer } from '@/game/audio/musicPlayer';
  * Persistent transport for the soundtrack. It intentionally lives above the
  * screen switch so music and its controls survive navigation.
  *
- * Docked to the top-left corner (not bottom-center) so it never sits on top
- * of centered screen copy -- the intro's credit line in particular -- or
- * crowds the intro's theme switcher and Reset button, which both live in
- * the bottom corners. Stays as a small round chip until tapped open; the
- * full transport only takes up space once someone actually wants it.
+ * The new hideout dock places these controls in document flow. Classic mode
+ * and other screens keep the original compact top-left corner.
  */
-export function MusicNowPlaying() {
+export function MusicNowPlaying({ placement = 'default' }: { placement?: 'default' | 'inline' | 'menu' }) {
   const player = useMusicPlayer();
   const [expanded, setExpanded] = useState(false);
+  const compactDock = placement === 'inline' ? 'relative' : placement === 'menu' ? 'fixed bottom-3 right-3 z-[100]' : 'fixed left-3 top-3 z-[100]';
+  const expandedDock = placement === 'inline' ? 'relative' : placement === 'menu' ? 'fixed bottom-3 right-3 z-[100]' : 'fixed left-3 top-3 z-[100]';
 
   const playRandomUnlocked = () => {
     const unlocked = player.tracks.filter((track) => !track.locked);
@@ -32,7 +31,7 @@ export function MusicNowPlaying() {
       <button
         type="button"
         onClick={playRandomUnlocked}
-        className="fixed left-3 top-3 z-[100] grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-black/35 text-white/55 opacity-75 backdrop-blur-sm transition hover:border-primary hover:text-primary hover:opacity-100"
+        className={`${compactDock} grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/25 bg-black/75 text-white/75 backdrop-blur-sm transition hover:border-primary hover:text-primary`}
         aria-label="Play a random unlocked soundtrack track"
         data-testid="button-global-random-music"
       >
@@ -46,7 +45,7 @@ export function MusicNowPlaying() {
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="fixed left-3 top-3 z-[100] grid h-8 w-8 place-items-center rounded-full border border-white/15 bg-black/35 text-white/65 opacity-75 backdrop-blur-sm transition hover:border-primary hover:text-primary hover:opacity-100"
+        className={`${compactDock} grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/25 bg-black/75 text-white/75 backdrop-blur-sm transition hover:border-primary hover:text-primary`}
         aria-label={`Now playing: ${player.currentTrack.title}. Open music controls.`}
         title={player.currentTrack.title}
         data-testid="music-now-playing-global"
@@ -58,7 +57,7 @@ export function MusicNowPlaying() {
 
   return (
     <div
-      className="fixed left-3 top-3 z-[100] flex max-w-[min(18rem,calc(100vw-1.5rem))] items-center gap-2 border border-white/15 bg-black/35 px-2 py-1 text-white/65 opacity-75 backdrop-blur-sm transition-opacity hover:opacity-100"
+      className={`${expandedDock} flex max-w-[min(18rem,calc(100vw-1.5rem))] items-center gap-2 border border-white/25 bg-black/90 px-2 py-1 text-white/85 shadow-xl backdrop-blur-sm`}
       data-testid="music-now-playing-global"
     >
       <button

@@ -1,7 +1,9 @@
 import { ArrowLeft, Check, Circle, Cpu, Grid3X3, Monitor, PawPrint, Pencil, Sparkles } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
-import { lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
+import { activeUiThemeSwatchId, lokPetTeamCapacity, useMeta } from '@/game/state/metaStore';
+import { effectiveCatalogIds } from '@/game/data/devUnlockRegistry';
+import { UI_THEMES } from '@/game/data/uiThemes';
 import type { MetaState } from '@/game/types';
 import { LokPetIcon } from '@/ui/LokPetVariantSheet';
 import { hasBranchToChoose, petEvolvedLook } from '@/game/engine/petEvolution';
@@ -61,6 +63,8 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     setUiPanelLayout,
     setMinimapVisible,
     equipPalette,
+    equipUiTheme,
+    selectUiThemeSwatch,
   } = useMeta();
   const [step, setStep] = useState<SetupStep>('companion');
   const [selectedPetIds, setSelectedPetIds] = useState<string[]>(meta.selectedLokPetIds);
@@ -78,6 +82,9 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
   const capacity = lokPetTeamCapacity(selectedCharacter);
   const isLaunch = intent === 'launch';
   const ownedPalettes = meta.ownedPaletteIds.map((id) => THEMED_PALETTES_BY_ID[id]).filter(Boolean);
+  const ownedUiThemeIds = effectiveCatalogIds(meta, 'uiThemes', meta.ownedUiThemeIds);
+  const ownedUiThemes = UI_THEMES.filter((theme) => ownedUiThemeIds.includes(theme.id));
+  const activeSwatchId = activeUiThemeSwatchId(meta);
   const paletteIndex = Math.max(0, ownedPalettes.findIndex((palette) => palette.id === meta.activePaletteId));
   const runtimeTier = detectRuntimePerformanceTier();
 
@@ -241,6 +248,22 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
                   <span className="font-mono text-[10px] font-bold uppercase text-cyan-100">{ownedPalettes[paletteIndex]?.name ?? 'Default'}</span>
                 </div>
                 <input type="range" min={0} max={Math.max(0, ownedPalettes.length - 1)} value={paletteIndex} onChange={(event) => { const palette = ownedPalettes[Number(event.target.value)]; if (palette) equipPalette(palette.id); }} className="mt-4 w-full accent-cyan-300" aria-label="Theme palette" />
+              </section>
+              <section className="border border-white/15 bg-white/[.03] p-4 lg:col-span-2" data-testid="looks-game-theme">
+                <h3 className="text-sm font-black uppercase">Game interface theme</h3>
+                <p className="mt-1 text-xs text-white/55">Choose an owned theme and its color. Menus update immediately.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {ownedUiThemes.map((theme) => {
+                    const equipped = meta.uiTheme === theme.id;
+                    return <div key={theme.id} className={`min-w-0 border p-3 ${equipped ? 'border-primary bg-primary/10' : 'border-white/15 bg-black/25'}`}>
+                      <button type="button" onClick={() => equipUiTheme(theme.id)} aria-pressed={equipped} className="w-full text-left" data-testid={`button-looks-ui-theme-${theme.id}`}>
+                        <span className="flex items-center justify-between gap-2 text-xs font-black uppercase"><span>{theme.name}</span>{equipped ? <Check className="h-4 w-4 text-primary" /> : null}</span>
+                        <span className="mt-2 flex h-2 overflow-hidden border border-white/20" aria-hidden="true">{theme.swatches?.map((swatch) => <span key={swatch.id} className="flex-1" style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }} />)}</span>
+                      </button>
+                      {equipped && theme.swatches ? <div className="mt-3 flex flex-wrap gap-2">{theme.swatches.map((swatch) => <button key={swatch.id} type="button" onClick={() => selectUiThemeSwatch(theme.id, swatch.id)} aria-pressed={activeSwatchId === swatch.id} className={`min-h-9 border px-2 py-1 text-[10px] font-bold ${activeSwatchId === swatch.id ? 'border-white text-white' : 'border-white/20 text-white/60 hover:border-white/60'}`} data-testid={`button-looks-ui-swatch-${theme.id}-${swatch.id}`}><span className="mr-1 inline-block h-3 w-3 border border-white/30 align-middle" style={{ backgroundColor: `hsl(${swatch.primaryHsl})` }} />{swatch.name}</button>)}</div> : null}
+                    </div>;
+                  })}
+                </div>
               </section>
               <section className="border border-white/15 bg-white/[.03] p-4">
                 <h3 className="flex items-center gap-2 text-sm font-black uppercase"><PawPrint className="h-4 w-4 text-pink-200" /> LokPet art style</h3>
