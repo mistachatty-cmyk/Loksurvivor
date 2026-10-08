@@ -681,11 +681,14 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
         )}
 
         {/* Quirks this run */}
-        {result.killsByQuirk && Object.keys(result.killsByQuirk).length > 0 && (
+        {(result.quirkSurgeSurvived || (result.killsByQuirk && Object.keys(result.killsByQuirk).length > 0)) && (
           <div className="border border-border bg-card p-6" data-testid="section-run-quirks">
             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Quirks Defeated</h2>
             <div className="flex flex-wrap gap-3">
-              {Object.entries(result.killsByQuirk).sort((a, b) => b[1] - a[1]).map(([quirkId, count]) => {
+              {result.quirkSurgeSurvived && (
+                <div className="border border-fuchsia-300 px-3 py-2 font-mono text-xs uppercase text-fuchsia-200" data-testid="chip-surge-survived">Surge survived</div>
+              )}
+              {Object.entries(result.killsByQuirk ?? {}).sort((a, b) => b[1] - a[1]).map(([quirkId, count]) => {
                 const quirk = ENEMY_QUIRKS_BY_ID[quirkId];
                 return (
                   <div key={quirkId} className="border px-3 py-2 font-mono text-xs uppercase" style={{ borderColor: quirk?.color ?? '#64748b', color: quirk?.color ?? '#cbd5e1' }}>

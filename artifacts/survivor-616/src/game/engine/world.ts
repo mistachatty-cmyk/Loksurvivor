@@ -1180,6 +1180,8 @@ export interface World {
   killsByQuirk: Record<string, number>;
   /** Quirk Surge progress: 0 waiting, 1 running, 2 paid out. */
   quirkSurgePhase: 0 | 1 | 2;
+  /** The 10-second countdown alert has fired. */
+  quirkSurgeWarned: boolean;
   /** How often this run gets a Quirk Surge, decided by the player's progress. */
   quirkSurgeMode: QuirkSurgeMode;
   /** Quirks already announced this run, so each is explained once. */
@@ -1754,6 +1756,7 @@ export function createWorld(
     killsByQuirk: {},
     quirkAnnounced: {},
     quirkSurgePhase: 0,
+    quirkSurgeWarned: false,
     quirkSurgeMode: setup.quirkSurgeMode ?? 'off',
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
@@ -4020,6 +4023,9 @@ function updateQuirkSurge(w: World) {
     pushAlert(w, `QUIRK SURGE! Every enemy is quirked for 20 seconds. ${QUIRK_SURGE_LORE.alertTail}`);
     pushSfx(w, 'ultimate');
     w.shake = Math.max(w.shake, 6);
+  } else if (w.quirkSurgePhase === 1 && !w.quirkSurgeWarned && w.now >= start + QUIRK_SURGE_MS - 10_000 && w.now < start + QUIRK_SURGE_MS) {
+    w.quirkSurgeWarned = true;
+    pushAlert(w, 'SURGE ENDS IN 10');
   } else if (w.quirkSurgePhase === 1 && w.now >= start + QUIRK_SURGE_MS) {
     w.quirkSurgePhase = 2;
     pushAlert(w, 'SURGE SURVIVED! Bonus drop');
@@ -12393,6 +12399,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     killsByQuirk: { ...w.killsByQuirk },
     quirkEverywhereRun: w.enemyQuirks.everywhere.some((id) => !w.enemyQuirks.disabled.has(id)),
     quirkTakenRun: w.enemyQuirks.taken.size > 0,
+    quirkSurgeSurvived: w.quirkSurgePhase === 2,
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
     mapFindIds: [...w.mapFindIds],

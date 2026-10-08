@@ -103,3 +103,26 @@ test('a run that used Everywhere or Take it on is counted once on the save', asy
   assert.equal(after.meta.quirkEverywhereRuns, 1);
   assert.equal(after.meta.quirkTakenRuns, 1);
 });
+
+test('Surge achievements complete at their thresholds and a survived Surge is counted once', async () => {
+  const { ACHIEVEMENTS_BY_ID } = await import('@/game/data/achievements');
+  const { AREAS } = await import('@/game/data/areas');
+  const { CHARACTERS } = await import('@/game/data/characters');
+  const { STANDARD_MAPS } = await import('@/game/data/endgameUnlocks');
+  const { buildResult, createWorld } = await import('@/game/engine/world');
+  const fresh = createInitialMeta();
+  const met = (id: string, patch: object) => ACHIEVEMENTS_BY_ID[id]!.isComplete({ ...fresh, ...patch });
+  for (const id of ['surge-glyph-reader', 'surge-first', 'surge-10', 'surge-50', 'victory-lap-reached']) assert.equal(met(id, {}), false, id);
+  assert.equal(met('surge-glyph-reader', { clearedAreaIds: AREAS.slice(0, 13).map((a) => a.id) }), false);
+  assert.equal(met('surge-glyph-reader', { clearedAreaIds: AREAS.slice(0, 14).map((a) => a.id) }), true);
+  assert.equal(met('surge-first', { quirkSurgesSurvived: 1 }), true);
+  assert.equal(met('surge-10', { quirkSurgesSurvived: 9 }), false);
+  assert.equal(met('surge-50', { quirkSurgesSurvived: 50 }), true);
+  assert.equal(met('victory-lap-reached', { clearedAreaIds: STANDARD_MAPS.map((a) => a.id) }), true);
+  const world = createWorld(AREAS[0]!, CHARACTERS[0]!, CHARACTERS[0]!.stats, 1);
+  world.quirkSurgePhase = 2;
+  const next = reducer({ meta: fresh, lastRun: null }, { type: 'completeRun', result: buildResult(world) });
+  assert.equal(next.meta.quirkSurgesSurvived, 1);
+  world.quirkSurgePhase = 1;
+  assert.equal(buildResult(world).quirkSurgeSurvived, false);
+});

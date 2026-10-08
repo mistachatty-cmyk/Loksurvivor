@@ -765,6 +765,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Before the end game, a Quirk Surge now comes to about 1 run in 4 instead of 2 in 5. Once Victory Lap opens it still comes every run.',
     ],
   },
+  {
+    version: '0.21.1',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T03:00:00Z',
+    kind: 'update',
+    title: 'Surge Records',
+    body: [
+      'The game now keeps count of the Quirk Surges you outlast. A 10-second warning appears before one ends, and the run summary marks a Surge survived.',
+      'Five new achievements: Glyph Reader, Heard the Howls, Eclipse Regular, Nothing Surprises Me, and Victory Lap for opening the end game.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

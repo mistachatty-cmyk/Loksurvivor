@@ -4,7 +4,7 @@ import test from 'node:test';
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
 import { ENEMY_QUIRKS } from '@/game/data/enemyQuirks';
-import { createWorld, damageEnemy, stepWorld } from './world';
+import { buildResult, createWorld, damageEnemy, stepWorld } from './world';
 
 const IDLE = { moveX: 0, moveY: 0, ultimate: false };
 
@@ -140,6 +140,8 @@ test('a Quirk Surge quirks every spawn for 20 seconds, then pays out once', asyn
     }
   }
   assert.equal(world.quirkSurgePhase, 2);
+  assert.equal(world.quirkSurgeWarned, true);
+  assert.equal(world.outcome === 'running' ? buildResult(world).quirkSurgeSurvived : true, true);
   assert.ok(spawnedInSurge.length > 20);
   const quirked = spawnedInSurge.filter(Boolean).length / spawnedInSurge.length;
   assert.ok(quirked > 0.9, `surge spawns quirked: ${quirked}`);

@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 65,
+      "version": "0.21.1",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T03:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Surge Records",
+      "body": [
+        "The game now keeps count of the Quirk Surges you outlast. A 10-second warning appears before one ends, and the run summary marks a Surge survived.",
+        "Five new achievements: Glyph Reader, Heard the Howls, Eclipse Regular, Nothing Surprises Me, and Victory Lap for opening the end game."
+      ]
+    },
+    {
       "number": 64,
       "version": "0.21.0",
       "date": "2026-10-08",

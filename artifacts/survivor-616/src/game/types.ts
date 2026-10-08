@@ -2431,6 +2431,8 @@ export interface MetaState {
   /** Runs started with at least one quirk set to Everywhere / Take it on. */
   quirkEverywhereRuns: number;
   quirkTakenRuns: number;
+  /** Quirk Surges the player has outlasted. */
+  quirkSurgesSurvived: number;
   /** GRPD evidence seals are earned every 1,000 lifetime kills; this is the spent amount. */
   grpdSpentSeals: number;
   /** Completed field prototypes fabricated at the GRPD Armory. */
@@ -2679,6 +2681,8 @@ export interface RunResult {
   /** This run used a quirk's Everywhere option / Take it on option. */
   quirkEverywhereRun?: boolean;
   quirkTakenRun?: boolean;
+  /** This run outlasted its Quirk Surge. */
+  quirkSurgeSurvived?: boolean;
   /** Growth Recap: XP, level and bond changes for pets that were out. Filled when the run is recorded. */
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;

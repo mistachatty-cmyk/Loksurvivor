@@ -6,6 +6,8 @@ import { CHARACTERS } from './characters';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
 import { FACTIONS_BY_ID } from './factions';
+import { endgameReached, mapsCleared } from './endgameUnlocks';
+import { QUIRK_SURGE_UNLOCK_MAPS } from './enemyQuirks';
 import { ENEMY_QUIRKS, QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } from './enemyQuirks';
 import { LOKPET_VARIANTS } from './lokPets';
 import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
@@ -590,6 +592,55 @@ const GEN_ACHIEVEMENTS: RawAchievement[] = [
 ];
 RAW_ACHIEVEMENTS.push(...GEN_ACHIEVEMENTS);
 
+/** The Quirk Surge, its unlock, and the end game it leads to. */
+const SURGE_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'surge-glyph-reader',
+    name: 'Glyph Reader',
+    description: 'Clear 14 maps, enough to start seeing the glyphs.',
+    tier: 'bronze',
+    isComplete: (meta) => meta.clearedAreaIds.length >= QUIRK_SURGE_UNLOCK_MAPS,
+    progress: (meta) => ratio(meta.clearedAreaIds.length, QUIRK_SURGE_UNLOCK_MAPS),
+    reward: { kind: 'cred', amount: 200 },
+  },
+  {
+    id: 'surge-first',
+    name: 'Heard the Howls',
+    description: 'Outlast a Quirk Surge.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 1,
+    reward: { kind: 'cred', amount: 500 },
+  },
+  {
+    id: 'surge-10',
+    name: 'Eclipse Regular',
+    description: 'Outlast 10 Quirk Surges.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 10,
+    progress: (meta) => ratio(meta.quirkSurgesSurvived, 10),
+    reward: { kind: 'lootTokens', amount: 5 },
+  },
+  {
+    id: 'surge-50',
+    name: 'Nothing Surprises Me',
+    description: 'Outlast 50 Quirk Surges.',
+    tier: 'legendary',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 50,
+    progress: (meta) => ratio(meta.quirkSurgesSurvived, 50),
+    reward: { kind: 'lootTokens', amount: 25 },
+  },
+  {
+    id: 'victory-lap-reached',
+    name: 'Victory Lap',
+    description: 'Clear every standard map and open the end game.',
+    tier: 'gold',
+    isComplete: (meta) => endgameReached(meta),
+    progress: (meta) => { const { have, need } = mapsCleared(meta); return ratio(have, need); },
+    reward: { kind: 'cred', amount: 1000 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...SURGE_ACHIEVEMENTS);
+
 const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'first-blood': 'combat', 'body-count-1000': 'combat', 'body-count-10000': 'combat', 'fourth-wall-breaker': 'combat',
   'glitch-hunter': 'combat', 'stack-smasher': 'combat', 'null-terminator': 'combat',
@@ -604,6 +655,7 @@ const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'sealed-no-more': 'cards', 'triple-stamped': 'cards', 'first-holo': 'cards', 'passive-powerhouse': 'cards',
   'half-the-deck': 'cards', 'complete-collector': 'cards', 'director-cut': 'combat',
   'passive-income': 'economy',
+  'surge-glyph-reader': 'world', 'surge-first': 'combat', 'surge-10': 'combat', 'surge-50': 'combat', 'victory-lap-reached': 'world',
   'gen-floor-cleared': 'world', 'gen-warden-down': 'combat', 'gen-six-styles': 'bestiary', 'gen-full-roster': 'bestiary',
   'quirk-everywhere-run': 'combat', 'quirk-everywhere-run-10': 'combat', 'quirk-taken-run': 'combat', 'quirk-taken-run-10': 'combat',
 };
