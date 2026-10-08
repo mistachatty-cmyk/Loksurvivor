@@ -890,6 +890,31 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Five new achievements: Glyph Reader, Heard the Howls, Eclipse Regular, Nothing Surprises Me, and Victory Lap for opening the end game.',
     ],
   },
+  {
+    version: '0.21.2',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T21:30:00Z',
+    kind: 'update',
+    title: 'Forge Gets Three Screens',
+    body: [
+      'The Forge now has a top bar with Operators, Enemies and LokPets. Switching is instant and each screen keeps where you left it.',
+      'Operators can use the Classic v1 look: the original plain build, with your detailed v2 features kept for when you switch back.',
+      'Enemies and LokPets open as classic galleries. Recolor any of them and keep it as a custom look. Stats and behavior never change; full part-by-part forging for both comes next.',
+    ],
+  },
+  {
+    version: '0.21.3',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T23:00:00Z',
+    kind: 'update',
+    title: 'Endgame, Within Reach',
+    body: [
+      'After Victory Lap the Bestiary gets a Custom Bestiary view for your recolored enemies and LokPets, and the hideout gets an Endgame dock with your switches and shortcuts. Hide the dock in Endgame settings.',
+      'Endgame settings now has a table of everything the end game unlocks, how to earn it and why. Every custom operator and look has its own "use in runs" switch, plus one master switch with All on and All off.',
+      'Custom looks now show up in your runs. Customs stay out of card packs for now.',
+      'Ten Forge achievements join the Archive.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

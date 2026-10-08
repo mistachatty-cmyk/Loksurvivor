@@ -13,6 +13,8 @@ import { LOKPET_VARIANTS } from './lokPets';
 import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
 import { RENTABLE_GENERATORS } from './generators';
 import { DEFAULT_DROP_PACK_ID, DROP_PACKS } from './dropPacks';
+import { FACTIONS } from './factions';
+import { earnedSlotCount, getForgeStats, loadCustomVariants, loadForgedOperators } from '@/game/state/operatorForgeStore';
 
 export interface AchievementReward {
   kind: 'cred' | 'lootTokens' | 'cardCredits';
@@ -26,7 +28,7 @@ export interface AchievementReward {
  * claiming one is tracked separately in `meta.claimedAchievementIds`
  * (see `claimAchievement` in `state/metaStore.tsx`) rather than here.
  */
-export type AchievementCategory = 'combat' | 'survival' | 'world' | 'crew' | 'bestiary' | 'lokpet' | 'cards' | 'economy';
+export type AchievementCategory = 'combat' | 'survival' | 'world' | 'crew' | 'bestiary' | 'lokpet' | 'cards' | 'economy' | 'forge';
 
 export const ACHIEVEMENT_CATEGORIES: Array<{ id: AchievementCategory; label: string }> = [
   { id: 'combat', label: 'Combat' },
@@ -37,6 +39,7 @@ export const ACHIEVEMENT_CATEGORIES: Array<{ id: AchievementCategory; label: str
   { id: 'lokpet', label: 'LokPets' },
   { id: 'cards', label: 'Cards' },
   { id: 'economy', label: 'Economy' },
+  { id: 'forge', label: 'Forge' },
 ];
 
 export interface AchievementDef {
@@ -51,6 +54,17 @@ export interface AchievementDef {
   progress?: (meta: MetaState) => number;
   reward?: AchievementReward;
 }
+
+/**
+ * Forge achievements read the device-local Forge store (it lives outside MetaState).
+ * Every counter only goes up, so a deleted operator never un-earns anything.
+ */
+const forge = {
+  stats: () => getForgeStats(),
+  distinctBases: (kind: 'enemy' | 'pet') => new Set(loadCustomVariants(kind).map((v) => v.baseId)),
+};
+const FACTION_ROSTERS = FACTIONS.map((f) => f.roster);
+const PET_FAMILIES = ['animal', 'ghoul', 'bat', 'mote', 'blob', 'mechanical'] as const;
 
 const ratio = (value: number, total: number) => (total <= 0 ? 0 : Math.min(1, value / total));
 
@@ -474,6 +488,96 @@ const RAW_ACHIEVEMENTS: RawAchievement[] = [
     progress: (meta) => ratio(Math.max(0, ...meta.savedLokPets.map((pet) => pet.level ?? 1)), 50),
     reward: { kind: 'cred', amount: 250 },
   },
+  {
+    id: 'forge-first-spark',
+    name: 'First Spark',
+    description: 'Save your first operator from the Forge.',
+    tier: 'bronze',
+    isComplete: () => forge.stats().classicSaved + forge.stats().detailedSaved >= 1 || loadForgedOperators().length >= 1,
+    reward: { kind: 'cred', amount: 50 },
+  },
+  {
+    id: 'forge-old-school',
+    name: 'Old School',
+    description: 'Save an operator with the Classic v1 look.',
+    tier: 'bronze',
+    isComplete: () => forge.stats().classicSaved >= 1,
+    reward: { kind: 'cred', amount: 50 },
+  },
+  {
+    id: 'forge-both-eras',
+    name: 'Both Eras',
+    description: 'Save one Classic v1 operator and one Detailed v2 operator.',
+    tier: 'silver',
+    isComplete: () => forge.stats().classicSaved >= 1 && forge.stats().detailedSaved >= 1,
+    reward: { kind: 'cred', amount: 150 },
+  },
+  {
+    id: 'forge-full-house',
+    name: 'Full House',
+    description: 'Fill all five custom operator slots.',
+    tier: 'gold',
+    isComplete: () => earnedSlotCount() >= 5 && loadForgedOperators().length >= 5,
+    progress: () => ratio(Math.min(loadForgedOperators().length, 5), 5),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+  {
+    id: 'forge-palette-nerd',
+    name: 'Palette Nerd',
+    description: 'Save 10 recolored enemy or LokPet looks.',
+    tier: 'silver',
+    isComplete: () => forge.stats().recolored >= 10,
+    progress: () => ratio(forge.stats().recolored, 10),
+    reward: { kind: 'cred', amount: 150 },
+  },
+  {
+    id: 'forge-rogues-gallery',
+    name: "Rogue's Gallery",
+    description: 'Keep custom looks for 10 different enemies.',
+    tier: 'silver',
+    isComplete: () => forge.distinctBases('enemy').size >= 10,
+    progress: () => ratio(forge.distinctBases('enemy').size, 10),
+    reward: { kind: 'cred', amount: 200 },
+  },
+  {
+    id: 'forge-menagerie',
+    name: 'Menagerie',
+    description: 'Keep custom looks for 10 different LokPets.',
+    tier: 'silver',
+    isComplete: () => forge.distinctBases('pet').size >= 10,
+    progress: () => ratio(forge.distinctBases('pet').size, 10),
+    reward: { kind: 'cardCredits', amount: 50 },
+  },
+  {
+    id: 'forge-tab-hopper',
+    name: 'Tab Hopper',
+    description: 'Visit the Operators, Enemies and LokPets screens in the Forge.',
+    tier: 'bronze',
+    isComplete: () => ['operators', 'enemies', 'lokpets'].every((tab) => forge.stats().tabsVisited.includes(tab)),
+    reward: { kind: 'cred', amount: 25 },
+  },
+  {
+    id: 'forge-share-the-look',
+    name: 'Share the Look',
+    description: 'Copy a share code for one of your operators.',
+    tier: 'bronze',
+    isComplete: () => forge.stats().shareCodes >= 1,
+    reward: { kind: 'cred', amount: 25 },
+  },
+  {
+    id: 'forge-complete-collection',
+    name: 'Complete Collection',
+    description: 'Keep a custom look for an enemy from every faction and a LokPet from every family.',
+    tier: 'legendary',
+    isComplete: () => {
+      const enemies = forge.distinctBases('enemy');
+      const petBases = forge.distinctBases('pet');
+      const factionsDone = FACTION_ROSTERS.every((roster) => roster.some((id) => enemies.has(id)));
+      const familiesDone = PET_FAMILIES.every((family) => [...petBases].some((id) => LOKPET_VARIANTS.find((v) => v.id === id)?.family === family));
+      return factionsDone && familiesDone;
+    },
+    reward: { kind: 'lootTokens', amount: 50 },
+  },
 ];
 
 /**
@@ -681,6 +785,9 @@ const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'soulbound': 'lokpet', 'five-names': 'lokpet', 'pet-level-20': 'lokpet', 'pet-level-50': 'lokpet',
   'sealed-no-more': 'cards', 'triple-stamped': 'cards', 'first-holo': 'cards', 'passive-powerhouse': 'cards',
   'half-the-deck': 'cards', 'complete-collector': 'cards', 'director-cut': 'combat',
+  'forge-first-spark': 'forge', 'forge-old-school': 'forge', 'forge-both-eras': 'forge', 'forge-full-house': 'forge',
+  'forge-palette-nerd': 'forge', 'forge-rogues-gallery': 'forge', 'forge-menagerie': 'forge', 'forge-tab-hopper': 'forge',
+  'forge-share-the-look': 'forge', 'forge-complete-collection': 'forge',
   'passive-income': 'economy', 'new-loot-look': 'economy', 'pack-rat': 'economy', 'full-stash': 'economy',
   'surge-glyph-reader': 'world', 'surge-first': 'combat', 'surge-10': 'combat', 'surge-50': 'combat', 'victory-lap-reached': 'world',
   'gen-floor-cleared': 'world', 'gen-warden-down': 'combat', 'gen-six-styles': 'bestiary', 'gen-full-roster': 'bestiary',

@@ -15,6 +15,7 @@ import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { LOKPET_VARIANTS_BY_ID, lokPetSpritePalette } from '@/game/data/lokPets';
+import { customEnemyPalette, customPetPalette } from '@/game/state/operatorForgeStore';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
@@ -5273,7 +5274,7 @@ function drawActors(
     const alpha = pet.ghost ? 0.3 + pulse * 0.08 : pulse;
     const facing: 1 | -1 = pet.vx < -4 ? -1 : 1;
     const rig = evolvedRig(pet.silhouette, pet.evolutionOverlays);
-    const palette = lokPetSpritePalette(pet.palette);
+    const palette = customPetPalette(pet.variantId) ?? lokPetSpritePalette(pet.palette);
     const petScale = LOKPET_SPRITE_SCALE * (pet.sizeScale ?? 1) * (0.9 + pulse * 0.1);
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -5739,10 +5740,11 @@ function drawActors(
   const enemyColorTheme = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
   const enemyPaletteCache = enemyColorTheme ? new Map<string, SpritePalette>() : null;
   const resolveEnemyPalette = (def: EnemyDef): SpritePalette => {
-    if (!enemyPaletteCache || !enemyColorTheme) return def.palette;
+    const basePalette = customEnemyPalette(def.id) ?? def.palette;
+    if (!enemyPaletteCache || !enemyColorTheme) return basePalette;
     const cached = enemyPaletteCache.get(def.id);
     if (cached) return cached;
-    const blended = blendSpritePalettes(def.palette, enemyColorTheme, 0.35);
+    const blended = blendSpritePalettes(basePalette, enemyColorTheme, 0.35);
     enemyPaletteCache.set(def.id, blended);
     return blended;
   };

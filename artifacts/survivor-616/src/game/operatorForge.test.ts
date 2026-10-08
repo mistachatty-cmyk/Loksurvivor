@@ -278,3 +278,23 @@ test('a faction race leans toward its own look', () => {
   assert.ok(lean('nullborn', 'back', 'cables') > baseline('back', 'cables') + 10);
   assert.ok(lean('bubblenaught', 'headwear', 'bubblehelm') > baseline('headwear', 'bubblehelm') + 10);
 });
+
+test('classic (v1) designs build the plain rig and round-trip', () => {
+  const detailed = generateOperatorDesign('classic-check');
+  assert.equal(detailed.style, undefined);
+  assert.equal(normalizeDesign(detailed).style, undefined);
+  const classic = { ...detailed, style: 'classic' as const };
+  const plain = buildOperatorRig(classic);
+  const full = buildOperatorRig(detailed);
+  assert.ok(plain.parts.length <= full.parts.length);
+  assert.equal(normalizeDesign(classic).style, 'classic');
+  assert.equal(normalizeDesign({ ...classic, style: 'bogus' }).style, undefined);
+  const op: ForgedOperator = { id: 'forge-classic1', name: 'Old School', handle: 'v1', tagline: 't', bio: 'b', kitId: 'x', design: classic, createdAt: 1 };
+  const back = importForgedOperator(exportForgedOperator(op), NONE, 2);
+  assert.equal(back?.design.style, 'classic');
+});
+
+test('forged operators never enter the card manifests', async () => {
+  const { CARD_MANIFESTS } = await import('./data/cards');
+  assert.ok(CARD_MANIFESTS.every((card) => !card.slug.includes(FORGE_ID_PREFIX)));
+});
