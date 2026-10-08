@@ -63,6 +63,8 @@ function clamp01(value: number): number {
 export interface AnalyserOptions {
   /** Called with the smoothed broadband energy, for the CSS reactive root. */
   onEnergy?: (energy: number) => void;
+  /** Exact timing supplied by a song created in Studio. */
+  authoredTiming?: () => { bpm: number; beat: number } | null;
 }
 
 /**
@@ -233,7 +235,8 @@ export class MusicAnalyser {
       }
     }
 
-    const beat = this.bpm > 0 ? this.beat : 0;
+    const authored = this.options.authoredTiming?.();
+    const beat = authored ? authored.beat : this.bpm > 0 ? this.beat : 0;
     const phase = beat - Math.floor(beat);
     const beatIndex = Math.floor(beat);
     const downbeat = beatIndex > this.lastBeatIndex && beatIndex % 4 === 0;
@@ -241,8 +244,8 @@ export class MusicAnalyser {
 
     beatBus.publish(
       {
-        bpm: this.bpm,
-        confidence: this.confidence,
+        bpm: authored?.bpm ?? this.bpm,
+        confidence: authored ? 1 : this.confidence,
         beat,
         bar: beat / 4,
         phase,
