@@ -372,9 +372,5 @@
   "hideout.event.ui.lockedBond": "Nécessite une caution {{rank}}",
   "hideout.event.ui.fizzle": "Vous avez presque trouvé quelque chose de spécial, mais le moment vous échappe. Vous en repartez quand même avec un peu.",
   "hideout.event.ui.gone": "Ce moment est déjà passé.",
-  "hideout.event.ui.fallbackPet": "votre LokPet",
-  "settings.dropStyle.title": "Style de chute",
-  "settings.dropStyle.enhanced": "Amélioré",
-  "settings.dropStyle.classic": "Classique",
-  "settings.dropStyle.description": "L'amélioration donne des gemmes, des coffres et des matériaux, des illustrations ombragées, des rebonds d'apparition, une animation inactive et des pistes de ramassage. Le classique est le look original. Les graphiques de performances utilisent toujours Classic. Affichage uniquement."
+  "hideout.event.ui.fallbackPet": "votre LokPet"
 }

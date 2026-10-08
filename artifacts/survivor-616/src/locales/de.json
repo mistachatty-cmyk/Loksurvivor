@@ -372,9 +372,5 @@
   "hideout.event.ui.lockedBond": "Benötigt {{rank}}-Anleihe",
   "hideout.event.ui.fizzle": "Fast hätte man etwas Besonderes gefunden, aber der Moment vergeht. Du hast immer noch ein wenig davon.",
   "hideout.event.ui.gone": "Dieser Moment ist bereits vergangen.",
-  "hideout.event.ui.fallbackPet": "Ihr LokPet",
-  "settings.dropStyle.title": "Drop-Stil",
-  "settings.dropStyle.enhanced": "Verbessert",
-  "settings.dropStyle.classic": "Klassisch",
-  "settings.dropStyle.description": "Verbessert: Edelsteine, Truhen und Materialien erhalten schattierte Grafiken, Spawn-Sprünge, Leerlaufanimationen und Aufnahmepfade. Klassisch ist der ursprüngliche Look. Performance-Grafiken verwenden immer Classic. Nur Anzeige."
+  "hideout.event.ui.fallbackPet": "Ihr LokPet"
 }

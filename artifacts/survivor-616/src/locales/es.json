@@ -372,9 +372,5 @@
   "hideout.event.ui.lockedBond": "Necesita bono {{rank}}",
   "hideout.event.ui.fizzle": "Casi encuentras algo especial, pero el momento se te escapa. Todavía te quedas con un poco.",
   "hideout.event.ui.gone": "Este momento ya pasó.",
-  "hideout.event.ui.fallbackPet": "tu LokPet",
-  "settings.dropStyle.title": "estilo gota",
-  "settings.dropStyle.enhanced": "Mejorado",
-  "settings.dropStyle.classic": "Clásico",
-  "settings.dropStyle.description": "Mejorado ofrece arte sombreado de gemas, cofres y materiales, rebotes de generación, animación inactiva y senderos de recogida. Clásico es el aspecto original. Los gráficos de rendimiento siempre utilizan Classic. Sólo visualización."
+  "hideout.event.ui.fallbackPet": "tu LokPet"
 }

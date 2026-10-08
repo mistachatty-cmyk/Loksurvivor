@@ -372,9 +372,5 @@
   "hideout.event.ui.lockedBond": "Precisa de vínculo {{rank}}",
   "hideout.event.ui.fizzle": "Você quase encontrou algo especial, mas o momento passa. Você ainda sai com um pouco.",
   "hideout.event.ui.gone": "Este momento já passou.",
-  "hideout.event.ui.fallbackPet": "seu LokPet",
-  "settings.dropStyle.title": "Estilo de queda",
-  "settings.dropStyle.enhanced": "Aprimorado",
-  "settings.dropStyle.classic": "Clássico",
-  "settings.dropStyle.description": "Aprimorado oferece arte sombreada para gemas, baús e materiais, saltos de spawn, animação ociosa e trilhas de coleta. Clássico é o visual original. Os gráficos de desempenho sempre usam Classic. Somente exibição."
+  "hideout.event.ui.fallbackPet": "seu LokPet"
 }

@@ -696,6 +696,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     body: [
       'Drops now come in packs. Your current gems, coins, chests and materials are the free Potato Pack, and everyone starts on it, so nothing about the way drops look has changed unless you pick something new.',
       'The Customization Shop has a new Drop packs tab with seven more looks, each sold for LokTokens: Pop Cut (bright and cartoon-clean), Paper Cut (layered craft paper), Pixel Stash (hand-pixeled sprites), Blueprint (drafting-table schematics), Salvage Grit (worn metal, glass and stone), Neon Arcade (tube-light outlines) and Dark Circuit (matte hardware with glowing lines). Packs add a spawn bounce, a soft shadow, idle animation and a streak when the magnet pulls a drop in. Display only; drops and rewards never change, and Performance graphics always uses Potato.',
+      'Three new Economy achievements go with it: New Loot Look, Pack Rat and Full Stash.',
     ],
   },
 ];

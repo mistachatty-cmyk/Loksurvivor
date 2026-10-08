@@ -372,9 +372,5 @@
   "hideout.event.ui.lockedBond": "{{rank}} 채권 필요",
   "hideout.event.ui.fizzle": "당신은 특별한 것을 거의 발견하지만 순간은 멀리 미끄러지습니다. 당신은 여전히 조금 떨어져 있습니다.",
   "hideout.event.ui.gone": "이 순간은 이미 통과했습니다.",
-  "hideout.event.ui.fallbackPet": "당신의 LokPet",
-  "settings.dropStyle.title": "드롭 스타일",
-  "settings.dropStyle.enhanced": "향상된",
-  "settings.dropStyle.classic": "클래식",
-  "settings.dropStyle.description": "Enhanced는 보석, 상자 및 재료에 음영 처리된 아트, 스폰 바운스, 유휴 애니메이션 및 픽업 트레일을 제공합니다. 클래식은 원래의 모습입니다. 성능 그래픽은 항상 Classic을 사용합니다. 표시 전용입니다."
+  "hideout.event.ui.fallbackPet": "당신의 LokPet"
 }

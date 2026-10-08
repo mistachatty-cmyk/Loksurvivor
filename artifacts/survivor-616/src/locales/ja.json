@@ -371,9 +371,5 @@
   "hideout.event.ui.lockedBond": "ニーズ {{rank}} ボンド",
   "hideout.event.ui.fizzle": "特別なものがほとんど見つかりましたが、その瞬間は消えます。 あなたはまだ少し離れて来る.",
   "hideout.event.ui.gone": "この瞬間はすでに通過しました。",
-  "hideout.event.ui.fallbackPet": "あなたのLokPet",
-  "settings.dropStyle.title": "ドロップスタイル",
-  "settings.dropStyle.enhanced": "強化された",
-  "settings.dropStyle.classic": "クラシック",
-  "settings.dropStyle.description": "強化されたジェム、チェスト、マテリアルのシェーディング アート、スポーン バウンス、アイドル アニメーション、ピックアップ トレイルが追加されます。クラシックはオリジナルの外観です。パフォーマンス グラフィックスは常にクラシックを使用します。表示のみ。"
+  "hideout.event.ui.fallbackPet": "あなたのLokPet"
 }
