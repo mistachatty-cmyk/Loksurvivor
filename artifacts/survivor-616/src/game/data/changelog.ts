@@ -690,7 +690,19 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.19.6',
     date: '2026-10-08',
-    publishedAt: '2026-10-08T01:00:00Z',
+    publishedAt: '2026-10-08T03:00:00Z',
+    kind: 'update',
+    title: 'The Sleeve Counter',
+    body: [
+      'The Neon Sleeve has a new Sleeve Counter tab where you can dress up your LokPacks with Card Credits. Pack wrappers: a crimped Foil Wrapper for every pack, a printed Fighter Print booster that puts a real fighter or LokPet from the game on the front with their attack, and a lift-lid Collector Box.',
+      'Eight district card backs, from Furniture City Walnut to the Null Sector Rack, each with a real fighter in the hub, show while you flip through a pack. Two new card frames lay your collection out like real cards: Printed Stock, with a halftone art window and a real attack box, and Spellbook Layout, with a cost line, type line, rules text, flavor and an attack/HP box. The old colored frames now work on the default card too. Everything is cosmetic only: pack odds, prices and card stats never change.',
+      'Settings has a new Card motion option: Full tilts cards toward your cursor and lets foil shimmer, Subtle only reacts on hover, Off keeps everything still. Classic tiles and the classic card stay free and are the default.',
+    ],
+  },
+  {
+    version: '0.19.7',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T04:00:00Z',
     kind: 'update',
     title: 'Drop Packs',
     body: [

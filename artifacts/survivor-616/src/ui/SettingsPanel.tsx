@@ -82,6 +82,7 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-chaos', label: 'Chaos toggles', terms: 'invert mirror world palette cheat' },
   { id: 'settings-wildlife', label: 'Wildlife', terms: 'birds fireflies weather' },
   { id: 'settings-card-layout', label: 'Card layout', terms: 'grid list density' },
+  { id: 'settings-card-motion', label: 'Card motion', terms: 'pack wrapper card back frame tilt shimmer animation' },
   { id: 'settings-panel-layout', label: 'Panel layout', terms: 'detail panel side bottom' },
   { id: 'settings-customization', label: 'Customization', terms: 'theme palette looks skins' },
   { id: 'settings-data', label: 'Save data', terms: 'backup export import progress forge' },
@@ -243,6 +244,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setMinimapVisible,
     setMinimapExpanded,
     setUiDensity,
+    setCardMotion,
     setUiPanelLayout,
     buyUiTheme,
     equipUiTheme,
@@ -1462,6 +1464,36 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   <LayoutList className="h-4 w-4" />
                   Legacy list
                 </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-card-motion" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-card-motion-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-fuchsia-300/40 bg-fuchsia-300/10 text-fuchsia-200">
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-black uppercase text-white">{t('settings.cardMotion.title')}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.cardMotion.body')}</p>
+              <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label={t('settings.cardMotion.title')}>
+                {(['full', 'subtle', 'off'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setCardMotion(option)}
+                    aria-pressed={meta.cardMotion === option}
+                    className={`border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.cardMotion === option
+                        ? 'border-fuchsia-300/60 bg-fuchsia-300/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid={`button-settings-card-motion-${option}`}
+                  >
+                    {t(`sleeve.motion.${option}` as const)}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
