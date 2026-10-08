@@ -89,6 +89,7 @@ import { chooseBranch, normalizeEvolutionPath, undoBranch } from '@/game/engine/
 import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDayKey, growPartyPets, growPet, growthHeadlines, runPetExpBase, sanitizePetName, scalePetExp, setPetName, type PetNameSlot } from '@/game/engine/petGrowth';
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
+import { CARD_COSMETICS_BY_ID, equipCardCosmetic, grantCardCosmetic, isCardCosmeticOwned, normalizeCardCosmetics } from '@/game/data/cardCosmetics';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
@@ -365,6 +366,11 @@ export function createInitialMeta(): MetaState {
     eclipseMonocleOwned: false,
     cardFrameSleeves: ['frame-classic'],
     selectedCardFrame: 'frame-classic',
+    ownedCardBackIds: ['back-default'],
+    selectedCardBack: 'back-default',
+    ownedPackSkinIds: ['pack-classic'],
+    selectedPackSkin: 'pack-classic',
+    cardMotion: 'subtle',
     lokCollectorRuns: 0,
     lokCollectorPetsFound: 0,
     lokPetLeagueTier: 0,
@@ -1344,8 +1350,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     miningHelmetOwned: parsed.miningHelmetOwned === true,
     rancherWhistleOwned: parsed.rancherWhistleOwned === true,
     eclipseMonocleOwned: parsed.eclipseMonocleOwned === true,
-    cardFrameSleeves: Array.isArray(parsed.cardFrameSleeves) && parsed.cardFrameSleeves.length > 0 ? (parsed.cardFrameSleeves as string[]) : ['frame-classic'],
-    selectedCardFrame: typeof parsed.selectedCardFrame === 'string' ? parsed.selectedCardFrame : 'frame-classic',
+    ...normalizeCardCosmetics(parsed),
+    cardMotion: parsed.cardMotion === 'full' || parsed.cardMotion === 'off' ? parsed.cardMotion : 'subtle',
     lokCollectorRuns: counter(parsed.lokCollectorRuns),
     lokCollectorPetsFound: counter(parsed.lokCollectorPetsFound),
     lokPetLeagueTier: counter(parsed.lokPetLeagueTier),
@@ -1893,8 +1899,9 @@ type Action =
   | { type: 'consumeThrownCard'; cardId: string }
   | { type: 'buyCardSalvageProtocol' }
   | { type: 'buyHandheldDigiScope' }
-  | { type: 'buyCardFrameSleeve'; frameId: string; cardCreditsCost: number }
-  | { type: 'equipCardFrameSleeve'; frameId: string }
+  | { type: 'buyCardCosmetic'; id: string }
+  | { type: 'equipCardCosmetic'; id: string }
+  | { type: 'setCardMotion'; motion: 'full' | 'subtle' | 'off' }
   | { type: 'buyKeyItem'; itemId: 'miningHelmet' | 'rancherWhistle' | 'eclipseMonocle'; credCost: number }
   | { type: 'craftRelic'; relicId: string }
   | { type: 'buyKeyItemAction'; keyItemId: string; credCost: number }
@@ -3473,6 +3480,19 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         },
       };
 
+    case 'buyCardCosmetic': {
+      const item = CARD_COSMETICS_BY_ID[action.id];
+      if (!item || item.cost <= 0 || isCardCosmeticOwned(state.meta, item) || state.meta.cardCredits < item.cost) return state;
+      return { ...state, meta: { ...grantCardCosmetic(state.meta, item), cardCredits: state.meta.cardCredits - item.cost } };
+    }
+    case 'equipCardCosmetic': {
+      const item = CARD_COSMETICS_BY_ID[action.id];
+      if (!item || !isCardCosmeticOwned(state.meta, item)) return state;
+      return { ...state, meta: equipCardCosmetic(state.meta, item) };
+    }
+    case 'setCardMotion':
+      return { ...state, meta: { ...state.meta, cardMotion: action.motion } };
+
     case 'setUiDensity':
       return {
         ...state,
@@ -4111,6 +4131,9 @@ export interface MetaContextValue {
   buyGenerator: (id: string) => void;
   refreshGeneratorIncome: () => void;
   setUiDensity: (density: 'grid' | 'list') => void;
+  buyCardCosmetic: (id: string) => void;
+  equipCardCosmetic: (id: string) => void;
+  setCardMotion: (motion: 'full' | 'subtle' | 'off') => void;
   setLokPetArtStyle: (style: MetaState['lokPetArtStyle']) => void;
   setUiBorderStyle: (style: MetaState['uiBorderStyle']) => void;
   setLokPetBorderStyle: (style: MetaState['lokPetBorderStyle']) => void;
@@ -4399,6 +4422,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setUpdatePopupKind = useCallback((kind: ChangelogKind, enabled: boolean) => dispatch({ type: 'setUpdatePopupKind', kind, enabled }), []);
   const buyGenerator = useCallback((id: string) => dispatch({ type: 'buyGenerator', id, now: Date.now() }), []);
   const refreshGeneratorIncome = useCallback(() => dispatch({ type: 'refreshGeneratorIncome', now: Date.now() }), []);
+  const buyCardCosmetic = useCallback((id: string) => dispatch({ type: 'buyCardCosmetic', id }), []);
+  const equipCardCosmetic = useCallback((id: string) => dispatch({ type: 'equipCardCosmetic', id }), []);
+  const setCardMotion = useCallback((motion: 'full' | 'subtle' | 'off') => dispatch({ type: 'setCardMotion', motion }), []);
   const setUiDensity = useCallback(
     (density: 'grid' | 'list') => dispatch({ type: 'setUiDensity', density }),
     [],
@@ -4615,6 +4641,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       buyGenerator,
       refreshGeneratorIncome,
       setUiDensity,
+      buyCardCosmetic,
+      equipCardCosmetic,
+      setCardMotion,
       setLokPetArtStyle,
       setUiBorderStyle,
       setLokPetBorderStyle,
@@ -4776,6 +4805,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     buyGenerator,
     refreshGeneratorIncome,
     setUiDensity,
+    buyCardCosmetic,
+    equipCardCosmetic,
+    setCardMotion,
     setLokPetArtStyle,
     setUiBorderStyle,
     setLokPetBorderStyle,

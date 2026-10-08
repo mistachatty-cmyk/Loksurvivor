@@ -3,6 +3,8 @@ import { Sparkles, Lock, Crown, Info } from 'lucide-react';
 import type { LokAssetManifest } from '@/game/lok/types';
 import { CardArtwork, RARITY_STYLE, cardMetadata } from './LockDeckCollection';
 import { cardPackFor } from '@/game/data/cards';
+import { cardLayoutForFrame, type CardMotion } from '@/game/data/cardCosmetics';
+import { LayoutCard } from './CardCosmetics';
 import {
   getCardVariableProfile,
   ELEMENT_METADATA,
@@ -23,6 +25,8 @@ interface LokDeckCardViewProps {
   customFrame?: string;
   customOverlay?: string;
   companionSeal?: string;
+  /** Motion level for the printed and spellbook layouts (Settings > Card motion). */
+  motion?: CardMotion;
   onClick?: () => void;
 }
 
@@ -36,6 +40,7 @@ export function LokDeckCardView({
   customFrame,
   customOverlay,
   companionSeal,
+  motion,
   onClick,
 }: LokDeckCardViewProps) {
   const profile = getCardVariableProfile(card);
@@ -77,6 +82,23 @@ export function LokDeckCardView({
     setTilt({ x: 0, y: 0 });
     setGlare({ x: 50, y: 50, opacity: 0 });
   };
+
+  // Equipped layout frames (Printed Stock, Spellbook) replace the whole card face.
+  const layout = cardLayoutForFrame(customFrame);
+  if (layout !== 'binder') {
+    return (
+      <LayoutCard
+        layout={layout}
+        card={card}
+        owned={owned}
+        copies={copies}
+        variant={variant}
+        motion={motion}
+        art={(artPx) => <CardArtwork card={card} size={artPx} animated={motion === 'full'} />}
+        onClick={onClick}
+      />
+    );
+  }
 
   // Compact, ergonomic sizes that don't blow out grids
   const cardDimensions =
@@ -122,7 +144,7 @@ export function LokDeckCardView({
       <button
         type="button"
         onClick={onClick}
-        className={`lok-collection-card group relative aspect-[5/7] w-full overflow-hidden rounded-[14px] border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${owned ? '' : 'is-locked'}`}
+        className={`lok-collection-card group relative aspect-[5/7] w-full overflow-hidden rounded-[14px] border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${owned ? frameBorderClass : ''} ${owned ? '' : 'is-locked'}`}
         style={{ '--card-edge': rarity.edge, '--card-glow': rarity.glow } as CSSProperties}
         data-testid={`card-lok-${card.slug}`}
         aria-label={`${owned ? card.name : 'Locked card'}, ${card.rarity}`}
