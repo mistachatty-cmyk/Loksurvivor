@@ -711,6 +711,28 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Three new Economy achievements go with it: New Loot Look, Pack Rat and Full Stash.',
     ],
   },
+  {
+    version: '0.19.8',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T05:00:00Z',
+    kind: 'update',
+    title: 'Longer Notes, Crew in Every Room',
+    body: [
+      'Settings now has a Note duration choice for the corner notes in the hideout: 6, 12, 20 or 30 seconds before they fade.',
+      'When you walk your operator into a room, the crew you rescued who hang out there now stand in it, so every room has someone to meet. Walk up to one to hear from them.',
+    ],
+  },
+  {
+    version: '0.19.9',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T05:30:00Z',
+    kind: 'update',
+    title: 'The Crew Have a Lot to Say',
+    body: [
+      'Rescued crew in the hideout now say something new every time you walk up to them, in their own voice. Vee talks shop, Mama Jo feeds you, Nyx talks paint, Deacon counts the hour.',
+      'Settings has a new Crew chatter choice: fresh lines or the original intro only, plus a Family or Wry tone. Wry is drier and more grown-up, and both stay fine for a child to read.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
