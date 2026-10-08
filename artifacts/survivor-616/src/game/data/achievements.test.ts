@@ -36,3 +36,14 @@ test('claiming an incomplete or unknown achievement is a no-op', () => {
   assert.equal(reducer(state, { type: 'claimAchievement', id: 'first-blood' }), state);
   assert.equal(reducer(state, { type: 'claimAchievement', id: 'not-a-real-achievement' }), state);
 });
+
+test('drop pack achievements track owned and equipped packs', () => {
+  const fresh = createInitialMeta();
+  const byId = (id: string) => ACHIEVEMENTS.find((a) => a.id === id)!;
+  const packs = fresh.ownedDropPackIds;
+  assert.deepEqual(packs, ['potato']);
+  const some = { ...fresh, ownedDropPackIds: ['potato', 'pop-cut', 'blueprint'], activeDropPackId: 'blueprint' };
+  assert.equal(byId('pack-rat').isComplete(some), true);
+  assert.equal(byId('new-loot-look').isComplete(some), true);
+  assert.equal(byId('full-stash').isComplete(some), false);
+});

@@ -383,5 +383,22 @@
   "hideout.event.ui.lockedBond": "Precisa de vínculo {{rank}}",
   "hideout.event.ui.fizzle": "Você quase encontrou algo especial, mas o momento passa. Você ainda sai com um pouco.",
   "hideout.event.ui.gone": "Este momento já passou.",
-  "hideout.event.ui.fallbackPet": "seu LokPet"
+  "hideout.event.ui.fallbackPet": "seu LokPet",
+  "sleeve.title": "Contador de manga",
+  "sleeve.intro": "Vista seus LokPacks. Os invólucros, versos e molduras dos cartões são apenas cosméticos: eles nunca alteram as probabilidades, os preços ou as estatísticas dos pacotes.",
+  "sleeve.motion.label": "Movimento de cartas",
+  "sleeve.motion.full": "Completo",
+  "sleeve.motion.subtle": "Sutil",
+  "sleeve.motion.off": "Desligado",
+  "sleeve.kind.packSkin": "Invólucros de embalagens",
+  "sleeve.kind.packSkin.hint": "Como ficam as embalagens no balcão.",
+  "sleeve.kind.cardBack": "Versos de cartas",
+  "sleeve.kind.cardBack.hint": "Mostrado voltado para baixo enquanto você abre um pacote.",
+  "sleeve.kind.cardFrame": "Molduras de cartão",
+  "sleeve.kind.cardFrame.hint": "Como seus cartões coletados são dispostos e delimitados.",
+  "sleeve.equip": "Equipar",
+  "sleeve.equipped": "Equipado",
+  "sleeve.buy": "Comprar · {{cost}} CC",
+  "settings.cardMotion.title": "Movimento de cartas",
+  "settings.cardMotion.body": "Invólucros de pacotes, versos e molduras de cartões podem inclinar-se em direção ao cursor e brilhar. Full faz as duas coisas, Subtle só reage quando você passa o mouse, Off mantém tudo parado. Dispositivos configurados para reduzir o movimento permanecem imóveis automaticamente."
 }

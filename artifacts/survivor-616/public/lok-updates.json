@@ -7,10 +7,10 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
-      "number": 54,
-      "version": "0.19.2",
-      "date": "2026-10-07",
-      "publishedAt": "2026-10-07T23:30:00Z",
+      "number": 61,
+      "version": "0.19.9",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T05:30:00Z",
       "kind": "update",
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",
@@ -22,10 +22,10 @@
       ]
     },
     {
-      "number": 53,
-      "version": "0.19.1",
-      "date": "2026-10-07",
-      "publishedAt": "2026-10-07T22:30:00Z",
+      "number": 60,
+      "version": "0.19.8",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T05:00:00Z",
       "kind": "update",
       "categoryLabel": "Major Update",
       "categoryColor": "#22d3ee",
@@ -34,6 +34,110 @@
       "body": [
         "Settings now has a Note duration choice for the corner notes in the hideout: 6, 12, 20 or 30 seconds before they fade.",
         "When you walk your operator into a room, the crew you rescued who hang out there now stand in it, so every room has someone to meet. Walk up to one to hear from them."
+      ]
+    },
+    {
+      "number": 59,
+      "version": "0.19.7",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T04:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Drop Packs",
+      "body": [
+        "Drops now come in packs. Your current gems, coins, chests and materials are the free Potato Pack, and everyone starts on it, so nothing about the way drops look has changed unless you pick something new.",
+        "The Customization Shop has a new Drop packs tab with seven more looks, each sold for LokTokens: Pop Cut (bright and cartoon-clean), Paper Cut (layered craft paper), Pixel Stash (hand-pixeled sprites), Blueprint (drafting-table schematics), Salvage Grit (worn metal, glass and stone), Neon Arcade (tube-light outlines) and Dark Circuit (matte hardware with glowing lines). Packs add a spawn bounce, a soft shadow, idle animation and a streak when the magnet pulls a drop in. Display only; drops and rewards never change, and Performance graphics always uses Potato.",
+        "Three new Economy achievements go with it: New Loot Look, Pack Rat and Full Stash."
+      ]
+    },
+    {
+      "number": 58,
+      "version": "0.19.6",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T03:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Sleeve Counter",
+      "body": [
+        "The Neon Sleeve has a new Sleeve Counter tab where you can dress up your LokPacks with Card Credits. Pack wrappers: a crimped Foil Wrapper for every pack, a printed Fighter Print booster that puts a real fighter or LokPet from the game on the front with their attack, and a lift-lid Collector Box.",
+        "Eight district card backs, from Furniture City Walnut to the Null Sector Rack, each with a real fighter in the hub, show while you flip through a pack. Two new card frames lay your collection out like real cards: Printed Stock, with a halftone art window and a real attack box, and Spellbook Layout, with a cost line, type line, rules text, flavor and an attack/HP box. The old colored frames now work on the default card too. Everything is cosmetic only: pack odds, prices and card stats never change.",
+        "Settings has a new Card motion option: Full tilts cards toward your cursor and lets foil shimmer, Subtle only reacts on hover, Off keeps everything still. Classic tiles and the classic card stay free and are the default."
+      ]
+    },
+    {
+      "number": 57,
+      "version": "0.19.5",
+      "date": "2026-10-08",
+      "publishedAt": "2026-10-08T00:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A Real Million",
+      "body": [
+        "Million Horde now holds real millions. Every one of the up to ten million enemies has its own place in the crowd, walks in toward you, waits in a mass just past the edge of the screen, and steps into the fight as room opens up. It used to be a counter standing in for the crowd; kills now count one enemy at a time. Weaker phones hold a smaller crowd, and the cost per frame stays flat whatever its size.",
+        "Big fights run lighter everywhere. Crowd collisions, the death dissolve, sprite drawing and loot trimming were all rebuilt to do less work, so mass wipes should stay smooth. Nothing about the way anything looks or plays changed."
+      ]
+    },
+    {
+      "number": 56,
+      "version": "0.19.4",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:50:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Sealed Card Secrets",
+      "body": [
+        "Every LOK card can still be opened and inspected, but a card you have not unlocked yet now keeps its stats, element, abilities, moves and matchups hidden until you own it."
+      ]
+    },
+    {
+      "number": 55,
+      "version": "0.19.3",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T23:30:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Settings Jump Menu Complete",
+      "body": [
+        "The Find a section menu at the top of Settings was missing half the screen. It now also jumps to Scrollbar, Minimap, Prop launches, Chaos toggles, Wildlife, Card layout and Panel layout."
+      ]
+    },
+    {
+      "number": 54,
+      "version": "0.19.2",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T22:45:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "A Quieter Scrollbar",
+      "body": [
+        "The scrollbar is now a thin, low-profile line that takes its color from your UI theme instead of the loud browser default.",
+        "Settings has a new Scrollbar section: pick Slim, Hidden or Standard, and match the theme or stay neutral."
+      ]
+    },
+    {
+      "number": 53,
+      "version": "0.19.1",
+      "date": "2026-10-07",
+      "publishedAt": "2026-10-07T22:30:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Tidier Hideout Links",
+      "body": [
+        "The Scene & Sanctum Links panel on the hideout main floor used to stack its buttons in a ragged, right-aligned pile. The rain and room notes now sit side by side, and every destination is an even card in a clean grid that reflows from three columns down to one on a phone."
       ]
     },
     {

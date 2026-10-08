@@ -9,6 +9,7 @@
  * snapshots out of it.
  */
 
+import type { DropStyle } from '@/game/data/dropPacks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
@@ -47,7 +48,9 @@ import type { SfxCueId, SfxEvent } from '@/game/audio/sfxCues';
 import { reactionIntensity, reactionMultiplier, type BeatReaction, type ReactionTarget } from '@/game/data/reactivity';
 import type { MusicEventEffect } from '@/game/data/musicEvents';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
-import { millionHordeActorCap } from '@/game/performanceProfile';
+import { CellGrid } from '@/game/engine/cellGrid';
+import { millionHordeActorCap, millionHordePopulationCap, millionHordeSweepBudget } from '@/game/performanceProfile';
+import { HordeField } from '@/game/engine/hordeField';
 import type {
   ActiveCrewRumor,
   AreaDef,
@@ -1192,9 +1195,9 @@ export interface World {
    */
   ambientRng: () => number;
   /** Rebuilt every frame for enemy separation. */
-  grid: Map<number, EnemyActor[]>;
+  grid: CellGrid<EnemyActor>;
   /** Rebuilt every frame from `obstacles` so per-actor collision only tests nearby boxes. */
-  obstacleGrid: Map<number, Aabb[]>;
+  obstacleGrid: CellGrid<Aabb>;
   /** True once `obstacleGrid` needs rebuilding (obstacles are static, so this only flips on add/break). */
   obstacleGridDirty: boolean;
   /** Page overlay hit feedback: see `PropHit` / `ImpactEvent`. Drained by the host each frame. */
@@ -1286,18 +1289,25 @@ export interface World {
   modifiers: RunModifiers;
   /** Capability tier detected once at launch; only bounds Million Horde's fully simulated near field. */
   runtimePerformanceTier: RuntimePerformanceTier;
-  /** Aggregated population that replaces millions of individual actor allocations. */
+  /** Million Horde run totals; the crowd itself lives in `hordeField`. */
   millionHorde: {
-    virtualPopulation: number;
     peakPopulation: number;
     defeatedPopulation: number;
   } | null;
+  /** Millions of real crowd members as typed arrays; null outside Million Horde. */
+  hordeField: HordeField | null;
+  /** Camera-derived radii the crowd layer works to; the run loop refines them via `setHordeView`. */
+  hordeView: { hold: number; ky: number; drawHalfW: number; drawHalfH: number };
+  /** Crowd members added so far this step, to bound spawn cost per step. */
+  hordeFedThisStep: number;
   /**
    * Player's persistent graphics preference (Settings), read once at
    * creation. Render-only -- affects decorative density (particles, damage
    * popups, enemy outlines/shadows), never difficulty or rewards.
    */
   graphicsQuality: 'high' | 'balanced' | 'performance';
+  /** Settings: enhanced (default) or classic drop art. Render-only. */
+  dropStyle: DropStyle;
   /** Settings: which damage-number style to draw. Render-only; never affects damage. */
   damageNumberStyle: DamageNumberStyle;
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
@@ -1487,6 +1497,7 @@ export function createWorld(
     startingLokPets?: LokPetRoll[];
     modifiers?: RunModifiers;
     graphicsQuality?: 'high' | 'balanced' | 'performance';
+    dropStyle?: DropStyle;
     damageNumberStyle?: DamageNumberStyle;
     runtimePerformanceTier?: RuntimePerformanceTier;
     worldColorPalette?: SpritePalette;
@@ -1739,8 +1750,8 @@ export function createWorld(
     nextUid: 100,
     rng,
     ambientRng: createRng(seed + 0x5eed),
-    grid: new Map(),
-    obstacleGrid: new Map(),
+    grid: new CellGrid<EnemyActor>(),
+    obstacleGrid: new CellGrid<Aabb>(),
     obstacleGridDirty: true,
     propHits: [],
     impacts: [],
@@ -1814,9 +1825,15 @@ export function createWorld(
     modifiers,
     runtimePerformanceTier: setup.runtimePerformanceTier ?? 'high-mobile',
     millionHorde: modifiers.millionHordeMode
-      ? { virtualPopulation: 0, peakPopulation: 0, defeatedPopulation: 0 }
+      ? { peakPopulation: 0, defeatedPopulation: 0 }
       : null,
+    hordeField: modifiers.millionHordeMode
+      ? new HordeField(millionHordePopulationCap(setup.runtimePerformanceTier ?? 'high-mobile'))
+      : null,
+    hordeView: { hold: 520, ky: 1.4, drawHalfW: 580, drawHalfH: 380 },
+    hordeFedThisStep: 0,
     graphicsQuality: setup.graphicsQuality ?? 'high',
+    dropStyle: setup.dropStyle ?? 'classic',
     damageNumberStyle: setup.damageNumberStyle ?? 'classic',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
@@ -2250,10 +2267,7 @@ function rebuildGrid(w: World) {
   for (const enemy of w.enemies) {
     w.enemiesByUid.set(enemy.uid, enemy);
     if (enemy.dying) continue;
-    const key = cellKey(enemy.x, enemy.y);
-    const bucket = w.grid.get(key);
-    if (bucket) bucket.push(enemy);
-    else w.grid.set(key, [enemy]);
+    w.grid.add(cellKey(enemy.x, enemy.y), enemy);
   }
 }
 
@@ -2273,10 +2287,7 @@ function rebuildObstacleGrid(w: World) {
     const maxCy = Math.floor((box.y + box.h / 2) / CELL);
     for (let cx = minCx; cx <= maxCx; cx += 1) {
       for (let cy = minCy; cy <= maxCy; cy += 1) {
-        const key = (cx + 512) * 4096 + (cy + 512);
-        const bucket = w.obstacleGrid.get(key);
-        if (bucket) bucket.push(box);
-        else w.obstacleGrid.set(key, [box]);
+        w.obstacleGrid.add((cx + 512) * 4096 + (cy + 512), box);
       }
     }
   }
@@ -2321,17 +2332,88 @@ function computeSpawnAngle(w: World): number {
   return w.rng() * Math.PI * 2;
 }
 
-function addMillionHordeVirtualPopulation(w: World, amount: number, pendingActors = 0) {
-  if (!w.millionHorde || amount <= 0) return;
-  const maxVirtualPopulation = Math.max(0, MILLION_HORDE_MAX_POPULATION - w.enemies.length - pendingActors);
-  w.millionHorde.virtualPopulation = Math.min(
-    maxVirtualPopulation,
-    w.millionHorde.virtualPopulation + amount,
+/** Crowd members one step may add, so a huge spawn rate cannot spike a single frame. */
+const HORDE_FEED_BUDGET_PER_STEP = 40_960;
+/** Live actors promoted out of the crowd per step. */
+const HORDE_PROMOTIONS_PER_STEP = 48;
+
+/**
+ * Add `perTick` real crowd members of `def` just outside the camera (or around
+ * a wave's fixed spawn point). Returns how many fit in the field.
+ */
+function feedHorde(w: World, def: EnemyDef, hpMult: number, perTick: number, at?: { x: number; y: number }): number {
+  const field = w.hordeField;
+  if (!field) return 0;
+  const speed = def.speed * (w.modifiers.speedMode ? 1.25 : 1);
+  const kind = field.registerKind(def, hpMult, speed);
+  const view = w.hordeView;
+  let cx: number;
+  let cy: number;
+  if (at) {
+    cx = at.x;
+    cy = at.y;
+  } else {
+    const angle = computeSpawnAngle(w);
+    const distance = view.hold + field.shellDepth(view.hold) + 180;
+    // Deliberately not clamped to the arena: in a small arena the waiting
+    // shell sits past the walls (the crowd pressing in from outside) rather
+    // than being squeezed inside the camera where nothing could hit it.
+    cx = w.player.x + Math.cos(angle) * distance;
+    cy = w.player.y + (Math.sin(angle) * distance) / view.ky;
+  }
+  const added = field.addBatch(kind, perTick, cx, cy, 320, 320, Math.floor(w.rng() * 0x7fffffff), w.now);
+  w.hordeFedThisStep += added;
+  return added;
+}
+
+/**
+ * Million Horde per-step upkeep: advance the crowd's fixed sweep budget, then
+ * promote members that reached the waiting shell into live actors while there
+ * are actor slots. Combat only ever sees the promoted actors.
+ */
+function updateHorde(w: World) {
+  const field = w.hordeField;
+  if (!field || !w.millionHorde) return;
+  const view = w.hordeView;
+  field.sweep(
+    w.now,
+    { px: w.player.x, py: w.player.y, hold: view.hold, ky: view.ky, drawHalfW: view.drawHalfW, drawHalfH: view.drawHalfH },
+    millionHordeSweepBudget(w.runtimePerformanceTier),
   );
-  w.millionHorde.peakPopulation = Math.max(
-    w.millionHorde.peakPopulation,
-    w.millionHorde.virtualPopulation + w.enemies.length,
-  );
+  const free = enemyCap(w) - w.enemies.length;
+  const promote = Math.min(free, HORDE_PROMOTIONS_PER_STEP, field.candidateCount);
+  if (promote > 0) {
+    field.sortCandidatesDescending();
+    for (let k = 0; k < promote; k += 1) {
+      const i = field.candidates[k]!;
+      if (i >= field.count) continue;
+      const kind = field.kinds[field.kind[i]!]!;
+      const dx = field.x[i]! - w.player.x;
+      const dy = (field.y[i]! - w.player.y) * view.ky;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      // Keep the member's bearing but enter at the shell's inner edge, never mid-screen.
+      const r = Math.min(d, view.hold + 50);
+      field.removeAt(i);
+      spawnEnemy(w, kind.def, kind.hpMult, { x: w.player.x + (dx / d) * r, y: w.player.y + ((dy / d) * r) / view.ky });
+    }
+  }
+  const live = field.count + w.enemies.length;
+  if (live > w.millionHorde.peakPopulation) w.millionHorde.peakPopulation = live;
+}
+
+/**
+ * The run loop reports the camera's half extents (world units) so the waiting
+ * shell always sits just outside what the player can see.
+ */
+export function setHordeView(w: World, halfW: number, halfH: number) {
+  if (!Number.isFinite(halfW) || !Number.isFinite(halfH) || halfW <= 0 || halfH <= 0) return;
+  // The shell's inner edge sits a hair inside the camera box on every side,
+  // so the crowd is visibly massed at the screen edge rather than all hidden
+  // beyond it; the +/-ARRIVE slack keeps a walking player from re-stepping it.
+  w.hordeView.hold = halfW - 12;
+  w.hordeView.ky = halfW / halfH;
+  w.hordeView.drawHalfW = halfW + 90;
+  w.hordeView.drawHalfH = halfH + 90;
 }
 
 function spawnEnemy(
@@ -2339,17 +2421,8 @@ function spawnEnemy(
   incomingDef: EnemyDef,
   hpMult: number,
   position?: { x: number; y: number },
-  representedCount = 1,
 ) {
-  const hasActorSlot = w.enemies.length < enemyCap(w);
-  if (w.millionHorde && representedCount > 0) {
-    const virtualAdded = Math.max(0, representedCount - (hasActorSlot ? 1 : 0));
-    addMillionHordeVirtualPopulation(w, virtualAdded, hasActorSlot ? 1 : 0);
-    if (hasActorSlot) {
-      w.millionHorde.peakPopulation = Math.max(w.millionHorde.peakPopulation, w.millionHorde.virtualPopulation + w.enemies.length + 1);
-    }
-  }
-  if (!hasActorSlot) return;
+  if (w.enemies.length >= enemyCap(w)) return;
 
   let def = incomingDef;
   if (w.disabledEnemyIds && w.disabledEnemyIds.includes(incomingDef.id)) {
@@ -2639,7 +2712,28 @@ function updateSpawning(w: World, dt: number) {
     const densityMult = w.threatCalibrations?.densityMult ?? 1;
     const spawnMultiplier = contractSpawnMultiplier * baseSpawnMult * infiniteSpawnMult * densityMult * directorWaveSpawnMult(w, wave.faction);
     w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) + wave.ratePerSec * spawnMultiplier * dt;
-    while ((w.spawnCredit[i] ?? 0) >= 1 && (!w.millionHorde || w.enemies.length < enemyCap(w))) {
+    if (w.hordeField) {
+      // Million Horde: each spawn tick adds real crowd members. They are
+      // promoted into live actors by `updateHorde` as slots open up.
+      const ids = [wave.enemyId, ...(wave.group ?? [])];
+      const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
+      while ((w.spawnCredit[i] ?? 0) >= 1 && w.hordeFedThisStep < HORDE_FEED_BUDGET_PER_STEP) {
+        w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
+        let added = 0;
+        for (let b = 0; b < wave.burst; b += 1) {
+          for (const id of ids) added += feedHorde(w, getEnemy(id), hpMult, MILLION_HORDE_REPRESENTATION_PER_SPAWN, wave.spawnAt);
+        }
+        if (added === 0) {
+          // The field is full: discard the backlog instead of spinning on it.
+          w.spawnCredit[i] = Math.min(w.spawnCredit[i] ?? 0, 1);
+          break;
+        }
+      }
+      // Backlog beyond this step's budget is throttled, never hoarded.
+      w.spawnCredit[i] = Math.min(w.spawnCredit[i] ?? 0, 64);
+      continue;
+    }
+    while ((w.spawnCredit[i] ?? 0) >= 1) {
       w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - 1;
       const def = getEnemy(wave.enemyId);
       const ids = [wave.enemyId, ...(wave.group ?? [])];
@@ -2656,23 +2750,12 @@ function updateSpawning(w: World, dt: number) {
       // modifierHpMult isn't applied here -- spawnEnemy applies it to every
       // caller uniformly (see its own comment for why).
       const hpMult = (wave.hpMult ?? 1) * infiniteHpMult;
-      const representedCount = w.millionHorde ? MILLION_HORDE_REPRESENTATION_PER_SPAWN : 1;
       for (let b = 0; b < wave.burst; b += 1) {
-        spawnEnemy(w, def, hpMult, positions[positionIndex++], representedCount);
+        spawnEnemy(w, def, hpMult, positions[positionIndex++]);
         for (const groupEnemyId of wave.group ?? []) {
-          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++], representedCount);
+          spawnEnemy(w, getEnemy(groupEnemyId), hpMult, positions[positionIndex++]);
         }
       }
-    }
-    if (w.millionHorde && (w.spawnCredit[i] ?? 0) >= 1) {
-      // Once the live near field is full, consume all whole spawn cycles in
-      // one operation. Extreme custom rates therefore stay constant-cost.
-      const aggregateCycles = Math.floor(w.spawnCredit[i] ?? 0);
-      w.spawnCredit[i] = (w.spawnCredit[i] ?? 0) - aggregateCycles;
-      addMillionHordeVirtualPopulation(
-        w,
-        aggregateCycles * wave.burst * (1 + (wave.group?.length ?? 0)) * MILLION_HORDE_REPRESENTATION_PER_SPAWN,
-      );
     }
   }
 }
@@ -3929,10 +4012,12 @@ function coneEffectColor(kind: 'pull' | 'slow' | 'chill' | 'burn' | 'shock'): st
 }
 
 function statusSpeedMultiplier(enemy: EnemyActor): number {
-  return enemy.activeEffects.reduce((multiplier, effect) => {
-    const def = STATUS_EFFECTS_BY_ID[effect.id];
-    return multiplier * (def?.speedMultiplier ?? 1);
-  }, 1);
+  const effects = enemy.activeEffects;
+  let multiplier = 1;
+  for (let i = 0; i < effects.length; i += 1) {
+    multiplier *= STATUS_EFFECTS_BY_ID[effects[i]!.id]?.speedMultiplier ?? 1;
+  }
+  return multiplier;
 }
 
 function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
@@ -3945,17 +4030,7 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
-  if (w.millionHorde) {
-    // Each defeated near-field actor breaks a matching aggregate crowd cell.
-    // This lets area damage visibly cut into the represented horde without
-    // creating loot, XP, or achievement rewards for enemies never simulated.
-    const virtualDefeated = Math.min(
-      w.millionHorde.virtualPopulation,
-      MILLION_HORDE_REPRESENTATION_PER_SPAWN - 1,
-    );
-    w.millionHorde.virtualPopulation -= virtualDefeated;
-    w.millionHorde.defeatedPopulation += virtualDefeated + 1;
-  }
+  if (w.millionHorde) w.millionHorde.defeatedPopulation += 1;
   // LokSurvivorArena: a guest kill also counts toward `kills`/`killsByEnemy`
   // above (so campaign-style read models keep working unmodified) *and*
   // toward its own attributed counter for the arena scoreboard.
@@ -5938,6 +6013,7 @@ function clampToArena(w: World, actor: Actor) {
 }
 
 function collideObstacles(w: World, actor: Actor) {
+  if (w.obstacleGrid.size === 0) return;
   // Only the cells within reach of the actor's radius can hold a box it
   // might overlap -- was a scan of every obstacle for every actor, which
   // dominated frame time once enemy counts climbed into the hundreds
@@ -6336,6 +6412,7 @@ function fluidSpeedMultiplierAt(w: World, x: number, y: number): number {
  * speed boost is this separate immediate check, reused for both actors.
  */
 function fluidOilBoostAt(w: World, x: number, y: number): number {
+  if (w.fluids.length === 0) return 1;
   for (const tile of w.fluids) {
     if (tile.kind !== 'oil' && tile.kind !== 'burning-oil') continue;
     if (dist2(x, y, tile.x, tile.y) <= tile.radius ** 2) return FLUID_SPEED_MULTIPLIERS.oil!;
@@ -6344,10 +6421,12 @@ function fluidOilBoostAt(w: World, x: number, y: number): number {
 }
 
 function statusDamageMultiplier(enemy: EnemyActor): number {
-  return enemy.activeEffects.reduce((multiplier, effect) => {
-    const def = STATUS_EFFECTS_BY_ID[effect.id];
-    return multiplier * (def?.damageMultiplier ?? 1);
-  }, 1);
+  const effects = enemy.activeEffects;
+  let multiplier = 1;
+  for (let i = 0; i < effects.length; i += 1) {
+    multiplier *= STATUS_EFFECTS_BY_ID[effects[i]!.id]?.damageMultiplier ?? 1;
+  }
+  return multiplier;
 }
 
 function updateFluids(w: World) {
@@ -6987,10 +7066,18 @@ function nearestDataChewTarget(w: World, x: number, y: number, range: number): B
   return closest;
 }
 
+let knockbackDecayDt = -1;
+let knockbackDecay = 1;
+
 function applyKnockback(actor: Actor, dt: number) {
   actor.x += actor.kx * dt;
   actor.y += actor.ky * dt;
-  const decay = Math.pow(0.0009, dt);
+  // One pow per step, not one per actor: every actor shares the step's dt.
+  if (dt !== knockbackDecayDt) {
+    knockbackDecayDt = dt;
+    knockbackDecay = Math.pow(0.0009, dt);
+  }
+  const decay = knockbackDecay;
   actor.kx *= decay;
   actor.ky *= decay;
   if (Math.abs(actor.kx) < 1) actor.kx = 0;
@@ -7335,6 +7422,91 @@ function updateStealth(w: World) {
   w.stealthAnchorY = w.player.y;
 }
 
+/**
+ * Enemies up to this radius are "small": two of them can only overlap within
+ * one grid cell's reach, so small/small pairs are resolved by sweeping each
+ * occupied cell against itself and four forward neighbours (each pair visited
+ * once, five map lookups per cell instead of nine per enemy). Larger actors
+ * (bosses, giants) take the wider per-actor scan below.
+ */
+const SEPARATION_SMALL_RADIUS = CELL / 2 - 2;
+const separationBigScratch: EnemyActor[] = [];
+
+function pushApart(a: EnemyActor, b: EnemyActor) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const minDist = a.radius + b.radius;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= minDist * minDist || d2 < 1e-4) return;
+  const d = Math.sqrt(d2);
+  const overlap = (minDist - d) * 0.5;
+  const ox = (dx / d) * overlap;
+  const oy = (dy / d) * overlap;
+  const total = a.mass + b.mass;
+  a.x -= ox * (b.mass / total) * 2;
+  a.y -= oy * (b.mass / total) * 2;
+  b.x += ox * (a.mass / total) * 2;
+  b.y += oy * (a.mass / total) * 2;
+}
+
+function separateEnemies(w: World) {
+  const bigs = separationBigScratch;
+  bigs.length = 0;
+  const grid = w.grid;
+  const cellCount = grid.size;
+  for (let c = 0; c < cellCount; c += 1) {
+    const key = grid.cellKeyAt(c);
+    const bucket = grid.cellBucketAt(c);
+    const n = bucket.length;
+    for (let i = 0; i < n; i += 1) {
+      const a = bucket[i]!;
+      if (a.radius > SEPARATION_SMALL_RADIUS) {
+        bigs.push(a);
+        continue;
+      }
+      for (let j = i + 1; j < n; j += 1) {
+        const b = bucket[j]!;
+        if (b.radius <= SEPARATION_SMALL_RADIUS) pushApart(a, b);
+      }
+    }
+    // Forward neighbours: E, NE-in-key-order, SE and S. Together with the
+    // in-cell pass every adjacent pair is visited exactly once.
+    for (let k = 0; k < 4; k += 1) {
+      const neighbour = grid.get(key + (k === 0 ? 4096 - 1 : k === 1 ? 4096 : k === 2 ? 4096 + 1 : 1));
+      if (!neighbour) continue;
+      const m = neighbour.length;
+      for (let i = 0; i < n; i += 1) {
+        const a = bucket[i]!;
+        if (a.radius > SEPARATION_SMALL_RADIUS) continue;
+        for (let j = 0; j < m; j += 1) {
+          const b = neighbour[j]!;
+          if (b.radius <= SEPARATION_SMALL_RADIUS) pushApart(a, b);
+        }
+      }
+    }
+  }
+  for (let i = 0; i < bigs.length; i += 1) {
+    const big = bigs[i]!;
+    const cells = Math.ceil((big.radius + SEPARATION_SMALL_RADIUS) / CELL);
+    const baseX = Math.floor(big.x / CELL);
+    const baseY = Math.floor(big.y / CELL);
+    for (let ix = -cells; ix <= cells; ix += 1) {
+      for (let iy = -cells; iy <= cells; iy += 1) {
+        const bucket = grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
+        if (!bucket) continue;
+        for (let j = 0; j < bucket.length; j += 1) {
+          const other = bucket[j]!;
+          if (other === big) continue;
+          // Big/big pairs are visited from both sides; keep one.
+          if (other.radius > SEPARATION_SMALL_RADIUS && other.uid < big.uid) continue;
+          pushApart(big, other);
+        }
+      }
+    }
+  }
+  bigs.length = 0;
+}
+
 function updateEnemies(w: World, dt: number) {
   const p = w.player;
   const stealthed = w.now < w.stealthUntil;
@@ -7433,8 +7605,10 @@ function updateEnemies(w: World, dt: number) {
     const targetY = dataGobFleeing ? enemy.y + (enemy.y - trackY) * 2 : chewTarget?.y ?? trackY;
     const dx = targetX - enemy.x;
     const dy = targetY - enemy.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    const playerDistance = Math.hypot(trackX - enemy.x, trackY - enemy.y) || 1;
+    const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+    const pdx = trackX - enemy.x;
+    const pdy = trackY - enemy.y;
+    const playerDistance = dataGobFleeing || chewTarget ? Math.sqrt(pdx * pdx + pdy * pdy) || 1 : distance;
     const dirX = dx / distance;
     const dirY = dy / distance;
     enemy.facing = dirX >= 0 ? 1 : -1;
@@ -8272,44 +8446,8 @@ function updateEnemies(w: World, dt: number) {
   }
 
   // Separation so enemies form a crowd instead of a single stacked sprite.
-  // Inlined rather than routed through `forEachNearby`'s callback: this is
-  // the one grid query that runs once per enemy (every other caller runs
-  // once per event -- a projectile, an effect tick), so at hundreds of
-  // enemies the per-enemy closure allocation and indirect call it would
-  // otherwise need were themselves a measurable share of frame time.
   rebuildGrid(w);
-  for (const enemy of w.enemies) {
-    if (enemy.dying) continue;
-    const radius = enemy.radius * 2;
-    const cells = Math.ceil(radius / CELL);
-    const baseX = Math.floor(enemy.x / CELL);
-    const baseY = Math.floor(enemy.y / CELL);
-    for (let ix = -cells; ix <= cells; ix += 1) {
-      for (let iy = -cells; iy <= cells; iy += 1) {
-        const bucket = w.grid.get((baseX + ix + 512) * 4096 + (baseY + iy + 512));
-        if (!bucket) continue;
-        for (const other of bucket) {
-          // Every pair only needs one symmetric resolution. The previous
-          // loop processed A/B and B/A, doubling the hottest crowd-work path.
-          if (other.uid <= enemy.uid) continue;
-          const dx = other.x - enemy.x;
-          const dy = other.y - enemy.y;
-          const minDist = enemy.radius + other.radius;
-          const d2 = dx * dx + dy * dy;
-          if (d2 >= minDist * minDist || d2 < 1e-4) continue;
-          const d = Math.sqrt(d2);
-          const overlap = (minDist - d) * 0.5;
-          const ox = (dx / d) * overlap;
-          const oy = (dy / d) * overlap;
-          const total = enemy.mass + other.mass;
-          enemy.x -= ox * (other.mass / total) * 2;
-          enemy.y -= oy * (other.mass / total) * 2;
-          other.x += ox * (enemy.mass / total) * 2;
-          other.y += oy * (enemy.mass / total) * 2;
-        }
-      }
-    }
-  }
+  separateEnemies(w);
 
   // Retire finished death animations.
   for (let i = w.enemies.length - 1; i >= 0; i -= 1) {
@@ -10310,15 +10448,24 @@ function updateAmbientDrops(w: World) {
   spawnParticles(w, x, y, '#ffe8a3', 6, 60);
 }
 
+/** Kinds whose collect branch spawns no particles of its own get a small burst. */
+const PICKUP_BURST_COLOR: Partial<Record<PickupKind, string>> = {
+  xp: '#9aefff',
+  health: '#7dffb2',
+  cred: '#ffd166',
+  coin: '#e8d48a',
+};
+
 function updatePickups(w: World, dt: number) {
   const p = w.player;
   const magnet = w.stats.magnet;
+  const pickupDrag = Math.pow(0.02, dt);
 
   for (let i = w.pickups.length - 1; i >= 0; i -= 1) {
     const pickup = w.pickups[i]!;
     const dx = p.x - pickup.x;
     const dy = p.y - pickup.y;
-    const distance = Math.hypot(dx, dy) || 1;
+    const distance = Math.sqrt(dx * dx + dy * dy) || 1;
 
     if (distance < magnet) {
       // Accelerate toward the player once inside the magnet radius.
@@ -10329,8 +10476,8 @@ function updatePickups(w: World, dt: number) {
 
     pickup.x += pickup.vx * dt;
     pickup.y += pickup.vy * dt;
-    pickup.vx *= Math.pow(0.02, dt);
-    pickup.vy *= Math.pow(0.02, dt);
+    pickup.vx *= pickupDrag;
+    pickup.vy *= pickupDrag;
 
     if (distance < p.radius + (pickup.kind === 'loot-box' || pickup.kind === 'card-pack' ? 18 : 10)) {
       switch (pickup.kind) {
@@ -10518,6 +10665,8 @@ function updatePickups(w: World, dt: number) {
           break;
         }
       }
+      const burstColor = PICKUP_BURST_COLOR[pickup.kind];
+      if (burstColor) spawnParticles(w, pickup.x, pickup.y, burstColor, pickup.kind === 'xp' && pickup.value >= 10 ? 7 : 4, 55);
       w.pickups.splice(i, 1);
     }
   }
@@ -10639,20 +10788,34 @@ export function episodeSnapshot(w: World): NonNullable<HudSnapshot['episode']> |
 }
 
 function updateParticles(w: World, dt: number) {
-  for (let i = w.particles.length - 1; i >= 0; i -= 1) {
-    const particle = w.particles[i]!;
+  // Order-preserving compaction (one pass) instead of a splice per expired
+  // item, and the drag factors computed once per step rather than per particle.
+  const particles = w.particles;
+  const drag = Math.pow(0.05, dt);
+  let keep = 0;
+  for (let i = 0; i < particles.length; i += 1) {
+    const particle = particles[i]!;
     particle.x += particle.vx * dt;
     particle.y += particle.vy * dt;
-    particle.vx *= Math.pow(0.05, dt);
-    particle.vy *= Math.pow(0.05, dt);
-    if (w.now - particle.bornAt > particle.lifeMs) w.particles.splice(i, 1);
+    particle.vx *= drag;
+    particle.vy *= drag;
+    if (w.now - particle.bornAt > particle.lifeMs) continue;
+    particles[keep++] = particle;
   }
-  for (let i = w.popups.length - 1; i >= 0; i -= 1) {
-    const popup = w.popups[i]!;
+  particles.length = keep;
+
+  const popups = w.popups;
+  const popupDrag = Math.pow(0.25, dt);
+  keep = 0;
+  for (let i = 0; i < popups.length; i += 1) {
+    const popup = popups[i]!;
     popup.y += popup.vy * dt;
-    popup.vy *= Math.pow(0.25, dt);
-    if (w.now - popup.bornAt > (popup.lifeMs ?? 700)) w.popups.splice(i, 1);
+    popup.vy *= popupDrag;
+    if (w.now - popup.bornAt > (popup.lifeMs ?? 700)) continue;
+    popups[keep++] = popup;
   }
+  popups.length = keep;
+
   for (let i = w.alerts.length - 1; i >= 0; i -= 1) {
     if (w.now - w.alerts[i]!.bornAt > 2600) w.alerts.splice(i, 1);
   }
@@ -11295,7 +11458,11 @@ function updateEndlessSpawning(w: World, dt: number) {
   while (e.spawnBudget >= 1) {
     e.spawnBudget -= 1;
     const enemyId = pool[Math.floor(w.rng() * pool.length)]!;
-    spawnEnemy(w, getEnemy(enemyId), hpMult, undefined, w.millionHorde ? MILLION_HORDE_REPRESENTATION_PER_SPAWN : 1);
+    if (w.hordeField) {
+      if (w.hordeFedThisStep < HORDE_FEED_BUDGET_PER_STEP) feedHorde(w, getEnemy(enemyId), hpMult, MILLION_HORDE_REPRESENTATION_PER_SPAWN);
+    } else {
+      spawnEnemy(w, getEnemy(enemyId), hpMult);
+    }
   }
 
   // Periodic multi-enemy surge -- the "wave" endless mode is otherwise
@@ -11636,6 +11803,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   updateLlamaMamaPassive(w);
   updateDistrictIncursion(w, dt);
 
+  w.hordeFedThisStep = 0;
   if (w.area.endless && w.endless) {
     updateEndlessChunks(w);
     updateEndlessRoute(w);
@@ -11646,6 +11814,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   } else {
     updateSpawning(w, dt);
   }
+  updateHorde(w);
 
   updateStatusEffects(w);
   updatePlayerConeEffects(w);
@@ -11762,7 +11931,7 @@ export function hudSnapshot(w: World): HudSnapshot {
     kills: w.kills,
     millionHorde: w.millionHorde
       ? {
-          population: w.millionHorde.virtualPopulation + w.enemies.filter((enemy) => !enemy.dying).length,
+          population: (w.hordeField?.count ?? 0) + w.enemies.filter((enemy) => !enemy.dying).length,
           peakPopulation: w.millionHorde.peakPopulation,
           defeatedPopulation: w.millionHorde.defeatedPopulation,
           liveActors: w.enemies.length,

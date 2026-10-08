@@ -1,4 +1,4 @@
-# Crew Chatter — handoff (v0.19.1 → v0.19.2)
+# Crew Chatter — handoff (v0.19.8 → v0.19.9)
 
 Procedural, per-character dialogue for rescued crew standing in hideout rooms.
 Inspired by [rant-lang/rant](https://github.com/rant-lang/rant) (Rant 4 alpha,
@@ -113,7 +113,7 @@ Ordered roughly by value for effort.
 - `Math.random` is used at the call site for real play; tests use `createRng`.
 - Four of the 20 voices (the Rapid Shelter trio and a few others) are shorter than
   the first nine and are the first place to deepen.
-- Changelog: v0.19.1 (note duration + crew in rooms), v0.19.2 (crew chatter).
+- Changelog: v0.19.8 (note duration + crew in rooms), v0.19.9 (crew chatter).
   `public/lok-updates.json` is regenerated with
   `pnpm exec tsx scripts/export-public-updates.ts public/lok-updates.json`.
 

@@ -9,6 +9,7 @@ import {
   PackageOpen,
   Sparkles,
   Swords,
+  Palette,
   RefreshCw,
   Flame,
   Info,
@@ -39,6 +40,8 @@ import type { CardPackId } from '@/game/types';
 import type { LokAssetManifest } from '@/game/lok/types';
 import { LockDeckCollection, CardDetail } from './LockDeckCollection';
 import { PackOpeningReveal } from './PackOpeningReveal';
+import { PackArt } from './CardCosmetics';
+import { SleeveCounter } from './SleeveCounter';
 import { ScreenLayout } from './ScreenLayout';
 import { LokDeckCardView, CardStyleToggle, type CardViewMode } from './LokDeckCardView';
 import { CardMatrixChartModal } from './CardMatrixChartModal';
@@ -71,13 +74,14 @@ const RECYCLE_VALUE: Record<string, number> = {
   secret: 40,
 };
 
-type ShopTab = 'binder' | 'singles' | 'salvage' | 'passive' | 'battle';
+type ShopTab = 'binder' | 'singles' | 'salvage' | 'passive' | 'battle' | 'sleeve';
 const SHOP_TABS: { id: ShopTab; label: string; icon: typeof PackageOpen }[] = [
   { id: 'binder', label: 'Lock Deck Binder', icon: PackageOpen },
   { id: 'singles', label: 'Singles Showcase', icon: Sparkles },
   { id: 'salvage', label: 'Card Recycle Depot', icon: RefreshCw },
   { id: 'passive', label: 'Passive Lock Deck', icon: Layers3 },
   { id: 'battle', label: 'Battle Deck', icon: Swords },
+  { id: 'sleeve', label: 'Sleeve Counter', icon: Palette },
 ];
 
 export function CardShopPanel({ onBack }: { onBack: () => void }) {
@@ -184,6 +188,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
                 variant="holo"
                 size="compact"
                 mode={singlesViewMode}
+                customFrame={meta.selectedCardFrame}
+                motion={meta.cardMotion}
                 onClick={() => {
                   setInspectCard(card);
                   sfx.play('uiNav');
@@ -759,10 +765,16 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
             key={pack.id}
             className="flex min-h-56 w-[220px] shrink-0 snap-start flex-col border border-white/15 bg-black/30 p-4 sm:w-auto hover:border-white/35 transition-all"
           >
-            <span className="font-mono text-[9px] uppercase tracking-widest text-fuchsia-200">
-              {pack.cards} cards
-            </span>
-            <h3 className="mt-4 font-display text-lg font-black uppercase text-white">{pack.name}</h3>
+            {meta.selectedPackSkin !== 'pack-classic' ? (
+              <div className="mb-3">
+                <PackArt pack={pack} skin={meta.selectedPackSkin} motion={meta.cardMotion} />
+              </div>
+            ) : (
+              <span className="font-mono text-[9px] uppercase tracking-widest text-fuchsia-200">
+                {pack.cards} cards
+              </span>
+            )}
+            <h3 className={`${meta.selectedPackSkin !== 'pack-classic' ? 'mt-1' : 'mt-4'} font-display text-lg font-black uppercase text-white`}>{pack.name}</h3>
             <p className="mt-2 text-[10px] text-white/50 leading-relaxed">{pack.description}</p>
             <button
               type="button"
@@ -852,6 +864,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         passiveSection
       ) : tab === 'battle' ? (
         battleSection
+      ) : tab === 'sleeve' ? (
+        <SleeveCounter onPlay={(sound) => sfx.play(sound)} />
       ) : (
         binderSection
       )}
@@ -1046,6 +1060,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         <PackOpeningReveal
           reveal={lastCardPackReveal}
           cardCredits={meta.cardCredits}
+          backId={meta.selectedCardBack}
+          cardMotion={meta.cardMotion}
           sfx={sfx}
           onOpenAnother={() => buyCardPack(lastCardPackReveal.packId)}
           onClose={clearCardPackReveal}
@@ -1057,6 +1073,8 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
         <CardDetail
           card={inspectCard}
           owned={owned.has(inspectCard.id)}
+          frame={meta.selectedCardFrame}
+          motion={meta.cardMotion}
           onClose={() => setInspectCard(null)}
         />
       )}
