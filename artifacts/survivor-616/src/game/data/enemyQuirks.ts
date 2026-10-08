@@ -15,24 +15,31 @@ export interface EnemyQuirkDef {
   kind: 'stat' | 'movement' | 'defense' | 'death';
   /** What defeating one is worth beyond normal drops. */
   reward: string;
+  /** What you gain when you "take on" the quirk yourself. */
+  playerEffect: string;
 }
 
 export const ENEMY_QUIRKS: EnemyQuirkDef[] = [
-  { id: 'frame-skip', name: 'Frame Skip', description: 'Every few seconds it skips forward a short hop toward you.', weight: 14, color: '#38bdf8', kind: 'movement', reward: 'Normal drops' },
-  { id: 'oversized', name: 'Oversized', description: 'Bigger, tougher and slower to knock around.', weight: 14, color: '#fb923c', kind: 'stat', reward: '1.5x XP' },
-  { id: 'shrunken', name: 'Shrunken', description: 'Smaller and faster, with less health.', weight: 14, color: '#a3e635', kind: 'stat', reward: 'Normal drops' },
-  { id: 'volatile', name: 'Volatile', description: 'Detonates a ring where it falls a moment after it dies.', weight: 12, color: '#f87171', kind: 'death', reward: 'Normal drops' },
-  { id: 'gilded', name: 'Gilded', description: 'Golden and sturdier. Drops a spill of extra cred.', weight: 8, color: '#facc15', kind: 'stat', reward: '3 extra cred drops' },
-  { id: 'regenerating', name: 'Regenerating', description: 'Heals 3% of its health every second until it is hurt hard.', weight: 10, color: '#4ade80', kind: 'defense', reward: 'Normal drops' },
-  { id: 'spawn-shield', name: 'Spawn Shield', description: 'Cannot be damaged for its first 1.5 seconds.', weight: 8, color: '#93c5fd', kind: 'defense', reward: 'Normal drops' },
-  { id: 'adrenaline', name: 'Adrenaline', description: 'Sprints at more than double speed for a second, every five.', weight: 10, color: '#f472b6', kind: 'movement', reward: 'Normal drops' },
-  { id: 'flicker', name: 'Flicker', description: 'Blinks out of reach for half a second every few seconds.', weight: 6, color: '#c4b5fd', kind: 'defense', reward: 'Normal drops' },
-  { id: 'jitterbug', name: 'Jitterbug', description: 'Moves in unpredictable lateral jolts as it advances.', weight: 4, color: '#fde047', kind: 'movement', reward: 'Normal drops' },
+  { id: 'frame-skip', name: 'Frame Skip', description: 'Every few seconds it skips forward a short hop toward you.', weight: 14, color: '#38bdf8', kind: 'movement', reward: 'Normal drops', playerEffect: 'Every 4 seconds, while moving, you hop 70 units ahead.' },
+  { id: 'oversized', name: 'Oversized', description: 'Bigger, tougher and slower to knock around.', weight: 14, color: '#fb923c', kind: 'stat', reward: '1.5x XP', playerEffect: '+40% max health, but you are a 25% bigger target.' },
+  { id: 'shrunken', name: 'Shrunken', description: 'Smaller and faster, with less health.', weight: 14, color: '#a3e635', kind: 'stat', reward: 'Normal drops', playerEffect: '+15% move speed and a 25% smaller target, but -25% max health.' },
+  { id: 'volatile', name: 'Volatile', description: 'Detonates a ring where it falls a moment after it dies.', weight: 12, color: '#f87171', kind: 'death', reward: 'Normal drops', playerEffect: 'Enemies you defeat burst, hurting others within 90 units.' },
+  { id: 'gilded', name: 'Gilded', description: 'Golden and sturdier. Drops a spill of extra cred.', weight: 8, color: '#facc15', kind: 'stat', reward: '3 extra cred drops', playerEffect: '12% of defeated enemies drop extra cred.' },
+  { id: 'regenerating', name: 'Regenerating', description: 'Heals 3% of its health every second until it is hurt hard.', weight: 10, color: '#4ade80', kind: 'defense', reward: 'Normal drops', playerEffect: 'Heal 1.5% of max health every second.' },
+  { id: 'spawn-shield', name: 'Spawn Shield', description: 'Cannot be damaged for its first 1.5 seconds.', weight: 8, color: '#93c5fd', kind: 'defense', reward: 'Normal drops', playerEffect: 'Your first hit every 15 seconds is blocked.' },
+  { id: 'adrenaline', name: 'Adrenaline', description: 'Sprints at more than double speed for a second, every five.', weight: 10, color: '#f472b6', kind: 'movement', reward: 'Normal drops', playerEffect: 'Sprint at 2.4x speed for 1 second out of every 5.' },
+  { id: 'flicker', name: 'Flicker', description: 'Blinks out of reach for half a second every few seconds.', weight: 6, color: '#c4b5fd', kind: 'defense', reward: 'Normal drops', playerEffect: 'You cannot be hurt for half a second every 4 seconds.' },
+  { id: 'jitterbug', name: 'Jitterbug', description: 'Moves in unpredictable lateral jolts as it advances.', weight: 4, color: '#fde047', kind: 'movement', reward: 'Normal drops', playerEffect: '8% of hits miss you entirely.' },
 ];
 
 export const ENEMY_QUIRKS_BY_ID: Record<string, EnemyQuirkDef> = Object.fromEntries(
   ENEMY_QUIRKS.map((quirk) => [quirk.id, quirk]),
 );
+
+/** Kills of enemies with a given quirk that unlock its "Everywhere" option. */
+export const QUIRK_EVERYWHERE_KILLS = 1_000_000;
+/** Kills of enemies with a given quirk that unlock "Take it on". */
+export const QUIRK_TAKE_ON_KILLS = 2_500_000;
 
 export const QUIRK_BASE_CHANCE = 0.06;
 export const QUIRK_MAX_CHANCE = 0.14;
@@ -66,7 +73,11 @@ export function rollEnemyQuirk(
   uid: number,
   /** Quirks the player has switched off; the rest keep their relative odds. */
   disabled?: ReadonlySet<string>,
+  /** Unlocked "Everywhere" quirks: every enemy, bosses included, gets one of these. */
+  everywhere?: readonly string[],
 ): string | undefined {
+  const forced = everywhere?.filter((id) => !disabled?.has(id) && ENEMY_QUIRKS.some((quirk) => quirk.id === id)) ?? [];
+  if (forced.length > 0) return forced[Math.floor(quirkHash(seed, uid, 3) * forced.length)];
   if (!canHaveQuirk(def)) return undefined;
   const pool = disabled && disabled.size > 0 ? ENEMY_QUIRKS.filter((quirk) => !disabled.has(quirk.id)) : ENEMY_QUIRKS;
   if (pool.length === 0) return undefined;

@@ -2426,6 +2426,8 @@ export interface MetaState {
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
   totalKills: number;
+  /** Lifetime kills of enemies carrying each random quirk, by quirk id. */
+  quirkKills: Record<string, number>;
   /** GRPD evidence seals are earned every 1,000 lifetime kills; this is the spent amount. */
   grpdSpentSeals: number;
   /** Completed field prototypes fabricated at the GRPD Armory. */
@@ -2669,6 +2671,8 @@ export interface RunResult {
   level: number;
   cred: number;
   killsByEnemy: Record<string, number>;
+  /** Kills of quirked enemies this run, by quirk id. */
+  killsByQuirk?: Record<string, number>;
   /** Growth Recap: XP, level and bond changes for pets that were out. Filled when the run is recorded. */
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;

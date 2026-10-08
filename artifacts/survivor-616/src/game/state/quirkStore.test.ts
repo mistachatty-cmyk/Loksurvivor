@@ -31,3 +31,27 @@ test('every quirk starts on, can be switched individually, and all at once', () 
   data.set(QUIRK_STORAGE_KEY, 'not json');
   assert.deepEqual(disabledQuirkIds(), []);
 });
+
+test('Everywhere and Take it on are ignored until their kill counts are reached', async () => {
+  installStorage();
+  const { QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } = await import('@/game/data/enemyQuirks');
+  const { earnedQuirkRunSetup, quirkUnlocks, setQuirkEverywhere, setQuirkTaken } = await import('./quirkStore');
+  assert.deepEqual(quirkUnlocks(0), { everywhere: false, taken: false });
+  assert.deepEqual(quirkUnlocks(QUIRK_EVERYWHERE_KILLS), { everywhere: true, taken: false });
+  assert.deepEqual(quirkUnlocks(QUIRK_TAKE_ON_KILLS), { everywhere: true, taken: true });
+  setQuirkEverywhere('volatile', true);
+  setQuirkTaken('volatile', true);
+  setQuirkEverywhere('gilded', true);
+  assert.deepEqual(earnedQuirkRunSetup({}), { disabledIds: [], everywhereIds: [], takenIds: [] });
+  const mid = earnedQuirkRunSetup({ volatile: QUIRK_EVERYWHERE_KILLS, gilded: QUIRK_EVERYWHERE_KILLS });
+  assert.deepEqual(mid.everywhereIds.sort(), ['gilded', 'volatile']);
+  assert.deepEqual(mid.takenIds, []);
+  assert.deepEqual(earnedQuirkRunSetup({ volatile: QUIRK_TAKE_ON_KILLS }).takenIds, ['volatile']);
+  assert.deepEqual(earnedQuirkRunSetup({}, true).takenIds, ['volatile']);
+});
+
+test('the first version of the save (a plain list of switched-off quirks) still loads', () => {
+  const data = installStorage();
+  data.set(QUIRK_STORAGE_KEY, '["flicker"]');
+  assert.deepEqual(disabledQuirkIds(), ['flicker']);
+});

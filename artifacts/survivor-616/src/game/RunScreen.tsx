@@ -3,7 +3,7 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
-import { disabledQuirkIds } from '@/game/state/quirkStore';
+import { earnedQuirkRunSetup } from '@/game/state/quirkStore';
 import { ChevronDown, ChevronUp, Eye, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -447,7 +447,7 @@ export function RunScreen({
         disabledWeaponIds: meta.disabledWeaponIds,
         grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id) || grpdEndgameWeaponEarned(id, meta.totalKills, endgameReached(meta))),
         endgameEvolutionsEnabled: isFeatureEnabled('weaponEvolutions'),
-        enemyQuirks: { enabled: isFeatureEnabled('enemyQuirks'), disabledIds: disabledQuirkIds() },
+        enemyQuirks: { enabled: isFeatureEnabled('enemyQuirks'), ...earnedQuirkRunSetup(meta.quirkKills, meta.devModeAllUnlocks) },
         grpdSpawnTierByWeaponId: meta.grpdSpawnTierByWeaponId,
         grpdCareerKills: meta.totalKills,
         grpdAutoIncreaseEnabled: meta.grpdAutoIncreaseEnabled,

@@ -6,6 +6,7 @@
  * mirrored into localStorage so a refresh does not wipe the hideout.
  */
 
+import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import {
   createContext,
   useCallback,
@@ -341,6 +342,7 @@ export function createInitialMeta(): MetaState {
     petElixirUpdatedAt: Date.now(),
     bestiary: {},
     totalKills: 0,
+    quirkKills: {},
     grpdSpentSeals: 0,
     grpdUnlockedWeaponIds: [],
     grpdActiveWeaponIds: [],
@@ -465,6 +467,25 @@ function normalizeEndlessDiscoveries(value: unknown): string[] {
     }
   }
   return [...discoveries];
+}
+
+function normalizeQuirkKills(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const quirk of ENEMY_QUIRKS) {
+    const count = counter((value as Record<string, unknown>)[quirk.id]);
+    if (count > 0) out[quirk.id] = count;
+  }
+  return out;
+}
+
+function mergeQuirkKills(prev: Record<string, number>, run?: Record<string, number>): Record<string, number> {
+  if (!run) return prev;
+  const out = { ...prev };
+  for (const [id, count] of Object.entries(run)) {
+    if (ENEMY_QUIRKS_BY_ID[id] && count > 0) out[id] = (out[id] ?? 0) + Math.floor(count);
+  }
+  return out;
 }
 
 function counter(value: unknown, fallback = 0): number {
@@ -1318,6 +1339,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ...recoveredElixirs,
     bestiary,
     totalKills: savedTotalKills,
+    quirkKills: normalizeQuirkKills(parsed.quirkKills),
     grpdSpentSeals: counter(parsed.grpdSpentSeals),
     grpdUnlockedWeaponIds: fabricatedGrpdIds,
     grpdActiveWeaponIds: activeGrpdIds,
@@ -3794,6 +3816,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         ...recoveredElixirs,
         clearedAreaIds,
         totalKills: prev.totalKills + result.kills,
+        quirkKills: mergeQuirkKills(prev.quirkKills, result.killsByQuirk),
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         totalLevelUps: prev.totalLevelUps + Math.max(0, result.level - 1),

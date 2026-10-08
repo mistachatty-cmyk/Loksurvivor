@@ -9,7 +9,7 @@
  * snapshots out of it.
  */
 
-import { rollEnemyQuirk } from '@/game/data/enemyQuirks';
+import { quirkHash, rollEnemyQuirk } from '@/game/data/enemyQuirks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
 import { AMBIENT_KINDS } from '@/game/data/ambient';
@@ -1175,6 +1175,12 @@ export interface World {
 
   kills: number;
   killsByEnemy: Record<string, number>;
+  /** Kills of quirked enemies this run, by quirk id. */
+  killsByQuirk: Record<string, number>;
+  /** Next time the taken Spawn Shield quirk can block a hit. */
+  quirkShieldReadyAt: number;
+  /** Next time the taken Frame Skip quirk can hop. */
+  quirkSkipReadyAt: number;
   cred: number;
 
   rescue: RescueState;
@@ -1357,7 +1363,7 @@ export interface World {
   grpdAutoIncreaseEnabled: boolean;
   endgameEvolutionsEnabled: boolean;
   /** End-game Enemy quirks feature: off unless the run is set up with it. */
-  enemyQuirks: { enabled: boolean; disabled: ReadonlySet<string> };
+  enemyQuirks: { enabled: boolean; disabled: ReadonlySet<string>; everywhere: string[]; taken: ReadonlySet<string> };
   disabledPassiveIds?: string[];
   threatCalibrations?: ThreatCalibrations;
   threatEventTimers?: {
@@ -1525,7 +1531,7 @@ export function createWorld(
     grpdCareerKills?: number;
     grpdAutoIncreaseEnabled?: boolean;
     endgameEvolutionsEnabled?: boolean;
-    enemyQuirks?: { enabled: boolean; disabledIds: string[] };
+    enemyQuirks?: { enabled: boolean; disabledIds: string[]; everywhereIds?: string[]; takenIds?: string[] };
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
@@ -1536,6 +1542,10 @@ export function createWorld(
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
+  const quirkSetup = { enabled: setup.enemyQuirks?.enabled ?? false };
+  const takenQuirks: ReadonlySet<string> = new Set(quirkSetup.enabled ? (setup.enemyQuirks?.takenIds ?? []).filter((id) => !setup.enemyQuirks?.disabledIds.includes(id)) : []);
+  if (takenQuirks.has('oversized')) stats = { ...stats, maxHp: Math.round(stats.maxHp * 1.4) };
+  if (takenQuirks.has('shrunken')) stats = { ...stats, maxHp: Math.max(1, Math.round(stats.maxHp * 0.75)) };
   const modifiers = setup.modifiers ?? {};
   // `invertedMap` mirrors the area's authored obstacle layout left-to-right;
   // area coordinates are centered at (0,0) (bounds are half-extents), so
@@ -1555,7 +1565,7 @@ export function createWorld(
     vy: 0,
     kx: 0,
     ky: 0,
-    radius: 12 * sizeMult,
+    radius: 12 * sizeMult * (takenQuirks.has('oversized') ? 1.25 : 1) * (takenQuirks.has('shrunken') ? 0.75 : 1),
     hp: stats.maxHp,
     maxHp: stats.maxHp,
     facing: 1,
@@ -1733,6 +1743,9 @@ export function createWorld(
     ultActiveUntil: -1,
     kills: 0,
     killsByEnemy: {},
+    killsByQuirk: {},
+    quirkShieldReadyAt: 0,
+    quirkSkipReadyAt: 0,
     cred: 0,
     rescue: {
       status: ('rescueAllyId' in setup ? setup.rescueAllyId : area.rescueAllyId) ? 'pending' : 'freed',
@@ -1882,7 +1895,12 @@ export function createWorld(
     grpdCareerKills: setup.grpdCareerKills ?? 0,
     grpdAutoIncreaseEnabled: setup.grpdAutoIncreaseEnabled ?? true,
     endgameEvolutionsEnabled: setup.endgameEvolutionsEnabled ?? false,
-    enemyQuirks: { enabled: setup.enemyQuirks?.enabled ?? false, disabled: new Set(setup.enemyQuirks?.disabledIds ?? []) },
+    enemyQuirks: {
+      enabled: quirkSetup.enabled,
+      disabled: new Set(setup.enemyQuirks?.disabledIds ?? []),
+      everywhere: quirkSetup.enabled ? (setup.enemyQuirks?.everywhereIds ?? []) : [],
+      taken: takenQuirks,
+    },
     disabledPassiveIds: setup.disabledPassiveIds ?? [],
     threatCalibrations: setup.threatCalibrations,
     threatEventTimers: {
@@ -2517,7 +2535,7 @@ function spawnEnemy(
     selectedForCommand: false,
     capturableUntil: 0,
   };
-  const quirk = w.enemyQuirks.enabled ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, w.enemyQuirks.disabled) : undefined;
+  const quirk = w.enemyQuirks.enabled ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, w.enemyQuirks.disabled, w.enemyQuirks.everywhere) : undefined;
   if (quirk) {
     enemy.quirk = quirk;
     if (quirk === 'oversized') {
@@ -3965,6 +3983,9 @@ function statusSpeedMultiplier(enemy: EnemyActor): number {
   }, 1);
 }
 
+/** Guards the taken Volatile quirk so its bursts cannot chain into each other. */
+let quirkBurstActive = false;
+
 function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   if (enemy.dying) return;
   enemy.dying = true;
@@ -3975,6 +3996,7 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  if (enemy.quirk) w.killsByQuirk[enemy.quirk] = (w.killsByQuirk[enemy.quirk] ?? 0) + 1;
   if (w.millionHorde) {
     // Each defeated near-field actor breaks a matching aggregate crowd cell.
     // This lets area damage visibly cut into the represented horde without
@@ -4070,6 +4092,27 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
     });
   }
 
+  if (w.enemyQuirks.taken.size > 0) {
+    if (w.enemyQuirks.taken.has('gilded') && w.rng() < 0.12) {
+      w.pickups.push({
+        uid: uid(w), kind: 'cred', x: enemy.x, y: enemy.y,
+        vx: randRange(w.rng, -30, 30), vy: randRange(w.rng, -30, 30),
+        value: Math.max(2, Math.round(enemy.xp / 2)), bornAt: w.now,
+      });
+    }
+    if (w.enemyQuirks.taken.has('volatile') && !quirkBurstActive) {
+      quirkBurstActive = true;
+      try {
+        spawnParticles(w, enemy.x, enemy.y, '#f87171', 8, 90);
+        for (const other of [...w.enemies]) {
+          if (other === enemy || other.dying) continue;
+          if (dist2(other.x, other.y, enemy.x, enemy.y) <= 90 * 90) damageEnemy(w, other, 14, 1, enemy.x, enemy.y, undefined, 1);
+        }
+      } finally {
+        quirkBurstActive = false;
+      }
+    }
+  }
   if (enemy.quirk === 'gilded') {
     for (let coin = 0; coin < 3; coin += 1) {
       w.pickups.push({
@@ -4290,6 +4333,21 @@ function damagePlayer(
   if (w.now < p.invulnUntil) return;
   if (w.stealthConfig?.fullInvisible && w.now < w.stealthUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
+  const taken = w.enemyQuirks.taken;
+  if (taken.size > 0) {
+    if (taken.has('flicker') && (w.now / 1000) % 4 < 0.5) return;
+    if (taken.has('jitterbug') && quirkHash(w.rngSeed, Math.floor(w.now / 16), 9) < 0.08) {
+      w.popups.push({ x: p.x, y: p.y - 18, text: 'MISS', color: '#fde047', bornAt: w.now, vy: 26 });
+      return;
+    }
+    if (taken.has('spawn-shield') && w.now >= w.quirkShieldReadyAt) {
+      w.quirkShieldReadyAt = w.now + 15000;
+      p.invulnUntil = w.now + 400;
+      w.popups.push({ x: p.x, y: p.y - 18, text: 'SHIELD', color: '#93c5fd', bornAt: w.now, vy: 26 });
+      spawnParticles(w, p.x, p.y, '#93c5fd', 8, 80);
+      return;
+    }
+  }
 
   if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
@@ -7103,7 +7161,13 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
   const coneSlow = w.now < w.playerConeUntil ? 1 - w.playerConeMag : 1;
   const pollenSpeed = (p.pollenSpeedUntil ?? 0) > w.now ? 1.18 : 1;
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed;
+  let quirkSpeed = 1;
+  if (w.enemyQuirks.taken.size > 0) {
+    if (w.enemyQuirks.taken.has('shrunken')) quirkSpeed *= 1.15;
+    if (w.enemyQuirks.taken.has('adrenaline') && (w.now / 1000) % 5 < 1) quirkSpeed *= 2.4;
+    if (w.enemyQuirks.taken.has('regenerating') && p.hp > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.015 * dt);
+  }
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed * quirkSpeed;
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -7121,6 +7185,13 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   p.x += p.vx * dt;
   p.y += p.vy * dt;
   if (!dashing) applyKnockback(p, dt);
+  if (w.enemyQuirks.taken.has('frame-skip') && len > 0.1 && w.now >= w.quirkSkipReadyAt) {
+    w.quirkSkipReadyAt = w.now + 4000;
+    spawnParticles(w, p.x, p.y, '#38bdf8', 6, 70);
+    p.x += nx * 70;
+    p.y += ny * 70;
+    spawnParticles(w, p.x, p.y, '#38bdf8', 6, 70);
+  }
 
   if (dashing) {
     p.facing = p.dashDirectionX < -0.05 ? -1 : p.dashDirectionX > 0.05 ? 1 : p.facing;
@@ -12271,6 +12342,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     level: w.level,
     cred: finalCred,
     killsByEnemy: { ...w.killsByEnemy },
+    killsByQuirk: { ...w.killsByQuirk },
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
     mapFindIds: [...w.mapFindIds],

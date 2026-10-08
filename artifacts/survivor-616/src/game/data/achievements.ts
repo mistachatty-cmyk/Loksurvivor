@@ -5,6 +5,7 @@ import { CARD_MANIFESTS, cardCollectionSummary } from './cards';
 import { CHARACTERS } from './characters';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
+import { ENEMY_QUIRKS, QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } from './enemyQuirks';
 import { LOKPET_VARIANTS } from './lokPets';
 import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
 import { RENTABLE_GENERATORS } from './generators';
@@ -445,6 +446,72 @@ const RAW_ACHIEVEMENTS: RawAchievement[] = [
   },
 ];
 
+/**
+ * Enemy quirk achievements, generated from the quirk list so a new quirk gets
+ * its own pair automatically: one for the Everywhere unlock, one for Take it on.
+ */
+const quirkTotal = (meta: MetaState) => Object.values(meta.quirkKills ?? {}).reduce((sum, n) => sum + n, 0);
+const quirkKillsOf = (meta: MetaState, id: string) => meta.quirkKills?.[id] ?? 0;
+
+const QUIRK_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'quirk-first-kill',
+    name: 'Odd One Out',
+    description: 'Defeat an enemy carrying a random quirk.',
+    tier: 'bronze',
+    isComplete: (meta) => quirkTotal(meta) >= 1,
+    reward: { kind: 'cred', amount: 100 },
+  },
+  {
+    id: 'quirk-collector',
+    name: 'Quirk Collector',
+    description: 'Defeat at least one enemy with every kind of quirk.',
+    tier: 'silver',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= 1),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= 1).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'cred', amount: 400 },
+  },
+  ...ENEMY_QUIRKS.flatMap((quirk): RawAchievement[] => [
+    {
+      id: `quirk-everywhere-${quirk.id}`,
+      name: `${quirk.name} Everywhere`,
+      description: `Defeat ${QUIRK_EVERYWHERE_KILLS.toLocaleString()} ${quirk.name} enemies. Unlocks the Everywhere option for it.`,
+      tier: 'gold',
+      isComplete: (meta) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS,
+      progress: (meta) => ratio(quirkKillsOf(meta, quirk.id), QUIRK_EVERYWHERE_KILLS),
+      reward: { kind: 'cred', amount: 2500 },
+    },
+    {
+      id: `quirk-taken-${quirk.id}`,
+      name: `Become ${quirk.name}`,
+      description: `Defeat ${QUIRK_TAKE_ON_KILLS.toLocaleString()} ${quirk.name} enemies. Unlocks Take it on, so you gain the quirk yourself.`,
+      tier: 'legendary',
+      isComplete: (meta) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS,
+      progress: (meta) => ratio(quirkKillsOf(meta, quirk.id), QUIRK_TAKE_ON_KILLS),
+      reward: { kind: 'lootTokens', amount: 25 },
+    },
+  ]),
+  {
+    id: 'quirk-everywhere-all',
+    name: 'Nothing Is Normal',
+    description: 'Unlock Everywhere for all ten quirks.',
+    tier: 'legendary',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'cred', amount: 15000 },
+  },
+  {
+    id: 'quirk-taken-all',
+    name: 'The Whole Weird Set',
+    description: 'Unlock Take it on for all ten quirks.',
+    tier: 'legendary',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'lootTokens', amount: 100 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...QUIRK_ACHIEVEMENTS);
+
 const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'first-blood': 'combat', 'body-count-1000': 'combat', 'body-count-10000': 'combat', 'fourth-wall-breaker': 'combat',
   'glitch-hunter': 'combat', 'stack-smasher': 'combat', 'null-terminator': 'combat',
@@ -463,7 +530,7 @@ const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
 
 export const ACHIEVEMENTS: AchievementDef[] = RAW_ACHIEVEMENTS.map((achievement) => ({
   ...achievement,
-  category: CATEGORY_BY_ID[achievement.id] ?? 'world',
+  category: CATEGORY_BY_ID[achievement.id] ?? (achievement.id.startsWith('quirk-') ? 'bestiary' : 'world'),
 }));
 
 export const ACHIEVEMENTS_BY_ID: Record<string, AchievementDef> = Object.fromEntries(

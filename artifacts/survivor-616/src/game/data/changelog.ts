@@ -699,6 +699,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings, End game now has an Enemy quirks switch and one switch for each of the ten quirks, plus All on and All off. A quirk you turn off never spawns, and the rest keep their relative odds.',
     ],
   },
+  {
+    version: '0.20.5',
+    date: '2026-10-08',
+    publishedAt: '2026-10-08T01:00:00Z',
+    kind: 'update',
+    title: 'Everywhere and Take It On',
+    body: [
+      'Every enemy quirk now counts the enemies you defeat with it. At 1,000,000 kills, a quirk unlocks Everywhere: it lands on every enemy in the game, bosses included. At 2,500,000 kills it unlocks Take it on: you gain the quirk yourself, such as Regenerating healing you or Frame Skip hopping you forward.',
+      'Both options are off until you switch them on, and sit right under each quirk in Settings, End game, with a progress bar until they unlock.',
+      'New achievements: Odd One Out, Quirk Collector, an Everywhere and a Become achievement for each of the ten quirks, plus Nothing Is Normal and The Whole Weird Set.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -36,3 +36,36 @@ test('claiming an incomplete or unknown achievement is a no-op', () => {
   assert.equal(reducer(state, { type: 'claimAchievement', id: 'first-blood' }), state);
   assert.equal(reducer(state, { type: 'claimAchievement', id: 'not-a-real-achievement' }), state);
 });
+
+test('every quirk has an Everywhere and a Take it on achievement that complete at their kill counts', async () => {
+  const { ENEMY_QUIRKS, QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } = await import('@/game/data/enemyQuirks');
+  const { ACHIEVEMENTS_BY_ID } = await import('@/game/data/achievements');
+  const fresh = createInitialMeta();
+  for (const quirk of ENEMY_QUIRKS) {
+    const everywhere = ACHIEVEMENTS_BY_ID[`quirk-everywhere-${quirk.id}`]!;
+    const taken = ACHIEVEMENTS_BY_ID[`quirk-taken-${quirk.id}`]!;
+    assert.ok(everywhere && taken);
+    assert.equal(everywhere.isComplete({ ...fresh, quirkKills: { [quirk.id]: QUIRK_EVERYWHERE_KILLS - 1 } }), false);
+    assert.equal(everywhere.isComplete({ ...fresh, quirkKills: { [quirk.id]: QUIRK_EVERYWHERE_KILLS } }), true);
+    assert.equal(taken.isComplete({ ...fresh, quirkKills: { [quirk.id]: QUIRK_EVERYWHERE_KILLS } }), false);
+    assert.equal(taken.isComplete({ ...fresh, quirkKills: { [quirk.id]: QUIRK_TAKE_ON_KILLS } }), true);
+  }
+  const all = Object.fromEntries(ENEMY_QUIRKS.map((quirk) => [quirk.id, QUIRK_TAKE_ON_KILLS]));
+  for (const id of ['quirk-first-kill', 'quirk-collector', 'quirk-everywhere-all', 'quirk-taken-all']) {
+    assert.equal(ACHIEVEMENTS_BY_ID[id]!.isComplete(fresh), false);
+    assert.equal(ACHIEVEMENTS_BY_ID[id]!.isComplete({ ...fresh, quirkKills: all }), true);
+  }
+});
+
+test('a finished run adds its quirk kills to the save and ignores unknown quirks', async () => {
+  const { AREAS } = await import('@/game/data/areas');
+  const { CHARACTERS } = await import('@/game/data/characters');
+  const { buildResult, createWorld } = await import('@/game/engine/world');
+  const world = createWorld(AREAS[0]!, CHARACTERS[0]!, CHARACTERS[0]!.stats, 1);
+  world.killsByQuirk = { volatile: 2, gilded: 1, bogus: 5 };
+  const state = { meta: createInitialMeta(), lastRun: null };
+  const next = reducer(state, { type: 'completeRun', result: buildResult(world) });
+  assert.deepEqual(next.meta.quirkKills, { volatile: 2, gilded: 1 });
+  const again = reducer(next, { type: 'completeRun', result: buildResult(world) });
+  assert.deepEqual(again.meta.quirkKills, { volatile: 4, gilded: 2 });
+});
