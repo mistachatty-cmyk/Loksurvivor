@@ -27,7 +27,7 @@ The owner found the new screen content "a lot on screen" and asked for it to be 
 - The standard-maps-only gate means the Settings tab is hidden entirely (no hint) before the end game. Do not add a teaser without asking.
 - Reading the toggles in render is cheap (`isFeatureEnabled` reads localStorage); `CharacterSelect` reads them once per mount.
 
-## Round 2 (0.19.13): customs control
+## Round 2 (0.21.3): customs control
 - **Customs stay out of card packs** until the owner decides otherwise: `CHARACTER_CARDS` (`data/cards.ts`) filters `forge-` ids. Custom enemy/LokPet looks are not in any manifest. Do not add them without asking.
 - Run switches live in the forge store (`runUse`): per item plus a master. Missing item = on. `loadRosterForgedOperators` filters by it; the renderer reads `customEnemyPalette`/`customPetPalette` (cached until the next store write, so no per-frame storage reads).
 - The Custom Bestiary view and hideout Endgame dock appear only after Victory Lap (or Dev Mode). The dock hides via `hideoutDock`.

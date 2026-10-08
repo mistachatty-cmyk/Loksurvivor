@@ -5,6 +5,10 @@ import { CARD_MANIFESTS, cardCollectionSummary } from './cards';
 import { CHARACTERS } from './characters';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
+import { FACTIONS_BY_ID } from './factions';
+import { endgameReached, mapsCleared } from './endgameUnlocks';
+import { QUIRK_SURGE_UNLOCK_MAPS } from './enemyQuirks';
+import { ENEMY_QUIRKS, QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } from './enemyQuirks';
 import { LOKPET_VARIANTS } from './lokPets';
 import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
 import { RENTABLE_GENERATORS } from './generators';
@@ -576,6 +580,198 @@ const RAW_ACHIEVEMENTS: RawAchievement[] = [
   },
 ];
 
+/**
+ * Enemy quirk achievements, generated from the quirk list so a new quirk gets
+ * its own pair automatically: one for the Everywhere unlock, one for Take it on.
+ */
+const quirkTotal = (meta: MetaState) => Object.values(meta.quirkKills ?? {}).reduce((sum, n) => sum + n, 0);
+const quirkKillsOf = (meta: MetaState, id: string) => meta.quirkKills?.[id] ?? 0;
+
+const QUIRK_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'quirk-first-kill',
+    name: 'Odd One Out',
+    description: 'Defeat an enemy carrying a random quirk.',
+    tier: 'bronze',
+    isComplete: (meta) => quirkTotal(meta) >= 1,
+    reward: { kind: 'cred', amount: 100 },
+  },
+  {
+    id: 'quirk-collector',
+    name: 'Quirk Collector',
+    description: 'Defeat at least one enemy with every kind of quirk.',
+    tier: 'silver',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= 1),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= 1).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'cred', amount: 400 },
+  },
+  ...ENEMY_QUIRKS.flatMap((quirk): RawAchievement[] => [
+    {
+      id: `quirk-everywhere-${quirk.id}`,
+      name: `${quirk.name} Everywhere`,
+      description: `Defeat ${QUIRK_EVERYWHERE_KILLS.toLocaleString()} ${quirk.name} enemies. Unlocks the Everywhere option for it.`,
+      tier: 'gold',
+      isComplete: (meta) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS,
+      progress: (meta) => ratio(quirkKillsOf(meta, quirk.id), QUIRK_EVERYWHERE_KILLS),
+      reward: { kind: 'cred', amount: 2500 },
+    },
+    {
+      id: `quirk-taken-${quirk.id}`,
+      name: `Become ${quirk.name}`,
+      description: `Defeat ${QUIRK_TAKE_ON_KILLS.toLocaleString()} ${quirk.name} enemies. Unlocks Take it on, so you gain the quirk yourself.`,
+      tier: 'legendary',
+      isComplete: (meta) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS,
+      progress: (meta) => ratio(quirkKillsOf(meta, quirk.id), QUIRK_TAKE_ON_KILLS),
+      reward: { kind: 'lootTokens', amount: 25 },
+    },
+  ]),
+  {
+    id: 'quirk-everywhere-all',
+    name: 'Nothing Is Normal',
+    description: 'Unlock Everywhere for all ten quirks.',
+    tier: 'legendary',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'cred', amount: 15000 },
+  },
+  {
+    id: 'quirk-taken-all',
+    name: 'The Whole Weird Set',
+    description: 'Unlock Take it on for all ten quirks.',
+    tier: 'legendary',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'lootTokens', amount: 100 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...QUIRK_ACHIEVEMENTS);
+
+/** Gen Fitting Floor, its enemies, and actually playing with the quirk options. */
+const GEN_FITTER_IDS = FACTIONS_BY_ID['gen-fitters']!.roster;
+const GEN_STYLE_IDS = ['gen-fit-check-duelist', 'gen-pin-pouncer', 'gen-color-wheel', 'gen-grid-stitcher', 'gen-fan-sampler', 'gen-checkpoint-rewinder'];
+const defeated = (meta: MetaState, ids: readonly string[]) => ids.filter((id) => (meta.bestiary[id] ?? 0) > 0).length;
+
+const GEN_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'gen-floor-cleared',
+    name: 'Fitted for Survival',
+    description: 'Survive Gen Fitting Floor.',
+    tier: 'silver',
+    isComplete: (meta) => meta.clearedAreaIds.includes('gen-fitting-floor'),
+    reward: { kind: 'cred', amount: 400 },
+  },
+  {
+    id: 'gen-warden-down',
+    name: 'Seams Broken',
+    description: 'Defeat the Tile Warden.',
+    tier: 'gold',
+    isComplete: (meta) => (meta.bestiary['gen-tile-warden'] ?? 0) > 0,
+    reward: { kind: 'cred', amount: 600 },
+  },
+  {
+    id: 'gen-six-styles',
+    name: 'Six Ways to Lose',
+    description: 'Defeat each of the six new fighting styles: the Duelist, Pouncer, Color Wheel, Stitcher, Sampler and Rewinder.',
+    tier: 'silver',
+    isComplete: (meta) => defeated(meta, GEN_STYLE_IDS) >= GEN_STYLE_IDS.length,
+    progress: (meta) => ratio(defeated(meta, GEN_STYLE_IDS), GEN_STYLE_IDS.length),
+    reward: { kind: 'cred', amount: 350 },
+  },
+  {
+    id: 'gen-full-roster',
+    name: 'Every Fit on the Rack',
+    description: 'Defeat every Gen Fitter at least once.',
+    tier: 'gold',
+    isComplete: (meta) => defeated(meta, GEN_FITTER_IDS) >= GEN_FITTER_IDS.length,
+    progress: (meta) => ratio(defeated(meta, GEN_FITTER_IDS), GEN_FITTER_IDS.length),
+    reward: { kind: 'lootTokens', amount: 5 },
+  },
+  {
+    id: 'quirk-everywhere-run',
+    name: 'Nobody Is Normal Today',
+    description: 'Finish a run with a quirk set to Everywhere.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkEverywhereRuns >= 1,
+    reward: { kind: 'cred', amount: 750 },
+  },
+  {
+    id: 'quirk-everywhere-run-10',
+    name: 'Weird Weather',
+    description: 'Finish 10 runs with a quirk set to Everywhere.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkEverywhereRuns >= 10,
+    progress: (meta) => ratio(meta.quirkEverywhereRuns, 10),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+  {
+    id: 'quirk-taken-run',
+    name: 'Wearing the Weird',
+    description: 'Finish a run with a quirk taken on.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkTakenRuns >= 1,
+    reward: { kind: 'cred', amount: 750 },
+  },
+  {
+    id: 'quirk-taken-run-10',
+    name: 'Quirk by Nature',
+    description: 'Finish 10 runs with a quirk taken on.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkTakenRuns >= 10,
+    progress: (meta) => ratio(meta.quirkTakenRuns, 10),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...GEN_ACHIEVEMENTS);
+
+/** The Quirk Surge, its unlock, and the end game it leads to. */
+const SURGE_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'surge-glyph-reader',
+    name: 'Glyph Reader',
+    description: 'Clear 14 maps, enough to start seeing the glyphs.',
+    tier: 'bronze',
+    isComplete: (meta) => meta.clearedAreaIds.length >= QUIRK_SURGE_UNLOCK_MAPS,
+    progress: (meta) => ratio(meta.clearedAreaIds.length, QUIRK_SURGE_UNLOCK_MAPS),
+    reward: { kind: 'cred', amount: 200 },
+  },
+  {
+    id: 'surge-first',
+    name: 'Heard the Howls',
+    description: 'Outlast a Quirk Surge.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 1,
+    reward: { kind: 'cred', amount: 500 },
+  },
+  {
+    id: 'surge-10',
+    name: 'Eclipse Regular',
+    description: 'Outlast 10 Quirk Surges.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 10,
+    progress: (meta) => ratio(meta.quirkSurgesSurvived, 10),
+    reward: { kind: 'lootTokens', amount: 5 },
+  },
+  {
+    id: 'surge-50',
+    name: 'Nothing Surprises Me',
+    description: 'Outlast 50 Quirk Surges.',
+    tier: 'legendary',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 50,
+    progress: (meta) => ratio(meta.quirkSurgesSurvived, 50),
+    reward: { kind: 'lootTokens', amount: 25 },
+  },
+  {
+    id: 'victory-lap-reached',
+    name: 'Victory Lap',
+    description: 'Clear every standard map and open the end game.',
+    tier: 'gold',
+    isComplete: (meta) => endgameReached(meta),
+    progress: (meta) => { const { have, need } = mapsCleared(meta); return ratio(have, need); },
+    reward: { kind: 'cred', amount: 1000 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...SURGE_ACHIEVEMENTS);
+
 const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'first-blood': 'combat', 'body-count-1000': 'combat', 'body-count-10000': 'combat', 'fourth-wall-breaker': 'combat',
   'glitch-hunter': 'combat', 'stack-smasher': 'combat', 'null-terminator': 'combat',
@@ -593,11 +789,14 @@ const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'forge-palette-nerd': 'forge', 'forge-rogues-gallery': 'forge', 'forge-menagerie': 'forge', 'forge-tab-hopper': 'forge',
   'forge-share-the-look': 'forge', 'forge-complete-collection': 'forge',
   'passive-income': 'economy', 'new-loot-look': 'economy', 'pack-rat': 'economy', 'full-stash': 'economy',
+  'surge-glyph-reader': 'world', 'surge-first': 'combat', 'surge-10': 'combat', 'surge-50': 'combat', 'victory-lap-reached': 'world',
+  'gen-floor-cleared': 'world', 'gen-warden-down': 'combat', 'gen-six-styles': 'bestiary', 'gen-full-roster': 'bestiary',
+  'quirk-everywhere-run': 'combat', 'quirk-everywhere-run-10': 'combat', 'quirk-taken-run': 'combat', 'quirk-taken-run-10': 'combat',
 };
 
 export const ACHIEVEMENTS: AchievementDef[] = RAW_ACHIEVEMENTS.map((achievement) => ({
   ...achievement,
-  category: CATEGORY_BY_ID[achievement.id] ?? 'world',
+  category: CATEGORY_BY_ID[achievement.id] ?? (achievement.id.startsWith('quirk-') ? 'bestiary' : 'world'),
 }));
 
 export const ACHIEVEMENTS_BY_ID: Record<string, AchievementDef> = Object.fromEntries(

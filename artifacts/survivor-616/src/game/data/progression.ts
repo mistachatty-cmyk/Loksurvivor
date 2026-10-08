@@ -562,6 +562,7 @@ export const DISCOVERIES: DiscoveryDef[] = [
   { id: 'digital-soul-core', name: 'The Digital Soul Core', blurb: "A crystallized fragment of every human essence The Director's foundry has compiled so far. It hums when it recognizes a name." },
   { id: 'tree-null-log', name: 'The Tree Null Log', blurb: "A growth ring cut from Yggdrasil Null's trunk, its rings encoded instead of counted -- one bio-digital season per line." },
   { id: 'floodline-breach-log', name: 'Floodline Exchange Ledger', blurb: 'A transit ledger that kept printing 616 after the roots reached the platforms.' },
+  { id: 'gen-fitting-floor-log', name: 'Fitting Floor Swatch Book', blurb: 'A swatch book of palettes, skins and hats that kept adding pages while the floor was being repainted around it.' },
   { id: 'glassroot-annex-log', name: 'Glassroot Field Note', blurb: 'A field note mapping false trees around the buried shrine.' },
   { id: 'breach-616-plate', name: 'The 616 Plate', blurb: 'A fractured station plate found under the Floodline relays. Its rain-worn number follows you home.' },
   { id: 'transit-coil-found', name: 'The Transit Coil', blurb: 'An intact rail coil that powers the Catenary Harpoon.' },

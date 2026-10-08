@@ -983,7 +983,26 @@ export type EnemyBehavior =
   /** Firefly Wranglers: dual-wielding boss firing twin incendiary streams that leave fire trails. */
   | 'firefly-pyro-duelist'
   /** Sub-Terra / Digiverse: disguised mimic chest that attacks when approached. */
-  | 'mimic-chest';
+  | 'mimic-chest'
+  /** Gen Fitters: circle-strafes at mid range, telegraphs, then lunges in a slash. */
+  | 'strafe-duelist'
+  /** Gen Fitters: marks the player's spot, leaps there and lands in a shockwave ring. */
+  | 'pouncer'
+  /** Gen Fitters: plants itself and spins a wheel of short beams around it. */
+  | 'beam-wheel'
+  /** Gen Fitters: zigzags toward the player, stitching a trail of lingering mines. */
+  | 'mine-stitcher'
+  /** Gen Fitters: kites at range and fires five-way projectile fans. */
+  | 'fan-sampler'
+  /** Gen Fitters: saves its position, then rewinds to it with a burst at both ends. */
+  | 'rewinder';
+
+export interface EnemyDrop {
+  kind: 'health' | 'cred' | 'phosphor-ore' | 'silicon-alloy' | 'cyber-resin' | 'prism-quartz' | 'rootglass-cell' | 'glitch-cache';
+  /** 0..1 chance per defeat. */
+  chance: number;
+  value?: number;
+}
 
 export interface EnemyDef {
   id: string;
@@ -1005,6 +1024,13 @@ export interface EnemyDef {
   palette: SpritePalette;
   rig: SpriteRig;
   lore: string;
+  /**
+   * Authored resource drops, rolled independently on defeat on top of the
+   * standard XP / health / cred rolls. `value` only matters for health and cred.
+   */
+  drops?: EnemyDrop[];
+  /** A delayed ring that detonates where this enemy fell. */
+  deathBurst?: { radius: number; damage: number };
   /** Spitter-only tuning. */
   ranged?: { cooldownMs: number; projectileSpeed: number; damage: number };
   faction?: string;
@@ -1020,6 +1046,9 @@ export interface EnemyDef {
   /** Ambient bioluminescent light radius in darkness or fog. */
   glowRadius?: number;
   traits?: {
+    /** Once at or below `belowHpPct` of max HP it moves faster, shortens its
+     *  attack cooldowns (Gen Fitters styles) and flares. */
+    enrage?: { belowHpPct: number; speedMult: number; cooldownMult: number };
     teleportMs?: number;
     ghostMs?: number;
     shiftMs?: number;
@@ -2398,6 +2427,13 @@ export interface MetaState {
   /** enemyId -> total defeats, drives the bestiary. */
   bestiary: Record<string, number>;
   totalKills: number;
+  /** Lifetime kills of enemies carrying each random quirk, by quirk id. */
+  quirkKills: Record<string, number>;
+  /** Runs started with at least one quirk set to Everywhere / Take it on. */
+  quirkEverywhereRuns: number;
+  quirkTakenRuns: number;
+  /** Quirk Surges the player has outlasted. */
+  quirkSurgesSurvived: number;
   /** GRPD evidence seals are earned every 1,000 lifetime kills; this is the spent amount. */
   grpdSpentSeals: number;
   /** Completed field prototypes fabricated at the GRPD Armory. */
@@ -2654,6 +2690,13 @@ export interface RunResult {
   level: number;
   cred: number;
   killsByEnemy: Record<string, number>;
+  /** Kills of quirked enemies this run, by quirk id. */
+  killsByQuirk?: Record<string, number>;
+  /** This run used a quirk's Everywhere option / Take it on option. */
+  quirkEverywhereRun?: boolean;
+  quirkTakenRun?: boolean;
+  /** This run outlasted its Quirk Surge. */
+  quirkSurgeSurvived?: boolean;
   /** Growth Recap: XP, level and bond changes for pets that were out. Filled when the run is recorded. */
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;

@@ -9,6 +9,8 @@
  * snapshots out of it.
  */
 
+import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
+import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
 import type { DropStyle } from '@/game/data/dropPacks';
 import { getEnemy, ENEMIES } from '@/game/data/enemies';
 import { CASCADE_STACK_PER_ENEMY, CASCADE_STACK_STEP, DAMAGE_TIERS, cascadeLifeMs, damageTier, type DamageNumberStyle } from '@/game/data/damageNumbers';
@@ -257,6 +259,14 @@ export interface EnemyActor extends Actor {
   veteranAffix?: 'armored' | 'overclocked' | 'incendiary' | 'vampiric' | 'magnetic';
   veteranTitle?: string;
   veteranColor?: string;
+  /** Gen Fitters per-style scratch state: a saved or landing point and a phase timer. */
+  fightX?: number;
+  fightY?: number;
+  fightPhase?: number;
+  /** Random spawn quirk id from `data/enemyQuirks.ts`. */
+  quirk?: string;
+  /** Set once `traits.enrage` has triggered. */
+  enraged?: boolean;
   /** Firefly spiker pulse sequence tracking */
   spikerPulseCount?: number;
   spikerPulseCooldown?: number;
@@ -1169,6 +1179,20 @@ export interface World {
 
   kills: number;
   killsByEnemy: Record<string, number>;
+  /** Kills of quirked enemies this run, by quirk id. */
+  killsByQuirk: Record<string, number>;
+  /** Quirk Surge progress: 0 waiting, 1 running, 2 paid out. */
+  quirkSurgePhase: 0 | 1 | 2;
+  /** The 10-second countdown alert has fired. */
+  quirkSurgeWarned: boolean;
+  /** How often this run gets a Quirk Surge, decided by the player's progress. */
+  quirkSurgeMode: QuirkSurgeMode;
+  /** Quirks already announced this run, so each is explained once. */
+  quirkAnnounced: Record<string, true>;
+  /** Next time the taken Spawn Shield quirk can block a hit. */
+  quirkShieldReadyAt: number;
+  /** Next time the taken Frame Skip quirk can hop. */
+  quirkSkipReadyAt: number;
   cred: number;
 
   rescue: RescueState;
@@ -1357,6 +1381,8 @@ export interface World {
   grpdCareerKills: number;
   grpdAutoIncreaseEnabled: boolean;
   endgameEvolutionsEnabled: boolean;
+  /** End-game Enemy quirks feature: off unless the run is set up with it. */
+  enemyQuirks: { enabled: boolean; disabled: ReadonlySet<string>; everywhere: string[]; taken: ReadonlySet<string> };
   disabledPassiveIds?: string[];
   threatCalibrations?: ThreatCalibrations;
   threatEventTimers?: {
@@ -1525,6 +1551,8 @@ export function createWorld(
     grpdCareerKills?: number;
     grpdAutoIncreaseEnabled?: boolean;
     endgameEvolutionsEnabled?: boolean;
+    quirkSurgeMode?: QuirkSurgeMode;
+    enemyQuirks?: { enabled: boolean; disabledIds: string[]; everywhereIds?: string[]; takenIds?: string[] };
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
     threatUpgrades?: Record<string, boolean>;
@@ -1535,6 +1563,10 @@ export function createWorld(
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
+  const quirkSetup = { enabled: setup.enemyQuirks?.enabled ?? false };
+  const takenQuirks: ReadonlySet<string> = new Set(quirkSetup.enabled ? (setup.enemyQuirks?.takenIds ?? []).filter((id) => !setup.enemyQuirks?.disabledIds.includes(id)) : []);
+  if (takenQuirks.has('oversized')) stats = { ...stats, maxHp: Math.round(stats.maxHp * 1.4) };
+  if (takenQuirks.has('shrunken')) stats = { ...stats, maxHp: Math.max(1, Math.round(stats.maxHp * 0.75)) };
   const modifiers = setup.modifiers ?? {};
   // `invertedMap` mirrors the area's authored obstacle layout left-to-right;
   // area coordinates are centered at (0,0) (bounds are half-extents), so
@@ -1554,7 +1586,7 @@ export function createWorld(
     vy: 0,
     kx: 0,
     ky: 0,
-    radius: 12 * sizeMult,
+    radius: 12 * sizeMult * (takenQuirks.has('oversized') ? 1.25 : 1) * (takenQuirks.has('shrunken') ? 0.75 : 1),
     hp: stats.maxHp,
     maxHp: stats.maxHp,
     facing: 1,
@@ -1732,6 +1764,13 @@ export function createWorld(
     ultActiveUntil: -1,
     kills: 0,
     killsByEnemy: {},
+    killsByQuirk: {},
+    quirkAnnounced: {},
+    quirkSurgePhase: 0,
+    quirkSurgeWarned: false,
+    quirkSurgeMode: setup.quirkSurgeMode ?? 'off',
+    quirkShieldReadyAt: 0,
+    quirkSkipReadyAt: 0,
     cred: 0,
     rescue: {
       status: ('rescueAllyId' in setup ? setup.rescueAllyId : area.rescueAllyId) ? 'pending' : 'freed',
@@ -1887,6 +1926,12 @@ export function createWorld(
     grpdCareerKills: setup.grpdCareerKills ?? 0,
     grpdAutoIncreaseEnabled: setup.grpdAutoIncreaseEnabled ?? true,
     endgameEvolutionsEnabled: setup.endgameEvolutionsEnabled ?? false,
+    enemyQuirks: {
+      enabled: quirkSetup.enabled,
+      disabled: new Set(setup.enemyQuirks?.disabledIds ?? []),
+      everywhere: quirkSetup.enabled ? (setup.enemyQuirks?.everywhereIds ?? []) : [],
+      taken: takenQuirks,
+    },
     disabledPassiveIds: setup.disabledPassiveIds ?? [],
     threatCalibrations: setup.threatCalibrations,
     threatEventTimers: {
@@ -2577,6 +2622,34 @@ function spawnEnemy(
     selectedForCommand: false,
     capturableUntil: 0,
   };
+  const surgeOn = quirkSurgeActive(w);
+  const featureOn = w.enemyQuirks.enabled;
+  const surgeIds = ENEMY_QUIRKS.map((q) => q.id).filter((id) => !(featureOn && w.enemyQuirks.disabled.has(id)));
+  const forcedIds = featureOn && w.enemyQuirks.everywhere.length > 0 ? w.enemyQuirks.everywhere : surgeOn ? surgeIds : undefined;
+  const quirk = featureOn || surgeOn
+    ? rollEnemyQuirk(def, w.now, w.rngSeed, enemy.uid, featureOn ? w.enemyQuirks.disabled : undefined, forcedIds)
+    : undefined;
+  if (quirk) {
+    enemy.quirk = quirk;
+    if (!w.quirkAnnounced[quirk]) {
+      w.quirkAnnounced[quirk] = true;
+      const quirkDef = ENEMY_QUIRKS_BY_ID[quirk];
+      if (quirkDef) pushAlert(w, `${quirkDef.name.toUpperCase()}: ${quirkDef.description}`);
+    }
+    if (quirk === 'oversized') {
+      enemy.radius *= 1.35; enemy.baseRadius = enemy.radius;
+      enemy.hp = enemy.maxHp = Math.round(enemy.maxHp * 1.4);
+      enemy.mass *= 1.5; enemy.xp = Math.round(enemy.xp * 1.5);
+    } else if (quirk === 'shrunken') {
+      enemy.radius *= 0.72; enemy.baseRadius = enemy.radius;
+      enemy.hp = enemy.maxHp = Math.max(1, Math.round(enemy.maxHp * 0.7));
+      enemy.speed *= 1.3;
+    } else if (quirk === 'gilded') {
+      enemy.hp = enemy.maxHp = Math.round(enemy.maxHp * 1.3);
+    } else if (quirk === 'spawn-shield') {
+      enemy.shieldedUntil = w.now + 1500;
+    }
+  }
   w.enemies.push(enemy);
   w.enemiesByUid.set(enemy.uid, enemy);
 
@@ -4020,6 +4093,37 @@ function statusSpeedMultiplier(enemy: EnemyActor): number {
   return multiplier;
 }
 
+function quirkSurgeActive(w: World): boolean {
+  if (!quirkSurgeScheduled(w.quirkSurgeMode, w.rngSeed)) return false;
+  const start = quirkSurgeStart(w.rngSeed);
+  return w.now >= start && w.now < start + QUIRK_SURGE_MS;
+}
+
+/** Quirk Surge: announces itself, lasts 20s, then pays out once if the player is still standing. */
+function updateQuirkSurge(w: World) {
+  if (w.outcome !== 'running' || !quirkSurgeScheduled(w.quirkSurgeMode, w.rngSeed)) return;
+  const start = quirkSurgeStart(w.rngSeed);
+  if (w.quirkSurgePhase === 0 && w.now >= start && w.now < start + QUIRK_SURGE_MS) {
+    w.quirkSurgePhase = 1;
+    pushAlert(w, `QUIRK SURGE! Every enemy is quirked for 20 seconds. ${QUIRK_SURGE_LORE.alertTail}`);
+    pushSfx(w, 'ultimate');
+    w.shake = Math.max(w.shake, 6);
+  } else if (w.quirkSurgePhase === 1 && !w.quirkSurgeWarned && w.now >= start + QUIRK_SURGE_MS - 10_000 && w.now < start + QUIRK_SURGE_MS) {
+    w.quirkSurgeWarned = true;
+    pushAlert(w, 'SURGE ENDS IN 10');
+  } else if (w.quirkSurgePhase === 1 && w.now >= start + QUIRK_SURGE_MS) {
+    w.quirkSurgePhase = 2;
+    pushAlert(w, 'SURGE SURVIVED! Bonus drop');
+    const p = w.player;
+    w.pickups.push({ uid: uid(w), kind: 'health', x: p.x + 30, y: p.y, vx: 0, vy: 0, value: 35, bornAt: w.now });
+    w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x - 30, y: p.y, vx: 0, vy: 0, value: 60, bornAt: w.now });
+    w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x, y: p.y + 30, vx: 0, vy: 0, value: 1, bornAt: w.now });
+  }
+}
+
+/** Guards the taken Volatile quirk so its bursts cannot chain into each other. */
+let quirkBurstActive = false;
+
 function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   if (enemy.dying) return;
   enemy.dying = true;
@@ -4030,6 +4134,7 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
   enemy.animStartedAt = w.now;
   w.kills += 1;
   w.killsByEnemy[enemy.defId] = (w.killsByEnemy[enemy.defId] ?? 0) + 1;
+  if (enemy.quirk) w.killsByQuirk[enemy.quirk] = (w.killsByQuirk[enemy.quirk] ?? 0) + 1;
   if (w.millionHorde) w.millionHorde.defeatedPopulation += 1;
   // LokSurvivorArena: a guest kill also counts toward `kills`/`killsByEnemy`
   // above (so campaign-style read models keep working unmodified) *and*
@@ -4113,6 +4218,63 @@ function killEnemy(w: World, enemy: EnemyActor, killerId?: string) {
       uid: uid(w), kind: 'sweep', x: enemy.x, y: enemy.y,
       vx: 0, vy: 0, value: 0, bornAt: w.now,
     });
+  }
+
+  if (w.enemyQuirks.taken.size > 0) {
+    if (w.enemyQuirks.taken.has('gilded') && w.rng() < 0.12) {
+      w.pickups.push({
+        uid: uid(w), kind: 'cred', x: enemy.x, y: enemy.y,
+        vx: randRange(w.rng, -30, 30), vy: randRange(w.rng, -30, 30),
+        value: Math.max(2, Math.round(enemy.xp / 2)), bornAt: w.now,
+      });
+    }
+    if (w.enemyQuirks.taken.has('volatile') && !quirkBurstActive) {
+      quirkBurstActive = true;
+      try {
+        spawnParticles(w, enemy.x, enemy.y, '#f87171', 8, 90);
+        for (const other of [...w.enemies]) {
+          if (other === enemy || other.dying) continue;
+          if (dist2(other.x, other.y, enemy.x, enemy.y) <= 90 * 90) damageEnemy(w, other, 14, 1, enemy.x, enemy.y, undefined, 1);
+        }
+      } finally {
+        quirkBurstActive = false;
+      }
+    }
+  }
+  if (enemy.quirk === 'gilded') {
+    for (let coin = 0; coin < 3; coin += 1) {
+      w.pickups.push({
+        uid: uid(w), kind: 'cred', x: enemy.x + randRange(w.rng, -18, 18), y: enemy.y + randRange(w.rng, -18, 18),
+        vx: randRange(w.rng, -34, 34), vy: randRange(w.rng, -34, 34),
+        value: Math.max(2, Math.round(enemy.xp / 2)), bornAt: w.now,
+      });
+    }
+    w.popups.push({ x: enemy.x, y: enemy.y - 16, text: 'GILDED', color: '#facc15', bornAt: w.now, vy: 28 });
+  }
+  if (enemy.quirk === 'volatile' && canSpawnEnemyEffect(w)) {
+    w.effects.push({
+      uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: 84, angle: 0, spread: Math.PI * 2,
+      bornAt: w.now + 450, expiresAt: w.now + 800, color: '#f87171', damage: 12, impactIntensity: 1,
+      hitUids: new Set(), followPlayer: false,
+    });
+  }
+  for (const drop of enemy.def.drops ?? []) {
+    if (w.rng() >= drop.chance) continue;
+    w.pickups.push({
+      uid: uid(w), kind: drop.kind,
+      x: enemy.x + randRange(w.rng, -16, 16), y: enemy.y + randRange(w.rng, -16, 16),
+      vx: randRange(w.rng, -28, 28), vy: randRange(w.rng, -28, 28),
+      value: drop.value ?? (drop.kind === 'cred' ? Math.max(1, Math.round(enemy.xp / 2)) : drop.kind === 'health' ? 22 : 1),
+      bornAt: w.now,
+    });
+  }
+  if (enemy.def.deathBurst && canSpawnEnemyEffect(w)) {
+    w.effects.push({
+      uid: uid(w), kind: 'ring', x: enemy.x, y: enemy.y, radius: enemy.def.deathBurst.radius, angle: 0, spread: Math.PI * 2,
+      bornAt: w.now + 450, expiresAt: w.now + 800, color: enemy.def.palette.accent, damage: enemy.def.deathBurst.damage, impactIntensity: 1,
+      hitUids: new Set(), followPlayer: false,
+    });
+    spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 8, 70);
   }
 
   const collector = w.character.lokPetCollector;
@@ -4299,6 +4461,21 @@ function damagePlayer(
   if (w.now < p.invulnUntil) return;
   if (w.stealthConfig?.fullInvisible && w.now < w.stealthUntil) return;
   if (ultActive(w) && w.character.ultimate.effect.invulnerable) return;
+  const taken = w.enemyQuirks.taken;
+  if (taken.size > 0) {
+    if (taken.has('flicker') && (w.now / 1000) % 4 < 0.5) return;
+    if (taken.has('jitterbug') && quirkHash(w.rngSeed, Math.floor(w.now / 16), 9) < 0.08) {
+      w.popups.push({ x: p.x, y: p.y - 18, text: 'MISS', color: '#fde047', bornAt: w.now, vy: 26 });
+      return;
+    }
+    if (taken.has('spawn-shield') && w.now >= w.quirkShieldReadyAt) {
+      w.quirkShieldReadyAt = w.now + 15000;
+      p.invulnUntil = w.now + 400;
+      w.popups.push({ x: p.x, y: p.y - 18, text: 'SHIELD', color: '#93c5fd', bornAt: w.now, vy: 26 });
+      spawnParticles(w, p.x, p.y, '#93c5fd', 8, 80);
+      return;
+    }
+  }
 
   if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
@@ -7124,7 +7301,13 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   const rumorSpeed = w.now < w.rumorSpeedUntil ? 44 : 0;
   const coneSlow = w.now < w.playerConeUntil ? 1 - w.playerConeMag : 1;
   const pollenSpeed = (p.pollenSpeedUntil ?? 0) > w.now ? 1.18 : 1;
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed;
+  let quirkSpeed = 1;
+  if (w.enemyQuirks.taken.size > 0) {
+    if (w.enemyQuirks.taken.has('shrunken')) quirkSpeed *= 1.15;
+    if (w.enemyQuirks.taken.has('adrenaline') && (w.now / 1000) % 5 < 1) quirkSpeed *= 2.4;
+    if (w.enemyQuirks.taken.has('regenerating') && p.hp > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.015 * dt);
+  }
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed * quirkSpeed;
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -7142,6 +7325,13 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
   p.x += p.vx * dt;
   p.y += p.vy * dt;
   if (!dashing) applyKnockback(p, dt);
+  if (w.enemyQuirks.taken.has('frame-skip') && len > 0.1 && w.now >= w.quirkSkipReadyAt) {
+    w.quirkSkipReadyAt = w.now + 4000;
+    spawnParticles(w, p.x, p.y, '#38bdf8', 6, 70);
+    p.x += nx * 70;
+    p.y += ny * 70;
+    spawnParticles(w, p.x, p.y, '#38bdf8', 6, 70);
+  }
 
   if (dashing) {
     p.facing = p.dashDirectionX < -0.05 ? -1 : p.dashDirectionX > 0.05 ? 1 : p.facing;
@@ -7616,6 +7806,33 @@ function updateEnemies(w: World, dt: number) {
     let speed = enemy.speed * statusSpeedMultiplier(enemy) * fluidOilBoostAt(w, enemy.x, enemy.y);
     speed *= musicMultiplier(w, enemy.def.react, 'speed');
     if (dataGobFleeing) speed *= 1.55;
+    const enrageTrait = traits?.enrage;
+    if (enrageTrait && !enemy.enraged && enemy.hp <= enemy.maxHp * enrageTrait.belowHpPct) {
+      enemy.enraged = true;
+      spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 14, 120);
+      pushAlert(w, `${enemy.def.name.toUpperCase()} ENRAGED`);
+    }
+    if (enemy.enraged && enrageTrait) speed *= enrageTrait.speedMult;
+    const styleCd = (ms: number) => w.now + ms * (enemy.enraged && enrageTrait ? enrageTrait.cooldownMult : 1);
+    if (enemy.quirk) {
+      const phase = (w.now + enemy.uid * 977) / 1000;
+      if (enemy.quirk === 'adrenaline' && phase % 5 < 1) speed *= 2.4;
+      else if (enemy.quirk === 'regenerating' && enemy.hp < enemy.maxHp) {
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.03 * dt);
+      } else if (enemy.quirk === 'flicker' && phase % 4 < 0.5) {
+        enemy.shieldedUntil = Math.max(enemy.shieldedUntil, w.now + 80);
+      } else if (enemy.quirk === 'frame-skip' && w.now >= enemy.specialReadyAt) {
+        enemy.specialReadyAt = w.now + 3600;
+        spawnParticles(w, enemy.x, enemy.y, '#38bdf8', 5, 60);
+        enemy.x += dirX * 70;
+        enemy.y += dirY * 70;
+        spawnParticles(w, enemy.x, enemy.y, '#38bdf8', 5, 60);
+      } else if (enemy.quirk === 'jitterbug') {
+        const jolt = Math.sin(phase * 9) * Math.sin(phase * 3.7);
+        enemy.x += -dirY * jolt * enemy.speed * 1.4 * dt;
+        enemy.y += dirX * jolt * enemy.speed * 1.4 * dt;
+      }
+    }
     if (w.now < enemy.burstUntil) speed *= traits?.burstSpeed ?? 1;
     if (traits?.burstSpeed && w.now >= enemy.burstUntil && w.now >= enemy.chargeReadyAt) {
       enemy.burstUntil = w.now + 360;
@@ -8360,6 +8577,191 @@ function updateEnemies(w: World, dt: number) {
             spawnParticles(w, enemy.x, enemy.y, '#dc2626', 14, 110);
           }
           speed = enemy.speed * 1.5;
+        }
+        break;
+      }
+      case 'strafe-duelist': {
+        // Circle-strafes at mid range, then telegraphs and lunges through the player.
+        const side = enemy.uid % 2 === 0 ? 1 : -1;
+        if (w.now < enemy.chargeUntil) {
+          enemy.x += (enemy.fightX ?? dirX) * enemy.speed * 3.4 * dt;
+          enemy.y += (enemy.fightY ?? dirY) * enemy.speed * 3.4 * dt;
+          speed = 0;
+        } else if (enemy.telegraphUntil > 0) {
+          speed = 0;
+          if (w.now >= enemy.telegraphUntil) {
+            enemy.telegraphUntil = 0;
+            enemy.chargeUntil = w.now + 420;
+            enemy.chargeReadyAt = styleCd(randRange(w.rng, 2600, 3600));
+            enemy.fightX = dirX;
+            enemy.fightY = dirY;
+            enemy.anim = 'attack';
+            enemy.animStartedAt = w.now;
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 150, angle: Math.atan2(dirY, dirX), spread: 0.35,
+                bornAt: w.now, expiresAt: w.now + 260, color: enemy.def.palette.accent, damage: 11, impactIntensity: 1,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          }
+        } else {
+          const ring = 175;
+          const pull = (distance - ring) / ring;
+          enemy.x += (-dirY * side + dirX * pull * 0.9) * enemy.speed * dt;
+          enemy.y += (dirX * side + dirY * pull * 0.9) * enemy.speed * dt;
+          speed = 0;
+          if (w.now >= enemy.chargeReadyAt && distance < 260) {
+            enemy.telegraphUntil = w.now + 520;
+            spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 6, 60);
+          }
+        }
+        break;
+      }
+      case 'pouncer': {
+        // Marks where the player stands, crouches, then leaps there and lands in a ring.
+        speed *= 0.8;
+        if (enemy.telegraphUntil > 0) {
+          speed = 0;
+          if (w.now >= enemy.telegraphUntil) {
+            enemy.telegraphUntil = 0;
+            enemy.fightPhase = 0;
+            const lx = enemy.fightX ?? enemy.x;
+            const ly = enemy.fightY ?? enemy.y;
+            spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 8, 70);
+            enemy.x = lx;
+            enemy.y = ly;
+            enemy.anim = 'attack';
+            enemy.animStartedAt = w.now;
+            w.shake = Math.max(w.shake, 2.5);
+            spawnParticles(w, lx, ly, enemy.def.palette.accent, 12, 110);
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'ring', x: lx, y: ly, radius: enemy.enraged ? 104 : 78, angle: 0, spread: Math.PI * 2,
+                bornAt: w.now, expiresAt: w.now + 380, color: enemy.def.palette.accent, damage: 15, impactIntensity: 2,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          }
+        } else if (w.now >= enemy.chargeReadyAt && distance < 440 && distance > 120) {
+          enemy.chargeReadyAt = styleCd(randRange(w.rng, 3200, 4400));
+          enemy.telegraphUntil = w.now + 650;
+          enemy.fightX = p.x;
+          enemy.fightY = p.y;
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'ring', x: p.x, y: p.y, radius: 78, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now, expiresAt: w.now + 650, color: enemy.def.palette.glow, damage: 0, impactIntensity: 0,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'beam-wheel': {
+        // Walks into range, plants, then sweeps a rotating wheel of short beams.
+        if (w.now < enemy.chargeUntil) {
+          speed = 0;
+          enemy.fightPhase = (enemy.fightPhase ?? 0) + dt * 1.7;
+          if (w.now >= enemy.fireReadyAt) {
+            enemy.fireReadyAt = w.now + 170;
+            if (canSpawnEnemyEffect(w)) {
+              const spokes = enemy.enraged ? 4 : 3;
+              for (let spoke = 0; spoke < spokes; spoke += 1) {
+                w.effects.push({
+                  uid: uid(w), kind: 'laser', x: enemy.x, y: enemy.y, radius: 210,
+                  angle: (enemy.fightPhase ?? 0) + (spoke * Math.PI * 2) / spokes, spread: 0.07,
+                  bornAt: w.now, expiresAt: w.now + 190, color: enemy.def.palette.accent, damage: 7, impactIntensity: 1,
+                  hitUids: new Set(), followPlayer: false,
+                });
+              }
+            }
+          }
+        } else if (distance < 330 && w.now >= enemy.chargeReadyAt) {
+          enemy.chargeUntil = w.now + 2600;
+          enemy.chargeReadyAt = styleCd(6200);
+          enemy.fightPhase = w.rng() * Math.PI * 2;
+          pushAlert(w, 'COLOR WHEEL!');
+          spawnParticles(w, enemy.x, enemy.y, enemy.def.palette.glow, 10, 80);
+        } else {
+          speed *= distance > 260 ? 1 : 0.4;
+        }
+        break;
+      }
+      case 'mine-stitcher': {
+        // Zigzags toward the player, dropping lingering mines along the stitch line.
+        enemy.weave += dt * 4.2;
+        const zig = Math.sign(Math.sin(enemy.weave)) * 0.9;
+        enemy.x += (-dirY * zig) * enemy.speed * dt;
+        enemy.y += (dirX * zig) * enemy.speed * dt;
+        if (distance < 120) speed *= 0.4;
+        if (w.now >= enemy.fireReadyAt) {
+          enemy.fireReadyAt = styleCd(1500);
+          if (canSpawnEnemyEffect(w)) {
+            w.effects.push({
+              uid: uid(w), kind: 'hazard', x: enemy.x, y: enemy.y, radius: enemy.enraged ? 42 : 32, angle: 0, spread: Math.PI * 2,
+              bornAt: w.now + 500, expiresAt: w.now + 5200, color: enemy.def.palette.accent, damage: 7, impactIntensity: 1,
+              hitUids: new Set(), followPlayer: false,
+            });
+          }
+        }
+        break;
+      }
+      case 'fan-sampler': {
+        // Kites at range and fires a five-way fan; backs off as the player closes.
+        if (distance < 230) speed = -enemy.speed * 0.9;
+        else if (distance > 340) speed = enemy.speed;
+        else speed = 0;
+        if (w.now >= enemy.fireReadyAt && distance < 520) {
+          enemy.fireReadyAt = styleCd(3000);
+          enemy.anim = 'attack';
+          enemy.animStartedAt = w.now;
+          const base = Math.atan2(dirY, dirX);
+          const half = enemy.enraged ? 3 : 2;
+          for (let shot = -half; shot <= half; shot += 1) {
+            if (!canSpawnEnemyProjectile(w)) break;
+            const a = base + shot * 0.28;
+            w.projectiles.push({
+              uid: uid(w), x: enemy.x, y: enemy.y,
+              vx: Math.cos(a) * 230, vy: Math.sin(a) * 230,
+              radius: 6, damage: 7, impactIntensity: 0, fromPlayer: false,
+              expiresAt: w.now + 2400, targetUid: null, turnRate: 0,
+              color: enemy.def.palette.accent, trail: [], pierce: 0, hitUids: new Set(),
+            });
+          }
+        }
+        break;
+      }
+      case 'rewinder': {
+        // Saves a point, wanders on, then snaps back to it with a burst at each end.
+        if (enemy.fightX === undefined || enemy.fightY === undefined) {
+          enemy.fightX = enemy.x;
+          enemy.fightY = enemy.y;
+          enemy.chargeReadyAt = w.now + 1700;
+          enemy.fireReadyAt = w.now + 3600;
+        }
+        if (w.now >= enemy.fireReadyAt) {
+          const burst = (bx: number, by: number) => {
+            spawnParticles(w, bx, by, enemy.def.palette.glow, 10, 90);
+            if (canSpawnEnemyEffect(w)) {
+              w.effects.push({
+                uid: uid(w), kind: 'ring', x: bx, y: by, radius: 58, angle: 0, spread: Math.PI * 2,
+                bornAt: w.now, expiresAt: w.now + 320, color: enemy.def.palette.accent, damage: 9, impactIntensity: 1,
+                hitUids: new Set(), followPlayer: false,
+              });
+            }
+          };
+          burst(enemy.x, enemy.y);
+          enemy.x = enemy.fightX;
+          enemy.y = enemy.fightY;
+          burst(enemy.x, enemy.y);
+          enemy.fireReadyAt = styleCd(3600);
+          enemy.fightX = undefined;
+        } else if (w.now >= enemy.chargeReadyAt && w.now < enemy.fireReadyAt - 400) {
+          // Re-save only early in each cycle so the rewind always reaches back.
+          enemy.fightX = enemy.x;
+          enemy.fightY = enemy.y;
+          enemy.chargeReadyAt = enemy.fireReadyAt + 1700;
         }
         break;
       }
@@ -11763,6 +12165,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   const dt = Math.min(dtSeconds, 1 / 30);
   w.time += dt;
   w.now += dt * 1000;
+  updateQuirkSurge(w);
   w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
@@ -12162,6 +12565,10 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     level: w.level,
     cred: finalCred,
     killsByEnemy: { ...w.killsByEnemy },
+    killsByQuirk: { ...w.killsByQuirk },
+    quirkEverywhereRun: w.enemyQuirks.everywhere.some((id) => !w.enemyQuirks.disabled.has(id)),
+    quirkTakenRun: w.enemyQuirks.taken.size > 0,
+    quirkSurgeSurvived: w.quirkSurgePhase === 2,
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
     mapFindIds: [...w.mapFindIds],

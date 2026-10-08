@@ -7,6 +7,7 @@ import { WEIRD_AREAS, BONUS_DIGIVERSE_AREAS } from './areas-weird';
 import { AREAS_ENDLESS } from './areas-endless';
 import { AREAS_NULL_SECTOR } from './areas-null-sector';
 import { AREAS_BREACH } from './areas-breach';
+import { AREAS_GEN } from './areas-gen';
 import { squadWave } from './authoring';
 
 /**
@@ -1090,6 +1091,7 @@ export const AREAS: AreaDef[] = [
   ...AREAS_DISCO,
   ...AREAS_NULL_SECTOR,
   ...AREAS_BREACH,
+  ...AREAS_GEN,
 ];
 
 export const AREAS_BY_ID: Record<string, AreaDef> = Object.fromEntries(

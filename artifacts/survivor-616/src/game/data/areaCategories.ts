@@ -3,7 +3,7 @@ import type { AreaDef } from '@/game/types';
 
 export type AreaCategory = 'standard' | 'bonus' | '2x' | '4x' | 'classic' | 'endless';
 
-const BONUS_AREA_IDS = new Set([...WEIRD_AREAS, ...BONUS_DIGIVERSE_AREAS].map((area) => area.id).concat(['floodline-breach', 'glassroot-annex']));
+const BONUS_AREA_IDS = new Set([...WEIRD_AREAS, ...BONUS_DIGIVERSE_AREAS].map((area) => area.id).concat(['floodline-breach', 'glassroot-annex', 'gen-fitting-floor']));
 
 export function areaCategory(area: AreaDef): AreaCategory {
   if (area.endless) return 'endless';

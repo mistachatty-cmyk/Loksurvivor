@@ -22,9 +22,9 @@ Saved so they are not lost. Nothing here is promised; items marked **done** ship
 - LokPet Forge: silhouette parts plus element/rarity accents, evolution-stage aware.
 - Then the "Classic" label becomes a toggle, as it already is for operators.
 
-## Achievements (Forge category, **done** in 0.19.13)
+## Achievements (Forge category, **done** in 0.21.3)
 First Spark, Old School, Both Eras, Full House, Palette Nerd, Rogue's Gallery, Menagerie, Tab Hopper, Share the Look, Complete Collection.
 Possible later: "Zoo Keeper" (custom look for every LokPet), "Make It Yours" (use a custom look in a cleared run), "Dock Regular" (use the hideout dock 25 times).
 
-## Done in 0.19.13
+## Done in 0.21.3
 Custom Bestiary view, unlock table, per-item and master run switches, hideout Endgame dock, customs kept out of card packs.
