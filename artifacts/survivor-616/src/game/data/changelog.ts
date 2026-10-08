@@ -947,6 +947,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Classic v1 / Detailed v2 switch moved to the top of the controls and is much bigger.',
     ],
   },
+  {
+    version: '0.21.7',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T00:30:00Z',
+    kind: 'update',
+    title: 'Clear View',
+    body: [
+      'Hideout notes like "Already done today" now sit small in the top corner of the strip, capped to two lines, instead of covering your pets and the use prompt.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
