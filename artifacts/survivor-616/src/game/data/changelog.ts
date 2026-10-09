@@ -1034,6 +1034,29 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Only places you have not opened yet can show a spur.',
     ],
   },
+  {
+    version: '0.22.5',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T22:00:00Z',
+    kind: 'update',
+    title: 'Street Life',
+    body: [
+      'The hideout street now has visitors. A llama trots across, a runner sprints past, a courier jogs by, and a tiny Digi mite skitters in that you can tap to squash. Your LokPets react in their own way: adoring, laughing, startled or curious.',
+      'Small things now turn up on the ground. Walk over one to pick it up. Ringing the bell calls a visitor over.',
+      'Three new LokPet emotes: adore, scared and laugh. A few text fixes too: the streak, chest, sky and shop lines now fill in their numbers and names.',
+    ],
+  },
+  {
+    version: '0.22.6',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:00:00Z',
+    kind: 'update',
+    title: 'Events That Matter',
+    body: [
+      'Nine hideout events that used to end with nothing now leave you a story and an event boost: a lift to one stat paired with a cost to another, for an hour. The result tells you exactly what you got and what it costs.',
+      'Only one event boost runs at a time and a new one replaces the old. The running boost shows in the Resources panel.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

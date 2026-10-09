@@ -22,6 +22,8 @@ import { MusicNowPlaying } from './MusicNowPlaying';
 import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { describeReward } from './hideoutRewardText';
 import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
+import { activeEventBuff } from '@/game/data/eventBuffs';
+import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
 import { CHEST_TIERS } from '@/game/data/chestLoot';
 import { CARD_COSMETICS_BY_ID } from '@/game/data/cardCosmetics';
 import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
@@ -160,7 +162,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const locale = useLocale();
@@ -210,6 +212,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   );
   const activeRoomId = unlockedRooms.find((r) => r.id === roomId)?.id ?? unlockedRooms[0]?.id ?? roomId;
   const [ballOut, setBallOut] = useState(false);
+  const [summonSeq, setSummonSeq] = useState(0);
   const [stripNotice, setStripNotice] = useState<StripNotice | undefined>(undefined);
   const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
   const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
@@ -273,6 +276,16 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     showStripNotice(t(def.labelKey), found ? `${line} ${t('hideout.life.found', { items: found })}` : line);
   };
 
+  const handlePickup = (kindId: string, _seed: number): boolean => {
+    const def = AMBIENT_PICKUPS_BY_ID[kindId];
+    if (!def) return false;
+    const preview = grantWithFallback(meta, def.reward, undefined, { now: Date.now(), elixirCap: ELIXIR_CAP });
+    if (!preview.paid) return false;
+    collectHideoutPickup(kindId);
+    showStripNotice(t('hideout.ambient.title'), t('hideout.ambient.found', { items: describeReward(preview.applied, t) }));
+    return true;
+  };
+
   const handlePropUse = (propId: string) => {
     if (propId.startsWith('ally:')) {
       const ally = rescuedAllies.find((candidate) => candidate.id === propId.slice(5));
@@ -294,6 +307,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     }
     const def = HIDEOUT_PROPS_BY_ID[propId];
     if (!def) return;
+    // The bell calls someone over, whether or not it still pays today.
+    if (propId === 'bell-cord') setSummonSeq((seq) => seq + 1);
     const title = t(def.labelKey);
     const line = t(def.lineKeys[Math.floor(Math.random() * def.lineKeys.length)] ?? def.lineKeys[0]!);
     const action = def.action;
@@ -657,6 +672,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             interactive={meta.hideoutInteractive}
             keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary}
             notice={stripNotice}
+            summonSeq={summonSeq}
+            onPickup={handlePickup}
             ball={{ present: ballOut && meta.ownsBall && meta.hideoutInteractive, themeId: meta.uiTheme }}
             cue={playCue}
             onPropUse={handlePropUse}
@@ -788,6 +805,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   { id: 'lokPetTreats', name: 'Pet treats', value: meta.lokPetTreats, color: 'text-pink-300' },
                   { id: 'petElixirs', name: 'Pet elixirs', value: meta.petElixirs, color: 'text-fuchsia-300' },
                   { id: 'grpdSeals', name: 'GRPD seals', value: grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals), color: 'text-blue-300' },
+                  ...(activeEventBuff(meta.eventBuff, Date.now()) ? [{ id: 'eventBuff', name: t('eventbuff.tile'), value: t(`eventbuff.${meta.eventBuff!.buffId}.name` as never), color: 'text-cyan-300' }] : []),
                   { id: 'runStreak', name: t('hub.resource.streak'), value: `${meta.runStreak} (${t('hub.resource.streakBest', { best: meta.bestRunStreak })})`, color: 'text-orange-300' },
                   ...(meta.rescuedAllyIds.length > 0 ? [{ id: 'crewMorale', name: t('hub.resource.morale'), value: meta.crewMorale > 0 ? `+${meta.crewMorale}` : meta.crewMorale, color: meta.crewMorale < 0 ? 'text-red-400' : 'text-lime-300' }] : []),
                   ...(session && lokBalance !== null ? [{ id: 'lokTokens', name: 'LokTokens', value: lokBalance, color: 'text-violet-300' }] : []),
