@@ -66,7 +66,7 @@ test('side job targets all exist and are reachable from a fresh save', () => {
 
 test('every side job kind pays out from the matching run stats', () => {
   const kinds = new Map<string, ReturnType<typeof dailyContractDefs>[number]>();
-  for (let day = 1; day <= 12; day += 1) {
+  for (let day = 1; day <= 30; day += 1) {
     const key = `2026-09-${String(day).padStart(2, '0')}`;
     for (const job of dailyContractDefs(key).slice(4)) {
       kinds.set(`${key}:${job.kind}`, job);
@@ -80,6 +80,7 @@ test('every side job kind pays out from the matching run stats', () => {
         level: job.targetCount,
         cred: job.targetCount,
         lootBoxesOpened: job.targetCount,
+        craftingMaterialsCollected: { scrap: job.targetCount },
         mapFindIds: Array.from({ length: job.targetCount }, (_, i) => `find-${i}`),
       };
       const advance = advanceDailyContracts({ dayKey: key, progressById: {}, completedIds: [] }, run, noon);
@@ -88,5 +89,5 @@ test('every side job kind pays out from the matching run stats', () => {
       assert.ok(!wrong.completedIds.includes(job.id), `${job.kind} completed on an empty run`);
     }
   }
-  assert.ok(new Set([...kinds.values()].map((job) => job.kind)).size >= 6);
+  assert.ok(new Set([...kinds.values()].map((job) => job.kind)).size >= 7);
 });

@@ -1089,6 +1089,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Every side job is doable from a fresh save and tracks automatically across your runs.',
     ],
   },
+  {
+    version: '0.23.0',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:45Z',
+    kind: 'update',
+    title: 'The Board Gets Weird',
+    body: [
+      'Side jobs now have local flavor: Bait Shop After Dark, Lost Dog, Found Teeth, Winter Pothole Revenge, Meijer Cart Roulette and more.',
+      'New job: the Raccoon Scrap Union wants relic crafting scraps hauled across your runs.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

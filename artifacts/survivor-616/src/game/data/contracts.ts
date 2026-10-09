@@ -43,30 +43,42 @@ export const SIDE_JOB_HUNT_TARGETS = ['nightcrawler', 'neon-leech', 'bloodhound'
 export const SIDE_JOB_DISTRICTS = ['monroe-strip', 'monroe-strip-2x', 'mirror-mile', 'clockmouth-roundabout', 'bubbleWash'] as const;
 
 type RunProgressInput = Pick<RunResult, 'cleared' | 'kills' | 'survivedSec'> &
-  Partial<Pick<RunResult, 'areaId' | 'killsByEnemy' | 'level' | 'cred' | 'lootBoxesOpened' | 'mapFindIds'>>;
+  Partial<Pick<RunResult, 'areaId' | 'killsByEnemy' | 'level' | 'cred' | 'lootBoxesOpened' | 'mapFindIds' | 'craftingMaterialsCollected'>>;
 
-/** Three rotating side jobs, picked from a pool of six so the board never repeats back to back. */
+/** Weird local flavor for each hunt: [job name, what the city is asking for]. */
+const HUNT_FLAVOR: Record<string, [string, string]> = {
+  'nightcrawler': ['Bait Shop After Dark', 'The worms are back and they are the wrong size. Defeat {n} Nightcrawlers.'],
+  'neon-leech': ['Fridge Buzz Intervention', 'Something in the neon is drinking the power bill. Defeat {n} Neon Leeches.'],
+  'bloodhound': ['Lost Dog, Found Teeth', 'Several families have posted fliers. Defeat {n} Bloodhounds.'],
+  'corner-cutter': ['No Shortcuts on Division', 'They refuse to use the crosswalk. Defeat {n} Corner Cutters.'],
+  'curb-stomper': ['Winter Pothole Revenge', 'Somebody has to stomp back. Defeat {n} Curb Stompers.'],
+  'crypt-bouncer': ['Guest List Dispute', 'You are not on it and neither are they. Defeat {n} Crypt Bouncers.'],
+};
+
+/** Three rotating side jobs, picked from a pool of seven so the board never repeats back to back. */
 function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
   const hunt = SIDE_JOB_HUNT_TARGETS[(roll >> 1) % SIDE_JOB_HUNT_TARGETS.length]!;
   const huntName = ENEMIES_BY_ID[hunt]?.name ?? hunt;
+  const huntCount = 12 + (roll % 4) * 4;
+  const [huntTitle, huntText] = HUNT_FLAVOR[hunt] ?? [`Hunt: ${huntName}`, `Defeat {n} ${huntName}s.`];
   const district = SIDE_JOB_DISTRICTS[(roll >> 2) % SIDE_JOB_DISTRICTS.length]!;
   const districtName = AREAS.find((area) => area.id === district)?.name ?? district;
   const pool: DailyContractDef[] = [
     {
       id: `${dayKey}:job-hunt`,
-      name: `Hunt: ${huntName}`,
-      description: `Defeat ${12 + (roll % 4) * 4} ${huntName}s across your runs today. Monroe Strip has plenty.`,
+      name: huntTitle,
+      description: `${huntText.replace('{n}', String(huntCount))} Across your runs today; Monroe Strip has plenty.`,
       kind: 'kill-enemy',
       targetId: hunt,
-      targetCount: 12 + (roll % 4) * 4,
+      targetCount: huntCount,
       rewardCred: 70,
       rewardTokens: 0,
       rewardKeys: 0,
     },
     {
       id: `${dayKey}:job-level`,
-      name: 'Level Up Fast',
-      description: `Reach level ${6 + (roll % 3)} in a single run.`,
+      name: 'Grow Up Faster Than the Rent',
+      description: `Reach level ${6 + (roll % 3)} in a single run. Beer City waits for no one.`,
       kind: 'reach-level',
       targetCount: 6 + (roll % 3),
       rewardCred: 80,
@@ -75,8 +87,8 @@ function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
     },
     {
       id: `${dayKey}:job-chests`,
-      name: 'Crack the Crates',
-      description: `Open ${2 + (roll % 3)} loot boxes across your runs today.`,
+      name: 'Meijer Cart Roulette',
+      description: `Open ${2 + (roll % 3)} loot boxes across your runs today. Nobody checks the receipt.`,
       kind: 'open-chests',
       targetCount: 2 + (roll % 3),
       rewardCred: 60,
@@ -85,7 +97,7 @@ function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
     },
     {
       id: `${dayKey}:job-payday`,
-      name: 'Payday',
+      name: 'Tip Jar Economics',
       description: `Earn ${120 + (roll % 3) * 40} Cred in your runs today.`,
       kind: 'earn-cred',
       targetCount: 120 + (roll % 3) * 40,
@@ -95,8 +107,8 @@ function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
     },
     {
       id: `${dayKey}:job-district`,
-      name: `Clear ${districtName}`,
-      description: `Clear ${districtName} today. A specific block, a specific favor.`,
+      name: `Haunt Audit: ${districtName}`,
+      description: `Clear ${districtName} today. A specific block holds a specific grudge.`,
       kind: 'clear-district',
       targetId: district,
       targetCount: 1,
@@ -106,7 +118,7 @@ function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
     },
     {
       id: `${dayKey}:job-finds`,
-      name: 'Eyes Open',
+      name: 'Lost & Found, Weird Edition',
       description: `Pick up ${2 + (roll % 3)} map finds across your runs today.`,
       kind: 'map-finds',
       targetCount: 2 + (roll % 3),
@@ -114,9 +126,19 @@ function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
       rewardTokens: 0,
       rewardKeys: 0,
     },
+    {
+      id: `${dayKey}:job-scrap`,
+      name: 'Raccoon Scrap Union',
+      description: `Gather ${6 + (roll % 3) * 2} relic crafting scraps across your runs today. The raccoons take a cut either way.`,
+      kind: 'scrap-haul',
+      targetCount: 6 + (roll % 3) * 2,
+      rewardCred: 70,
+      rewardTokens: 0,
+      rewardKeys: 0,
+    },
   ];
   const start = roll % pool.length;
-  return [0, 1, 3].map((offset) => pool[(start + offset) % pool.length]!);
+  return [0, 2, 4].map((offset) => pool[(start + offset) % pool.length]!);
 }
 
 /** Three deterministic contracts (a clear, a crowd-control quota, a hold-the-line target) plus one optional, tougher wildcard job, then three rotating side jobs. */
@@ -195,6 +217,7 @@ function progressFromRun(contract: DailyContractDef, result: RunProgressInput): 
     case 'earn-cred': return Math.max(0, Math.floor(result.cred ?? 0));
     case 'clear-district': return result.cleared && result.areaId === contract.targetId ? 1 : 0;
     case 'map-finds': return result.mapFindIds?.length ?? 0;
+    case 'scrap-haul': return Object.values(result.craftingMaterialsCollected ?? {}).reduce((sum, n) => sum + n, 0);
   }
 }
 

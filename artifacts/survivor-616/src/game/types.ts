@@ -406,7 +406,9 @@ export type DailyContractKind =
   /** Clear the district named by `targetId`. */
   | 'clear-district'
   /** Find `targetCount` map finds across runs. */
-  | 'map-finds';
+  | 'map-finds'
+  /** Gather `targetCount` relic crafting materials across runs. */
+  | 'scrap-haul';
 
 export interface DailyContractDef {
   id: string;
