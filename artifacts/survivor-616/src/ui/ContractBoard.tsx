@@ -9,6 +9,8 @@ export interface ContractBoardProps {
 
 function progressLabel(contract: DailyContractStatus): string {
   if (contract.kind === 'clear-area') return contract.completed ? 'Block cleared' : 'Clear any district';
+  if (contract.kind === 'clear-district') return contract.completed ? 'Block cleared' : 'Not yet';
+  if (contract.kind === 'reach-level') return `Lv ${contract.progress}/${contract.targetCount}`;
   if (contract.kind === 'survive-sec') return `${contract.progress}/${contract.targetCount}s`;
   return `${contract.progress}/${contract.targetCount}`;
 }
@@ -90,7 +92,7 @@ export function ContractBoard({ onHeadOut }: ContractBoardProps) {
           </button>
         </div>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
         {dailyContracts.map((contract) => <ContractCard key={contract.id} contract={contract} />)}
       </div>
       <p className="mt-3 flex items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-cyan-100/50">

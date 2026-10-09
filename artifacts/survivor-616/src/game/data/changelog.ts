@@ -1078,6 +1078,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The warning before you enter the hideout now spells out what can trigger a reaction (strobing flashes, bright bursts, screen shake), the symptoms that mean you should stop playing, and a few ways to play more safely.',
     ],
   },
+  {
+    version: '0.22.9',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:30Z',
+    kind: 'update',
+    title: 'More Jobs On The Board',
+    body: [
+      'The Broadcast Board now posts three extra rotating side jobs each day: hunt a specific street enemy, reach a level in one run, crack open crates, earn Cred, clear a named district, or spot map finds.',
+      'Every side job is doable from a fresh save and tracks automatically across your runs.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

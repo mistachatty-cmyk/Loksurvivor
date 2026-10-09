@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 93,
+      "version": "0.22.9",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "More Jobs On The Board",
+      "body": [
+        "The Broadcast Board now posts three extra rotating side jobs each day: hunt a specific street enemy, reach a level in one run, crack open crates, earn Cred, clear a named district, or spot map finds.",
+        "Every side job is doable from a fresh save and tracks automatically across your runs."
+      ]
+    },
+    {
       "number": 92,
       "version": "0.22.8",
       "date": "2026-10-09",
