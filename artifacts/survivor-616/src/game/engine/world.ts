@@ -1180,6 +1180,10 @@ export interface World {
   ultActiveUntil: number;
 
   kills: number;
+  /** Times the ultimate was fired this run (Broadcast Board jobs). */
+  ultimatesUsed: number;
+  /** Hits that actually hurt the player this run (Broadcast Board jobs). */
+  hitsTaken: number;
   killsByEnemy: Record<string, number>;
   /** Kills of quirked enemies this run, by quirk id. */
   killsByQuirk: Record<string, number>;
@@ -1768,6 +1772,8 @@ export function createWorld(
     ultReadyAt: 4000,
     ultActiveUntil: -1,
     kills: 0,
+    ultimatesUsed: 0,
+    hitsTaken: 0,
     killsByEnemy: {},
     killsByQuirk: {},
     quirkAnnounced: {},
@@ -4485,6 +4491,7 @@ function damagePlayer(
   if (source === 'contact') triggerBellShock(w);
   const reduced = amount * (1 - clamp(w.stats.armor, 0, 0.6));
   p.hp -= reduced;
+  w.hitsTaken += 1;
   if (w.character.id === 'llama-mama' && p.hp > 0 && p.hp / p.maxHp <= 0.24 && !w.llamaMamaEnraged) {
     w.llamaMamaEnraged = true;
     w.llamaMamaRageUntil = w.now + 14000;
@@ -5691,6 +5698,7 @@ function updateOrbiters(w: World, dt: number) {
 export function activateUltimate(w: World): boolean {
   if (w.now < w.ultReadyAt || w.outcome !== 'running') return false;
   const ult = w.character.ultimate;
+  w.ultimatesUsed += 1;
   w.ultActiveUntil = w.now + ult.durationMs;
   w.ultReadyAt = w.now + ult.cooldownMs * w.ultCooldownMult;
 
@@ -12567,6 +12575,8 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     missionComplete: w.mission ? w.mission.complete : undefined,
     survivedSec: survival,
     kills: w.kills,
+    ultimatesUsed: w.ultimatesUsed,
+    hitsTaken: w.hitsTaken,
     level: w.level,
     cred: finalCred,
     killsByEnemy: { ...w.killsByEnemy },

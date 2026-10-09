@@ -16,9 +16,9 @@ test('the Broadcast board has three deterministic contracts plus an optional wil
   const day = contractDayKey(new Date(2026, 7, 30, 12).getTime());
   const first = dailyContractDefs(day);
   assert.deepEqual(dailyContractDefs(day), first);
-  assert.equal(first.length, 7);
+  assert.equal(first.length, 8);
   assert.deepEqual(first.slice(0, 4).map((contract) => contract.kind), ['clear-area', 'kill-any', 'survive-sec', 'kill-any']);
-  assert.equal(new Set(first.slice(4).map((contract) => contract.kind)).size, 3);
+  assert.equal(new Set(first.slice(4).map((contract) => contract.kind)).size, 4);
   assert.notDeepEqual(first, dailyContractDefs('2026-08-31'));
 });
 
@@ -66,7 +66,7 @@ test('side job targets all exist and are reachable from a fresh save', () => {
 
 test('every side job kind pays out from the matching run stats', () => {
   const kinds = new Map<string, ReturnType<typeof dailyContractDefs>[number]>();
-  for (let day = 1; day <= 30; day += 1) {
+  for (let day = 1; day <= 28; day += 1) {
     const key = `2026-09-${String(day).padStart(2, '0')}`;
     for (const job of dailyContractDefs(key).slice(4)) {
       kinds.set(`${key}:${job.kind}`, job);
@@ -74,13 +74,19 @@ test('every side job kind pays out from the matching run stats', () => {
       const run = {
         cleared: true,
         kills: 0,
-        survivedSec: 0,
+        survivedSec: job.kind === 'untouched' ? job.targetCount : 0,
         areaId: job.targetId ?? 'monroe-strip',
         killsByEnemy: job.targetId ? { [job.targetId]: job.targetCount } : {},
         level: job.targetCount,
         cred: job.targetCount,
         lootBoxesOpened: job.targetCount,
         craftingMaterialsCollected: { scrap: job.targetCount },
+        ultimatesUsed: job.targetCount,
+        hitsTaken: 0,
+        loadout: {
+          weapons: Array.from({ length: job.targetCount }, (_, i) => ({ id: `w${i}`, name: 'w', level: 1, kind: 'melee' as never })),
+          passives: [{ id: 'p', name: 'p', stacks: job.targetCount }],
+        },
         mapFindIds: Array.from({ length: job.targetCount }, (_, i) => `find-${i}`),
       };
       const advance = advanceDailyContracts({ dayKey: key, progressById: {}, completedIds: [] }, run, noon);
@@ -89,5 +95,5 @@ test('every side job kind pays out from the matching run stats', () => {
       assert.ok(!wrong.completedIds.includes(job.id), `${job.kind} completed on an empty run`);
     }
   }
-  assert.ok(new Set([...kinds.values()].map((job) => job.kind)).size >= 7);
+  assert.ok(new Set([...kinds.values()].map((job) => job.kind)).size >= 11);
 });

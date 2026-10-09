@@ -1100,6 +1100,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New job: the Raccoon Scrap Union wants relic crafting scraps hauled across your runs.',
     ],
   },
+  {
+    version: '0.23.1',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:30:00Z',
+    kind: 'update',
+    title: 'Four Jobs A Day, Four Weird New Ones',
+    body: [
+      'The Broadcast Board now posts four rotating side jobs a day, drawn from a pool of eleven.',
+      'New jobs: Ghost on the Bus Line (survive without a hit), Overshare Hour (fire your ultimate repeatedly), Pawn Shop Pockets (carry a full arsenal) and Layer Cake Weather (stack a passive).',
+      'Runs now track ultimates fired and hits taken so these jobs pay out from real play.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

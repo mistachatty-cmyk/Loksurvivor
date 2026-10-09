@@ -43,7 +43,7 @@ export const SIDE_JOB_HUNT_TARGETS = ['nightcrawler', 'neon-leech', 'bloodhound'
 export const SIDE_JOB_DISTRICTS = ['monroe-strip', 'monroe-strip-2x', 'mirror-mile', 'clockmouth-roundabout', 'bubbleWash'] as const;
 
 type RunProgressInput = Pick<RunResult, 'cleared' | 'kills' | 'survivedSec'> &
-  Partial<Pick<RunResult, 'areaId' | 'killsByEnemy' | 'level' | 'cred' | 'lootBoxesOpened' | 'mapFindIds' | 'craftingMaterialsCollected'>>;
+  Partial<Pick<RunResult, 'areaId' | 'killsByEnemy' | 'level' | 'cred' | 'lootBoxesOpened' | 'mapFindIds' | 'craftingMaterialsCollected' | 'ultimatesUsed' | 'hitsTaken' | 'loadout'>>;
 
 /** Weird local flavor for each hunt: [job name, what the city is asking for]. */
 const HUNT_FLAVOR: Record<string, [string, string]> = {
@@ -55,7 +55,7 @@ const HUNT_FLAVOR: Record<string, [string, string]> = {
   'crypt-bouncer': ['Guest List Dispute', 'You are not on it and neither are they. Defeat {n} Crypt Bouncers.'],
 };
 
-/** Three rotating side jobs, picked from a pool of seven so the board never repeats back to back. */
+/** Four rotating side jobs, picked from a pool of eleven so the board never repeats back to back. */
 function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
   const hunt = SIDE_JOB_HUNT_TARGETS[(roll >> 1) % SIDE_JOB_HUNT_TARGETS.length]!;
   const huntName = ENEMIES_BY_ID[hunt]?.name ?? hunt;
@@ -136,9 +136,49 @@ function sideJobs(dayKey: string, roll: number): DailyContractDef[] {
       rewardTokens: 0,
       rewardKeys: 0,
     },
+    {
+      id: `${dayKey}:job-ghost`,
+      name: 'Ghost on the Bus Line',
+      description: `Survive ${40 + (roll % 3) * 10} seconds in one run without a single hit. Rapid drivers swear you were never there.`,
+      kind: 'untouched',
+      targetCount: 40 + (roll % 3) * 10,
+      rewardCred: 100,
+      rewardTokens: 0,
+      rewardKeys: 0,
+    },
+    {
+      id: `${dayKey}:job-ult`,
+      name: 'Overshare Hour',
+      description: `Fire your ultimate ${2 + (roll % 2)} times in one run. Subtlety is for the suburbs.`,
+      kind: 'ultimate-spam',
+      targetCount: 2 + (roll % 2),
+      rewardCred: 75,
+      rewardTokens: 0,
+      rewardKeys: 0,
+    },
+    {
+      id: `${dayKey}:job-arsenal`,
+      name: 'Pawn Shop Pockets',
+      description: `Carry ${3 + (roll % 2)} weapons at once in one run. Everything is a weapon if you believe hard enough.`,
+      kind: 'full-arsenal',
+      targetCount: 3 + (roll % 2),
+      rewardCred: 70,
+      rewardTokens: 0,
+      rewardKeys: 0,
+    },
+    {
+      id: `${dayKey}:job-stack`,
+      name: 'Layer Cake Weather',
+      description: `Stack one passive ${3 + (roll % 2)} times in a single run. Michigan dresses in layers.`,
+      kind: 'passive-stack',
+      targetCount: 3 + (roll % 2),
+      rewardCred: 70,
+      rewardTokens: 0,
+      rewardKeys: 0,
+    },
   ];
   const start = roll % pool.length;
-  return [0, 2, 4].map((offset) => pool[(start + offset) % pool.length]!);
+  return [0, 3, 6, 9].map((offset) => pool[(start + offset) % pool.length]!);
 }
 
 /** Three deterministic contracts (a clear, a crowd-control quota, a hold-the-line target) plus one optional, tougher wildcard job, then three rotating side jobs. */
@@ -217,6 +257,10 @@ function progressFromRun(contract: DailyContractDef, result: RunProgressInput): 
     case 'earn-cred': return Math.max(0, Math.floor(result.cred ?? 0));
     case 'clear-district': return result.cleared && result.areaId === contract.targetId ? 1 : 0;
     case 'map-finds': return result.mapFindIds?.length ?? 0;
+    case 'untouched': return (result.hitsTaken ?? 1) === 0 ? Math.max(0, Math.floor(result.survivedSec)) : 0;
+    case 'ultimate-spam': return Math.max(0, Math.floor(result.ultimatesUsed ?? 0));
+    case 'full-arsenal': return result.loadout?.weapons.length ?? 0;
+    case 'passive-stack': return Math.max(0, ...(result.loadout?.passives.map((passive) => passive.stacks) ?? [0]));
     case 'scrap-haul': return Object.values(result.craftingMaterialsCollected ?? {}).reduce((sum, n) => sum + n, 0);
   }
 }
@@ -238,7 +282,7 @@ export function advanceDailyContracts(
     if (completedIds.includes(contract.id)) continue;
     const runProgress = progressFromRun(contract, result);
     const previous = progressById[contract.id] ?? 0;
-    const next = contract.kind === 'survive-sec' || contract.kind === 'reach-level'
+    const next = (['survive-sec', 'reach-level', 'untouched', 'ultimate-spam', 'full-arsenal', 'passive-stack'] as const).some((kind) => kind === contract.kind)
       ? Math.max(previous, runProgress)
       : previous + runProgress;
     const capped = Math.min(contract.targetCount, next);

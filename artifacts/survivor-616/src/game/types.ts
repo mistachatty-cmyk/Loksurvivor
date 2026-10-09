@@ -408,7 +408,15 @@ export type DailyContractKind =
   /** Find `targetCount` map finds across runs. */
   | 'map-finds'
   /** Gather `targetCount` relic crafting materials across runs. */
-  | 'scrap-haul';
+  | 'scrap-haul'
+  /** Survive `targetCount` seconds in one run without taking a single hit. */
+  | 'untouched'
+  /** Fire the ultimate `targetCount` times in one run. */
+  | 'ultimate-spam'
+  /** Carry `targetCount` weapons at once in one run. */
+  | 'full-arsenal'
+  /** Stack any one passive `targetCount` times in one run. */
+  | 'passive-stack';
 
 export interface DailyContractDef {
   id: string;
@@ -2719,6 +2727,10 @@ export interface RunResult {
   missionComplete?: boolean;
   survivedSec: number;
   kills: number;
+  /** Ultimates fired this run. */
+  ultimatesUsed?: number;
+  /** Hits that hurt the player this run. */
+  hitsTaken?: number;
   level: number;
   cred: number;
   killsByEnemy: Record<string, number>;
