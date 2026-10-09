@@ -1112,6 +1112,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Pinch-zoom works again, and back buttons stay clear of phone notches.',
     ],
   },
+  {
+    version: '0.23.2',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:55Z',
+    kind: 'update',
+    title: 'Go To Anywhere',
+    body: [
+      'New Go to search: press Ctrl+K or / (or tap the Go to button) to jump straight to any screen you have unlocked. Locked rooms stay locked.',
+      'Your browser or phone Back button now walks back through the menus you visited instead of leaving the game, and a stray Back never drops a live run.',
+      'Escape in the pause menu now closes Settings or Soundtrack first, and menu corner buttons stay clear of notches.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

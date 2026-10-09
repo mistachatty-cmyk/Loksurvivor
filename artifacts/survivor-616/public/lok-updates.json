@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 96,
+      "version": "0.23.2",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:55Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Go To Anywhere",
+      "body": [
+        "New Go to search: press Ctrl+K or / (or tap the Go to button) to jump straight to any screen you have unlocked. Locked rooms stay locked.",
+        "Your browser or phone Back button now walks back through the menus you visited instead of leaving the game, and a stray Back never drops a live run.",
+        "Escape in the pause menu now closes Settings or Soundtrack first, and menu corner buttons stay clear of notches."
+      ]
+    },
+    {
       "number": 95,
       "version": "0.23.1",
       "date": "2026-10-09",

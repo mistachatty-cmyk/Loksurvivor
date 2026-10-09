@@ -297,6 +297,10 @@ export function RunScreen({
   const [celebration, setCelebration] = useState(false);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   const [pauseSoundtrackOpen, setPauseSoundtrackOpen] = useState(false);
+  const runSettingsOpenRef = useRef(false);
+  const pauseSoundtrackOpenRef = useRef(false);
+  runSettingsOpenRef.current = runSettingsOpen;
+  pauseSoundtrackOpenRef.current = pauseSoundtrackOpen;
   const [lootPickups, setLootPickups] = useState<LootPickup[]>([]);
   const expireLootPickup = useCallback(
     (id: string) => setLootPickups((prev) => prev.filter((pickup) => pickup.id !== id)),
@@ -501,7 +505,13 @@ export function RunScreen({
       if (key === 'escape' || key === 'p') {
         if (phaseRef.current === 'playing' && meta.liveModeEnabled) setLiveDashboardOpen((open) => !open);
         else if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
-        else if (phaseRef.current === 'paused') setPhaseBoth('playing');
+        else if (phaseRef.current === 'paused') {
+          // Close a pause sub-panel first; a second press resumes.
+          if (runSettingsOpenRef.current || pauseSoundtrackOpenRef.current) {
+            setRunSettingsOpen(false);
+            setPauseSoundtrackOpen(false);
+          } else setPhaseBoth('playing');
+        }
       }
     };
     const up = (event: KeyboardEvent) => keysRef.current.delete(event.key.toLowerCase());

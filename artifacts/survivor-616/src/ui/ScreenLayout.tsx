@@ -33,7 +33,7 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       const el = event.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
-      if (document.querySelector('[aria-modal="true"]')) return;
+      if (document.querySelector('[aria-modal="true"], [role="dialog"]')) return;
       onBack();
     };
     window.addEventListener('keydown', onKey);
