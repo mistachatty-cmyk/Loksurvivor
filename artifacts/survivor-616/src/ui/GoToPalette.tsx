@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { OPEN_GO_TO_EVENT } from './MenuDock';
 import { useT, type MessageKey } from '@/lib/i18n';
 
 /** A destination the palette can jump to. `feature` ties it to a hub-room feature so locked rooms stay locked. */
@@ -41,6 +42,8 @@ interface Props {
   unlockedFeatures: ReadonlySet<string>;
   /** Hidden on screens where a stray key press would cost the player (an active run). */
   disabled?: boolean;
+  /** Show the floating button (the dock has its own search tab on other screens). */
+  showButton?: boolean;
   onGo: (id: string) => void;
 }
 
@@ -50,7 +53,7 @@ function isTyping(el: EventTarget | null): boolean {
 }
 
 /** "Go to" search: Ctrl/Cmd-K or `/` opens it from anywhere outside a run. */
-export function GoToPalette({ unlockedFeatures, disabled, onGo }: Props) {
+export function GoToPalette({ unlockedFeatures, disabled, showButton = true, onGo }: Props) {
   const t = useT();
   const [open, setOpen] = useState(false);
 
@@ -67,13 +70,20 @@ export function GoToPalette({ unlockedFeatures, disabled, onGo }: Props) {
   }, [disabled]);
 
   useEffect(() => {
+    if (disabled) return;
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_GO_TO_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_GO_TO_EVENT, onOpen);
+  }, [disabled]);
+
+  useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
 
   const groups = Array.from(new Set(GO_TO_TARGETS.map((target) => target.group)));
   return (
     <>
-      {!disabled && (
+      {!disabled && showButton && (
         <button
           type="button"
           onClick={() => setOpen(true)}

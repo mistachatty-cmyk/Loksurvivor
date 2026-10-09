@@ -66,13 +66,13 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
         </div>
       )}
 
-      <header className={`relative z-30 px-6 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 ${onBack ? 'pt-[calc(5rem+var(--safe-top))]' : 'pt-[calc(2.5rem+var(--safe-top))]'}`}>
+      <header className={`relative z-30 px-6 sm:pl-24 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 ${onBack ? 'pt-[calc(5rem+var(--safe-top))]' : 'pt-[calc(2.5rem+var(--safe-top))]'}`}>
         <div>
           {onBack && (
             <button 
               type="button"
               onClick={onBack} 
-              className="group fixed left-[max(0.75rem,var(--safe-left))] top-[max(0.75rem,var(--safe-top))] z-[110] inline-flex min-h-11 active:scale-95 items-center gap-1 border border-white/15 bg-black/65 px-2.5 text-white/60 opacity-75 backdrop-blur transition hover:border-primary hover:text-white hover:opacity-100 uppercase text-[10px] tracking-widest font-bold"
+              className="group fixed left-[max(0.75rem,var(--safe-left))] sm:left-[5.75rem] top-[max(0.75rem,var(--safe-top))] z-[110] inline-flex min-h-11 active:scale-95 items-center gap-1 border border-white/15 bg-black/65 px-2.5 text-white/60 opacity-75 backdrop-blur transition hover:border-primary hover:text-white hover:opacity-100 uppercase text-[10px] tracking-widest font-bold"
               data-testid="button-back"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -92,7 +92,7 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </header>
-      <main className="relative z-20 px-6 pb-16 flex-1 flex flex-col">
+      <main className="relative z-20 px-6 pb-[calc(6rem+var(--safe-bottom))] sm:pl-24 flex-1 flex flex-col">
         {children}
       </main>
     </motion.div>

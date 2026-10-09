@@ -1134,6 +1134,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New Text size setting (Settings, under Accessibility): Small, Normal, Large or Extra large, for phones, TVs and arcade screens viewed from across the room.',
     ],
   },
+  {
+    version: '0.23.4',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:00:10Z',
+    kind: 'update',
+    title: 'Menu Dock',
+    body: [
+      'Menu screens now have an always-there dock: Hideout, Pick a map, Roster, Card shop, Settings and Search. It sits along the bottom on phones and down the left side on bigger screens.',
+      'Search opens the Go to menu, so any unlocked screen is one tap away.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

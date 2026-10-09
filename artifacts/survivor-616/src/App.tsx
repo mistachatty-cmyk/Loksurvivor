@@ -75,6 +75,7 @@ import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
 import { eventsLeftToday } from '@/game/engine/hideoutRewards';
 import { getFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
 import { GoToPalette } from '@/ui/GoToPalette';
+import { MenuDock } from '@/ui/MenuDock';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
@@ -89,6 +90,9 @@ const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
 
 const queryClient = new QueryClient();
+
+/** Full-screen moments where a persistent menu would intrude. */
+const DOCK_HIDDEN_SCREENS = ['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle'];
 
 /** Screens with no payload that browser Back may return to. */
 const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback']);
@@ -743,8 +747,10 @@ function Game() {
       <GoToPalette
         unlockedFeatures={unlockedFeatures}
         disabled={['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena'].includes(screen.name)}
+        showButton={screen.name === 'hub'}
         onGo={goToScreen}
       />
+      {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} />}
       {!['intro', 'hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter'].includes(screen.name) && (
         <button type="button" onClick={openLooks} className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" />Looks & LokPets</button>
       )}

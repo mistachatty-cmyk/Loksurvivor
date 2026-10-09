@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 98,
+      "version": "0.23.4",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:00:10Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Menu Dock",
+      "body": [
+        "Menu screens now have an always-there dock: Hideout, Pick a map, Roster, Card shop, Settings and Search. It sits along the bottom on phones and down the left side on bigger screens.",
+        "Search opens the Go to menu, so any unlocked screen is one tap away."
+      ]
+    },
+    {
       "number": 97,
       "version": "0.23.3",
       "date": "2026-10-10",
