@@ -215,6 +215,7 @@
   "hideout.life.item.bond": "engere Bindung",
   "hideout.life.found": "Gefunden: {{items}}",
   "hideout.life.usedToday": "Heute schon erledigt. Morgen wieder zurück.",
+  "hideout.life.capped": "Ihre Taschen sind für heute voll. Versuchen Sie es morgen noch einmal.",
   "hideout.life.useProp": "Verwenden Sie {{label}}",
   "hideout.life.eventChip": "Es ist etwas los",
   "hideout.life.eventChipAria": "In der Nähe passiert etwas. Zum Ansehen antippen.",
