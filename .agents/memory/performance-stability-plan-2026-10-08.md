@@ -1,5 +1,71 @@
 # 616 Survivor — Stability & Performance Plan
 
+## Update — 2026-10-09: diagnosed the actual reported lag
+
+The user reported the game "still lagging." Investigation confirmed two things:
+
+**Nothing from this plan has been applied yet** — it's still a plan, not a changelog (the
+`.agents/memory/` index entry for it already says so explicitly: "plan, not yet executed").
+Zero commits have landed in `artifacts/survivor-616/` since this doc was written, so there is
+no new regression to explain — whatever's being felt now is the same unaddressed state this
+plan already described... except it turned out the Tier 1 list below **wasn't actually the
+cause of what the user is feeling**, because of how they described it:
+
+> lag happens in normal play, early/mid areas (not Unleashed/Million Horde), on desktop,
+> "always been there," and correlates with music playing.
+
+Every Tier 1/Tier 2 item below requires *high density* (lots of enemies, breakables, or fluids
+alive at once) to matter — exactly what "early/mid areas" doesn't have. Two hypotheses were
+chased and ruled out with real measurement before finding the actual answer:
+
+- **Ruled out: the music analyser.** It runs on its own separate `requestAnimationFrame` loop
+  (confirmed real — `src/game/audio/analysis.ts:127-137`, independent of `RunScreen.tsx`'s own
+  loop) and runs unconditionally whenever a track is *playing*, even muted. But measured
+  directly: ~1,500 trivial scalar ops on a 512-element `Uint8Array` per frame, sub-0.1ms on any
+  desktop JS engine. Computationally insignificant — ruled out by actual arithmetic, not
+  assumption. (The two-separate-rAF-loops architecture is still worth noting for Tier 2, see
+  below, but it's not the lag.)
+- **Confirmed: baseline background/lighting rendering that runs every frame regardless of
+  enemy count, scaling instead with obstacle/light-source count and screen area.** This is
+  `drawObjectLighting` (`draw.ts:2736-2946`) plus the ground-tile layers (`drawGround`,
+  `drawStreetDressing`, `draw.ts:157`/`238`) plus the ambient sky/civilian layer (`drawAmbient`
+  and the cloud/firefly/litter/puddle passes, `draw.ts:5140`, `6684-6739`). **None of these are
+  gated by `visualBudget`/`graphicsQuality`/`backingScale` at all** — confirmed by reading the
+  call sites directly: those three tiers are consumed only by `drawEffects`/`drawParticles`/
+  `drawPopups` (cosmetic VFX), keyed only on `enemies.length`. The auto-degrade controller
+  measures overall render cost and *will* eventually throttle `backingScale` down if frame time
+  is bad enough, but has no finer-grained lever for this specific cost — it's structurally
+  blind to *why* a frame is slow here the same way it was blind to the music analyser's
+  separate loop, it just eventually hits the resolution-scaling hammer for everything at once.
+
+  Specifically, `drawObjectLighting` runs unconditionally every frame (`draw.ts:6716`) and does,
+  for an ordinary street scene with lamps/barrels/signs/benches/crates (tens of breakables is
+  completely normal authored-area content, not a density extreme): up to 8 fresh
+  `ctx.createRadialGradient` calls for active light sources/effects, **plus** a shadow-caster
+  pass (`draw.ts:2856-2896`) that checks every light source against every non-light breakable
+  (cheap distance check, correctly skips anything past 260 units) but does a full
+  `save/beginPath/4-point-polygon-fill/stroke/restore` for every pair that *is* within range —
+  which in a normal lamp-lit street corner with several breakables clustered near a couple of
+  lights is a real, non-trivial number of canvas state changes and fills, every frame, with
+  zero dependency on how many enemies are alive. `drawGround`/`drawStreetDressing` separately
+  iterate a 64px/192px grid over the *entire visible viewport* every frame (~500 + ~150 cells on
+  a 1920×1080 desktop view) doing a hash + conditional fill/ellipse per cell — pure screen-area
+  cost, same whether the area is empty or packed.
+
+  **This is the actual explanation for "always been there, even in simple early areas, on
+  desktop."** It has nothing to do with enemy density, and everything to do with scene geometry
+  (obstacle/light count) and viewport size, which is why the previously-documented
+  density-focused hotspots in Tier 1 below didn't match the symptom, and why no amount of the
+  existing auto-degrade logic (keyed on enemy count) has ever touched it.
+
+**New Tier 0 item below reflects this. The "also correlates with music" report is most likely
+incidental** (music is on by default for most sessions, so it roughly tracks "normal play" in
+general) rather than causal — but the two-separate-rAF-loops point from the ruled-out
+hypothesis is folded into Tier 2 anyway since it's a real architectural gap worth closing
+eventually, just not the cause of this specific complaint.
+
+---
+
 ## Context
 
 This plan follows a full-codebase audit of `artifacts/survivor-616` (bugs, dead content,
@@ -92,6 +158,46 @@ project's own named next step, not a new idea — see Tier 2.
 
 ---
 
+## Tier 0 — Do first: the actual reported lag
+
+This is the new finding from the 2026-10-09 update above. Unlike everything in Tier 1 (which
+only matters at high enemy/breakable density), this is the one item that explains lag in
+ordinary, low-density early/mid areas on desktop — i.e. this is almost certainly what the user
+is actually feeling, and should be fixed before anything else in this plan.
+
+| # | What | File | Why it matters / impact | Risk if skipped | Effort |
+|---|------|------|--------------------------|------------------|--------|
+| 1 | **Gate `drawObjectLighting`'s shadow-caster pass** (`draw.ts:2856-2896`) by `graphicsQuality`/`visualBudget` — e.g. skip it entirely at `'performance'` quality, or reduce the active-light-source cap below the current 5, or shrink the 260-unit proximity range at lower tiers | Full `save/polygon-fill/stroke/restore` per nearby light-source/breakable pair, every frame, scaling with ordinary authored-scene obstacle density (lamps, barrels, signs, crates) — not enemy count. This is the single clearest match for "constant lag in simple areas" found in this plan | Without this, a desktop player on a normal street-corner scene pays a real, unconditional, ungated canvas-state cost every frame that has nothing to do with how the fight is going — the one thing in this whole plan actually matching the user's own description | S–M (isolated to this one function; the gating pattern to copy already exists for `drawEffects`/`drawParticles`) |
+| 2 | **Cache/reduce the per-frame `createRadialGradient` calls in `drawObjectLighting`** (up to 8 per frame today: `draw.ts:2742,2758,2780,2798,2806,2827,2908,2947`) — gradients are recreated from scratch every frame for slowly-changing or static light sources; most could be built once per light source and reused, or built less often and reused across frames with just an alpha change | Each `createRadialGradient` + multiple `addColorStop` calls is real (if individually small) allocation + GPU-state work; 8 of them every frame, every area, adds up exactly the way the ground-tile/shadow-caster costs do — same root cause, same fix shape (do less work per frame when the underlying thing hasn't moved) | Compounds with #1 — fixing the shadow caster alone won't fully resolve the complaint if this is still paying a similar tax right next to it in the same function | S–M |
+| 3 | **Gate `drawGround`/`drawStreetDressing`'s per-cell work by `graphicsQuality`** (currently always full 64px/192px grid density regardless of viewport size or quality setting, `draw.ts:157`, `238`) — e.g. a coarser cell size or a cheaper fill path at `'performance'` tier | Pure screen-area cost (~500 + ~150 cells on a 1920×1080 view), identical whether the area is empty or packed with enemies — directly explains why this never improves no matter what's happening in combat | Same class as #1/#2: an always-on tax that the existing auto-degrade system can't see because it isn't keyed to anything this cost actually depends on | S |
+
+**Verification for Tier 0:** profile first with the existing methodology (`node scripts/bench-render.mjs`
+in a simple early/mid area with a normal scattering of breakables, NOT an extreme mode) to get a
+real before number, then again after each fix for a real after number — this is exactly the
+kind of claim this repo's own history warns not to ship on a guess. Manually confirm on desktop
+in a normal early-area run: does the frame time/smoothness improve with no change to enemy
+count or combat? That's the actual test of whether this was the right diagnosis.
+
+**Status: #1 and #3 implemented and shipped (graphicsQuality gating on the shadow-caster and
+street-dressing layers, plus viewport culling added to `drawObjectLighting`'s light sources —
+not in the original item list, but the same root cause: `sources`/`shadowObjects` had zero
+camera-bounds check, so an off-screen lamp still paid for a fresh gradient and shadow-pair scan
+every frame). Verified: `pnpm typecheck`/`pnpm test` (840/840) clean, visual output confirmed
+correct via headless screenshot (lights/shadows still render, no pop-in/missing geometry).
+**Known limitation of this verification**: `scripts/bench-render.mjs` only exercises `AREAS[0]`
+("monroe-strip"), which is small enough (~16 obstacles, all roughly within one screen's worth
+of world space) that the before/after numbers came back statistically indistinguishable
+(~2.3-3.0ms drawJS avg either way, within the benchmark's own noise band) — this area simply
+doesn't have enough off-screen clutter to exercise the new culling. The fix should matter most
+in endless-mode/larger authored areas with many more light-emitting props scattered beyond one
+viewport, which the current benchmark doesn't cover. **Extending `bench-render.ts` to also cover
+a denser/larger area (or endless-mode chunk streaming) would give this fix a real measured
+number** — worth folding into Tier 2 #2's CI-wiring work rather than left unverified. #2
+(gradient caching) not yet implemented — lower priority since the culling fix likely already
+removes most of the wasted work it would have targeted.
+
+---
+
 ## Tier 1 — Do now: real bugs, cheap, isolated
 
 Each of these is small, independent, and directly reduces stutter/crash risk at the specific
@@ -141,6 +247,7 @@ yet — rather than relying on today's hotspot list being complete.
 | 4 | **Broad-phase/narrow-phase split: skip full AI/damage-update cost for enemies far outside the viewport/interaction radius**, not just draw-culling them. This is not a new idea — `.agents/memory/swarm-collision-nearestenemy-2026-09-22.md` names this exact change as the still-open next step after closing the quadratic `nearestEnemy()` gaps, and says explicitly to re-profile the same way (real V8 profile) before spending budget here | This is the project's own identified path past today's hard caps (190 / 1,000 / Million-Horde-actor-tier) toward real "thousands on screen" without raising those caps blindly — currently simulation updates every live enemy's full logic regardless of distance from the player/camera, only rendering culls | This is the highest-effort, highest-payoff item in the whole plan if the ambition is ever to raise the live-actor ceilings further — and the one most likely to introduce a subtle gameplay bug (an enemy that should have reacted but didn't) if done without the Tier 2 #2 regression harness in place first | L (touches core simulation code many systems depend on; do this only after #2's CI harness exists, exactly as this repo's own history recommends) |
 | 5 | **Close the documented 120Hz interpolation gap**: the sim runs a fixed 60Hz step with no render interpolation/sub-stepping, so a 120Hz/144Hz display shows 60 distinct frames stretched across more refreshes — this reads as visible judder on high-refresh hardware even when the sim itself is fast. Explicitly recorded as still-open in `million-horde-crowd.md` ("left alone because it affects gameplay tuning") | Directly a "stutter" symptom on an increasingly common class of hardware (most current phones and many monitors are 90Hz+) that has nothing to do with simulation cost — fixing the *other* items in this plan won't touch this one at all | On a 120Hz+ device, the game will visibly judder even at a perfect, unloaded 60fps simulation rate — a "no matter what, never stutters" promise has a real, known, named gap here today | L (render-interpolation changes touch gameplay feel/tuning — the prior pass deliberately deferred it for exactly that reason; needs a design decision, not just an engineering one) |
 | 6 | **Fold `musicMultiplier`/`musicVisual` into the same budget-tier gating** as #1, once it exists | Currently a small but ungated O(N) cost; cheap to bring under the same umbrella once the umbrella exists | Low urgency today — flagged so it doesn't get forgotten as enemy counts climb | S |
+| 7 | **Consider merging the music analyser's independent `requestAnimationFrame` loop into RunScreen's own loop** (today: `src/game/audio/analysis.ts:127-137` schedules its own rAF, fully separate from `RunScreen.tsx:897/1220`) | Measured insignificant on its own (~1,500 trivial ops/frame, sub-0.1ms) — this is architectural cleanliness, not a performance fix. Two independent per-frame callbacks is still one more thing than necessary, and it means the auto-degrade controller can never account for it even in principle | Low — included because it was investigated this session and the "two loops" fact is worth having on record even though it wasn't the cause of anything | S, but touches audio plumbing — verify playback timing isn't subtly tied to its own rAF cadence before merging |
 
 **Verification for Tier 2:** #2 turns itself into the ongoing test once wired up. Until then,
 verify #1 manually: force `visualPressure` artificially high (or play Unleashed mode) and
@@ -227,6 +334,9 @@ through).
 
 ## Suggested order of execution
 
+0. **Tier 0 first, ahead of everything else.** It's the diagnosed cause of the lag actually
+   reported, it's isolated to one function family in `draw.ts`, and nothing else in this plan
+   depends on it or blocks it.
 1. Profile first (per the note at the top of Tier 1) using `scripts/bench-sim.ts`/
    `bench-render.mjs` or a real V8 profile, with breakables/fluids/status-ring-tagged enemies
    alive — this both informs which of Tier 1's items 1, 2, 4, 5 are actually worth doing and
