@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -74,6 +74,8 @@ import { CHOICE_TRIGGERS } from '@/game/data/choiceEvents';
 import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
 import { eventsLeftToday } from '@/game/engine/hideoutRewards';
 import { getFightStyle, type FightStyle } from '@/game/state/fightStyleSetting';
+import { GoToPalette } from '@/ui/GoToPalette';
+import { MenuDock } from '@/ui/MenuDock';
 import { StarterLokPetEncounter } from '@/ui/StarterLokPetEncounter';
 import { RunSetupScreen } from '@/ui/RunSetupScreen';
 import { createLokPetArchiveFixtureResult } from '@/test/lokpetArchiveFixture';
@@ -88,6 +90,12 @@ const StudioScreen = lazy(() => import('@/ui/StudioScreen').then(m => ({ default
 const RunScreen = lazy(() => import('@/game/RunScreen').then(m => ({ default: m.RunScreen })));
 
 const queryClient = new QueryClient();
+
+/** Full-screen moments where a persistent menu would intrude. */
+const DOCK_HIDDEN_SCREENS = ['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'hub', 'run-setup', 'run', 'arena', 'arena-setup', 'arena-join', 'summary', 'studio', 'map-editor', 'sector-command', 'lokpet-battle'];
+
+/** Screens with no payload that browser Back may return to. */
+const HISTORY_SCREENS = new Set(['intro', 'hub', 'roster', 'areas', 'bestiary', 'archive', 'music', 'studio', 'recovery', 'vendor', 'workshop', 'card-shop', 'lok-shop', 'weapon-bans', 'settings', 'palette-store', 'sound-booth', 'account', 'feedback']);
 
 type Screen =
   | { name: 'intro' }
@@ -204,6 +212,7 @@ function Game() {
   const [screen, setScreen] = useState<Screen>(() => initialScreen());
   const chromeLayout = useUiChromeLayout();
   const looksReturnRef = useRef<Screen | null>(null);
+  const screenRef = useRef<Screen>(screen);
   const [roomId, setRoomId] = useState('main-floor');
   const [travelEncounter, setTravelEncounter] = useState<PendingTravelEncounter | null>(null);
   const [choiceEvent, setChoiceEvent] = useState<PendingChoiceEvent | null>(null);
@@ -426,6 +435,47 @@ function Game() {
       proceed();
     },
     [tryTravelFight, tryChoiceEvent],
+  );
+
+  // Browser/OS Back support: screens without a payload get a history entry, so Back walks the
+  // player through the menus they visited instead of leaving the site. Screens that carry
+  // state (a run in progress, a summary) are never re-entered from history.
+  const lastPushedScreen = useRef<string | null>(null);
+  useEffect(() => {
+    const onPop = (event: PopStateEvent) => {
+      const name = (event.state as { screen?: string } | null)?.screen;
+      lastPushedScreen.current = name ?? null;
+      if (screenRef.current.name === 'run' || screenRef.current.name === 'arena') {
+        // Never abandon a live run on a stray Back press.
+        window.history.pushState({ screen: screenRef.current.name }, '');
+        return;
+      }
+      if (name && HISTORY_SCREENS.has(name)) setScreen({ name } as Screen);
+      else if (name === undefined) goHub();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [goHub]);
+  useEffect(() => {
+    screenRef.current = screen;
+    if (lastPushedScreen.current === screen.name) return;
+    const isFirst = lastPushedScreen.current === null;
+    lastPushedScreen.current = screen.name;
+    // The first screen replaces the entry the browser opened with, so Back from the title leaves the site.
+    if (isFirst) window.history.replaceState({ screen: screen.name }, '');
+    else window.history.pushState({ screen: screen.name }, '');
+  }, [screen]);
+
+  const unlockedFeatures = useMemo(() => new Set<string>(unlockedRooms.flatMap((room) => room.features)), [unlockedRooms]);
+  const goToScreen = useCallback(
+    (id: string) => {
+      sfx.play('uiNav');
+      if (id === 'hub') goHub();
+      else if (id === 'looks') openLooks();
+      else if (id === 'areas') setScreen({ name: 'areas' });
+      else setScreen({ name: id } as Screen);
+    },
+    [goHub, openLooks, sfx],
   );
 
   /** Where the title screen leads once the player is ready: the starter pet meeting, or the hideout. */
@@ -694,8 +744,15 @@ function Game() {
     <>
       {renderScreen()}
       {!(screen.name === 'hub' && chromeLayout === 'new') && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
+      <GoToPalette
+        unlockedFeatures={unlockedFeatures}
+        disabled={['intro', 'photosensitivity-notice', 'starter-lokpet-encounter', 'run-setup', 'run', 'arena'].includes(screen.name)}
+        showButton={screen.name === 'hub'}
+        onGo={goToScreen}
+      />
+      {!DOCK_HIDDEN_SCREENS.includes(screen.name) && <MenuDock screenName={screen.name} onGo={goToScreen} />}
       {!['intro', 'hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter'].includes(screen.name) && (
-        <button type="button" onClick={openLooks} className="fixed right-3 top-3 z-[110] inline-flex min-h-10 items-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" />Looks & LokPets</button>
+        <button type="button" onClick={openLooks} className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-[110] inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" />Looks & LokPets</button>
       )}
       {choiceEvent && (
         <ChoiceEventOverlay

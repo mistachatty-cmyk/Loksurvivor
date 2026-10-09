@@ -4,7 +4,8 @@
  * which freezes the title-screen live feed, hideout rain and parallax, and the
  * walking operative. The choice is stored on this device only.
  */
-import { deviceWantsReducedMotion, getMotionMode, liveFeedPausedByDevice, setMotionMode } from '@/anim/motion';
+import { useState } from 'react';
+import { deviceWantsReducedMotion, getMotionMode, getShakeLevel, liveFeedPausedByDevice, setMotionMode, setShakeLevel, type ShakeLevel } from '@/anim/motion';
 
 function applyAndReload(mode: 'system' | 'full') {
   setMotionMode(mode);
@@ -57,6 +58,47 @@ export function MotionSetting() {
         >
           {mode === 'full' ? 'On' : 'Off'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+const SHAKE_LEVELS: ShakeLevel[] = ['off', 'low', 'normal'];
+
+/** Settings row: how hard the camera shakes on hits. Reduced motion always forces it off. */
+export function ShakeSetting() {
+  const [level, setLevel] = useState<ShakeLevel>(getShakeLevel);
+  return (
+    <div className="mt-3 border border-border/70 bg-background/50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-wide text-white">Screen shake</h3>
+          <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            How hard the camera jolts on big hits. Your device's reduced-motion setting turns it off unless you pick
+            Always animate above.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1" role="group" aria-label="Screen shake">
+          {SHAKE_LEVELS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => {
+                setShakeLevel(option);
+                setLevel(option);
+              }}
+              aria-pressed={level === option}
+              className={`min-h-11 border px-4 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors active:scale-95 ${
+                level === option
+                  ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                  : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+              }`}
+              data-testid={`button-shake-${option}`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

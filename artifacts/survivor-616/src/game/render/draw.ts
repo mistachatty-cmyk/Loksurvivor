@@ -6,6 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { shakeScale } from '@/anim/motion';
 import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { drawStyledPickup } from './pickupArtStyles';
 import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Pickup, type Popup, type World } from '@/game/engine/world';
@@ -6436,7 +6437,7 @@ function drawGuests(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 function drawParticles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds, visualBudget: NonNullable<Viewport['visualBudget']>) {
-  const limit = visualBudget === 'minimal' ? 56 : visualBudget === 'reduced' ? 112 : Number.POSITIVE_INFINITY;
+  const limit = visualBudget === 'minimal' ? 56 : visualBudget === 'reduced' ? 112 : 600;
   const stride = visualBudget === 'minimal' ? 3 : visualBudget === 'reduced' ? 2 : 1;
   let drawn = 0;
   for (let index = 0; index < w.particles.length; index += 1) {
@@ -6785,8 +6786,9 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
 
   // The page overlay shakes the real scroll position in whole cells instead, so the page and the
   // game move together; a fractional random translate here would tear the sprites off the pixel grid.
-  const shakeX = !overlay && w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
-  const shakeY = !overlay && w.shake > 0 ? (Math.random() - 0.5) * w.shake : 0;
+  const shakeAmp = !overlay && w.shake > 0 ? w.shake * shakeScale() : 0;
+  const shakeX = shakeAmp > 0 ? (Math.random() - 0.5) * shakeAmp : 0;
+  const shakeY = shakeAmp > 0 ? (Math.random() - 0.5) * shakeAmp : 0;
 
   ctx.save();
   ctx.translate(width / 2 + shakeX, height / 2 + shakeY);

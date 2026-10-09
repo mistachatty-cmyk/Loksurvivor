@@ -6,7 +6,9 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import './index.css';
 import { restoreUiTransparency } from '@/ui/UiTransparencyControls';
 import { applyScrollbarPrefs } from '@/lib/scrollbar';
-import { applyMotionMode, registerLiveFeedLoad } from '@/anim/motion';
+import { applyTextSize } from '@/lib/textScale';
+import { MotionConfig } from 'framer-motion';
+import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
 
 function describeUnknown(value: unknown): string {
@@ -70,6 +72,7 @@ function installRuntimeDiagnostics(): void {
 installRuntimeDiagnostics();
 restoreUiTransparency();
 applyMotionMode();
+applyTextSize();
 applyScrollbarPrefs();
 registerLiveFeedLoad();
 
@@ -81,7 +84,9 @@ function mount(): void {
     },
   }).render(
     <ErrorBoundary>
-      <App />
+      <MotionConfig reducedMotion={getMotionMode() === 'full' ? 'never' : 'user'}>
+        <App />
+      </MotionConfig>
     </ErrorBoundary>,
   );
 }

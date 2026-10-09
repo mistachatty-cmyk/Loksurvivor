@@ -1193,6 +1193,72 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The hideout has five new little stories that depend on the weather and the hour: a leaking awning in the rain, a horn in the fog, a LokPet that wanders off into it, card night with the crew, and warm glass in the cellar.',
     ],
   },
+  {
+    version: '0.23.9',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:05Z',
+    kind: 'update',
+    title: 'Smoother Menus',
+    body: [
+      'Menus now slide in softly, buttons press down when tapped, and Escape takes you back from any screen.',
+      'Screen shake can be turned down or off, and it follows your device\'s reduced-motion setting.',
+      'Pinch-zoom works again, and back buttons stay clear of phone notches.',
+    ],
+  },
+  {
+    version: '0.24.0',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:10Z',
+    kind: 'update',
+    title: 'Go To Anywhere',
+    body: [
+      'New Go to search: press Ctrl+K or / (or tap the Go to button) to jump straight to any screen you have unlocked. Locked rooms stay locked.',
+      'Your browser or phone Back button now walks back through the menus you visited instead of leaving the game, and a stray Back never drops a live run.',
+      'Escape in the pause menu now closes Settings or Soundtrack first, and menu corner buttons stay clear of notches.',
+    ],
+  },
+  {
+    version: '0.24.1',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:15Z',
+    kind: 'update',
+    title: 'Bigger Text On Demand',
+    body: [
+      'New Text size setting (Settings, under Accessibility): Small, Normal, Large or Extra large, for phones, TVs and arcade screens viewed from across the room.',
+    ],
+  },
+  {
+    version: '0.24.2',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:20Z',
+    kind: 'update',
+    title: 'Menu Dock',
+    body: [
+      'Menu screens now have an always-there dock: Hideout, Pick a map, Roster, Card shop, Settings and Search. It sits along the bottom on phones and down the left side on bigger screens.',
+      'Search opens the Go to menu, so any unlocked screen is one tap away.',
+    ],
+  },
+  {
+    version: '0.24.3',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:25Z',
+    kind: 'update',
+    title: 'Overlays Ease In',
+    body: [
+      'Level-up choices now rise in one after another, and the pause menu, soundtrack panel and outcome banner fade and pop in instead of snapping on.',
+      'All of it respects your reduced-motion setting.',
+    ],
+  },
+  {
+    version: '0.24.4',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:30Z',
+    kind: 'update',
+    title: 'Steadier Big Fights',
+    body: [
+      'Huge particle storms are now capped at 600 visible sparks on High graphics, which keeps frame rate steadier on phones and older arcade machines without changing how fights look.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

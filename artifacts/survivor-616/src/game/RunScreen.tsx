@@ -307,6 +307,10 @@ export function RunScreen({
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
   useEffect(() => { setControlSettings(getControls()); }, [runSettingsOpen]);
   const [pauseSoundtrackOpen, setPauseSoundtrackOpen] = useState(false);
+  const runSettingsOpenRef = useRef(false);
+  const pauseSoundtrackOpenRef = useRef(false);
+  runSettingsOpenRef.current = runSettingsOpen;
+  pauseSoundtrackOpenRef.current = pauseSoundtrackOpen;
   const [lootPickups, setLootPickups] = useState<LootPickup[]>([]);
   const expireLootPickup = useCallback(
     (id: string) => setLootPickups((prev) => prev.filter((pickup) => pickup.id !== id)),
@@ -517,7 +521,13 @@ export function RunScreen({
       if (action === 'pause' || key === 'p') {
         if (phaseRef.current === 'playing' && meta.liveModeEnabled) setLiveDashboardOpen((open) => !open);
         else if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
-        else if (phaseRef.current === 'paused') setPhaseBoth('playing');
+        else if (phaseRef.current === 'paused') {
+          // Close a pause sub-panel first; a second press resumes.
+          if (runSettingsOpenRef.current || pauseSoundtrackOpenRef.current) {
+            setRunSettingsOpen(false);
+            setPauseSoundtrackOpen(false);
+          } else setPhaseBoth('playing');
+        }
       }
     };
     const up = (event: KeyboardEvent) => keysRef.current.delete(event.key.toLowerCase());
@@ -2329,7 +2339,7 @@ export function RunScreen({
       {/* Level up */}
       {phase === 'levelup' && meta.levelUpPausesEnabled ? (
         <div
-          className="absolute inset-0 flex items-end justify-start bg-black/55 p-3"
+          className="ui-fade-in absolute inset-0 flex items-end justify-start bg-black/55 p-3"
           style={{
             paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
             paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
@@ -2351,14 +2361,15 @@ export function RunScreen({
               </button>
             ) : null}
             <div className="space-y-2">
-              {choices.map((upgrade) => {
+              {choices.map((upgrade, choiceIndex) => {
                 const cardWeapon = resolveCardWeapon(upgrade);
                 return (
                   <button
                     key={upgrade.id}
                     type="button"
                     onClick={() => pickUpgrade(upgrade)}
-                    className="flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-2 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                    style={{ '--i': choiceIndex } as React.CSSProperties}
+                    className="ui-rise-in flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-2 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
                     data-testid={`button-upgrade-${upgrade.id}`}
                   >
                     {cardWeapon ? (
@@ -2486,8 +2497,8 @@ export function RunScreen({
 
       {/* Pause */}
       {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen && !pauseSoundtrackOpen ? (
-        <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
-          <div className="pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
+        <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'ui-fade-in absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
+          <div className="ui-pop-in pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
             <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><div className="flex gap-2">{liveDashboardOpen ? <button type="button" onClick={() => { setLiveDashboardOpen(false); setPhaseBoth('paused'); }} className="border border-amber-300/40 px-3 py-2 font-mono text-[10px] uppercase text-amber-100">Pause</button> : null}<button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div></div>
             {!liveDashboardOpen ? (
               <div className="mb-3 flex items-center gap-2 border border-cyan-200/20 bg-[#08111a] px-3 py-2" data-testid="pause-music-bar">
@@ -2604,7 +2615,7 @@ export function RunScreen({
       ) : null}
 
       {phase === 'paused' && pauseSoundtrackOpen ? (
-        <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-pause-soundtrack">
+        <div className="ui-fade-in absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-pause-soundtrack">
           <MusicPanel onBack={() => setPauseSoundtrackOpen(false)} />
         </div>
       ) : null}
@@ -2706,8 +2717,8 @@ export function RunScreen({
 
       {/* Outcome */}
       {phase === 'over' ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
-          <h2 className="text-4xl font-black uppercase tracking-widest text-white drop-shadow" data-testid="text-outcome">
+        <div className="ui-fade-in pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
+          <h2 className="ui-pop-in text-4xl font-black uppercase tracking-widest text-white drop-shadow" data-testid="text-outcome">
             {worldRef.current?.outcome === 'cleared'
               ? 'Block cleared'
               : worldRef.current?.deathCause === 'lethal-pothole'
