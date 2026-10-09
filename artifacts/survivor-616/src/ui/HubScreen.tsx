@@ -34,7 +34,7 @@ import { createRng } from '@/game/engine/math';
 import { applyPetCare, PET_CARE_VERBS_BY_ID } from '@/game/data/petCare';
 import { beatBus } from '@/game/audio/beatBus';
 import { petEvolvedLook } from '@/game/engine/petEvolution';
-import { bondRankFor, petCallName } from '@/game/engine/petGrowth';
+import { bondDayKey, bondRankFor, petCallName } from '@/game/engine/petGrowth';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -194,6 +194,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           overlays: look.overlays,
           sizeScale: (pet.roll.sizeScale ?? 1) * look.scale,
           bondRank: bondRankFor(pet.bond).id,
+          playedToday: pet.careDay === bondDayKey(Date.now()),
           history: pet.hideoutEvents,
         };
       });
@@ -208,6 +209,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     [selectedCharacter, meta.characterSkinByCharacterId, meta.activePaletteId, meta.worldPaletteBlendEnabled],
   );
   const activeRoomId = unlockedRooms.find((r) => r.id === roomId)?.id ?? unlockedRooms[0]?.id ?? roomId;
+  const [ballOut, setBallOut] = useState(false);
   const [stripNotice, setStripNotice] = useState<StripNotice | undefined>(undefined);
   const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
   const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
@@ -653,6 +655,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             interactive={meta.hideoutInteractive}
             keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary}
             notice={stripNotice}
+            ball={{ present: ballOut && meta.ownsBall && meta.hideoutInteractive, themeId: meta.uiTheme }}
             cue={playCue}
             onPropUse={handlePropUse}
             onFocusPet={setFocusPetId}
@@ -665,6 +668,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             }}
           />
         )}
+        {meta.hideoutPreviewEnabled && meta.ownsBall && meta.hideoutInteractive ? (
+          <div className="mb-3 -mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setBallOut((out) => !out)}
+              className="border border-border px-3 py-1.5 text-xs font-bold uppercase tracking-wide hover:bg-white/10"
+              data-testid="button-toggle-ball"
+            >
+              {ballOut ? t('hideout.ball.putAway') : t('hideout.ball.putOut')}
+            </button>
+            {ballOut ? <span className="text-xs text-muted-foreground">{t('hideout.ball.hint')}</span> : null}
+          </div>
+        ) : null}
         {meta.hideoutPreviewEnabled && meta.hideoutPetPlay && focusPet ? (
           <HideoutPlayBar
             pet={focusPet}
