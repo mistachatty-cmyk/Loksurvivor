@@ -27,6 +27,11 @@ Settings > Run events (`state/runEventSetting.ts`, device-local list of switched
 12s, x4 pull radius for xp/cred/coin/health only so chests are not dragged in), included in the supply drop.
 Beat names in Settings come from `RUN_EVENTS[].name` (English, not in `en.json`).
 
+## Added v0.22.7: Tremor
+`tremorPulse` (world.ts): 4 pulses 700ms apart, radius 420, shoves non-boss enemies (`kx/ky`, scaled by
+1/mass) and movable breakables, staggers via `contactReadyAt`. Deals NO damage on purpose so it cannot
+create kills/XP/loot (impact-physics.md). Pays one heart at the epicenter when it ends. Needs 6 maps.
+
 ## Not built yet
 Beats in the Archive/bestiary,
-Blackout / Block party / Tremor / Relay storm, first-time tooltip, a screenshot playtest.
+Blackout / Block party / Relay storm, first-time tooltip, a screenshot playtest.

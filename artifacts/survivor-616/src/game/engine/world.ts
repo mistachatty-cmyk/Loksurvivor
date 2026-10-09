@@ -1208,6 +1208,8 @@ export interface World {
     /** Unit direction a stampede travels, for the HUD marker. */
     dirX: number;
     dirY: number;
+    /** Tremor shock pulses already fired in the current beat. */
+    pulses: number;
     survived: RunEventId[];
   };
   /** Quirks already announced this run, so each is explained once. */
@@ -1800,7 +1802,7 @@ export function createWorld(
     quirkSurgeMode: setup.quirkSurgeMode ?? 'off',
     runEvents: {
       schedule: setup.runEvents ? scheduleRunEvents(seed, setup.runEvents.mapsCleared, setup.runEvents.disabledIds) : [],
-      index: 0, phase: 'wait', phaseAt: 0, x: 0, y: 0, dirX: 1, dirY: 0, survived: [],
+      index: 0, phase: 'wait', phaseAt: 0, x: 0, y: 0, dirX: 1, dirY: 0, pulses: 0, survived: [],
     },
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
@@ -4174,6 +4176,41 @@ function runEventPoint(w: World, x: number, y: number): { x: number; y: number }
 }
 
 /**
+ * One shock of a Tremor: shoves enemies and movable props away from the epicenter and
+ * staggers them (no contact damage for a moment). It deals no damage itself, so it can
+ * never create a kill, XP or loot through a side door -- see impact-physics.md.
+ */
+function tremorPulse(w: World) {
+  const re = w.runEvents;
+  const radius = 420;
+  for (const enemy of w.enemies) {
+    if (enemy.dying || enemy.def.family === 'Boss') continue;
+    const dx = enemy.x - re.x;
+    const dy = enemy.y - re.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > radius) continue;
+    const length = distance || 1;
+    const force = 220 * Math.max(0.25, 1 - distance / radius) / Math.max(0.6, enemy.mass);
+    enemy.kx += (dx / length) * force;
+    enemy.ky += (dy / length) * force;
+    enemy.contactReadyAt = Math.max(enemy.contactReadyAt, w.now + 650);
+  }
+  for (const b of w.breakables) {
+    if (b.broken || !b.movable) continue;
+    const dx = b.x - re.x;
+    const dy = b.y - re.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > radius) continue;
+    const length = distance || 1;
+    b.vx += (dx / length) * 120 / Math.max(1, b.mass);
+    b.vy += (dy / length) * 120 / Math.max(1, b.mass);
+  }
+  spawnParticles(w, re.x, re.y, '#a8a29e', 14, 130);
+  w.shake = Math.max(w.shake, 7);
+  pushSfx(w, 'ultimate');
+}
+
+/**
  * Director beats: warn, run, pay out once. Modelled on the Quirk Surge -- optional,
  * seeded, and if the run ends mid-beat nothing is paid. Never consumes `w.rng` for the
  * schedule; positions use it only once a beat is already live.
@@ -4196,6 +4233,11 @@ function updateRunEvents(w: World) {
       const spot = runEventPoint(w, p.x + re.dirX * 240, p.y + re.dirY * 240);
       re.x = spot.x;
       re.y = spot.y;
+    } else if (def.id === 'tremor') {
+      const spot = runEventPoint(w, p.x + re.dirX * 160, p.y + re.dirY * 160);
+      re.x = spot.x;
+      re.y = spot.y;
+      re.pulses = 0;
     } else {
       re.x = p.x;
       re.y = p.y;
@@ -4222,6 +4264,9 @@ function updateRunEvents(w: World) {
         const at = runEventPoint(w, re.x + Math.cos(a) * 70, re.y + Math.sin(a) * 70);
         spawnEnemy(w, pool[i % pool.length]!, 1, at);
       }
+    } else if (def.id === 'tremor') {
+      tremorPulse(w);
+      re.pulses = 1;
     } else if (pool.length > 0) {
       // A wall of runners crosses the screen; a gap is left where the player stood at the warning.
       const perpX = -re.dirY;
@@ -4247,7 +4292,15 @@ function updateRunEvents(w: World) {
     }
     return;
   }
+  if (def.id === 'tremor' && re.pulses < 4 && w.now >= re.phaseAt + re.pulses * 700) {
+    tremorPulse(w);
+    re.pulses += 1;
+  }
   if (w.now >= re.phaseAt + def.activeMs) {
+    if (def.id === 'tremor') {
+      // A breather after the shaking: one heart where it centred.
+      w.pickups.push({ uid: uid(w), kind: 'health', x: re.x, y: re.y, vx: 0, vy: 0, value: 30, bornAt: w.now });
+    }
     re.survived.push(def.id);
     re.index += 1;
     re.phase = 'wait';

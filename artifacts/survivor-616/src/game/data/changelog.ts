@@ -1057,6 +1057,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Settings has a new Run events section where you can switch each kind of moment on or off.',
     ],
   },
+  {
+    version: '0.22.7',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:00:00Z',
+    kind: 'update',
+    title: 'The ground shakes',
+    body: [
+      'Clear 6 maps and a Tremor can hit mid-run. A grey ring spreads from the epicenter, then the ground shakes four times. Enemies and loose props get shoved away and enemies stagger for a moment. The tremor never hurts anything, and it leaves a heart where it centred.',
+      'The Seen It All achievement now asks for every kind of moment, Tremor included.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

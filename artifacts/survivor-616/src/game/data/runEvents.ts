@@ -10,7 +10,7 @@
 
 import { quirkHash } from '@/game/data/enemyQuirks';
 
-export type RunEventId = 'supply-drop' | 'rush-hour';
+export type RunEventId = 'supply-drop' | 'rush-hour' | 'tremor';
 
 export interface RunEventDef {
   id: RunEventId;
@@ -43,6 +43,15 @@ export const RUN_EVENTS: RunEventDef[] = [
     activeMs: 4200,
     warnText: 'RUSH HOUR! Step into the gap',
     doneText: 'STAMPEDE DODGED',
+  },
+  {
+    id: 'tremor',
+    name: 'Tremor',
+    unlockMaps: 6,
+    warnMs: 3000,
+    activeMs: 3000,
+    warnText: 'TREMOR! The ground is about to shake',
+    doneText: 'TREMOR PASSED. Breathe',
   },
 ];
 

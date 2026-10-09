@@ -94,3 +94,25 @@ test('a magnet coil pulls loot from four times as far, only while it lasts', () 
   stepWorld(world, 1 / 30, IDLE);
   assert.equal(world.pickups[0]!.vx, 0, 'no pull once it ends');
 });
+
+test('a tremor pushes and staggers enemies, never damages them, and leaves a heart behind', () => {
+  const world = makeWorld(6);
+  world.runEvents.schedule = [{ id: 'tremor', startMs: 500 }];
+  for (let frame = 0; frame < 20; frame += 1) stepWorld(world, 1 / 30, IDLE);
+  assert.equal(world.runEvents.phase, 'warn');
+  const { x, y } = world.runEvents;
+  for (let frame = 0; frame < 30 * 8; frame += 1) {
+    stepWorld(world, 1 / 30, IDLE);
+    for (const e of world.enemies) assert.ok(Number.isFinite(e.x) && Number.isFinite(e.kx));
+  }
+  assert.deepEqual(world.runEvents.survived, ['tremor']);
+  assert.ok(world.pickups.some((p) => p.kind === 'health' && Math.hypot(p.x - x, p.y - y) < 400));
+  assert.equal(world.kills, 0, 'a tremor never kills');
+});
+
+test('tremor needs 6 maps', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    assert.ok(scheduleRunEvents(seed, 5).every((e) => e.id !== 'tremor'));
+  }
+  assert.ok([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].some((seed) => scheduleRunEvents(seed, 20).some((e) => e.id === 'tremor')));
+});

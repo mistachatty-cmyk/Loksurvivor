@@ -3333,6 +3333,15 @@ function drawRunEventMarker(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fillStyle = `rgba(253,224,71,${0.08 + 0.2 * falling})`;
       ctx.fillRect(re.x - 8 - 14 * falling, re.y - 900, 16 + 28 * falling, 900);
     }
+  } else if (beat.id === 'tremor') {
+    const spread = re.phase === 'warn' ? (w.now - re.phaseAt) / 3000 : 1;
+    ctx.strokeStyle = `rgba(168,162,158,${0.3 + 0.35 * pulse})`;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    ctx.arc(re.x, re.y, 60 + 360 * spread, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
   } else if (re.phase === 'warn') {
     const px = -re.dirY;
     const py = re.dirX;
