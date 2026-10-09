@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 99,
+      "version": "0.23.5",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:00:15Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Overlays Ease In",
+      "body": [
+        "Level-up choices now rise in one after another, and the pause menu, soundtrack panel and outcome banner fade and pop in instead of snapping on.",
+        "All of it respects your reduced-motion setting."
+      ]
+    },
+    {
       "number": 98,
       "version": "0.23.4",
       "date": "2026-10-10",

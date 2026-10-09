@@ -1145,6 +1145,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Search opens the Go to menu, so any unlocked screen is one tap away.',
     ],
   },
+  {
+    version: '0.23.5',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:00:15Z',
+    kind: 'update',
+    title: 'Overlays Ease In',
+    body: [
+      'Level-up choices now rise in one after another, and the pause menu, soundtrack panel and outcome banner fade and pop in instead of snapping on.',
+      'All of it respects your reduced-motion setting.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

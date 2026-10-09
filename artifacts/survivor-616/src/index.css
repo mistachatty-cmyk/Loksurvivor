@@ -1031,3 +1031,14 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
   :root:not([data-motion='full']) .soundbar-panel, :root:not([data-motion='full']) .soundbar-row { animation: none; }
   :root:not([data-motion='full']) .soundbar-fill, :root:not([data-motion='full']) .soundbar-thumb { transition: none; }
 }
+
+/* Shared entrance motion for overlays and panels -- timings come from the motion tokens */
+.ui-fade-in { animation: ui-fade-in var(--dur-base) var(--ease-out) both; }
+.ui-pop-in { animation: ui-pop-in var(--dur-slow) var(--ease-pop) both; }
+.ui-rise-in { animation: ui-rise-in var(--dur-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-pop-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes ui-rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) :is(.ui-fade-in, .ui-pop-in, .ui-rise-in) { animation-duration: .001ms; animation-delay: 0ms; }
+}
