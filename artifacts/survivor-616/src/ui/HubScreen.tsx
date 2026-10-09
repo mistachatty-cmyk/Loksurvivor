@@ -304,6 +304,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       const seed = Math.floor(Math.random() * 0x7fffffff);
       const roll = resolvePropReward(def, createRng(seed), bondLuck(meta.savedLokPets));
       const preview = roll ? grantWithFallback(meta, roll.reward, roll.fallback, { now, rare: roll.rare, elixirCap: ELIXIR_CAP }) : null;
+      if (!preview?.paid) {
+        // The daily caps would swallow this grant: say so and keep the claim for later.
+        showStripNotice(title, t('hideout.life.capped'));
+        return;
+      }
       activateHideoutProp(propId, seed);
       const found = preview ? describeReward(preview.applied, t) : '';
       const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;

@@ -3387,6 +3387,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       const roll = resolvePropReward(def, createRng(action.seed), bondLuck(state.meta.savedLokPets));
       if (!roll) return state;
       const result = grantWithFallback(state.meta, roll.reward, roll.fallback, { now: action.now, rare: roll.rare, elixirCap: ELIXIR_CAP });
+      // A grant the daily caps swallowed whole pays nothing, so it must not burn the day's claim.
+      if (!result.paid) return state;
       const claimed = trimClaims({ ...result.meta.hideoutClaims, [propClaimKey(def.id)]: action.now });
       return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
     }

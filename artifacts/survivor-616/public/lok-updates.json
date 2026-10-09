@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 79,
+      "version": "0.21.5",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T12:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "The Crate Answers",
+      "body": [
+        "Hideout props no longer eat your daily claim when the daily reward limit leaves nothing to pay. The Relay Crate now tells you your pockets are full and lets you try again later."
+      ]
+    },
+    {
       "number": 78,
       "version": "0.21.4",
       "date": "2026-10-08",

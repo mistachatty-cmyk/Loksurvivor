@@ -925,6 +925,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The hideout now has a Resources panel above Passive income that counts everything you are holding: cred, loot tokens, skeleton keys, card credits, pet treats, pet elixirs, GRPD seals and LokTokens.',
     ],
   },
+  {
+    version: '0.21.5',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T12:00:00Z',
+    kind: 'hotfix',
+    title: 'The Crate Answers',
+    body: [
+      'Hideout props no longer eat your daily claim when the daily reward limit leaves nothing to pay. The Relay Crate now tells you your pockets are full and lets you try again later.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
