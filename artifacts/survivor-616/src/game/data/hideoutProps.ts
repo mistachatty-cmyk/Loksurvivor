@@ -39,6 +39,8 @@ export type PropAction =
   | { kind: 'event'; pool: string }
   /** Looks at the sky (`data/skyEvents.ts`) and starts its boost when there is one. */
   | { kind: 'sky' }
+  /** The Lucky Chest (`data/chestLoot.ts`): opens when it is out. */
+  | { kind: 'chest' }
   /** A small payout, once per cooldown. */
   | { kind: 'reward'; table: PropRewardRow[]; rare?: PropRareFind };
 
@@ -112,6 +114,13 @@ export const HIDEOUT_PROPS: HideoutPropDef[] = [
     lineKeys: ['hideout.prop.beacon-lamp.line.1', 'hideout.prop.beacon-lamp.line.2'],
     cooldown: 'daily',
     action: { kind: 'reward', table: [{ weight: 1, reward: { cred: 6 } }] },
+  },
+  {
+    id: 'lucky-chest', roomIds: ['main-floor'], x: 0.68, art: 'crate', accent: '#facc15',
+    labelKey: 'hideout.prop.lucky-chest.label',
+    lineKeys: ['hideout.prop.lucky-chest.line.1', 'hideout.prop.lucky-chest.line.2'],
+    cooldown: 0,
+    action: { kind: 'chest' },
   },
   {
     id: 'sky-spyglass', roomIds: ['rooftop-perch'], x: 0.4, art: 'scope', accent: '#fbbf24',
