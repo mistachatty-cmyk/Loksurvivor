@@ -84,3 +84,30 @@ Close on outside click, Escape, or screen change. Only one popover open at a tim
 - Copy: add strings to `src/locales/en.json` only (see Localization). Do not use
   the prohibited word from CLAUDE.md in any name, id, class, or comment.
 - Bump `changelog.ts` and regenerate `public/lok-updates.json`.
+
+## Revision (owner direction, same day) -- supersedes the P1/P2 placement above
+
+The soundbar's standard stays exactly as is: closed (round icon) and open
+(title + previous / shuffle / play / next). The volume bar and everything else
+are a third, opt-in tier. Nothing new is visible by default.
+
+Reveal order: closed icon -> click -> open bar (unchanged) -> click "more" -> panel.
+
+How to expand without increasing the bar's profile:
+- The panel is an overlay, never in flow. It is portalled to `document.body`,
+  `position: fixed`, placed from the anchor's `getBoundingClientRect()`, so the
+  bar's width and height never change and parent `overflow` (the hub's inline
+  placement) cannot clip it. Opens downward for top-left, upward for bottom-right,
+  and flips if it would leave the viewport. Match `z-[100]` of the bar.
+- The only change to the open bar is one small "more" chevron button. The title is
+  already `flex-1 truncate`, so the chevron takes ~28px from the title, not from
+  the bar: outer width stays within the existing `max-w-[min(18rem,...)]`.
+- The volume slider lives in the panel's first row, not on the bar. The
+  mute/volume icon is the panel's first control. Panel width ~ the bar's width.
+- Animation: panel scales/fades from the chevron (origin at the anchor, 150ms);
+  rows stagger in 30ms apart; chevron rotates 180deg. Reduced motion: no animation.
+- Closing the bar (collapse icon), Escape, outside click or a screen change also
+  closes the panel. The panel's open state is NOT persisted: a fresh load starts
+  at the standard closed bar.
+- The closed (collapsed) state keeps zero extra controls; the no-track state is
+  unchanged.
