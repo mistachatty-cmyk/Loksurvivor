@@ -215,6 +215,7 @@
   "hideout.life.item.bond": "より緊密な絆",
   "hideout.life.found": "見つかりました: {{items}}",
   "hideout.life.usedToday": "今日はすでに完了しました。明日戻ってきます。",
+  "hideout.life.capped": "今日はポケットがいっぱいです。明日もう一度試してください。",
   "hideout.life.useProp": "{{label}}を使用する",
   "hideout.life.eventChip": "何か問題がある",
   "hideout.life.eventChipAria": "近くで何かが起こっています。タップしてご覧ください。",

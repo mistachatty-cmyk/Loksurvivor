@@ -215,6 +215,7 @@
   "hideout.life.item.bond": "vínculo más cercano",
   "hideout.life.found": "Encontrado: {{items}}",
   "hideout.life.usedToday": "Ya hecho hoy. Volveremos mañana.",
+  "hideout.life.capped": "Tus bolsillos están llenos por hoy. Inténtalo de nuevo mañana.",
   "hideout.life.useProp": "Utilice {{label}}",
   "hideout.life.eventChip": "algo pasa",
   "hideout.life.eventChipAria": "Algo está pasando cerca. Toca para ver.",

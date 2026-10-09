@@ -215,6 +215,7 @@
   "hideout.life.item.bond": "更接近的债券",
   "hideout.life.found": "发现: {{items}}",
   "hideout.life.usedToday": "今天已经做完了 明天再来",
+  "hideout.life.capped": "今天你的口袋已经满了。明天再试一次。",
   "hideout.life.useProp": "使用 {{label}}",
   "hideout.life.eventChip": "有事发生",
   "hideout.life.eventChipAria": "附近有事发生 拍击看。",
