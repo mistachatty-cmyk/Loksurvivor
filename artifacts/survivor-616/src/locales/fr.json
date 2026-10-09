@@ -215,6 +215,7 @@
   "hideout.life.item.bond": "lien plus étroit",
   "hideout.life.found": "Trouvé : {{items}}",
   "hideout.life.usedToday": "Déjà fait aujourd'hui. De retour demain.",
+  "hub.resource.morale": "Moral de l'équipage",
   "hideout.life.capped": "Vos poches sont pleines pour aujourd'hui. Réessayez demain.",
   "hideout.life.useProp": "Utiliser {{label}}",
   "hideout.life.eventChip": "Quelque chose se passe",
