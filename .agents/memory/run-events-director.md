@@ -3,7 +3,7 @@ name: Run events (Director) contract
 description: How seeded run beats (supply drop, rush-hour stampede) are scheduled, unlocked, simulated, drawn and counted. Read before adding a beat.
 ---
 
-Built v0.22.5, step 1 of `docs/EVENTS_AND_INTERACTIONS_PLAN.md`.
+Built v0.23.2, step 1 of `docs/EVENTS_AND_INTERACTIONS_PLAN.md`.
 
 - `data/runEvents.ts`: `RUN_EVENTS` records + `scheduleRunEvents(seed, mapsCleared, disabled)`.
   Seeded with `quirkHash`, never `w.rng`. Count = 0 below 2 maps, then +1 per 3 maps (max 4);
@@ -21,25 +21,25 @@ Built v0.22.5, step 1 of `docs/EVENTS_AND_INTERACTIONS_PLAN.md`.
 - Counted in `meta.runEventsSurvived` (id -> count) from `RunResult.runEventsSurvived`; achievements
   `moment-first / 10 / 50 / both`.
 
-## Added v0.22.6
+## Added v0.23.3
 Settings > Run events (`state/runEventSetting.ts`, device-local list of switched-off ids, passed as
 `disabledIds`). Warning text doubles as the first-time hint. `magnet-coil` pickup (`World.magnetUntil`,
 12s, x4 pull radius for xp/cred/coin/health only so chests are not dragged in), included in the supply drop.
 Beat names in Settings come from `RUN_EVENTS[].name` (English, not in `en.json`).
 
-## Added v0.22.7: Tremor
+## Added v0.23.4: Tremor
 `tremorPulse` (world.ts): 4 pulses 700ms apart, radius 420, shoves non-boss enemies (`kx/ky`, scaled by
 1/mass) and movable breakables, staggers via `contactReadyAt`. Deals NO damage on purpose so it cannot
 create kills/XP/loot (impact-physics.md). Pays one heart at the epicenter when it ends. Needs 6 maps.
 
-## Added v0.23.0: Block party
+## Added v0.23.7: Block party
 Needs 8 maps. A 130px ring near the player; while inside, `rootglassUntil` is kept topped up and HP
 trickles back (1% max HP/s). `zoneMs` counts time inside (via `lastAt`); at 6s or more the end pays
 cred + a magnet coil, otherwise nothing. Host line uses the first rescued ally if any.
 Known unrelated flake: `quickFight.test.ts` "a fainted lead sends in a teammate" fails ~1 in 8 runs on
 the base branch too.
 
-## Added v0.23.1: Blackout and Relay storm (all planned beats now exist)
+## Added v0.23.8: Blackout and Relay storm (all planned beats now exist)
 - Blackout (10 maps): `drawBlackout` (draw.ts) darkens everything but a pool around the screen centre
   (the camera follows the player); 5 stalkers spawn at the active start; always pays cred, plus a prism
   quartz if `p.lastDamageAt < re.phaseAt` (untouched).

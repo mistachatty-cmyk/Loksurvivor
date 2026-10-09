@@ -1026,7 +1026,84 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.22.4',
     date: '2026-10-09',
+    publishedAt: '2026-10-09T21:00:00Z',
+    kind: 'update',
+    title: 'Light Spurs',
+    body: [
+      'Every few hours a Light Spur can streak across the sky over a place where Digi enemies are moving all wrong. Look through the rooftop Sky Spyglass while one is up and that place is revealed and unlocked.',
+      'Only places you have not opened yet can show a spur.',
+    ],
+  },
+  {
+    version: '0.22.5',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T22:00:00Z',
+    kind: 'update',
+    title: 'Street Life',
+    body: [
+      'The hideout street now has visitors. A llama trots across, a runner sprints past, a courier jogs by, and a tiny Digi mite skitters in that you can tap to squash. Your LokPets react in their own way: adoring, laughing, startled or curious.',
+      'Small things now turn up on the ground. Walk over one to pick it up. Ringing the bell calls a visitor over.',
+      'Three new LokPet emotes: adore, scared and laugh. A few text fixes too: the streak, chest, sky and shop lines now fill in their numbers and names.',
+    ],
+  },
+  {
+    version: '0.22.6',
+    date: '2026-10-09',
     publishedAt: '2026-10-09T23:00:00Z',
+    kind: 'update',
+    title: 'Events That Matter',
+    body: [
+      'Nine hideout events that used to end with nothing now leave you a story and an event boost: a lift to one stat paired with a cost to another, for an hour. The result tells you exactly what you got and what it costs.',
+      'Only one event boost runs at a time and a new one replaces the old. The running boost shows in the Resources panel.',
+    ],
+  },
+  {
+    version: '0.22.7',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:30:00Z',
+    kind: 'update',
+    title: 'Volume On The Soundbar',
+    body: [
+      'Open the music bar and tap the small arrow to reveal volume, seek, shuffle, repeat and speed. The panel floats over the screen, so the bar itself stays the same size, and it stays hidden until you ask for it.',
+      'Your volume and mute choice are now remembered between visits.',
+    ],
+  },
+  {
+    version: '0.22.8',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:00Z',
+    kind: 'update',
+    title: 'A Clearer Photosensitivity Warning',
+    body: [
+      'The warning before you enter the hideout now spells out what can trigger a reaction (strobing flashes, bright bursts, screen shake), the symptoms that mean you should stop playing, and a few ways to play more safely.',
+    ],
+  },
+  {
+    version: '0.22.9',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:30Z',
+    kind: 'update',
+    title: 'More Jobs On The Board',
+    body: [
+      'The Broadcast Board now posts three extra rotating side jobs each day: hunt a specific street enemy, reach a level in one run, crack open crates, earn Cred, clear a named district, or spot map finds.',
+      'Every side job is doable from a fresh save and tracks automatically across your runs.',
+    ],
+  },
+  {
+    version: '0.23.0',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:45Z',
+    kind: 'update',
+    title: 'The Board Gets Weird',
+    body: [
+      'Side jobs now have local flavor: Bait Shop After Dark, Lost Dog, Found Teeth, Winter Pothole Revenge, Meijer Cart Roulette and more.',
+      'New job: the Raccoon Scrap Union wants relic crafting scraps hauled across your runs.',
+    ],
+  },
+  {
+    version: '0.23.1',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:10:00Z',
     kind: 'update',
     title: 'The hideout, painted',
     body: [
@@ -1036,9 +1113,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.22.5',
-    date: '2026-10-09',
-    publishedAt: '2026-10-09T23:59:00Z',
+    version: '0.23.2',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:20:00Z',
     kind: 'update',
     title: 'Things happen now',
     body: [
@@ -1047,7 +1124,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.22.6',
+    version: '0.23.3',
     date: '2026-10-10',
     publishedAt: '2026-10-10T00:30:00Z',
     kind: 'update',
@@ -1058,9 +1135,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.22.7',
+    version: '0.23.4',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T01:00:00Z',
+    publishedAt: '2026-10-10T00:40:00Z',
     kind: 'update',
     title: 'The ground shakes',
     body: [
@@ -1069,9 +1146,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.22.8',
+    version: '0.23.5',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T02:00:00Z',
+    publishedAt: '2026-10-10T00:50:00Z',
     kind: 'update',
     title: 'Dash and a Controls page',
     body: [
@@ -1081,9 +1158,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.22.9',
+    version: '0.23.6',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T03:00:00Z',
+    publishedAt: '2026-10-10T01:00:00Z',
     kind: 'update',
     title: 'Call the crew',
     body: [
@@ -1093,9 +1170,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.23.0',
+    version: '0.23.7',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T04:00:00Z',
+    publishedAt: '2026-10-10T01:10:00Z',
     kind: 'update',
     title: 'Block party',
     body: [
@@ -1104,9 +1181,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.23.1',
+    version: '0.23.8',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T05:00:00Z',
+    publishedAt: '2026-10-10T01:20:00Z',
     kind: 'update',
     title: 'Blackout, static and hideout stories',
     body: [

@@ -3,7 +3,7 @@ name: Controls page and PC dash
 description: Where player controls live (rebindable keys, controller, touch), how dash is triggered from each input, and the rules that keep rebinding safe.
 ---
 
-Built v0.22.8.
+Built v0.23.5.
 
 - `game/input/controls.ts` is the single source: `ControlSettings` (keys, mouse, gamepad, touch), pure
   helpers (`normalizeControls`, `rebindKey/Button` with swap-on-clash, `stickVector`, `padMove`,

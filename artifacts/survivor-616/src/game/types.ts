@@ -391,7 +391,24 @@ export interface CompletedObjective {
   rewardTokens: number;
 }
 
-export type DailyContractKind = 'clear-area' | 'kill-any' | 'survive-sec';
+export type DailyContractKind =
+  | 'clear-area'
+  | 'kill-any'
+  | 'survive-sec'
+  /** Defeat `targetCount` of the enemy named by `targetId`, across runs. */
+  | 'kill-enemy'
+  /** Reach level `targetCount` within a single run. */
+  | 'reach-level'
+  /** Open `targetCount` loot boxes across runs. */
+  | 'open-chests'
+  /** Earn `targetCount` Cred in runs (before contract pay). */
+  | 'earn-cred'
+  /** Clear the district named by `targetId`. */
+  | 'clear-district'
+  /** Find `targetCount` map finds across runs. */
+  | 'map-finds'
+  /** Gather `targetCount` relic crafting materials across runs. */
+  | 'scrap-haul';
 
 export interface DailyContractDef {
   id: string;
@@ -399,6 +416,8 @@ export interface DailyContractDef {
   description: string;
   kind: DailyContractKind;
   targetCount: number;
+  /** Enemy id (`kill-enemy`) or area id (`clear-district`) the job is about. */
+  targetId?: string;
   rewardCred: number;
   rewardTokens: number;
   /** Rare-currency payout; 0 for the three standard jobs, nonzero for the optional wildcard. */
@@ -2373,6 +2392,10 @@ export interface MetaState {
   /** A started sky boost from the spyglass (`data/skyEvents.ts`). */
   /** Whether the player owns the hideout Ball (sold in the LokShop; `data/hideoutBall.ts`). */
   ownsBall: boolean;
+  /** The buff a hideout event left behind (`data/eventBuffs.ts`). */
+  eventBuff: { buffId: string; until: number } | null;
+  /** Places revealed by following a Light Spur in the spyglass (`data/lightSpurs.ts`). */
+  spurAreaIds: string[];
   skyBoost: { eventId: string; until: number; window: number } | null;
   bestRunStreak: number;
   /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */

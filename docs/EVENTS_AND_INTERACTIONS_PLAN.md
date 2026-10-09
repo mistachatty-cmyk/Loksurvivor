@@ -1,6 +1,6 @@
 # Events, crew interactions, specials, resources and physics — plan
 
-Status: **plan; shipped so far: Event Director + Supply drop + Rush-hour (v0.22.5), Magnet coil, Tremor (v0.22.7), crew call-ins (v0.22.9), Block party (v0.23.0), Blackout + Relay storm + 5 hideout choice events (v0.23.1), see `.agents/memory/run-events-director.md`. Everything else is unbuilt.** Drafted 2026-10-09 from a "make events
+Status: **plan; shipped so far: Event Director + Supply drop + Rush-hour (v0.23.2), Magnet coil, Tremor (v0.23.4), crew call-ins (v0.23.6), Block party (v0.23.7), Blackout + Relay storm + 5 hideout choice events (v0.23.8), see `.agents/memory/run-events-director.md`. Everything else is unbuilt.** Drafted 2026-10-09 from a "make events
 and things that happen feel alive" request. Every item respects the existing
 contracts; read the linked notes before building one.
 
@@ -195,7 +195,7 @@ cause, and use `beacon` / `pulse` / `relay` / `static` wording per the naming ru
 `achievements.test.ts` already checks unique ids, positive rewards and a zero-state
 save; extend it to cover each new counter's default.
 
-## 9. Review of the recent additions (hideout scenery + melody, v0.22.4)
+## 9. Review of the recent additions (hideout scenery + melody, v0.23.1)
 
 Checked after the build: typecheck and all 882 tests pass; no naming-rule words in
 new files; reduced motion renders a still frame. Follow-ups worth doing:

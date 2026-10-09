@@ -184,7 +184,7 @@ function drawGround(ctx: CanvasRenderingContext2D, w: World, left: number, top: 
         ctx.fillRect(x, y, tile, tile);
         ctx.globalAlpha = 1;
       }
-      if (noise > 0.93) {
+      if (noise > 0.93 && w.graphicsQuality !== 'performance') {
         ctx.fillStyle = ground.glow;
         ctx.globalAlpha = 0.3;
         const px = x + 10 + noise * 18;
@@ -237,6 +237,9 @@ function drawAuthoredGroundTiles(ctx: CanvasRenderingContext2D, w: World) {
 
 /** Small, deterministic bits of city dressing that sit between the combat props. */
 function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  // Purely cosmetic (per the comment above) and an unconditional per-viewport-cell
+  // cost independent of enemy count -- skip entirely at the lowest quality tier.
+  if (w.graphicsQuality === 'performance') return;
   const endless = Boolean(w.area.endless);
   const dungeon = Boolean(w.endless?.inDungeon);
   const accent = groundAccent(w);
@@ -2734,9 +2737,10 @@ function drawObstacles(
   }
 }
 
-function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
+function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds) {
+  const LIGHT_MARGIN = 280;
   for (const prop of w.breakables) {
-    if (prop.broken || !prop.chainActive || prop.landedHeatActive || (!prop.vx && !prop.vy)) continue;
+    if (prop.broken || !prop.chainActive || prop.landedHeatActive || (!prop.vx && !prop.vy) || !isNearView(prop.x, prop.y, bounds, LIGHT_MARGIN)) continue;
     const speed = Math.hypot(prop.vx, prop.vy);
     const pulse = 0.4 + Math.sin(w.now / 92) * 0.12;
     const radius = Math.max(prop.w, prop.h) * 0.62 + clamp(speed / 60, 0, 1) * 12;
@@ -2753,7 +2757,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.restore();
   }
   for (const prop of w.breakables) {
-    if (prop.broken || !prop.landedHeatActive) continue;
+    if (prop.broken || !prop.landedHeatActive || !isNearView(prop.x, prop.y, bounds, LIGHT_MARGIN)) continue;
     const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
     const radius = LANDED_HEAT_RADIUS + Math.sin(w.now / 72) * 10;
     const gradient = ctx.createRadialGradient(prop.x, prop.y, 5, prop.x, prop.y, radius);
@@ -2814,7 +2818,12 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.save(); ctx.globalAlpha = Math.max(0, fade) * 0.32; ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind));
+  // The main always-on cost in this function: every unbroken lamp/barrel/sign
+  // feeds both this glow loop and the shadow caster below, with no camera
+  // check previously -- an off-screen light still paid for a fresh gradient
+  // every frame. Cull to the viewport the same way the enemy/breakable sprite
+  // passes already do.
+  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind) && isNearView(b.x, b.y, bounds, LIGHT_MARGIN));
   let dynamicCount = 0;
   for (const b of sources) {
     const isBarrel = b.kind === 'barrel';
@@ -2857,12 +2866,19 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   // Rebuild hard-edged occlusion every frame. The two rear-most corners of
   // each nearby obstacle are projected away from the moving light source, so
   // shadows rotate, stretch, and vanish immediately when a breakable breaks.
-  const shadowSources = sources.slice(0, 5);
-  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind));
+  // Unconditional in an ordinary lamp-lit street scene this is a real,
+  // enemy-count-independent canvas-state cost (save/polygon-fill/stroke per
+  // nearby source/object pair) -- gate it the same way drawEffects/
+  // drawParticles already gate their own per-frame work by graphicsQuality.
+  const shadowCasterRange = w.graphicsQuality === 'performance' ? 0 : w.graphicsQuality === 'balanced' ? 160 : 260;
+  const shadowSources = shadowCasterRange > 0 ? sources.slice(0, w.graphicsQuality === 'balanced' ? 3 : 5) : [];
+  const shadowObjects = shadowCasterRange > 0
+    ? w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind) && isNearView(b.x, b.y, bounds, LIGHT_MARGIN))
+    : [];
   for (const source of shadowSources) {
     for (const object of shadowObjects) {
       const distance = Math.hypot(object.x - source.x, object.y - source.y);
-      if (distance > 260) continue;
+      if (distance > shadowCasterRange) continue;
       const corners = [
         { x: object.x - object.w / 2, y: object.y - object.h / 2 },
         { x: object.x + object.w / 2, y: object.y - object.h / 2 },
@@ -6835,7 +6851,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     drawLightPool(ctx, w);
     drawLandmark(ctx, w);
     drawDistrictIncursion(ctx, w);
-    drawObjectLighting(ctx, w);
+    drawObjectLighting(ctx, w, viewBounds);
     if (sky !== 'roofed') {
       drawSteamVents(ctx, w, left, top, right, bottom);
       if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);

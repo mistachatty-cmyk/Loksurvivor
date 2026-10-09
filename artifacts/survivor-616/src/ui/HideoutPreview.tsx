@@ -74,6 +74,25 @@ import {
   type Racer,
 } from '@/game/engine/hideoutBall';
 import { drawSceneryBack, drawSceneryFront, dustColorFor } from '@/ui/hideoutScenery';
+import { AMBIENT_PICKUPS_BY_ID, AMBIENT_TIMING, AMBIENT_VISITORS_BY_ID } from '@/game/data/hideoutAmbient';
+import {
+  nextPickupAt,
+  nextVisitorAt,
+  petsToReact,
+  pickVisitor,
+  pickupDef,
+  pickupExpired,
+  pickupWithinReach,
+  reactionFor,
+  spawnPickup,
+  spawnVisitor,
+  squashActor,
+  squashProgress,
+  stepActor,
+  type AmbientActor,
+  type AmbientPickup,
+} from '@/game/engine/hideoutAmbient';
+import { drawPickup, drawVisitor } from '@/ui/hideoutAmbientArt';
 import { drawProp, PROP_HALF_WIDTH_UNITS, PROP_HEIGHT_UNITS } from '@/ui/hideoutPropArt';
 import { drawRig } from '@/game/render/sprite';
 import { hideoutNoticeMs } from '@/game/state/hideoutNoticeSetting';
@@ -166,6 +185,10 @@ export interface HideoutPreviewProps {
   onEventChip?: () => void;
   /** The ball lying in the room, if the player put it out. The UI theme decides how a throw feels. */
   ball?: { present: boolean; themeId: string };
+  /** A new value calls a visitor now (the bell). */
+  summonSeq?: number;
+  /** The operator picked something up off the ground. Return false to leave it there (nothing was paid). */
+  onPickup?: (kindId: string, seed: number) => boolean | void;
 }
 
 const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
@@ -176,6 +199,9 @@ const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
   bang: '!',
   drop: '•',
   star: '★',
+  adore: '♡',
+  scared: '!?',
+  laugh: '^^',
 };
 
 interface Spark { x: number; y: number; vx: number; vy: number; born: number; life: number; color: string }
@@ -187,7 +213,7 @@ export function HideoutPreview({
   rig, palette, height = 176, className = '', pets = [], weather = 'clear', biome = 'sanctum', accent = '#f59e0b', eventsMode = 'on',
   onPetCare, onPetEvent, firstEventDelayMs = 9000,
   props: roomProps = [], interactive = false, keyboardActive = true, cue, notice,
-  onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip, ball: ballProp,
+  onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip, ball: ballProp, summonSeq, onPickup,
 }: HideoutPreviewProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -199,11 +225,11 @@ export function HideoutPreview({
   // unchanged, so everything else reaches it through this ref instead of restarting it.
   const live = useRef({
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, biome, accent,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent,
   });
   live.current = {
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, biome, accent,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent,
   };
 
   // Keyed on `seq` so a parent re-render that rebuilds the object does not restart the toast.
@@ -283,6 +309,21 @@ export function HideoutPreview({
     let ball: BallState | null = null;
     let winnerFx: { id: string; x: number; lift: number } | null = null;
     let lastStage = '';
+    // Ambient life: visitors crossing the strip, and things lying on the ground.
+    const actors: AmbientActor[] = [];
+    const pickups: AmbientPickup[] = [];
+    let uid = 0;
+    const blockedPickups = new Set<number>();
+    let lastVisitorKind: string | null = null;
+    let nextVisitor = AMBIENT_TIMING.firstVisitorMs;
+    let nextPickup = AMBIENT_TIMING.firstPickupMs;
+    let lastSummon = live.current.summonSeq ?? 0;
+    const callVisitor = (now: number, r: { min: number; max: number }) => {
+      const def = pickVisitor(rng, lastVisitorKind);
+      lastVisitorKind = def.id;
+      actors.push(spawnVisitor(uid += 1, def, r, rng, now));
+      setToast({ key: Date.now(), title: t('hideout.ambient.title'), line: t(def.lineKey as never) });
+    };
     // Props are about 32 units tall; one unit is this many pixels on a strip of this height.
     const propUnit = cssH * 0.0105;
     const reachPx = unit * 0.6;
@@ -452,6 +493,53 @@ export function HideoutPreview({
         }
       }
 
+      // Ambient life: visitors cross, pets react, the mite can be squashed, things turn up on the ground.
+      if (!reduceMotion) {
+        const summon = settings.summonSeq ?? 0;
+        if (summon !== lastSummon) {
+          lastSummon = summon;
+          callVisitor(now, r);
+        }
+        if (settings.eventsMode !== 'off') {
+          const slow = settings.eventsMode === 'quiet' ? 3 : 1;
+          if (now >= nextVisitor) {
+            callVisitor(now, r);
+            nextVisitor = nextVisitorAt(now, rng) + (slow - 1) * 40_000;
+          }
+          if (now >= nextPickup && pickups.length < AMBIENT_TIMING.maxPickups) {
+            pickups.push(spawnPickup(uid += 1, r, rng, now));
+            nextPickup = nextPickupAt(now, rng) + (slow - 1) * 20_000;
+          }
+        }
+        for (let i = actors.length - 1; i >= 0; i -= 1) {
+          const actor = actors[i]!;
+          if (stepActor(actor, dt, now, r)) { actors.splice(i, 1); continue; }
+          const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
+          if (!def) continue;
+          const placed = wanted.flatMap((info) => { const s = states.get(info.id); return s ? [{ id: info.id, x: s.x }] : []; });
+          for (const petId of petsToReact(actor, placed, unit)) {
+            const state = states.get(petId);
+            if (!state) continue;
+            const reaction = reactionFor(def, state.temperamentId);
+            startMove(state, reaction.move, now, 900);
+            setEmote(state, reaction.emote, now, 1700);
+          }
+        }
+        for (let i = pickups.length - 1; i >= 0; i -= 1) {
+          const pick = pickups[i]!;
+          if (pickupExpired(pick, now)) { pickups.splice(i, 1); continue; }
+          const inReach = pickupWithinReach([pick], operator.x, unit) !== undefined;
+          if (!inReach) blockedPickups.delete(pick.uid);
+          if (inReach && !blockedPickups.has(pick.uid) && pickupDef(pick)) {
+            const accepted = settings.onPickup?.(pick.kindId, Math.floor(rng() * 0x7fffffff));
+            // Nothing was paid (the daily limits): leave it until the operator walks away and back.
+            if (accepted === false) { blockedPickups.add(pick.uid); continue; }
+            burst(pick.x, groundY - 10, pickupDef(pick)!.color, 6, now);
+            pickups.splice(i, 1);
+          }
+        }
+      }
+
       // A play move from the parent (scratch, fetch, nap together...).
       const cueNow = settings.cue;
       if (cueNow && cueNow.seq !== lastCueSeq) {
@@ -529,6 +617,16 @@ export function HideoutPreview({
         }
         const gap = (settings.eventsMode === 'quiet' ? 3 : 1) * (played ? 16000 + rng() * 18000 : 7000);
         nextEventAt = now + gap;
+      }
+
+      // Things on the ground and visitors, behind the pets.
+      for (const pick of pickups) {
+        const def = pickupDef(pick);
+        if (def) drawPickup(ctx, def, pick.x, groundY, now, (now - pick.born) / AMBIENT_TIMING.pickupLifeMs);
+      }
+      for (const actor of actors) {
+        const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
+        if (def) drawVisitor(ctx, { def, x: actor.x, groundY, h: cssH * def.size * 0.6, dir: actor.dir, now, squash: squashProgress(actor, now) });
       }
 
       // Rain: ripples on the ground.
@@ -671,6 +769,24 @@ export function HideoutPreview({
     const handleTap = (px: number, py: number) => {
       const now = performance.now() - start;
       const settings = live.current;
+      if (!reduceMotion) {
+        for (const actor of actors) {
+          const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
+          if (!def?.squashable) continue;
+          const half = Math.max(16, cssH * def.size * 0.6 * 0.7);
+          if (Math.abs(px - actor.x) <= half && py >= groundY - half - 8 && py <= groundY + 10 && squashActor(actor, now)) {
+            burst(actor.x, groundY - 6, def.accent, 8, now);
+            setToast({ key: Date.now(), title: t('hideout.ambient.title'), line: t('hideout.ambient.squash') });
+            return;
+          }
+        }
+        const tapped = pickups.find((pick) => Math.abs(px - pick.x) <= 16 && py >= groundY - 26 && py <= groundY + 10);
+        if (tapped && settings.interactive) {
+          pendingProp = null;
+          setGoal(operator, control, tapped.x, now, range(), false);
+          return;
+        }
+      }
       const wanted = settings.pets.slice(0, MAX_PETS);
       let hit: HideoutPetInfo | undefined;
       let hitState: HideoutPetState | undefined;

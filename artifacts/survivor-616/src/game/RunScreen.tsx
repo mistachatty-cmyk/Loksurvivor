@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { beatBus, SILENT_FRAME } from '@/game/audio/beatBus';
 import { useMusicPlayer } from '@/game/audio/musicPlayer';
 import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
+import { runPowerScale } from '@/game/engine/petExpCurve';
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
@@ -442,7 +443,15 @@ export function RunScreen({
         hatStyle: getHatStyle(meta.activeHatId),
         paletteEffect: prefersReducedMotion || !meta.paletteAnimationsEnabled ? undefined : getThemePalette(meta.activePaletteId)?.effect,
         rescueAllyId,
-        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0)).map((pet) => ({ ...pet.roll, level: pet.level ?? 1, ...(pet.evolutionPath ? { evolutionBranchId: pet.evolutionPath.branchId } : {}) })),
+        startingLokPets: meta.savedLokPets.filter((pet) => meta.selectedLokPetIds.includes(pet.id) && (pet.starter || pet.stamina > 0)).map((pet) => {
+          const scale = runPowerScale(pet.level ?? 1, pet.starter);
+          return {
+            ...pet.roll,
+            stats: { ...pet.roll.stats, health: Math.round(pet.roll.stats.health * scale), damage: Math.round(pet.roll.stats.damage * scale) },
+            level: pet.level ?? 1,
+            ...(pet.evolutionPath ? { evolutionBranchId: pet.evolutionPath.branchId } : {}),
+          };
+        }),
         modifiers: meta.runModifiers,
         graphicsQuality: meta.graphicsQuality,
         dropStyle: getDropStyle(meta.activeDropPackId),

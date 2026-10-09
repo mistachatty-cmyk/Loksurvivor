@@ -16,6 +16,7 @@ import { useSfxPlayer } from '@/game/audio/useSfxPlayer';
 import { getActiveSoundPackStyle } from '@/game/data/soundPacks';
 import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
 import { ELEMENT_METADATA, getCardVariableProfile } from '@/game/data/cardVariables';
+import { enemyBattleElement } from '@/game/data/lokPetBattles';
 import { resolveCharacterCosmeticPalette } from '@/game/data/characterSkins';
 import { lokPetRig, lokPetSpritePalette } from '@/game/data/lokPets';
 import { DEFAULT_PALETTE_ID, getActivePalette } from '@/game/data/themedPalettes';
@@ -144,12 +145,11 @@ export function EncounterFightOverlay({ style, opponent, rng, label, onClose }: 
   );
 
   const [fight, setFight] = useState<QuickFightState>(() => {
-    // Street enemies have no element of their own; the card system gives them one.
+    // Street enemies derive their element from their own role/family/faction,
+    // not a hash of their name -- so two enemies with the same role always
+    // fight the same elemental way, and different roles read as different fights.
     const enemyElement: LokPetElement = opponent.kind === 'enemy'
-      ? (getCardVariableProfile(
-          CARD_MANIFESTS_BY_ID[`lok.survivor-616.card.threat-${opponent.enemyId}`] ||
-            ({ id: opponent.enemyId, name: opponent.name } as never),
-        ).element as LokPetElement)
+      ? enemyBattleElement({ role: opponent.enemyRole, family: opponent.enemyFamily, faction: opponent.enemyFaction })
       : 'none';
     return createQuickFight({ playerPets: team, maxTeam: canSwitch ? team.length : 1, opponent, enemyElement, depth: isArena ? 'deep' : 'quick' });
   });

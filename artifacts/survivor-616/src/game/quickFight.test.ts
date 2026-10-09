@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BATTLE_MOVES } from './data/lokPetBattles';
+import { BATTLE_MOVES, enemyBattleElement } from './data/lokPetBattles';
 import { rollLokPet } from './data/lokPets';
 import { ENEMIES_BY_ID } from './data/enemies';
 import { moveMatchup, statusChips, describeIntent } from './engine/battleClarity';
@@ -8,6 +8,7 @@ import {
   ASSIST_SCALE,
   DEEP_TURN_CAP,
   QUICK_MAX_MOVES,
+  buildQuickOpponent,
   cheerQuickFight,
   QUICK_TURN_CAP,
   createQuickFight,
@@ -24,6 +25,10 @@ import type { SavedLokPet } from './types';
 function enemyOpponent(): ResolvedTravelEncounterOpponent {
   const enemy = Object.values(ENEMIES_BY_ID)[0]!;
   return { kind: 'enemy', name: enemy.name, hp: enemy.hp, damage: enemy.damage, rig: enemy.rig, palette: enemy.palette, enemyId: enemy.id };
+}
+
+function enemyOpponentWithRole(role: ResolvedTravelEncounterOpponent['enemyRole']): ResolvedTravelEncounterOpponent {
+  return { ...enemyOpponent(), enemyRole: role };
 }
 
 function petOpponent(): ResolvedTravelEncounterOpponent {
@@ -127,6 +132,22 @@ test('stepping a finished fight does nothing', () => {
   let qf = createQuickFight({ opponent: enemyOpponent() });
   while (quickFightOutcome(qf) === 'active') qf = stepQuickFight(qf, qf.battle.playerTeam[0]!.moves[0]!.id);
   assert.equal(stepQuickFight(qf, qf.battle.playerTeam[0]!.moves[0]!.id), qf);
+});
+
+test('street enemies with different roles fight differently, not just with different numbers', () => {
+  const sniper = enemyOpponentWithRole('sniper');
+  const heavy = enemyOpponentWithRole('heavy');
+  // Same hp/damage on both -- any difference below comes from role, not stats.
+  const sniperPet = buildQuickOpponent(sniper, 10, enemyBattleElement({ role: sniper.enemyRole }));
+  const heavyPet = buildQuickOpponent(heavy, 10, enemyBattleElement({ role: heavy.enemyRole }));
+  assert.notEqual(sniperPet.element, heavyPet.element);
+  assert.notEqual(sniperPet.moves.map((m) => m.id).join(','), heavyPet.moves.map((m) => m.id).join(','));
+});
+
+test('a street enemy with no role falls back to the old generic pool', () => {
+  const pet = buildQuickOpponent(enemyOpponent(), 10, 'none');
+  assert.equal(pet.element, 'none');
+  assert.ok(pet.moves.length > 0);
 });
 
 test('outcome rewards match the classic encounter rules', () => {

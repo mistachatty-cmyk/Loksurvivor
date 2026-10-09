@@ -3,7 +3,7 @@ name: Crew call-ins
 description: How rescued allies lend a hand mid-run (shared cooldown, rotation, effects reuse existing mechanics) and the design choices behind it.
 ---
 
-Built v0.22.9, step 3 of `docs/EVENTS_AND_INTERACTIONS_PLAN.md`.
+Built v0.23.6, step 3 of `docs/EVENTS_AND_INTERACTIONS_PLAN.md`.
 
 - Decision (the plan's open question): NO loadout slot. Every rescued ally with an entry in
   `data/crewCallIns.ts` joins `World.callIns.roster` in rescue order; each press calls the next one

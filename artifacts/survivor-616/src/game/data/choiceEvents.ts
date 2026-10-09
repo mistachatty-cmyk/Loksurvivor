@@ -24,6 +24,8 @@ export interface ChoiceOutcome {
   /** A rare find: bounded by the daily and per-item rare limits. */
   rare?: boolean;
   textKey: MessageKey;
+  /** Starts this event buff (`data/eventBuffs.ts`): a boost and a cost for an hour. */
+  buffId?: string;
   reward?: SmallReward;
   /** Paid instead when a rare outcome is refused by the limits. */
   fallback?: SmallReward;
@@ -69,7 +71,7 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'feed', labelKey: 'hideout.event.stray-at-the-door.c.feed',
         outcomes: [
           { id: '1', weight: 70, textKey: 'hideout.event.stray-at-the-door.o.feed.1', reward: { cred: 6 } },
-          { id: '2', weight: 27, textKey: 'hideout.event.stray-at-the-door.o.feed.2' },
+          { id: '2', weight: 27, textKey: 'hideout.event.stray-at-the-door.o.feed.2', buffId: 'warm-heart' },
           { id: '3', weight: 3, textKey: 'hideout.event.stray-at-the-door.o.feed.3', rare: true, reward: { lokPetTreats: 1 }, fallback: { cred: 6 } },
         ],
       },
@@ -97,7 +99,7 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'open', labelKey: 'hideout.event.dropped-satchel.c.open',
         outcomes: [
           { id: '1', weight: 60, textKey: 'hideout.event.dropped-satchel.o.open.1', reward: { cred: 8 } },
-          { id: '2', weight: 37, textKey: 'hideout.event.dropped-satchel.o.open.2' },
+          { id: '2', weight: 37, textKey: 'hideout.event.dropped-satchel.o.open.2', buffId: 'borrowed-luck' },
           { id: '3', weight: 3, textKey: 'hideout.event.dropped-satchel.o.open.3', rare: true, reward: { cardCredits: 2 }, fallback: { cred: 8 } },
         ],
       },
@@ -131,14 +133,14 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'request', labelKey: 'hideout.event.busker-on-the-corner.c.request',
         outcomes: [
           { id: '1', weight: 50, textKey: 'hideout.event.busker-on-the-corner.o.request.1', reward: { cred: 4 } },
-          { id: '2', weight: 50, textKey: 'hideout.event.busker-on-the-corner.o.request.2' },
+          { id: '2', weight: 50, textKey: 'hideout.event.busker-on-the-corner.o.request.2', buffId: 'quick-hands' },
         ],
       },
       {
         id: 'join', labelKey: 'hideout.event.busker-on-the-corner.c.join',
         outcomes: [
           { id: '1', weight: 60, textKey: 'hideout.event.busker-on-the-corner.o.join.1', reward: { cred: 6 } },
-          { id: '2', weight: 40, textKey: 'hideout.event.busker-on-the-corner.o.join.2' },
+          { id: '2', weight: 40, textKey: 'hideout.event.busker-on-the-corner.o.join.2', buffId: 'warm-heart' },
         ],
       },
     ],
@@ -152,7 +154,7 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'follow', labelKey: 'hideout.event.rooftop-flare.c.follow',
         outcomes: [
           { id: '1', weight: 60, textKey: 'hideout.event.rooftop-flare.o.follow.1', reward: { cred: 6 } },
-          { id: '2', weight: 37, textKey: 'hideout.event.rooftop-flare.o.follow.2' },
+          { id: '2', weight: 37, textKey: 'hideout.event.rooftop-flare.o.follow.2', buffId: 'sharp-eyes' },
           { id: '3', weight: 3, textKey: 'hideout.event.rooftop-flare.o.follow.3', rare: true, reward: { petElixirs: 1 }, fallback: { cred: 6 } },
         ],
       },
@@ -166,7 +168,7 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'wave', labelKey: 'hideout.event.rooftop-flare.c.wave',
         outcomes: [
           { id: '1', weight: 50, textKey: 'hideout.event.rooftop-flare.o.wave.1', reward: { cred: 5 } },
-          { id: '2', weight: 50, textKey: 'hideout.event.rooftop-flare.o.wave.2' },
+          { id: '2', weight: 50, textKey: 'hideout.event.rooftop-flare.o.wave.2', buffId: 'steady-breath' },
         ],
       },
     ],
@@ -186,7 +188,7 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'salute', labelKey: 'hideout.event.pigeon-census.c.salute',
         outcomes: [
           { id: '1', weight: 60, textKey: 'hideout.event.pigeon-census.o.salute.1', reward: { cred: 4 } },
-          { id: '2', weight: 40, textKey: 'hideout.event.pigeon-census.o.salute.2' },
+          { id: '2', weight: 40, textKey: 'hideout.event.pigeon-census.o.salute.2', buffId: 'thick-skin' },
         ],
       },
     ],
@@ -200,7 +202,7 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'patch', labelKey: 'hideout.event.leaking-pipe.c.patch',
         outcomes: [
           { id: '1', weight: 70, textKey: 'hideout.event.leaking-pipe.o.patch.1', reward: { cred: 6 } },
-          { id: '2', weight: 30, textKey: 'hideout.event.leaking-pipe.o.patch.2' },
+          { id: '2', weight: 30, textKey: 'hideout.event.leaking-pipe.o.patch.2', buffId: 'wide-swing' },
         ],
       },
       {
@@ -279,7 +281,7 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
         id: 'long', labelKey: 'hideout.event.long-way-round.c.long',
         outcomes: [
           { id: '1', weight: 60, textKey: 'hideout.event.long-way-round.o.long.1', reward: { cred: 4 } },
-          { id: '2', weight: 40, textKey: 'hideout.event.long-way-round.o.long.2' },
+          { id: '2', weight: 40, textKey: 'hideout.event.long-way-round.o.long.2', buffId: 'steady-breath' },
         ],
       },
       {
