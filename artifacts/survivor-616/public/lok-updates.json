@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 88,
+      "version": "0.22.4",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T21:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Light Spurs",
+      "body": [
+        "Every few hours a Light Spur can streak across the sky over a place where Digi enemies are moving all wrong. Look through the rooftop Sky Spyglass while one is up and that place is revealed and unlocked.",
+        "Only places you have not opened yet can show a spur."
+      ]
+    },
+    {
       "number": 87,
       "version": "0.22.3",
       "date": "2026-10-09",

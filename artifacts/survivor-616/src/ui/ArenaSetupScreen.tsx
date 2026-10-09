@@ -19,7 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { AREAS } from '@/game/data/areas';
 import { CHARACTERS } from '@/game/data/characters';
-import { isUnlocked, useMeta } from '@/game/state/metaStore';
+import { areaOpen, useMeta } from '@/game/state/metaStore';
 import type { AreaDef, CharacterDef } from '@/game/types';
 import { ARENA_MAX_PLAYERS, ARENA_MIN_PLAYERS, type ArenaSeat } from '@/game/arena/arenaWorld';
 import { createRoomCode, hostArenaRoom, type ArenaNetRole, type HostArenaRoom } from '@/game/arena/arenaNet';
@@ -46,7 +46,7 @@ export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupS
     [meta.unlockedCharacterIds, meta.devModeAllUnlocks],
   );
   const unlockedAreas = useMemo(
-    () => AREAS.filter((a) => isUnlocked(a.unlock, meta)),
+    () => AREAS.filter((a) => areaOpen(a, meta)),
     [meta],
   );
 

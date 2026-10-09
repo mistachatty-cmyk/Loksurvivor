@@ -98,6 +98,7 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { normalizeSpurAreaIds, spurAt } from '@/game/data/lightSpurs';
 import { openLuckyChest } from '@/game/engine/chestOpen';
 import { activeSkyBoost, applySkyStatBonus, normalizeSkyBoost, skyXpMultiplier, startSkyBoost } from '@/game/data/skyEvents';
 import { moraleMultiplier, nextMorale, nextStreak, normalizeMorale, normalizeStreak } from '@/game/data/morale';
@@ -324,6 +325,7 @@ export function createInitialMeta(): MetaState {
     runStreak: 0,
     skyBoost: null,
     ownsBall: false,
+    spurAreaIds: [],
     bestRunStreak: 0,
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
@@ -1326,6 +1328,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     runStreak: normalizeStreak(parsed.runStreak),
     skyBoost: normalizeSkyBoost(parsed.skyBoost),
     ownsBall: parsed.ownsBall === true,
+    spurAreaIds: normalizeSpurAreaIds(parsed.spurAreaIds),
     bestRunStreak: Math.max(normalizeStreak(parsed.bestRunStreak), normalizeStreak(parsed.runStreak)),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
@@ -1604,6 +1607,20 @@ export function isUnlocked(rule: UnlockRule | undefined | null, meta: MetaState)
     default:
       return false;
   }
+}
+
+/** Whether a place is open to the player: its own rule, or a Light Spur they followed. */
+export function areaOpen(area: AreaDef, meta: MetaState): boolean {
+  return isUnlocked(area.unlock, meta) || meta.spurAreaIds.includes(area.id);
+}
+
+/** The Light Spur showing at `now` for this player, or null. */
+export function spurShowing(meta: MetaState, now: number): AreaDef | null {
+  const lead = spurAt(now, (areaId) => {
+    const area = AREAS.find((a) => a.id === areaId);
+    return !area || areaOpen(area, meta);
+  });
+  return lead ? AREAS.find((a) => a.id === lead.areaId) ?? null : null;
 }
 
 export function describeUnlock(rule: UnlockRule): string {
@@ -3421,7 +3438,16 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
     case 'lookThroughSpyglass': {
       const boost = startSkyBoost(state.meta.skyBoost, action.now);
-      return boost ? { ...state, meta: { ...state.meta, skyBoost: boost } } : state;
+      const spur = spurShowing(state.meta, action.now);
+      if (!boost && !spur) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          skyBoost: boost ?? state.meta.skyBoost,
+          spurAreaIds: spur ? [...state.meta.spurAreaIds, spur.id] : state.meta.spurAreaIds,
+        },
+      };
     }
 
     case 'chooseLokPetBranch': {
@@ -4581,8 +4607,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     const { meta } = state;
     const unlockedCharacters = CHARACTERS.filter((c) => isUnlocked(c.unlock, meta));
     const lockedCharacters = CHARACTERS.filter((c) => !isUnlocked(c.unlock, meta));
-    const unlockedAreas = AREAS.filter((a) => isUnlocked(a.unlock, meta));
-    const lockedAreas = AREAS.filter((a) => !isUnlocked(a.unlock, meta));
+    const unlockedAreas = AREAS.filter((a) => areaOpen(a, meta));
+    const lockedAreas = AREAS.filter((a) => !areaOpen(a, meta));
     const unlockedRooms = HUB_ROOMS.filter((r) => isUnlocked(r.unlock, meta));
     const lockedRooms = HUB_ROOMS.filter((r) => !isUnlocked(r.unlock, meta));
     const rescuedAllies = ALLIES.filter((a) => meta.rescuedAllyIds.includes(a.id));
@@ -4971,7 +4997,7 @@ export function areaStatus(areaId: string, meta: MetaState) {
   const area = getArea(areaId);
   return {
     area,
-    unlocked: isUnlocked(area.unlock, meta),
+    unlocked: areaOpen(area, meta),
     cleared: meta.clearedAreaIds.includes(areaId),
   };
 }
