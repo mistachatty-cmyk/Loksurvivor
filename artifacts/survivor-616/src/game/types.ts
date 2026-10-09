@@ -1610,7 +1610,7 @@ export interface DirectorRunState {
 
 /** A one-shot meta-progression announcement, drained and shown by the hub on return. See `MetaState.pendingNotifications`. */
 /** A hideout panel a room tile or prop can open. */
-export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch';
+export type HubPanel = 'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'grpd-armory' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'threat-matrix' | 'director-terminal' | 'dust-mite-rancher' | 'frog-ranch' | 'lok-shop';
 
 /** Today's hideout payouts (local day), see `engine/hideoutRewards.ts`. */
 export interface HideoutLedger {

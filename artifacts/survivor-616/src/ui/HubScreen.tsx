@@ -106,6 +106,7 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   'threat-matrix': { icon: ShieldAlert, testId: 'button-open-threat-matrix' },
   'dust-mite-rancher': { icon: Bug, testId: 'button-open-dust-mite-rancher' },
   'frog-ranch': { icon: Zap, testId: 'button-open-frog-ranch' },
+  'lok-shop': { icon: Sparkles, testId: 'button-open-lok-shop' },
   'director-terminal': { icon: ScanEye, testId: 'button-open-director-terminal' },
 };
 
