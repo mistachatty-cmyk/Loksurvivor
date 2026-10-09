@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 85,
+      "version": "0.22.1",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T18:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Before You Play",
+      "body": [
+        "A seizure and photosensitivity warning now fades in between the title screen and the hideout, and fades out when you continue. Tick \"Don't show this again\" to skip it on later visits."
+      ]
+    },
+    {
       "number": 84,
       "version": "0.22.0",
       "date": "2026-10-09",
