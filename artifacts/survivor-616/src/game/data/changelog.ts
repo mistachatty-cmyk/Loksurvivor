@@ -1100,6 +1100,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New job: the Raccoon Scrap Union wants relic crafting scraps hauled across your runs.',
     ],
   },
+  {
+    version: '0.23.1',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:50Z',
+    kind: 'update',
+    title: 'Smoother Menus',
+    body: [
+      'Menus now slide in softly, buttons press down when tapped, and Escape takes you back from any screen.',
+      'Screen shake can be turned down or off, and it follows your device\'s reduced-motion setting.',
+      'Pinch-zoom works again, and back buttons stay clear of phone notches.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

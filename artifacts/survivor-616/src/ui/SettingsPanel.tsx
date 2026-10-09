@@ -47,7 +47,7 @@ import { vendorPurchaseCount } from '@/game/data/vendor';
 import { TiltReadout } from './TiltReadout';
 import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
-import { MotionSetting } from './MotionToggle';
+import { MotionSetting, ShakeSetting } from './MotionToggle';
 import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
@@ -450,6 +450,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           <section className="border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
+            <ShakeSetting />
           </section>
           <section id="settings-scrollbar" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Scrollbar</h2>

@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { activeUiThemeSwatchId, useMeta } from '@/game/state/metaStore';
 import { dismissVisitTheme, useVisitTheme, visitThemeStyle } from '@/lib/gsixVisitTheme';
 import { useT } from '@/lib/i18n';
+import { PANEL_TRANSITION } from '@/anim/motion';
 
 interface Props {
   title: string;
@@ -25,10 +26,25 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [title]);
 
+  // Escape goes back, unless a dialog or text field owns the key.
+  useEffect(() => {
+    if (!onBack) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const el = event.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      onBack();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onBack]);
+
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={PANEL_TRANSITION}
       style={visitTheme ? visitThemeStyle(visitTheme) : undefined}
       data-ui-theme={meta.uiTheme}
       data-ui-swatch={activeUiThemeSwatchId(meta)}
@@ -50,13 +66,13 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
         </div>
       )}
 
-      <header className={`relative z-30 px-6 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 ${onBack ? 'pt-20' : 'pt-10'}`}>
+      <header className={`relative z-30 px-6 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 ${onBack ? 'pt-[calc(5rem+var(--safe-top))]' : 'pt-[calc(2.5rem+var(--safe-top))]'}`}>
         <div>
           {onBack && (
             <button 
               type="button"
               onClick={onBack} 
-              className="group fixed left-3 top-3 z-[110] inline-flex min-h-10 items-center gap-1 border border-white/15 bg-black/65 px-2.5 text-white/60 opacity-75 backdrop-blur transition hover:border-primary hover:text-white hover:opacity-100 uppercase text-[10px] tracking-widest font-bold"
+              className="group fixed left-[max(0.75rem,var(--safe-left))] top-[max(0.75rem,var(--safe-top))] z-[110] inline-flex min-h-11 active:scale-95 items-center gap-1 border border-white/15 bg-black/65 px-2.5 text-white/60 opacity-75 backdrop-blur transition hover:border-primary hover:text-white hover:opacity-100 uppercase text-[10px] tracking-widest font-bold"
               data-testid="button-back"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 95,
+      "version": "0.23.1",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:50Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Smoother Menus",
+      "body": [
+        "Menus now slide in softly, buttons press down when tapped, and Escape takes you back from any screen.",
+        "Screen shake can be turned down or off, and it follows your device's reduced-motion setting.",
+        "Pinch-zoom works again, and back buttons stay clear of phone notches."
+      ]
+    },
+    {
       "number": 94,
       "version": "0.23.0",
       "date": "2026-10-09",
