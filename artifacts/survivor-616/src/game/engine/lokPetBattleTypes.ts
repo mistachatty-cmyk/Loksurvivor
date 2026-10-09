@@ -67,6 +67,7 @@ export interface BattlePet {
   equippedTrinket?: string;
   starter?: boolean;
   evolutionStage?: 1 | 2 | 3;
+  specialAbility?: string;
   evolutionTitle?: string;
   /** Overlay parts from a chosen evolution branch (see engine/petEvolution.ts). */
   evolutionOverlays?: EvolutionOverlayId[];

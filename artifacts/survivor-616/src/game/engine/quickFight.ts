@@ -115,11 +115,18 @@ export function buildQuickOpponent(
     pet.element = roll.element;
     pet.elementLabel = roll.elementLabel;
     pet.rarity = roll.rarity;
-    pet.moves = assignBattleMoves(roll.variantId, roll.element, level, pet.evolutionStage ?? 1);
+    pet.specialAbility = roll.specialAbility;
+    pet.moves = assignBattleMoves(roll.variantId, roll.family, roll.element, level, pet.evolutionStage ?? 1);
   } else {
     pet.element = enemyElement;
     pet.elementLabel = enemyElement === 'none' ? 'Street' : enemyElement;
-    pet.moves = assignBattleMoves('street-enemy', enemyElement, level, 1);
+    // Role-keyed so different street enemies draw from different move pools,
+    // not just different hp/damage numbers -- falls back to the old generic
+    // pool for enemies with no role. The role branches are checked before
+    // any family branch in assignBattleMoves, so the family value here is
+    // inert for street enemies -- they have no real one to pass.
+    const roleKey = opponent.enemyRole ? `street-${opponent.enemyRole}` : 'street-enemy';
+    pet.moves = assignBattleMoves(roleKey, 'mechanical', enemyElement, level, 1);
   }
 
   if (depth === 'quick') pet.moves = trimQuickMoves(pet.moves);

@@ -12,6 +12,7 @@ import {
   BATTLE_MOVES,
   BATTLE_TRINKETS,
   LEAGUE_TIERS,
+  SPECIAL_ABILITY_BATTLE_PASSIVE,
   getElementalMultiplier,
 } from '@/game/data/lokPetBattles';
 import {
@@ -23,13 +24,14 @@ import {
 import { applyPetExp, getExpForLevel, scalePetExp } from '@/game/engine/petExpCurve';
 import { evolvedLook, petEvolvedLook } from '@/game/engine/petEvolution';
 import { petBattleName } from '@/game/engine/petGrowth';
-import type { LokPetElement, SavedLokPet } from '@/game/types';
+import type { LokPetElement, LokPetFamily, SavedLokPet } from '@/game/types';
 
 export { getExpForLevel };
 
-/** Assign 4 battle moves based on pet element, variant, level, and evolution stage */
+/** Assign 4 battle moves based on pet element, family, variant, level, and evolution stage */
 export function assignBattleMoves(
   variantId: string,
+  family: LokPetFamily,
   element: LokPetElement,
   level = 1,
   _stage: 1 | 2 | 3 = 1,
@@ -69,7 +71,25 @@ export function assignBattleMoves(
   }
 
   // 3. Tactical / Support Move
-  if (variantId === 'cosmic-axolotl' || variantId === 'rain-jelly') {
+  if (variantId === 'street-sniper') {
+    moves.push(BATTLE_MOVES['dive-talon-strike']);
+  } else if (variantId === 'street-spitter') {
+    moves.push(BATTLE_MOVES['concussive-croak']);
+  } else if (variantId === 'street-heavy' || variantId === 'street-anchor') {
+    moves.push(BATTLE_MOVES['tectonic-firewall']);
+  } else if (variantId === 'street-flanker') {
+    moves.push(BATTLE_MOVES['sonic-slipstream']);
+  } else if (variantId === 'street-disruptor') {
+    moves.push(BATTLE_MOVES['sloth-dilation-wave']);
+  } else if (variantId === 'street-carrier') {
+    moves.push(BATTLE_MOVES['mite-swarm-shield']);
+  } else if (variantId === 'street-skirmisher') {
+    moves.push(BATTLE_MOVES['starlight-remedy']);
+  } else if (variantId === 'street-boss') {
+    moves.push(BATTLE_MOVES['singularity-drain']);
+  } else if (variantId === 'street-swarm') {
+    moves.push(BATTLE_MOVES['radiant-refract']);
+  } else if (variantId === 'cosmic-axolotl' || variantId === 'rain-jelly') {
     moves.push(BATTLE_MOVES['starlight-remedy']);
   } else if (variantId === 'byte-dust-mite' || variantId === 'neon-dust-roller' || variantId === 'amber-dust-mite' || variantId === 'void-dust-mite') {
     moves.push(BATTLE_MOVES['mite-swarm-shield']);
@@ -87,12 +107,44 @@ export function assignBattleMoves(
     moves.push(BATTLE_MOVES['tectonic-firewall']);
   } else if (variantId === 'aero-raptor' || variantId === 'ion-pegasus' || element === 'aero') {
     moves.push(BATTLE_MOVES['sonic-slipstream']);
+  } else if (family === 'mote') {
+    moves.push(BATTLE_MOVES['mite-swarm-shield']);
+  } else if (family === 'blob') {
+    moves.push(BATTLE_MOVES['sloth-dilation-wave']);
+  } else if (family === 'bat') {
+    moves.push(BATTLE_MOVES['dive-talon-strike']);
+  } else if (family === 'mechanical') {
+    moves.push(BATTLE_MOVES['tectonic-firewall']);
+  } else if (family === 'ghoul') {
+    moves.push(BATTLE_MOVES['singularity-drain']);
+  } else if (family === 'animal') {
+    moves.push(BATTLE_MOVES['sonic-slipstream']);
   } else {
     moves.push(BATTLE_MOVES['barrier-shield']);
   }
 
   // 4. Apex Ultimate Finisher
-  if (variantId === 'byte-dust-mite' || variantId === 'neon-dust-roller' || variantId === 'amber-dust-mite' || variantId === 'void-dust-mite') {
+  if (variantId === 'street-sniper') {
+    moves.push(BATTLE_MOVES['aero-razor-storm']);
+  } else if (variantId === 'street-spitter') {
+    moves.push(BATTLE_MOVES['null-overflow']);
+  } else if (variantId === 'street-heavy') {
+    moves.push(BATTLE_MOVES['seismic-fissure']);
+  } else if (variantId === 'street-flanker') {
+    moves.push(BATTLE_MOVES['aero-tempest-dive']);
+  } else if (variantId === 'street-disruptor') {
+    moves.push(BATTLE_MOVES['absolute-lag-stasis']);
+  } else if (variantId === 'street-carrier') {
+    moves.push(BATTLE_MOVES['byte-mite-avalanche']);
+  } else if (variantId === 'street-skirmisher') {
+    moves.push(BATTLE_MOVES['inferno-pillar']);
+  } else if (variantId === 'street-boss') {
+    moves.push(BATTLE_MOVES['dark-singularity-rift']);
+  } else if (variantId === 'street-swarm') {
+    moves.push(BATTLE_MOVES['prism-supernova']);
+  } else if (variantId === 'street-anchor') {
+    moves.push(BATTLE_MOVES['terra-monolith-crush']);
+  } else if (variantId === 'byte-dust-mite' || variantId === 'neon-dust-roller' || variantId === 'amber-dust-mite' || variantId === 'void-dust-mite') {
     moves.push(BATTLE_MOVES['byte-mite-avalanche']);
   } else if (variantId === 'chrono-sloth' || variantId === 'chill-byte-sloth' || variantId === 'quantum-sloth') {
     moves.push(BATTLE_MOVES['absolute-lag-stasis']);
@@ -148,6 +200,18 @@ export function assignBattleMoves(
     moves.push(BATTLE_MOVES['prism-supernova']);
   } else if (element === 'dark') {
     moves.push(BATTLE_MOVES['dark-singularity-rift']);
+  } else if (family === 'mechanical') {
+    moves.push(BATTLE_MOVES['firewall-fortress']);
+  } else if (family === 'ghoul') {
+    moves.push(BATTLE_MOVES['singularity-collapse']);
+  } else if (family === 'blob') {
+    moves.push(BATTLE_MOVES['absolute-lag-stasis']);
+  } else if (family === 'bat') {
+    moves.push(BATTLE_MOVES['mach-vector-cyclone']);
+  } else if (family === 'mote') {
+    moves.push(BATTLE_MOVES['byte-mite-avalanche']);
+  } else if (family === 'animal') {
+    moves.push(BATTLE_MOVES['aero-razor-storm']);
   } else {
     moves.push(BATTLE_MOVES['hyper-beam']);
   }
@@ -197,7 +261,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
   }
 
   const finalMaxHp = maxHp + trinketBonusHp;
-  const moves = assignBattleMoves(roll.variantId, roll.element, level, stage);
+  const moves = assignBattleMoves(roll.variantId, roll.family, roll.element, level, stage);
 
   return {
     id: `battle-${savedPet.id}-${Date.now()}`,
@@ -230,6 +294,7 @@ export function convertSavedPetToBattlePet(savedPet: SavedLokPet): BattlePet {
     equippedTrinket: savedPet.equippedTrinket,
     starter: savedPet.starter,
     evolutionStage: stage,
+    specialAbility: roll.specialAbility,
     evolutionTitle: look.title,
     ...(look.overlays.length > 0 ? { evolutionOverlays: look.overlays } : {}),
     ...(savedPet.evolutionPath ? { evolutionBranchId: savedPet.evolutionPath.branchId } : {}),
@@ -256,7 +321,7 @@ export function generateOpponentPet(
   const defense = Math.floor((12 + level * 1.6) * stageMult);
   const speed = Math.floor(baseSpd * 0.1 + level * 0.9);
 
-  const moves = assignBattleMoves(roll.variantId, roll.element, level, stage);
+  const moves = assignBattleMoves(roll.variantId, roll.family, roll.element, level, stage);
 
   return {
     id: `enemy-${variantId}-${level}-${Math.random().toString(36).substring(2, 7)}`,
@@ -285,6 +350,7 @@ export function generateOpponentPet(
     fainted: false,
     battlesWon: 0,
     evolutionStage: getLokPetEvolutionStage(level, false),
+    specialAbility: roll.specialAbility,
     evolutionTitle: getLokPetEvolutionTitle(roll.variantId, getLokPetEvolutionStage(level, false)),
   };
 }
@@ -367,6 +433,13 @@ export function createBattle(options: {
   };
 }
 
+/** Speed after freeze/slow debuffs are subtracted, floored at 1. */
+function effectiveSpeed(pet: BattlePet): number {
+  const freeze = pet.statusEffects.find((e) => e.type === 'freeze');
+  const slow = pet.statusEffects.find((e) => e.type === 'slow');
+  return Math.max(1, pet.speed - (freeze?.value ?? 0) - (slow?.value ?? 0));
+}
+
 /** Execute a chosen Move */
 export function executeMove(
   state: BattleState,
@@ -382,6 +455,24 @@ export function executeMove(
   const defender = isPlayer ? next.enemyTeam[next.activeEnemyIndex] : next.playerTeam[next.activePlayerIndex];
 
   if (!attacker || !defender || attacker.fainted || defender.fainted) {
+    return next;
+  }
+
+  const stunEffect = attacker.statusEffects.find((e) => e.type === 'stun');
+  if (stunEffect) {
+    attacker.statusEffects = attacker.statusEffects.filter((e) => e !== stunEffect);
+    next.combatLog.unshift({
+      id: `log-stun-${Date.now()}`,
+      text: `${attacker.name} is stunned and can't move!`,
+      type: 'status',
+      timestamp: Date.now(),
+    });
+    next.currentTurnActor = isPlayer ? 'enemy' : 'player';
+    if (!isPlayer) {
+      next.turn += 1;
+      applyEndOfTurnEffects(next);
+      resolveStatusFaints(next);
+    }
     return next;
   }
 
@@ -473,8 +564,9 @@ export function executeMove(
       const critMultiplier = isCrit ? 1.75 : 1.0;
       const elementResult = getElementalMultiplier(move.element, defender.element);
 
-      // Status boosts
-      const empowered = attacker.statusEffects.some((e) => e.type === 'empower') ? 1.3 : 1.0;
+      // Status boosts -- magnitude comes from the move that applied it, not a flat number.
+      const empowerEffect = attacker.statusEffects.find((e) => e.type === 'empower');
+      const empowered = empowerEffect ? 1 + empowerEffect.value / 100 : 1.0;
 
       // Defense mitigation
       const effectiveDef = defender.isGuarding ? defender.defense * 1.8 : defender.defense;
@@ -492,6 +584,39 @@ export function executeMove(
 
       // Defender generates energy from taking damage
       defender.energy = Math.min(defender.maxEnergy, defender.energy + Math.min(25, Math.floor(finalDamage * 0.35)));
+
+      // specialAbility battle hooks -- partial coverage, unmapped abilities do nothing extra.
+      const attackerPassive = attacker.specialAbility ? SPECIAL_ABILITY_BATTLE_PASSIVE[attacker.specialAbility] : undefined;
+      if (attackerPassive?.kind === 'leech-on-hit') {
+        const healed = Math.max(1, Math.floor(finalDamage * (attackerPassive.value / 100)));
+        attacker.hp = Math.min(attacker.maxHp, attacker.hp + healed);
+        next.combatLog.unshift({
+          id: `log-leech-passive-${Date.now()}`,
+          text: `${attacker.name}'s ${attacker.specialAbility} drains ${healed} HP!`,
+          type: 'status',
+          timestamp: Date.now(),
+        });
+      }
+      if (isCrit && attackerPassive?.kind === 'empower-on-crit' && !attacker.statusEffects.some((e) => e.type === 'empower')) {
+        attacker.statusEffects.push({ type: 'empower', duration: 2, value: attackerPassive.value, sourcePetName: attacker.name });
+        next.combatLog.unshift({
+          id: `log-empower-passive-${Date.now()}`,
+          text: `${attacker.name}'s ${attacker.specialAbility} empowers it after a critical hit!`,
+          type: 'status',
+          timestamp: Date.now(),
+        });
+      }
+      const defenderPassive = defender.specialAbility ? SPECIAL_ABILITY_BATTLE_PASSIVE[defender.specialAbility] : undefined;
+      if (defenderPassive?.kind === 'shield-on-low-hp' && defender.hp > 0 && defender.hp < defender.maxHp * defenderPassive.threshold
+        && !defender.statusEffects.some((e) => e.type === 'shield')) {
+        defender.statusEffects.push({ type: 'shield', duration: 2, value: defenderPassive.value, sourcePetName: defender.name });
+        next.combatLog.unshift({
+          id: `log-shield-passive-${Date.now()}`,
+          text: `${defender.name}'s ${defender.specialAbility} throws up a shield!`,
+          type: 'status',
+          timestamp: Date.now(),
+        });
+      }
 
       // Add floating damage text
       next.floatingTexts.push({
@@ -593,12 +718,26 @@ export function executeMove(
     }
   }
 
-  // Advance turn to other side
-  next.currentTurnActor = isPlayer ? 'enemy' : 'player';
-  if (!isPlayer) {
-    next.turn += 1;
-    applyEndOfTurnEffects(next);
-    resolveStatusFaints(next);
+  // A pet notably faster than its foe (after freeze/slow) has a small,
+  // capped chance to act again immediately instead of the turn flipping --
+  // otherwise speed only ever mattered for who opened the fight.
+  const speedRatio = effectiveSpeed(attacker) / Math.max(1, effectiveSpeed(defender));
+  const extraTurnChance = Math.min(0.25, Math.max(0, (speedRatio - 1.15) * 0.4));
+  if (extraTurnChance > 0 && Math.random() < extraTurnChance && !defender.fainted) {
+    next.combatLog.unshift({
+      id: `log-speed-${Date.now()}`,
+      text: `${attacker.name} is fast enough to move again!`,
+      type: 'status',
+      timestamp: Date.now(),
+    });
+  } else {
+    // Advance turn to other side
+    next.currentTurnActor = isPlayer ? 'enemy' : 'player';
+    if (!isPlayer) {
+      next.turn += 1;
+      applyEndOfTurnEffects(next);
+      resolveStatusFaints(next);
+    }
   }
 
   return next;
@@ -738,6 +877,17 @@ function applyEndOfTurnEffects(state: BattleState): void {
           type: 'damage',
           timestamp: Date.now(),
         });
+      } else if (effect.type === 'leech') {
+        const leechDmg = Math.max(2, Math.floor(pet.maxHp * (effect.value / 100)));
+        pet.hp = Math.max(0, pet.hp - leechDmg);
+        const source = allActive.find((p) => p !== pet && p.name === effect.sourcePetName);
+        if (source) source.hp = Math.min(source.maxHp, source.hp + leechDmg);
+        state.combatLog.unshift({
+          id: `log-leech-${Date.now()}-${Math.random()}`,
+          text: `${pet.name} had ${leechDmg} HP drained by ${effect.sourcePetName}'s leech!`,
+          type: 'damage',
+          timestamp: Date.now(),
+        });
       }
 
       effect.duration -= 1;
@@ -874,7 +1024,7 @@ export function calculateBattleRewards(state: BattleState): BattleRewards {
         branchId: pet.evolutionBranchId,
       });
       pet.evolutionTitle = pet.evolutionBranchId ? grownLook.title : getLokPetEvolutionTitle(pet.variantId, newStage);
-      pet.moves = assignBattleMoves(pet.variantId, pet.element, newLevel, newStage);
+      pet.moves = assignBattleMoves(pet.variantId, pet.family, pet.element, newLevel, newStage);
       if (evolved) {
         pet.maxHp = Math.floor(pet.maxHp * 1.15);
         pet.hp = pet.maxHp;
