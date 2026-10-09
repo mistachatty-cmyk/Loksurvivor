@@ -968,6 +968,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Tap a LokPet quickly: after 6 taps it gets dizzy and stumbles around, and after 14 it gets sick and needs a rest. Stop on exactly 249 spins and it super charges for 2% more XP, for good.',
     ],
   },
+  {
+    version: '0.21.9',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T02:00:00Z',
+    kind: 'update',
+    title: 'Keys and Momentum',
+    body: [
+      'The "Locked: needs a skeleton key" note on a vault chest no longer spams while you stand on it. It shows once every few seconds and tells you where keys come from.',
+      'The hideout Resources panel and currency help now say how to earn skeleton keys (break crates and props in a run, or Contract Board rewards) and where to spend them (the Quartermaster, or vault chests in a run).',
+      'Tap a LokPet quickly and it builds speed, sliding along faster and faster before slowing down on its own. Turn it off in Settings under Tap momentum.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -592,7 +592,7 @@ export function HideoutPreview({
         }
       }
       if (hit && hitState) {
-        const tapped = tapPet(hitState, now);
+        const tapped = tapPet(hitState, now, getSongSpinSettings().momentum);
         burst(hitState.x, groundY - petLook(hit).height, hit.palette.glow, tapped === 'sick' ? 1 : 5, now);
         // A sick pet needs a rest: no care credit until it recovers.
         if (tapped !== 'sick') settings.onPetCare?.(hit.id);

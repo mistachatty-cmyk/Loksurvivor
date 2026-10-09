@@ -469,6 +469,10 @@ export type PickupKind =
   | 'water-flask'
   | 'rootglass-cell';
 
+/** Last time each world showed the locked-vault hint, so it cannot spam while the player stands on the chest. */
+const vaultHintAt = new WeakMap<object, number>();
+const VAULT_HINT_COOLDOWN_MS = 4000;
+
 export interface Pickup {
   uid: number;
   kind: PickupKind;
@@ -10967,7 +10971,12 @@ function updatePickups(w: World, dt: number) {
         case 'relic-vault-chest': {
           const hasKey = w.skeletonKeysGained > 0 || w.craftedRelicIds?.includes('overflow-service-key');
           if (!hasKey) {
-            w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCKED (NEED SKELETON KEY)', color: '#f59e0b', bornAt: w.now, vy: 20 });
+            // Standing on the chest used to repeat this every frame; now one hint per few seconds.
+            if (w.now - (vaultHintAt.get(w) ?? -Infinity) >= VAULT_HINT_COOLDOWN_MS) {
+              vaultHintAt.set(w, w.now);
+              w.popups.push({ x: p.x, y: p.y - 20, text: 'LOCKED: NEEDS A SKELETON KEY', color: '#f59e0b', bornAt: w.now, vy: 20 });
+              pushAlert(w, 'Skeleton keys drop from breaking crates and props, and from Contract Board rewards.');
+            }
             continue;
           }
           if (w.skeletonKeysGained > 0 && !w.craftedRelicIds?.includes('overflow-service-key')) {

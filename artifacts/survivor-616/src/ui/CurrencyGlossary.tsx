@@ -23,7 +23,7 @@ const ENTRIES = [
     icon: KeyRound,
     color: 'text-sky-400',
     name: 'Skeleton keys',
-    description: "Rarer drops. Spent at the Quartermaster on things cred alone can't buy.",
+    description: "Rarer drops. Earn them by breaking crates and props out in a run, or from Contract Board rewards. Spend them at the Quartermaster on things cred alone can't buy, or on locked vault chests in a run.",
   },
   {
     icon: Sparkles,

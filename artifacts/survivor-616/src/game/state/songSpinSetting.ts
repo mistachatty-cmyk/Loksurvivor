@@ -14,9 +14,11 @@ export interface SongSpinSettings {
   cadence: SongSpinCadence;
   length: SongSpinLength;
   byBond: boolean;
+  /** Quick taps build up speed that slides the pet along, then slows. */
+  momentum: boolean;
 }
 
-export const DEFAULT_SONG_SPIN: SongSpinSettings = { enabled: true, cadence: 'every', length: 'burst', byBond: true };
+export const DEFAULT_SONG_SPIN: SongSpinSettings = { enabled: true, cadence: 'every', length: 'burst', byBond: true, momentum: true };
 
 const KEY = 'survivor616.songSpin.v1';
 
@@ -29,6 +31,7 @@ export function getSongSpinSettings(): SongSpinSettings {
         cadence: raw.cadence === 'other' ? 'other' : 'every',
         length: raw.length === 'song' ? 'song' : 'burst',
         byBond: raw.byBond !== false,
+        momentum: raw.momentum !== false,
       };
     }
   } catch {

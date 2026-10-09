@@ -739,6 +739,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   </div>
                 ))}
               </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground" data-testid="text-resource-keys-hint">
+                <span className="font-bold text-sky-300">Skeleton keys:</span> earn them by breaking crates and props out in a run, or from Contract Board rewards. Spend them at the Quartermaster, or on locked vault chests in a run.
+              </p>
             </CollapsibleSection>
           </div>
 

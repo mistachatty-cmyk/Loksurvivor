@@ -26,6 +26,14 @@ export function SongSpinSetting() {
         {chip(s.enabled, 'On', () => update({ enabled: true }), 'button-song-spin-on')}
         {chip(!s.enabled, 'Off', () => update({ enabled: false }), 'button-song-spin-off')}
       </div>
+      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">Tap momentum</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+        Tapping a LokPet quickly builds up speed so it slides along faster and faster, then slows down by itself.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Tap momentum">
+        {chip(s.momentum, 'On', () => update({ momentum: true }), 'button-tap-momentum-on')}
+        {chip(!s.momentum, 'Off', () => update({ momentum: false }), 'button-tap-momentum-off')}
+      </div>
       {s.enabled ? (
         <>
           <p className="mt-3 text-xs uppercase tracking-widest text-muted-foreground">When</p>

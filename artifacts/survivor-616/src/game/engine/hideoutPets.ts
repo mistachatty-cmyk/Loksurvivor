@@ -82,13 +82,15 @@ export interface HideoutPetState {
   /** Strip time the dizzy or sick spell ends (0 when neither). */
   dizzyUntil: number;
   sickUntil: number;
+  /** 0..1 spin speed that builds with every quick tap, then bleeds off. */
+  momentum: number;
   temperamentId: HideoutTemperament['id'];
 }
 
 export function createHideoutPetState(id: string, x: number): HideoutPetState {
   return {
     id, x, facing: 1, mode: 'follow', idleKind: 'sit', modeUntil: 0, targetX: x, walking: false,
-    operatorRestingSince: null, move: null, emote: null, lastTapAt: -10_000, spinStreak: 0, spinTotal: 0, dizzyUntil: 0, sickUntil: 0, temperamentId: temperamentFor(id).id,
+    operatorRestingSince: null, move: null, emote: null, lastTapAt: -10_000, spinStreak: 0, spinTotal: 0, dizzyUntil: 0, sickUntil: 0, momentum: 0, temperamentId: temperamentFor(id).id,
   };
 }
 
@@ -136,6 +138,18 @@ export function stepHideoutPet(pet: HideoutPetState, input: PetStepInput): void 
   const t = HIDEOUT_TEMPERAMENTS_BY_ID[pet.temperamentId];
 
   if (pet.emote && now >= pet.emote.until) pet.emote = null;
+
+  // Momentum from quick taps: the pet slides along, bounces off the ends, and slows down.
+  if (pet.momentum > 0.02) {
+    pet.momentum *= Math.exp(-dt / MOMENTUM_DECAY_MS);
+    pet.x += pet.facing * pet.momentum * MOMENTUM_MAX_SPEED * dt;
+    if (pet.x >= range.max) { pet.x = range.max; pet.facing = -1; }
+    if (pet.x <= range.min) { pet.x = range.min; pet.facing = 1; }
+    pet.walking = false;
+    if (pet.momentum > 0.15) return;
+  } else {
+    pet.momentum = 0;
+  }
 
   // Too many spins: it reels around dizzy, or lies still while sick.
   if (now < pet.sickUntil) { pet.walking = false; pet.move = null; return; }
@@ -205,6 +219,9 @@ export function stepHideoutPet(pet: HideoutPetState, input: PetStepInput): void 
 export const SPIN_STREAK_GAP_MS = 700;
 export const SPIN_DIZZY_AT = 6;
 export const SPIN_SICK_AT = 14;
+const MOMENTUM_PER_TAP = 0.16;
+const MOMENTUM_DECAY_MS = 1100;
+const MOMENTUM_MAX_SPEED = 0.32;
 export const SPIN_JACKPOT = 249;
 const DIZZY_MS = 4500;
 const SICK_MS = 9000;
@@ -233,13 +250,15 @@ export function setEmote(pet: HideoutPetState, kind: HideoutEmote, now: number, 
 }
 
 /** You tapped the pet: a happy hop and a heart. A quick second tap does a spin. */
-export function tapPet(pet: HideoutPetState, now: number): 'pet' | 'trick' | 'dizzy' | 'sick' {
+export function tapPet(pet: HideoutPetState, now: number, momentum = true): 'pet' | 'trick' | 'dizzy' | 'sick' {
   if (now < pet.sickUntil) return 'sick';
   const trick = now - pet.lastTapAt < 450;
   pet.spinStreak = now - pet.lastTapAt < SPIN_STREAK_GAP_MS ? pet.spinStreak + 1 : 1;
   pet.spinTotal += 1;
   pet.lastTapAt = now;
+  if (momentum) pet.momentum = Math.min(1, pet.momentum + MOMENTUM_PER_TAP);
   if (pet.spinStreak >= SPIN_SICK_AT) {
+    pet.momentum = 0;
     pet.sickUntil = now + SICK_MS;
     pet.dizzyUntil = 0;
     pet.spinStreak = 0;
@@ -253,7 +272,7 @@ export function tapPet(pet: HideoutPetState, now: number): 'pet' | 'trick' | 'di
     setEmote(pet, 'dizzy', now, DIZZY_MS);
     return 'dizzy';
   }
-  startMove(pet, trick ? 'spin' : 'hop', now, trick ? 900 : 700);
+  startMove(pet, trick ? 'spin' : 'hop', now, (trick ? 900 : 700) * (1 - 0.5 * pet.momentum));
   setEmote(pet, trick ? 'star' : 'heart', now);
   return trick ? 'trick' : 'pet';
 }
