@@ -814,10 +814,41 @@ const RUN_EVENT_ACHIEVEMENTS: RawAchievement[] = [
 ];
 RAW_ACHIEVEMENTS.push(...RUN_EVENT_ACHIEVEMENTS);
 
+const CALL_IN_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'crew-callin-1',
+    name: 'Phone a Friend',
+    description: 'Call in a crew member during a run.',
+    tier: 'bronze',
+    isComplete: (meta) => meta.callInsUsed >= 1,
+    reward: { kind: 'cred', amount: 150 },
+  },
+  {
+    id: 'crew-callin-25',
+    name: 'On Speed Dial',
+    description: 'Call in your crew 25 times.',
+    tier: 'silver',
+    isComplete: (meta) => meta.callInsUsed >= 25,
+    progress: (meta) => ratio(meta.callInsUsed, 25),
+    reward: { kind: 'lootTokens', amount: 3 },
+  },
+  {
+    id: 'crew-callin-100',
+    name: 'Never Alone',
+    description: 'Call in your crew 100 times.',
+    tier: 'gold',
+    isComplete: (meta) => meta.callInsUsed >= 100,
+    progress: (meta) => ratio(meta.callInsUsed, 100),
+    reward: { kind: 'lootTokens', amount: 15 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...CALL_IN_ACHIEVEMENTS);
+
 const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'first-blood': 'combat', 'body-count-1000': 'combat', 'body-count-10000': 'combat', 'fourth-wall-breaker': 'combat',
   'glitch-hunter': 'combat', 'stack-smasher': 'combat', 'null-terminator': 'combat',
   'survivor-20': 'survival', 'marathoner-45': 'survival', 'veteran-100-runs': 'survival', 'grand-survivor': 'survival',
+  'crew-callin-1': 'crew', 'crew-callin-25': 'crew', 'crew-callin-100': 'crew',
   'moment-first': 'survival', 'moment-10': 'survival', 'moment-50': 'survival', 'moment-both': 'survival',
   'into-the-dark': 'survival', 'bottomless': 'survival', 'mission-operative': 'survival',
   'district-tourist': 'world', 'know-the-city': 'world', 'relic-hunter': 'world', 'city-archivist': 'world',

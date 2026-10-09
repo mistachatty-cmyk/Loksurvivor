@@ -29,12 +29,12 @@ test('bad saved data falls back to defaults field by field', () => {
   assert.deepEqual(normalizeControls(null), DEFAULT_CONTROLS);
   assert.deepEqual(normalizeControls('nonsense'), DEFAULT_CONTROLS);
   const messy = normalizeControls({
-    keys: { dash: 'w', ultimate: 'q', interact: 'q', pause: 5 },
+    keys: { dash: 'w', ultimate: 'x', interact: 'x', pause: 5 },
     gamepad: { deadzone: 9, buttons: { dash: -1 } },
     touch: { dashButton: 'yes' },
   });
   assert.equal(messy.keys.dash, DEFAULT_CONTROLS.keys.dash, 'a movement key is refused');
-  assert.equal(messy.keys.ultimate, 'q');
+  assert.equal(messy.keys.ultimate, 'x');
   assert.equal(new Set(Object.values(messy.keys)).size, CONTROL_ACTIONS.length, 'never two actions on one key');
   assert.equal(messy.gamepad.deadzone, 0.6);
   assert.equal(messy.gamepad.buttons.dash, DEFAULT_CONTROLS.gamepad.buttons.dash);
@@ -66,4 +66,11 @@ test('a dash always has a direction', () => {
   assert.deepEqual(dashDirection({ x: 0, y: 0 }, { x: -1, y: 0 }, 1), { x: -1, y: 0 });
   assert.deepEqual(dashDirection({ x: 0, y: 0 }, null, -1), { x: -1, y: 0 });
   assert.deepEqual(dashDirection({ x: 0.05, y: 0 }, null, 1), { x: 1, y: 0 });
+});
+
+test('an older save that already used Q elsewhere keeps its bindings and gives Call-in a spare key', () => {
+  const old = normalizeControls({ keys: { dash: 'shift', ultimate: 'q', interact: 'f', pause: 'escape', zoom: 'z', tactical: 'tab' } });
+  assert.equal(old.keys.ultimate, 'q');
+  assert.notEqual(old.keys.callin, 'q');
+  assert.equal(new Set(Object.values(old.keys)).size, CONTROL_ACTIONS.length);
 });

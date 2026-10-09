@@ -1,6 +1,6 @@
 # Events, crew interactions, specials, resources and physics — plan
 
-Status: **plan; step 1 (Event Director + Supply drop + Rush-hour) shipped in v0.22.5, see `.agents/memory/run-events-director.md`. Everything else is unbuilt.** Drafted 2026-10-09 from a "make events
+Status: **plan; shipped so far: Event Director + Supply drop + Rush-hour (v0.22.5), Magnet coil, Tremor (v0.22.7), crew call-ins (v0.22.9), see `.agents/memory/run-events-director.md`. Everything else is unbuilt.** Drafted 2026-10-09 from a "make events
 and things that happen feel alive" request. Every item respects the existing
 contracts; read the linked notes before building one.
 

@@ -1080,6 +1080,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Controllers can now steer with the left stick or d-pad. A controller button does its job when you press it, not while you hold it.',
     ],
   },
+  {
+    version: '0.22.9',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T03:00:00Z',
+    kind: 'update',
+    title: 'Call the crew',
+    body: [
+      'Rescued crew can now help mid-run. Press Q (or the new round button with their name) to call the next one in line: Pippa patches you up, Nyx freezes the crowd, Bulbosa stomps, Vee pulls loot in, and more. The button fills as the shared cooldown recovers.',
+      'It costs no slot. Everyone you have rescued with a call-in takes a turn in the order you rescued them, so the bigger your crew, the more variety you get. Q can be changed on the Controls page.',
+      'New achievements for calling in your crew: Phone a Friend, On Speed Dial and Never Alone.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

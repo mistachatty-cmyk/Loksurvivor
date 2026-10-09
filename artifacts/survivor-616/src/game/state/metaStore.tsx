@@ -359,6 +359,7 @@ export function createInitialMeta(): MetaState {
     quirkTakenRuns: 0,
     quirkSurgesSurvived: 0,
     runEventsSurvived: {},
+    callInsUsed: 0,
     grpdSpentSeals: 0,
     grpdUnlockedWeaponIds: [],
     grpdActiveWeaponIds: [],
@@ -1380,6 +1381,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     quirkTakenRuns: counter(parsed.quirkTakenRuns),
     quirkSurgesSurvived: counter(parsed.quirkSurgesSurvived),
     runEventsSurvived: cleanCounts(parsed.runEventsSurvived),
+    callInsUsed: counter(parsed.callInsUsed),
     grpdSpentSeals: counter(parsed.grpdSpentSeals),
     grpdUnlockedWeaponIds: fabricatedGrpdIds,
     grpdActiveWeaponIds: activeGrpdIds,
@@ -3913,6 +3915,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         quirkEverywhereRuns: prev.quirkEverywhereRuns + (result.quirkEverywhereRun ? 1 : 0),
         quirkTakenRuns: prev.quirkTakenRuns + (result.quirkTakenRun ? 1 : 0),
         quirkSurgesSurvived: prev.quirkSurgesSurvived + (result.quirkSurgeSurvived ? 1 : 0),
+        callInsUsed: prev.callInsUsed + (result.callInsUsed ?? 0),
         runEventsSurvived: (result.runEventsSurvived ?? []).reduce(
           (counts, id) => ({ ...counts, [id]: (counts[id] ?? 0) + 1 }),
           prev.runEventsSurvived,

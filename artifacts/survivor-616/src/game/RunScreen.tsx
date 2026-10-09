@@ -22,6 +22,7 @@ import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
 import { grpdEndgameWeaponEarned } from '@/game/data/grpdArmory';
+import { callInRoster } from '@/game/data/crewCallIns';
 import { actionForKey, dashDirection, getControls, padMove } from '@/game/input/controls';
 import { getDisabledRunEvents } from '@/game/state/runEventSetting';
 import { endgameReached, mapsCleared } from '@/game/data/endgameUnlocks';
@@ -54,6 +55,7 @@ import {
   createWorld,
   commitArtisteDraw,
   dashPlayer,
+  callInCrew,
   endCommandSelectionDrag,
   endFreezeSelectionDrag,
   hudSnapshot,
@@ -246,6 +248,7 @@ export function RunScreen({
   const interactRequestRef = useRef(false);
   const gamepadHeldRef = useRef(new Set<number>());
   const dashRequestRef = useRef(false);
+  const callInRequestRef = useRef(false);
   const lastMoveDirRef = useRef<{ x: number; y: number } | null>(null);
   const stickRef = useRef<StickState>({
     active: false,
@@ -460,6 +463,7 @@ export function RunScreen({
         disabledWeaponIds: meta.disabledWeaponIds,
         grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id) || grpdEndgameWeaponEarned(id, meta.totalKills, endgameReached(meta))),
         endgameEvolutionsEnabled: isFeatureEnabled('weaponEvolutions'),
+        callInAllyIds: callInRoster(meta.rescuedAllyIds),
         runEvents: { mapsCleared: mapsCleared(meta).have, disabledIds: getDisabledRunEvents() },
         quirkSurgeMode: quirkSurgeMode(meta.clearedAreaIds.length, endgameReached(meta), isFeatureEnabled('quirkSurge')),
         enemyQuirks: { enabled: isFeatureEnabled('enemyQuirks'), ...earnedQuirkRunSetup(meta.quirkKills, meta.devModeAllUnlocks) },
@@ -490,6 +494,7 @@ export function RunScreen({
       if (action === 'ultimate') ultRequestRef.current = true;
       if (action === 'interact' && !event.repeat) interactRequestRef.current = true;
       if (action === 'dash' && !event.repeat) dashRequestRef.current = true;
+      if (action === 'callin' && !event.repeat) callInRequestRef.current = true;
       if (action === 'tactical') {
         event.preventDefault();
         tacticalCameraRef.current.toggleTacticalView();
@@ -963,6 +968,7 @@ export function RunScreen({
               if (name === 'interact') interactRequestRef.current = true;
               else if (name === 'ultimate') ultRequestRef.current = true;
               else if (name === 'dash') dashRequestRef.current = true;
+              else if (name === 'callin') callInRequestRef.current = true;
               else if (name === 'pause' && phaseRef.current === 'playing' && !world.player.falling) setPhaseBoth('paused');
             }
             if (down) held.add(button); else held.delete(button);
@@ -976,6 +982,11 @@ export function RunScreen({
           dashRequestRef.current = false;
           const dir = dashDirection({ x: moveX, y: moveY }, lastMoveDirRef.current, world.player.facing);
           dashPlayer(world, dir.x, dir.y);
+        }
+
+        if (callInRequestRef.current) {
+          callInRequestRef.current = false;
+          callInCrew(world);
         }
 
         let ultimate = ultRequestRef.current;
@@ -2166,6 +2177,21 @@ export function RunScreen({
           data-testid="button-freeze-cone"
         >
           Freeze
+        </button>
+      ) : null}
+
+      {/* Crew call-in: the next rescued ally in line. Hidden until someone with a call-in is rescued. */}
+      {hud?.callIn ? (
+        <button
+          type="button"
+          onClick={() => { callInRequestRef.current = true; }}
+          disabled={hud.callIn.readyPct < 100}
+          aria-label={`Call ${hud.callIn.name}: ${hud.callIn.label}`}
+          className="absolute bottom-24 right-16 h-12 w-14 rounded-full border-2 border-amber-200/40 bg-black/75 px-1 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider text-amber-100 disabled:opacity-45 sm:bottom-32 sm:right-24 sm:h-14 sm:w-16 sm:text-[9px]"
+          style={{ background: `conic-gradient(rgba(251,191,36,0.55) ${hud.callIn.readyPct * 3.6}deg, rgba(0,0,0,0.75) 0deg)` }}
+          data-testid="button-call-in"
+        >
+          {hud.callIn.name}
         </button>
       ) : null}
 

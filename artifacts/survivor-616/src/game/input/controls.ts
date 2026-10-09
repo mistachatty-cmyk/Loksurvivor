@@ -10,9 +10,9 @@
  * player lock themselves out of walking. Everything else can be remapped.
  */
 
-export type ControlAction = 'dash' | 'ultimate' | 'interact' | 'pause' | 'zoom' | 'tactical';
+export type ControlAction = 'dash' | 'ultimate' | 'callin' | 'interact' | 'pause' | 'zoom' | 'tactical';
 
-export const CONTROL_ACTIONS: ControlAction[] = ['dash', 'ultimate', 'interact', 'pause', 'zoom', 'tactical'];
+export const CONTROL_ACTIONS: ControlAction[] = ['dash', 'ultimate', 'callin', 'interact', 'pause', 'zoom', 'tactical'];
 
 /** Keys that always move the player and so can never be bound to an action. */
 export const RESERVED_KEYS: readonly string[] = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
@@ -40,13 +40,13 @@ export interface ControlSettings {
 }
 
 export const DEFAULT_CONTROLS: ControlSettings = {
-  keys: { dash: 'shift', ultimate: ' ', interact: 'f', pause: 'escape', zoom: 'z', tactical: 'tab' },
+  keys: { dash: 'shift', ultimate: ' ', callin: 'q', interact: 'f', pause: 'escape', zoom: 'z', tactical: 'tab' },
   mouse: { doubleClickDash: true },
   gamepad: {
     enabled: true,
     deadzone: 0.2,
     // Standard layout: A, B, X, Y, LB, RB, LT, RT, Back, Start, L3, R3, d-pad.
-    buttons: { interact: 0, dash: 1, ultimate: 2, zoom: 3, tactical: 8, pause: 9 },
+    buttons: { interact: 0, dash: 1, ultimate: 2, callin: 4, zoom: 3, tactical: 8, pause: 9 },
   },
   touch: { dashButton: true, doubleTapDash: true },
 };
@@ -54,6 +54,7 @@ export const DEFAULT_CONTROLS: ControlSettings = {
 export const CONTROL_LABELS: Record<ControlAction, string> = {
   dash: 'Dash',
   ultimate: 'Ultimate',
+  callin: 'Crew call-in',
   interact: 'Interact',
   pause: 'Pause',
   zoom: 'Zoom',
@@ -64,6 +65,9 @@ export const GAMEPAD_BUTTON_NAMES: Record<number, string> = {
   0: 'A / Cross', 1: 'B / Circle', 2: 'X / Square', 3: 'Y / Triangle', 4: 'LB / L1', 5: 'RB / R1',
   6: 'LT / L2', 7: 'RT / R2', 8: 'Back / Select', 9: 'Start', 10: 'L3', 11: 'R3',
 };
+
+const SPARE_KEYS = ['q', 'e', 'r', 'c', 'v', 'x', 'g', 'h'];
+const SPARE_BUTTONS = [4, 5, 6, 7, 10, 11, 3, 2];
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -84,7 +88,10 @@ export function normalizeControls(raw: unknown): ControlSettings {
   for (const action of CONTROL_ACTIONS) {
     const saved = r.keys?.[action];
     const ok = typeof saved === 'string' && saved.length > 0 && saved.length <= 12 && !RESERVED_KEYS.includes(saved) && !used.has(saved);
-    keys[action] = ok ? saved : d.keys[action];
+    // A binding that is missing (e.g. an action added after the save) takes its default, or the
+    // next free spare key if the player already put that default somewhere else.
+    const fallback = used.has(d.keys[action]) ? SPARE_KEYS.find((k) => !used.has(k)) ?? d.keys[action] : d.keys[action];
+    keys[action] = ok ? saved : fallback;
     used.add(keys[action]);
   }
   // A bad save must never leave two actions on one key.
@@ -95,7 +102,8 @@ export function normalizeControls(raw: unknown): ControlSettings {
   for (const action of CONTROL_ACTIONS) {
     const saved = r.gamepad?.buttons?.[action];
     const ok = Number.isInteger(saved) && saved >= 0 && saved <= 15 && !usedButtons.has(saved);
-    buttons[action] = ok ? saved : d.gamepad.buttons[action];
+    const fallbackButton = usedButtons.has(d.gamepad.buttons[action]) ? SPARE_BUTTONS.find((b) => !usedButtons.has(b)) ?? d.gamepad.buttons[action] : d.gamepad.buttons[action];
+    buttons[action] = ok ? saved : fallbackButton;
     usedButtons.add(buttons[action]);
   }
   if (new Set(Object.values(buttons)).size !== CONTROL_ACTIONS.length) Object.assign(buttons, d.gamepad.buttons);

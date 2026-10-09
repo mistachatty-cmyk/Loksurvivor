@@ -9,6 +9,7 @@
  * snapshots out of it.
  */
 
+import { CALL_INS, CALL_IN_COOLDOWN_MS, CALL_IN_FIRST_READY_MS } from '@/game/data/crewCallIns';
 import { RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
 import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
@@ -1212,6 +1213,8 @@ export interface World {
     pulses: number;
     survived: RunEventId[];
   };
+  /** Crew call-ins: who can be called (in rescue order), who is next, and when the next is ready. */
+  callIns: { roster: string[]; index: number; readyAt: number; used: number };
   /** Quirks already announced this run, so each is explained once. */
   quirkAnnounced: Record<string, true>;
   /** Next time the taken Spawn Shield quirk can block a hit. */
@@ -1581,6 +1584,8 @@ export function createWorld(
     quirkSurgeMode?: QuirkSurgeMode;
     /** Standard maps cleared, and beats the player switched off. Omitted = no run events. */
     runEvents?: { mapsCleared: number; disabledIds?: string[] };
+    /** Rescued allies, in rescue order; those with a call-in can be called mid-run. */
+    callInAllyIds?: string[];
     enemyQuirks?: { enabled: boolean; disabledIds: string[]; everywhereIds?: string[]; takenIds?: string[] };
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
@@ -1800,6 +1805,7 @@ export function createWorld(
     quirkSurgePhase: 0,
     quirkSurgeWarned: false,
     quirkSurgeMode: setup.quirkSurgeMode ?? 'off',
+    callIns: { roster: (setup.callInAllyIds ?? []).filter((id) => id in CALL_INS), index: 0, readyAt: CALL_IN_FIRST_READY_MS, used: 0 },
     runEvents: {
       schedule: setup.runEvents ? scheduleRunEvents(seed, setup.runEvents.mapsCleared, setup.runEvents.disabledIds) : [],
       index: 0, phase: 'wait', phaseAt: 0, x: 0, y: 0, dirX: 1, dirY: 0, pulses: 0, survived: [],
@@ -7603,6 +7609,59 @@ const DASH_DURATION_MS = 180;
 const DASH_COOLDOWN_MS = 820;
 const DASH_KNOCKBACK_MULTIPLIER = 1.8;
 
+/**
+ * Calls the next rescued ally in line. Returns false when nothing happens (no crew with a
+ * call-in, still cooling down, or the run is not live). Pays through existing paths only:
+ * damage goes through `damageEnemy`, so a call-in kill still counts exactly once.
+ */
+export function callInCrew(w: World): boolean {
+  const c = w.callIns;
+  if (w.outcome !== 'running' || w.player.falling || c.roster.length === 0 || w.now < c.readyAt) return false;
+  const allyId = c.roster[c.index % c.roster.length]!;
+  const def = CALL_INS[allyId];
+  if (!def) return false;
+  const p = w.player;
+  const e = def.effect;
+  switch (e.kind) {
+    case 'heal':
+      p.hp = Math.min(p.maxHp, p.hp + p.maxHp * e.pct);
+      break;
+    case 'shield':
+      p.invulnUntil = Math.max(p.invulnUntil, w.now + e.ms);
+      break;
+    case 'magnet':
+      w.magnetUntil = Math.max(w.magnetUntil, w.now) + e.ms;
+      break;
+    case 'haste':
+      w.rootglassUntil = Math.max(w.rootglassUntil, w.now) + e.ms;
+      break;
+    case 'nova': {
+      const amount = Math.round(e.damage * (1 + w.level * 0.1));
+      for (const enemy of [...w.enemies]) {
+        if (enemy.dying || w.now < enemy.frozenUntil) continue;
+        if (Math.hypot(enemy.x - p.x, enemy.y - p.y) <= e.radius) damageEnemy(w, enemy, amount, 2, p.x, p.y);
+      }
+      break;
+    }
+    case 'stun':
+      for (const enemy of w.enemies) {
+        if (enemy.dying || enemy.def.family === 'Boss') continue;
+        if (Math.hypot(enemy.x - p.x, enemy.y - p.y) <= e.radius) enemy.frozenUntil = Math.max(enemy.frozenUntil, w.now + e.ms);
+      }
+      break;
+  }
+  const ally = ALLIES_BY_ID[allyId];
+  const color = ally?.palette.accent ?? '#fde047';
+  spawnParticles(w, p.x, p.y, color, 16, 130);
+  w.popups.push({ x: p.x, y: p.y - 30, text: `${ally?.name ?? 'Crew'}: ${def.label.toUpperCase()}`, color, bornAt: w.now, vy: 30 });
+  pushAlert(w, `${ally?.name ?? 'Crew'}: "${def.line}"`);
+  pushSfx(w, 'ultimate');
+  c.readyAt = w.now + CALL_IN_COOLDOWN_MS;
+  c.index = (c.index + 1) % c.roster.length;
+  c.used += 1;
+  return true;
+}
+
 export function dashPlayer(w: World, directionX: number, directionY: number): boolean {
   if (
     w.outcome !== 'running' ||
@@ -12554,6 +12613,13 @@ export function hudSnapshot(w: World): HudSnapshot {
       : undefined,
     cred: w.cred,
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),
+    callIn: w.callIns.roster.length > 0
+      ? {
+          name: ALLIES_BY_ID[w.callIns.roster[w.callIns.index]!]?.name ?? '',
+          label: CALL_INS[w.callIns.roster[w.callIns.index]!]?.label ?? '',
+          readyPct: clamp(100 - (Math.max(0, w.callIns.readyAt - w.now) / CALL_IN_COOLDOWN_MS) * 100, 0, 100),
+        }
+      : undefined,
     dashReadyPct: clamp(100 - (Math.max(0, w.player.dashReadyAt - w.now) / DASH_COOLDOWN_MS) * 100, 0, 100),
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
@@ -12783,6 +12849,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     quirkTakenRun: w.enemyQuirks.taken.size > 0,
     quirkSurgeSurvived: w.quirkSurgePhase === 2,
     runEventsSurvived: [...w.runEvents.survived],
+    callInsUsed: w.callIns.used,
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
     mapFindIds: [...w.mapFindIds],

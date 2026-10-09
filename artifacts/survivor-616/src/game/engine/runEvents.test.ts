@@ -116,3 +116,26 @@ test('tremor needs 6 maps', () => {
   }
   assert.ok([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].some((seed) => scheduleRunEvents(seed, 20).some((e) => e.id === 'tremor')));
 });
+
+test('crew call-ins: rotate through the rescued crew, share one cooldown, and pay through the normal paths', async () => {
+  const { callInCrew } = await import('./world');
+  const area = {
+    ...AREAS[0]!, id: 'call-in-test', obstacles: [], musicEvents: undefined, rescueAllyId: undefined, durationSec: 900,
+    waves: [{ fromSec: 0, toSec: 900, enemyId: 'nightcrawler', ratePerSec: 0.1, burst: 1 }],
+  };
+  const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 100 }, 3, [], 1, true, null, { callInAllyIds: ['pippa', 'not-a-real-ally', 'nyx'] });
+  assert.deepEqual(world.callIns.roster, ['pippa', 'nyx'], 'allies without a call-in are left out');
+  assert.equal(callInCrew(world), false, 'not ready in the first seconds');
+  world.now = 25_000;
+  world.player.hp = 50;
+  assert.equal(callInCrew(world), true);
+  assert.equal(world.player.hp, 75, "Pippa heals a quarter of max HP");
+  assert.equal(callInCrew(world), false, 'shared cooldown');
+  world.now += 31_000;
+  assert.equal(callInCrew(world), true, 'next in line is Nyx');
+  assert.equal(world.callIns.used, 2);
+  assert.equal(buildResult(world).callInsUsed, 2);
+  const solo = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats }, 3, [], 1, true, null, {});
+  solo.now = 99_000;
+  assert.equal(callInCrew(solo), false, 'no crew, no call-in');
+});
