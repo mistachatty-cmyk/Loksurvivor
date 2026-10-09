@@ -694,7 +694,7 @@ function Game() {
     <>
       {renderScreen()}
       {!(screen.name === 'hub' && chromeLayout === 'new') && <MusicNowPlaying placement={['intro', 'hub', 'run', 'arena'].includes(screen.name) ? 'default' : 'menu'} />}
-      {!['hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter'].includes(screen.name) && (
+      {!['intro', 'hub', 'run-setup', 'run', 'arena', 'starter-lokpet-encounter'].includes(screen.name) && (
         <button type="button" onClick={openLooks} className="fixed right-3 top-3 z-[110] inline-flex min-h-10 items-center gap-2 border border-cyan-200/35 bg-slate-950/85 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-xl backdrop-blur transition hover:border-cyan-100" data-testid="button-global-looks-lokpets"><Sparkles className="h-4 w-4 text-cyan-200" />Looks & LokPets</button>
       )}
       {choiceEvent && (
