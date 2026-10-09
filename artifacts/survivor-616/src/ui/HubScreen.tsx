@@ -735,6 +735,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   { id: 'lokPetTreats', name: 'Pet treats', value: meta.lokPetTreats, color: 'text-pink-300' },
                   { id: 'petElixirs', name: 'Pet elixirs', value: meta.petElixirs, color: 'text-fuchsia-300' },
                   { id: 'grpdSeals', name: 'GRPD seals', value: grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals), color: 'text-blue-300' },
+                  ...(meta.rescuedAllyIds.length > 0 ? [{ id: 'crewMorale', name: t('hub.resource.morale'), value: meta.crewMorale > 0 ? `+${meta.crewMorale}` : meta.crewMorale, color: meta.crewMorale < 0 ? 'text-red-400' : 'text-lime-300' }] : []),
                   ...(session && lokBalance !== null ? [{ id: 'lokTokens', name: 'LokTokens', value: lokBalance, color: 'text-violet-300' }] : []),
                 ]).map((r) => (
                   <div key={r.id} className="border border-border bg-black/20 p-2" data-testid={`resource-${r.id}`}>

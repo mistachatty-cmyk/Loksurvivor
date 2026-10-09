@@ -98,6 +98,7 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { moraleMultiplier, nextMorale, normalizeMorale } from '@/game/data/morale';
 import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
@@ -317,6 +318,7 @@ export function createInitialMeta(): MetaState {
     hideoutChoiceEvents: 'on',
     hideoutClaims: {},
     hideoutLedger: emptyLedger(),
+    crewMorale: 0,
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
@@ -1314,6 +1316,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutChoiceEvents: parsed.hideoutChoiceEvents === 'quiet' || parsed.hideoutChoiceEvents === 'off' ? parsed.hideoutChoiceEvents : 'on',
     hideoutClaims: normalizeHideoutClaims(parsed.hideoutClaims),
     hideoutLedger: normalizeHideoutLedger(parsed.hideoutLedger),
+    crewMorale: normalizeMorale(parsed.crewMorale),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
@@ -1643,11 +1646,12 @@ function validEpisodeResult(result: RunResult): CharacterEpisodeDef | undefined 
 /** Total permanent stat boost granted by every rescued ally. */
 export function allyBoostTotals(meta: MetaState): Partial<BaseStats> {
   const totals: Partial<BaseStats> = {};
+  const morale = moraleMultiplier(meta.crewMorale, endgameReached(meta));
   for (const id of meta.rescuedAllyIds) {
     const ally = ALLIES_BY_ID[id];
     if (!ally) continue;
     for (const [key, value] of Object.entries(ally.boost) as Array<[keyof BaseStats, number]>) {
-      totals[key] = (totals[key] ?? 0) + value;
+      totals[key] = (totals[key] ?? 0) + value * morale;
     }
   }
   return totals;
@@ -3771,6 +3775,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'completeRun': {
       const result = action.result;
       const prev = state.meta;
+      const crewMorale = nextMorale(prev.crewMorale, result.cleared);
       const runCharacter = getCharacter(result.characterId);
       const collectorRun = Boolean(runCharacter.lokPetCollector);
       const collectorPetsFound = collectorRun
@@ -3850,6 +3855,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
       const next: MetaState = {
         ...prev,
+        crewMorale,
         ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
         rescuedAllyIds,

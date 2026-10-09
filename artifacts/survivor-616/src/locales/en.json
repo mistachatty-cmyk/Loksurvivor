@@ -225,6 +225,7 @@
   "hideout.life.item.bond": "closer bond",
   "hideout.life.found": "Found: {{items}}",
   "hideout.life.usedToday": "Already done today. Back tomorrow.",
+  "hub.resource.morale": "Crew morale",
   "hideout.life.capped": "Your pockets are full for today. Try again tomorrow.",
   "hideout.life.useProp": "Use {{label}}",
   "hideout.life.eventChip": "Something's up",

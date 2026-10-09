@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 80,
+      "version": "0.21.6",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T13:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Crew Morale",
+      "body": [
+        "Your crew now has morale. Winning a run raises it and losing lowers it, and it can go negative. While it is negative your crew boosts shrink, down to half.",
+        "A loss while morale is positive wipes the streak back to zero. Once the end game is reached, every point of positive morale adds a quarter to every crew boost, with no upper limit.",
+        "Crew morale shows in the hideout Resources panel."
+      ]
+    },
+    {
       "number": 79,
       "version": "0.21.5",
       "date": "2026-10-09",

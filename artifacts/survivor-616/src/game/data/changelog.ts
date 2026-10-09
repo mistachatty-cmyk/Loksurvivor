@@ -935,6 +935,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Hideout props no longer eat your daily claim when the daily reward limit leaves nothing to pay. The Relay Crate now tells you your pockets are full and lets you try again later.',
     ],
   },
+  {
+    version: '0.21.6',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T13:00:00Z',
+    kind: 'update',
+    title: 'Crew Morale',
+    body: [
+      'Your crew now has morale. Winning a run raises it and losing lowers it, and it can go negative. While it is negative your crew boosts shrink, down to half.',
+      'A loss while morale is positive wipes the streak back to zero. Once the end game is reached, every point of positive morale adds a quarter to every crew boost, with no upper limit.',
+      'Crew morale shows in the hideout Resources panel.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
