@@ -98,6 +98,7 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
 import { normalizeSpurAreaIds, spurAt } from '@/game/data/lightSpurs';
 import { openLuckyChest } from '@/game/engine/chestOpen';
 import { activeSkyBoost, applySkyStatBonus, normalizeSkyBoost, skyXpMultiplier, startSkyBoost } from '@/game/data/skyEvents';
@@ -2056,6 +2057,7 @@ type Action =
   | { type: 'lookThroughSpyglass'; now: number }
   | { type: 'openLuckyChest'; now: number; seed: number }
   | { type: 'grantBall' }
+  | { type: 'collectHideoutPickup'; kindId: string; now: number }
   | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
   | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
@@ -3428,6 +3430,13 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
     }
 
+    case 'collectHideoutPickup': {
+      const def = AMBIENT_PICKUPS_BY_ID[action.kindId];
+      if (!def) return state;
+      const paid = grantWithFallback(state.meta, def.reward, undefined, { now: action.now, elixirCap: ELIXIR_CAP });
+      return paid.paid ? { ...state, meta: paid.meta } : state;
+    }
+
     case 'grantBall':
       return state.meta.ownsBall ? state : { ...state, meta: { ...state.meta, ownsBall: true } };
 
@@ -4219,6 +4228,7 @@ export interface MetaContextValue {
   openLuckyChest: (seed: number) => void;
   /** Gives the player the Ball. The LokShop purchase will call this. */
   grantBall: () => void;
+  collectHideoutPickup: (kindId: string) => void;
   playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
   resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
@@ -4457,6 +4467,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setHideoutChoiceEvents = useCallback((mode: MetaState['hideoutChoiceEvents']) => dispatch({ type: 'setHideoutChoiceEvents', mode }), []);
   const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
   const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
+  const collectHideoutPickup = useCallback((kindId: string) => dispatch({ type: 'collectHideoutPickup', kindId, now: Date.now() }), []);
   const grantBall = useCallback(() => dispatch({ type: 'grantBall' }), []);
   const openLuckyChestAction = useCallback((seed: number) => dispatch({ type: 'openLuckyChest', now: Date.now(), seed }), []);
   const lookThroughSpyglass = useCallback(() => dispatch({ type: 'lookThroughSpyglass', now: Date.now() }), []);
@@ -4739,6 +4750,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       lookThroughSpyglass,
       openLuckyChest: openLuckyChestAction,
       grantBall,
+      collectHideoutPickup,
       playWithLokPet,
       resolveChoiceEvent,
       careForLokPet,
