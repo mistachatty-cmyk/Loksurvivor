@@ -18,7 +18,7 @@ contracts; read the linked notes before building one.
 - Idle things are a chip, never a pop-up (`hideout-interactables.md`).
 - Endless-mode difficulty stays inside the existing `Math.min()` caps
   (`endless-mode-engine.md`).
-- Never use the word "signal". Use beacon / pulse / relay / static / frequency.
+- Follow the naming rule in CLAUDE.md. Use beacon / pulse / relay / static / frequency.
 - New player text goes in `locales/en.json`; bump the changelog every release.
 
 ## 1. In-run events: a "Director" that tells a story
