@@ -925,6 +925,49 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The hideout now has a Resources panel above Passive income that counts everything you are holding: cred, loot tokens, skeleton keys, card credits, pet treats, pet elixirs, GRPD seals and LokTokens.',
     ],
   },
+  {
+    version: '0.21.5',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T12:00:00Z',
+    kind: 'hotfix',
+    title: 'The Crate Answers',
+    body: [
+      'Hideout props no longer eat your daily claim when the daily reward limit leaves nothing to pay. The Relay Crate now tells you your pockets are full and lets you try again later.',
+    ],
+  },
+  {
+    version: '0.21.6',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T13:00:00Z',
+    kind: 'update',
+    title: 'Crew Morale',
+    body: [
+      'Your crew now has morale. Winning a run raises it and losing lowers it, and it can go negative. While it is negative your crew boosts shrink, down to half.',
+      'A loss while morale is positive wipes the streak back to zero. Once the end game is reached, every point of positive morale adds a quarter to every crew boost, with no upper limit.',
+      'Crew morale shows in the hideout Resources panel.',
+    ],
+  },
+  {
+    version: '0.21.7',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T14:00:00Z',
+    kind: 'update',
+    title: 'Secrets on the Title Screen',
+    body: [
+      'The title screen now sometimes shows a little pop in the corner, including a salute to Perfect L13gend, one of the greatest fighting game players ever.',
+      'Five secrets can also be summoned by typing a word on the title screen. Finding the words is half the fun.',
+    ],
+  },
+  {
+    version: '0.21.8',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T15:00:00Z',
+    kind: 'update',
+    title: 'Win Streak',
+    body: [
+      'The hideout Resources panel now counts your win streak, the number of runs you have won in a row, and remembers your best. Any loss sends the streak back to zero.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

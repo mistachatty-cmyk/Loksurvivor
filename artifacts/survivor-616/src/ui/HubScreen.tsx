@@ -304,6 +304,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       const seed = Math.floor(Math.random() * 0x7fffffff);
       const roll = resolvePropReward(def, createRng(seed), bondLuck(meta.savedLokPets));
       const preview = roll ? grantWithFallback(meta, roll.reward, roll.fallback, { now, rare: roll.rare, elixirCap: ELIXIR_CAP }) : null;
+      if (!preview?.paid) {
+        // The daily caps would swallow this grant: say so and keep the claim for later.
+        showStripNotice(title, t('hideout.life.capped'));
+        return;
+      }
       activateHideoutProp(propId, seed);
       const found = preview ? describeReward(preview.applied, t) : '';
       const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;
@@ -730,6 +735,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   { id: 'lokPetTreats', name: 'Pet treats', value: meta.lokPetTreats, color: 'text-pink-300' },
                   { id: 'petElixirs', name: 'Pet elixirs', value: meta.petElixirs, color: 'text-fuchsia-300' },
                   { id: 'grpdSeals', name: 'GRPD seals', value: grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals), color: 'text-blue-300' },
+                  { id: 'runStreak', name: t('hub.resource.streak'), value: `${meta.runStreak} (${t('hub.resource.streakBest', { best: meta.bestRunStreak })})`, color: 'text-orange-300' },
+                  ...(meta.rescuedAllyIds.length > 0 ? [{ id: 'crewMorale', name: t('hub.resource.morale'), value: meta.crewMorale > 0 ? `+${meta.crewMorale}` : meta.crewMorale, color: meta.crewMorale < 0 ? 'text-red-400' : 'text-lime-300' }] : []),
                   ...(session && lokBalance !== null ? [{ id: 'lokTokens', name: 'LokTokens', value: lokBalance, color: 'text-violet-300' }] : []),
                 ]).map((r) => (
                   <div key={r.id} className="border border-border bg-black/20 p-2" data-testid={`resource-${r.id}`}>

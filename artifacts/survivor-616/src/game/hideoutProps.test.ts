@@ -15,6 +15,7 @@ import {
   resolvePropReward,
 } from '@/game/data/hideoutProps';
 import { PER_GRANT_MAX, type SmallReward } from '@/game/engine/hideoutRewards';
+import { bondDayKey } from '@/game/engine/petGrowth';
 import { rollLokPet } from '@/game/data/lokPets';
 import { createInitialMeta, reducer } from '@/game/state/metaStore';
 import type { SavedLokPet } from '@/game/types';
@@ -117,6 +118,14 @@ describe('hideout prop data', () => {
 describe('activating a prop', () => {
   const pet = (): SavedLokPet => ({ id: 'p1', roll: rollLokPet(createRng(7), { fixedVariantId: 'gyro-sentry' }), stamina: 3, level: 1, exp: 0, battlesWon: 0, battlesFought: 0 });
   const start = () => ({ meta: { ...createInitialMeta(), savedLokPets: [pet()], cred: 0 }, lastRun: null, lastCardPackReveal: null });
+
+  it('keeps the daily claim when the daily caps leave nothing to pay', () => {
+    const full = start();
+    full.meta = { ...full.meta, hideoutLedger: { day: bondDayKey(NOON), granted: { cred: 60 }, events: 0, rare: 0 } };
+    const result = reducer(full, { type: 'activateHideoutProp', propId: 'bell-cord', seed: 1, now: NOON });
+    assert.equal(result.meta.cred, 0);
+    assert.equal(result.meta.hideoutClaims[propClaimKey('bell-cord')], undefined);
+  });
 
   it('pays once per day and treats a replay as a no-op', () => {
     const first = reducer(start(), { type: 'activateHideoutProp', propId: 'bell-cord', seed: 1, now: NOON });
