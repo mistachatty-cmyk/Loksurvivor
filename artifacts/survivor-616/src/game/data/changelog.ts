@@ -1011,6 +1011,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The shelf previews what is coming: the Ball, the Chest Pass and the Rider Saddle. Nothing can be bought yet.',
     ],
   },
+  {
+    version: '0.22.3',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T20:00:00Z',
+    kind: 'update',
+    title: 'Fetch!',
+    body: [
+      'The hideout now has a Ball. Put it out, tap it and your operator walks over and picks it up, then tap anywhere to throw it. How far and how high it goes depends on your UI theme.',
+      'Your LokPets race for it, faster pets and closer bonds win more often. Most pets love the ball. A few are ball-shy until you bond or play with them. The winner spits the ball out, spins, jumps on your head and jumps off.',
+      'The Ball will be sold in the LokShop. It is not for sale yet.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

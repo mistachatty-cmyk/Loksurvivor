@@ -1,9 +1,43 @@
 # Hideout rewards, LokShop, morale and LokPet expansion: raw design notes
 
-Status: **notes only, nothing built.** Captured 2026-10-08 from the owner's brain-dump so it can be
-planned after the session reset. Wording is preserved where the owner was specific; open questions
-are flagged `Q:`. Everything here should land as **data in charts/tables plus small systems with
-clean code** (per the data-driven rule in `CLAUDE.md`: new content is a record, not an engine edit).
+Status (updated 2026-10-09): **partly built.** The original notes came from the owner's brain-dump on
+2026-10-08; the table below tracks what has shipped and what is still open. Open questions are
+flagged `Q:`. Everything lands as **data in charts/tables plus small systems with clean code**
+(the data-driven rule in `CLAUDE.md`: new content is a record, not an engine edit).
+
+## Build status
+
+| Item | Status | Version | Where |
+| --- | --- | --- | --- |
+| Relay Crate "does nothing" bug | Fixed: a prop no longer burns its daily claim when the daily caps pay nothing | 0.21.5 | `state/metaStore.tsx`, `ui/HubScreen.tsx` |
+| Crew morale (wins/losses, negative, +0.25 stack after endgame, reset on loss) | Built, crew-wide | 0.21.6 | `data/morale.ts` |
+| Win streak counter (feeds the future leaderboard) | Built | 0.21.8 | `data/morale.ts`, Resources panel |
+| Intro easter eggs incl. Perfect L13gend salute | Built | 0.21.7 | `data/introEggs.ts` |
+| Sky Spyglass: eclipse, glyphs, eclipse + glyphs | Built; boost is started by looking, 1 hour, once per 2-hour window | 0.21.9 | `data/skyEvents.ts` |
+| Lucky Chest event (tiered loot, cards, cosmetics) | Built; chest-only cards NOT done (uses existing cards by rarity); no pop-up/float-out yet | 0.22.0 | `data/chestLoot.ts`, `engine/chestOpen.ts` |
+| Seizure and photosensitivity warning | Built | 0.22.1 | `ui/PhotosensitivityNotice.tsx` |
+| LokShop + LokServer shell, knowledge doc | Built; shelf is preview only | 0.22.2 | `data/lokServer.ts`, `docs/lokserver-knowledge.md` |
+| The Ball (fetch, throw, race, winner routine) | Built; gated by `ownsBall`, no purchase path yet | 0.22.3 | `data/hideoutBall.ts`, `engine/hideoutBall.ts` |
+| Light Spurs | Not started | | |
+| Chest Pass (3-round LokToken consumable) + leaderboard stash | Not started; blocked on the LokToken catalog decision below | | |
+| Event rework (story + boost + negation) | Not started | | |
+| Ambient events, emotions, llamas, Digi mite, bell | Not started | | |
+| Looks-first UI pass | Not started | | |
+| Pet rider (5 jumps, knock-off, enrage) | Not started | | |
+| Crew expeditions | Not started | | |
+| Leaderboard on gsix | Not started (streak data exists) | | |
+
+### Blocker: LokToken purchases
+Real LokToken spending goes through the shared account economy (`lok_catalog` on the shared server).
+The Ball, Chest Pass and Rider Saddle each need a catalog entry (generate the SQL with
+`scripts/export-lok-registry.ts`; someone must apply it to the shared project). The existing
+`spend()` treats a purchase as buy-once, so rebuyable consumables (Chest Pass) need either a
+repeatable item type on the server or a per-use token count. Until decided, `ownsBall` is the
+local gate and the LokShop shelf shows these as Coming soon.
+
+### Not yet verified by eye
+The Ball was driven in headless Chromium (state read out, a few screenshots); the title screen
+pops, Resources tiles, chest and spyglass props have not been looked at in a browser.
 
 Rules that apply to all of it:
 - Every hideout payout goes through `engine/hideoutRewards.ts` (daily caps, rare limits) -

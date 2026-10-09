@@ -323,6 +323,7 @@ export function createInitialMeta(): MetaState {
     crewMorale: 0,
     runStreak: 0,
     skyBoost: null,
+    ownsBall: false,
     bestRunStreak: 0,
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
@@ -1324,6 +1325,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     crewMorale: normalizeMorale(parsed.crewMorale),
     runStreak: normalizeStreak(parsed.runStreak),
     skyBoost: normalizeSkyBoost(parsed.skyBoost),
+    ownsBall: parsed.ownsBall === true,
     bestRunStreak: Math.max(normalizeStreak(parsed.bestRunStreak), normalizeStreak(parsed.runStreak)),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
@@ -2036,6 +2038,7 @@ type Action =
   | { type: 'activateHideoutProp'; propId: string; seed: number; now: number }
   | { type: 'lookThroughSpyglass'; now: number }
   | { type: 'openLuckyChest'; now: number; seed: number }
+  | { type: 'grantBall' }
   | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
   | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
@@ -3408,6 +3411,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
     }
 
+    case 'grantBall':
+      return state.meta.ownsBall ? state : { ...state, meta: { ...state.meta, ownsBall: true } };
+
     case 'openLuckyChest': {
       const opened = openLuckyChest(state.meta, action.now, action.seed, ELIXIR_CAP);
       return opened ? { ...state, meta: opened.meta } : state;
@@ -4185,6 +4191,8 @@ export interface MetaContextValue {
   activateHideoutProp: (propId: string, seed: number) => void;
   lookThroughSpyglass: () => void;
   openLuckyChest: (seed: number) => void;
+  /** Gives the player the Ball. The LokShop purchase will call this. */
+  grantBall: () => void;
   playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
   resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
@@ -4423,6 +4431,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setHideoutChoiceEvents = useCallback((mode: MetaState['hideoutChoiceEvents']) => dispatch({ type: 'setHideoutChoiceEvents', mode }), []);
   const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
   const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
+  const grantBall = useCallback(() => dispatch({ type: 'grantBall' }), []);
   const openLuckyChestAction = useCallback((seed: number) => dispatch({ type: 'openLuckyChest', now: Date.now(), seed }), []);
   const lookThroughSpyglass = useCallback(() => dispatch({ type: 'lookThroughSpyglass', now: Date.now() }), []);
   const activateHideoutProp = useCallback((propId: string, seed: number) => dispatch({ type: 'activateHideoutProp', propId, seed, now: Date.now() }), []);
@@ -4703,6 +4712,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       activateHideoutProp,
       lookThroughSpyglass,
       openLuckyChest: openLuckyChestAction,
+      grantBall,
       playWithLokPet,
       resolveChoiceEvent,
       careForLokPet,
