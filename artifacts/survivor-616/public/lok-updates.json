@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 83,
+      "version": "0.21.9",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T16:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Look at the Sky",
+      "body": [
+        "The rooftop now has a Sky Spyglass. Every two hours the sky changes: clear, glyphs, an eclipse, or both at once.",
+        "Look through the spyglass while something is up to start a one hour boost. Glyphs give +10% to every stat, an eclipse gives +5% experience, and a glyph eclipse gives +15% to every stat plus the +5% experience."
+      ]
+    },
+    {
       "number": 82,
       "version": "0.21.8",
       "date": "2026-10-09",

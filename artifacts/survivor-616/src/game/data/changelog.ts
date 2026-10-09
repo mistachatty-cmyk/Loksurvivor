@@ -968,6 +968,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The hideout Resources panel now counts your win streak, the number of runs you have won in a row, and remembers your best. Any loss sends the streak back to zero.',
     ],
   },
+  {
+    version: '0.21.9',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T16:00:00Z',
+    kind: 'update',
+    title: 'Look at the Sky',
+    body: [
+      'The rooftop now has a Sky Spyglass. Every two hours the sky changes: clear, glyphs, an eclipse, or both at once.',
+      'Look through the spyglass while something is up to start a one hour boost. Glyphs give +10% to every stat, an eclipse gives +5% experience, and a glyph eclipse gives +15% to every stat plus the +5% experience.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -1164,6 +1164,8 @@ export interface World {
 
   level: number;
   xp: number;
+  /** Multiplier on experience gained this run. */
+  xpMult: number;
   xpToNext: number;
   pendingLevelUps: number;
   /** Level-up rerolls left this run, spent via `consumeReroll`. */
@@ -1508,6 +1510,8 @@ export function createWorld(
     wildlifeSheltersInRain?: boolean;
     physicsObjectClickRadiusBonus?: number;
     sizeMult?: number;
+    /** Multiplier on experience gained this run (1 = normal). */
+    xpMult?: number;
     stealth?: StealthAbilityConfig | null;
     hazardImmune?: boolean;
     unlockedCharacterIds?: string[];
@@ -1753,6 +1757,7 @@ export function createWorld(
     onBeatHits: 0,
     level: 1,
     xp: 0,
+    xpMult: Math.max(0, setup.xpMult ?? 1),
     xpToNext: xpForLevel(1),
     pendingLevelUps: 0,
     rerollsRemaining: LEVEL_UP_REROLLS_PER_RUN,
@@ -6157,7 +6162,7 @@ function applyEffect(w: World, effect: UpgradeDef['effects'][number]) {
 }
 
 function gainXp(w: World, amount: number) {
-  w.xp += amount;
+  w.xp += amount * w.xpMult;
   while (w.xp >= w.xpToNext) {
     w.xp -= w.xpToNext;
     w.level += 1;

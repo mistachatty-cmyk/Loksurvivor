@@ -22,6 +22,7 @@ import { MusicNowPlaying } from './MusicNowPlaying';
 import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { describeReward } from './hideoutRewardText';
 import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
+import { activeSkyBoost, skyAt, startSkyBoost } from '@/game/data/skyEvents';
 import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER, type NpcCastMember } from '@/game/data/npcCast';
 import { bondLuck, eventsLeftToday, grantWithFallback } from '@/game/engine/hideoutRewards';
 import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
@@ -154,7 +155,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const locale = useLocale();
@@ -313,6 +314,13 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       const found = preview ? describeReward(preview.applied, t) : '';
       const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;
       showStripNotice(title, found ? `${text} ${t('hideout.life.found', { items: found })}` : text);
+    } else if (action.kind === 'sky') {
+      const sky = skyAt(Date.now());
+      const started = startSkyBoost(meta.skyBoost, Date.now());
+      if (started) lookThroughSpyglass();
+      const running = activeSkyBoost(started ?? meta.skyBoost, Date.now());
+      const suffix = started ? t('sky.started') : running ? t('sky.running', { title: t(running.titleKey as never) }) : '';
+      showStripNotice(t(sky.titleKey as never), `${t(sky.lineKey as never)} ${suffix}`.trim());
     } else if (action.kind === 'event') {
       const now = Date.now();
       if (!propReady(def, meta.hideoutClaims, now)) {

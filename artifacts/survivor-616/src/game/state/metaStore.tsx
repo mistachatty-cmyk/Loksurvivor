@@ -98,6 +98,7 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { activeSkyBoost, applySkyStatBonus, normalizeSkyBoost, skyXpMultiplier, startSkyBoost } from '@/game/data/skyEvents';
 import { moraleMultiplier, nextMorale, nextStreak, normalizeMorale, normalizeStreak } from '@/game/data/morale';
 import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
@@ -320,6 +321,7 @@ export function createInitialMeta(): MetaState {
     hideoutLedger: emptyLedger(),
     crewMorale: 0,
     runStreak: 0,
+    skyBoost: null,
     bestRunStreak: 0,
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
@@ -1320,6 +1322,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutLedger: normalizeHideoutLedger(parsed.hideoutLedger),
     crewMorale: normalizeMorale(parsed.crewMorale),
     runStreak: normalizeStreak(parsed.runStreak),
+    skyBoost: normalizeSkyBoost(parsed.skyBoost),
     bestRunStreak: Math.max(normalizeStreak(parsed.bestRunStreak), normalizeStreak(parsed.runStreak)),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
@@ -1696,6 +1699,7 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   const cards = activeCardEffects(meta);
   for (const [stat, multiplier] of Object.entries(cards.statMults) as Array<[keyof BaseStats, number]>) stats[stat] *= multiplier;
   stats.magnet *= cards.magnetMult;
+  applySkyStatBonus(stats, activeSkyBoost(meta.skyBoost, Date.now())?.statBonus ?? 0);
   stats.armor = Math.min(stats.armor, 0.6);
   if (!ignoreFatigue) {
     const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
@@ -2029,6 +2033,7 @@ type Action =
   | { type: 'setHideoutPetPlay'; enabled: boolean }
   | { type: 'setHideoutChoiceEvents'; mode: MetaState['hideoutChoiceEvents'] }
   | { type: 'activateHideoutProp'; propId: string; seed: number; now: number }
+  | { type: 'lookThroughSpyglass'; now: number }
   | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
   | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
@@ -3401,6 +3406,11 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
     }
 
+    case 'lookThroughSpyglass': {
+      const boost = startSkyBoost(state.meta.skyBoost, action.now);
+      return boost ? { ...state, meta: { ...state.meta, skyBoost: boost } } : state;
+    }
+
     case 'chooseLokPetBranch': {
       const pet = state.meta.savedLokPets.find((candidate) => candidate.id === action.id);
       if (!pet) return state;
@@ -4166,6 +4176,7 @@ export interface MetaContextValue {
   setHideoutPetPlay: (enabled: boolean) => void;
   setHideoutChoiceEvents: (mode: MetaState['hideoutChoiceEvents']) => void;
   activateHideoutProp: (propId: string, seed: number) => void;
+  lookThroughSpyglass: () => void;
   playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
   resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
@@ -4404,6 +4415,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setHideoutChoiceEvents = useCallback((mode: MetaState['hideoutChoiceEvents']) => dispatch({ type: 'setHideoutChoiceEvents', mode }), []);
   const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
   const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
+  const lookThroughSpyglass = useCallback(() => dispatch({ type: 'lookThroughSpyglass', now: Date.now() }), []);
   const activateHideoutProp = useCallback((propId: string, seed: number) => dispatch({ type: 'activateHideoutProp', propId, seed, now: Date.now() }), []);
   const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
   const chooseLokPetBranch = useCallback((id: string, branchId: string) => dispatch({ type: 'chooseLokPetBranch', id, branchId, now: Date.now() }), []);
@@ -4680,6 +4692,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutPetPlay,
       setHideoutChoiceEvents,
       activateHideoutProp,
+      lookThroughSpyglass,
       playWithLokPet,
       resolveChoiceEvent,
       careForLokPet,

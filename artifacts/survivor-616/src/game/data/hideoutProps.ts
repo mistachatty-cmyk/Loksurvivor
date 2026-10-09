@@ -37,6 +37,8 @@ export type PropAction =
   | { kind: 'panel'; panel: HubPanel }
   /** Starts a choice event from this pool (`data/choiceEvents.ts`). */
   | { kind: 'event'; pool: string }
+  /** Looks at the sky (`data/skyEvents.ts`) and starts its boost when there is one. */
+  | { kind: 'sky' }
   /** A small payout, once per cooldown. */
   | { kind: 'reward'; table: PropRewardRow[]; rare?: PropRareFind };
 
@@ -110,6 +112,13 @@ export const HIDEOUT_PROPS: HideoutPropDef[] = [
     lineKeys: ['hideout.prop.beacon-lamp.line.1', 'hideout.prop.beacon-lamp.line.2'],
     cooldown: 'daily',
     action: { kind: 'reward', table: [{ weight: 1, reward: { cred: 6 } }] },
+  },
+  {
+    id: 'sky-spyglass', roomIds: ['rooftop-perch'], x: 0.4, art: 'scope', accent: '#fbbf24',
+    labelKey: 'hideout.prop.sky-spyglass.label',
+    lineKeys: ['hideout.prop.sky-spyglass.line.1', 'hideout.prop.sky-spyglass.line.2'],
+    cooldown: 0,
+    action: { kind: 'sky' },
   },
   {
     id: 'old-telescope', roomIds: ['rooftop-perch'], x: 0.75, art: 'scope', accent: '#67e8f9',
