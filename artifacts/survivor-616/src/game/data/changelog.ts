@@ -1126,7 +1126,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.23.3',
-    date: '2026-10-09',
+    date: '2026-10-10',
     publishedAt: '2026-10-10T00:00:05Z',
     kind: 'update',
     title: 'Bigger Text On Demand',
