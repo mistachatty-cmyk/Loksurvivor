@@ -547,5 +547,14 @@
   "bestiary.custom.empty": "아직 아무것도 없습니다. Forge에서 적이나 LokPet를 다시 칠하고 저장하세요.",
   "bestiary.custom.unchanged": "능력치와 행동에는 변함이 없습니다.",
   "bestiary.custom.active": "실행에 사용",
-  "bestiary.custom.openForge": "대장간을여세요"
+  "bestiary.custom.openForge": "대장간을여세요",
+  "soundbar.more": "더 많은 음악 컨트롤",
+  "soundbar.more.aria": "음악 컨트롤",
+  "soundbar.mute": "음악 음소거",
+  "soundbar.unmute": "음악 음소거 해제",
+  "soundbar.volume": "음악 볼륨",
+  "soundbar.seek": "트랙에서 탐색",
+  "soundbar.shuffle": "셔플",
+  "soundbar.repeat": "반복",
+  "soundbar.speed": "재생 속도"
 }

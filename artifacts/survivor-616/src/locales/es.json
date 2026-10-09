@@ -547,5 +547,14 @@
   "bestiary.custom.empty": "Nada aquí todavía. Cambia el color de un enemigo o LokPet en Forge y guárdalo.",
   "bestiary.custom.unchanged": "Las estadísticas y el comportamiento no cambian.",
   "bestiary.custom.active": "Uso en carreras",
-  "bestiary.custom.openForge": "Abre la fragua"
+  "bestiary.custom.openForge": "Abre la fragua",
+  "soundbar.more": "Más controles de música",
+  "soundbar.more.aria": "Controles de música",
+  "soundbar.mute": "música silenciosa",
+  "soundbar.unmute": "Activar música",
+  "soundbar.volume": "Volumen de música",
+  "soundbar.seek": "buscar en la pista",
+  "soundbar.shuffle": "barajar",
+  "soundbar.repeat": "repetir",
+  "soundbar.speed": "Velocidad de reproducción"
 }

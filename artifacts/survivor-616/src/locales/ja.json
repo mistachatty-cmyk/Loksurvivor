@@ -546,5 +546,14 @@
   "bestiary.custom.empty": "ここにはまだ何もありません。フォージで敵または LokPet の色を変更して保存します。",
   "bestiary.custom.unchanged": "統計と動作は変わりません。",
   "bestiary.custom.active": "ランニングでの使用",
-  "bestiary.custom.openForge": "鍛冶場を開く"
+  "bestiary.custom.openForge": "鍛冶場を開く",
+  "soundbar.more": "より多くの音楽コントロール",
+  "soundbar.more.aria": "音楽コントロール",
+  "soundbar.mute": "音楽をミュートします",
+  "soundbar.unmute": "音楽のミュートを解除する",
+  "soundbar.volume": "音楽の音量",
+  "soundbar.seek": "トラック内でシークする",
+  "soundbar.shuffle": "シャッフル",
+  "soundbar.repeat": "リピート",
+  "soundbar.speed": "再生速度"
 }

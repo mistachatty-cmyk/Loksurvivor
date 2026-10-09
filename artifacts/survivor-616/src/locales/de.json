@@ -547,5 +547,14 @@
   "bestiary.custom.empty": "Hier ist noch nichts. Färbe einen Feind oder LokPet in der Schmiede um und speichere ihn.",
   "bestiary.custom.unchanged": "Statistiken und Verhalten bleiben unverändert.",
   "bestiary.custom.active": "Verwendung in Läufen",
-  "bestiary.custom.openForge": "Öffne die Schmiede"
+  "bestiary.custom.openForge": "Öffne die Schmiede",
+  "soundbar.more": "Mehr Musiksteuerung",
+  "soundbar.more.aria": "Musiksteuerung",
+  "soundbar.mute": "Stumme Musik",
+  "soundbar.unmute": "Stummschaltung der Musik aufheben",
+  "soundbar.volume": "Musiklautstärke",
+  "soundbar.seek": "Auf Spur suchen",
+  "soundbar.shuffle": "Mischen",
+  "soundbar.repeat": "Wiederholen",
+  "soundbar.speed": "Wiedergabegeschwindigkeit"
 }

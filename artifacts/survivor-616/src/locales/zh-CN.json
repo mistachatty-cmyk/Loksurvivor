@@ -547,5 +547,14 @@
   "bestiary.custom.empty": "这里还什么都没有。为熔炉中的敌人或 LokPet 重新着色并保存。",
   "bestiary.custom.unchanged": "统计数据和行为保持不变。",
   "bestiary.custom.active": "在运行中使用",
-  "bestiary.custom.openForge": "打开熔炉"
+  "bestiary.custom.openForge": "打开熔炉",
+  "soundbar.more": "更多音乐控制",
+  "soundbar.more.aria": "音乐控制",
+  "soundbar.mute": "将音乐静音",
+  "soundbar.unmute": "取消音乐静音",
+  "soundbar.volume": "音乐音量",
+  "soundbar.seek": "在轨道中寻找",
+  "soundbar.shuffle": "随机播放",
+  "soundbar.repeat": "重复",
+  "soundbar.speed": "播放速度"
 }

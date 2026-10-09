@@ -552,7 +552,16 @@
     "sleeve.motion.label": "9fa5e3ca9d0e",
     "sleeve.motion.off": "e3de5ab0ca4c",
     "sleeve.motion.subtle": "615336f890ec",
-    "sleeve.title": "d01cb7834834"
+    "sleeve.title": "d01cb7834834",
+    "soundbar.more": "5d7d3f7753a2",
+    "soundbar.more.aria": "a3573d2e3ed7",
+    "soundbar.mute": "155a1fae518d",
+    "soundbar.repeat": "659eba121958",
+    "soundbar.seek": "a85bfeac3880",
+    "soundbar.shuffle": "5b772b7bfd0a",
+    "soundbar.speed": "6ff42b75c926",
+    "soundbar.unmute": "91872b594bf1",
+    "soundbar.volume": "0d49fceb8d4a"
   },
   "es": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -1107,7 +1116,16 @@
     "sleeve.motion.label": "9fa5e3ca9d0e",
     "sleeve.motion.off": "e3de5ab0ca4c",
     "sleeve.motion.subtle": "615336f890ec",
-    "sleeve.title": "d01cb7834834"
+    "sleeve.title": "d01cb7834834",
+    "soundbar.more": "5d7d3f7753a2",
+    "soundbar.more.aria": "a3573d2e3ed7",
+    "soundbar.mute": "155a1fae518d",
+    "soundbar.repeat": "659eba121958",
+    "soundbar.seek": "a85bfeac3880",
+    "soundbar.shuffle": "5b772b7bfd0a",
+    "soundbar.speed": "6ff42b75c926",
+    "soundbar.unmute": "91872b594bf1",
+    "soundbar.volume": "0d49fceb8d4a"
   },
   "fr": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -1662,7 +1680,16 @@
     "sleeve.motion.label": "9fa5e3ca9d0e",
     "sleeve.motion.off": "e3de5ab0ca4c",
     "sleeve.motion.subtle": "615336f890ec",
-    "sleeve.title": "d01cb7834834"
+    "sleeve.title": "d01cb7834834",
+    "soundbar.more": "5d7d3f7753a2",
+    "soundbar.more.aria": "a3573d2e3ed7",
+    "soundbar.mute": "155a1fae518d",
+    "soundbar.repeat": "659eba121958",
+    "soundbar.seek": "a85bfeac3880",
+    "soundbar.shuffle": "5b772b7bfd0a",
+    "soundbar.speed": "6ff42b75c926",
+    "soundbar.unmute": "91872b594bf1",
+    "soundbar.volume": "0d49fceb8d4a"
   },
   "ja": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -2216,7 +2243,16 @@
     "sleeve.motion.label": "9fa5e3ca9d0e",
     "sleeve.motion.off": "e3de5ab0ca4c",
     "sleeve.motion.subtle": "615336f890ec",
-    "sleeve.title": "d01cb7834834"
+    "sleeve.title": "d01cb7834834",
+    "soundbar.more": "5d7d3f7753a2",
+    "soundbar.more.aria": "a3573d2e3ed7",
+    "soundbar.mute": "155a1fae518d",
+    "soundbar.repeat": "659eba121958",
+    "soundbar.seek": "a85bfeac3880",
+    "soundbar.shuffle": "5b772b7bfd0a",
+    "soundbar.speed": "6ff42b75c926",
+    "soundbar.unmute": "91872b594bf1",
+    "soundbar.volume": "0d49fceb8d4a"
   },
   "ko": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -2771,7 +2807,16 @@
     "sleeve.motion.label": "9fa5e3ca9d0e",
     "sleeve.motion.off": "e3de5ab0ca4c",
     "sleeve.motion.subtle": "615336f890ec",
-    "sleeve.title": "d01cb7834834"
+    "sleeve.title": "d01cb7834834",
+    "soundbar.more": "5d7d3f7753a2",
+    "soundbar.more.aria": "a3573d2e3ed7",
+    "soundbar.mute": "155a1fae518d",
+    "soundbar.repeat": "659eba121958",
+    "soundbar.seek": "a85bfeac3880",
+    "soundbar.shuffle": "5b772b7bfd0a",
+    "soundbar.speed": "6ff42b75c926",
+    "soundbar.unmute": "91872b594bf1",
+    "soundbar.volume": "0d49fceb8d4a"
   },
   "pt-BR": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -3326,7 +3371,16 @@
     "sleeve.motion.label": "9fa5e3ca9d0e",
     "sleeve.motion.off": "e3de5ab0ca4c",
     "sleeve.motion.subtle": "615336f890ec",
-    "sleeve.title": "d01cb7834834"
+    "sleeve.title": "d01cb7834834",
+    "soundbar.more": "5d7d3f7753a2",
+    "soundbar.more.aria": "a3573d2e3ed7",
+    "soundbar.mute": "155a1fae518d",
+    "soundbar.repeat": "659eba121958",
+    "soundbar.seek": "a85bfeac3880",
+    "soundbar.shuffle": "5b772b7bfd0a",
+    "soundbar.speed": "6ff42b75c926",
+    "soundbar.unmute": "91872b594bf1",
+    "soundbar.volume": "0d49fceb8d4a"
   },
   "zh-CN": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -3881,6 +3935,15 @@
     "sleeve.motion.label": "9fa5e3ca9d0e",
     "sleeve.motion.off": "e3de5ab0ca4c",
     "sleeve.motion.subtle": "615336f890ec",
-    "sleeve.title": "d01cb7834834"
+    "sleeve.title": "d01cb7834834",
+    "soundbar.more": "5d7d3f7753a2",
+    "soundbar.more.aria": "a3573d2e3ed7",
+    "soundbar.mute": "155a1fae518d",
+    "soundbar.repeat": "659eba121958",
+    "soundbar.seek": "a85bfeac3880",
+    "soundbar.shuffle": "5b772b7bfd0a",
+    "soundbar.speed": "6ff42b75c926",
+    "soundbar.unmute": "91872b594bf1",
+    "soundbar.volume": "0d49fceb8d4a"
   }
 }

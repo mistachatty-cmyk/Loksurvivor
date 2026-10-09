@@ -547,5 +547,14 @@
   "bestiary.custom.empty": "Rien ici encore. Recolorez un ennemi ou un LokPet dans la Forge et sauvegardez-le.",
   "bestiary.custom.unchanged": "Les statistiques et le comportement sont inchangés.",
   "bestiary.custom.active": "Utilisation en courses",
-  "bestiary.custom.openForge": "Ouvrez la Forge"
+  "bestiary.custom.openForge": "Ouvrez la Forge",
+  "soundbar.more": "Plus de commandes musicales",
+  "soundbar.more.aria": "Commandes musicales",
+  "soundbar.mute": "Musique muette",
+  "soundbar.unmute": "Réactiver la musique",
+  "soundbar.volume": "Volume de la musique",
+  "soundbar.seek": "Rechercher dans la piste",
+  "soundbar.shuffle": "Mélanger",
+  "soundbar.repeat": "Répéter",
+  "soundbar.speed": "Vitesse de lecture"
 }
