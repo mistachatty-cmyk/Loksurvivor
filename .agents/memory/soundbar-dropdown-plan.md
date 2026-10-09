@@ -111,3 +111,15 @@ How to expand without increasing the bar's profile:
   at the standard closed bar.
 - The closed (collapsed) state keeps zero extra controls; the no-track state is
   unchanged.
+
+## Status: built in 0.22.7
+
+Implemented as designed: `src/ui/SoundbarPanel.tsx` (portal, fixed overlay),
+chevron `button-global-music-more` in `MusicNowPlaying.tsx`, pure helpers and
+volume persistence in `src/game/audio/volumeCurve.ts` (+ test), strings under
+`soundbar.*` in `en.json`, `.soundbar-*` styles in `index.css`. Verified in a
+headless browser at 420px: bar size is identical before and after opening.
+Gotcha found: on phones the top-left bar ran under the fixed Looks & LokPets
+button and hid the chevron. Fixed by removing that button from the intro screen
+(owner request), not by shrinking the bar; it is already absent on hub/run/arena.
+Not built: quick track picker, "open music panel" link, pause-only hotkeys.
