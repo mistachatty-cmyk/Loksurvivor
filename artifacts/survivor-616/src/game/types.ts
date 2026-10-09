@@ -2443,6 +2443,8 @@ export interface MetaState {
   quirkTakenRuns: number;
   /** Quirk Surges the player has outlasted. */
   quirkSurgesSurvived: number;
+  /** Director beats (supply drops, stampedes) finished, lifetime, by beat id. */
+  runEventsSurvived: Record<string, number>;
   /** GRPD evidence seals are earned every 1,000 lifetime kills; this is the spent amount. */
   grpdSpentSeals: number;
   /** Completed field prototypes fabricated at the GRPD Armory. */
@@ -2706,6 +2708,8 @@ export interface RunResult {
   quirkTakenRun?: boolean;
   /** This run outlasted its Quirk Surge. */
   quirkSurgeSurvived?: boolean;
+  /** Director beats this run finished (survived the whole beat). */
+  runEventsSurvived?: string[];
   /** Growth Recap: XP, level and bond changes for pets that were out. Filled when the run is recorded. */
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;

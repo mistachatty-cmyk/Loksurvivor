@@ -3300,7 +3300,52 @@ export function drawPickupClassic(ctx: CanvasRenderingContext2D, pickup: Pickup,
   }
 }
 
+/** Ground markers for the Director's live beat: the drop zone, or the stampede lane and its safe gap. */
+function drawRunEventMarker(ctx: CanvasRenderingContext2D, w: World) {
+  const re = w.runEvents;
+  const beat = re.schedule[re.index];
+  if (!beat || re.phase === 'wait') return;
+  const pulse = 0.5 + 0.5 * Math.sin(w.now / 160);
+  ctx.save();
+  if (beat.id === 'supply-drop') {
+    const falling = re.phase === 'warn' ? Math.min(1, (w.now - re.phaseAt) / 4000) : 1;
+    ctx.strokeStyle = `rgba(253,224,71,${0.35 + 0.4 * pulse})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(re.x, re.y, 46 - 10 * falling + 4 * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    if (re.phase === 'warn') {
+      // A beam that thickens as the crate comes in.
+      ctx.fillStyle = `rgba(253,224,71,${0.08 + 0.2 * falling})`;
+      ctx.fillRect(re.x - 8 - 14 * falling, re.y - 900, 16 + 28 * falling, 900);
+    }
+  } else if (re.phase === 'warn') {
+    const px = -re.dirY;
+    const py = re.dirX;
+    ctx.strokeStyle = `rgba(248,113,113,${0.3 + 0.35 * pulse})`;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([14, 10]);
+    for (const lateral of [-200, -56, 56, 200]) {
+      ctx.beginPath();
+      ctx.moveTo(re.x + px * lateral - re.dirX * 520, re.y + py * lateral - re.dirY * 520);
+      ctx.lineTo(re.x + px * lateral + re.dirX * 520, re.y + py * lateral + re.dirY * 520);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.fillStyle = `rgba(74,222,128,${0.1 + 0.12 * pulse})`;
+    ctx.beginPath();
+    ctx.moveTo(re.x + px * 56 - re.dirX * 520, re.y + py * 56 - re.dirY * 520);
+    ctx.lineTo(re.x + px * 56 + re.dirX * 520, re.y + py * 56 + re.dirY * 520);
+    ctx.lineTo(re.x - px * 56 + re.dirX * 520, re.y - py * 56 + re.dirY * 520);
+    ctx.lineTo(re.x - px * 56 - re.dirX * 520, re.y - py * 56 - re.dirY * 520);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawPickups(ctx: CanvasRenderingContext2D, w: World) {
+  drawRunEventMarker(ctx, w);
   for (const pickup of w.pickups) {
     ctx.save();
     if (w.dropStyle !== 'classic' && w.graphicsQuality !== 'performance') {

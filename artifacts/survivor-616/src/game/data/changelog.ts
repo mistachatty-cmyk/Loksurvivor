@@ -1035,6 +1035,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'With Hideout ambience on, each room now hums a slow music-box line of its own over the bed. It stays off until you turn it on.',
     ],
   },
+  {
+    version: '0.22.5',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:00Z',
+    kind: 'update',
+    title: 'Things happen now',
+    body: [
+      'Runs now have moments. Clear 2 maps and a Supply Drop can land mid-run: a glowing ring marks where the crate falls, and it comes with guards. Clear 4 maps and a Rush-Hour stampede can charge across the map; step into the green gap to dodge it.',
+      'The more maps you clear, the more moments a run can have (up to 4). Your first runs stay calm.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

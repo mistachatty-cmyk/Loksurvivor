@@ -9,6 +9,7 @@
  * snapshots out of it.
  */
 
+import { RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
 import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
 import type { DropStyle } from '@/game/data/dropPacks';
@@ -226,6 +227,8 @@ export interface EnemyActor extends Actor {
   /** commander: true while it currently has the player found and is
    *  buffing nearby allies; false while shielded and searching to relock. */
   commanderLocked: boolean;
+  /** Rush-hour stampede: runs a straight line at this velocity (px/s) until `until`, ignoring normal AI. */
+  stampede?: { until: number; vx: number; vy: number };
   /** Zero Day: frozen "stone" and fully inert (no AI, no contact damage, undamageable) while `w.now < frozenUntil`. */
   frozenUntil: number;
   /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
@@ -1189,6 +1192,21 @@ export interface World {
   quirkSurgeWarned: boolean;
   /** How often this run gets a Quirk Surge, decided by the player's progress. */
   quirkSurgeMode: QuirkSurgeMode;
+  /** Director beats for this run and where the current one stands. */
+  runEvents: {
+    schedule: ScheduledRunEvent[];
+    /** Index of the next or current beat. */
+    index: number;
+    phase: 'wait' | 'warn' | 'active';
+    phaseAt: number;
+    /** World point the beat is about (drop zone, or the gap's anchor). */
+    x: number;
+    y: number;
+    /** Unit direction a stampede travels, for the HUD marker. */
+    dirX: number;
+    dirY: number;
+    survived: RunEventId[];
+  };
   /** Quirks already announced this run, so each is explained once. */
   quirkAnnounced: Record<string, true>;
   /** Next time the taken Spawn Shield quirk can block a hit. */
@@ -1556,6 +1574,8 @@ export function createWorld(
     grpdAutoIncreaseEnabled?: boolean;
     endgameEvolutionsEnabled?: boolean;
     quirkSurgeMode?: QuirkSurgeMode;
+    /** Standard maps cleared, and beats the player switched off. Omitted = no run events. */
+    runEvents?: { mapsCleared: number; disabledIds?: string[] };
     enemyQuirks?: { enabled: boolean; disabledIds: string[]; everywhereIds?: string[]; takenIds?: string[] };
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
@@ -1774,6 +1794,10 @@ export function createWorld(
     quirkSurgePhase: 0,
     quirkSurgeWarned: false,
     quirkSurgeMode: setup.quirkSurgeMode ?? 'off',
+    runEvents: {
+      schedule: setup.runEvents ? scheduleRunEvents(seed, setup.runEvents.mapsCleared, setup.runEvents.disabledIds) : [],
+      index: 0, phase: 'wait', phaseAt: 0, x: 0, y: 0, dirX: 1, dirY: 0, survived: [],
+    },
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
     cred: 0,
@@ -4123,6 +4147,106 @@ function updateQuirkSurge(w: World) {
     w.pickups.push({ uid: uid(w), kind: 'health', x: p.x + 30, y: p.y, vx: 0, vy: 0, value: 35, bornAt: w.now });
     w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x - 30, y: p.y, vx: 0, vy: 0, value: 60, bornAt: w.now });
     w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x, y: p.y + 30, vx: 0, vy: 0, value: 1, bornAt: w.now });
+  }
+}
+
+/** Enemy defs a beat may use: this area's own non-boss wave enemies. */
+function runEventEnemyPool(w: World): EnemyDef[] {
+  const defs: EnemyDef[] = [];
+  for (const wave of w.area.waves) {
+    const def = getEnemy(wave.enemyId);
+    if (def.family === 'Boss' || def.sizeClass === 'giant' || defs.includes(def)) continue;
+    defs.push(def);
+  }
+  return defs;
+}
+
+/** Keeps a beat's world point inside a walled arena (endless streets have no walls). */
+function runEventPoint(w: World, x: number, y: number): { x: number; y: number } {
+  if (w.area.endless) return { x, y };
+  const hw = w.bounds.w / 2 - 40;
+  const hh = w.bounds.h / 2 - 40;
+  return { x: clamp(x, -hw, hw), y: clamp(y, -hh, hh) };
+}
+
+/**
+ * Director beats: warn, run, pay out once. Modelled on the Quirk Surge -- optional,
+ * seeded, and if the run ends mid-beat nothing is paid. Never consumes `w.rng` for the
+ * schedule; positions use it only once a beat is already live.
+ */
+function updateRunEvents(w: World) {
+  const re = w.runEvents;
+  if (w.outcome !== 'running') return;
+  const next = re.schedule[re.index];
+  if (!next) return;
+  const def = RUN_EVENTS_BY_ID[next.id];
+  const p = w.player;
+  if (re.phase === 'wait') {
+    if (w.now < next.startMs) return;
+    re.phase = 'warn';
+    re.phaseAt = w.now;
+    const angle = w.rng() * Math.PI * 2;
+    re.dirX = Math.cos(angle);
+    re.dirY = Math.sin(angle);
+    if (def.id === 'supply-drop') {
+      const spot = runEventPoint(w, p.x + re.dirX * 240, p.y + re.dirY * 240);
+      re.x = spot.x;
+      re.y = spot.y;
+    } else {
+      re.x = p.x;
+      re.y = p.y;
+    }
+    pushAlert(w, def.warnText);
+    pushSfx(w, 'ultimate');
+    return;
+  }
+  if (re.phase === 'warn') {
+    if (w.now < re.phaseAt + def.warnMs) return;
+    re.phase = 'active';
+    re.phaseAt = w.now;
+    const pool = runEventEnemyPool(w);
+    if (def.id === 'supply-drop') {
+      w.pickups.push({ uid: uid(w), kind: 'health', x: re.x - 24, y: re.y, vx: 0, vy: 0, value: 40, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: re.x + 24, y: re.y, vx: 0, vy: 0, value: 80, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: re.x, y: re.y + 24, vx: 0, vy: 0, value: 1, bornAt: w.now });
+      spawnParticles(w, re.x, re.y, '#fde047', 18, 140);
+      w.shake = Math.max(w.shake, 4);
+      // Greed has a price: a small guard ring spawns around the crate.
+      for (let i = 0; i < 4 && pool.length > 0; i += 1) {
+        const a = (Math.PI * 2 * i) / 4 + 0.4;
+        const at = runEventPoint(w, re.x + Math.cos(a) * 70, re.y + Math.sin(a) * 70);
+        spawnEnemy(w, pool[i % pool.length]!, 1, at);
+      }
+    } else if (pool.length > 0) {
+      // A wall of runners crosses the screen; a gap is left where the player stood at the warning.
+      const perpX = -re.dirY;
+      const perpY = re.dirX;
+      const speed = 320;
+      const gap = 56;
+      let placed = 0;
+      for (let i = -5; i <= 5 && placed < 10; i += 1) {
+        const lateral = i * 34;
+        if (Math.abs(lateral) < gap) continue;
+        const startX = re.x + perpX * lateral - re.dirX * 480;
+        const startY = re.y + perpY * lateral - re.dirY * 480;
+        const at = runEventPoint(w, startX, startY);
+        const before = w.enemies.length;
+        spawnEnemy(w, pool[placed % pool.length]!, 1, at);
+        const spawned = w.enemies[w.enemies.length - 1];
+        if (spawned && w.enemies.length > before) {
+          spawned.stampede = { until: w.now + def.activeMs, vx: re.dirX * speed, vy: re.dirY * speed };
+        }
+        placed += 1;
+      }
+      w.shake = Math.max(w.shake, 5);
+    }
+    return;
+  }
+  if (w.now >= re.phaseAt + def.activeMs) {
+    re.survived.push(def.id);
+    re.index += 1;
+    re.phase = 'wait';
+    pushAlert(w, def.doneText);
   }
 }
 
@@ -7731,6 +7855,21 @@ function updateEnemies(w: World, dt: number) {
     if (w.now < enemy.frozenUntil) {
       enemy.vx = 0;
       enemy.vy = 0;
+      continue;
+    }
+
+    // Rush-hour stampede: a straight run that ignores the normal AI, but still hurts on contact.
+    if (enemy.stampede && w.now < enemy.stampede.until) {
+      enemy.x += enemy.stampede.vx * dt;
+      enemy.y += enemy.stampede.vy * dt;
+      enemy.facing = enemy.stampede.vx >= 0 ? 1 : -1;
+      collideObstacles(w, enemy);
+      clampToArena(w, enemy);
+      const reach = enemy.radius + p.radius;
+      if (w.now >= enemy.contactReadyAt && Math.hypot(p.x - enemy.x, p.y - enemy.y) <= reach) {
+        enemy.contactReadyAt = w.now + 520;
+        damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
+      }
       continue;
     }
 
@@ -12171,6 +12310,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   w.time += dt;
   w.now += dt * 1000;
   updateQuirkSurge(w);
+  updateRunEvents(w);
   w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
@@ -12574,6 +12714,7 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     quirkEverywhereRun: w.enemyQuirks.everywhere.some((id) => !w.enemyQuirks.disabled.has(id)),
     quirkTakenRun: w.enemyQuirks.taken.size > 0,
     quirkSurgeSurvived: w.quirkSurgePhase === 2,
+    runEventsSurvived: [...w.runEvents.survived],
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
     mapFindIds: [...w.mapFindIds],

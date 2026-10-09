@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { AREAS } from '@/game/data/areas';
+import { CHARACTERS } from '@/game/data/characters';
+import { RUN_EVENTS, runEventCount, scheduleRunEvents } from '@/game/data/runEvents';
+import { buildResult, createWorld, stepWorld } from './world';
+
+const IDLE = { moveX: 0, moveY: 0, ultimate: false };
+
+function makeWorld(maps: number | null, seed = 7) {
+  const area = {
+    ...AREAS[0]!, id: 'run-event-test', obstacles: [], musicEvents: undefined, rescueAllyId: undefined, durationSec: 900,
+    waves: [{ fromSec: 0, toSec: 900, enemyId: 'nightcrawler', ratePerSec: 0.1, burst: 1 }],
+  };
+  const setup = maps === null ? {} : { runEvents: { mapsCleared: maps } };
+  const world = createWorld(area, CHARACTERS[0]!, { ...CHARACTERS[0]!.stats, maxHp: 1_000_000 }, seed, [], 1, true, null, setup);
+  world.player.hp = world.player.maxHp = 1_000_000;
+  return world;
+}
+
+test('beats unlock with maps cleared and never appear before that', () => {
+  assert.equal(runEventCount(0), 0);
+  assert.equal(runEventCount(1), 0);
+  assert.equal(runEventCount(2), 1);
+  assert.equal(runEventCount(5), 2);
+  assert.equal(runEventCount(99), 4);
+  assert.deepEqual(scheduleRunEvents(1, 1), []);
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    assert.ok(scheduleRunEvents(seed, 3).every((e) => e.id === 'supply-drop'), 'rush-hour needs 4 maps');
+  }
+  const ids = new Set(RUN_EVENTS.flatMap((e) => scheduleRunEvents(3, 12).map((s) => s.id)));
+  assert.ok(ids.size >= 1);
+});
+
+test('the schedule is seeded, ordered and spaced so beats never overlap', () => {
+  for (const seed of [1, 9, 42, 1234]) {
+    const a = scheduleRunEvents(seed, 12);
+    assert.deepEqual(a, scheduleRunEvents(seed, 12));
+    for (let i = 1; i < a.length; i += 1) assert.ok(a[i]!.startMs - a[i - 1]!.startMs >= 25_000);
+  }
+  assert.deepEqual(scheduleRunEvents(5, 12, RUN_EVENTS.map((e) => e.id)), []);
+});
+
+test('a run with no runEvents setup never schedules a beat', () => {
+  const world = makeWorld(null);
+  assert.equal(world.runEvents.schedule.length, 0);
+});
+
+test('a supply drop warns, drops a crate with guards, and counts once it ends', () => {
+  const world = makeWorld(2);
+  world.runEvents.schedule = [{ id: 'supply-drop', startMs: 1000 }];
+  let warned = false;
+  let sawCrate = false;
+  for (let frame = 0; frame < 30 * 25; frame += 1) {
+    stepWorld(world, 1 / 30, IDLE);
+    if (world.runEvents.phase === 'warn') warned = true;
+    if (world.runEvents.phase === 'active' && world.pickups.some((p) => p.kind === 'prism-quartz')) sawCrate = true;
+  }
+  assert.ok(warned && sawCrate);
+  assert.deepEqual(world.runEvents.survived, ['supply-drop']);
+  assert.deepEqual(buildResult(world).runEventsSurvived, ['supply-drop']);
+});
+
+test('a stampede runs in a straight line with a gap, hurts on contact and stays finite', () => {
+  const world = makeWorld(4);
+  world.runEvents.schedule = [{ id: 'rush-hour', startMs: 500 }];
+  let stampeders = 0;
+  for (let frame = 0; frame < 30 * 14; frame += 1) {
+    stepWorld(world, 1 / 30, IDLE);
+    const running = world.enemies.filter((e) => e.stampede);
+    stampeders = Math.max(stampeders, running.length);
+    for (const e of world.enemies) assert.ok(Number.isFinite(e.x) && Number.isFinite(e.y));
+  }
+  assert.ok(stampeders >= 6, `only ${stampeders} stampeders`);
+  assert.deepEqual(world.runEvents.survived, ['rush-hour']);
+});

@@ -1,6 +1,6 @@
 # Events, crew interactions, specials, resources and physics — plan
 
-Status: **plan only, nothing here is built.** Drafted 2026-10-09 from a "make events
+Status: **plan; step 1 (Event Director + Supply drop + Rush-hour) shipped in v0.22.5, see `.agents/memory/run-events-director.md`. Everything else is unbuilt.** Drafted 2026-10-09 from a "make events
 and things that happen feel alive" request. Every item respects the existing
 contracts; read the linked notes before building one.
 
