@@ -46,6 +46,7 @@ import { BestiaryPanel } from '@/ui/BestiaryPanel';
 import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
+import { PhotosensitivityNotice, photosensitivityNoticeHidden } from '@/ui/PhotosensitivityNotice';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
 import { RecoveryPanel } from '@/ui/RecoveryPanel';
@@ -89,6 +90,7 @@ const queryClient = new QueryClient();
 
 type Screen =
   | { name: 'intro' }
+  | { name: 'photosensitivity-notice' }
   | { name: 'starter-lokpet-encounter' }
   | { name: 'hub' }
   | { name: 'roster' }
@@ -421,6 +423,15 @@ function Game() {
     [tryTravelFight, tryChoiceEvent],
   );
 
+  /** Where the title screen leads once the player is ready: the starter pet meeting, or the hideout. */
+  function enterAfterIntro() {
+    if (!meta.starterLokPetOnboardingComplete && meta.totalRuns === 0 && meta.savedLokPets.length === 0) {
+      setScreen({ name: 'starter-lokpet-encounter' });
+    } else {
+      goHub();
+    }
+  }
+
   function renderScreen(): ReactNode {
   switch (screen.name) {
     case 'intro':
@@ -428,11 +439,8 @@ function Game() {
         <IntroScreen
           onBegin={() => {
             markOnboarded();
-            if (!meta.starterLokPetOnboardingComplete && meta.totalRuns === 0 && meta.savedLokPets.length === 0) {
-              setScreen({ name: 'starter-lokpet-encounter' });
-            } else {
-              goHub();
-            }
+            if (photosensitivityNoticeHidden()) enterAfterIntro();
+            else setScreen({ name: 'photosensitivity-notice' });
           }}
           onSignIn={() => {
             markOnboarded();
@@ -440,6 +448,9 @@ function Game() {
           }}
         />
       );
+
+    case 'photosensitivity-notice':
+      return <PhotosensitivityNotice onContinue={enterAfterIntro} />;
 
     case 'starter-lokpet-encounter':
       return (

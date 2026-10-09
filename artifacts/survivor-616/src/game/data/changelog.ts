@@ -990,6 +990,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Inside is a roll from four rarity tiers: common, uncommon, rare and ultra rare. Higher tiers can hold cards and card cosmetics you do not own yet, and everything else pays out resources.',
     ],
   },
+  {
+    version: '0.22.1',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T18:00:00Z',
+    kind: 'hotfix',
+    title: 'Before You Play',
+    body: [
+      'A seizure and photosensitivity warning now fades in between the title screen and the hideout, and fades out when you continue. Tick "Don\'t show this again" to skip it on later visits.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
