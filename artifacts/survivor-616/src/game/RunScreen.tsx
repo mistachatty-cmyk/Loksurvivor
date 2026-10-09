@@ -22,6 +22,7 @@ import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
 import { grpdEndgameWeaponEarned } from '@/game/data/grpdArmory';
+import { getDisabledRunEvents } from '@/game/state/runEventSetting';
 import { endgameReached, mapsCleared } from '@/game/data/endgameUnlocks';
 import { isFeatureEnabled } from '@/game/state/operatorForgeStore';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
@@ -453,7 +454,7 @@ export function RunScreen({
         disabledWeaponIds: meta.disabledWeaponIds,
         grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id) || grpdEndgameWeaponEarned(id, meta.totalKills, endgameReached(meta))),
         endgameEvolutionsEnabled: isFeatureEnabled('weaponEvolutions'),
-        runEvents: { mapsCleared: mapsCleared(meta).have },
+        runEvents: { mapsCleared: mapsCleared(meta).have, disabledIds: getDisabledRunEvents() },
         quirkSurgeMode: quirkSurgeMode(meta.clearedAreaIds.length, endgameReached(meta), isFeatureEnabled('quirkSurge')),
         enemyQuirks: { enabled: isFeatureEnabled('enemyQuirks'), ...earnedQuirkRunSetup(meta.quirkKills, meta.devModeAllUnlocks) },
         grpdSpawnTierByWeaponId: meta.grpdSpawnTierByWeaponId,

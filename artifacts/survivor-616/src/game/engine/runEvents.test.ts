@@ -75,3 +75,22 @@ test('a stampede runs in a straight line with a gap, hurts on contact and stays 
   assert.ok(stampeders >= 6, `only ${stampeders} stampeders`);
   assert.deepEqual(world.runEvents.survived, ['rush-hour']);
 });
+
+test('a magnet coil pulls loot from four times as far, only while it lasts', () => {
+  const world = makeWorld(null);
+  const p = world.player;
+  world.stats.magnet = 100;
+  world.pickups.length = 0;
+  world.pickups.push({ uid: 9001, kind: 'magnet-coil', x: p.x, y: p.y, vx: 0, vy: 0, value: 1, bornAt: 0 });
+  stepWorld(world, 1 / 30, IDLE);
+  assert.ok(world.magnetUntil > world.now, 'collecting the coil starts the timer');
+  world.pickups.length = 0;
+  world.pickups.push({ uid: 9002, kind: 'cred', x: p.x + 300, y: p.y, vx: 0, vy: 0, value: 1, bornAt: 0 });
+  stepWorld(world, 1 / 30, IDLE);
+  assert.ok(world.pickups[0]!.vx < 0, 'cred 300px away is pulled in');
+  world.magnetUntil = 0;
+  world.pickups[0]!.x = p.x + 300;
+  world.pickups[0]!.vx = 0;
+  stepWorld(world, 1 / 30, IDLE);
+  assert.equal(world.pickups[0]!.vx, 0, 'no pull once it ends');
+});

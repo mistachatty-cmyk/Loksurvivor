@@ -3254,6 +3254,20 @@ export function drawPickupClassic(ctx: CanvasRenderingContext2D, pickup: Pickup,
       ctx.fill();
       break;
     }
+    case 'magnet-coil': {
+      const pulse = 0.7 + Math.sin((now - pickup.bornAt) / 150) * 0.3;
+      ctx.shadowColor = '#fb7185';
+      ctx.shadowBlur = 16 * pulse;
+      ctx.strokeStyle = '#fb7185';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(x, y, 7, Math.PI * 0.15, Math.PI * 1.85, true);
+      ctx.stroke();
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(x - 8, y + 3, 5, 5);
+      ctx.fillRect(x + 3, y + 3, 5, 5);
+      break;
+    }
     case 'rootglass-cell': {
       const pulse = 0.7 + Math.sin((now - pickup.bornAt) / 180) * 0.3;
       ctx.shadowColor = '#5eead4';

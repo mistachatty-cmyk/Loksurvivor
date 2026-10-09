@@ -1046,6 +1046,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The more maps you clear, the more moments a run can have (up to 4). Your first runs stay calm.',
     ],
   },
+  {
+    version: '0.22.6',
+    date: '2026-10-09',
+    publishedAt: '2026-10-10T00:30:00Z',
+    kind: 'update',
+    title: 'Magnet coil and event switches',
+    body: [
+      'Supply drops now include a Magnet Coil. Grab it and coins, gems and hearts get pulled to you from four times as far for 12 seconds.',
+      'Settings has a new Run events section where you can switch each kind of moment on or off.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

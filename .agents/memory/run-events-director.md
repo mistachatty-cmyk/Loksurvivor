@@ -21,6 +21,12 @@ Built v0.22.5, step 1 of `docs/EVENTS_AND_INTERACTIONS_PLAN.md`.
 - Counted in `meta.runEventsSurvived` (id -> count) from `RunResult.runEventsSurvived`; achievements
   `moment-first / 10 / 50 / both`.
 
+## Added v0.22.6
+Settings > Run events (`state/runEventSetting.ts`, device-local list of switched-off ids, passed as
+`disabledIds`). Warning text doubles as the first-time hint. `magnet-coil` pickup (`World.magnetUntil`,
+12s, x4 pull radius for xp/cred/coin/health only so chests are not dragged in), included in the supply drop.
+Beat names in Settings come from `RUN_EVENTS[].name` (English, not in `en.json`).
+
 ## Not built yet
-Per-beat Settings toggle (`disabledIds` is plumbed but nothing sets it), beats in the Archive/bestiary,
+Beats in the Archive/bestiary,
 Blackout / Block party / Tremor / Relay storm, first-time tooltip, a screenshot playtest.

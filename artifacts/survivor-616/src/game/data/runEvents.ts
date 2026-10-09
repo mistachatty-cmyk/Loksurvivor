@@ -32,7 +32,7 @@ export const RUN_EVENTS: RunEventDef[] = [
     unlockMaps: 2,
     warnMs: 4000,
     activeMs: 14000,
-    warnText: 'SUPPLY DROP INBOUND! Watch the sky',
+    warnText: 'SUPPLY DROP INBOUND! Grab the crate, mind the guards',
     doneText: 'SUPPLY DROP SECURED',
   },
   {

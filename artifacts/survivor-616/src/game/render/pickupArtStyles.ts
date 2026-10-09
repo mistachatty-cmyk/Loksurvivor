@@ -209,6 +209,7 @@ const ARCH: Record<PickupKind, { a: string; c: string }> = {
   sweep: { a: 'orb', c: '#bfe9ff' },
   'cyber-resin': { a: 'drop', c: '#a855f7' },
   'rootglass-cell': { a: 'cell', c: '#5eead4' },
+  'magnet-coil': { a: 'orb', c: '#fb7185' },
   'loot-box': { a: 'chest', c: '#3b82f6' },
   'relic-vault-chest': { a: 'chest', c: '#f59e0b' },
   'firefly-amber-chest': { a: 'chest', c: '#fbbf24' },

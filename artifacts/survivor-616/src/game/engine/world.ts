@@ -470,7 +470,8 @@ export type PickupKind =
   | 'cyber-resin'
   | 'prism-quartz'
   | 'water-flask'
-  | 'rootglass-cell';
+  | 'rootglass-cell'
+  | 'magnet-coil';
 
 export interface Pickup {
   uid: number;
@@ -1121,6 +1122,8 @@ export interface World {
   mapFindIds: Set<string>;
   unlockedMapFindIds: string[];
   rootglassUntil: number;
+  /** Magnet coil: coins, gems and hearts are pulled from four times as far until this time. */
+  magnetUntil: number;
   popups: Popup[];
   particles: Particle[];
   followers: Follower[];
@@ -1749,6 +1752,7 @@ export function createWorld(
     mapFindIds: new Set(),
     unlockedMapFindIds: setup.unlockedMapFindIds ?? [],
     rootglassUntil: 0,
+    magnetUntil: 0,
     popups: [],
     particles: [],
     followers: [],
@@ -4209,6 +4213,7 @@ function updateRunEvents(w: World) {
       w.pickups.push({ uid: uid(w), kind: 'health', x: re.x - 24, y: re.y, vx: 0, vy: 0, value: 40, bornAt: w.now });
       w.pickups.push({ uid: uid(w), kind: 'cred', x: re.x + 24, y: re.y, vx: 0, vy: 0, value: 80, bornAt: w.now });
       w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: re.x, y: re.y + 24, vx: 0, vy: 0, value: 1, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'magnet-coil', x: re.x, y: re.y - 24, vx: 0, vy: 0, value: 1, bornAt: w.now });
       spawnParticles(w, re.x, re.y, '#fde047', 18, 140);
       w.shake = Math.max(w.shake, 4);
       // Greed has a price: a small guard ring spawns around the crate.
@@ -11004,7 +11009,8 @@ const PICKUP_BURST_COLOR: Partial<Record<PickupKind, string>> = {
 
 function updatePickups(w: World, dt: number) {
   const p = w.player;
-  const magnet = w.stats.magnet;
+  const baseMagnet = w.stats.magnet;
+  const coilOn = w.now < w.magnetUntil;
   const pickupDrag = Math.pow(0.02, dt);
 
   for (let i = w.pickups.length - 1; i >= 0; i -= 1) {
@@ -11012,6 +11018,7 @@ function updatePickups(w: World, dt: number) {
     const dx = p.x - pickup.x;
     const dy = p.y - pickup.y;
     const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+    const magnet = coilOn && (pickup.kind === 'xp' || pickup.kind === 'cred' || pickup.kind === 'coin' || pickup.kind === 'health') ? baseMagnet * 4 : baseMagnet;
 
     if (distance < magnet) {
       // Accelerate toward the player once inside the magnet radius.
@@ -11201,6 +11208,13 @@ function updatePickups(w: World, dt: number) {
           spawnParticles(w, p.x, p.y, '#38bdf8', 8, 80);
           pushAlert(w, 'Water Flask used — flames quenched & health restored');
           pushSfx(w, 'heal');
+          break;
+        }
+        case 'magnet-coil': {
+          w.magnetUntil = Math.max(w.magnetUntil, w.now) + 12_000;
+          w.popups.push({ x: p.x, y: p.y - 18, text: 'MAGNET COIL / PULLING LOOT', color: '#fb7185', bornAt: w.now, vy: 26 });
+          spawnParticles(w, p.x, p.y, '#fb7185', 12, 90);
+          pushSfx(w, 'gemPickup');
           break;
         }
         case 'rootglass-cell': {
