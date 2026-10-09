@@ -28,6 +28,7 @@ export const PICKUP_COLOR: Record<PickupKind, string> = {
   'prism-quartz': '#f43f5e',
   'water-flask': '#38bdf8',
   'rootglass-cell': '#5eead4',
+  'magnet-coil': '#fb7185',
 };
 
 interface Tier {

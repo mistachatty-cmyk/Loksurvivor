@@ -363,6 +363,8 @@ export function createInitialMeta(): MetaState {
     quirkEverywhereRuns: 0,
     quirkTakenRuns: 0,
     quirkSurgesSurvived: 0,
+    runEventsSurvived: {},
+    callInsUsed: 0,
     grpdSpentSeals: 0,
     grpdUnlockedWeaponIds: [],
     grpdActiveWeaponIds: [],
@@ -517,6 +519,15 @@ function counter(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
     : fallback;
+}
+
+/** A saved id -> count map, keeping only well-formed entries so an old or edited save cannot poison arithmetic. */
+function cleanCounts(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (value && typeof value === 'object') {
+    for (const [key, count] of Object.entries(value as Record<string, unknown>)) out[key] = counter(count);
+  }
+  return out;
 }
 
 function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
@@ -1376,6 +1387,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     quirkEverywhereRuns: counter(parsed.quirkEverywhereRuns),
     quirkTakenRuns: counter(parsed.quirkTakenRuns),
     quirkSurgesSurvived: counter(parsed.quirkSurgesSurvived),
+    runEventsSurvived: cleanCounts(parsed.runEventsSurvived),
+    callInsUsed: counter(parsed.callInsUsed),
     grpdSpentSeals: counter(parsed.grpdSpentSeals),
     grpdUnlockedWeaponIds: fabricatedGrpdIds,
     grpdActiveWeaponIds: activeGrpdIds,
@@ -3941,6 +3954,11 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         quirkEverywhereRuns: prev.quirkEverywhereRuns + (result.quirkEverywhereRun ? 1 : 0),
         quirkTakenRuns: prev.quirkTakenRuns + (result.quirkTakenRun ? 1 : 0),
         quirkSurgesSurvived: prev.quirkSurgesSurvived + (result.quirkSurgeSurvived ? 1 : 0),
+        callInsUsed: prev.callInsUsed + (result.callInsUsed ?? 0),
+        runEventsSurvived: (result.runEventsSurvived ?? []).reduce(
+          (counts, id) => ({ ...counts, [id]: (counts[id] ?? 0) + 1 }),
+          prev.runEventsSurvived,
+        ),
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         totalLevelUps: prev.totalLevelUps + Math.max(0, result.level - 1),

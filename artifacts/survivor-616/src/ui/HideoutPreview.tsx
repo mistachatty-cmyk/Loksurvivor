@@ -73,6 +73,7 @@ import {
   type BallState,
   type Racer,
 } from '@/game/engine/hideoutBall';
+import { drawSceneryBack, drawSceneryFront, dustColorFor } from '@/ui/hideoutScenery';
 import { AMBIENT_PICKUPS_BY_ID, AMBIENT_TIMING, AMBIENT_VISITORS_BY_ID } from '@/game/data/hideoutAmbient';
 import {
   nextPickupAt,
@@ -95,7 +96,7 @@ import { drawPickup, drawVisitor } from '@/ui/hideoutAmbientArt';
 import { drawProp, PROP_HALF_WIDTH_UNITS, PROP_HEIGHT_UNITS } from '@/ui/hideoutPropArt';
 import { drawRig } from '@/game/render/sprite';
 import { hideoutNoticeMs } from '@/game/state/hideoutNoticeSetting';
-import type { EvolutionOverlayId, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
+import type { EvolutionOverlayId, HideoutBiome, HideoutWeather, LokPetPalette, LokPetSilhouette, SpritePalette, SpriteRig } from '@/game/types';
 import { prefersReducedMotion as prefersReducedMotionNow } from '@/anim/motion';
 
 /** What the strip needs to know about each pet that walks it. */
@@ -155,6 +156,10 @@ export interface HideoutPreviewProps {
   /** Pets that walk the strip (the parent decides how many). */
   pets?: HideoutPetInfo[];
   weather?: HideoutWeather;
+  /** Which room's backdrop to paint behind the actors. */
+  biome?: HideoutBiome;
+  /** Room accent for the backdrop lights. */
+  accent?: string;
   /** How often events play. */
   eventsMode?: 'on' | 'quiet' | 'off';
   /** The pet was petted. The parent decides whether it counts (once a day). */
@@ -205,7 +210,7 @@ interface Ripple { x: number; born: number }
 const MAX_PETS = 4;
 
 export function HideoutPreview({
-  rig, palette, height = 176, className = '', pets = [], weather = 'clear', eventsMode = 'on',
+  rig, palette, height = 176, className = '', pets = [], weather = 'clear', biome = 'sanctum', accent = '#f59e0b', eventsMode = 'on',
   onPetCare, onPetEvent, firstEventDelayMs = 9000,
   props: roomProps = [], interactive = false, keyboardActive = true, cue, notice,
   onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip, ball: ballProp, summonSeq, onPickup,
@@ -220,11 +225,11 @@ export function HideoutPreview({
   // unchanged, so everything else reaches it through this ref instead of restarting it.
   const live = useRef({
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent,
   });
   live.current = {
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup, biome, accent,
   };
 
   // Keyed on `seq` so a parent re-render that rebuilds the object does not restart the toast.
@@ -333,6 +338,7 @@ export function HideoutPreview({
     const ripples: Ripple[] = [];
     let nextEventAt = live.current.firstEventDelayMs;
     let lastBeatIndex = -1;
+    let nextStepPuffAt = 0;
     let raf = 0;
 
     const burst = (x: number, y: number, color: string, count: number, now: number) => {
@@ -383,6 +389,13 @@ export function HideoutPreview({
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
+      const sceneAudio = beatBus.read();
+      const sceneryOpts = {
+        biome: live.current.biome, accent: live.current.accent, w: cssW, h: cssH, groundY, now,
+        energy: sceneAudio.source !== 'none' ? sceneAudio.energy : 0, beatPhase: sceneAudio.phase,
+        lightX: operator.x, reduceMotion,
+      };
+      drawSceneryBack(ctx, sceneryOpts);
 
       if (!reduceMotion) {
         // With Walk and props off the operator only ever wanders, exactly as before.
@@ -711,6 +724,15 @@ export function HideoutPreview({
         ctx.restore();
       }
 
+      // Footstep puffs while the operator walks: low, short and grey, unlike the upward sparks.
+      if (!reduceMotion && operatorAnim === 'walk' && now >= nextStepPuffAt) {
+        nextStepPuffAt = now + 210;
+        const dustColor = dustColorFor(settings.biome);
+        for (let n = 0; n < 2 && sparks.length < 48; n += 1) {
+          sparks.push({ x: operator.x - operator.dir * 6, y: groundY - 1, vx: -operator.dir * (0.01 + rng() * 0.02), vy: -0.012 - rng() * 0.012, born: now, life: 380 + rng() * 220, color: dustColor });
+        }
+      }
+
       // Sparks.
       for (let i = sparks.length - 1; i >= 0; i -= 1) {
         const s = sparks[i]!;
@@ -725,6 +747,7 @@ export function HideoutPreview({
         ctx.fillRect(s.x - 1.5, s.y - 1.5, 3, 3);
         ctx.restore();
       }
+      drawSceneryFront(ctx, sceneryOpts);
     };
     raf = requestAnimationFrame(frame);
 

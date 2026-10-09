@@ -50,8 +50,11 @@ import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
 import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
+import { ControlsSettings } from './ControlsSettings';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
+import { RUN_EVENTS } from '@/game/data/runEvents';
+import { getDisabledRunEvents, setRunEventEnabled } from '@/game/state/runEventSetting';
 import { CREW_TALK_MODES, CREW_TALK_TONES, getCrewTalkMode, getCrewTalkTone, setCrewTalkMode, setCrewTalkTone, type CrewTalkMode } from '@/game/state/crewTalkSetting';
 import type { Tone } from '@/game/engine/crewTalk';
 import { HIDEOUT_NOTICE_SECONDS, getHideoutNoticeSeconds, setHideoutNoticeSeconds, type HideoutNoticeSeconds } from '@/game/state/hideoutNoticeSetting';
@@ -163,6 +166,29 @@ function LanguageSetting() {
         </div>
       </div>
     </section>
+  );
+}
+
+function RunEventsSetting() {
+  const t = useT();
+  const [disabled, setDisabled] = useState<string[]>(getDisabledRunEvents);
+  return (
+    <div data-testid="settings-run-events">
+      <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.runEvents.title')}</h3>
+      <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.runEvents.description')}</p>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.runEvents.title')}>
+        {RUN_EVENTS.map((event) => {
+          const on = !disabled.includes(event.id);
+          return (
+            <button key={event.id} type="button" aria-pressed={on}
+              className={`border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${on ? 'border-amber-300/60 bg-amber-400/15 text-amber-100' : 'border-border bg-background text-muted-foreground hover:border-amber-300/60 hover:text-white'}`}
+              onClick={() => setDisabled(setRunEventEnabled(event.id, !on))} data-testid={`button-run-event-${event.id}`}>
+              {event.name}: {on ? t('settings.runEvents.on') : t('settings.runEvents.off')}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -403,7 +429,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
 
   return (
     <ScreenLayout title={t('settings.title')} subtitle={t('settings.subtitle')} onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">{t('common.looksLokpets')}</button> : undefined}>
-    <SettingsPager endgame={<EndgameSettings />} standard={
+    <SettingsPager endgame={<EndgameSettings />} controls={<ControlsSettings />} standard={
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
         <SettingsJumpNav />
         <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-ui-layout">
@@ -995,6 +1021,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                     </div>
                   ))}
                   <CrewTalkSetting />
+                  <RunEventsSetting />
                   <h3 className="mt-4 text-sm font-black uppercase tracking-wide text-white">{t('settings.hideout.notice.title')}</h3>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">{t('settings.hideout.notice.description')}</p>
                   <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('settings.hideout.notice.title')}>

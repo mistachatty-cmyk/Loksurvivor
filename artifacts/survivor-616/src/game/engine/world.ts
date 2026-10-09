@@ -9,6 +9,8 @@
  * snapshots out of it.
  */
 
+import { CALL_INS, CALL_IN_COOLDOWN_MS, CALL_IN_FIRST_READY_MS } from '@/game/data/crewCallIns';
+import { BLACKOUT_STALKERS, RELAY_STORM_DRIFT_PX_PER_SEC, RELAY_STORM_MAX_INSIDE_MS, RELAY_STORM_RADIUS, RELAY_STORM_SLOW, BLOCK_PARTY_NEEDED_MS, BLOCK_PARTY_RADIUS, RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
 import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
 import type { DropStyle } from '@/game/data/dropPacks';
@@ -226,6 +228,8 @@ export interface EnemyActor extends Actor {
   /** commander: true while it currently has the player found and is
    *  buffing nearby allies; false while shielded and searching to relock. */
   commanderLocked: boolean;
+  /** Rush-hour stampede: runs a straight line at this velocity (px/s) until `until`, ignoring normal AI. */
+  stampede?: { until: number; vx: number; vy: number };
   /** Zero Day: frozen "stone" and fully inert (no AI, no contact damage, undamageable) while `w.now < frozenUntil`. */
   frozenUntil: number;
   /** Zero Day: true while inside the player's active drag-select box and still frozen. Render-only outside of throwSelectedFrozenEnemies. */
@@ -467,7 +471,8 @@ export type PickupKind =
   | 'cyber-resin'
   | 'prism-quartz'
   | 'water-flask'
-  | 'rootglass-cell';
+  | 'rootglass-cell'
+  | 'magnet-coil';
 
 export interface Pickup {
   uid: number;
@@ -1118,6 +1123,8 @@ export interface World {
   mapFindIds: Set<string>;
   unlockedMapFindIds: string[];
   rootglassUntil: number;
+  /** Magnet coil: coins, gems and hearts are pulled from four times as far until this time. */
+  magnetUntil: number;
   popups: Popup[];
   particles: Particle[];
   followers: Follower[];
@@ -1189,6 +1196,28 @@ export interface World {
   quirkSurgeWarned: boolean;
   /** How often this run gets a Quirk Surge, decided by the player's progress. */
   quirkSurgeMode: QuirkSurgeMode;
+  /** Director beats for this run and where the current one stands. */
+  runEvents: {
+    schedule: ScheduledRunEvent[];
+    /** Index of the next or current beat. */
+    index: number;
+    phase: 'wait' | 'warn' | 'active';
+    phaseAt: number;
+    /** World point the beat is about (drop zone, or the gap's anchor). */
+    x: number;
+    y: number;
+    /** Unit direction a stampede travels, for the HUD marker. */
+    dirX: number;
+    dirY: number;
+    /** Tremor shock pulses already fired in the current beat. */
+    pulses: number;
+    /** Block party: ms the player has spent inside the ring, and the last time it was counted. */
+    zoneMs: number;
+    lastAt: number;
+    survived: RunEventId[];
+  };
+  /** Crew call-ins: who can be called (in rescue order), who is next, and when the next is ready. */
+  callIns: { roster: string[]; index: number; readyAt: number; used: number };
   /** Quirks already announced this run, so each is explained once. */
   quirkAnnounced: Record<string, true>;
   /** Next time the taken Spawn Shield quirk can block a hit. */
@@ -1556,6 +1585,10 @@ export function createWorld(
     grpdAutoIncreaseEnabled?: boolean;
     endgameEvolutionsEnabled?: boolean;
     quirkSurgeMode?: QuirkSurgeMode;
+    /** Standard maps cleared, and beats the player switched off. Omitted = no run events. */
+    runEvents?: { mapsCleared: number; disabledIds?: string[] };
+    /** Rescued allies, in rescue order; those with a call-in can be called mid-run. */
+    callInAllyIds?: string[];
     enemyQuirks?: { enabled: boolean; disabledIds: string[]; everywhereIds?: string[]; takenIds?: string[] };
     disabledPassiveIds?: string[];
     threatCalibrations?: ThreatCalibrations;
@@ -1729,6 +1762,7 @@ export function createWorld(
     mapFindIds: new Set(),
     unlockedMapFindIds: setup.unlockedMapFindIds ?? [],
     rootglassUntil: 0,
+    magnetUntil: 0,
     popups: [],
     particles: [],
     followers: [],
@@ -1774,6 +1808,11 @@ export function createWorld(
     quirkSurgePhase: 0,
     quirkSurgeWarned: false,
     quirkSurgeMode: setup.quirkSurgeMode ?? 'off',
+    callIns: { roster: (setup.callInAllyIds ?? []).filter((id) => id in CALL_INS), index: 0, readyAt: CALL_IN_FIRST_READY_MS, used: 0 },
+    runEvents: {
+      schedule: setup.runEvents ? scheduleRunEvents(seed, setup.runEvents.mapsCleared, setup.runEvents.disabledIds) : [],
+      index: 0, phase: 'wait', phaseAt: 0, x: 0, y: 0, dirX: 1, dirY: 0, pulses: 0, zoneMs: 0, lastAt: 0, survived: [],
+    },
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
     cred: 0,
@@ -4123,6 +4162,229 @@ function updateQuirkSurge(w: World) {
     w.pickups.push({ uid: uid(w), kind: 'health', x: p.x + 30, y: p.y, vx: 0, vy: 0, value: 35, bornAt: w.now });
     w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x - 30, y: p.y, vx: 0, vy: 0, value: 60, bornAt: w.now });
     w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x, y: p.y + 30, vx: 0, vy: 0, value: 1, bornAt: w.now });
+  }
+}
+
+/** Inside a live Relay storm's static the player moves slower; everywhere else this is 1. */
+function relayStormSlow(w: World): number {
+  const re = w.runEvents;
+  if (re.phase !== 'active' || re.schedule[re.index]?.id !== 'relay-storm') return 1;
+  return Math.hypot(w.player.x - re.x, w.player.y - re.y) <= RELAY_STORM_RADIUS ? RELAY_STORM_SLOW : 1;
+}
+
+/** Enemy defs a beat may use: this area's own non-boss wave enemies. */
+function runEventEnemyPool(w: World): EnemyDef[] {
+  const defs: EnemyDef[] = [];
+  for (const wave of w.area.waves) {
+    const def = getEnemy(wave.enemyId);
+    if (def.family === 'Boss' || def.sizeClass === 'giant' || defs.includes(def)) continue;
+    defs.push(def);
+  }
+  return defs;
+}
+
+/** Keeps a beat's world point inside a walled arena (endless streets have no walls). */
+function runEventPoint(w: World, x: number, y: number): { x: number; y: number } {
+  if (w.area.endless) return { x, y };
+  const hw = w.bounds.w / 2 - 40;
+  const hh = w.bounds.h / 2 - 40;
+  return { x: clamp(x, -hw, hw), y: clamp(y, -hh, hh) };
+}
+
+/**
+ * One shock of a Tremor: shoves enemies and movable props away from the epicenter and
+ * staggers them (no contact damage for a moment). It deals no damage itself, so it can
+ * never create a kill, XP or loot through a side door -- see impact-physics.md.
+ */
+function tremorPulse(w: World) {
+  const re = w.runEvents;
+  const radius = 420;
+  for (const enemy of w.enemies) {
+    if (enemy.dying || enemy.def.family === 'Boss') continue;
+    const dx = enemy.x - re.x;
+    const dy = enemy.y - re.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > radius) continue;
+    const length = distance || 1;
+    const force = 220 * Math.max(0.25, 1 - distance / radius) / Math.max(0.6, enemy.mass);
+    enemy.kx += (dx / length) * force;
+    enemy.ky += (dy / length) * force;
+    enemy.contactReadyAt = Math.max(enemy.contactReadyAt, w.now + 650);
+  }
+  for (const b of w.breakables) {
+    if (b.broken || !b.movable) continue;
+    const dx = b.x - re.x;
+    const dy = b.y - re.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > radius) continue;
+    const length = distance || 1;
+    b.vx += (dx / length) * 120 / Math.max(1, b.mass);
+    b.vy += (dy / length) * 120 / Math.max(1, b.mass);
+  }
+  spawnParticles(w, re.x, re.y, '#a8a29e', 14, 130);
+  w.shake = Math.max(w.shake, 7);
+  pushSfx(w, 'ultimate');
+}
+
+/**
+ * Director beats: warn, run, pay out once. Modelled on the Quirk Surge -- optional,
+ * seeded, and if the run ends mid-beat nothing is paid. Never consumes `w.rng` for the
+ * schedule; positions use it only once a beat is already live.
+ */
+function updateRunEvents(w: World) {
+  const re = w.runEvents;
+  if (w.outcome !== 'running') return;
+  const next = re.schedule[re.index];
+  if (!next) return;
+  const def = RUN_EVENTS_BY_ID[next.id];
+  const p = w.player;
+  if (re.phase === 'wait') {
+    if (w.now < next.startMs) return;
+    re.phase = 'warn';
+    re.phaseAt = w.now;
+    const angle = w.rng() * Math.PI * 2;
+    re.dirX = Math.cos(angle);
+    re.dirY = Math.sin(angle);
+    if (def.id === 'supply-drop') {
+      const spot = runEventPoint(w, p.x + re.dirX * 240, p.y + re.dirY * 240);
+      re.x = spot.x;
+      re.y = spot.y;
+    } else if (def.id === 'relay-storm') {
+      const spot = runEventPoint(w, p.x + re.dirX * 340, p.y + re.dirY * 340);
+      re.x = spot.x;
+      re.y = spot.y;
+      re.zoneMs = 0;
+    } else if (def.id === 'block-party') {
+      const spot = runEventPoint(w, p.x + re.dirX * 150, p.y + re.dirY * 150);
+      re.x = spot.x;
+      re.y = spot.y;
+      re.zoneMs = 0;
+    } else if (def.id === 'tremor') {
+      const spot = runEventPoint(w, p.x + re.dirX * 160, p.y + re.dirY * 160);
+      re.x = spot.x;
+      re.y = spot.y;
+      re.pulses = 0;
+    } else {
+      re.x = p.x;
+      re.y = p.y;
+    }
+    pushAlert(w, def.warnText);
+    pushSfx(w, 'ultimate');
+    return;
+  }
+  if (re.phase === 'warn') {
+    if (w.now < re.phaseAt + def.warnMs) return;
+    re.phase = 'active';
+    re.phaseAt = w.now;
+    const pool = runEventEnemyPool(w);
+    if (def.id === 'supply-drop') {
+      w.pickups.push({ uid: uid(w), kind: 'health', x: re.x - 24, y: re.y, vx: 0, vy: 0, value: 40, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: re.x + 24, y: re.y, vx: 0, vy: 0, value: 80, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: re.x, y: re.y + 24, vx: 0, vy: 0, value: 1, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'magnet-coil', x: re.x, y: re.y - 24, vx: 0, vy: 0, value: 1, bornAt: w.now });
+      spawnParticles(w, re.x, re.y, '#fde047', 18, 140);
+      w.shake = Math.max(w.shake, 4);
+      // Greed has a price: a small guard ring spawns around the crate.
+      for (let i = 0; i < 4 && pool.length > 0; i += 1) {
+        const a = (Math.PI * 2 * i) / 4 + 0.4;
+        const at = runEventPoint(w, re.x + Math.cos(a) * 70, re.y + Math.sin(a) * 70);
+        spawnEnemy(w, pool[i % pool.length]!, 1, at);
+      }
+    } else if (def.id === 'blackout') {
+      // Under the dark, a few extra stalkers creep in from the edge of what you can see.
+      for (let i = 0; i < BLACKOUT_STALKERS && pool.length > 0; i += 1) {
+        const a = re.dirX !== 0 || re.dirY !== 0 ? Math.atan2(re.dirY, re.dirX) + (Math.PI * 2 * i) / BLACKOUT_STALKERS : (Math.PI * 2 * i) / BLACKOUT_STALKERS;
+        const at = runEventPoint(w, p.x + Math.cos(a) * 340, p.y + Math.sin(a) * 340);
+        spawnEnemy(w, pool[i % pool.length]!, 1, at);
+      }
+      w.shake = Math.max(w.shake, 3);
+    } else if (def.id === 'relay-storm') {
+      re.lastAt = w.now;
+      spawnParticles(w, re.x, re.y, '#a5b4fc', 16, 120);
+    } else if (def.id === 'block-party') {
+      re.lastAt = w.now;
+      spawnParticles(w, re.x, re.y, '#f0abfc', 18, 120);
+      const host = ALLIES_BY_ID[w.callIns.roster[0] ?? ''];
+      if (host) pushAlert(w, `${host.name} brought the speakers`);
+    } else if (def.id === 'tremor') {
+      tremorPulse(w);
+      re.pulses = 1;
+    } else if (pool.length > 0) {
+      // A wall of runners crosses the screen; a gap is left where the player stood at the warning.
+      const perpX = -re.dirY;
+      const perpY = re.dirX;
+      const speed = 320;
+      const gap = 56;
+      let placed = 0;
+      for (let i = -5; i <= 5 && placed < 10; i += 1) {
+        const lateral = i * 34;
+        if (Math.abs(lateral) < gap) continue;
+        const startX = re.x + perpX * lateral - re.dirX * 480;
+        const startY = re.y + perpY * lateral - re.dirY * 480;
+        const at = runEventPoint(w, startX, startY);
+        const before = w.enemies.length;
+        spawnEnemy(w, pool[placed % pool.length]!, 1, at);
+        const spawned = w.enemies[w.enemies.length - 1];
+        if (spawned && w.enemies.length > before) {
+          spawned.stampede = { until: w.now + def.activeMs, vx: re.dirX * speed, vy: re.dirY * speed };
+        }
+        placed += 1;
+      }
+      w.shake = Math.max(w.shake, 5);
+    }
+    return;
+  }
+  if (def.id === 'relay-storm') {
+    const elapsed = w.now - re.lastAt;
+    re.lastAt = w.now;
+    // The field creeps toward you; spend too long inside and it keeps what it was hiding.
+    const dx = p.x - re.x;
+    const dy = p.y - re.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const step = (RELAY_STORM_DRIFT_PX_PER_SEC * elapsed) / 1000;
+    re.x += (dx / dist) * Math.min(step, dist);
+    re.y += (dy / dist) * Math.min(step, dist);
+    if (Math.hypot(p.x - re.x, p.y - re.y) <= RELAY_STORM_RADIUS) re.zoneMs += elapsed;
+  }
+  if (def.id === 'block-party') {
+    const elapsed = w.now - re.lastAt;
+    re.lastAt = w.now;
+    if (Math.hypot(p.x - re.x, p.y - re.y) <= BLOCK_PARTY_RADIUS) {
+      re.zoneMs += elapsed;
+      // The party buff: faster weapons while inside, and a slow trickle of health.
+      w.rootglassUntil = Math.max(w.rootglassUntil, w.now + 500);
+      p.hp = Math.min(p.maxHp, p.hp + (p.maxHp * 0.01 * elapsed) / 1000);
+    }
+  }
+  if (def.id === 'tremor' && re.pulses < 4 && w.now >= re.phaseAt + re.pulses * 700) {
+    tremorPulse(w);
+    re.pulses += 1;
+  }
+  if (w.now >= re.phaseAt + def.activeMs) {
+    if (def.id === 'blackout') {
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x - 24, y: p.y, vx: 0, vy: 0, value: 100, bornAt: w.now });
+      // Came through the dark without being touched: a rare crystal as well.
+      if (p.lastDamageAt < re.phaseAt) w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x + 24, y: p.y, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    }
+    if (def.id === 'relay-storm' && re.zoneMs <= RELAY_STORM_MAX_INSIDE_MS) {
+      // The crate the static was sitting on, left where it ended.
+      w.pickups.push({ uid: uid(w), kind: 'health', x: p.x - 26, y: p.y, vx: 0, vy: 0, value: 40, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x + 26, y: p.y, vx: 0, vy: 0, value: 150, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x, y: p.y + 26, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    }
+    if (def.id === 'block-party' && re.zoneMs >= BLOCK_PARTY_NEEDED_MS) {
+      // Danced long enough: a thank-you from the neighbourhood.
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: re.x - 20, y: re.y, vx: 0, vy: 0, value: 120, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'magnet-coil', x: re.x + 20, y: re.y, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    }
+    if (def.id === 'tremor') {
+      // A breather after the shaking: one heart where it centred.
+      w.pickups.push({ uid: uid(w), kind: 'health', x: re.x, y: re.y, vx: 0, vy: 0, value: 30, bornAt: w.now });
+    }
+    re.survived.push(def.id);
+    re.index += 1;
+    re.phase = 'wait';
+    pushAlert(w, def.doneText);
   }
 }
 
@@ -7312,7 +7574,7 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
     if (w.enemyQuirks.taken.has('adrenaline') && (w.now / 1000) % 5 < 1) quirkSpeed *= 2.4;
     if (w.enemyQuirks.taken.has('regenerating') && p.hp > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.015 * dt);
   }
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed * quirkSpeed;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed * quirkSpeed * relayStormSlow(w);
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;
@@ -7420,6 +7682,59 @@ const DASH_SPEED = 760;
 const DASH_DURATION_MS = 180;
 const DASH_COOLDOWN_MS = 820;
 const DASH_KNOCKBACK_MULTIPLIER = 1.8;
+
+/**
+ * Calls the next rescued ally in line. Returns false when nothing happens (no crew with a
+ * call-in, still cooling down, or the run is not live). Pays through existing paths only:
+ * damage goes through `damageEnemy`, so a call-in kill still counts exactly once.
+ */
+export function callInCrew(w: World): boolean {
+  const c = w.callIns;
+  if (w.outcome !== 'running' || w.player.falling || c.roster.length === 0 || w.now < c.readyAt) return false;
+  const allyId = c.roster[c.index % c.roster.length]!;
+  const def = CALL_INS[allyId];
+  if (!def) return false;
+  const p = w.player;
+  const e = def.effect;
+  switch (e.kind) {
+    case 'heal':
+      p.hp = Math.min(p.maxHp, p.hp + p.maxHp * e.pct);
+      break;
+    case 'shield':
+      p.invulnUntil = Math.max(p.invulnUntil, w.now + e.ms);
+      break;
+    case 'magnet':
+      w.magnetUntil = Math.max(w.magnetUntil, w.now) + e.ms;
+      break;
+    case 'haste':
+      w.rootglassUntil = Math.max(w.rootglassUntil, w.now) + e.ms;
+      break;
+    case 'nova': {
+      const amount = Math.round(e.damage * (1 + w.level * 0.1));
+      for (const enemy of [...w.enemies]) {
+        if (enemy.dying || w.now < enemy.frozenUntil) continue;
+        if (Math.hypot(enemy.x - p.x, enemy.y - p.y) <= e.radius) damageEnemy(w, enemy, amount, 2, p.x, p.y);
+      }
+      break;
+    }
+    case 'stun':
+      for (const enemy of w.enemies) {
+        if (enemy.dying || enemy.def.family === 'Boss') continue;
+        if (Math.hypot(enemy.x - p.x, enemy.y - p.y) <= e.radius) enemy.frozenUntil = Math.max(enemy.frozenUntil, w.now + e.ms);
+      }
+      break;
+  }
+  const ally = ALLIES_BY_ID[allyId];
+  const color = ally?.palette.accent ?? '#fde047';
+  spawnParticles(w, p.x, p.y, color, 16, 130);
+  w.popups.push({ x: p.x, y: p.y - 30, text: `${ally?.name ?? 'Crew'}: ${def.label.toUpperCase()}`, color, bornAt: w.now, vy: 30 });
+  pushAlert(w, `${ally?.name ?? 'Crew'}: "${def.line}"`);
+  pushSfx(w, 'ultimate');
+  c.readyAt = w.now + CALL_IN_COOLDOWN_MS;
+  c.index = (c.index + 1) % c.roster.length;
+  c.used += 1;
+  return true;
+}
 
 export function dashPlayer(w: World, directionX: number, directionY: number): boolean {
   if (
@@ -7731,6 +8046,21 @@ function updateEnemies(w: World, dt: number) {
     if (w.now < enemy.frozenUntil) {
       enemy.vx = 0;
       enemy.vy = 0;
+      continue;
+    }
+
+    // Rush-hour stampede: a straight run that ignores the normal AI, but still hurts on contact.
+    if (enemy.stampede && w.now < enemy.stampede.until) {
+      enemy.x += enemy.stampede.vx * dt;
+      enemy.y += enemy.stampede.vy * dt;
+      enemy.facing = enemy.stampede.vx >= 0 ? 1 : -1;
+      collideObstacles(w, enemy);
+      clampToArena(w, enemy);
+      const reach = enemy.radius + p.radius;
+      if (w.now >= enemy.contactReadyAt && Math.hypot(p.x - enemy.x, p.y - enemy.y) <= reach) {
+        enemy.contactReadyAt = w.now + 520;
+        damagePlayer(w, enemy.damage * statusDamageMultiplier(enemy), enemy.x, enemy.y, 'contact');
+      }
       continue;
     }
 
@@ -10865,7 +11195,8 @@ const PICKUP_BURST_COLOR: Partial<Record<PickupKind, string>> = {
 
 function updatePickups(w: World, dt: number) {
   const p = w.player;
-  const magnet = w.stats.magnet;
+  const baseMagnet = w.stats.magnet;
+  const coilOn = w.now < w.magnetUntil;
   const pickupDrag = Math.pow(0.02, dt);
 
   for (let i = w.pickups.length - 1; i >= 0; i -= 1) {
@@ -10873,6 +11204,7 @@ function updatePickups(w: World, dt: number) {
     const dx = p.x - pickup.x;
     const dy = p.y - pickup.y;
     const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+    const magnet = coilOn && (pickup.kind === 'xp' || pickup.kind === 'cred' || pickup.kind === 'coin' || pickup.kind === 'health') ? baseMagnet * 4 : baseMagnet;
 
     if (distance < magnet) {
       // Accelerate toward the player once inside the magnet radius.
@@ -11062,6 +11394,13 @@ function updatePickups(w: World, dt: number) {
           spawnParticles(w, p.x, p.y, '#38bdf8', 8, 80);
           pushAlert(w, 'Water Flask used — flames quenched & health restored');
           pushSfx(w, 'heal');
+          break;
+        }
+        case 'magnet-coil': {
+          w.magnetUntil = Math.max(w.magnetUntil, w.now) + 12_000;
+          w.popups.push({ x: p.x, y: p.y - 18, text: 'MAGNET COIL / PULLING LOOT', color: '#fb7185', bornAt: w.now, vy: 26 });
+          spawnParticles(w, p.x, p.y, '#fb7185', 12, 90);
+          pushSfx(w, 'gemPickup');
           break;
         }
         case 'rootglass-cell': {
@@ -12171,6 +12510,7 @@ export function stepWorld(w: World, dtSeconds: number, input: StepInput) {
   w.time += dt;
   w.now += dt * 1000;
   updateQuirkSurge(w);
+  updateRunEvents(w);
   w.cycle.phase = (w.cycle.phase + (dt * 1000) / w.cycle.cycleMs) % 1;
 
   updateAudioState(w, input.audio ?? SILENT_FRAME, dt);
@@ -12347,6 +12687,14 @@ export function hudSnapshot(w: World): HudSnapshot {
       : undefined,
     cred: w.cred,
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),
+    callIn: w.callIns.roster.length > 0
+      ? {
+          name: ALLIES_BY_ID[w.callIns.roster[w.callIns.index]!]?.name ?? '',
+          label: CALL_INS[w.callIns.roster[w.callIns.index]!]?.label ?? '',
+          readyPct: clamp(100 - (Math.max(0, w.callIns.readyAt - w.now) / CALL_IN_COOLDOWN_MS) * 100, 0, 100),
+        }
+      : undefined,
+    dashReadyPct: clamp(100 - (Math.max(0, w.player.dashReadyAt - w.now) / DASH_COOLDOWN_MS) * 100, 0, 100),
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
     stormCloud: w.stormCloud ? { mode: w.stormCloud.mode, autoCycle: w.stormCloud.autoCycle } : undefined,
@@ -12574,6 +12922,8 @@ export function buildResult(w: World, utilityRewardMultiplier = 1): RunResult {
     quirkEverywhereRun: w.enemyQuirks.everywhere.some((id) => !w.enemyQuirks.disabled.has(id)),
     quirkTakenRun: w.enemyQuirks.taken.size > 0,
     quirkSurgeSurvived: w.quirkSurgePhase === 2,
+    runEventsSurvived: [...w.runEvents.survived],
+    callInsUsed: w.callIns.used,
     rescuedAllyId: w.rescue.status === 'freed' ? w.rescue.allyId : undefined,
     discoveryId: w.area.discoveryId,
     mapFindIds: [...w.mapFindIds],
