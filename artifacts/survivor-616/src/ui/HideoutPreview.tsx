@@ -56,6 +56,42 @@ import {
   stepOperatorControl,
 } from '@/game/engine/hideoutWalk';
 import type { BondRankId } from '@/game/engine/petGrowth';
+import { BOND_RANK_BY_ID } from '@/game/engine/petGrowth';
+import {
+  CARRY_HEIGHT,
+  ballInterest,
+  carryBall,
+  celebrationStage,
+  createBall,
+  finishCelebration,
+  startFetch,
+  stepFetch,
+  stepFlight,
+  stepRacer,
+  throwBall,
+  throwFeelFor,
+  type BallState,
+  type Racer,
+} from '@/game/engine/hideoutBall';
+import { AMBIENT_PICKUPS_BY_ID, AMBIENT_TIMING, AMBIENT_VISITORS_BY_ID } from '@/game/data/hideoutAmbient';
+import {
+  nextPickupAt,
+  nextVisitorAt,
+  petsToReact,
+  pickVisitor,
+  pickupDef,
+  pickupExpired,
+  pickupWithinReach,
+  reactionFor,
+  spawnPickup,
+  spawnVisitor,
+  squashActor,
+  squashProgress,
+  stepActor,
+  type AmbientActor,
+  type AmbientPickup,
+} from '@/game/engine/hideoutAmbient';
+import { drawPickup, drawVisitor } from '@/ui/hideoutAmbientArt';
 import { drawProp, PROP_HALF_WIDTH_UNITS, PROP_HEIGHT_UNITS } from '@/ui/hideoutPropArt';
 import { drawRig } from '@/game/render/sprite';
 import { hideoutNoticeMs } from '@/game/state/hideoutNoticeSetting';
@@ -75,6 +111,8 @@ export interface HideoutPetInfo {
   overlays?: EvolutionOverlayId[];
   sizeScale?: number;
   bondRank: BondRankId;
+  /** Played with today, which can win a ball-shy pet over. */
+  playedToday?: boolean;
   /** Events this pet already played: id -> last time (ms). */
   history?: Record<string, number>;
 }
@@ -140,6 +178,12 @@ export interface HideoutPreviewProps {
   /** A "something is happening" prompt waiting for a tap. */
   eventChip?: { label: string; aria: string } | null;
   onEventChip?: () => void;
+  /** The ball lying in the room, if the player put it out. The UI theme decides how a throw feels. */
+  ball?: { present: boolean; themeId: string };
+  /** A new value calls a visitor now (the bell). */
+  summonSeq?: number;
+  /** The operator picked something up off the ground. Return false to leave it there (nothing was paid). */
+  onPickup?: (kindId: string, seed: number) => boolean | void;
 }
 
 const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
@@ -150,6 +194,9 @@ const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
   bang: '!',
   drop: '•',
   star: '★',
+  adore: '♡',
+  scared: '!?',
+  laugh: '^^',
 };
 
 interface Spark { x: number; y: number; vx: number; vy: number; born: number; life: number; color: string }
@@ -161,7 +208,7 @@ export function HideoutPreview({
   rig, palette, height = 176, className = '', pets = [], weather = 'clear', eventsMode = 'on',
   onPetCare, onPetEvent, firstEventDelayMs = 9000,
   props: roomProps = [], interactive = false, keyboardActive = true, cue, notice,
-  onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip,
+  onPropUse, onFocusPet, onWalkBeat, eventChip = null, onEventChip, ball: ballProp, summonSeq, onPickup,
 }: HideoutPreviewProps) {
   const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -173,11 +220,11 @@ export function HideoutPreview({
   // unchanged, so everything else reaches it through this ref instead of restarting it.
   const live = useRef({
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup,
   });
   live.current = {
     pets, weather, eventsMode, onPetCare, onPetEvent, firstEventDelayMs,
-    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat,
+    roomProps, interactive, keyboardActive, cue, onPropUse, onFocusPet, onWalkBeat, ball: ballProp, summonSeq, onPickup,
   };
 
   // Keyed on `seq` so a parent re-render that rebuilds the object does not restart the toast.
@@ -253,6 +300,25 @@ export function HideoutPreview({
     let pendingProp: string | null = null;
     let nearId: string | null = null;
     let lastCueSeq = live.current.cue?.seq ?? 0;
+    // The ball (when the player has put it out), and the winner's moves over the head.
+    let ball: BallState | null = null;
+    let winnerFx: { id: string; x: number; lift: number } | null = null;
+    let lastStage = '';
+    // Ambient life: visitors crossing the strip, and things lying on the ground.
+    const actors: AmbientActor[] = [];
+    const pickups: AmbientPickup[] = [];
+    let uid = 0;
+    const blockedPickups = new Set<number>();
+    let lastVisitorKind: string | null = null;
+    let nextVisitor = AMBIENT_TIMING.firstVisitorMs;
+    let nextPickup = AMBIENT_TIMING.firstPickupMs;
+    let lastSummon = live.current.summonSeq ?? 0;
+    const callVisitor = (now: number, r: { min: number; max: number }) => {
+      const def = pickVisitor(rng, lastVisitorKind);
+      lastVisitorKind = def.id;
+      actors.push(spawnVisitor(uid += 1, def, r, rng, now));
+      setToast({ key: Date.now(), title: t('hideout.ambient.title'), line: t(def.lineKey as never) });
+    };
     // Props are about 32 units tall; one unit is this many pixels on a strip of this height.
     const propUnit = cssH * 0.0105;
     const reachPx = unit * 0.6;
@@ -334,7 +400,8 @@ export function HideoutPreview({
         }
         wanted.forEach((info, slot) => {
           const state = states.get(info.id);
-          if (state) stepHideoutPet(state, { dt, now, operator, slot, range: r, unit, rng });
+          const racing = ball !== null && ((ball.phase === 'racing' && ball.racers.includes(info.id)) || (ball.phase === 'celebrating' && ball.winnerId === info.id));
+          if (state && !racing) stepHideoutPet(state, { dt, now, operator, slot, range: r, unit, rng });
         });
       } else {
         // Reduced motion: a still scene. Pets rest in a row beside the operator.
@@ -342,6 +409,122 @@ export function HideoutPreview({
           const state = states.get(info.id);
           if (state) { state.x = operator.x - (slot + 1) * unit * 0.5; state.facing = 1; state.walking = false; }
         });
+      }
+
+      // The ball: fetch, carry, throw, race, and the winner's routine.
+      const ballCfg = settings.ball;
+      if (!ballCfg?.present || reduceMotion) {
+        ball = null;
+        winnerFx = null;
+      } else {
+        if (!ball) ball = createBall(r.min + (r.max - r.min) * (0.3 + rng() * 0.4));
+        const feel = throwFeelFor(ballCfg.themeId);
+        const racerList = (): Racer[] => wanted.flatMap((info) => {
+          const s = states.get(info.id);
+          if (!s) return [];
+          const bondOrder = BOND_RANK_BY_ID[info.bondRank]?.order ?? 0;
+          return [{ id: info.id, x: s.x, speed: temperamentFor(info.id).speed, bondOrder, interest: ballInterest({ petId: info.id, bondOrder, playedToday: info.playedToday === true }) }];
+        });
+        if (ball.phase === 'fetch') stepFetch(ball, operator.x);
+        else if (ball.phase === 'carried') carryBall(ball, operator.x);
+        else if (ball.phase === 'flying') stepFlight(ball, dt, feel, r, racerList());
+        else if (ball.phase === 'racing') {
+          for (const racer of racerList()) {
+            if (!ball.racers.includes(racer.id)) continue;
+            const state = states.get(racer.id);
+            if (!state) continue;
+            const nextX = stepRacer(ball, racer, dt, now);
+            if (nextX !== state.x) state.facing = nextX > state.x ? 1 : -1;
+            state.x = nextX;
+            state.walking = ball.phase === 'racing';
+            state.mode = 'follow';
+          }
+        } else if (ball.phase === 'celebrating' && ball.winnerId) {
+          const winner = states.get(ball.winnerId);
+          const stage = celebrationStage(ball, now);
+          const headY = rig.pixelHeight * scale * 0.92;
+          const side = operator.dir;
+          if (winner) {
+            const changed = stage.step !== lastStage;
+            lastStage = stage.step;
+            winner.walking = false;
+            if (stage.step === 'spit') {
+              if (changed) setEmote(winner, 'bang', now, 900);
+              ball.x = winner.x + winner.facing * 8 * stage.progress;
+              ball.z = Math.sin(stage.progress * Math.PI) * 22;
+              winnerFx = { id: winner.id, x: winner.x, lift: 0 };
+            } else if (stage.step === 'spin') {
+              if (changed) startMove(winner, 'spin', now, 750);
+              ball.z = 0;
+              winnerFx = { id: winner.id, x: winner.x, lift: 0 };
+            } else if (stage.step === 'head-jump') {
+              const fromX = winner.x;
+              winnerFx = { id: winner.id, x: fromX + (operator.x - fromX) * stage.progress, lift: Math.sin(stage.progress * Math.PI / 2) * headY };
+            } else {
+              const landX = operator.x + side * unit * 0.7;
+              winnerFx = { id: winner.id, x: operator.x + (landX - operator.x) * stage.progress, lift: headY * (1 - stage.progress) + Math.sin(stage.progress * Math.PI) * 6 };
+            }
+            if (stage.done) {
+              winner.x = operator.x + side * unit * 0.7;
+              winner.facing = (side * -1) as 1 | -1;
+              winner.mode = 'follow';
+              setEmote(winner, 'heart', now, 1800);
+              burst(winner.x, groundY - 14, '#fde047', 8, now);
+              finishCelebration(ball, operator.x + side * unit * 1.1);
+              winnerFx = null;
+              lastStage = '';
+            }
+          } else {
+            finishCelebration(ball, operator.x);
+          }
+        }
+      }
+
+      // Ambient life: visitors cross, pets react, the mite can be squashed, things turn up on the ground.
+      if (!reduceMotion) {
+        const summon = settings.summonSeq ?? 0;
+        if (summon !== lastSummon) {
+          lastSummon = summon;
+          callVisitor(now, r);
+        }
+        if (settings.eventsMode !== 'off') {
+          const slow = settings.eventsMode === 'quiet' ? 3 : 1;
+          if (now >= nextVisitor) {
+            callVisitor(now, r);
+            nextVisitor = nextVisitorAt(now, rng) + (slow - 1) * 40_000;
+          }
+          if (now >= nextPickup && pickups.length < AMBIENT_TIMING.maxPickups) {
+            pickups.push(spawnPickup(uid += 1, r, rng, now));
+            nextPickup = nextPickupAt(now, rng) + (slow - 1) * 20_000;
+          }
+        }
+        for (let i = actors.length - 1; i >= 0; i -= 1) {
+          const actor = actors[i]!;
+          if (stepActor(actor, dt, now, r)) { actors.splice(i, 1); continue; }
+          const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
+          if (!def) continue;
+          const placed = wanted.flatMap((info) => { const s = states.get(info.id); return s ? [{ id: info.id, x: s.x }] : []; });
+          for (const petId of petsToReact(actor, placed, unit)) {
+            const state = states.get(petId);
+            if (!state) continue;
+            const reaction = reactionFor(def, state.temperamentId);
+            startMove(state, reaction.move, now, 900);
+            setEmote(state, reaction.emote, now, 1700);
+          }
+        }
+        for (let i = pickups.length - 1; i >= 0; i -= 1) {
+          const pick = pickups[i]!;
+          if (pickupExpired(pick, now)) { pickups.splice(i, 1); continue; }
+          const inReach = pickupWithinReach([pick], operator.x, unit) !== undefined;
+          if (!inReach) blockedPickups.delete(pick.uid);
+          if (inReach && !blockedPickups.has(pick.uid) && pickupDef(pick)) {
+            const accepted = settings.onPickup?.(pick.kindId, Math.floor(rng() * 0x7fffffff));
+            // Nothing was paid (the daily limits): leave it until the operator walks away and back.
+            if (accepted === false) { blockedPickups.add(pick.uid); continue; }
+            burst(pick.x, groundY - 10, pickupDef(pick)!.color, 6, now);
+            pickups.splice(i, 1);
+          }
+        }
       }
 
       // A play move from the parent (scratch, fetch, nap together...).
@@ -423,6 +606,16 @@ export function HideoutPreview({
         nextEventAt = now + gap;
       }
 
+      // Things on the ground and visitors, behind the pets.
+      for (const pick of pickups) {
+        const def = pickupDef(pick);
+        if (def) drawPickup(ctx, def, pick.x, groundY, now, (now - pick.born) / AMBIENT_TIMING.pickupLifeMs);
+      }
+      for (const actor of actors) {
+        const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
+        if (def) drawVisitor(ctx, { def, x: actor.x, groundY, h: cssH * def.size * 0.6, dir: actor.dir, now, squash: squashProgress(actor, now) });
+      }
+
       // Rain: ripples on the ground.
       if (settings.weather === 'rain' && !reduceMotion) {
         if (ripples.length < 4 && rng() < 0.03) ripples.push({ x: r.min + rng() * (r.max - r.min), born: now });
@@ -446,15 +639,18 @@ export function HideoutPreview({
         if (!state) return;
         const look = petLook(info);
         const pose = petPose(state, now, groove, reduceMotion);
+        const fx = winnerFx && winnerFx.id === info.id ? winnerFx : null;
+        const drawX = fx ? fx.x : state.x;
+        pose.lift += fx ? fx.lift : 0;
         ctx.save();
         ctx.globalAlpha = 0.3;
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.ellipse(state.x, groundY, look.height * 0.34 * (1 - Math.min(0.4, pose.lift / 40)), 3.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(drawX, groundY, look.height * 0.34 * (1 - Math.min(0.4, pose.lift / 40)), 3.5, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
         ctx.save();
-        ctx.translate(state.x, groundY - pose.lift);
+        ctx.translate(drawX, groundY - pose.lift);
         ctx.scale(pose.scaleX, pose.scaleY);
         ctx.shadowColor = info.palette.glow;
         ctx.shadowBlur = 6;
@@ -469,7 +665,7 @@ export function HideoutPreview({
           ctx.lineWidth = 3;
           ctx.strokeStyle = 'rgba(0,0,0,0.65)';
           ctx.fillStyle = pose.emote === 'heart' ? '#ff6fa8' : info.palette.glow;
-          const ex = state.x + (pose.emote === 'zzz' ? 8 + Math.sin(now / 300) * 3 : 0);
+          const ex = drawX + (pose.emote === 'zzz' ? 8 + Math.sin(now / 300) * 3 : 0);
           const ey = groundY - look.height - 8 - pose.emoteAge * 10 - pose.lift;
           ctx.strokeText(EMOTE_GLYPHS[pose.emote], ex, ey);
           ctx.fillText(EMOTE_GLYPHS[pose.emote], ex, ey);
@@ -488,6 +684,32 @@ export function HideoutPreview({
       ctx.fill();
       ctx.restore();
       drawRig(ctx, rig, palette, operatorAnim, reduceMotion ? 0 : now, operator.x, groundY, operatorFacing, scale, { outline: true });
+
+      // The ball, over the operator so a carried one stays visible.
+      if (ball) {
+        const bx = ball.x;
+        const by = groundY - 7 - ball.z;
+        ctx.save();
+        ctx.globalAlpha = 0.3 * (1 - Math.min(0.6, ball.z / 60));
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.ellipse(bx, groundY, 5, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.fillStyle = '#fde047';
+        ctx.strokeStyle = '#a16207';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(bx, by, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = '#fef9c3';
+        ctx.beginPath();
+        ctx.arc(bx - 2, by - 2, 3, Math.PI, Math.PI * 1.6);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Sparks.
       for (let i = sparks.length - 1; i >= 0; i -= 1) {
@@ -524,6 +746,24 @@ export function HideoutPreview({
     const handleTap = (px: number, py: number) => {
       const now = performance.now() - start;
       const settings = live.current;
+      if (!reduceMotion) {
+        for (const actor of actors) {
+          const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
+          if (!def?.squashable) continue;
+          const half = Math.max(16, cssH * def.size * 0.6 * 0.7);
+          if (Math.abs(px - actor.x) <= half && py >= groundY - half - 8 && py <= groundY + 10 && squashActor(actor, now)) {
+            burst(actor.x, groundY - 6, def.accent, 8, now);
+            setToast({ key: Date.now(), title: t('hideout.ambient.title'), line: t('hideout.ambient.squash') });
+            return;
+          }
+        }
+        const tapped = pickups.find((pick) => Math.abs(px - pick.x) <= 16 && py >= groundY - 26 && py <= groundY + 10);
+        if (tapped && settings.interactive) {
+          pendingProp = null;
+          setGoal(operator, control, tapped.x, now, range(), false);
+          return;
+        }
+      }
       const wanted = settings.pets.slice(0, MAX_PETS);
       let hit: HideoutPetInfo | undefined;
       let hitState: HideoutPetState | undefined;
@@ -536,6 +776,25 @@ export function HideoutPreview({
           hit = info;
           hitState = state;
           break;
+        }
+      }
+      if (ball && settings.ball?.present && !reduceMotion) {
+        if (ball.phase === 'carried') {
+          const dir: 1 | -1 = px >= operator.x ? 1 : -1;
+          const r0 = range();
+          const power = Math.min(1, Math.abs(px - operator.x) / Math.max(1, (r0.max - r0.min) * 0.5));
+          if (throwBall(ball, dir, power, throwFeelFor(settings.ball.themeId))) {
+            operator.dir = dir;
+            ball.z = CARRY_HEIGHT;
+            return;
+          }
+        } else if (ball.phase === 'ground' && settings.interactive && Math.abs(px - ball.x) <= 16 && py >= groundY - 26 && py <= groundY + 10) {
+          if (startFetch(ball)) {
+            pendingProp = null;
+            setGoal(operator, control, ball.x, now, range(), false);
+            burst(ball.x, groundY - 8, '#fde047', 4, now);
+            return;
+          }
         }
       }
       if (hit && hitState) {

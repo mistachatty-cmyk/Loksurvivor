@@ -9,8 +9,9 @@
  * corrupt data, and never throws.
  */
 import {
-  MAX_FORGED_OPERATORS, normalizeForgedOperator, type ForgedOperator,
+  HEX, MAX_FORGED_OPERATORS, PALETTE_KEYS, normalizeForgedOperator, type ForgedOperator,
 } from '@/game/data/operatorForge';
+import type { SpritePalette } from '@/game/types';
 import { CUSTOM_SLOT_IDS, ENDGAME_FEATURE_IDS, type EndgameFeatureId } from '@/game/data/endgameUnlocks';
 
 export const FORGE_STORAGE_KEY = 'survivor616.forge.v1';
@@ -27,6 +28,98 @@ export interface ForgeState {
   earned: string[];
   /** Explicit on/off choices; a missing key means "use the default". */
   toggles: Partial<Record<EndgameFeatureId, boolean>>;
+  /** Cosmetic recolors of classic enemies. Never change stats or behavior. */
+  customEnemies: CustomVariant[];
+  /** Cosmetic recolors of LokPet variants. */
+  customPets: CustomVariant[];
+  /** Which customs take part in runs. A missing id means on; the master switch turns every custom off at once. */
+  runUse: RunUse;
+  /** Show the Endgame dock in the hideout. Missing means on. */
+  hideoutDock: boolean;
+  /** Counters for forge achievements. They only ever go up. */
+  stats: ForgeStats;
+}
+
+export interface RunUse {
+  master: boolean;
+  operators: Record<string, boolean>;
+  enemies: Record<string, boolean>;
+  pets: Record<string, boolean>;
+}
+
+export interface ForgeStats {
+  tabsVisited: string[];
+  shareCodes: number;
+  classicSaved: number;
+  detailedSaved: number;
+  recolored: number;
+}
+
+export const EMPTY_STATS: ForgeStats = { tabsVisited: [], shareCodes: 0, classicSaved: 0, detailedSaved: 0, recolored: 0 };
+const EMPTY_RUN_USE: RunUse = { master: true, operators: {}, enemies: {}, pets: {} };
+
+function normalizeFlags(input: unknown): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return out;
+  for (const [key, value] of Object.entries(input as Record<string, unknown>).slice(0, 200)) {
+    if (typeof value === 'boolean') out[key.slice(0, 64)] = value;
+  }
+  return out;
+}
+
+function normalizeRunUse(input: unknown): RunUse {
+  const src = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>;
+  return { master: src.master !== false, operators: normalizeFlags(src.operators), enemies: normalizeFlags(src.enemies), pets: normalizeFlags(src.pets) };
+}
+
+function normalizeStats(input: unknown): ForgeStats {
+  const src = (input && typeof input === 'object' && !Array.isArray(input) ? input : {}) as Record<string, unknown>;
+  const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.min(Math.floor(v), 1_000_000) : 0);
+  const tabs = Array.isArray(src.tabsVisited) ? src.tabsVisited.filter((t): t is string => typeof t === 'string').slice(0, 8) : [];
+  return { tabsVisited: [...new Set(tabs)], shareCodes: count(src.shareCodes), classicSaved: count(src.classicSaved), detailedSaved: count(src.detailedSaved), recolored: count(src.recolored) };
+}
+
+export type CustomVariantKind = 'enemy' | 'pet';
+
+/** A saved recolor of an existing enemy or LokPet (the base keeps its rig, stats and behavior). */
+export interface CustomVariant {
+  id: string;
+  baseId: string;
+  name: string;
+  palette: SpritePalette;
+  createdAt: number;
+}
+
+export const MAX_CUSTOM_VARIANTS = 60;
+
+function normalizeVariants(input: unknown): CustomVariant[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: CustomVariant[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Record<string, unknown>;
+    if (typeof raw.id !== 'string' || typeof raw.baseId !== 'string' || seen.has(raw.id)) continue;
+    const pal = (raw.palette && typeof raw.palette === 'object' ? raw.palette : {}) as Record<string, unknown>;
+    const palette = {} as SpritePalette;
+    let valid = true;
+    for (const key of PALETTE_KEYS) {
+      const value = pal[key];
+      if (typeof value === 'string' && HEX.test(value)) palette[key] = value;
+      else valid = false;
+    }
+    if (!valid) continue;
+    seen.add(raw.id);
+    out.push({
+      id: raw.id.slice(0, 64),
+      baseId: raw.baseId.slice(0, 64),
+      name: (typeof raw.name === 'string' && raw.name.trim() ? raw.name : 'Custom').slice(0, 40),
+      palette,
+      createdAt: typeof raw.createdAt === 'number' && Number.isFinite(raw.createdAt) ? raw.createdAt : 0,
+    });
+    if (out.length >= MAX_CUSTOM_VARIANTS) break;
+  }
+  return out;
 }
 
 function storage(): Storage | null {
@@ -53,7 +146,7 @@ function devModeForgeAccess(): boolean {
 
 function normalizeForgeState(input: unknown): ForgeState | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
-  const parsed = input as { unlocked?: unknown; operators?: unknown; earned?: unknown; toggles?: unknown };
+  const parsed = input as { unlocked?: unknown; operators?: unknown; earned?: unknown; toggles?: unknown; customEnemies?: unknown; customPets?: unknown; runUse?: unknown; hideoutDock?: unknown; stats?: unknown };
   try {
     const seen = new Set<string>();
     const operators: ForgedOperator[] = [];
@@ -76,14 +169,14 @@ function normalizeForgeState(input: unknown): ForgeState | null {
         if (typeof value === 'boolean') toggles[id] = value;
       }
     }
-    return { unlocked: parsed.unlocked === true, operators, earned, toggles };
+    return { unlocked: parsed.unlocked === true, operators, earned, toggles, customEnemies: normalizeVariants(parsed.customEnemies), customPets: normalizeVariants(parsed.customPets), runUse: normalizeRunUse(parsed.runUse), hideoutDock: parsed.hideoutDock !== false, stats: normalizeStats(parsed.stats) };
   } catch {
     return null;
   }
 }
 
 function read(): ForgeState {
-  const empty: ForgeState = { unlocked: false, operators: [], earned: [], toggles: {} };
+  const empty: ForgeState = { unlocked: false, operators: [], earned: [], toggles: {}, customEnemies: [], customPets: [], runUse: EMPTY_RUN_USE, hideoutDock: true, stats: EMPTY_STATS };
   const store = storage();
   if (!store) return empty;
   try {
@@ -97,6 +190,7 @@ function read(): ForgeState {
 function write(state: ForgeState): boolean {
   const store = storage();
   if (!store) return false;
+  activeCache = null;
   try {
     store.setItem(FORGE_STORAGE_KEY, JSON.stringify(state));
     return true;
@@ -162,7 +256,7 @@ export function isFeatureEnabled(id: EndgameFeatureId): boolean {
   if (!available) return false;
   const choice = state.toggles[id];
   if (typeof choice === 'boolean') return choice;
-  return (id === 'forge' && state.unlocked) || id === 'weaponEvolutions';
+  return (id === 'forge' && state.unlocked) || id === 'weaponEvolutions' || id === 'enemyQuirks' || id === 'quirkSurge';
 }
 
 export function setFeatureEnabled(id: EndgameFeatureId, enabled: boolean): void {
@@ -181,7 +275,9 @@ export function loadForgedOperators(): ForgedOperator[] {
 
 /** Forged operators appear on the roster only while the Forge is switched on. */
 export function loadRosterForgedOperators(): ForgedOperator[] {
-  return isFeatureEnabled('forge') ? read().operators : [];
+  if (!isFeatureEnabled('forge')) return [];
+  const state = read();
+  return state.operators.filter((op) => isRunUseOn(state.runUse, 'operators', op.id));
 }
 
 /** How many more operators can be kept: earned slots minus operators already saved (never below 0). */
@@ -208,4 +304,126 @@ export function saveForgedOperator(op: ForgedOperator): boolean {
 export function deleteForgedOperator(id: string): void {
   const state = read();
   write({ ...state, operators: state.operators.filter((o) => o.id !== id) });
+}
+
+/* ------------------------------------------------------------------ */
+/* Classic enemy and LokPet recolors                                   */
+
+const variantKey = (kind: CustomVariantKind) => (kind === 'enemy' ? 'customEnemies' : 'customPets') as 'customEnemies' | 'customPets';
+
+export function loadCustomVariants(kind: CustomVariantKind): CustomVariant[] {
+  return read()[variantKey(kind)];
+}
+
+/** Adds or replaces (same id) a recolor. Returns false when full or storage is unavailable. */
+export function saveCustomVariant(kind: CustomVariantKind, variant: CustomVariant): boolean {
+  const state = read();
+  const key = variantKey(kind);
+  const list = [...state[key]];
+  const at = list.findIndex((v) => v.id === variant.id);
+  if (at >= 0) list[at] = variant;
+  else if (list.length >= MAX_CUSTOM_VARIANTS) return false;
+  else list.push(variant);
+  return write({ ...state, [key]: list });
+}
+
+export function deleteCustomVariant(kind: CustomVariantKind, id: string): void {
+  const state = read();
+  const key = variantKey(kind);
+  write({ ...state, [key]: state[key].filter((v) => v.id !== id) });
+}
+
+/* ------------------------------------------------------------------ */
+/* Per-item and master "use in runs" switches                          */
+
+type RunUseGroup = 'operators' | 'enemies' | 'pets';
+
+function isRunUseOn(runUse: RunUse, group: RunUseGroup, id: string): boolean {
+  return runUse.master && runUse[group][id] !== false;
+}
+
+export function getRunUse(): RunUse {
+  return read().runUse;
+}
+
+/** True when the master switch and the item's own switch are both on. */
+export function isCustomActive(group: RunUseGroup, id: string): boolean {
+  return isRunUseOn(read().runUse, group, id);
+}
+
+export function setCustomActive(group: RunUseGroup, id: string, on: boolean): void {
+  const state = read();
+  write({ ...state, runUse: { ...state.runUse, [group]: { ...state.runUse[group], [id]: on } } });
+}
+
+export function setCustomMaster(on: boolean): void {
+  const state = read();
+  write({ ...state, runUse: { ...state.runUse, master: on } });
+}
+
+/** Sets every saved custom (operators, enemy looks, pet looks) on or off in one go. */
+export function setAllCustomsActive(on: boolean): void {
+  const state = read();
+  const flags = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, on]));
+  write({
+    ...state,
+    runUse: {
+      master: on ? true : state.runUse.master,
+      operators: flags(state.operators.map((o) => o.id)),
+      enemies: flags(state.customEnemies.map((v) => v.id)),
+      pets: flags(state.customPets.map((v) => v.id)),
+    },
+  });
+}
+
+export function isHideoutDockEnabled(): boolean {
+  return read().hideoutDock;
+}
+
+export function setHideoutDockEnabled(on: boolean): void {
+  write({ ...read(), hideoutDock: on });
+}
+
+/* Palette overrides read by the renderer. Cached until the next write. */
+
+let activeCache: { enemies: Map<string, SpritePalette>; pets: Map<string, SpritePalette> } | null = null;
+
+function activePalettes() {
+  if (activeCache) return activeCache;
+  const state = read();
+  const pick = (list: CustomVariant[], group: 'enemies' | 'pets') => {
+    const map = new Map<string, SpritePalette>();
+    // First active look for a base wins.
+    for (const v of list) if (!map.has(v.baseId) && isRunUseOn(state.runUse, group, v.id)) map.set(v.baseId, v.palette);
+    return map;
+  };
+  activeCache = { enemies: pick(state.customEnemies, 'enemies'), pets: pick(state.customPets, 'pets') };
+  return activeCache;
+}
+
+/** The active custom palette for an enemy id, if the player has one switched on for runs. */
+export function customEnemyPalette(enemyId: string): SpritePalette | undefined {
+  return activePalettes().enemies.get(enemyId);
+}
+
+export function customPetPalette(variantId: string): SpritePalette | undefined {
+  return activePalettes().pets.get(variantId);
+}
+
+/* ------------------------------------------------------------------ */
+/* Achievement counters                                                */
+
+export function getForgeStats(): ForgeStats {
+  return read().stats;
+}
+
+export function bumpForgeStat(stat: 'shareCodes' | 'classicSaved' | 'detailedSaved' | 'recolored'): void {
+  const state = read();
+  write({ ...state, stats: { ...state.stats, [stat]: state.stats[stat] + 1 } });
+}
+
+export function recordForgeTab(tab: string): void {
+  const state = read();
+  if (state.stats.tabsVisited.includes(tab)) return;
+  write({ ...state, stats: { ...state.stats, tabsVisited: [...state.stats.tabsVisited, tab] } });
 }

@@ -6,6 +6,7 @@
  * mirrored into localStorage so a refresh does not wipe the hideout.
  */
 
+import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import {
   createContext,
   useCallback,
@@ -97,6 +98,12 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { activeEventBuff, applyEventBuff, normalizeEventBuff } from '@/game/data/eventBuffs';
+import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
+import { normalizeSpurAreaIds, spurAt } from '@/game/data/lightSpurs';
+import { openLuckyChest } from '@/game/engine/chestOpen';
+import { activeSkyBoost, applySkyStatBonus, normalizeSkyBoost, skyXpMultiplier, startSkyBoost } from '@/game/data/skyEvents';
+import { moraleMultiplier, nextMorale, nextStreak, normalizeMorale, normalizeStreak } from '@/game/data/morale';
 import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
@@ -316,6 +323,13 @@ export function createInitialMeta(): MetaState {
     hideoutChoiceEvents: 'on',
     hideoutClaims: {},
     hideoutLedger: emptyLedger(),
+    crewMorale: 0,
+    runStreak: 0,
+    skyBoost: null,
+    ownsBall: false,
+    eventBuff: null,
+    spurAreaIds: [],
+    bestRunStreak: 0,
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
@@ -345,6 +359,10 @@ export function createInitialMeta(): MetaState {
     petElixirUpdatedAt: Date.now(),
     bestiary: {},
     totalKills: 0,
+    quirkKills: {},
+    quirkEverywhereRuns: 0,
+    quirkTakenRuns: 0,
+    quirkSurgesSurvived: 0,
     grpdSpentSeals: 0,
     grpdUnlockedWeaponIds: [],
     grpdActiveWeaponIds: [],
@@ -474,6 +492,25 @@ function normalizeEndlessDiscoveries(value: unknown): string[] {
     }
   }
   return [...discoveries];
+}
+
+function normalizeQuirkKills(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const quirk of ENEMY_QUIRKS) {
+    const count = counter((value as Record<string, unknown>)[quirk.id]);
+    if (count > 0) out[quirk.id] = count;
+  }
+  return out;
+}
+
+function mergeQuirkKills(prev: Record<string, number>, run?: Record<string, number>): Record<string, number> {
+  if (!run) return prev;
+  const out = { ...prev };
+  for (const [id, count] of Object.entries(run)) {
+    if (ENEMY_QUIRKS_BY_ID[id] && count > 0) out[id] = (out[id] ?? 0) + Math.floor(count);
+  }
+  return out;
 }
 
 function counter(value: unknown, fallback = 0): number {
@@ -1290,6 +1327,13 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutChoiceEvents: parsed.hideoutChoiceEvents === 'quiet' || parsed.hideoutChoiceEvents === 'off' ? parsed.hideoutChoiceEvents : 'on',
     hideoutClaims: normalizeHideoutClaims(parsed.hideoutClaims),
     hideoutLedger: normalizeHideoutLedger(parsed.hideoutLedger),
+    crewMorale: normalizeMorale(parsed.crewMorale),
+    runStreak: normalizeStreak(parsed.runStreak),
+    skyBoost: normalizeSkyBoost(parsed.skyBoost),
+    ownsBall: parsed.ownsBall === true,
+    eventBuff: normalizeEventBuff(parsed.eventBuff),
+    spurAreaIds: normalizeSpurAreaIds(parsed.spurAreaIds),
+    bestRunStreak: Math.max(normalizeStreak(parsed.bestRunStreak), normalizeStreak(parsed.runStreak)),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
@@ -1328,6 +1372,10 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     ...recoveredElixirs,
     bestiary,
     totalKills: savedTotalKills,
+    quirkKills: normalizeQuirkKills(parsed.quirkKills),
+    quirkEverywhereRuns: counter(parsed.quirkEverywhereRuns),
+    quirkTakenRuns: counter(parsed.quirkTakenRuns),
+    quirkSurgesSurvived: counter(parsed.quirkSurgesSurvived),
     grpdSpentSeals: counter(parsed.grpdSpentSeals),
     grpdUnlockedWeaponIds: fabricatedGrpdIds,
     grpdActiveWeaponIds: activeGrpdIds,
@@ -1565,6 +1613,20 @@ export function isUnlocked(rule: UnlockRule | undefined | null, meta: MetaState)
   }
 }
 
+/** Whether a place is open to the player: its own rule, or a Light Spur they followed. */
+export function areaOpen(area: AreaDef, meta: MetaState): boolean {
+  return isUnlocked(area.unlock, meta) || meta.spurAreaIds.includes(area.id);
+}
+
+/** The Light Spur showing at `now` for this player, or null. */
+export function spurShowing(meta: MetaState, now: number): AreaDef | null {
+  const lead = spurAt(now, (areaId) => {
+    const area = AREAS.find((a) => a.id === areaId);
+    return !area || areaOpen(area, meta);
+  });
+  return lead ? AREAS.find((a) => a.id === lead.areaId) ?? null : null;
+}
+
 export function describeUnlock(rule: UnlockRule): string {
   switch (rule.kind) {
     case 'default':
@@ -1615,11 +1677,12 @@ function validEpisodeResult(result: RunResult): CharacterEpisodeDef | undefined 
 /** Total permanent stat boost granted by every rescued ally. */
 export function allyBoostTotals(meta: MetaState): Partial<BaseStats> {
   const totals: Partial<BaseStats> = {};
+  const morale = moraleMultiplier(meta.crewMorale, endgameReached(meta));
   for (const id of meta.rescuedAllyIds) {
     const ally = ALLIES_BY_ID[id];
     if (!ally) continue;
     for (const [key, value] of Object.entries(ally.boost) as Array<[keyof BaseStats, number]>) {
-      totals[key] = (totals[key] ?? 0) + value;
+      totals[key] = (totals[key] ?? 0) + value * morale;
     }
   }
   return totals;
@@ -1660,6 +1723,8 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   const cards = activeCardEffects(meta);
   for (const [stat, multiplier] of Object.entries(cards.statMults) as Array<[keyof BaseStats, number]>) stats[stat] *= multiplier;
   stats.magnet *= cards.magnetMult;
+  applyEventBuff(stats, activeEventBuff(meta.eventBuff, Date.now()));
+  applySkyStatBonus(stats, activeSkyBoost(meta.skyBoost, Date.now())?.statBonus ?? 0);
   stats.armor = Math.min(stats.armor, 0.6);
   if (!ignoreFatigue) {
     const fatigue = Math.min(MAX_FATIGUE_PCT, Math.max(0, settled.fatigueByCharacter[character.id] ?? 0)) / 100;
@@ -1993,6 +2058,10 @@ type Action =
   | { type: 'setHideoutPetPlay'; enabled: boolean }
   | { type: 'setHideoutChoiceEvents'; mode: MetaState['hideoutChoiceEvents'] }
   | { type: 'activateHideoutProp'; propId: string; seed: number; now: number }
+  | { type: 'lookThroughSpyglass'; now: number }
+  | { type: 'openLuckyChest'; now: number; seed: number }
+  | { type: 'grantBall' }
+  | { type: 'collectHideoutPickup'; kindId: string; now: number }
   | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
   | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
@@ -3359,8 +3428,39 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       const roll = resolvePropReward(def, createRng(action.seed), bondLuck(state.meta.savedLokPets));
       if (!roll) return state;
       const result = grantWithFallback(state.meta, roll.reward, roll.fallback, { now: action.now, rare: roll.rare, elixirCap: ELIXIR_CAP });
+      // A grant the daily caps swallowed whole pays nothing, so it must not burn the day's claim.
+      if (!result.paid) return state;
       const claimed = trimClaims({ ...result.meta.hideoutClaims, [propClaimKey(def.id)]: action.now });
       return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
+    }
+
+    case 'collectHideoutPickup': {
+      const def = AMBIENT_PICKUPS_BY_ID[action.kindId];
+      if (!def) return state;
+      const paid = grantWithFallback(state.meta, def.reward, undefined, { now: action.now, elixirCap: ELIXIR_CAP });
+      return paid.paid ? { ...state, meta: paid.meta } : state;
+    }
+
+    case 'grantBall':
+      return state.meta.ownsBall ? state : { ...state, meta: { ...state.meta, ownsBall: true } };
+
+    case 'openLuckyChest': {
+      const opened = openLuckyChest(state.meta, action.now, action.seed, ELIXIR_CAP);
+      return opened ? { ...state, meta: opened.meta } : state;
+    }
+
+    case 'lookThroughSpyglass': {
+      const boost = startSkyBoost(state.meta.skyBoost, action.now);
+      const spur = spurShowing(state.meta, action.now);
+      if (!boost && !spur) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          skyBoost: boost ?? state.meta.skyBoost,
+          spurAreaIds: spur ? [...state.meta.spurAreaIds, spur.id] : state.meta.spurAreaIds,
+        },
+      };
     }
 
     case 'chooseLokPetBranch': {
@@ -3741,6 +3841,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'completeRun': {
       const result = action.result;
       const prev = state.meta;
+      const crewMorale = nextMorale(prev.crewMorale, result.cleared);
+      const runStreak = nextStreak(prev.runStreak, result.cleared);
+      const bestRunStreak = Math.max(prev.bestRunStreak, runStreak);
       const runCharacter = getCharacter(result.characterId);
       const collectorRun = Boolean(runCharacter.lokPetCollector);
       const collectorPetsFound = collectorRun
@@ -3820,6 +3923,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
 
       const next: MetaState = {
         ...prev,
+        crewMorale,
+        runStreak,
+        bestRunStreak,
         ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
         rescuedAllyIds,
@@ -3831,6 +3937,10 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         ...recoveredElixirs,
         clearedAreaIds,
         totalKills: prev.totalKills + result.kills,
+        quirkKills: mergeQuirkKills(prev.quirkKills, result.killsByQuirk),
+        quirkEverywhereRuns: prev.quirkEverywhereRuns + (result.quirkEverywhereRun ? 1 : 0),
+        quirkTakenRuns: prev.quirkTakenRuns + (result.quirkTakenRun ? 1 : 0),
+        quirkSurgesSurvived: prev.quirkSurgesSurvived + (result.quirkSurgeSurvived ? 1 : 0),
         totalRuns: prev.totalRuns + 1,
         bestSurvivalSec: Math.max(prev.bestSurvivalSec, Math.round(result.survivedSec)),
         totalLevelUps: prev.totalLevelUps + Math.max(0, result.level - 1),
@@ -4118,6 +4228,11 @@ export interface MetaContextValue {
   setHideoutPetPlay: (enabled: boolean) => void;
   setHideoutChoiceEvents: (mode: MetaState['hideoutChoiceEvents']) => void;
   activateHideoutProp: (propId: string, seed: number) => void;
+  lookThroughSpyglass: () => void;
+  openLuckyChest: (seed: number) => void;
+  /** Gives the player the Ball. The LokShop purchase will call this. */
+  grantBall: () => void;
+  collectHideoutPickup: (kindId: string) => void;
   playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
   resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
@@ -4356,6 +4471,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setHideoutChoiceEvents = useCallback((mode: MetaState['hideoutChoiceEvents']) => dispatch({ type: 'setHideoutChoiceEvents', mode }), []);
   const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
   const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
+  const collectHideoutPickup = useCallback((kindId: string) => dispatch({ type: 'collectHideoutPickup', kindId, now: Date.now() }), []);
+  const grantBall = useCallback(() => dispatch({ type: 'grantBall' }), []);
+  const openLuckyChestAction = useCallback((seed: number) => dispatch({ type: 'openLuckyChest', now: Date.now(), seed }), []);
+  const lookThroughSpyglass = useCallback(() => dispatch({ type: 'lookThroughSpyglass', now: Date.now() }), []);
   const activateHideoutProp = useCallback((propId: string, seed: number) => dispatch({ type: 'activateHideoutProp', propId, seed, now: Date.now() }), []);
   const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
   const chooseLokPetBranch = useCallback((id: string, branchId: string) => dispatch({ type: 'chooseLokPetBranch', id, branchId, now: Date.now() }), []);
@@ -4503,8 +4622,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     const { meta } = state;
     const unlockedCharacters = CHARACTERS.filter((c) => isUnlocked(c.unlock, meta));
     const lockedCharacters = CHARACTERS.filter((c) => !isUnlocked(c.unlock, meta));
-    const unlockedAreas = AREAS.filter((a) => isUnlocked(a.unlock, meta));
-    const lockedAreas = AREAS.filter((a) => !isUnlocked(a.unlock, meta));
+    const unlockedAreas = AREAS.filter((a) => areaOpen(a, meta));
+    const lockedAreas = AREAS.filter((a) => !areaOpen(a, meta));
     const unlockedRooms = HUB_ROOMS.filter((r) => isUnlocked(r.unlock, meta));
     const lockedRooms = HUB_ROOMS.filter((r) => !isUnlocked(r.unlock, meta));
     const rescuedAllies = ALLIES.filter((a) => meta.rescuedAllyIds.includes(a.id));
@@ -4632,6 +4751,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutPetPlay,
       setHideoutChoiceEvents,
       activateHideoutProp,
+      lookThroughSpyglass,
+      openLuckyChest: openLuckyChestAction,
+      grantBall,
+      collectHideoutPickup,
       playWithLokPet,
       resolveChoiceEvent,
       careForLokPet,
@@ -4890,7 +5013,7 @@ export function areaStatus(areaId: string, meta: MetaState) {
   const area = getArea(areaId);
   return {
     area,
-    unlocked: isUnlocked(area.unlock, meta),
+    unlocked: areaOpen(area, meta),
     cleared: meta.clearedAreaIds.includes(areaId),
   };
 }

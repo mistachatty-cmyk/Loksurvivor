@@ -2,7 +2,7 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { ELIXIR_CAP, isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
+import { ELIXIR_CAP, isPrimeTakeoverActive, spurShowing, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
@@ -22,6 +22,13 @@ import { MusicNowPlaying } from './MusicNowPlaying';
 import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { describeReward } from './hideoutRewardText';
 import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
+import { activeEventBuff } from '@/game/data/eventBuffs';
+import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
+import { CHEST_TIERS } from '@/game/data/chestLoot';
+import { CARD_COSMETICS_BY_ID } from '@/game/data/cardCosmetics';
+import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
+import { chestStatus, openLuckyChest as previewLuckyChest } from '@/game/engine/chestOpen';
+import { activeSkyBoost, skyAt, startSkyBoost } from '@/game/data/skyEvents';
 import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER, type NpcCastMember } from '@/game/data/npcCast';
 import { bondLuck, eventsLeftToday, grantWithFallback } from '@/game/engine/hideoutRewards';
 import { eventPetFor, pickChoiceEvent } from '@/game/engine/choiceEvents';
@@ -29,7 +36,7 @@ import { createRng } from '@/game/engine/math';
 import { applyPetCare, PET_CARE_VERBS_BY_ID } from '@/game/data/petCare';
 import { beatBus } from '@/game/audio/beatBus';
 import { petEvolvedLook } from '@/game/engine/petEvolution';
-import { bondRankFor, petCallName } from '@/game/engine/petGrowth';
+import { bondDayKey, bondRankFor, petCallName } from '@/game/engine/petGrowth';
 import { CurrencyGlossary } from './CurrencyGlossary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -48,9 +55,10 @@ import { useAuth } from '@/state/authStore';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { useT, useLocale } from '@/lib/i18n';
-import { grpdArmoryLocation } from '@/game/data/grpdArmory';
+import { grpdArmoryLocation, grpdAvailableSeals } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
+import { HideoutEndgameDock } from './HideoutEndgameDock';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
 let hasShownHideoutArrivalThisSession = false;
@@ -100,6 +108,7 @@ const PANEL_CONFIG: Record<HubPanel, { icon: any; testId: string }> = {
   'threat-matrix': { icon: ShieldAlert, testId: 'button-open-threat-matrix' },
   'dust-mite-rancher': { icon: Bug, testId: 'button-open-dust-mite-rancher' },
   'frog-ranch': { icon: Zap, testId: 'button-open-frog-ranch' },
+  'lok-shop': { icon: Sparkles, testId: 'button-open-lok-shop' },
   'director-terminal': { icon: ScanEye, testId: 'button-open-director-terminal' },
 };
 
@@ -153,7 +162,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const locale = useLocale();
@@ -187,6 +196,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           overlays: look.overlays,
           sizeScale: (pet.roll.sizeScale ?? 1) * look.scale,
           bondRank: bondRankFor(pet.bond).id,
+          playedToday: pet.careDay === bondDayKey(Date.now()),
           history: pet.hideoutEvents,
         };
       });
@@ -201,6 +211,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     [selectedCharacter, meta.characterSkinByCharacterId, meta.activePaletteId, meta.worldPaletteBlendEnabled],
   );
   const activeRoomId = unlockedRooms.find((r) => r.id === roomId)?.id ?? unlockedRooms[0]?.id ?? roomId;
+  const [ballOut, setBallOut] = useState(false);
+  const [summonSeq, setSummonSeq] = useState(0);
   const [stripNotice, setStripNotice] = useState<StripNotice | undefined>(undefined);
   const [playCue, setPlayCue] = useState<PlayCue | undefined>(undefined);
   const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
@@ -264,6 +276,16 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     showStripNotice(t(def.labelKey), found ? `${line} ${t('hideout.life.found', { items: found })}` : line);
   };
 
+  const handlePickup = (kindId: string, _seed: number): boolean => {
+    const def = AMBIENT_PICKUPS_BY_ID[kindId];
+    if (!def) return false;
+    const preview = grantWithFallback(meta, def.reward, undefined, { now: Date.now(), elixirCap: ELIXIR_CAP });
+    if (!preview.paid) return false;
+    collectHideoutPickup(kindId);
+    showStripNotice(t('hideout.ambient.title'), t('hideout.ambient.found', { items: describeReward(preview.applied, t) }));
+    return true;
+  };
+
   const handlePropUse = (propId: string) => {
     if (propId.startsWith('ally:')) {
       const ally = rescuedAllies.find((candidate) => candidate.id === propId.slice(5));
@@ -285,6 +307,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     }
     const def = HIDEOUT_PROPS_BY_ID[propId];
     if (!def) return;
+    // The bell calls someone over, whether or not it still pays today.
+    if (propId === 'bell-cord') setSummonSeq((seq) => seq + 1);
     const title = t(def.labelKey);
     const line = t(def.lineKeys[Math.floor(Math.random() * def.lineKeys.length)] ?? def.lineKeys[0]!);
     const action = def.action;
@@ -303,10 +327,46 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       const seed = Math.floor(Math.random() * 0x7fffffff);
       const roll = resolvePropReward(def, createRng(seed), bondLuck(meta.savedLokPets));
       const preview = roll ? grantWithFallback(meta, roll.reward, roll.fallback, { now, rare: roll.rare, elixirCap: ELIXIR_CAP }) : null;
+      if (!preview?.paid) {
+        // The daily caps would swallow this grant: say so and keep the claim for later.
+        showStripNotice(title, t('hideout.life.capped'));
+        return;
+      }
       activateHideoutProp(propId, seed);
       const found = preview ? describeReward(preview.applied, t) : '';
       const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;
       showStripNotice(title, found ? `${text} ${t('hideout.life.found', { items: found })}` : text);
+    } else if (action.kind === 'chest') {
+      const now = Date.now();
+      const status = chestStatus(meta, now);
+      if (status !== 'out') {
+        showStripNotice(title, t(status === 'opened' ? 'chest.opened' : 'chest.away'));
+        return;
+      }
+      const seed = Math.floor(Math.random() * 0x7fffffff);
+      const opening = previewLuckyChest(meta, now, seed, ELIXIR_CAP);
+      if (!opening) {
+        showStripNotice(title, t('hideout.life.capped'));
+        return;
+      }
+      openLuckyChest(seed);
+      const { loot } = opening;
+      const tierLabel = t((CHEST_TIERS.find((tier) => tier.id === loot.tier)?.labelKey ?? 'chest.tier.common') as never);
+      const found = loot.cardId
+        ? t('chest.found.card', { name: CARD_MANIFESTS_BY_ID[loot.cardId]?.name ?? loot.cardId })
+        : loot.cosmeticId
+          ? t('chest.found.cosmetic', { name: CARD_COSMETICS_BY_ID[loot.cosmeticId]?.name ?? loot.cosmeticId })
+          : t('hideout.life.found', { items: describeReward(opening.applied, t) });
+      showStripNotice(`${title} - ${tierLabel}`, found);
+    } else if (action.kind === 'sky') {
+      const sky = skyAt(Date.now());
+      const started = startSkyBoost(meta.skyBoost, Date.now());
+      const spur = spurShowing(meta, Date.now());
+      if (started || spur) lookThroughSpyglass();
+      const running = activeSkyBoost(started ?? meta.skyBoost, Date.now());
+      const suffix = started ? t('sky.started') : running ? t('sky.running', { title: t(running.titleKey as never) }) : '';
+      const spurLine = spur ? t('sky.spur', { name: spur.name }) : '';
+      showStripNotice(t(sky.titleKey as never), `${t(sky.lineKey as never)} ${suffix} ${spurLine}`.replace(/\s+/g, ' ').trim());
     } else if (action.kind === 'event') {
       const now = Date.now();
       if (!propReady(def, meta.hideoutClaims, now)) {
@@ -596,6 +656,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
           </div>
         ) : null}
+        <HideoutEndgameDock onOpen={onOpen} />
         {meta.hideoutPreviewEnabled && (
           <HideoutPreview
             rig={selectedCharacter.rig}
@@ -611,6 +672,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             interactive={meta.hideoutInteractive}
             keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary}
             notice={stripNotice}
+            summonSeq={summonSeq}
+            onPickup={handlePickup}
+            ball={{ present: ballOut && meta.ownsBall && meta.hideoutInteractive, themeId: meta.uiTheme }}
             cue={playCue}
             onPropUse={handlePropUse}
             onFocusPet={setFocusPetId}
@@ -623,6 +687,19 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             }}
           />
         )}
+        {meta.hideoutPreviewEnabled && meta.ownsBall && meta.hideoutInteractive ? (
+          <div className="mb-3 -mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setBallOut((out) => !out)}
+              className="border border-border px-3 py-1.5 text-xs font-bold uppercase tracking-wide hover:bg-white/10"
+              data-testid="button-toggle-ball"
+            >
+              {ballOut ? t('hideout.ball.putAway') : t('hideout.ball.putOut')}
+            </button>
+            {ballOut ? <span className="text-xs text-muted-foreground">{t('hideout.ball.hint')}</span> : null}
+          </div>
+        ) : null}
         {meta.hideoutPreviewEnabled && meta.hideoutPetPlay && focusPet ? (
           <HideoutPlayBar
             pet={focusPet}
@@ -710,6 +787,36 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               )}
               {showCurrencyGlossary && <CurrencyGlossary />}
             </div>
+          </div>
+
+          <div className="mb-6">
+            <CollapsibleSection
+              title="Resources"
+              subtitle="Everything you're holding"
+              defaultCollapsed={meta.hideoutSectionsCollapsedByDefault}
+              testId="section-resources"
+            >
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="resource-list">
+                {([
+                  { id: 'cred', name: 'Cred', value: meta.cred, color: 'text-amber-300' },
+                  { id: 'lootTokens', name: 'Loot tokens', value: meta.lootTokens, color: 'text-amber-400' },
+                  { id: 'skeletonKeys', name: 'Skeleton keys', value: meta.skeletonKeys, color: 'text-sky-400' },
+                  { id: 'cardCredits', name: 'Card credits', value: meta.cardCredits, color: 'text-emerald-300' },
+                  { id: 'lokPetTreats', name: 'Pet treats', value: meta.lokPetTreats, color: 'text-pink-300' },
+                  { id: 'petElixirs', name: 'Pet elixirs', value: meta.petElixirs, color: 'text-fuchsia-300' },
+                  { id: 'grpdSeals', name: 'GRPD seals', value: grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals), color: 'text-blue-300' },
+                  ...(activeEventBuff(meta.eventBuff, Date.now()) ? [{ id: 'eventBuff', name: t('eventbuff.tile'), value: t(`eventbuff.${meta.eventBuff!.buffId}.name` as never), color: 'text-cyan-300' }] : []),
+                  { id: 'runStreak', name: t('hub.resource.streak'), value: `${meta.runStreak} (${t('hub.resource.streakBest', { best: meta.bestRunStreak })})`, color: 'text-orange-300' },
+                  ...(meta.rescuedAllyIds.length > 0 ? [{ id: 'crewMorale', name: t('hub.resource.morale'), value: meta.crewMorale > 0 ? `+${meta.crewMorale}` : meta.crewMorale, color: meta.crewMorale < 0 ? 'text-red-400' : 'text-lime-300' }] : []),
+                  ...(session && lokBalance !== null ? [{ id: 'lokTokens', name: 'LokTokens', value: lokBalance, color: 'text-violet-300' }] : []),
+                ]).map((r) => (
+                  <div key={r.id} className="border border-border bg-black/20 p-2" data-testid={`resource-${r.id}`}>
+                    <p className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{r.name}</p>
+                    <p className={`font-mono text-sm font-black ${r.color}`}>{r.value}</p>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
           </div>
 
           <div className="mb-6">
@@ -815,6 +922,141 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
               </section>
             ))}
           </div>
+
+        <section className="mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-px bg-border flex-1" />
+            <p className="text-xs uppercase tracking-widest text-primary font-bold">Playing as <span className="text-white">{selectedCharacter.name}</span></p>
+            <div className="h-px bg-border flex-1" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {activeRoom.features.map(feature => {
+              // 'allies' is rendered separately below, skip it here
+              if (feature === 'allies') return null;
+              
+              const config = PANEL_CONFIG[feature as HubPanel];
+              if (!config) return null;
+              
+              const Icon = config.icon;
+              const isPrimary = feature === 'runs';
+
+              return (
+                <button 
+                  key={feature}
+                  type="button" 
+                  onClick={() => onOpen(feature as HubPanel)} 
+                  className={`group relative p-6 text-left border flex flex-col gap-4 transition-all overflow-hidden ${
+                    isPrimary 
+                      ? 'bg-primary text-primary-foreground border-primary hover:bg-white' 
+                      : 'bg-card border-border hover:border-primary'
+                  }`}
+                  data-testid={config.testId}
+                >
+                  {isPrimary && (
+                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:250%_250%,100%_100%] animate-[shimmer_2s_infinite] pointer-events-none" />
+                  )}
+                  <Icon className={`w-8 h-8 ${isPrimary ? 'text-primary-foreground' : 'text-primary group-hover:text-white transition-colors'}`} />
+                  <div className="relative z-10">
+                    <h3 className={`text-2xl font-black uppercase tracking-tight ${isPrimary ? 'text-primary-foreground' : 'text-white'}`}>{t(`hub.room.${feature as HubPanel}.label`)}</h3>
+                    <p className={`text-xs uppercase tracking-wider mt-1 ${isPrimary ? 'text-primary-foreground/80' : 'text-muted-foreground group-hover:text-gray-300'}`}>
+                      {t(`hub.room.${feature as HubPanel}.description`)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {(meta.threatMatrixUnlocked || (meta.vendorPurchases?.['threat-matrix-console'] ?? 0) > 0) && (
+          <section className="mb-8 border border-cyan-500/40 bg-cyan-950/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg shadow-lg" data-testid="section-threat-matrix-banner">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded border border-cyan-400/50 bg-cyan-900/40 text-cyan-300">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">Security Override Terminal</span>
+                  <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-200">ONLINE</span>
+                </div>
+                <h3 className="text-base font-black uppercase text-white tracking-wide">Threat Matrix Quarantine Console</h3>
+                <p className="text-xs text-cyan-200/70">
+                  Override spawn tables, quarantine enemy specimens, or trigger Universal Cross-Map Incursions.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpen('threat-matrix')}
+              className="flex shrink-0 items-center justify-center gap-2 rounded border border-cyan-400 bg-cyan-500/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/35 transition-all shadow-md"
+            >
+              Access Terminal
+            </button>
+          </section>
+        )}
+
+        {activeRoom.id === 'grpd-station' && (
+          <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{armoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
+              {armoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
+            </div>
+          </section>
+        )}
+
+        {activeRoom.id === 'grpd-vault' && blue616 && (
+          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
+                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
+                </div>
+                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
+                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
+              </div>
+              {legendaryPoliceDog ? (
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
+                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
+                    <ShieldCheck className="h-4 w-4" /> Recovered
+                  </div>
+                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
+                    Equip LokPet
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
+                  <Dog className="h-5 w-5" /> Claim Blue 616
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+         {newlyRescuedAlly && (
+           <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
+             <div className="mb-3 flex items-center gap-2">
+               <PartyPopper className="h-5 w-5 text-emerald-300" />
+               <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Welcome home</p>
+             </div>
+             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+               <HideoutVignette
+                 left={{ name: selectedCharacter.name, rig: selectedCharacter.rig, palette: selectedCharacterPalette }}
+                 right={{ name: newlyRescuedAlly.name, rig: allyRig(newlyRescuedAlly), palette: newlyRescuedAlly.palette }}
+                 size={110}
+               />
+               <p className="text-sm text-white/80">
+                 <span className="font-black uppercase text-white">{newlyRescuedAlly.name}</span> made it back with {selectedCharacter.name}.
+                 {' '}{newlyRescuedAlly.boostLabel}
+               </p>
+             </div>
+           </section>
+         )}
 
           <div className="p-4 bg-card border border-border">
             <h2 className="text-xl font-bold text-white mb-1">{activeRoom.subtitle}</h2>
@@ -951,48 +1193,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             </div>
         </header>
 
-        {activeRoom.id === 'grpd-station' && (
-          <section className="mb-8 border border-sky-300/40 bg-sky-950/30 p-4 sm:p-5" data-testid="section-grpd-armory">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div><p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">Division St. evidence room</p><h2 className="mt-1 text-xl font-black text-white">GRPD Armory</h2><p className="mt-1 text-sm text-sky-100/70">{armoryAnchor === 'station' ? 'Browse sealed designs, fabricate field prototypes, and choose which weapons may appear in future runs.' : 'The keeper hummed the Armory to the hideout. Its protected entrance is on the main floor until it returns.'}</p></div>
-              {armoryAnchor === 'station' && <button type="button" onClick={() => onOpen('grpd-armory')} className="min-h-11 border border-sky-200/70 bg-sky-300/15 px-4 font-mono text-xs font-black uppercase text-sky-50 hover:bg-sky-300/25" data-testid="button-open-grpd-armory">Open Armory</button>}
-            </div>
-          </section>
-        )}
-
-        {activeRoom.id === 'grpd-vault' && blue616 && (
-          <section className="mb-8 border border-sky-300/45 bg-sky-950/35 p-4 shadow-[0_0_36px_rgba(96,165,250,.12)] sm:p-6" data-testid="section-grpd-vault-k9">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="grid h-28 w-28 shrink-0 place-items-center border border-sky-300/50 bg-slate-950/80">
-                <LokPetIcon silhouette={blue616.silhouette} palette={blue616.palette} size={88} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="border border-amber-300/50 bg-amber-300/10 px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">Legendary K9</span>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-sky-200">GRPD · Call sign 616</span>
-                </div>
-                <h2 className="mt-2 text-3xl font-black uppercase tracking-tight text-white">Blue 616</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-sky-100/70">The vault guardian held the last watch alone. Claim Blue directly from the evidence room—no cred, loot token, pack, or shop roll required.</p>
-                <p className="mt-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55">Heavy shot · Blue-line frost · Last Watch</p>
-              </div>
-              {legendaryPoliceDog ? (
-                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-44">
-                  <div className="flex items-center justify-center gap-2 border border-emerald-300/45 bg-emerald-400/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-emerald-200" data-testid="status-blue-616-recovered">
-                    <ShieldCheck className="h-4 w-4" /> Recovered
-                  </div>
-                  <button type="button" onClick={onOpenRunSetup} className="border border-sky-300/45 bg-sky-300/10 px-4 py-3 font-mono text-xs font-black uppercase tracking-wider text-sky-100 transition hover:bg-sky-300/20" data-testid="button-equip-blue-616">
-                    Equip LokPet
-                  </button>
-                </div>
-              ) : (
-                <button type="button" onClick={claimLegendaryPoliceDog} className="flex shrink-0 items-center justify-center gap-2 border border-sky-200 bg-sky-300/15 px-5 py-4 font-mono text-xs font-black uppercase tracking-wider text-sky-50 transition hover:bg-sky-300/30 sm:min-w-44" data-testid="button-claim-blue-616">
-                  <Dog className="h-5 w-5" /> Claim Blue 616
-                </button>
-              )}
-            </div>
-          </section>
-        )}
-
         <div className="mb-8">
         <CollapsibleSection
           title="Rumor for the road"
@@ -1064,99 +1264,6 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
           </div>
         </CollapsibleSection>
         </div>
-
-        <section className="mb-10 flex-1">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-px bg-border flex-1" />
-            <p className="text-xs uppercase tracking-widest text-primary font-bold">Playing as <span className="text-white">{selectedCharacter.name}</span></p>
-            <div className="h-px bg-border flex-1" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {activeRoom.features.map(feature => {
-              // 'allies' is rendered separately below, skip it here
-              if (feature === 'allies') return null;
-              
-              const config = PANEL_CONFIG[feature as HubPanel];
-              if (!config) return null;
-              
-              const Icon = config.icon;
-              const isPrimary = feature === 'runs';
-
-              return (
-                <button 
-                  key={feature}
-                  type="button" 
-                  onClick={() => onOpen(feature as HubPanel)} 
-                  className={`group relative p-6 text-left border flex flex-col gap-4 transition-all overflow-hidden ${
-                    isPrimary 
-                      ? 'bg-primary text-primary-foreground border-primary hover:bg-white' 
-                      : 'bg-card border-border hover:border-primary'
-                  }`}
-                  data-testid={config.testId}
-                >
-                  {isPrimary && (
-                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:250%_250%,100%_100%] animate-[shimmer_2s_infinite] pointer-events-none" />
-                  )}
-                  <Icon className={`w-8 h-8 ${isPrimary ? 'text-primary-foreground' : 'text-primary group-hover:text-white transition-colors'}`} />
-                  <div className="relative z-10">
-                    <h3 className={`text-2xl font-black uppercase tracking-tight ${isPrimary ? 'text-primary-foreground' : 'text-white'}`}>{t(`hub.room.${feature as HubPanel}.label`)}</h3>
-                    <p className={`text-xs uppercase tracking-wider mt-1 ${isPrimary ? 'text-primary-foreground/80' : 'text-muted-foreground group-hover:text-gray-300'}`}>
-                      {t(`hub.room.${feature as HubPanel}.description`)}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {(meta.threatMatrixUnlocked || (meta.vendorPurchases?.['threat-matrix-console'] ?? 0) > 0) && (
-          <section className="mb-8 border border-cyan-500/40 bg-cyan-950/25 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg shadow-lg" data-testid="section-threat-matrix-banner">
-            <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded border border-cyan-400/50 bg-cyan-900/40 text-cyan-300">
-                <ShieldAlert className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-400">Security Override Terminal</span>
-                  <span className="rounded bg-cyan-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-cyan-200">ONLINE</span>
-                </div>
-                <h3 className="text-base font-black uppercase text-white tracking-wide">Threat Matrix Quarantine Console</h3>
-                <p className="text-xs text-cyan-200/70">
-                  Override spawn tables, quarantine enemy specimens, or trigger Universal Cross-Map Incursions.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpen('threat-matrix')}
-              className="flex shrink-0 items-center justify-center gap-2 rounded border border-cyan-400 bg-cyan-500/20 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-cyan-200 hover:bg-cyan-500/35 transition-all shadow-md"
-            >
-              Access Terminal
-            </button>
-          </section>
-        )}
-
-         {newlyRescuedAlly && (
-           <section className="mb-8 border border-emerald-300/40 bg-emerald-950/20 p-4 sm:p-5" data-testid="section-welcome-home">
-             <div className="mb-3 flex items-center gap-2">
-               <PartyPopper className="h-5 w-5 text-emerald-300" />
-               <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-300">Welcome home</p>
-             </div>
-             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-               <HideoutVignette
-                 left={{ name: selectedCharacter.name, rig: selectedCharacter.rig, palette: selectedCharacterPalette }}
-                 right={{ name: newlyRescuedAlly.name, rig: allyRig(newlyRescuedAlly), palette: newlyRescuedAlly.palette }}
-                 size={110}
-               />
-               <p className="text-sm text-white/80">
-                 <span className="font-black uppercase text-white">{newlyRescuedAlly.name}</span> made it back with {selectedCharacter.name}.
-                 {' '}{newlyRescuedAlly.boostLabel}
-               </p>
-             </div>
-           </section>
-         )}
 
          {activeRoom.features.includes('allies') && (
           <section className="mt-auto">

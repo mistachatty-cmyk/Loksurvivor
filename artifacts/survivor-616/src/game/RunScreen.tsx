@@ -3,6 +3,9 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
+import { skyXpMultiplier } from '@/game/data/skyEvents';
+import { quirkSurgeMode } from '@/game/data/enemyQuirks';
+import { earnedQuirkRunSetup } from '@/game/state/quirkStore';
 import { getDropStyle } from '@/game/data/dropPacks';
 import { ChevronDown, ChevronUp, Eye, Maximize2, Minimize2, Pause, Play, SkipBack, SkipForward, Volume2, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -417,6 +420,7 @@ export function RunScreen({
         wildlifeSheltersInRain: meta.wildlifeSheltersInRain,
         physicsObjectClickRadiusBonus: physicsObjectClickRadiusBonus(meta),
         sizeMult: giantSizeMult(meta),
+        xpMult: skyXpMultiplier(meta.skyBoost, Date.now()),
         stealth: stealthConfig(meta),
         hazardImmune: hazardImmunityUnlocked(meta),
         unlockedCharacterIds: meta.unlockedCharacterIds,
@@ -458,6 +462,8 @@ export function RunScreen({
         disabledWeaponIds: meta.disabledWeaponIds,
         grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id) || grpdEndgameWeaponEarned(id, meta.totalKills, endgameReached(meta))),
         endgameEvolutionsEnabled: isFeatureEnabled('weaponEvolutions'),
+        quirkSurgeMode: quirkSurgeMode(meta.clearedAreaIds.length, endgameReached(meta), isFeatureEnabled('quirkSurge')),
+        enemyQuirks: { enabled: isFeatureEnabled('enemyQuirks'), ...earnedQuirkRunSetup(meta.quirkKills, meta.devModeAllUnlocks) },
         grpdSpawnTierByWeaponId: meta.grpdSpawnTierByWeaponId,
         grpdCareerKills: meta.totalKills,
         grpdAutoIncreaseEnabled: meta.grpdAutoIncreaseEnabled,

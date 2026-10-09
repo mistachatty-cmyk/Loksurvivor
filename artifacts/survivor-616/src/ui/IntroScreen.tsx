@@ -18,6 +18,7 @@ import { pickCreditName } from '@/game/data/creditRotation';
 import { IntroTitle } from '@/ui/IntroTitle';
 import { useT } from '@/lib/i18n';
 import { FireflyEasterEgg } from '@/ui/FireflyEasterEgg';
+import { IntroEggPop } from '@/ui/IntroEggPop';
 import { MotionNotice } from '@/ui/MotionToggle';
 import { IntroPhysicsBody, IntroPhysicsProvider, IntroPhysicsReset } from '@/ui/introPhysics';
 import { introPhysicsForTheme, resolveIntroEvent } from '@/ui/introPresentation';
@@ -232,6 +233,7 @@ export function IntroScreen({ onBegin, onSignIn }: IntroScreenProps) {
         <IntroPhysicsReset />
       </IntroPhysicsProvider>
       <FireflyEasterEgg />
+      <IntroEggPop />
 
       {/* Mission Briefing / Lore Screen Modal (Setup like UpdatePopup with button theme) */}
       <AnimatePresence>

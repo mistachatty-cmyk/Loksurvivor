@@ -6,6 +6,7 @@
  * reads as pixel art without needing image atlases.
  */
 
+import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { drawStyledPickup } from './pickupArtStyles';
 import { LANDED_HEAT_RADIUS, fogAt, type FluidKind, type Pickup, type Popup, type World } from '@/game/engine/world';
 import { DAMAGE_TIERS, GLOW_FROM_TIER } from '@/game/data/damageNumbers';
@@ -14,6 +15,7 @@ import { ENDLESS_BANDS_BY_ID } from '@/game/data/endlessBands';
 import { STATUS_EFFECTS_BY_ID } from '@/game/data/statusEffects';
 import { AMBIENT_KINDS_BY_ID } from '@/game/data/ambient';
 import { LOKPET_VARIANTS_BY_ID, lokPetSpritePalette } from '@/game/data/lokPets';
+import { customEnemyPalette, customPetPalette } from '@/game/state/operatorForgeStore';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import { ALLIES_BY_ID } from '@/game/data/progression';
 import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } from '@/game/types';
@@ -182,7 +184,7 @@ function drawGround(ctx: CanvasRenderingContext2D, w: World, left: number, top: 
         ctx.fillRect(x, y, tile, tile);
         ctx.globalAlpha = 1;
       }
-      if (noise > 0.93) {
+      if (noise > 0.93 && w.graphicsQuality !== 'performance') {
         ctx.fillStyle = ground.glow;
         ctx.globalAlpha = 0.3;
         const px = x + 10 + noise * 18;
@@ -235,6 +237,9 @@ function drawAuthoredGroundTiles(ctx: CanvasRenderingContext2D, w: World) {
 
 /** Small, deterministic bits of city dressing that sit between the combat props. */
 function drawStreetDressing(ctx: CanvasRenderingContext2D, w: World, left: number, top: number, right: number, bottom: number) {
+  // Purely cosmetic (per the comment above) and an unconditional per-viewport-cell
+  // cost independent of enemy count -- skip entirely at the lowest quality tier.
+  if (w.graphicsQuality === 'performance') return;
   const endless = Boolean(w.area.endless);
   const dungeon = Boolean(w.endless?.inDungeon);
   const accent = groundAccent(w);
@@ -2732,9 +2737,10 @@ function drawObstacles(
   }
 }
 
-function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
+function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds) {
+  const LIGHT_MARGIN = 280;
   for (const prop of w.breakables) {
-    if (prop.broken || !prop.chainActive || prop.landedHeatActive || (!prop.vx && !prop.vy)) continue;
+    if (prop.broken || !prop.chainActive || prop.landedHeatActive || (!prop.vx && !prop.vy) || !isNearView(prop.x, prop.y, bounds, LIGHT_MARGIN)) continue;
     const speed = Math.hypot(prop.vx, prop.vy);
     const pulse = 0.4 + Math.sin(w.now / 92) * 0.12;
     const radius = Math.max(prop.w, prop.h) * 0.62 + clamp(speed / 60, 0, 1) * 12;
@@ -2751,7 +2757,7 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.restore();
   }
   for (const prop of w.breakables) {
-    if (prop.broken || !prop.landedHeatActive) continue;
+    if (prop.broken || !prop.landedHeatActive || !isNearView(prop.x, prop.y, bounds, LIGHT_MARGIN)) continue;
     const pulse = 0.65 + Math.sin(w.now / 105) * 0.25;
     const radius = LANDED_HEAT_RADIUS + Math.sin(w.now / 72) * 10;
     const gradient = ctx.createRadialGradient(prop.x, prop.y, 5, prop.x, prop.y, radius);
@@ -2812,7 +2818,12 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
     ctx.save(); ctx.globalAlpha = Math.max(0, fade) * 0.32; ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(boss.x - 12, boss.y - 300); ctx.lineTo(boss.x - 70, boss.y + 20); ctx.lineTo(boss.x + 70, boss.y + 20); ctx.lineTo(boss.x + 12, boss.y - 300); ctx.closePath(); ctx.fill(); ctx.restore();
   }
-  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind));
+  // The main always-on cost in this function: every unbroken lamp/barrel/sign
+  // feeds both this glow loop and the shadow caster below, with no camera
+  // check previously -- an off-screen light still paid for a fresh gradient
+  // every frame. Cull to the viewport the same way the enemy/breakable sprite
+  // passes already do.
+  const sources = w.breakables.filter((b) => !b.broken && ['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind) && isNearView(b.x, b.y, bounds, LIGHT_MARGIN));
   let dynamicCount = 0;
   for (const b of sources) {
     const isBarrel = b.kind === 'barrel';
@@ -2855,12 +2866,19 @@ function drawObjectLighting(ctx: CanvasRenderingContext2D, w: World) {
   // Rebuild hard-edged occlusion every frame. The two rear-most corners of
   // each nearby obstacle are projected away from the moving light source, so
   // shadows rotate, stretch, and vanish immediately when a breakable breaks.
-  const shadowSources = sources.slice(0, 5);
-  const shadowObjects = w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind));
+  // Unconditional in an ordinary lamp-lit street scene this is a real,
+  // enemy-count-independent canvas-state cost (save/polygon-fill/stroke per
+  // nearby source/object pair) -- gate it the same way drawEffects/
+  // drawParticles already gate their own per-frame work by graphicsQuality.
+  const shadowCasterRange = w.graphicsQuality === 'performance' ? 0 : w.graphicsQuality === 'balanced' ? 160 : 260;
+  const shadowSources = shadowCasterRange > 0 ? sources.slice(0, w.graphicsQuality === 'balanced' ? 3 : 5) : [];
+  const shadowObjects = shadowCasterRange > 0
+    ? w.breakables.filter((b) => !b.broken && !['barrel', 'neon-sign', 'street-lamp', 'fuse-box', 'attack-block', 'server-rack'].includes(b.kind) && isNearView(b.x, b.y, bounds, LIGHT_MARGIN))
+    : [];
   for (const source of shadowSources) {
     for (const object of shadowObjects) {
       const distance = Math.hypot(object.x - source.x, object.y - source.y);
-      if (distance > 260) continue;
+      if (distance > shadowCasterRange) continue;
       const corners = [
         { x: object.x - object.w / 2, y: object.y - object.h / 2 },
         { x: object.x + object.w / 2, y: object.y - object.h / 2 },
@@ -4458,7 +4476,7 @@ function drawProjectiles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBo
     // Zero Day: a thrown frozen enemy renders as its own rig in flight
     // instead of a normal weapon-projectile sprite.
     if (proj.carriedEnemyUid !== undefined) {
-      const carried = w.enemies.find((e) => e.uid === proj.carriedEnemyUid);
+      const carried = w.enemiesByUid.get(proj.carriedEnemyUid);
       ctx.save();
       if (carried) {
         drawRig(ctx, carried.def.rig, carried.def.palette, 'idle', 0, proj.x, proj.y, proj.vx >= 0 ? 1 : -1,
@@ -5272,7 +5290,7 @@ function drawActors(
     const alpha = pet.ghost ? 0.3 + pulse * 0.08 : pulse;
     const facing: 1 | -1 = pet.vx < -4 ? -1 : 1;
     const rig = evolvedRig(pet.silhouette, pet.evolutionOverlays);
-    const palette = lokPetSpritePalette(pet.palette);
+    const palette = customPetPalette(pet.variantId) ?? lokPetSpritePalette(pet.palette);
     const petScale = LOKPET_SPRITE_SCALE * (pet.sizeScale ?? 1) * (0.9 + pulse * 0.1);
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -5738,10 +5756,11 @@ function drawActors(
   const enemyColorTheme = w.musicColorOverride ?? (w.worldColorFullRecolor ? w.worldColorPalette : undefined);
   const enemyPaletteCache = enemyColorTheme ? new Map<string, SpritePalette>() : null;
   const resolveEnemyPalette = (def: EnemyDef): SpritePalette => {
-    if (!enemyPaletteCache || !enemyColorTheme) return def.palette;
+    const basePalette = customEnemyPalette(def.id) ?? def.palette;
+    if (!enemyPaletteCache || !enemyColorTheme) return basePalette;
     const cached = enemyPaletteCache.get(def.id);
     if (cached) return cached;
-    const blended = blendSpritePalettes(def.palette, enemyColorTheme, 0.35);
+    const blended = blendSpritePalettes(basePalette, enemyColorTheme, 0.35);
     enemyPaletteCache.set(def.id, blended);
     return blended;
   };
@@ -5931,6 +5950,72 @@ function drawActors(
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    }
+    if (enemy.quirk && !enemy.dying) {
+      const quirkDef = ENEMY_QUIRKS_BY_ID[enemy.quirk];
+      if (quirkDef) {
+        ctx.save();
+        ctx.globalAlpha = 0.55 + Math.sin(w.now / 160 + enemy.uid) * 0.2;
+        ctx.strokeStyle = quirkDef.color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(enemy.x, enemy.y + 2, enemy.radius + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = quirkDef.color;
+        ctx.font = 'bold 6px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(quirkDef.name.toUpperCase(), enemy.x, enemy.y + enemy.radius + 12);
+        ctx.restore();
+        // Per-quirk flair so each one reads at a glance, not only by its label.
+        ctx.save();
+        const flairR = enemy.radius + 2;
+        if (enemy.quirk === 'gilded') {
+          const glow = ctx.createRadialGradient(enemy.x, enemy.y, 1, enemy.x, enemy.y, flairR * 2);
+          glow.addColorStop(0, 'rgba(250,204,21,0.38)');
+          glow.addColorStop(1, 'rgba(250,204,21,0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, flairR * 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (enemy.quirk === 'volatile') {
+          const hurt = 1 - Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
+          const blink = Math.sin(w.now / (260 - hurt * 190) + enemy.uid) * 0.5 + 0.5;
+          ctx.fillStyle = `rgba(248,113,113,${0.12 + blink * (0.12 + hurt * 0.4)})`;
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, flairR + 3 + blink * 3, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (enemy.quirk === 'regenerating' && enemy.hp < enemy.maxHp) {
+          ctx.fillStyle = '#4ade80';
+          ctx.font = 'bold 7px monospace';
+          ctx.textAlign = 'center';
+          const rise = (w.now / 40 + enemy.uid * 7) % 14;
+          ctx.globalAlpha = 1 - rise / 14;
+          ctx.fillText('+', enemy.x + Math.sin(enemy.uid) * 6, enemy.y - enemy.radius - rise);
+        } else if (enemy.quirk === 'adrenaline' && ((w.now + enemy.uid * 977) / 1000) % 5 < 1) {
+          ctx.strokeStyle = '#f472b6';
+          ctx.lineWidth = 1.5;
+          for (let streak = 0; streak < 3; streak += 1) {
+            ctx.globalAlpha = 0.7 - streak * 0.2;
+            ctx.beginPath();
+            ctx.moveTo(enemy.x - enemy.facing * (flairR + 2 + streak * 5), enemy.y - 3 + streak * 3);
+            ctx.lineTo(enemy.x - enemy.facing * (flairR + 12 + streak * 5), enemy.y - 3 + streak * 3);
+            ctx.stroke();
+          }
+        }
+        if ((enemy.quirk === 'spawn-shield' || enemy.quirk === 'flicker') && w.now < enemy.shieldedUntil) {
+          ctx.strokeStyle = quirkDef.color;
+          ctx.fillStyle = 'rgba(147,197,253,0.18)';
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = 0.6 + Math.sin(w.now / 70) * 0.25;
+          ctx.beginPath();
+          ctx.arc(enemy.x, enemy.y, flairR + 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
     }
     if (enemy.isVeteran && !enemy.dying) {
       const affixColors: Record<string, string> = {
@@ -6646,7 +6731,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
     drawLightPool(ctx, w);
     drawLandmark(ctx, w);
     drawDistrictIncursion(ctx, w);
-    drawObjectLighting(ctx, w);
+    drawObjectLighting(ctx, w, viewBounds);
     if (sky !== 'roofed') {
       drawSteamVents(ctx, w, left, top, right, bottom);
       if (showFireflies) drawRoadFireflies(ctx, w, left, top, right, bottom);

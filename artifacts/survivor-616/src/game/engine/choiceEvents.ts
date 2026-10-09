@@ -24,6 +24,7 @@ import {
   temperamentFor,
   type HideoutEventContext,
 } from '@/game/data/hideoutEvents';
+import { startEventBuff } from '@/game/data/eventBuffs';
 import { createRng } from '@/game/engine/math';
 import { BOND_RANK_BY_ID, bondRankFor } from '@/game/engine/petGrowth';
 import {
@@ -158,12 +159,13 @@ export function applyChoice<T extends RewardState>(meta: T, eventId: string, cho
     countsAsEvent: true,
     elixirCap: ctx.elixirCap,
   });
+  const buff = outcome.buffId ? startEventBuff(outcome.buffId, ctx.now) : null;
   const stamped: Record<string, number> = { ...paid.meta.hideoutClaims, [choiceClaimKey(def.id)]: ctx.now };
   if (ctx.propId) stamped[propClaimKey(ctx.propId)] = ctx.now;
   return {
     ok: true,
     failure: null,
-    meta: { ...paid.meta, hideoutClaims: trimClaims(stamped) },
+    meta: { ...paid.meta, hideoutClaims: trimClaims(stamped), eventBuff: buff ?? paid.meta.eventBuff },
     outcome,
     applied: paid.applied,
     usedFallback: paid.usedFallback,

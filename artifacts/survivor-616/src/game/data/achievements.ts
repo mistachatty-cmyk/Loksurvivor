@@ -5,10 +5,16 @@ import { CARD_MANIFESTS, cardCollectionSummary } from './cards';
 import { CHARACTERS } from './characters';
 import { CITY_RELICS } from './relics';
 import { ENEMIES } from './enemies';
+import { FACTIONS_BY_ID } from './factions';
+import { endgameReached, mapsCleared } from './endgameUnlocks';
+import { QUIRK_SURGE_UNLOCK_MAPS } from './enemyQuirks';
+import { ENEMY_QUIRKS, QUIRK_EVERYWHERE_KILLS, QUIRK_TAKE_ON_KILLS } from './enemyQuirks';
 import { LOKPET_VARIANTS } from './lokPets';
 import { BOND_RANK_BY_ID, PET_NAME_SLOTS, bondRankFor, getPetNameValue } from '../engine/petGrowth';
 import { RENTABLE_GENERATORS } from './generators';
 import { DEFAULT_DROP_PACK_ID, DROP_PACKS } from './dropPacks';
+import { FACTIONS } from './factions';
+import { earnedSlotCount, getForgeStats, loadCustomVariants, loadForgedOperators } from '@/game/state/operatorForgeStore';
 
 export interface AchievementReward {
   kind: 'cred' | 'lootTokens' | 'cardCredits';
@@ -22,7 +28,7 @@ export interface AchievementReward {
  * claiming one is tracked separately in `meta.claimedAchievementIds`
  * (see `claimAchievement` in `state/metaStore.tsx`) rather than here.
  */
-export type AchievementCategory = 'combat' | 'survival' | 'world' | 'crew' | 'bestiary' | 'lokpet' | 'cards' | 'economy';
+export type AchievementCategory = 'combat' | 'survival' | 'world' | 'crew' | 'bestiary' | 'lokpet' | 'cards' | 'economy' | 'forge';
 
 export const ACHIEVEMENT_CATEGORIES: Array<{ id: AchievementCategory; label: string }> = [
   { id: 'combat', label: 'Combat' },
@@ -33,6 +39,7 @@ export const ACHIEVEMENT_CATEGORIES: Array<{ id: AchievementCategory; label: str
   { id: 'lokpet', label: 'LokPets' },
   { id: 'cards', label: 'Cards' },
   { id: 'economy', label: 'Economy' },
+  { id: 'forge', label: 'Forge' },
 ];
 
 export interface AchievementDef {
@@ -47,6 +54,17 @@ export interface AchievementDef {
   progress?: (meta: MetaState) => number;
   reward?: AchievementReward;
 }
+
+/**
+ * Forge achievements read the device-local Forge store (it lives outside MetaState).
+ * Every counter only goes up, so a deleted operator never un-earns anything.
+ */
+const forge = {
+  stats: () => getForgeStats(),
+  distinctBases: (kind: 'enemy' | 'pet') => new Set(loadCustomVariants(kind).map((v) => v.baseId)),
+};
+const FACTION_ROSTERS = FACTIONS.map((f) => f.roster);
+const PET_FAMILIES = ['animal', 'ghoul', 'bat', 'mote', 'blob', 'mechanical'] as const;
 
 const ratio = (value: number, total: number) => (total <= 0 ? 0 : Math.min(1, value / total));
 
@@ -470,7 +488,289 @@ const RAW_ACHIEVEMENTS: RawAchievement[] = [
     progress: (meta) => ratio(Math.max(0, ...meta.savedLokPets.map((pet) => pet.level ?? 1)), 50),
     reward: { kind: 'cred', amount: 250 },
   },
+  {
+    id: 'forge-first-spark',
+    name: 'First Spark',
+    description: 'Save your first operator from the Forge.',
+    tier: 'bronze',
+    isComplete: () => forge.stats().classicSaved + forge.stats().detailedSaved >= 1 || loadForgedOperators().length >= 1,
+    reward: { kind: 'cred', amount: 50 },
+  },
+  {
+    id: 'forge-old-school',
+    name: 'Old School',
+    description: 'Save an operator with the Classic v1 look.',
+    tier: 'bronze',
+    isComplete: () => forge.stats().classicSaved >= 1,
+    reward: { kind: 'cred', amount: 50 },
+  },
+  {
+    id: 'forge-both-eras',
+    name: 'Both Eras',
+    description: 'Save one Classic v1 operator and one Detailed v2 operator.',
+    tier: 'silver',
+    isComplete: () => forge.stats().classicSaved >= 1 && forge.stats().detailedSaved >= 1,
+    reward: { kind: 'cred', amount: 150 },
+  },
+  {
+    id: 'forge-full-house',
+    name: 'Full House',
+    description: 'Fill all five custom operator slots.',
+    tier: 'gold',
+    isComplete: () => earnedSlotCount() >= 5 && loadForgedOperators().length >= 5,
+    progress: () => ratio(Math.min(loadForgedOperators().length, 5), 5),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+  {
+    id: 'forge-palette-nerd',
+    name: 'Palette Nerd',
+    description: 'Save 10 recolored enemy or LokPet looks.',
+    tier: 'silver',
+    isComplete: () => forge.stats().recolored >= 10,
+    progress: () => ratio(forge.stats().recolored, 10),
+    reward: { kind: 'cred', amount: 150 },
+  },
+  {
+    id: 'forge-rogues-gallery',
+    name: "Rogue's Gallery",
+    description: 'Keep custom looks for 10 different enemies.',
+    tier: 'silver',
+    isComplete: () => forge.distinctBases('enemy').size >= 10,
+    progress: () => ratio(forge.distinctBases('enemy').size, 10),
+    reward: { kind: 'cred', amount: 200 },
+  },
+  {
+    id: 'forge-menagerie',
+    name: 'Menagerie',
+    description: 'Keep custom looks for 10 different LokPets.',
+    tier: 'silver',
+    isComplete: () => forge.distinctBases('pet').size >= 10,
+    progress: () => ratio(forge.distinctBases('pet').size, 10),
+    reward: { kind: 'cardCredits', amount: 50 },
+  },
+  {
+    id: 'forge-tab-hopper',
+    name: 'Tab Hopper',
+    description: 'Visit the Operators, Enemies and LokPets screens in the Forge.',
+    tier: 'bronze',
+    isComplete: () => ['operators', 'enemies', 'lokpets'].every((tab) => forge.stats().tabsVisited.includes(tab)),
+    reward: { kind: 'cred', amount: 25 },
+  },
+  {
+    id: 'forge-share-the-look',
+    name: 'Share the Look',
+    description: 'Copy a share code for one of your operators.',
+    tier: 'bronze',
+    isComplete: () => forge.stats().shareCodes >= 1,
+    reward: { kind: 'cred', amount: 25 },
+  },
+  {
+    id: 'forge-complete-collection',
+    name: 'Complete Collection',
+    description: 'Keep a custom look for an enemy from every faction and a LokPet from every family.',
+    tier: 'legendary',
+    isComplete: () => {
+      const enemies = forge.distinctBases('enemy');
+      const petBases = forge.distinctBases('pet');
+      const factionsDone = FACTION_ROSTERS.every((roster) => roster.some((id) => enemies.has(id)));
+      const familiesDone = PET_FAMILIES.every((family) => [...petBases].some((id) => LOKPET_VARIANTS.find((v) => v.id === id)?.family === family));
+      return factionsDone && familiesDone;
+    },
+    reward: { kind: 'lootTokens', amount: 50 },
+  },
 ];
+
+/**
+ * Enemy quirk achievements, generated from the quirk list so a new quirk gets
+ * its own pair automatically: one for the Everywhere unlock, one for Take it on.
+ */
+const quirkTotal = (meta: MetaState) => Object.values(meta.quirkKills ?? {}).reduce((sum, n) => sum + n, 0);
+const quirkKillsOf = (meta: MetaState, id: string) => meta.quirkKills?.[id] ?? 0;
+
+const QUIRK_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'quirk-first-kill',
+    name: 'Odd One Out',
+    description: 'Defeat an enemy carrying a random quirk.',
+    tier: 'bronze',
+    isComplete: (meta) => quirkTotal(meta) >= 1,
+    reward: { kind: 'cred', amount: 100 },
+  },
+  {
+    id: 'quirk-collector',
+    name: 'Quirk Collector',
+    description: 'Defeat at least one enemy with every kind of quirk.',
+    tier: 'silver',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= 1),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= 1).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'cred', amount: 400 },
+  },
+  ...ENEMY_QUIRKS.flatMap((quirk): RawAchievement[] => [
+    {
+      id: `quirk-everywhere-${quirk.id}`,
+      name: `${quirk.name} Everywhere`,
+      description: `Defeat ${QUIRK_EVERYWHERE_KILLS.toLocaleString()} ${quirk.name} enemies. Unlocks the Everywhere option for it.`,
+      tier: 'gold',
+      isComplete: (meta) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS,
+      progress: (meta) => ratio(quirkKillsOf(meta, quirk.id), QUIRK_EVERYWHERE_KILLS),
+      reward: { kind: 'cred', amount: 2500 },
+    },
+    {
+      id: `quirk-taken-${quirk.id}`,
+      name: `Become ${quirk.name}`,
+      description: `Defeat ${QUIRK_TAKE_ON_KILLS.toLocaleString()} ${quirk.name} enemies. Unlocks Take it on, so you gain the quirk yourself.`,
+      tier: 'legendary',
+      isComplete: (meta) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS,
+      progress: (meta) => ratio(quirkKillsOf(meta, quirk.id), QUIRK_TAKE_ON_KILLS),
+      reward: { kind: 'lootTokens', amount: 25 },
+    },
+  ]),
+  {
+    id: 'quirk-everywhere-all',
+    name: 'Nothing Is Normal',
+    description: 'Unlock Everywhere for all ten quirks.',
+    tier: 'legendary',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_EVERYWHERE_KILLS).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'cred', amount: 15000 },
+  },
+  {
+    id: 'quirk-taken-all',
+    name: 'The Whole Weird Set',
+    description: 'Unlock Take it on for all ten quirks.',
+    tier: 'legendary',
+    isComplete: (meta) => ENEMY_QUIRKS.every((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS),
+    progress: (meta) => ratio(ENEMY_QUIRKS.filter((quirk) => quirkKillsOf(meta, quirk.id) >= QUIRK_TAKE_ON_KILLS).length, ENEMY_QUIRKS.length),
+    reward: { kind: 'lootTokens', amount: 100 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...QUIRK_ACHIEVEMENTS);
+
+/** Gen Fitting Floor, its enemies, and actually playing with the quirk options. */
+const GEN_FITTER_IDS = FACTIONS_BY_ID['gen-fitters']!.roster;
+const GEN_STYLE_IDS = ['gen-fit-check-duelist', 'gen-pin-pouncer', 'gen-color-wheel', 'gen-grid-stitcher', 'gen-fan-sampler', 'gen-checkpoint-rewinder'];
+const defeated = (meta: MetaState, ids: readonly string[]) => ids.filter((id) => (meta.bestiary[id] ?? 0) > 0).length;
+
+const GEN_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'gen-floor-cleared',
+    name: 'Fitted for Survival',
+    description: 'Survive Gen Fitting Floor.',
+    tier: 'silver',
+    isComplete: (meta) => meta.clearedAreaIds.includes('gen-fitting-floor'),
+    reward: { kind: 'cred', amount: 400 },
+  },
+  {
+    id: 'gen-warden-down',
+    name: 'Seams Broken',
+    description: 'Defeat the Tile Warden.',
+    tier: 'gold',
+    isComplete: (meta) => (meta.bestiary['gen-tile-warden'] ?? 0) > 0,
+    reward: { kind: 'cred', amount: 600 },
+  },
+  {
+    id: 'gen-six-styles',
+    name: 'Six Ways to Lose',
+    description: 'Defeat each of the six new fighting styles: the Duelist, Pouncer, Color Wheel, Stitcher, Sampler and Rewinder.',
+    tier: 'silver',
+    isComplete: (meta) => defeated(meta, GEN_STYLE_IDS) >= GEN_STYLE_IDS.length,
+    progress: (meta) => ratio(defeated(meta, GEN_STYLE_IDS), GEN_STYLE_IDS.length),
+    reward: { kind: 'cred', amount: 350 },
+  },
+  {
+    id: 'gen-full-roster',
+    name: 'Every Fit on the Rack',
+    description: 'Defeat every Gen Fitter at least once.',
+    tier: 'gold',
+    isComplete: (meta) => defeated(meta, GEN_FITTER_IDS) >= GEN_FITTER_IDS.length,
+    progress: (meta) => ratio(defeated(meta, GEN_FITTER_IDS), GEN_FITTER_IDS.length),
+    reward: { kind: 'lootTokens', amount: 5 },
+  },
+  {
+    id: 'quirk-everywhere-run',
+    name: 'Nobody Is Normal Today',
+    description: 'Finish a run with a quirk set to Everywhere.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkEverywhereRuns >= 1,
+    reward: { kind: 'cred', amount: 750 },
+  },
+  {
+    id: 'quirk-everywhere-run-10',
+    name: 'Weird Weather',
+    description: 'Finish 10 runs with a quirk set to Everywhere.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkEverywhereRuns >= 10,
+    progress: (meta) => ratio(meta.quirkEverywhereRuns, 10),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+  {
+    id: 'quirk-taken-run',
+    name: 'Wearing the Weird',
+    description: 'Finish a run with a quirk taken on.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkTakenRuns >= 1,
+    reward: { kind: 'cred', amount: 750 },
+  },
+  {
+    id: 'quirk-taken-run-10',
+    name: 'Quirk by Nature',
+    description: 'Finish 10 runs with a quirk taken on.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkTakenRuns >= 10,
+    progress: (meta) => ratio(meta.quirkTakenRuns, 10),
+    reward: { kind: 'lootTokens', amount: 10 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...GEN_ACHIEVEMENTS);
+
+/** The Quirk Surge, its unlock, and the end game it leads to. */
+const SURGE_ACHIEVEMENTS: RawAchievement[] = [
+  {
+    id: 'surge-glyph-reader',
+    name: 'Glyph Reader',
+    description: 'Clear 14 maps, enough to start seeing the glyphs.',
+    tier: 'bronze',
+    isComplete: (meta) => meta.clearedAreaIds.length >= QUIRK_SURGE_UNLOCK_MAPS,
+    progress: (meta) => ratio(meta.clearedAreaIds.length, QUIRK_SURGE_UNLOCK_MAPS),
+    reward: { kind: 'cred', amount: 200 },
+  },
+  {
+    id: 'surge-first',
+    name: 'Heard the Howls',
+    description: 'Outlast a Quirk Surge.',
+    tier: 'silver',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 1,
+    reward: { kind: 'cred', amount: 500 },
+  },
+  {
+    id: 'surge-10',
+    name: 'Eclipse Regular',
+    description: 'Outlast 10 Quirk Surges.',
+    tier: 'gold',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 10,
+    progress: (meta) => ratio(meta.quirkSurgesSurvived, 10),
+    reward: { kind: 'lootTokens', amount: 5 },
+  },
+  {
+    id: 'surge-50',
+    name: 'Nothing Surprises Me',
+    description: 'Outlast 50 Quirk Surges.',
+    tier: 'legendary',
+    isComplete: (meta) => meta.quirkSurgesSurvived >= 50,
+    progress: (meta) => ratio(meta.quirkSurgesSurvived, 50),
+    reward: { kind: 'lootTokens', amount: 25 },
+  },
+  {
+    id: 'victory-lap-reached',
+    name: 'Victory Lap',
+    description: 'Clear every standard map and open the end game.',
+    tier: 'gold',
+    isComplete: (meta) => endgameReached(meta),
+    progress: (meta) => { const { have, need } = mapsCleared(meta); return ratio(have, need); },
+    reward: { kind: 'cred', amount: 1000 },
+  },
+];
+RAW_ACHIEVEMENTS.push(...SURGE_ACHIEVEMENTS);
 
 const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'first-blood': 'combat', 'body-count-1000': 'combat', 'body-count-10000': 'combat', 'fourth-wall-breaker': 'combat',
@@ -485,12 +785,18 @@ const CATEGORY_BY_ID: Record<string, AchievementCategory> = {
   'soulbound': 'lokpet', 'five-names': 'lokpet', 'pet-level-20': 'lokpet', 'pet-level-50': 'lokpet',
   'sealed-no-more': 'cards', 'triple-stamped': 'cards', 'first-holo': 'cards', 'passive-powerhouse': 'cards',
   'half-the-deck': 'cards', 'complete-collector': 'cards', 'director-cut': 'combat',
+  'forge-first-spark': 'forge', 'forge-old-school': 'forge', 'forge-both-eras': 'forge', 'forge-full-house': 'forge',
+  'forge-palette-nerd': 'forge', 'forge-rogues-gallery': 'forge', 'forge-menagerie': 'forge', 'forge-tab-hopper': 'forge',
+  'forge-share-the-look': 'forge', 'forge-complete-collection': 'forge',
   'passive-income': 'economy', 'new-loot-look': 'economy', 'pack-rat': 'economy', 'full-stash': 'economy',
+  'surge-glyph-reader': 'world', 'surge-first': 'combat', 'surge-10': 'combat', 'surge-50': 'combat', 'victory-lap-reached': 'world',
+  'gen-floor-cleared': 'world', 'gen-warden-down': 'combat', 'gen-six-styles': 'bestiary', 'gen-full-roster': 'bestiary',
+  'quirk-everywhere-run': 'combat', 'quirk-everywhere-run-10': 'combat', 'quirk-taken-run': 'combat', 'quirk-taken-run-10': 'combat',
 };
 
 export const ACHIEVEMENTS: AchievementDef[] = RAW_ACHIEVEMENTS.map((achievement) => ({
   ...achievement,
-  category: CATEGORY_BY_ID[achievement.id] ?? 'world',
+  category: CATEGORY_BY_ID[achievement.id] ?? (achievement.id.startsWith('quirk-') ? 'bestiary' : 'world'),
 }));
 
 export const ACHIEVEMENTS_BY_ID: Record<string, AchievementDef> = Object.fromEntries(

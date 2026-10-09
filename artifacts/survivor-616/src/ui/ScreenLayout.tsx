@@ -50,7 +50,7 @@ export function ScreenLayout({ title, subtitle, onBack, children, action, backdr
         </div>
       )}
 
-      <header className={`relative z-20 px-6 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 ${onBack ? 'pt-20' : 'pt-10'}`}>
+      <header className={`relative z-30 px-6 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 ${onBack ? 'pt-20' : 'pt-10'}`}>
         <div>
           {onBack && (
             <button 

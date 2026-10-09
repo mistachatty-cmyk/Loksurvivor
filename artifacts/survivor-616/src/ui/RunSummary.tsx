@@ -5,6 +5,7 @@
 import { getArea } from '@/game/data/areas';
 import { getCharacter } from '@/game/data/characters';
 import { ENEMIES_BY_ID } from '@/game/data/enemies';
+import { ENEMY_QUIRKS_BY_ID } from '@/game/data/enemyQuirks';
 import { ALLIES_BY_ID, DISCOVERIES_BY_ID } from '@/game/data/progression';
 import { LOKPET_ELEMENT_COLORS, LOKPET_RARITY_COLORS, LOKPET_VARIANTS_BY_ID } from '@/game/data/lokPets';
 import { CITY_RELICS_BY_ID, RELIC_RECIPES } from '@/game/data/relics';
@@ -676,6 +677,26 @@ export function RunSummary({ result, onReturnToHub, onRetry, onOpenArchive, onOp
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Quirks this run */}
+        {(result.quirkSurgeSurvived || (result.killsByQuirk && Object.keys(result.killsByQuirk).length > 0)) && (
+          <div className="border border-border bg-card p-6" data-testid="section-run-quirks">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-4">Quirks Defeated</h2>
+            <div className="flex flex-wrap gap-3">
+              {result.quirkSurgeSurvived && (
+                <div className="border border-fuchsia-300 px-3 py-2 font-mono text-xs uppercase text-fuchsia-200" data-testid="chip-surge-survived">Surge survived</div>
+              )}
+              {Object.entries(result.killsByQuirk ?? {}).sort((a, b) => b[1] - a[1]).map(([quirkId, count]) => {
+                const quirk = ENEMY_QUIRKS_BY_ID[quirkId];
+                return (
+                  <div key={quirkId} className="border px-3 py-2 font-mono text-xs uppercase" style={{ borderColor: quirk?.color ?? '#64748b', color: quirk?.color ?? '#cbd5e1' }}>
+                    {quirk?.name ?? quirkId} <span className="text-white/80">x{count}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
