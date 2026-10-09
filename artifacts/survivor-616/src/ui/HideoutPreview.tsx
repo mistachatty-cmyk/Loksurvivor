@@ -171,6 +171,9 @@ const EMOTE_GLYPHS: Record<HideoutEmote, string> = {
   bang: '!',
   drop: '•',
   star: '★',
+  adore: '♡',
+  scared: '!?',
+  laugh: '^^',
 };
 
 interface Spark { x: number; y: number; vx: number; vy: number; born: number; life: number; color: string }
