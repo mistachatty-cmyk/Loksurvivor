@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 92,
+      "version": "0.22.8",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A Clearer Photosensitivity Warning",
+      "body": [
+        "The warning before you enter the hideout now spells out what can trigger a reaction (strobing flashes, bright bursts, screen shake), the symptoms that mean you should stop playing, and a few ways to play more safely."
+      ]
+    },
+    {
       "number": 91,
       "version": "0.22.7",
       "date": "2026-10-09",

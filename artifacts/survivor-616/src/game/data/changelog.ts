@@ -1068,6 +1068,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Your volume and mute choice are now remembered between visits.',
     ],
   },
+  {
+    version: '0.22.8',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:59:00Z',
+    kind: 'update',
+    title: 'A Clearer Photosensitivity Warning',
+    body: [
+      'The warning before you enter the hideout now spells out what can trigger a reaction (strobing flashes, bright bursts, screen shake), the symptoms that mean you should stop playing, and a few ways to play more safely.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
