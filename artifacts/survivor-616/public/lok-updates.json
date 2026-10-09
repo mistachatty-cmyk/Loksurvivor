@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 91,
+      "version": "0.22.7",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Volume On The Soundbar",
+      "body": [
+        "Open the music bar and tap the small arrow to reveal volume, seek, shuffle, repeat and speed. The panel floats over the screen, so the bar itself stays the same size, and it stays hidden until you ask for it.",
+        "Your volume and mute choice are now remembered between visits."
+      ]
+    },
+    {
       "number": 90,
       "version": "0.22.6",
       "date": "2026-10-09",

@@ -1011,3 +1011,17 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
 @media (prefers-reduced-motion: reduce) {
   canvas[style*='registry-art-bob'] { animation: none !important; }
 }
+
+/* Soundbar extras panel: an overlay that grows out of the bar. */
+.soundbar-panel { transform-origin: top; animation: soundbar-drop 150ms ease-out both; }
+.soundbar-panel-up { transform-origin: bottom; }
+.soundbar-row { animation: soundbar-row-in 180ms ease-out both; }
+.soundbar-fill { background: linear-gradient(90deg, hsl(var(--primary) / 0.45), hsl(var(--primary))); box-shadow: 0 0 8px hsl(var(--primary) / 0.6); transition: width 60ms linear; }
+.soundbar-thumb { box-shadow: 0 0 8px hsl(var(--primary) / 0.8); transition: transform 120ms ease-out, left 60ms linear; }
+.soundbar-track:hover .soundbar-thumb, .soundbar-track:focus-visible .soundbar-thumb, .soundbar-track[data-dragging] .soundbar-thumb { transform: translate(-50%, -50%) scale(1.5); }
+@keyframes soundbar-drop { from { opacity: 0; transform: scaleY(0.6); } to { opacity: 1; transform: scaleY(1); } }
+@keyframes soundbar-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .soundbar-panel, :root:not([data-motion='full']) .soundbar-row { animation: none; }
+  :root:not([data-motion='full']) .soundbar-fill, :root:not([data-motion='full']) .soundbar-thumb { transition: none; }
+}

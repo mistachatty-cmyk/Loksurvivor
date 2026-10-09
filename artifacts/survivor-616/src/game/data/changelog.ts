@@ -1057,6 +1057,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Only one event boost runs at a time and a new one replaces the old. The running boost shows in the Resources panel.',
     ],
   },
+  {
+    version: '0.22.7',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:30:00Z',
+    kind: 'update',
+    title: 'Volume On The Soundbar',
+    body: [
+      'Open the music bar and tap the small arrow to reveal volume, seek, shuffle, repeat and speed. The panel floats over the screen, so the bar itself stays the same size, and it stays hidden until you ask for it.',
+      'Your volume and mute choice are now remembered between visits.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

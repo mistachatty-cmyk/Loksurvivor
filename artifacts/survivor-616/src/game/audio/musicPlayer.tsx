@@ -9,6 +9,7 @@
  * like a dropped file; nothing routes through a server this app doesn't have.
  */
 
+import { DEFAULT_VOLUME, VOLUME_STORAGE_KEY, parseStoredVolume } from './volumeCurve';
 import {
   createContext,
   useCallback,
@@ -489,8 +490,22 @@ export function MusicProvider({ children }: { children: ReactNode }) {
   // gesture before sound begins, so this selects it without forcing autoplay.
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolumeState] = useState(0.7);
-  const [muted, setMuted] = useState(false);
+  const [savedVolume] = useState(() => {
+    try {
+      return parseStoredVolume(window.localStorage.getItem(VOLUME_STORAGE_KEY));
+    } catch {
+      return DEFAULT_VOLUME;
+    }
+  });
+  const [volume, setVolumeState] = useState(savedVolume.volume);
+  const [muted, setMuted] = useState(savedVolume.muted);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VOLUME_STORAGE_KEY, JSON.stringify({ volume, muted }));
+    } catch {
+      // Storage may be unavailable -- the level just will not persist.
+    }
+  }, [volume, muted]);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>('all');
   const [playbackRate, setPlaybackRateState] = useState(1.0);
