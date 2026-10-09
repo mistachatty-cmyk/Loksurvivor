@@ -69,6 +69,10 @@ test('a leech status effect drains the afflicted pet and heals its source at end
   pinMoves(state.enemyTeam[0]);
   const enemy = state.enemyTeam[0];
   const player = state.playerTeam[0];
+  // Equal speed keeps the unrelated speed-differential extra-turn mechanic (tested separately
+  // below) from occasionally skipping the very end-of-turn tick this test depends on.
+  player.speed = 100;
+  enemy.speed = 100;
   player.hp = Math.max(1, player.maxHp - 50);
   enemy.statusEffects.push({ type: 'leech', duration: 2, value: 10, sourcePetName: player.name });
 
