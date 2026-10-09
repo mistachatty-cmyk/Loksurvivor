@@ -6317,7 +6317,7 @@ function drawGuests(ctx: CanvasRenderingContext2D, w: World) {
 }
 
 function drawParticles(ctx: CanvasRenderingContext2D, w: World, bounds: ViewBounds, visualBudget: NonNullable<Viewport['visualBudget']>) {
-  const limit = visualBudget === 'minimal' ? 56 : visualBudget === 'reduced' ? 112 : Number.POSITIVE_INFINITY;
+  const limit = visualBudget === 'minimal' ? 56 : visualBudget === 'reduced' ? 112 : 600;
   const stride = visualBudget === 'minimal' ? 3 : visualBudget === 'reduced' ? 2 : 1;
   let drawn = 0;
   for (let index = 0; index < w.particles.length; index += 1) {

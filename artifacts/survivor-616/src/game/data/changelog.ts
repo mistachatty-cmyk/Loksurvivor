@@ -1156,6 +1156,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'All of it respects your reduced-motion setting.',
     ],
   },
+  {
+    version: '0.23.6',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:00:20Z',
+    kind: 'update',
+    title: 'Steadier Big Fights',
+    body: [
+      'Huge particle storms are now capped at 600 visible sparks on High graphics, which keeps frame rate steadier on phones and older arcade machines without changing how fights look.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

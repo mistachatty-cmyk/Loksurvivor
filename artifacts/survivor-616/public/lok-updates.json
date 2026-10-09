@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 100,
+      "version": "0.23.6",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:00:20Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Steadier Big Fights",
+      "body": [
+        "Huge particle storms are now capped at 600 visible sparks on High graphics, which keeps frame rate steadier on phones and older arcade machines without changing how fights look."
+      ]
+    },
+    {
       "number": 99,
       "version": "0.23.5",
       "date": "2026-10-10",
