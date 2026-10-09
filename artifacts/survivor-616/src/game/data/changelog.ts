@@ -1048,7 +1048,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.22.6',
-    date: '2026-10-09',
+    date: '2026-10-10',
     publishedAt: '2026-10-10T00:30:00Z',
     kind: 'update',
     title: 'Magnet coil and event switches',
