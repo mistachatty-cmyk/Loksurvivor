@@ -947,6 +947,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Crew morale shows in the hideout Resources panel.',
     ],
   },
+  {
+    version: '0.21.7',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T14:00:00Z',
+    kind: 'update',
+    title: 'Secrets on the Title Screen',
+    body: [
+      'The title screen now sometimes shows a little pop in the corner, including a salute to Perfect L13gend, one of the greatest fighting game players ever.',
+      'Five secrets can also be summoned by typing a word on the title screen. Finding the words is half the fun.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
