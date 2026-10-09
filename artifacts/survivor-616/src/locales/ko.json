@@ -215,6 +215,7 @@
   "hideout.life.item.bond": "더 보기",
   "hideout.life.found": "발견: {{items}}",
   "hideout.life.usedToday": "Already 오늘. 기타 제품",
+  "hub.resource.morale": "승무원 사기",
   "hideout.life.capped": "오늘은 주머니가 꽉 찼습니다. 내일 다시 시도해 보세요.",
   "hideout.life.useProp": "{{label}} 사용",
   "hideout.life.eventChip": "더 알아보기",
