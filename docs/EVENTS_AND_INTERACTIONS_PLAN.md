@@ -141,3 +141,72 @@ a playtest note, and the matching `.agents/memory` entry.
   sensitivity)? Reduced-motion must disable all of it.
 - Any events that are off-limits for tone (PG-13 / kid-safe rules in
   `crew-dialogue-rant.md` apply to all new text).
+
+## 7. Unlock as you play (nothing arrives all at once)
+
+New features must not dump on a new player or surprise a returning one. Use the
+existing unlock machinery (`UnlockRule`, `MetaState` counters, `endgameUnlocks.ts`
+gating) instead of a new system.
+
+- **Run beats unlock in tiers by maps cleared** (`mapsCleared(meta)`): 0 maps = none
+  (the base loop stays calm), 2 = Supply drop, 4 = Rush-hour stampede, 6 = Block
+  party and Tremor, 9 = Blackout block, 12 = Relay storm. Each beat record carries
+  `unlock: { kind: 'clearArea' | 'kills' ... }`, the same rule type areas use.
+- **Pickups appear as you meet their source:** a pickup joins the pool the first
+  time its elite/beat/prop kind is seen (tracked in the existing bestiary-style
+  `Record<id, count>`), and the first one you collect shows a one-line tooltip.
+- **Crew call-ins unlock per ally:** rescuing the ally unlocks the *slot*; using
+  their call-in 10 times unlocks an upgraded version. Bonds unlock when both allies
+  are rescued and have shared a run.
+- **Hideout extras follow bond rank and rooms** (pet bond ranks, rooms unlocked),
+  never the clock.
+- **A "New this update" check:** when a save loads on a newer `CURRENT_VERSION`,
+  the unlocks it is already eligible for are granted silently and listed once in
+  the update dialog, so veterans see the new content without grinding. Tested the
+  same way `changelog.test.ts` guards versions.
+- **Off-switches stay:** every beat family has a Settings toggle (like quirks), and
+  reduced motion disables shake, hit-stop and screen flashes.
+
+## 8. Achievements (added after each system lands)
+
+Achievements stay pure functions over `MetaState` in `data/achievements.ts`
+(`isComplete` / `progress`, never a stored boolean; rewards are `cred`, `lootTokens`
+or `cardCredits`, claimed once via `claimedAchievementIds`). Each system adds only
+the counters it needs, then its achievements in the *same release*.
+
+New counters (all concrete numbers, so `effectiveStats`-style arithmetic never
+sees `NaN`): `beatsSurvived`, `beatsByKind`, `pickupsCollected`, `callInsUsed`,
+`chainReactions`, `bondsFormed`, `hideoutEventsSeen`.
+
+Starter list, one per system, tiered (3 / 25 / 100 style) where it makes sense:
+- **Events:** *Rain Check* (survive a Supply drop), *Lane Discipline* (stand in the
+  safe lane through a stampede), *Lights Out* (finish a Blackout block untouched),
+  *Weather the Weather* (survive every beat kind).
+- **Crew:** *Plus One* (use a call-in), *Best Friends* (form a bond), *Whole Crew*
+  (all call-ins used in one run), *Plenty of Hands* (100 call-ins).
+- **Pickups:** *Pocket Change* (collect 50), *Overclocked* (kill 100 with one cell).
+- **Physics:** *Domino Effect* (a chain reaction), *Wrecking Crew* (three-cycle heat
+  hazard created), *Hold the Line* (a tremor with no prop damage taken).
+- **Hideout:** *Regular* (every room's idle event seen), *Good Dog* (max bond with
+  every pet on the strip).
+
+Rules: achievements are never required for core progress, never name the Surge's
+cause, and use `beacon` / `pulse` / `relay` / `static` wording per the naming rule.
+`achievements.test.ts` already checks unique ids, positive rewards and a zero-state
+save; extend it to cover each new counter's default.
+
+## 9. Review of the recent additions (hideout scenery + melody, v0.22.4)
+
+Checked after the build: typecheck and all 882 tests pass; no naming-rule words in
+new files; reduced motion renders a still frame. Follow-ups worth doing:
+- **Cache the static backdrop.** The cellar brick wall and the skyline are redrawn
+  every frame with fresh color strings. Render the static layer once to an
+  offscreen canvas (re-render on resize / room change) and draw only lamps, windows
+  and dust live. Matters most on low-end phones.
+- **No Settings toggle for the melody.** It is gated by the existing
+  Hideout ambience switch, but a separate "Room melody" toggle would let players
+  keep the bed and drop the notes.
+- **Add a test** for `BedProfile` melody (every non-snow profile has notes, notes
+  are positive frequencies) and for `dustColorFor` covering every `HideoutBiome`.
+- **No visual playtest yet.** Screenshot all five rooms at phone and desktop widths
+  before the next release.
