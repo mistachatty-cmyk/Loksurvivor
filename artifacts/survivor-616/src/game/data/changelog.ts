@@ -1102,8 +1102,101 @@ export const CHANGELOG: ChangelogEntry[] = [
   },
   {
     version: '0.23.1',
-    date: '2026-10-09',
-    publishedAt: '2026-10-09T23:59:50Z',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:10:00Z',
+    kind: 'update',
+    title: 'The hideout, painted',
+    body: [
+      'The hideout strip is no longer a flat dark band. Every room now has its own backdrop: a lit skyline over the Sanctum, stars and a blinking marker lamp on the rooftop, breathing glass growths in the cellar, a swaying service lamp in the alley and a stuttering neon sign at the Neon Sleeve.',
+      'There is a lit pool of floor light that follows your operator and pulses with whatever music is playing, dust drifting through the light, and little puffs when you walk.',
+      'With Hideout ambience on, each room now hums a slow music-box line of its own over the bed. It stays off until you turn it on.',
+    ],
+  },
+  {
+    version: '0.23.2',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:20:00Z',
+    kind: 'update',
+    title: 'Things happen now',
+    body: [
+      'Runs now have moments. Clear 2 maps and a Supply Drop can land mid-run: a glowing ring marks where the crate falls, and it comes with guards. Clear 4 maps and a Rush-Hour stampede can charge across the map; step into the green gap to dodge it.',
+      'The more maps you clear, the more moments a run can have (up to 4). Your first runs stay calm.',
+    ],
+  },
+  {
+    version: '0.23.3',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:30:00Z',
+    kind: 'update',
+    title: 'Magnet coil and event switches',
+    body: [
+      'Supply drops now include a Magnet Coil. Grab it and coins, gems and hearts get pulled to you from four times as far for 12 seconds.',
+      'Settings has a new Run events section where you can switch each kind of moment on or off.',
+    ],
+  },
+  {
+    version: '0.23.4',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:40:00Z',
+    kind: 'update',
+    title: 'The ground shakes',
+    body: [
+      'Clear 6 maps and a Tremor can hit mid-run. A grey ring spreads from the epicenter, then the ground shakes four times. Enemies and loose props get shoved away and enemies stagger for a moment. The tremor never hurts anything, and it leaves a heart where it centred.',
+      'The Seen It All achievement now asks for every kind of moment, Tremor included.',
+    ],
+  },
+  {
+    version: '0.23.5',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T00:50:00Z',
+    kind: 'update',
+    title: 'Dash and a Controls page',
+    body: [
+      'You can now dash on a computer: press Shift, click the new Dash button above the Ultimate button, or double-click the playfield. The button shows its cooldown. Dash goes the way you are steering, or the way you last moved.',
+      'Settings has a new Controls page with keyboard, mouse, controller and touch sections. Rebind any key (a clash swaps the two), remap controller buttons, set the stick deadzone, and switch the on-screen Dash button and double-tap dash on or off.',
+      'Controllers can now steer with the left stick or d-pad. A controller button does its job when you press it, not while you hold it.',
+    ],
+  },
+  {
+    version: '0.23.6',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:00:00Z',
+    kind: 'update',
+    title: 'Call the crew',
+    body: [
+      'Rescued crew can now help mid-run. Press Q (or the new round button with their name) to call the next one in line: Pippa patches you up, Nyx freezes the crowd, Bulbosa stomps, Vee pulls loot in, and more. The button fills as the shared cooldown recovers.',
+      'It costs no slot. Everyone you have rescued with a call-in takes a turn in the order you rescued them, so the bigger your crew, the more variety you get. Q can be changed on the Controls page.',
+      'New achievements for calling in your crew: Phone a Friend, On Speed Dial and Never Alone.',
+    ],
+  },
+  {
+    version: '0.23.7',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:10:00Z',
+    kind: 'update',
+    title: 'Block party',
+    body: [
+      'Clear 8 maps and a Block Party can break out mid-run. A glowing pink ring appears nearby. Stand in it and your weapons fire faster while you slowly recover health.',
+      'Stay in the ring for at least 6 seconds and the neighbourhood says thanks with cred and a Magnet Coil. Skip it and nothing is lost.',
+    ],
+  },
+  {
+    version: '0.23.8',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:00Z',
+    kind: 'update',
+    title: 'Blackout, static and hideout stories',
+    body: [
+      'Clear 10 maps and a Blackout can hit: the lights go out and only a pool of light follows you while a few extra stalkers creep in. Get through it for cred, and come through untouched for a rare crystal.',
+      'Clear 12 maps and a Relay Storm can roll in: a field of static drifts toward you and slows you down inside it. Keep out of it for most of the storm and you find the supplies it was sitting on.',
+      'That makes six kinds of moment in a run. The Seen It All achievement now asks for all of them.',
+      'The hideout has five new little stories that depend on the weather and the hour: a leaking awning in the rain, a horn in the fog, a LokPet that wanders off into it, card night with the crew, and warm glass in the cellar.',
+    ],
+  },
+  {
+    version: '0.23.9',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:05Z',
     kind: 'update',
     title: 'Smoother Menus',
     body: [
@@ -1113,9 +1206,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.23.2',
-    date: '2026-10-09',
-    publishedAt: '2026-10-09T23:59:55Z',
+    version: '0.24.0',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:10Z',
     kind: 'update',
     title: 'Go To Anywhere',
     body: [
@@ -1125,9 +1218,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.23.3',
+    version: '0.24.1',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T00:00:05Z',
+    publishedAt: '2026-10-10T01:20:15Z',
     kind: 'update',
     title: 'Bigger Text On Demand',
     body: [
@@ -1135,9 +1228,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.23.4',
+    version: '0.24.2',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T00:00:10Z',
+    publishedAt: '2026-10-10T01:20:20Z',
     kind: 'update',
     title: 'Menu Dock',
     body: [
@@ -1146,9 +1239,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.23.5',
+    version: '0.24.3',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T00:00:15Z',
+    publishedAt: '2026-10-10T01:20:25Z',
     kind: 'update',
     title: 'Overlays Ease In',
     body: [
@@ -1157,9 +1250,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '0.23.6',
+    version: '0.24.4',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T00:00:20Z',
+    publishedAt: '2026-10-10T01:20:30Z',
     kind: 'update',
     title: 'Steadier Big Fights',
     body: [

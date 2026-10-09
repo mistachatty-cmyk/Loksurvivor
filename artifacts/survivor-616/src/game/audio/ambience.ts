@@ -41,6 +41,8 @@ interface BedProfile {
   /** Mean seconds between one-shot accents (drips, creaks, ticks). 0 = none. */
   accentEverySec?: number;
   accentHz?: number;
+  /** A sparse, slow melody of soft notes (Hz) -- the room humming to itself. */
+  melody?: { notes: number[]; everySec: number; wave: OscillatorType };
 }
 
 /**
@@ -49,11 +51,11 @@ interface BedProfile {
  * so it gets more than the shared heat bed.
  */
 const WEATHER_BEDS: Record<string, BedProfile> = {
-  rain: { cutoffHz: 2400, noiseLevel: 0.5, accentEverySec: 5.5, accentHz: 1500 },
-  fog: { cutoffHz: 480, noiseLevel: 0.32, droneHz: 62, droneLevel: 0.16 },
-  heat: { cutoffHz: 900, noiseLevel: 0.2, droneHz: 96, droneLevel: 0.14 },
+  rain: { melody: { notes: [196, 233.08, 261.63, 311.13, 349.23], everySec: 5.5, wave: 'sine' }, cutoffHz: 2400, noiseLevel: 0.5, accentEverySec: 5.5, accentHz: 1500 },
+  fog: { melody: { notes: [146.83, 174.61, 220, 261.63], everySec: 7, wave: 'sine' }, cutoffHz: 480, noiseLevel: 0.32, droneHz: 62, droneLevel: 0.16 },
+  heat: { melody: { notes: [220, 277.18, 329.63, 415.3], everySec: 6, wave: 'triangle' }, cutoffHz: 900, noiseLevel: 0.2, droneHz: 96, droneLevel: 0.14 },
   snow: { cutoffHz: 700, noiseLevel: 0.22 },
-  clear: { cutoffHz: 620, noiseLevel: 0.16, droneHz: 48, droneLevel: 0.12 },
+  clear: { melody: { notes: [174.61, 220, 261.63, 329.63], everySec: 6.5, wave: 'sine' }, cutoffHz: 620, noiseLevel: 0.16, droneHz: 48, droneLevel: 0.12 },
 };
 
 /**
@@ -61,6 +63,7 @@ const WEATHER_BEDS: Record<string, BedProfile> = {
  * plus slow water drips and a soft vinyl crackle for the record grotto.
  */
 const CELLAR_BED: BedProfile = {
+  melody: { notes: [220, 261.63, 293.66, 392, 440], everySec: 4.5, wave: 'triangle' },
   cutoffHz: 1100,
   noiseLevel: 0.24,
   droneHz: 74,
@@ -146,6 +149,38 @@ export function startHideoutAmbience(
     };
     scheduleAccent();
 
+    // A slow music-box line over the bed. Each note is a soft, quickly decaying
+    // pluck, chosen by a small random walk along the room's scale so it wanders
+    // instead of looping -- and chained timeouts keep it one note at a time.
+    let melodyTimer: ReturnType<typeof setTimeout> | null = null;
+    let melodyIndex = 0;
+    const scheduleMelody = () => {
+      const m = profile.melody;
+      if (stopped || !m) return;
+      const wait = m.everySec * (0.6 + Math.random() * 1.2) * 1000;
+      melodyTimer = setTimeout(() => {
+        if (stopped || context.state === 'closed') return;
+        try {
+          melodyIndex = Math.max(0, Math.min(m.notes.length - 1, melodyIndex + Math.floor(Math.random() * 3) - 1));
+          const now = context.currentTime;
+          const voice = context.createOscillator();
+          voice.type = m.wave;
+          voice.frequency.value = m.notes[melodyIndex]!;
+          const env = context.createGain();
+          env.gain.setValueAtTime(0.0001, now);
+          env.gain.exponentialRampToValueAtTime(0.07, now + 0.03);
+          env.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+          voice.connect(env).connect(master);
+          voice.start(now);
+          voice.stop(now + 1.7);
+        } catch {
+          // A dropped note is not worth tearing the bed down for.
+        }
+        scheduleMelody();
+      }, wait);
+    };
+    scheduleMelody();
+
     const setLevel = (next: number) => {
       const clamped = Math.max(0, Math.min(1, next));
       try {
@@ -162,6 +197,7 @@ export function startHideoutAmbience(
         if (stopped) return;
         stopped = true;
         if (accentTimer !== null) clearTimeout(accentTimer);
+        if (melodyTimer !== null) clearTimeout(melodyTimer);
         try {
           const now = context.currentTime;
           master.gain.setTargetAtTime(0, now, 0.15);
