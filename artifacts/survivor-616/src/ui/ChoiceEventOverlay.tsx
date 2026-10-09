@@ -10,11 +10,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { CHOICE_EVENTS_BY_ID } from '@/game/data/choiceEvents';
+import { EVENT_BUFFS_BY_ID, EVENT_BUFF_MS, describePercent, type EventBuffEffect } from '@/game/data/eventBuffs';
 import { applyChoice, choiceBlock } from '@/game/engine/choiceEvents';
 import { petCallName } from '@/game/engine/petGrowth';
 import { ELIXIR_CAP, useMeta } from '@/game/state/metaStore';
 import { useT, type MessageKey } from '@/lib/i18n';
 import { describeReward } from '@/ui/hideoutRewardText';
+
+type Translate = (key: MessageKey, vars?: Record<string, unknown>) => string;
+
+/** Reads like "+8% Speed" or "-5% Power". */
+function describeEffect(effect: EventBuffEffect, t: Translate): string {
+  const pct = describePercent(effect);
+  return `${pct > 0 ? '+' : ''}${pct}% ${t(`eventbuff.stat.${effect.stat}` as MessageKey)}`;
+}
 
 export interface ChoiceEventOverlayProps {
   eventId: string;
@@ -38,7 +47,7 @@ export function ChoiceEventOverlay({ eventId, petId, propId, onClose }: ChoiceEv
   const { meta, resolveChoiceEvent } = useMeta();
   const def = CHOICE_EVENTS_BY_ID[eventId];
   const pet = petId ? meta.savedLokPets.find((candidate) => candidate.id === petId) : undefined;
-  const [result, setResult] = useState<{ text: string; found: string } | null>(null);
+  const [result, setResult] = useState<{ text: string; found: string; buffLine: string } | null>(null);
   const [gone, setGone] = useState(false);
   const firstRef = useRef<HTMLButtonElement>(null);
 
@@ -76,7 +85,15 @@ export function ChoiceEventOverlay({ eventId, petId, propId, onClose }: ChoiceEv
     }
     resolveChoiceEvent(def.id, choiceId, seed, pet?.id, propId);
     const text = preview.usedFallback ? t('hideout.event.ui.fizzle') : t(preview.outcome.textKey, vars);
-    setResult({ text, found: describeReward(preview.applied, t) });
+    const buff = preview.outcome.buffId ? EVENT_BUFFS_BY_ID[preview.outcome.buffId] : undefined;
+    const buffLine = buff
+      ? t('eventbuff.line', {
+          boost: `${t(`eventbuff.${buff.id}.name` as never)} ${describeEffect(buff.boost, t)}`,
+          cost: describeEffect(buff.cost, t),
+          minutes: Math.round(EVENT_BUFF_MS / 60000),
+        })
+      : '';
+    setResult({ text, found: describeReward(preview.applied, t), buffLine });
   };
 
   return (
@@ -104,6 +121,7 @@ export function ChoiceEventOverlay({ eventId, petId, propId, onClose }: ChoiceEv
             <>
               <p className="mt-4 border-l-2 border-pink-200/60 pl-3 text-sm leading-relaxed text-white" data-testid="choice-event-result">{result.text}</p>
               {result.found ? <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-amber-200">{t('hideout.life.found', { items: result.found })}</p> : null}
+              {result.buffLine ? <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-cyan-200" data-testid="choice-event-buff">{result.buffLine}</p> : null}
               <button type="button" ref={firstRef} onClick={onClose} className="mt-4 min-h-11 w-full border border-pink-200/50 bg-pink-400/15 px-4 font-mono text-xs font-bold uppercase tracking-widest text-pink-50 hover:bg-pink-400/25" data-testid="button-choice-event-ok">
                 {t('hideout.event.ui.ok')}
               </button>

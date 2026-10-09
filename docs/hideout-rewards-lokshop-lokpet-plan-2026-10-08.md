@@ -20,7 +20,7 @@ flagged `Q:`. Everything lands as **data in charts/tables plus small systems wit
 | The Ball (fetch, throw, race, winner routine) | Built; gated by `ownsBall`, no purchase path yet | 0.22.3 | `data/hideoutBall.ts`, `engine/hideoutBall.ts` |
 | Light Spurs (spyglass reveals and unlocks a locked place) | Built; leads are `null-sector`, `digital-disco`, `glassroot-annex` | 0.22.4 | `data/lightSpurs.ts` |
 | Chest Pass (3-round LokToken consumable) + leaderboard stash | Not started; blocked on the LokToken catalog decision below | | |
-| Event rework (story + boost + negation) | Not started | | |
+| Event rework (story + boost + negation) | Built for 9 choice-event outcomes that used to pay nothing; one hour, one buff at a time; other events still pay resources only | 0.22.6 | `data/eventBuffs.ts`, `data/choiceEvents.ts` |
 | Ambient events (llama, running man, courier, squashable Digi mite, ground pickups, bell calls a visitor, adore/scared/laugh emotes) | Built; pickups pay through the daily limits; surprise-character cameos are the courier only | 0.22.5 | `data/hideoutAmbient.ts`, `engine/hideoutAmbient.ts`, `ui/hideoutAmbientArt.ts` |
 | Looks-first UI pass | Not started | | |
 | Pet rider (5 jumps, knock-off, enrage) | Not started | | |

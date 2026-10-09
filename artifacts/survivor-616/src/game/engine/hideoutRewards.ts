@@ -107,7 +107,7 @@ export function trimClaims(claims: Record<string, number>): Record<string, numbe
 
 export type RewardState = Pick<
   MetaState,
-  'cred' | 'cardCredits' | 'lokPetTreats' | 'petElixirs' | 'skeletonKeys' | 'savedLokPets' | 'hideoutClaims' | 'hideoutLedger'
+  'cred' | 'cardCredits' | 'lokPetTreats' | 'petElixirs' | 'skeletonKeys' | 'savedLokPets' | 'hideoutClaims' | 'hideoutLedger' | 'eventBuff'
 >;
 
 export interface GrantContext {

@@ -22,6 +22,7 @@ import { MusicNowPlaying } from './MusicNowPlaying';
 import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { describeReward } from './hideoutRewardText';
 import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
+import { activeEventBuff } from '@/game/data/eventBuffs';
 import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
 import { CHEST_TIERS } from '@/game/data/chestLoot';
 import { CARD_COSMETICS_BY_ID } from '@/game/data/cardCosmetics';
@@ -804,6 +805,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
                   { id: 'lokPetTreats', name: 'Pet treats', value: meta.lokPetTreats, color: 'text-pink-300' },
                   { id: 'petElixirs', name: 'Pet elixirs', value: meta.petElixirs, color: 'text-fuchsia-300' },
                   { id: 'grpdSeals', name: 'GRPD seals', value: grpdAvailableSeals(meta.totalKills, meta.grpdSpentSeals), color: 'text-blue-300' },
+                  ...(activeEventBuff(meta.eventBuff, Date.now()) ? [{ id: 'eventBuff', name: t('eventbuff.tile'), value: t(`eventbuff.${meta.eventBuff!.buffId}.name` as never), color: 'text-cyan-300' }] : []),
                   { id: 'runStreak', name: t('hub.resource.streak'), value: `${meta.runStreak} (${t('hub.resource.streakBest', { best: meta.bestRunStreak })})`, color: 'text-orange-300' },
                   ...(meta.rescuedAllyIds.length > 0 ? [{ id: 'crewMorale', name: t('hub.resource.morale'), value: meta.crewMorale > 0 ? `+${meta.crewMorale}` : meta.crewMorale, color: meta.crewMorale < 0 ? 'text-red-400' : 'text-lime-300' }] : []),
                   ...(session && lokBalance !== null ? [{ id: 'lokTokens', name: 'LokTokens', value: lokBalance, color: 'text-violet-300' }] : []),

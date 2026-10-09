@@ -22,7 +22,7 @@ import type { MetaState } from '@/game/types';
 
 type ChestMeta = Pick<
   MetaState,
-  | 'cred' | 'cardCredits' | 'lokPetTreats' | 'petElixirs' | 'skeletonKeys' | 'savedLokPets' | 'hideoutClaims' | 'hideoutLedger'
+  | 'cred' | 'cardCredits' | 'lokPetTreats' | 'petElixirs' | 'skeletonKeys' | 'savedLokPets' | 'hideoutClaims' | 'hideoutLedger' | 'eventBuff'
   | 'cardCollection' | 'cardFrameSleeves' | 'ownedCardBackIds' | 'ownedPackSkinIds' | 'selectedCardFrame' | 'selectedCardBack' | 'selectedPackSkin'
 >;
 

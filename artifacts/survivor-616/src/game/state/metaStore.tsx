@@ -98,6 +98,7 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { activeEventBuff, applyEventBuff, normalizeEventBuff } from '@/game/data/eventBuffs';
 import { AMBIENT_PICKUPS_BY_ID } from '@/game/data/hideoutAmbient';
 import { normalizeSpurAreaIds, spurAt } from '@/game/data/lightSpurs';
 import { openLuckyChest } from '@/game/engine/chestOpen';
@@ -326,6 +327,7 @@ export function createInitialMeta(): MetaState {
     runStreak: 0,
     skyBoost: null,
     ownsBall: false,
+    eventBuff: null,
     spurAreaIds: [],
     bestRunStreak: 0,
     hideoutStickyHeadOutEnabled: true,
@@ -1329,6 +1331,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     runStreak: normalizeStreak(parsed.runStreak),
     skyBoost: normalizeSkyBoost(parsed.skyBoost),
     ownsBall: parsed.ownsBall === true,
+    eventBuff: normalizeEventBuff(parsed.eventBuff),
     spurAreaIds: normalizeSpurAreaIds(parsed.spurAreaIds),
     bestRunStreak: Math.max(normalizeStreak(parsed.bestRunStreak), normalizeStreak(parsed.runStreak)),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
@@ -1720,6 +1723,7 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   const cards = activeCardEffects(meta);
   for (const [stat, multiplier] of Object.entries(cards.statMults) as Array<[keyof BaseStats, number]>) stats[stat] *= multiplier;
   stats.magnet *= cards.magnetMult;
+  applyEventBuff(stats, activeEventBuff(meta.eventBuff, Date.now()));
   applySkyStatBonus(stats, activeSkyBoost(meta.skyBoost, Date.now())?.statBonus ?? 0);
   stats.armor = Math.min(stats.armor, 0.6);
   if (!ignoreFatigue) {
