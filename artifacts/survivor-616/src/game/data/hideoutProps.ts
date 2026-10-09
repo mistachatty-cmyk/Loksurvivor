@@ -123,6 +123,13 @@ export const HIDEOUT_PROPS: HideoutPropDef[] = [
     action: { kind: 'chest' },
   },
   {
+    id: 'lok-shop-counter', roomIds: ['main-floor'], x: 0.2, art: 'door', accent: '#c084fc',
+    labelKey: 'hideout.prop.lok-shop-counter.label',
+    lineKeys: ['hideout.prop.lok-shop-counter.line.1', 'hideout.prop.lok-shop-counter.line.2'],
+    cooldown: 0,
+    action: { kind: 'panel', panel: 'lok-shop' },
+  },
+  {
     id: 'sky-spyglass', roomIds: ['rooftop-perch'], x: 0.4, art: 'scope', accent: '#fbbf24',
     labelKey: 'hideout.prop.sky-spyglass.label',
     lineKeys: ['hideout.prop.sky-spyglass.line.1', 'hideout.prop.sky-spyglass.line.2'],

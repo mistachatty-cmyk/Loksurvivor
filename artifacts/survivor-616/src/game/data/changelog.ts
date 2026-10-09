@@ -1000,6 +1000,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'A seizure and photosensitivity warning now fades in between the title screen and the hideout, and fades out when you continue. Tick "Don\'t show this again" to skip it on later visits.',
     ],
   },
+  {
+    version: '0.22.2',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T19:00:00Z',
+    kind: 'update',
+    title: 'The LokShop Opens',
+    body: [
+      'A LokShop counter now stands on the main floor, run by LokServer, a cheerful digital host with owl energy. Ask it about the shop, the eclipse, other universes, other games and what we could build.',
+      'The shelf previews what is coming: the Ball, the Chest Pass and the Rider Saddle. Nothing can be bought yet.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

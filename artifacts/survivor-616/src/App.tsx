@@ -46,6 +46,7 @@ import { BestiaryPanel } from '@/ui/BestiaryPanel';
 import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
+import { LokShopScreen } from '@/ui/LokShopScreen';
 import { PhotosensitivityNotice, photosensitivityNoticeHidden } from '@/ui/PhotosensitivityNotice';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
@@ -103,6 +104,7 @@ type Screen =
   | { name: 'vendor'; initialCategory?: VendorItemCategory }
   | { name: 'workshop' }
   | { name: 'card-shop' }
+  | { name: 'lok-shop' }
   | { name: 'weapon-bans' }
   | { name: 'grpd-armory' }
   | { name: 'settings' }
@@ -271,6 +273,9 @@ function Game() {
         break;
       case 'card-shop':
         setScreen({ name: 'card-shop' });
+        break;
+      case 'lok-shop':
+        setScreen({ name: 'lok-shop' });
         break;
       case 'weapon-bans':
         setScreen({ name: 'weapon-bans' });
@@ -593,6 +598,9 @@ function Game() {
 
     case 'card-shop':
       return <CardShopPanel onBack={goHub} />;
+
+    case 'lok-shop':
+      return <LokShopScreen onBack={goHub} />;
 
     case 'weapon-bans':
       return <WeaponBansScreen onBack={goHub} />;

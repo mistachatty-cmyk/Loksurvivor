@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 86,
+      "version": "0.22.2",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T19:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The LokShop Opens",
+      "body": [
+        "A LokShop counter now stands on the main floor, run by LokServer, a cheerful digital host with owl energy. Ask it about the shop, the eclipse, other universes, other games and what we could build.",
+        "The shelf previews what is coming: the Ball, the Chest Pass and the Rider Saddle. Nothing can be bought yet."
+      ]
+    },
+    {
       "number": 85,
       "version": "0.22.1",
       "date": "2026-10-09",
