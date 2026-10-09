@@ -1023,6 +1023,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Ball will be sold in the LokShop. It is not for sale yet.',
     ],
   },
+  {
+    version: '0.22.4',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T23:00:00Z',
+    kind: 'update',
+    title: 'The hideout, painted',
+    body: [
+      'The hideout strip is no longer a flat dark band. Every room now has its own backdrop: a lit skyline over the Sanctum, stars and a blinking marker lamp on the rooftop, breathing glass growths in the cellar, a swaying service lamp in the alley and a stuttering neon sign at the Neon Sleeve.',
+      'There is a lit pool of floor light that follows your operator and pulses with whatever music is playing, dust drifting through the light, and little puffs when you walk.',
+      'With Hideout ambience on, each room now hums a slow music-box line of its own over the bed. It stays off until you turn it on.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

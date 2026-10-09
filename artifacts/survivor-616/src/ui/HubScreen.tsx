@@ -647,6 +647,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             className="mb-6 -mx-6 w-auto sm:mx-0 sm:w-full"
             pets={hideoutPets}
             weather={scene.weather}
+            biome={scene.biome}
+            accent={scene.homeAccent}
             eventsMode={meta.hideoutEvents}
             onPetCare={careForLokPet}
             onPetEvent={completeHideoutEvent}
