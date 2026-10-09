@@ -1068,6 +1068,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Seen It All achievement now asks for every kind of moment, Tremor included.',
     ],
   },
+  {
+    version: '0.22.8',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T02:00:00Z',
+    kind: 'update',
+    title: 'Dash and a Controls page',
+    body: [
+      'You can now dash on a computer: press Shift, click the new Dash button above the Ultimate button, or double-click the playfield. The button shows its cooldown. Dash goes the way you are steering, or the way you last moved.',
+      'Settings has a new Controls page with keyboard, mouse, controller and touch sections. Rebind any key (a clash swaps the two), remap controller buttons, set the stick deadzone, and switch the on-screen Dash button and double-tap dash on or off.',
+      'Controllers can now steer with the left stick or d-pad. A controller button does its job when you press it, not while you hold it.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

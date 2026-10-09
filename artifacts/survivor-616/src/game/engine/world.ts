@@ -12554,6 +12554,7 @@ export function hudSnapshot(w: World): HudSnapshot {
       : undefined,
     cred: w.cred,
     ultimateReadyPct: ultTotal <= 0 ? 100 : clamp(100 - (ultRemaining / ultTotal) * 100, 0, 100),
+    dashReadyPct: clamp(100 - (Math.max(0, w.player.dashReadyAt - w.now) / DASH_COOLDOWN_MS) * 100, 0, 100),
     ultimateActive: w.now < w.ultActiveUntil,
     weaponLevel: w.weaponLevel,
     stormCloud: w.stormCloud ? { mode: w.stormCloud.mode, autoCycle: w.stormCloud.autoCycle } : undefined,

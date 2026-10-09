@@ -50,6 +50,7 @@ import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting } from './MotionToggle';
 import { ScrollbarSetting } from './ScrollbarSetting';
 import { FullscreenSetting } from './FullscreenSetting';
+import { ControlsSettings } from './ControlsSettings';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
 import { RUN_EVENTS } from '@/game/data/runEvents';
@@ -428,7 +429,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
 
   return (
     <ScreenLayout title={t('settings.title')} subtitle={t('settings.subtitle')} onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">{t('common.looksLokpets')}</button> : undefined}>
-    <SettingsPager endgame={<EndgameSettings />} standard={
+    <SettingsPager endgame={<EndgameSettings />} controls={<ControlsSettings />} standard={
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
         <SettingsJumpNav />
         <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-ui-layout">

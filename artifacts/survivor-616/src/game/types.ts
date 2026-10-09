@@ -2858,6 +2858,8 @@ export interface HudSnapshot {
   millionHorde?: { population: number; peakPopulation: number; defeatedPopulation: number; liveActors: number };
   cred: number;
   ultimateReadyPct: number;
+  /** 0 to 100: how far the dash cooldown has recovered (100 = ready). */
+  dashReadyPct?: number;
   ultimateActive: boolean;
   weaponLevel: number;
   /** Storm Chaser only: the weather cloud's current mode and whether the player has taken manual control of it. */
