@@ -3,6 +3,7 @@
  * pause, reel overlay, and the hand-off back to the meta layer when it ends.
  */
 
+import { skyXpMultiplier } from '@/game/data/skyEvents';
 import { quirkSurgeMode } from '@/game/data/enemyQuirks';
 import { earnedQuirkRunSetup } from '@/game/state/quirkStore';
 import { getDropStyle } from '@/game/data/dropPacks';
@@ -418,6 +419,7 @@ export function RunScreen({
         wildlifeSheltersInRain: meta.wildlifeSheltersInRain,
         physicsObjectClickRadiusBonus: physicsObjectClickRadiusBonus(meta),
         sizeMult: giantSizeMult(meta),
+        xpMult: skyXpMultiplier(meta.skyBoost, Date.now()),
         stealth: stealthConfig(meta),
         hazardImmune: hazardImmunityUnlocked(meta),
         unlockedCharacterIds: meta.unlockedCharacterIds,

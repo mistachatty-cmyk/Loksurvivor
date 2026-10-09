@@ -2370,6 +2370,8 @@ export interface MetaState {
   crewMorale: number;
   /** Runs won in a row right now, and the longest such run ever (`data/morale.ts`). */
   runStreak: number;
+  /** A started sky boost from the spyglass (`data/skyEvents.ts`). */
+  skyBoost: { eventId: string; until: number; window: number } | null;
   bestRunStreak: number;
   /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */
   hideoutStickyHeadOutEnabled: boolean;
