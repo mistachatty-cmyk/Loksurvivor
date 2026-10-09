@@ -285,6 +285,7 @@
   "hideout.ball.putOut": "把球放出去",
   "hideout.ball.putAway": "把球放开",
   "hideout.ball.hint": "点击球来取球，然后点击来投掷。你的 LokPets 竞赛。",
+  "sky.spur": "一道光刺掠过{name}，数码人的移动方向完全错误。这个地方现在向你开放。",
   "hideout.life.capped": "今天你的口袋已经满了。明天再试一次。",
   "hideout.life.useProp": "使用 {{label}}",
   "hideout.life.eventChip": "有事发生",

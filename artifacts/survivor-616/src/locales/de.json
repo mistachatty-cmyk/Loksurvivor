@@ -285,6 +285,7 @@
   "hideout.ball.putOut": "Werfen Sie den Ball raus",
   "hideout.ball.putAway": "Leg den Ball weg",
   "hideout.ball.hint": "Tippen Sie auf den Ball, um ihn zu holen, und tippen Sie dann, um ihn zu werfen. Euer LokPets Rennen darum.",
+  "sky.spur": "Ein Lichtsporn streift über {name}, wo sich die Digi völlig falsch bewegen. Der Platz steht Ihnen nun offen.",
   "hideout.life.capped": "Ihre Taschen sind für heute voll. Versuchen Sie es morgen noch einmal.",
   "hideout.life.useProp": "Verwenden Sie {{label}}",
   "hideout.life.eventChip": "Es ist etwas los",

@@ -285,6 +285,7 @@
   "hideout.ball.putOut": "공을 밖으로 넣어",
   "hideout.ball.putAway": "공을 치워두세요",
   "hideout.ball.hint": "공을 탭하여 가져온 다음 탭하여 던지세요. 당신의 LokPets 경주입니다.",
+  "sky.spur": "Digi가 완전히 잘못된 방향으로 움직이고 있는 {name} 위로 Light Spur가 연속적으로 발생합니다. 이제 그 장소가 여러분에게 열려있습니다.",
   "hideout.life.capped": "오늘은 주머니가 꽉 찼습니다. 내일 다시 시도해 보세요.",
   "hideout.life.useProp": "{{label}} 사용",
   "hideout.life.eventChip": "더 알아보기",

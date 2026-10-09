@@ -285,6 +285,7 @@
   "hideout.ball.putOut": "ボールを外に出す",
   "hideout.ball.putAway": "ボールをしまってください",
   "hideout.ball.hint": "ボールをタップしてフェッチし、タップして投げます。あなたの LokPets がそれを目指して競争します。",
+  "sky.spur": "光の拍車が {name} の上に縞模様を描き、デジたちはまったく間違った動きをしています。その場所は今、あなたに開かれています。",
   "hideout.life.capped": "今日はポケットがいっぱいです。明日もう一度試してください。",
   "hideout.life.useProp": "{{label}}を使用する",
   "hideout.life.eventChip": "何か問題がある",

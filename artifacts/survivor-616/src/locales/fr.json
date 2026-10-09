@@ -285,6 +285,7 @@
   "hideout.ball.putOut": "Sortez le ballon",
   "hideout.ball.putAway": "Rangez le ballon",
   "hideout.ball.hint": "Appuyez sur le ballon pour le récupérer, puis appuyez pour le lancer. Votre course LokPets pour cela.",
+  "sky.spur": "Un éperon lumineux traverse {name}, là où les Digi se déplacent complètement de travers. Le lieu vous est désormais ouvert.",
   "hideout.life.capped": "Vos poches sont pleines pour aujourd'hui. Réessayez demain.",
   "hideout.life.useProp": "Utiliser {{label}}",
   "hideout.life.eventChip": "Quelque chose se passe",
