@@ -2373,6 +2373,8 @@ export interface MetaState {
   /** A started sky boost from the spyglass (`data/skyEvents.ts`). */
   /** Whether the player owns the hideout Ball (sold in the LokShop; `data/hideoutBall.ts`). */
   ownsBall: boolean;
+  /** Places revealed by following a Light Spur in the spyglass (`data/lightSpurs.ts`). */
+  spurAreaIds: string[];
   skyBoost: { eventId: string; until: number; window: number } | null;
   bestRunStreak: number;
   /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */

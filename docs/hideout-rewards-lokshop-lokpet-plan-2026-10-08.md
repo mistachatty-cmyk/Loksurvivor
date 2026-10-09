@@ -18,7 +18,7 @@ flagged `Q:`. Everything lands as **data in charts/tables plus small systems wit
 | Seizure and photosensitivity warning | Built | 0.22.1 | `ui/PhotosensitivityNotice.tsx` |
 | LokShop + LokServer shell, knowledge doc | Built; shelf is preview only | 0.22.2 | `data/lokServer.ts`, `docs/lokserver-knowledge.md` |
 | The Ball (fetch, throw, race, winner routine) | Built; gated by `ownsBall`, no purchase path yet | 0.22.3 | `data/hideoutBall.ts`, `engine/hideoutBall.ts` |
-| Light Spurs | Not started | | |
+| Light Spurs (spyglass reveals and unlocks a locked place) | Built; leads are `null-sector`, `digital-disco`, `glassroot-annex` | 0.22.4 | `data/lightSpurs.ts` |
 | Chest Pass (3-round LokToken consumable) + leaderboard stash | Not started; blocked on the LokToken catalog decision below | | |
 | Event rework (story + boost + negation) | Not started | | |
 | Ambient events, emotions, llamas, Digi mite, bell | Not started | | |

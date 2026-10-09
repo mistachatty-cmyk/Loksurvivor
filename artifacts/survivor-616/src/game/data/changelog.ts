@@ -1023,6 +1023,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Ball will be sold in the LokShop. It is not for sale yet.',
     ],
   },
+  {
+    version: '0.22.4',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T21:00:00Z',
+    kind: 'update',
+    title: 'Light Spurs',
+    body: [
+      'Every few hours a Light Spur can streak across the sky over a place where Digi enemies are moving all wrong. Look through the rooftop Sky Spyglass while one is up and that place is revealed and unlocked.',
+      'Only places you have not opened yet can show a spur.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

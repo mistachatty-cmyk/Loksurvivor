@@ -295,6 +295,7 @@
   "hideout.ball.putOut": "Put the ball out",
   "hideout.ball.putAway": "Put the ball away",
   "hideout.ball.hint": "Tap the ball to fetch it, then tap to throw. Your LokPets race for it.",
+  "sky.spur": "A Light Spur streaks over {name}, where the Digi are moving all wrong. The place is now open to you.",
   "hideout.life.capped": "Your pockets are full for today. Try again tomorrow.",
   "hideout.life.useProp": "Use {{label}}",
   "hideout.life.eventChip": "Something's up",

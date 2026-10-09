@@ -2,7 +2,7 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
-import { ELIXIR_CAP, isPrimeTakeoverActive, useMeta, describeUnlock } from '@/game/state/metaStore';
+import { ELIXIR_CAP, isPrimeTakeoverActive, spurShowing, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
 import { getCharacter } from '@/game/data/characters';
@@ -346,10 +346,12 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     } else if (action.kind === 'sky') {
       const sky = skyAt(Date.now());
       const started = startSkyBoost(meta.skyBoost, Date.now());
-      if (started) lookThroughSpyglass();
+      const spur = spurShowing(meta, Date.now());
+      if (started || spur) lookThroughSpyglass();
       const running = activeSkyBoost(started ?? meta.skyBoost, Date.now());
       const suffix = started ? t('sky.started') : running ? t('sky.running', { title: t(running.titleKey as never) }) : '';
-      showStripNotice(t(sky.titleKey as never), `${t(sky.lineKey as never)} ${suffix}`.trim());
+      const spurLine = spur ? t('sky.spur', { name: spur.name }) : '';
+      showStripNotice(t(sky.titleKey as never), `${t(sky.lineKey as never)} ${suffix} ${spurLine}`.replace(/\s+/g, ' ').trim());
     } else if (action.kind === 'event') {
       const now = Date.now();
       if (!propReady(def, meta.hideoutClaims, now)) {
