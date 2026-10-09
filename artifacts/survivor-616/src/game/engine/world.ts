@@ -10,7 +10,7 @@
  */
 
 import { CALL_INS, CALL_IN_COOLDOWN_MS, CALL_IN_FIRST_READY_MS } from '@/game/data/crewCallIns';
-import { BLOCK_PARTY_NEEDED_MS, BLOCK_PARTY_RADIUS, RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
+import { BLACKOUT_STALKERS, RELAY_STORM_DRIFT_PX_PER_SEC, RELAY_STORM_MAX_INSIDE_MS, RELAY_STORM_RADIUS, RELAY_STORM_SLOW, BLOCK_PARTY_NEEDED_MS, BLOCK_PARTY_RADIUS, RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
 import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
 import type { DropStyle } from '@/game/data/dropPacks';
@@ -4165,6 +4165,13 @@ function updateQuirkSurge(w: World) {
   }
 }
 
+/** Inside a live Relay storm's static the player moves slower; everywhere else this is 1. */
+function relayStormSlow(w: World): number {
+  const re = w.runEvents;
+  if (re.phase !== 'active' || re.schedule[re.index]?.id !== 'relay-storm') return 1;
+  return Math.hypot(w.player.x - re.x, w.player.y - re.y) <= RELAY_STORM_RADIUS ? RELAY_STORM_SLOW : 1;
+}
+
 /** Enemy defs a beat may use: this area's own non-boss wave enemies. */
 function runEventEnemyPool(w: World): EnemyDef[] {
   const defs: EnemyDef[] = [];
@@ -4242,6 +4249,11 @@ function updateRunEvents(w: World) {
       const spot = runEventPoint(w, p.x + re.dirX * 240, p.y + re.dirY * 240);
       re.x = spot.x;
       re.y = spot.y;
+    } else if (def.id === 'relay-storm') {
+      const spot = runEventPoint(w, p.x + re.dirX * 340, p.y + re.dirY * 340);
+      re.x = spot.x;
+      re.y = spot.y;
+      re.zoneMs = 0;
     } else if (def.id === 'block-party') {
       const spot = runEventPoint(w, p.x + re.dirX * 150, p.y + re.dirY * 150);
       re.x = spot.x;
@@ -4278,6 +4290,17 @@ function updateRunEvents(w: World) {
         const at = runEventPoint(w, re.x + Math.cos(a) * 70, re.y + Math.sin(a) * 70);
         spawnEnemy(w, pool[i % pool.length]!, 1, at);
       }
+    } else if (def.id === 'blackout') {
+      // Under the dark, a few extra stalkers creep in from the edge of what you can see.
+      for (let i = 0; i < BLACKOUT_STALKERS && pool.length > 0; i += 1) {
+        const a = re.dirX !== 0 || re.dirY !== 0 ? Math.atan2(re.dirY, re.dirX) + (Math.PI * 2 * i) / BLACKOUT_STALKERS : (Math.PI * 2 * i) / BLACKOUT_STALKERS;
+        const at = runEventPoint(w, p.x + Math.cos(a) * 340, p.y + Math.sin(a) * 340);
+        spawnEnemy(w, pool[i % pool.length]!, 1, at);
+      }
+      w.shake = Math.max(w.shake, 3);
+    } else if (def.id === 'relay-storm') {
+      re.lastAt = w.now;
+      spawnParticles(w, re.x, re.y, '#a5b4fc', 16, 120);
     } else if (def.id === 'block-party') {
       re.lastAt = w.now;
       spawnParticles(w, re.x, re.y, '#f0abfc', 18, 120);
@@ -4311,6 +4334,18 @@ function updateRunEvents(w: World) {
     }
     return;
   }
+  if (def.id === 'relay-storm') {
+    const elapsed = w.now - re.lastAt;
+    re.lastAt = w.now;
+    // The field creeps toward you; spend too long inside and it keeps what it was hiding.
+    const dx = p.x - re.x;
+    const dy = p.y - re.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const step = (RELAY_STORM_DRIFT_PX_PER_SEC * elapsed) / 1000;
+    re.x += (dx / dist) * Math.min(step, dist);
+    re.y += (dy / dist) * Math.min(step, dist);
+    if (Math.hypot(p.x - re.x, p.y - re.y) <= RELAY_STORM_RADIUS) re.zoneMs += elapsed;
+  }
   if (def.id === 'block-party') {
     const elapsed = w.now - re.lastAt;
     re.lastAt = w.now;
@@ -4326,6 +4361,17 @@ function updateRunEvents(w: World) {
     re.pulses += 1;
   }
   if (w.now >= re.phaseAt + def.activeMs) {
+    if (def.id === 'blackout') {
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x - 24, y: p.y, vx: 0, vy: 0, value: 100, bornAt: w.now });
+      // Came through the dark without being touched: a rare crystal as well.
+      if (p.lastDamageAt < re.phaseAt) w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x + 24, y: p.y, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    }
+    if (def.id === 'relay-storm' && re.zoneMs <= RELAY_STORM_MAX_INSIDE_MS) {
+      // The crate the static was sitting on, left where it ended.
+      w.pickups.push({ uid: uid(w), kind: 'health', x: p.x - 26, y: p.y, vx: 0, vy: 0, value: 40, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: p.x + 26, y: p.y, vx: 0, vy: 0, value: 150, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'prism-quartz', x: p.x, y: p.y + 26, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    }
     if (def.id === 'block-party' && re.zoneMs >= BLOCK_PARTY_NEEDED_MS) {
       // Danced long enough: a thank-you from the neighbourhood.
       w.pickups.push({ uid: uid(w), kind: 'cred', x: re.x - 20, y: re.y, vx: 0, vy: 0, value: 120, bornAt: w.now });
@@ -7528,7 +7574,7 @@ function updatePlayer(w: World, dt: number, moveX: number, moveY: number) {
     if (w.enemyQuirks.taken.has('adrenaline') && (w.now / 1000) % 5 < 1) quirkSpeed *= 2.4;
     if (w.enemyQuirks.taken.has('regenerating') && p.hp > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.015 * dt);
   }
-  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed * quirkSpeed;
+  const speed = (w.stats.speed + rumorSpeed) * speedMult(w) * fluidSpeedMultiplierAt(w, p.x, p.y) * coneSlow * pollenSpeed * quirkSpeed * relayStormSlow(w);
   const len = Math.hypot(moveX, moveY);
   const nx = len > 1 ? moveX / len : moveX;
   const ny = len > 1 ? moveY / len : moveY;

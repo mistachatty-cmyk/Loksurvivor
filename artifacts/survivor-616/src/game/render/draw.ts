@@ -3314,6 +3314,29 @@ export function drawPickupClassic(ctx: CanvasRenderingContext2D, pickup: Pickup,
   }
 }
 
+/** Blackout: the screen goes dark except a pool of light around the player, fading in and out. */
+function drawBlackout(ctx: CanvasRenderingContext2D, w: World, width: number, height: number) {
+  const re = w.runEvents;
+  const beat = re.schedule[re.index];
+  if (!beat || beat.id !== 'blackout' || re.phase === 'wait') return;
+  let strength: number;
+  if (re.phase === 'warn') {
+    // Lights stutter as they fail.
+    const t = Math.min(1, (w.now - re.phaseAt) / 3000);
+    strength = t * (0.55 + 0.45 * Math.abs(Math.sin(w.now / 85)));
+  } else {
+    const left = 14000 - (w.now - re.phaseAt);
+    strength = Math.min(1, Math.max(0, left / 1200));
+  }
+  if (strength <= 0.01) return;
+  const gradient = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.1, width / 2, height / 2, Math.min(width, height) * 0.42);
+  gradient.addColorStop(0, 'rgba(2,3,10,0)');
+  gradient.addColorStop(1, `rgba(2,3,10,${0.94 * strength})`);
+  ctx.fillStyle = gradient;
+  // Past the outer radius a radial gradient keeps its last colour, so the corners stay fully dark.
+  ctx.fillRect(0, 0, width, height);
+}
+
 /** Ground markers for the Director's live beat: the drop zone, or the stampede lane and its safe gap. */
 function drawRunEventMarker(ctx: CanvasRenderingContext2D, w: World) {
   const re = w.runEvents;
@@ -3332,6 +3355,25 @@ function drawRunEventMarker(ctx: CanvasRenderingContext2D, w: World) {
       // A beam that thickens as the crate comes in.
       ctx.fillStyle = `rgba(253,224,71,${0.08 + 0.2 * falling})`;
       ctx.fillRect(re.x - 8 - 14 * falling, re.y - 900, 16 + 28 * falling, 900);
+    }
+  } else if (beat.id === 'relay-storm') {
+    const live = re.phase === 'active';
+    const flick = 0.5 + 0.5 * Math.sin(w.now / 55) * Math.sin(w.now / 130);
+    ctx.fillStyle = `rgba(165,180,252,${(live ? 0.16 : 0.08) + 0.08 * flick})`;
+    ctx.beginPath();
+    ctx.arc(re.x, re.y, 120, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(199,210,254,${0.4 + 0.4 * flick})`;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Static: short bright dashes jittering inside the ring.
+    ctx.fillStyle = 'rgba(224,231,255,0.7)';
+    for (let i = 0; i < 18; i += 1) {
+      const a = (i * 2.399 + Math.floor(w.now / 90) * 1.7) % (Math.PI * 2);
+      const r = ((i * 37 + Math.floor(w.now / 70) * 13) % 100) / 100 * 112;
+      ctx.fillRect(re.x + Math.cos(a) * r, re.y + Math.sin(a) * r, 6, 1.5);
     }
   } else if (beat.id === 'block-party') {
     const inside = Math.hypot(w.player.x - re.x, w.player.y - re.y) <= 130;
@@ -6883,6 +6925,7 @@ export function renderWorld(ctx: CanvasRenderingContext2D, w: World, view: Viewp
   }
 
   if (!overlay) drawMillionHordePressure(ctx, w, width, height);
+  if (!overlay) drawBlackout(ctx, w, width, height);
 
   // Distant lightning, under the damage flash so a hit still reads as red.
   const bolt = overlay ? 0 : lightningIntensity(w.now, profile.lightningPeriodMs);

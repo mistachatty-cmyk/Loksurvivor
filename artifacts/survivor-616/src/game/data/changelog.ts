@@ -1103,6 +1103,19 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Stay in the ring for at least 6 seconds and the neighbourhood says thanks with cred and a Magnet Coil. Skip it and nothing is lost.',
     ],
   },
+  {
+    version: '0.23.1',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T05:00:00Z',
+    kind: 'update',
+    title: 'Blackout, static and hideout stories',
+    body: [
+      'Clear 10 maps and a Blackout can hit: the lights go out and only a pool of light follows you while a few extra stalkers creep in. Get through it for cred, and come through untouched for a rare crystal.',
+      'Clear 12 maps and a Relay Storm can roll in: a field of static drifts toward you and slows you down inside it. Keep out of it for most of the storm and you find the supplies it was sitting on.',
+      'That makes six kinds of moment in a run. The Seen It All achievement now asks for all of them.',
+      'The hideout has five new little stories that depend on the weather and the hour: a leaking awning in the rain, a horn in the fog, a LokPet that wanders off into it, card night with the crew, and warm glass in the cellar.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

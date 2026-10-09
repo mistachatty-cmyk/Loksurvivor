@@ -39,6 +39,17 @@ cred + a magnet coil, otherwise nothing. Host line uses the first rescued ally i
 Known unrelated flake: `quickFight.test.ts` "a fainted lead sends in a teammate" fails ~1 in 8 runs on
 the base branch too.
 
+## Added v0.23.1: Blackout and Relay storm (all planned beats now exist)
+- Blackout (10 maps): `drawBlackout` (draw.ts) darkens everything but a pool around the screen centre
+  (the camera follows the player); 5 stalkers spawn at the active start; always pays cred, plus a prism
+  quartz if `p.lastDamageAt < re.phaseAt` (untouched).
+- Relay storm (12 maps): a 120px static field starts 340px away and creeps toward the player at 60px/s;
+  inside it the player moves at 60% (`relayStormSlow`, in the player speed product). `zoneMs` counts time
+  inside; at 2s or less the end pays health + cred + quartz, otherwise nothing.
+- Constants live in `data/runEvents.ts` so balance is one place.
+- Hideout choice events: 5 more in `data/choiceEvents.ts` (roof-leak, fog-horn, fog-wander, crew-card-night,
+  warm-glass), gated by weather/time, text in `en.json`. All pay through `hideoutRewards.ts` as before.
+
 ## Not built yet
 Beats in the Archive/bestiary,
-Blackout / Relay storm, first-time tooltip, a screenshot playtest.
+a screenshot playtest of every beat, a per-ally line for the block-party host, balance tuning from real runs.

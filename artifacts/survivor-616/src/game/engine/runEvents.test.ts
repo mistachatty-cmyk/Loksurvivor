@@ -180,3 +180,66 @@ test('block party needs 8 maps', () => {
   }
   assert.ok([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].some((seed) => scheduleRunEvents(seed, 30).some((e) => e.id === 'block-party')));
 });
+
+test('blackout adds stalkers, always pays cred, and a rare crystal only if untouched', () => {
+  const run = (hit: boolean) => {
+    const world = makeWorld(10);
+    world.runEvents.schedule = [{ id: 'blackout', startMs: 500 }];
+    let stalkers = 0;
+    for (let frame = 0; frame < 30 * 22; frame += 1) {
+      if (hit && world.runEvents.phase === 'active' && frame % 90 === 0) world.player.lastDamageAt = world.now;
+      stepWorld(world, 1 / 30, IDLE);
+      stalkers = Math.max(stalkers, world.enemies.length);
+    }
+    return { world, stalkers };
+  };
+  const clean = run(false);
+  assert.ok(clean.stalkers >= 5, `only ${clean.stalkers} enemies appeared`);
+  assert.deepEqual(clean.world.runEvents.survived, ['blackout']);
+  const hit = run(true);
+  assert.deepEqual(hit.world.runEvents.survived, ['blackout']);
+});
+
+test('relay storm: the field creeps toward you, slows you inside it, and pays only if you stayed out', () => {
+  const world = makeWorld(12);
+  world.runEvents.schedule = [{ id: 'relay-storm', startMs: 500 }];
+  for (let frame = 0; frame < 30; frame += 1) stepWorld(world, 1 / 30, IDLE);
+  assert.equal(world.runEvents.phase, 'warn');
+  const startX = world.runEvents.x;
+  const startY = world.runEvents.y;
+  const startDist = Math.hypot(startX - world.player.x, startY - world.player.y);
+  assert.ok(startDist > 250, 'it starts well away from you');
+  for (let frame = 0; frame < 30 * 8; frame += 1) {
+    stepWorld(world, 1 / 30, IDLE);
+    for (const e of world.enemies) assert.ok(Number.isFinite(e.x));
+  }
+  const nowDist = Math.hypot(world.runEvents.x - world.player.x, world.runEvents.y - world.player.y);
+  assert.ok(nowDist < startDist, 'the static creeps closer');
+});
+
+test('relay storm slows only the player standing in it', () => {
+  const stand = (inside: boolean) => {
+    const world = makeWorld(12);
+    world.runEvents.schedule = [{ id: 'relay-storm', startMs: 100 }];
+    for (let frame = 0; frame < 30 * 5; frame += 1) stepWorld(world, 1 / 30, IDLE);
+    assert.equal(world.runEvents.phase, 'active');
+    world.runEvents.x = world.player.x + (inside ? 0 : 500);
+    world.runEvents.y = world.player.y;
+    const x0 = world.player.x;
+    for (let frame = 0; frame < 15; frame += 1) {
+      world.runEvents.x = world.player.x + (inside ? 0 : 500);
+      stepWorld(world, 1 / 30, { moveX: 1, moveY: 0, ultimate: false });
+    }
+    return world.player.x - x0;
+  };
+  const slowed = stand(true);
+  const free = stand(false);
+  assert.ok(slowed > 0 && slowed < free * 0.8, `slowed ${slowed} vs free ${free}`);
+});
+
+test('blackout and relay storm unlock at 10 and 12 maps', () => {
+  const ids = (maps: number) => new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].flatMap((seed) => scheduleRunEvents(seed, maps).map((e) => e.id)));
+  assert.ok(!ids(9).has('blackout'));
+  assert.ok(!ids(11).has('relay-storm'));
+  assert.ok(ids(40).has('blackout') && ids(40).has('relay-storm'));
+});

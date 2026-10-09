@@ -10,7 +10,7 @@
 
 import { quirkHash } from '@/game/data/enemyQuirks';
 
-export type RunEventId = 'supply-drop' | 'rush-hour' | 'tremor' | 'block-party';
+export type RunEventId = 'supply-drop' | 'rush-hour' | 'tremor' | 'block-party' | 'blackout' | 'relay-storm';
 
 export interface RunEventDef {
   id: RunEventId;
@@ -62,7 +62,34 @@ export const RUN_EVENTS: RunEventDef[] = [
     warnText: 'BLOCK PARTY! Stand in the ring to join the fun',
     doneText: 'BLOCK PARTY OVER. That was a good one',
   },
+  {
+    id: 'blackout',
+    name: 'Blackout',
+    unlockMaps: 10,
+    warnMs: 3000,
+    activeMs: 14000,
+    warnText: 'BLACKOUT! The lights are going out',
+    doneText: 'POWER BACK ON',
+  },
+  {
+    id: 'relay-storm',
+    name: 'Relay storm',
+    unlockMaps: 12,
+    warnMs: 3500,
+    activeMs: 12000,
+    warnText: 'RELAY STORM! Keep clear of the static',
+    doneText: 'STATIC CLEARED',
+  },
 ];
+
+/** Relay storm: how big the drifting static field is, how fast it creeps toward you, how much it slows you. */
+export const RELAY_STORM_RADIUS = 120;
+export const RELAY_STORM_DRIFT_PX_PER_SEC = 60;
+export const RELAY_STORM_SLOW = 0.6;
+/** Spend no more than this long inside the field to earn the supplies it was hiding. */
+export const RELAY_STORM_MAX_INSIDE_MS = 2000;
+/** Blackout: how many extra enemies creep in under the dark. */
+export const BLACKOUT_STALKERS = 5;
 
 /** A Block party pays out if the player spent at least this long inside the ring. */
 export const BLOCK_PARTY_NEEDED_MS = 6000;

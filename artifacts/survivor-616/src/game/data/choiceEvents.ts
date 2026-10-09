@@ -298,6 +298,123 @@ export const CHOICE_EVENTS: ChoiceEventDef[] = [
       },
     ],
   },
+  {
+    id: 'roof-leak', pools: ['idle', 'rooftop'], weight: 4, cooldownMs: 8 * HOUR,
+    titleKey: 'hideout.event.roof-leak.title', bodyKey: 'hideout.event.roof-leak.body',
+    when: { weather: ['rain'] },
+    choices: [
+      {
+        id: 'bucket', labelKey: 'hideout.event.roof-leak.c.bucket',
+        outcomes: [
+          { id: '1', weight: 70, textKey: 'hideout.event.roof-leak.o.bucket.1', reward: { cred: 6 } },
+          { id: '2', weight: 30, textKey: 'hideout.event.roof-leak.o.bucket.2' },
+        ],
+      },
+      {
+        id: 'patch', labelKey: 'hideout.event.roof-leak.c.patch',
+        outcomes: [
+          { id: '1', weight: 60, textKey: 'hideout.event.roof-leak.o.patch.1', reward: { cred: 8 } },
+          { id: '2', weight: 40, textKey: 'hideout.event.roof-leak.o.patch.2' },
+        ],
+      },
+      {
+        id: 'drip', labelKey: 'hideout.event.roof-leak.c.drip',
+        outcomes: [
+          { id: '1', weight: 100, textKey: 'hideout.event.roof-leak.o.drip.1' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'fog-horn', pools: ['rooftop', 'idle'], weight: 4, cooldownMs: 10 * HOUR,
+    titleKey: 'hideout.event.fog-horn.title', bodyKey: 'hideout.event.fog-horn.body',
+    when: { weather: ['fog'] },
+    choices: [
+      {
+        id: 'answer', labelKey: 'hideout.event.fog-horn.c.answer',
+        outcomes: [
+          { id: '1', weight: 70, textKey: 'hideout.event.fog-horn.o.answer.1', reward: { cred: 6 } },
+          { id: '2', weight: 22, textKey: 'hideout.event.fog-horn.o.answer.2' },
+          { id: '3', weight: 8, textKey: 'hideout.event.fog-horn.o.answer.3', reward: { cardCredits: 1 } },
+        ],
+      },
+      {
+        id: 'quiet', labelKey: 'hideout.event.fog-horn.c.quiet',
+        outcomes: [
+          { id: '1', weight: 100, textKey: 'hideout.event.fog-horn.o.quiet.1' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'fog-wander', pools: ['idle', 'walk'], weight: 4, cooldownMs: 10 * HOUR,
+    titleKey: 'hideout.event.fog-wander.title', bodyKey: 'hideout.event.fog-wander.body',
+    when: { weather: ['fog'], needsPet: true },
+    choices: [
+      {
+        id: 'call', labelKey: 'hideout.event.fog-wander.c.call', requires: { needsPet: true },
+        outcomes: [
+          { id: '1', weight: 60, textKey: 'hideout.event.fog-wander.o.call.1', reward: { petExp: 6, bond: true } },
+          { id: '2', weight: 40, textKey: 'hideout.event.fog-wander.o.call.2', reward: { cred: 5 } },
+        ],
+      },
+      {
+        id: 'wait', labelKey: 'hideout.event.fog-wander.c.wait', requires: { needsPet: true },
+        outcomes: [
+          { id: '1', weight: 55, textKey: 'hideout.event.fog-wander.o.wait.1', reward: { petExp: 4 } },
+          { id: '2', weight: 45, textKey: 'hideout.event.fog-wander.o.wait.2' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'crew-card-night', pools: ['idle'], weight: 5, cooldownMs: 12 * HOUR,
+    titleKey: 'hideout.event.crew-card-night.title', bodyKey: 'hideout.event.crew-card-night.body',
+    when: { timeOfDay: ['night'] },
+    choices: [
+      {
+        id: 'deal', labelKey: 'hideout.event.crew-card-night.c.deal',
+        outcomes: [
+          { id: '1', weight: 55, textKey: 'hideout.event.crew-card-night.o.deal.1', reward: { cred: 7 } },
+          { id: '2', weight: 45, textKey: 'hideout.event.crew-card-night.o.deal.2', reward: { cred: 3 } },
+        ],
+      },
+      {
+        id: 'watch', labelKey: 'hideout.event.crew-card-night.c.watch',
+        outcomes: [
+          { id: '1', weight: 100, textKey: 'hideout.event.crew-card-night.o.watch.1' },
+        ],
+      },
+      {
+        id: 'tidy', labelKey: 'hideout.event.crew-card-night.c.tidy',
+        outcomes: [
+          { id: '1', weight: 60, textKey: 'hideout.event.crew-card-night.o.tidy.1', reward: { cred: 5 } },
+          { id: '2', weight: 40, textKey: 'hideout.event.crew-card-night.o.tidy.2' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'warm-glass', pools: ['cellar'], weight: 4, cooldownMs: 8 * HOUR,
+    titleKey: 'hideout.event.warm-glass.title', bodyKey: 'hideout.event.warm-glass.body',
+    when: { weather: ['heat'] },
+    choices: [
+      {
+        id: 'polish', labelKey: 'hideout.event.warm-glass.c.polish',
+        outcomes: [
+          { id: '1', weight: 65, textKey: 'hideout.event.warm-glass.o.polish.1', reward: { cred: 6 } },
+          { id: '2', weight: 35, textKey: 'hideout.event.warm-glass.o.polish.2', reward: { cred: 3 } },
+        ],
+      },
+      {
+        id: 'listen', labelKey: 'hideout.event.warm-glass.c.listen',
+        outcomes: [
+          { id: '1', weight: 70, textKey: 'hideout.event.warm-glass.o.listen.1', reward: { cred: 2 } },
+          { id: '2', weight: 30, textKey: 'hideout.event.warm-glass.o.listen.2' },
+        ],
+      },
+    ],
+  },
 ];
 
 export const CHOICE_EVENTS_BY_ID: Record<string, ChoiceEventDef> = Object.fromEntries(CHOICE_EVENTS.map((event) => [event.id, event]));
