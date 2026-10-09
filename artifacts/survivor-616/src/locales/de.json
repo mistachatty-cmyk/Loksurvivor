@@ -311,7 +311,6 @@
   "eventbuff.stat.lifesteal": "Lebensraub",
   "eventbuff.line": "Boost: {{boost}}. Kosten: {{cost}}. Dauert {{minutes}} Minuten.",
   "eventbuff.tile": "Event-Boost",
-  "sky.spur": "Ein Lichtsporn streift über {name}, wo sich die Digi völlig falsch bewegen. Der Platz steht Ihnen nun offen.",
   "hideout.life.capped": "Ihre Taschen sind für heute voll. Versuchen Sie es morgen noch einmal.",
   "hideout.life.useProp": "Verwenden Sie {{label}}",
   "hideout.life.eventChip": "Es ist etwas los",
