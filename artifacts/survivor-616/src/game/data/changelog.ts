@@ -958,6 +958,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Five secrets can also be summoned by typing a word on the title screen. Finding the words is half the fun.',
     ],
   },
+  {
+    version: '0.21.8',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T15:00:00Z',
+    kind: 'update',
+    title: 'Win Streak',
+    body: [
+      'The hideout Resources panel now counts your win streak, the number of runs you have won in a row, and remembers your best. Any loss sends the streak back to zero.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

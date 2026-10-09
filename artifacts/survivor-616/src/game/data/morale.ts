@@ -40,6 +40,17 @@ export function nextMorale(morale: number, cleared: boolean, rules: MoraleRules 
   return Math.max(rules.floor, current + rules.loss);
 }
 
+/** Runs won in a row after a run ends; any loss sends it back to 0. */
+export function nextStreak(streak: number, cleared: boolean): number {
+  const current = Number.isFinite(streak) ? Math.max(0, Math.trunc(streak)) : 0;
+  return cleared ? current + 1 : 0;
+}
+
+/** Cleans a saved streak count: a whole number, never negative. */
+export function normalizeStreak(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+}
+
 /** What every crew boost is multiplied by at this morale. */
 export function moraleMultiplier(morale: number, endgameReached: boolean, rules: MoraleRules = MORALE_RULES): number {
   const m = Number.isFinite(morale) ? Math.trunc(morale) : 0;

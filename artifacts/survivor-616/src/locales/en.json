@@ -225,6 +225,8 @@
   "hideout.life.item.bond": "closer bond",
   "hideout.life.found": "Found: {{items}}",
   "hideout.life.usedToday": "Already done today. Back tomorrow.",
+  "hub.resource.streak": "Win streak",
+  "hub.resource.streakBest": "best {best}",
   "hub.resource.morale": "Crew morale",
   "egg.perfect-legend.title": "Perfect L13gend",
   "egg.perfect-legend.line": "A tip of the cap to one of the greatest fighting game players ever, a champion who picked up a controller at age three and never stopped winning.",

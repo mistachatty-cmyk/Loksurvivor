@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { MORALE_RULES, moraleMultiplier, nextMorale, normalizeMorale } from '@/game/data/morale';
+import { MORALE_RULES, moraleMultiplier, nextMorale, nextStreak, normalizeMorale, normalizeStreak } from '@/game/data/morale';
 
 describe('crew morale', () => {
   it('climbs on wins and digs deeper on losses while negative', () => {
@@ -25,6 +25,14 @@ describe('crew morale', () => {
     assert.equal(moraleMultiplier(4, false), 1);
     assert.equal(moraleMultiplier(4, true), 2);
     assert.equal(moraleMultiplier(400, true), 101);
+  });
+
+  it('counts wins in a row and resets on any loss', () => {
+    assert.equal(nextStreak(0, true), 1);
+    assert.equal(nextStreak(4, true), 5);
+    assert.equal(nextStreak(4, false), 0);
+    assert.equal(normalizeStreak(-3), 0);
+    assert.equal(normalizeStreak(2.7), 2);
   });
 
   it('cleans saved values', () => {

@@ -98,7 +98,7 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
-import { moraleMultiplier, nextMorale, normalizeMorale } from '@/game/data/morale';
+import { moraleMultiplier, nextMorale, nextStreak, normalizeMorale, normalizeStreak } from '@/game/data/morale';
 import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
 import { recordEarnedEndgame } from '@/game/state/operatorForgeStore';
 import { PASSIVES } from '@/game/data/passives';
@@ -319,6 +319,8 @@ export function createInitialMeta(): MetaState {
     hideoutClaims: {},
     hideoutLedger: emptyLedger(),
     crewMorale: 0,
+    runStreak: 0,
+    bestRunStreak: 0,
     hideoutStickyHeadOutEnabled: true,
     splashTextEnabled: true,
     oneLineTitleEnabled: false,
@@ -1317,6 +1319,8 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutClaims: normalizeHideoutClaims(parsed.hideoutClaims),
     hideoutLedger: normalizeHideoutLedger(parsed.hideoutLedger),
     crewMorale: normalizeMorale(parsed.crewMorale),
+    runStreak: normalizeStreak(parsed.runStreak),
+    bestRunStreak: Math.max(normalizeStreak(parsed.bestRunStreak), normalizeStreak(parsed.runStreak)),
     hideoutStickyHeadOutEnabled: parsed.hideoutStickyHeadOutEnabled !== false,
     splashTextEnabled: parsed.splashTextEnabled !== false,
     oneLineTitleEnabled: parsed.oneLineTitleEnabled === true,
@@ -3776,6 +3780,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       const result = action.result;
       const prev = state.meta;
       const crewMorale = nextMorale(prev.crewMorale, result.cleared);
+      const runStreak = nextStreak(prev.runStreak, result.cleared);
+      const bestRunStreak = Math.max(prev.bestRunStreak, runStreak);
       const runCharacter = getCharacter(result.characterId);
       const collectorRun = Boolean(runCharacter.lokPetCollector);
       const collectorPetsFound = collectorRun
@@ -3856,6 +3862,8 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       const next: MetaState = {
         ...prev,
         crewMorale,
+        runStreak,
+        bestRunStreak,
         ownedUiThemeIds: discoveryIds.includes('breach-616-plate') ? addUnique(prev.ownedUiThemeIds, 'breach-616') : prev.ownedUiThemeIds,
         bestiary,
         rescuedAllyIds,

@@ -2368,6 +2368,9 @@ export interface MetaState {
   hideoutLedger: HideoutLedger;
   /** Crew-wide morale that follows how runs end (`data/morale.ts`); negative shrinks crew boosts. */
   crewMorale: number;
+  /** Runs won in a row right now, and the longest such run ever (`data/morale.ts`). */
+  runStreak: number;
+  bestRunStreak: number;
   /** The fixed mobile-only "Head out" button pinned to the bottom of the Hideout screen. On by default. */
   hideoutStickyHeadOutEnabled: boolean;
   /** The rotating Minecraft-style splash blurb on the title screen. On by default. */
