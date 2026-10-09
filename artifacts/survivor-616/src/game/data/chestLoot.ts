@@ -67,8 +67,15 @@ export function chestOut(window: number): boolean {
   return createRng(window * 104729 + 7)() < CHEST_OUT_CHANCE;
 }
 
-export function chestClaimKey(window: number): string {
-  return `chest.${window}`;
+/**
+ * One claim key for the chest, holding when it was last opened. A key per window would pile
+ * up and push older cooldowns out of the capped claims record.
+ */
+export const CHEST_CLAIM_KEY = 'chest.last';
+
+/** Whether a saved claim time falls in the same window as `now`. */
+export function chestOpenedThisWindow(claimedAt: number | undefined, now: number): boolean {
+  return claimedAt !== undefined && chestWindow(claimedAt) === chestWindow(now);
 }
 
 function weighted<T>(rows: readonly T[], weight: (row: T) => number, roll: number): T | undefined {

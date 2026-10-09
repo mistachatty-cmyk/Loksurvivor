@@ -8,7 +8,8 @@
 import { CARD_MANIFESTS, isCardOwned } from '@/game/data/cards';
 import { CARD_COSMETICS_BY_ID, grantCardCosmetic, isCardCosmeticOwned } from '@/game/data/cardCosmetics';
 import {
-  chestClaimKey,
+  CHEST_CLAIM_KEY,
+  chestOpenedThisWindow,
   chestOut,
   chestWindow,
   rollChest,
@@ -30,7 +31,7 @@ export type ChestStatus = 'out' | 'away' | 'opened';
 export function chestStatus(meta: Pick<MetaState, 'hideoutClaims'>, now: number): ChestStatus {
   const window = chestWindow(now);
   if (!chestOut(window)) return 'away';
-  return meta.hideoutClaims[chestClaimKey(window)] !== undefined ? 'opened' : 'out';
+  return chestOpenedThisWindow(meta.hideoutClaims[CHEST_CLAIM_KEY], now) ? 'opened' : 'out';
 }
 
 function poolsFor(meta: ChestMeta): ChestPools {
@@ -67,6 +68,6 @@ export function openLuckyChest<T extends ChestMeta>(meta: T, now: number, seed: 
     next = paid.meta;
     applied = paid.applied;
   }
-  const claims = trimClaims({ ...next.hideoutClaims, [chestClaimKey(chestWindow(now))]: now });
+  const claims = trimClaims({ ...next.hideoutClaims, [CHEST_CLAIM_KEY]: now });
   return { meta: { ...next, hideoutClaims: claims }, loot, applied };
 }
