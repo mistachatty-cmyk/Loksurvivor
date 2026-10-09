@@ -311,6 +311,7 @@
   "eventbuff.stat.lifesteal": "robo de vida",
   "eventbuff.line": "Impulso: {{boost}}. Costo: {{cost}}. Dura {{minutes}} minutos.",
   "eventbuff.tile": "Impulso del evento",
+  "sky.spur": "Un Light Spur pasa sobre {nombre}, donde los Digi se están moviendo mal. El lugar ya está abierto para ti.",
   "hideout.life.capped": "Tus bolsillos están llenos por hoy. Inténtalo de nuevo mañana.",
   "hideout.life.useProp": "Utilice {{label}}",
   "hideout.life.eventChip": "algo pasa",

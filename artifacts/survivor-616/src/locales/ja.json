@@ -311,6 +311,7 @@
   "eventbuff.stat.lifesteal": "ライフスティール",
   "eventbuff.line": "ブースト：{{boost}}。価格：{{cost}}。持続時間は {{minutes}} 分です。",
   "eventbuff.tile": "イベントブースト",
+  "sky.spur": "光の拍車が {name} の上に縞模様を描き、デジたちはまったく間違った動きをしています。その場所は今、あなたに開かれています。",
   "hideout.life.capped": "今日はポケットがいっぱいです。明日もう一度試してください。",
   "hideout.life.useProp": "{{label}}を使用する",
   "hideout.life.eventChip": "何か問題がある",
