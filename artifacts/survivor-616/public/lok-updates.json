@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 97,
+      "version": "0.23.3",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-10T00:00:05Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Bigger Text On Demand",
+      "body": [
+        "New Text size setting (Settings, under Accessibility): Small, Normal, Large or Extra large, for phones, TVs and arcade screens viewed from across the room."
+      ]
+    },
+    {
       "number": 96,
       "version": "0.23.2",
       "date": "2026-10-09",

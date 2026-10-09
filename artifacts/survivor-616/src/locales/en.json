@@ -1,4 +1,10 @@
 {
+  "settings.textSize.title": "Text size",
+  "settings.textSize.body": "Makes menu text bigger or smaller. Helpful on a phone, a TV or an arcade screen across the room.",
+  "settings.textSize.small": "Small",
+  "settings.textSize.normal": "Normal",
+  "settings.textSize.large": "Large",
+  "settings.textSize.xlarge": "Extra large",
   "goto.open": "Go to\u2026",
   "goto.placeholder": "Search screens and rooms\u2026",
   "goto.empty": "Nothing matches that.",

@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import './index.css';
 import { restoreUiTransparency } from '@/ui/UiTransparencyControls';
 import { applyScrollbarPrefs } from '@/lib/scrollbar';
+import { applyTextSize } from '@/lib/textScale';
 import { MotionConfig } from 'framer-motion';
 import { applyMotionMode, getMotionMode, registerLiveFeedLoad } from '@/anim/motion';
 import { initLocalization } from '@/lib/i18n';
@@ -71,6 +72,7 @@ function installRuntimeDiagnostics(): void {
 installRuntimeDiagnostics();
 restoreUiTransparency();
 applyMotionMode();
+applyTextSize();
 applyScrollbarPrefs();
 registerLiveFeedLoad();
 

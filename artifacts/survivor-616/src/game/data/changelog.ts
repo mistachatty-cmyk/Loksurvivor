@@ -1124,6 +1124,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Escape in the pause menu now closes Settings or Soundtrack first, and menu corner buttons stay clear of notches.',
     ],
   },
+  {
+    version: '0.23.3',
+    date: '2026-10-09',
+    publishedAt: '2026-10-10T00:00:05Z',
+    kind: 'update',
+    title: 'Bigger Text On Demand',
+    body: [
+      'New Text size setting (Settings, under Accessibility): Small, Normal, Large or Extra large, for phones, TVs and arcade screens viewed from across the room.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

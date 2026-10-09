@@ -49,6 +49,7 @@ import { ScreenLayout } from './ScreenLayout';
 import { UiTransparencyControls } from './UiTransparencyControls';
 import { MotionSetting, ShakeSetting } from './MotionToggle';
 import { ScrollbarSetting } from './ScrollbarSetting';
+import { TextSizeSetting } from './TextSizeSetting';
 import { FullscreenSetting } from './FullscreenSetting';
 import { EndgameSettings } from './EndgameSettings';
 import { SettingsPager } from './SettingsPager';
@@ -447,6 +448,9 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         <LanguageSetting />
         <div id="settings-accessibility" className="space-y-4 scroll-mt-24 lg:col-span-2">
           <UiTransparencyControls />
+          <section className="border border-border bg-card p-5 sm:p-6">
+            <TextSizeSetting />
+          </section>
           <section className="border border-border bg-card p-5 sm:p-6">
             <h2 className="text-xl font-black uppercase text-white">Motion</h2>
             <MotionSetting />
