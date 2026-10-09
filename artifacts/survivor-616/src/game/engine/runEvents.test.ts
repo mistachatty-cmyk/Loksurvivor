@@ -139,3 +139,44 @@ test('crew call-ins: rotate through the rescued crew, share one cooldown, and pa
   solo.now = 99_000;
   assert.equal(callInCrew(solo), false, 'no crew, no call-in');
 });
+
+test('block party pays only if the player stays in the ring long enough, and heals while inside', () => {
+  const dance = (stayIn: boolean) => {
+    const world = makeWorld(8);
+    world.runEvents.schedule = [{ id: 'block-party', startMs: 500 }];
+    world.player.hp = 500;
+    world.player.maxHp = 1000;
+    for (let frame = 0; frame < 30 * 6; frame += 1) {
+      stepWorld(world, 1 / 30, IDLE);
+      if (world.runEvents.phase === 'active' && stayIn) {
+        world.player.x = world.runEvents.x;
+        world.player.y = world.runEvents.y;
+      }
+      if (world.runEvents.phase === 'active' && !stayIn) {
+        world.player.x = world.runEvents.x + 600;
+        world.player.y = world.runEvents.y;
+      }
+    }
+    for (let frame = 0; frame < 30 * 14; frame += 1) {
+      stepWorld(world, 1 / 30, IDLE);
+      if (world.runEvents.phase === 'active') {
+        world.player.x = world.runEvents.x + (stayIn ? 0 : 600);
+        world.player.y = world.runEvents.y;
+      }
+    }
+    return world;
+  };
+  const stayed = dance(true);
+  assert.deepEqual(stayed.runEvents.survived, ['block-party']);
+  assert.ok(stayed.player.hp > 500, 'healed while dancing');
+  const skipped = dance(false);
+  assert.deepEqual(skipped.runEvents.survived, ['block-party'], 'the beat still ends');
+  assert.ok(stayed.cred >= skipped.cred + 120, 'staying in the ring pays the thank-you, skipping pays nothing');
+});
+
+test('block party needs 8 maps', () => {
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    assert.ok(scheduleRunEvents(seed, 7).every((e) => e.id !== 'block-party'));
+  }
+  assert.ok([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].some((seed) => scheduleRunEvents(seed, 30).some((e) => e.id === 'block-party')));
+});

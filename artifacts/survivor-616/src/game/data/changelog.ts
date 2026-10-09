@@ -1092,6 +1092,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New achievements for calling in your crew: Phone a Friend, On Speed Dial and Never Alone.',
     ],
   },
+  {
+    version: '0.23.0',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T04:00:00Z',
+    kind: 'update',
+    title: 'Block party',
+    body: [
+      'Clear 8 maps and a Block Party can break out mid-run. A glowing pink ring appears nearby. Stand in it and your weapons fire faster while you slowly recover health.',
+      'Stay in the ring for at least 6 seconds and the neighbourhood says thanks with cred and a Magnet Coil. Skip it and nothing is lost.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

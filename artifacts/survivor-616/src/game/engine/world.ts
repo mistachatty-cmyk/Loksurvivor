@@ -10,7 +10,7 @@
  */
 
 import { CALL_INS, CALL_IN_COOLDOWN_MS, CALL_IN_FIRST_READY_MS } from '@/game/data/crewCallIns';
-import { RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
+import { BLOCK_PARTY_NEEDED_MS, BLOCK_PARTY_RADIUS, RUN_EVENTS_BY_ID, scheduleRunEvents, type RunEventId, type ScheduledRunEvent } from '@/game/data/runEvents';
 import { QUIRK_SURGE_LORE } from '@/game/data/quirkSurgeLore';
 import { ENEMY_QUIRKS, ENEMY_QUIRKS_BY_ID, QUIRK_SURGE_MS, quirkHash, quirkSurgeScheduled, quirkSurgeStart, rollEnemyQuirk, type QuirkSurgeMode } from '@/game/data/enemyQuirks';
 import type { DropStyle } from '@/game/data/dropPacks';
@@ -1211,6 +1211,9 @@ export interface World {
     dirY: number;
     /** Tremor shock pulses already fired in the current beat. */
     pulses: number;
+    /** Block party: ms the player has spent inside the ring, and the last time it was counted. */
+    zoneMs: number;
+    lastAt: number;
     survived: RunEventId[];
   };
   /** Crew call-ins: who can be called (in rescue order), who is next, and when the next is ready. */
@@ -1808,7 +1811,7 @@ export function createWorld(
     callIns: { roster: (setup.callInAllyIds ?? []).filter((id) => id in CALL_INS), index: 0, readyAt: CALL_IN_FIRST_READY_MS, used: 0 },
     runEvents: {
       schedule: setup.runEvents ? scheduleRunEvents(seed, setup.runEvents.mapsCleared, setup.runEvents.disabledIds) : [],
-      index: 0, phase: 'wait', phaseAt: 0, x: 0, y: 0, dirX: 1, dirY: 0, pulses: 0, survived: [],
+      index: 0, phase: 'wait', phaseAt: 0, x: 0, y: 0, dirX: 1, dirY: 0, pulses: 0, zoneMs: 0, lastAt: 0, survived: [],
     },
     quirkShieldReadyAt: 0,
     quirkSkipReadyAt: 0,
@@ -4239,6 +4242,11 @@ function updateRunEvents(w: World) {
       const spot = runEventPoint(w, p.x + re.dirX * 240, p.y + re.dirY * 240);
       re.x = spot.x;
       re.y = spot.y;
+    } else if (def.id === 'block-party') {
+      const spot = runEventPoint(w, p.x + re.dirX * 150, p.y + re.dirY * 150);
+      re.x = spot.x;
+      re.y = spot.y;
+      re.zoneMs = 0;
     } else if (def.id === 'tremor') {
       const spot = runEventPoint(w, p.x + re.dirX * 160, p.y + re.dirY * 160);
       re.x = spot.x;
@@ -4270,6 +4278,11 @@ function updateRunEvents(w: World) {
         const at = runEventPoint(w, re.x + Math.cos(a) * 70, re.y + Math.sin(a) * 70);
         spawnEnemy(w, pool[i % pool.length]!, 1, at);
       }
+    } else if (def.id === 'block-party') {
+      re.lastAt = w.now;
+      spawnParticles(w, re.x, re.y, '#f0abfc', 18, 120);
+      const host = ALLIES_BY_ID[w.callIns.roster[0] ?? ''];
+      if (host) pushAlert(w, `${host.name} brought the speakers`);
     } else if (def.id === 'tremor') {
       tremorPulse(w);
       re.pulses = 1;
@@ -4298,11 +4311,26 @@ function updateRunEvents(w: World) {
     }
     return;
   }
+  if (def.id === 'block-party') {
+    const elapsed = w.now - re.lastAt;
+    re.lastAt = w.now;
+    if (Math.hypot(p.x - re.x, p.y - re.y) <= BLOCK_PARTY_RADIUS) {
+      re.zoneMs += elapsed;
+      // The party buff: faster weapons while inside, and a slow trickle of health.
+      w.rootglassUntil = Math.max(w.rootglassUntil, w.now + 500);
+      p.hp = Math.min(p.maxHp, p.hp + (p.maxHp * 0.01 * elapsed) / 1000);
+    }
+  }
   if (def.id === 'tremor' && re.pulses < 4 && w.now >= re.phaseAt + re.pulses * 700) {
     tremorPulse(w);
     re.pulses += 1;
   }
   if (w.now >= re.phaseAt + def.activeMs) {
+    if (def.id === 'block-party' && re.zoneMs >= BLOCK_PARTY_NEEDED_MS) {
+      // Danced long enough: a thank-you from the neighbourhood.
+      w.pickups.push({ uid: uid(w), kind: 'cred', x: re.x - 20, y: re.y, vx: 0, vy: 0, value: 120, bornAt: w.now });
+      w.pickups.push({ uid: uid(w), kind: 'magnet-coil', x: re.x + 20, y: re.y, vx: 0, vy: 0, value: 1, bornAt: w.now });
+    }
     if (def.id === 'tremor') {
       // A breather after the shaking: one heart where it centred.
       w.pickups.push({ uid: uid(w), kind: 'health', x: re.x, y: re.y, vx: 0, vy: 0, value: 30, bornAt: w.now });

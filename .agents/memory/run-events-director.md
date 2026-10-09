@@ -32,6 +32,13 @@ Beat names in Settings come from `RUN_EVENTS[].name` (English, not in `en.json`)
 1/mass) and movable breakables, staggers via `contactReadyAt`. Deals NO damage on purpose so it cannot
 create kills/XP/loot (impact-physics.md). Pays one heart at the epicenter when it ends. Needs 6 maps.
 
+## Added v0.23.0: Block party
+Needs 8 maps. A 130px ring near the player; while inside, `rootglassUntil` is kept topped up and HP
+trickles back (1% max HP/s). `zoneMs` counts time inside (via `lastAt`); at 6s or more the end pays
+cred + a magnet coil, otherwise nothing. Host line uses the first rescued ally if any.
+Known unrelated flake: `quickFight.test.ts` "a fainted lead sends in a teammate" fails ~1 in 8 runs on
+the base branch too.
+
 ## Not built yet
 Beats in the Archive/bestiary,
-Blackout / Block party / Relay storm, first-time tooltip, a screenshot playtest.
+Blackout / Relay storm, first-time tooltip, a screenshot playtest.

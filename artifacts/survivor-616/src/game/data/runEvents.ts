@@ -10,7 +10,7 @@
 
 import { quirkHash } from '@/game/data/enemyQuirks';
 
-export type RunEventId = 'supply-drop' | 'rush-hour' | 'tremor';
+export type RunEventId = 'supply-drop' | 'rush-hour' | 'tremor' | 'block-party';
 
 export interface RunEventDef {
   id: RunEventId;
@@ -53,7 +53,20 @@ export const RUN_EVENTS: RunEventDef[] = [
     warnText: 'TREMOR! The ground is about to shake',
     doneText: 'TREMOR PASSED. Breathe',
   },
+  {
+    id: 'block-party',
+    name: 'Block party',
+    unlockMaps: 8,
+    warnMs: 3000,
+    activeMs: 12000,
+    warnText: 'BLOCK PARTY! Stand in the ring to join the fun',
+    doneText: 'BLOCK PARTY OVER. That was a good one',
+  },
 ];
+
+/** A Block party pays out if the player spent at least this long inside the ring. */
+export const BLOCK_PARTY_NEEDED_MS = 6000;
+export const BLOCK_PARTY_RADIUS = 130;
 
 export const RUN_EVENTS_BY_ID: Record<RunEventId, RunEventDef> = Object.fromEntries(
   RUN_EVENTS.map((e) => [e.id, e]),

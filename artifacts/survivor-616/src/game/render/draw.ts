@@ -3333,6 +3333,16 @@ function drawRunEventMarker(ctx: CanvasRenderingContext2D, w: World) {
       ctx.fillStyle = `rgba(253,224,71,${0.08 + 0.2 * falling})`;
       ctx.fillRect(re.x - 8 - 14 * falling, re.y - 900, 16 + 28 * falling, 900);
     }
+  } else if (beat.id === 'block-party') {
+    const inside = Math.hypot(w.player.x - re.x, w.player.y - re.y) <= 130;
+    const beatPulse = 0.5 + 0.5 * Math.sin(w.now / 220);
+    ctx.fillStyle = `rgba(240,171,252,${(inside ? 0.16 : 0.08) + 0.08 * beatPulse})`;
+    ctx.beginPath();
+    ctx.arc(re.x, re.y, 130, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(240,171,252,${0.45 + 0.4 * beatPulse})`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
   } else if (beat.id === 'tremor') {
     const spread = re.phase === 'warn' ? (w.now - re.phaseAt) / 3000 : 1;
     ctx.strokeStyle = `rgba(168,162,158,${0.3 + 0.35 * pulse})`;
