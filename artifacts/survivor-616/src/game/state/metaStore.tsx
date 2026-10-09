@@ -98,6 +98,7 @@ import type { TravelEncounterResult } from '@/game/travelEncounter';
 import { SECTOR_MISSIONS, SECTOR_MISSIONS_BY_ID } from '@/game/data/sectorMissions';
 import { WEAPONS_BY_ID } from '@/game/data/weapons';
 import { GRPD_MAX_SPAWN_MULTIPLIER, GRPD_PLAYABLE_WEAPON_IDS, GRPD_UNLOCK_SEAL_COST, grpdAvailableSeals, grpdEarnedSeals, grpdNextTierCost, grpdEndgameWeaponEarned, isGrpdEndgameWeapon, isGrpdPlayableWeapon } from '@/game/data/grpdArmory';
+import { openLuckyChest } from '@/game/engine/chestOpen';
 import { activeSkyBoost, applySkyStatBonus, normalizeSkyBoost, skyXpMultiplier, startSkyBoost } from '@/game/data/skyEvents';
 import { moraleMultiplier, nextMorale, nextStreak, normalizeMorale, normalizeStreak } from '@/game/data/morale';
 import { earnedEndgame, endgameReached, featureById, slotById } from '@/game/data/endgameUnlocks';
@@ -2034,6 +2035,7 @@ type Action =
   | { type: 'setHideoutChoiceEvents'; mode: MetaState['hideoutChoiceEvents'] }
   | { type: 'activateHideoutProp'; propId: string; seed: number; now: number }
   | { type: 'lookThroughSpyglass'; now: number }
+  | { type: 'openLuckyChest'; now: number; seed: number }
   | { type: 'resolveChoiceEvent'; eventId: string; choiceId: string; seed: number; now: number; petId?: string; propId?: string }
   | { type: 'playWithLokPet'; petId: string; verbId: string; seed: number; now: number; musicPlaying: boolean }
   | { type: 'careForLokPet'; id: string; now: number }
@@ -3406,6 +3408,11 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...result.meta, hideoutClaims: claimed } };
     }
 
+    case 'openLuckyChest': {
+      const opened = openLuckyChest(state.meta, action.now, action.seed, ELIXIR_CAP);
+      return opened ? { ...state, meta: opened.meta } : state;
+    }
+
     case 'lookThroughSpyglass': {
       const boost = startSkyBoost(state.meta.skyBoost, action.now);
       return boost ? { ...state, meta: { ...state.meta, skyBoost: boost } } : state;
@@ -4177,6 +4184,7 @@ export interface MetaContextValue {
   setHideoutChoiceEvents: (mode: MetaState['hideoutChoiceEvents']) => void;
   activateHideoutProp: (propId: string, seed: number) => void;
   lookThroughSpyglass: () => void;
+  openLuckyChest: (seed: number) => void;
   playWithLokPet: (petId: string, verbId: string, seed: number, musicPlaying: boolean) => void;
   resolveChoiceEvent: (eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => void;
   careForLokPet: (id: string) => void;
@@ -4415,6 +4423,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setHideoutChoiceEvents = useCallback((mode: MetaState['hideoutChoiceEvents']) => dispatch({ type: 'setHideoutChoiceEvents', mode }), []);
   const resolveChoiceEvent = useCallback((eventId: string, choiceId: string, seed: number, petId?: string, propId?: string) => dispatch({ type: 'resolveChoiceEvent', eventId, choiceId, seed, now: Date.now(), petId, propId }), []);
   const playWithLokPet = useCallback((petId: string, verbId: string, seed: number, musicPlaying: boolean) => dispatch({ type: 'playWithLokPet', petId, verbId, seed, now: Date.now(), musicPlaying }), []);
+  const openLuckyChestAction = useCallback((seed: number) => dispatch({ type: 'openLuckyChest', now: Date.now(), seed }), []);
   const lookThroughSpyglass = useCallback(() => dispatch({ type: 'lookThroughSpyglass', now: Date.now() }), []);
   const activateHideoutProp = useCallback((propId: string, seed: number) => dispatch({ type: 'activateHideoutProp', propId, seed, now: Date.now() }), []);
   const careForLokPet = useCallback((id: string) => dispatch({ type: 'careForLokPet', id, now: Date.now() }), []);
@@ -4693,6 +4702,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setHideoutChoiceEvents,
       activateHideoutProp,
       lookThroughSpyglass,
+      openLuckyChest: openLuckyChestAction,
       playWithLokPet,
       resolveChoiceEvent,
       careForLokPet,

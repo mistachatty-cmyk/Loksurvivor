@@ -979,6 +979,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Look through the spyglass while something is up to start a one hour boost. Glyphs give +10% to every stat, an eclipse gives +5% experience, and a glyph eclipse gives +15% to every stat plus the +5% experience.',
     ],
   },
+  {
+    version: '0.22.0',
+    date: '2026-10-09',
+    publishedAt: '2026-10-09T17:00:00Z',
+    kind: 'update',
+    title: 'The Lucky Chest',
+    body: [
+      'A Lucky Chest now turns up in the main floor every so often. Open it once each time it is out.',
+      'Inside is a roll from four rarity tiers: common, uncommon, rare and ultra rare. Higher tiers can hold cards and card cosmetics you do not own yet, and everything else pays out resources.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

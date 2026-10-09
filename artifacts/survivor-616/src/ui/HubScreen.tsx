@@ -22,6 +22,10 @@ import { MusicNowPlaying } from './MusicNowPlaying';
 import { setUiChromeLayout, useUiChromeLayout } from '@/game/state/uiChromeLayoutSetting';
 import { describeReward } from './hideoutRewardText';
 import { HIDEOUT_PROPS_BY_ID, propReady, propsForRoom, resolvePropReward } from '@/game/data/hideoutProps';
+import { CHEST_TIERS } from '@/game/data/chestLoot';
+import { CARD_COSMETICS_BY_ID } from '@/game/data/cardCosmetics';
+import { CARD_MANIFESTS_BY_ID } from '@/game/data/cards';
+import { chestStatus, openLuckyChest as previewLuckyChest } from '@/game/engine/chestOpen';
 import { activeSkyBoost, skyAt, startSkyBoost } from '@/game/data/skyEvents';
 import { JERAMY_FROGSTER, JEREMEY_FROGSTER, LUVITNOT_KEEPER, type NpcCastMember } from '@/game/data/npcCast';
 import { bondLuck, eventsLeftToday, grantWithFallback } from '@/game/engine/hideoutRewards';
@@ -155,7 +159,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
 
 export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
-  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass } = useMeta();
+  const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
   const t = useT();
   const locale = useLocale();
@@ -314,6 +318,28 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       const found = preview ? describeReward(preview.applied, t) : '';
       const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;
       showStripNotice(title, found ? `${text} ${t('hideout.life.found', { items: found })}` : text);
+    } else if (action.kind === 'chest') {
+      const now = Date.now();
+      const status = chestStatus(meta, now);
+      if (status !== 'out') {
+        showStripNotice(title, t(status === 'opened' ? 'chest.opened' : 'chest.away'));
+        return;
+      }
+      const seed = Math.floor(Math.random() * 0x7fffffff);
+      const opening = previewLuckyChest(meta, now, seed, ELIXIR_CAP);
+      if (!opening) {
+        showStripNotice(title, t('hideout.life.capped'));
+        return;
+      }
+      openLuckyChest(seed);
+      const { loot } = opening;
+      const tierLabel = t((CHEST_TIERS.find((tier) => tier.id === loot.tier)?.labelKey ?? 'chest.tier.common') as never);
+      const found = loot.cardId
+        ? t('chest.found.card', { name: CARD_MANIFESTS_BY_ID[loot.cardId]?.name ?? loot.cardId })
+        : loot.cosmeticId
+          ? t('chest.found.cosmetic', { name: CARD_COSMETICS_BY_ID[loot.cosmeticId]?.name ?? loot.cosmeticId })
+          : t('hideout.life.found', { items: describeReward(opening.applied, t) });
+      showStripNotice(`${title} - ${tierLabel}`, found);
     } else if (action.kind === 'sky') {
       const sky = skyAt(Date.now());
       const started = startSkyBoost(meta.skyBoost, Date.now());
