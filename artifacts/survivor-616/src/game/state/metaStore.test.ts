@@ -170,6 +170,16 @@ test('buying the LokPet field guide and Collector access are separate, idempoten
   assert.equal(afterAccess.meta.lokPetCollectorAccessUnlocked, true);
 });
 
+test('buying the Faction Races Pass is a separate, idempotent, one-time flag', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
+  assert.equal(initial.meta.factionRacesUnlocked, false);
+
+  const after = reducer(initial, { type: 'grantFactionRacesUnlock' });
+  assert.equal(after.meta.factionRacesUnlocked, true);
+  assert.equal(after.meta.lokPetFieldGuideUnlocked, false, 'must not be coupled to the other unlocks');
+  assert.equal(reducer(after, { type: 'grantFactionRacesUnlock' }), after, 'granting twice is a no-op');
+});
+
 test('the GRPD Vault grants Blue 616 once after the Site Crew zone is cleared', () => {
   const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
   assert.equal(reducer(initial, { type: 'claimLegendaryPoliceDog' }), initial);

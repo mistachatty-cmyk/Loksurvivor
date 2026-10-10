@@ -1,13 +1,22 @@
 /**
  * The LokShop: LokServer, an owl-flavored digital host, talks about the world and shows
- * the shelf (`LOKSHOP_STOCK`). Nothing is for sale yet; the shelf previews what is coming.
+ * the shelf (`LOKSHOP_STOCK`, still previews -- see `.agents/memory/lok-passport-slots.md`
+ * for the backlog on making those real) plus the three Lok Passport slot tiers, which ARE
+ * real LokToken purchases against the shared economy (`useLokEconomy`), the same
+ * server-authoritative path every other LokToken-only cosmetic already uses.
  */
 import { ArrowLeft } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { LOKSERVER_TOPICS, LOKSHOP_STOCK } from '@/game/data/lokServer';
 import { lokServerSay } from '@/game/engine/lokServerSpeak';
 import { useT } from '@/lib/i18n';
+import { useAuth } from '@/state/authStore';
+import { useMeta } from '@/game/state/metaStore';
+import { useLokEconomy } from '@/state/lokEconomyStore';
+import { catalogSku, PASSPORT_TIERS } from '@/lib/lokStoreCatalog';
+import { requestLokPassportPurchase } from '@/lib/lokPassportPurchase';
+import { toast } from '@/hooks/use-toast';
 
 const RECENT_LINES = 8;
 
@@ -26,7 +35,17 @@ function OwlFace() {
 
 export function LokShopScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
+  const { session } = useAuth();
+  const { meta, setLokPassportTier } = useMeta();
+  const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
   const recent = useRef<string[]>([]);
+
+  // A tier bought on another device (or another install) follows the account.
+  useEffect(() => {
+    for (const tier of PASSPORT_TIERS) {
+      if (ownedSkus.has(catalogSku('passportTier', tier.skuId)) && !meta[tier.metaFlag]) setLokPassportTier(tier.metaFlag, true);
+    }
+  }, [ownedSkus, meta.lokPassOwned, meta.lokPassportActive, meta.lokPassportLifetime, setLokPassportTier]);
   const speak = (topicId: string) => {
     const line = lokServerSay(topicId, Math.random, recent.current);
     recent.current = [...recent.current, line].slice(-RECENT_LINES);
@@ -71,6 +90,51 @@ export function LokShopScreen({ onBack }: { onBack: () => void }) {
           </li>
         ))}
       </ul>
+
+      {session ? (
+        <div className="mt-6" data-testid="section-lok-passport">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-[11px] uppercase tracking-wide text-muted-foreground">Lok Passport</h2>
+            {signedIn && lokBalance !== null ? <p className="font-mono text-[11px] text-violet-300" data-testid="text-lok-balance">{lokBalance} LokTokens</p> : null}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Unlocks more custom Operator Forge save slots on top of what play earns. One-time LokToken purchases, never a recurring charge.</p>
+          <ul className="mt-2 grid gap-2">
+            {PASSPORT_TIERS.map((tier) => {
+              const owned = meta[tier.metaFlag];
+              const price = priceOf(catalogSku('passportTier', tier.skuId)) ?? tier.price;
+              const canAfford = lokBalance === null || lokBalance >= price;
+              return (
+                <li key={tier.skuId} className="flex items-start justify-between gap-3 border border-border bg-black/20 p-3" data-testid={`lokshop-passport-${tier.skuId}`}>
+                  <div>
+                    <p className="text-sm font-black">{tier.name}</p>
+                    <p className="text-xs text-muted-foreground">{tier.blurb}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-mono text-[10px] uppercase text-violet-300">{price} tokens</p>
+                    <button
+                      type="button"
+                      disabled={owned || !signedIn || !canAfford}
+                      onClick={() => {
+                        if (!signedIn) {
+                          toast({ description: 'Sign in to buy from the Lok Shop.' });
+                          return;
+                        }
+                        void requestLokPassportPurchase(tier, spend, setLokPassportTier).then((result) => {
+                          toast({ description: result.message });
+                        });
+                      }}
+                      className="mt-1 border border-border px-2 py-1 text-[10px] font-bold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
+                      data-testid={`button-lokshop-passport-${tier.skuId}`}
+                    >
+                      {owned ? 'Owned' : 'Buy'}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
     </main>
   );
 }

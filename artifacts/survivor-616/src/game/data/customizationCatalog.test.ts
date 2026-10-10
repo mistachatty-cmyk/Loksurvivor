@@ -23,8 +23,8 @@ test('the customization shop has twenty new palettes and a deep animated collect
   }
 });
 
-test('run auras cover seven paid styles across multiple cosmetic tiers', () => {
-  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 7);
+test('run auras cover eight paid styles across multiple cosmetic tiers', () => {
+  assert.equal(RUN_AURAS.filter((aura) => aura.cost > 0).length, 8);
   assert.equal(new Set(RUN_AURAS.map((aura) => aura.id)).size, RUN_AURAS.length);
   assert.deepEqual(new Set(RUN_AURAS.map((aura) => aura.tier)), new Set(['standard', 'uncommon', 'rare', 'legendary']));
 });

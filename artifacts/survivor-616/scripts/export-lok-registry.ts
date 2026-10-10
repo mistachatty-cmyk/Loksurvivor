@@ -21,7 +21,7 @@ import { HATS } from '../src/game/data/hats';
 import { CELEBRATIONS } from '../src/game/data/celebrations';
 import { DROP_PACKS } from '../src/game/data/dropPacks';
 import { LOK_SHOP_UNLOCKS } from '../src/game/data/lokShopUnlocks';
-import { LOKTOKEN_PRICE_BY_TIER, catalogSku, type StoreItemKind } from '../src/lib/lokStoreCatalog';
+import { LOKTOKEN_PRICE_BY_TIER, PASSPORT_TIERS, catalogSku, type StoreItemKind } from '../src/lib/lokStoreCatalog';
 
 const platform = JSON.parse(readFileSync(new URL('../lok.universe.json', import.meta.url), 'utf8')) as PlatformManifest;
 
@@ -61,12 +61,25 @@ const items = (kind: StoreItemKind, itemType: string, list: Priced[]): PublishIt
       };
     });
 
+// Passport tiers have their own explicit prices, not the standard/rare/legendary
+// ladder the other kinds use -- built directly rather than through `items()`.
+const passportTiers: PublishItem[] = PASSPORT_TIERS.map((tier) => ({
+  sku: catalogSku('passportTier', tier.skuId),
+  name: tier.name,
+  description: tier.blurb,
+  price: tier.price,
+  rarity: 'legendary',
+  itemType: 'boost',
+  payload: { kind: 'passportTier', id: tier.skuId },
+}));
+
 const catalog = [
   ...items('palette', 'theme', THEMED_PALETTES),
   ...items('aura', 'cosmetic', RUN_AURAS),
   ...items('hat', 'cosmetic', HATS),
   ...items('celebration', 'cosmetic', CELEBRATIONS),
   ...items('dropPack', 'cosmetic', DROP_PACKS),
+  ...passportTiers,
   // Feature unlocks, not cosmetics -- each entry has its own StoreItemKind, so it goes
   // through `items()` one kind at a time rather than as one uniformly-kinded list.
   // itemType 'boost' is the closest fit in lib/lok-universe's lok_item_type enum

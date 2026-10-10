@@ -2288,6 +2288,15 @@ export interface MetaState {
   devModeAccessUnlocked: boolean;
   /** Settings toggle for exposing every unlockable surface regardless of progress. */
   devModeAllUnlocks: boolean;
+  /**
+   * Lok ecosystem purchase entitlements gating the upper Operator Forge custom-slot
+   * tiers. No real payment processing lives in this repo yet -- these flags are the
+   * contract the Lok platform flips once a purchase completes (see
+   * .agents/memory/lok-passport-slots.md); today they're only settable via Dev Mode.
+   */
+  lokPassOwned: boolean;
+  lokPassportActive: boolean;
+  lokPassportLifetime: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */
@@ -2629,6 +2638,8 @@ export interface MetaState {
   lokPetFieldGuideUnlocked: boolean;
   /** LokToken purchase (Lok Shop): required to select any LokPet Collector character, in addition to that character's own progress-based unlock. */
   lokPetCollectorAccessUnlocked: boolean;
+  /** LokToken purchase (Lok Shop): unlocks the Operator Forge's faction races list before Victory Lap would otherwise earn it. */
+  factionRacesUnlocked: boolean;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */

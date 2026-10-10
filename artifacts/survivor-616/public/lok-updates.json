@@ -7,6 +7,50 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 111,
+      "version": "0.24.7",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:45Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "New Faces at the Lok Shop",
+      "body": [
+        "A Faction Races Pass joins the Lok Shop's Unlocks tab, opening the Operator Forge's faction races early for LokTokens.",
+        "Furniture City Dusk (palette), Furnace Orbit (run aura), Relay Mast (hat) and Ticker Tape (celebration) join the shop. The hideout Ball is free for everyone and was dropped from the \"coming soon\" shelf, since it already shipped."
+      ]
+    },
+    {
+      "number": 110,
+      "version": "0.24.6",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:40Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Passport Goes Live",
+      "body": [
+        "LokPass, Lok Passport and Lifetime Lok Passport are now real purchases in the Lok Shop, paid in LokTokens just like a theme or drop pack -- your balance shows, and a tier bought on one device follows your account everywhere."
+      ]
+    },
+    {
+      "number": 109,
+      "version": "0.24.5",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:35Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The 616 Roster",
+      "body": [
+        "The Operator Forge's Operators tab now has a browsable roster below the creator: every one of the 69 hand-authored operators, reinterpreted through the Forge's own engine, plus your own custom operators on top. Pick any card to load it into the creator as an editable starting point -- your real operators are never changed.",
+        "Custom save slots grew from 5 to 8 earned purely by play, with a Lok Passport shop section (behind login) offering further batches up to 24 and beyond."
+      ]
+    },
+    {
       "number": 108,
       "version": "0.24.4",
       "date": "2026-10-10",

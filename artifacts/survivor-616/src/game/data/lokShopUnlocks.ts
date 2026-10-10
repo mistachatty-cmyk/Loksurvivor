@@ -35,6 +35,14 @@ export const LOK_SHOP_UNLOCKS: LokShopUnlockDef[] = [
     tier: 'legendary',
     cost: 1500,
   },
+  {
+    id: 'faction-races',
+    kind: 'factionRacesUnlock',
+    name: 'Faction Races Pass',
+    description: 'Unlocks the Operator Forge\'s faction races (Watchborn, Nullborn, and the rest) before clearing every standard map would otherwise earn them.',
+    tier: 'rare',
+    cost: 750,
+  },
 ];
 
 export const LOK_SHOP_UNLOCKS_BY_ID: Record<string, LokShopUnlockDef> = Object.fromEntries(

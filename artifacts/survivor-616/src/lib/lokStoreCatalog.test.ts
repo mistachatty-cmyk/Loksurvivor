@@ -4,7 +4,7 @@ import test from 'node:test';
 import { combatForRarity, RARITY_ORDER } from '../../../../lib/lok-client/src/cards';
 import { THEMED_PALETTES } from '../game/data/themedPalettes';
 import { CARD_MANIFESTS } from '../game/data/cards';
-import { LOKTOKEN_ONLY_KINDS, LOKTOKEN_PRICE_BY_TIER, catalogSku } from './lokStoreCatalog';
+import { LOKTOKEN_ONLY_KINDS, LOKTOKEN_PRICE_BY_TIER, PASSPORT_TIERS, catalogSku } from './lokStoreCatalog';
 
 test('every paid palette tier has a LokToken price and a unique SKU', () => {
   const skus = new Set<string>();
@@ -18,6 +18,22 @@ test('every paid palette tier has a LokToken price and a unique SKU', () => {
 
 test('palettes are LokToken-only', () => {
   assert.ok(LOKTOKEN_ONLY_KINDS.has('palette'));
+});
+
+test('every Lok Passport tier has a unique sku, a rising price and a matching meta flag', () => {
+  assert.ok(LOKTOKEN_ONLY_KINDS.has('passportTier'));
+  const skus = new Set<string>();
+  const flags = new Set<string>();
+  let lastPrice = 0;
+  for (const tier of PASSPORT_TIERS) {
+    const sku = catalogSku('passportTier', tier.skuId);
+    assert.ok(!skus.has(sku), `duplicate sku ${sku}`);
+    skus.add(sku);
+    assert.ok(!flags.has(tier.metaFlag), `duplicate meta flag ${tier.metaFlag}`);
+    flags.add(tier.metaFlag);
+    assert.ok(tier.price > lastPrice, `${tier.skuId} should cost more than the tier below`);
+    lastPrice = tier.price;
+  }
 });
 
 test('combat stats rise with rarity and every card rarity is known to the registry', () => {

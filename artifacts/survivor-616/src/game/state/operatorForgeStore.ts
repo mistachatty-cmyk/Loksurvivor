@@ -12,7 +12,7 @@ import {
   HEX, MAX_FORGED_OPERATORS, PALETTE_KEYS, normalizeForgedOperator, type ForgedOperator,
 } from '@/game/data/operatorForge';
 import type { SpritePalette } from '@/game/types';
-import { CUSTOM_SLOT_IDS, ENDGAME_FEATURE_IDS, type EndgameFeatureId } from '@/game/data/endgameUnlocks';
+import { ALL_CUSTOM_SLOT_IDS, ALL_CUSTOM_SLOTS, ENDGAME_FEATURE_IDS, type EndgameFeatureId, type SlotTier } from '@/game/data/endgameUnlocks';
 
 export const FORGE_STORAGE_KEY = 'survivor616.forge.v1';
 
@@ -130,18 +130,54 @@ function storage(): Storage | null {
   }
 }
 
-const KNOWN_EARNED = new Set<string>([...ENDGAME_FEATURE_IDS, ...CUSTOM_SLOT_IDS]);
+const KNOWN_EARNED = new Set<string>([...ENDGAME_FEATURE_IDS, ...ALL_CUSTOM_SLOT_IDS]);
+
+interface StoredMetaFlags {
+  devModeAccessUnlocked?: unknown;
+  devModeAllUnlocks?: unknown;
+  lokPassOwned?: unknown;
+  lokPassportActive?: unknown;
+  lokPassportLifetime?: unknown;
+  factionRacesUnlocked?: unknown;
+}
+
+function readMetaFlags(): StoredMetaFlags {
+  try {
+    const raw = storage()?.getItem('survivor616.meta.v1');
+    return raw ? (JSON.parse(raw) as StoredMetaFlags) : {};
+  } catch {
+    return {};
+  }
+}
 
 /** Dev Mode is stored with the main save, which is available before the roster is built. */
 function devModeForgeAccess(): boolean {
-  try {
-    const raw = storage()?.getItem('survivor616.meta.v1');
-    if (!raw) return false;
-    const meta = JSON.parse(raw) as { devModeAccessUnlocked?: unknown; devModeAllUnlocks?: unknown };
-    return meta.devModeAccessUnlocked === true && meta.devModeAllUnlocks === true;
-  } catch {
-    return false;
+  const meta = readMetaFlags();
+  return meta.devModeAccessUnlocked === true && meta.devModeAllUnlocks === true;
+}
+
+/** A LokToken purchase (Lok Shop) that opens faction races before Victory Lap would earn them. */
+function factionRacesPurchased(): boolean {
+  return devModeForgeAccess() || readMetaFlags().factionRacesUnlocked === true;
+}
+
+/**
+ * Which paid slot tiers are unlocked right now. No real payment processing
+ * lives in this repo -- these three flags are the Lok platform's contract
+ * (see `.agents/memory/lok-passport-slots.md`); Dev Mode's "all unlocks" also
+ * grants every tier, same as it does for everything else in the Forge.
+ */
+function unlockedSlotTiers(): ReadonlySet<SlotTier> {
+  const tiers = new Set<SlotTier>(['free']);
+  if (devModeForgeAccess()) {
+    tiers.add('lokpass'); tiers.add('passport'); tiers.add('lifetime');
+    return tiers;
   }
+  const meta = readMetaFlags();
+  if (meta.lokPassOwned === true) tiers.add('lokpass');
+  if (meta.lokPassportActive === true) tiers.add('passport');
+  if (meta.lokPassportLifetime === true) tiers.add('lifetime');
+  return tiers;
 }
 
 function normalizeForgeState(input: unknown): ForgeState | null {
@@ -233,16 +269,28 @@ export function earnedEndgameIds(): string[] {
   return read().earned;
 }
 
-/** How many custom slots have been earned. */
-export function earnedSlotCount(): number {
-  if (devModeForgeAccess()) return CUSTOM_SLOT_IDS.length;
+/** Every slot earned by milestone AND whose tier is currently unlocked, in order. */
+export function earnedSlots() {
+  if (devModeForgeAccess()) return ALL_CUSTOM_SLOTS;
+  const tiers = unlockedSlotTiers();
   const earned = read().earned;
-  return CUSTOM_SLOT_IDS.filter((id) => earned.includes(id)).length;
+  return ALL_CUSTOM_SLOTS.filter((slot) => tiers.has(slot.tier) && earned.includes(slot.id));
+}
+
+/** How many custom slots have been earned (milestone reached AND tier unlocked). */
+export function earnedSlotCount(): number {
+  return earnedSlots().length;
+}
+
+/** Whether a given tier's slots are currently unlocked (owned/subscribed, or Dev Mode). */
+export function isSlotTierUnlocked(tier: SlotTier): boolean {
+  return unlockedSlotTiers().has(tier);
 }
 
 /** Whether a feature has been earned (or, for the Forge, was already found before it became an unlock). */
 export function isFeatureAvailable(id: EndgameFeatureId): boolean {
   if (id === 'forge' && devModeForgeAccess()) return true;
+  if (id === 'factionRaces' && factionRacesPurchased()) return true;
   const state = read();
   if (state.earned.includes(id)) return true;
   return id === 'forge' && state.unlocked;
@@ -251,6 +299,7 @@ export function isFeatureAvailable(id: EndgameFeatureId): boolean {
 /** Whether the player has it switched on. Endgame weapon evolutions default to on when earned. */
 export function isFeatureEnabled(id: EndgameFeatureId): boolean {
   if (id === 'forge' && devModeForgeAccess()) return true;
+  if (id === 'factionRaces' && factionRacesPurchased()) return true;
   const state = read();
   const available = state.earned.includes(id) || (id === 'forge' && state.unlocked);
   if (!available) return false;

@@ -88,9 +88,15 @@ export interface LokShopItemDef {
   status: 'soon' | 'planned';
 }
 
-/** The stock chart. Nothing here can be bought yet; the shelf shows what is coming. */
+/**
+ * The stock chart. Nothing here can be bought yet; the shelf shows what is coming.
+ * `ball` used to be listed here too, but the hideout Ball (`hideout.ball.*`,
+ * `engine/hideoutBall.ts`) shipped free for everyone -- it was never gated, so
+ * leaving it on this "coming soon" shelf was stale, not aspirational. See
+ * `.agents/memory/lok-passport-slots.md` for why it was dropped rather than wired
+ * to a purchase (that would mean taking away something players already have).
+ */
 export const LOKSHOP_STOCK: LokShopItemDef[] = [
-  { id: 'ball', nameKey: 'lokshop.item.ball.name', blurbKey: 'lokshop.item.ball.blurb', price: 120, status: 'soon' },
   { id: 'chest-pass', nameKey: 'lokshop.item.chest-pass.name', blurbKey: 'lokshop.item.chest-pass.blurb', price: 200, status: 'soon' },
   { id: 'pet-rider-saddle', nameKey: 'lokshop.item.pet-rider-saddle.name', blurbKey: 'lokshop.item.pet-rider-saddle.blurb', price: 350, status: 'planned' },
 ];

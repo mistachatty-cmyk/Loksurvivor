@@ -280,6 +280,9 @@ export function createInitialMeta(): MetaState {
     version: META_VERSION,
     devModeAccessUnlocked: false,
     devModeAllUnlocks: false,
+    lokPassOwned: false,
+    lokPassportActive: false,
+    lokPassportLifetime: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
     liveModeEnabled: false,
@@ -291,6 +294,7 @@ export function createInitialMeta(): MetaState {
     activeDropPackId: DEFAULT_DROP_PACK_ID,
     lokPetFieldGuideUnlocked: false,
     lokPetCollectorAccessUnlocked: false,
+    factionRacesUnlocked: false,
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -1264,6 +1268,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     version: META_VERSION,
     devModeAccessUnlocked: parsed.devModeAccessUnlocked === true,
     devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
+    lokPassOwned: parsed.lokPassOwned === true,
+    lokPassportActive: parsed.lokPassportActive === true,
+    lokPassportLifetime: parsed.lokPassportLifetime === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: !liveModeEnabled && parsed.levelUpPausesEnabled !== false,
     liveModeEnabled,
@@ -1328,6 +1335,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // LokToken purchases (Lok Shop) -- off by default for a returning save that predates them.
     lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
     lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
+    factionRacesUnlocked: parsed.factionRacesUnlocked === true,
     // Falls back to the pre-existing standalone localStorage toggle
     // (AttractMode.tsx's old component-local key) so a player who already
     // turned the background sim off doesn't see it silently re-enabled.
@@ -2059,6 +2067,7 @@ type Action =
   | { type: 'checkHiddenThemeReload' }
   | { type: 'unlockDevModeAccess' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
+  | { type: 'setLokPassportTier'; tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
   | { type: 'setLiveMode'; enabled: boolean }
@@ -2069,6 +2078,7 @@ type Action =
   | { type: 'grantDropPack'; id: string }
   | { type: 'grantLokPetFieldGuide' }
   | { type: 'grantLokPetCollectorAccess' }
+  | { type: 'grantFactionRacesUnlock' }
   | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
@@ -3312,6 +3322,12 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'unlockDevModeAccess':
       return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
 
+    case 'setLokPassportTier':
+      // Granted either by a real LokToken purchase (LokShopScreen) or, for
+      // testing, by the Dev Mode panel -- both call sites gate themselves;
+      // this reducer just records the grant.
+      return { ...state, meta: { ...state.meta, [action.tier]: action.enabled } };
+
     case 'setDevModeAllUnlocks':
       if (!state.meta.devModeAccessUnlocked) return state;
       return {
@@ -3376,6 +3392,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantLokPetCollectorAccess':
       if (state.meta.lokPetCollectorAccessUnlocked) return state;
       return { ...state, meta: { ...state.meta, lokPetCollectorAccessUnlocked: true } };
+    case 'grantFactionRacesUnlock':
+      if (state.meta.factionRacesUnlocked) return state;
+      return { ...state, meta: { ...state.meta, factionRacesUnlocked: true } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -4264,6 +4283,7 @@ export interface MetaContextValue {
   checkHiddenThemeReload: () => void;
   unlockDevModeAccess: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
+  setLokPassportTier: (tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime', enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
   setLiveMode: (enabled: boolean) => void;
@@ -4274,6 +4294,7 @@ export interface MetaContextValue {
   grantDropPack: (id: string) => void;
   grantLokPetFieldGuide: () => void;
   grantLokPetCollectorAccess: () => void;
+  grantFactionRacesUnlock: () => void;
   equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
@@ -4483,6 +4504,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
     [],
   );
+  const setLokPassportTier = useCallback(
+    (tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime', enabled: boolean) => dispatch({ type: 'setLokPassportTier', tier, enabled }),
+    [],
+  );
   const setPhysicsObjectClicks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setPhysicsObjectClicks', enabled }),
     [],
@@ -4498,6 +4523,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
   const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
+  const grantFactionRacesUnlock = useCallback(() => dispatch({ type: 'grantFactionRacesUnlock' }), []);
   const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
@@ -4791,6 +4817,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       checkHiddenThemeReload,
       unlockDevModeAccess,
       setDevModeAllUnlocks,
+      setLokPassportTier,
       setPhysicsObjectClicks,
       setLevelUpPauses,
       setLiveMode,
@@ -4801,6 +4828,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantDropPack,
       grantLokPetFieldGuide,
       grantLokPetCollectorAccess,
+      grantFactionRacesUnlock,
       equipDropPack,
       setDamageNumberStyle,
       setCompanionRevealStyle,
@@ -4964,6 +4992,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     checkHiddenThemeReload,
     unlockDevModeAccess,
     setDevModeAllUnlocks,
+    setLokPassportTier,
     setPhysicsObjectClicks,
     setLevelUpPauses,
     setLiveMode,
@@ -4974,6 +5003,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantDropPack,
     grantLokPetFieldGuide,
     grantLokPetCollectorAccess,
+    grantFactionRacesUnlock,
     equipDropPack,
     setDamageNumberStyle,
     setCompanionRevealStyle,
