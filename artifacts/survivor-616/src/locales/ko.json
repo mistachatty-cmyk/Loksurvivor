@@ -683,5 +683,6 @@
   "booster.need": "◫ {cost} 카드 크레딧 필요",
   "booster.ownedTitle": "귀하의 고스트 사본 · {count}",
   "booster.empty": "아직 부스터가 없습니다. 쓰레기통이 잘 갖춰져 있습니다. 솔직한.",
-  "booster.ghostLabel": "고스트 카피"
+  "booster.ghostLabel": "고스트 카피",
+  "sleeve.locked.visualizer": "LokPack Visualizer가 필요합니다(LOK Shop)."
 }

@@ -683,5 +683,6 @@
   "booster.need": "需要 ◫ {cost} 卡积分",
   "booster.ownedTitle": "你的幻影副本 · {count}",
   "booster.empty": "还没有助推器。垃圾箱里存货充足。诚实的。",
-  "booster.ghostLabel": "幽灵副本"
+  "booster.ghostLabel": "幽灵副本",
+  "sleeve.locked.visualizer": "需要 LokPack Visualizer（LOK 商店）"
 }

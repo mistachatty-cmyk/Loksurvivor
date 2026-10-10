@@ -683,5 +683,6 @@
   "booster.need": "Benötigen Sie ◫ {cost} Kartenguthaben",
   "booster.ownedTitle": "Ihre Geisterkopien · {count}",
   "booster.empty": "Noch keine Booster. Der Behälter ist gut gefüllt. Ehrlich.",
-  "booster.ghostLabel": "Geisterkopie"
+  "booster.ghostLabel": "Geisterkopie",
+  "sleeve.locked.visualizer": "Benötigt den LokPack Visualizer (LOK Shop)"
 }

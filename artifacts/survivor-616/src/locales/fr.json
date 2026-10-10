@@ -683,5 +683,6 @@
   "booster.need": "Besoin de ◫ {cost} crédits de carte",
   "booster.ownedTitle": "Vos copies fantômes · {count}",
   "booster.empty": "Pas encore de booster. La poubelle est bien garnie. Honnête.",
-  "booster.ghostLabel": "Copie fantôme"
+  "booster.ghostLabel": "Copie fantôme",
+  "sleeve.locked.visualizer": "Nécessite le visualiseur LokPack (LOK Shop)"
 }

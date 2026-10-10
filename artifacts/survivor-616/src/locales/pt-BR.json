@@ -683,5 +683,6 @@
   "booster.need": "Precisa de ◫ {cost} créditos de cartão",
   "booster.ownedTitle": "Suas cópias fantasmas · {count}",
   "booster.empty": "Ainda não há reforços. A lixeira está bem abastecida. Honesto.",
-  "booster.ghostLabel": "Cópia fantasma"
+  "booster.ghostLabel": "Cópia fantasma",
+  "sleeve.locked.visualizer": "Precisa do LokPack Visualizer (LOK Shop)"
 }

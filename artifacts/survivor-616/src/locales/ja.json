@@ -682,5 +682,6 @@
   "booster.need": "◫ {コスト} カード クレジットが必要です",
   "booster.ownedTitle": "ゴースト化されたコピー · {count}",
   "booster.empty": "まだブースターはありません。ゴミ箱には十分な在庫があります。正直。",
-  "booster.ghostLabel": "ゴーストコピー"
+  "booster.ghostLabel": "ゴーストコピー",
+  "sleeve.locked.visualizer": "LokPack Visualizer が必要です (LOK ショップ)"
 }
