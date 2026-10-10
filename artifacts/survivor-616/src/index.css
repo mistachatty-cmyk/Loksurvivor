@@ -204,6 +204,12 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
 @keyframes cosmetic-celebrate { to { transform: translateY(-54px) rotate(120deg); opacity: 0; } }
 
 :root, .dark {
+  /* Motion tokens -- mirror MOTION in src/anim/motion.ts */
+  --dur-instant: 80ms; --dur-fast: 140ms; --dur-base: 220ms; --dur-slow: 340ms; --dur-hero: 560ms;
+  --ease-out: cubic-bezier(.16, 1, .3, 1); --ease-in-out: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.56, .64, 1);
+  /* Safe-area insets for notches, status bars and arcade overscan */
+  --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px);
   --background: 240 6% 6%;
   --foreground: 0 0% 90%;
 
@@ -834,7 +840,7 @@ body:has([data-testid="screen-run"]) [data-testid="music-now-playing-global"] > 
     linear-gradient(to bottom, rgba(0,0,0,.18), transparent 25%, transparent 72%, rgba(0,0,0,.42));
   box-shadow: inset 0 0 8rem rgba(0,0,0,.54);
 }
-.intro-screen__content { animation: intro-flow-in 900ms cubic-bezier(.2,.8,.2,1) both; }
+.intro-screen__content { animation: intro-flow-in 900ms var(--ease-out) both; }
 .intro-location { color: var(--intro-accent); text-shadow: 0 0 .8rem hsl(var(--primary) / .3); }
 .intro-title {
   display: flex;
@@ -1010,4 +1016,29 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
 }
 @media (prefers-reduced-motion: reduce) {
   canvas[style*='registry-art-bob'] { animation: none !important; }
+}
+
+/* Soundbar extras panel: an overlay that grows out of the bar. */
+.soundbar-panel { transform-origin: top; animation: soundbar-drop 150ms ease-out both; }
+.soundbar-panel-up { transform-origin: bottom; }
+.soundbar-row { animation: soundbar-row-in 180ms ease-out both; }
+.soundbar-fill { background: linear-gradient(90deg, hsl(var(--primary) / 0.45), hsl(var(--primary))); box-shadow: 0 0 8px hsl(var(--primary) / 0.6); transition: width 60ms linear; }
+.soundbar-thumb { box-shadow: 0 0 8px hsl(var(--primary) / 0.8); transition: transform 120ms ease-out, left 60ms linear; }
+.soundbar-track:hover .soundbar-thumb, .soundbar-track:focus-visible .soundbar-thumb, .soundbar-track[data-dragging] .soundbar-thumb { transform: translate(-50%, -50%) scale(1.5); }
+@keyframes soundbar-drop { from { opacity: 0; transform: scaleY(0.6); } to { opacity: 1; transform: scaleY(1); } }
+@keyframes soundbar-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .soundbar-panel, :root:not([data-motion='full']) .soundbar-row { animation: none; }
+  :root:not([data-motion='full']) .soundbar-fill, :root:not([data-motion='full']) .soundbar-thumb { transition: none; }
+}
+
+/* Shared entrance motion for overlays and panels -- timings come from the motion tokens */
+.ui-fade-in { animation: ui-fade-in var(--dur-base) var(--ease-out) both; }
+.ui-pop-in { animation: ui-pop-in var(--dur-slow) var(--ease-pop) both; }
+.ui-rise-in { animation: ui-rise-in var(--dur-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ui-pop-in { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes ui-rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) :is(.ui-fade-in, .ui-pop-in, .ui-rise-in) { animation-duration: .001ms; animation-delay: 0ms; }
 }

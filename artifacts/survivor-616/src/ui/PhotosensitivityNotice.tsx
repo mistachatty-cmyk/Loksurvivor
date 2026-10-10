@@ -57,12 +57,23 @@ export function PhotosensitivityNotice({ onContinue }: { onContinue: () => void 
       aria-describedby="photosensitivity-body"
       data-testid="screen-photosensitivity-notice"
     >
-      <div className="w-full max-w-md border border-border bg-black/40 p-6 text-center">
+      <div className="max-h-full w-full max-w-lg overflow-y-auto border border-border bg-black/40 p-6 text-left">
         <p className="text-xs font-black uppercase tracking-widest text-amber-300">{t('photosensitivity.kicker')}</p>
         <h1 id="photosensitivity-title" className="mt-2 text-xl font-black uppercase tracking-wide">{t('photosensitivity.title')}</h1>
         <p id="photosensitivity-body" className="mt-3 text-sm text-muted-foreground">{t('photosensitivity.body')}</p>
-        <p className="mt-3 text-sm text-muted-foreground">{t('photosensitivity.tip')}</p>
-        <label className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <h2 className="mt-4 text-xs font-black uppercase tracking-widest text-amber-300">{t('photosensitivity.triggersTitle')}</h2>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          <li>{t('photosensitivity.trigger1')}</li>
+          <li>{t('photosensitivity.trigger2')}</li>
+          <li>{t('photosensitivity.trigger3')}</li>
+        </ul>
+        <div className="mt-4 border border-amber-300/60 bg-amber-300/10 p-3 text-sm">
+          <p className="font-black uppercase tracking-wide text-amber-300">{t('photosensitivity.stopTitle')}</p>
+          <p className="mt-1 text-muted-foreground">{t('photosensitivity.stop')}</p>
+        </div>
+        <p className="mt-3 text-sm text-muted-foreground">{t('photosensitivity.safer')}</p>
+        <p className="mt-3 text-sm font-semibold">{t('photosensitivity.tip')}</p>
+        <label className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
           <input type="checkbox" checked={dontShow} onChange={(event) => setDontShow(event.target.checked)} data-testid="checkbox-photosensitivity-hide" />
           {t('photosensitivity.hide')}
         </label>

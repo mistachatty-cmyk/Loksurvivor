@@ -1,0 +1,131 @@
+/**
+ * Run events: short authored beats the Director drops into a run (a supply drop,
+ * a rush-hour stampede). They are seeded from the run seed, never `w.rng`, so a
+ * seeded run always gets the same beats and deterministic tests do not shift.
+ *
+ * Adding a beat means adding a record here plus one `case` in `updateRunEvents`
+ * (world.ts). Beats unlock as the player clears maps (`unlockMaps`), so a new
+ * player's first runs stay calm. See docs/EVENTS_AND_INTERACTIONS_PLAN.md.
+ */
+
+import { quirkHash } from '@/game/data/enemyQuirks';
+
+export type RunEventId = 'supply-drop' | 'rush-hour' | 'tremor' | 'block-party' | 'blackout' | 'relay-storm';
+
+export interface RunEventDef {
+  id: RunEventId;
+  name: string;
+  /** Standard maps the player must have cleared before this beat can appear. */
+  unlockMaps: number;
+  /** Heads-up before anything happens, ms. */
+  warnMs: number;
+  /** How long the beat runs after the warning, ms. */
+  activeMs: number;
+  warnText: string;
+  doneText: string;
+}
+
+export const RUN_EVENTS: RunEventDef[] = [
+  {
+    id: 'supply-drop',
+    name: 'Supply drop',
+    unlockMaps: 2,
+    warnMs: 4000,
+    activeMs: 14000,
+    warnText: 'SUPPLY DROP INBOUND! Grab the crate, mind the guards',
+    doneText: 'SUPPLY DROP SECURED',
+  },
+  {
+    id: 'rush-hour',
+    name: 'Rush-hour stampede',
+    unlockMaps: 4,
+    warnMs: 3500,
+    activeMs: 4200,
+    warnText: 'RUSH HOUR! Step into the gap',
+    doneText: 'STAMPEDE DODGED',
+  },
+  {
+    id: 'tremor',
+    name: 'Tremor',
+    unlockMaps: 6,
+    warnMs: 3000,
+    activeMs: 3000,
+    warnText: 'TREMOR! The ground is about to shake',
+    doneText: 'TREMOR PASSED. Breathe',
+  },
+  {
+    id: 'block-party',
+    name: 'Block party',
+    unlockMaps: 8,
+    warnMs: 3000,
+    activeMs: 12000,
+    warnText: 'BLOCK PARTY! Stand in the ring to join the fun',
+    doneText: 'BLOCK PARTY OVER. That was a good one',
+  },
+  {
+    id: 'blackout',
+    name: 'Blackout',
+    unlockMaps: 10,
+    warnMs: 3000,
+    activeMs: 14000,
+    warnText: 'BLACKOUT! The lights are going out',
+    doneText: 'POWER BACK ON',
+  },
+  {
+    id: 'relay-storm',
+    name: 'Relay storm',
+    unlockMaps: 12,
+    warnMs: 3500,
+    activeMs: 12000,
+    warnText: 'RELAY STORM! Keep clear of the static',
+    doneText: 'STATIC CLEARED',
+  },
+];
+
+/** Relay storm: how big the drifting static field is, how fast it creeps toward you, how much it slows you. */
+export const RELAY_STORM_RADIUS = 120;
+export const RELAY_STORM_DRIFT_PX_PER_SEC = 60;
+export const RELAY_STORM_SLOW = 0.6;
+/** Spend no more than this long inside the field to earn the supplies it was hiding. */
+export const RELAY_STORM_MAX_INSIDE_MS = 2000;
+/** Blackout: how many extra enemies creep in under the dark. */
+export const BLACKOUT_STALKERS = 5;
+
+/** A Block party pays out if the player spent at least this long inside the ring. */
+export const BLOCK_PARTY_NEEDED_MS = 6000;
+export const BLOCK_PARTY_RADIUS = 130;
+
+export const RUN_EVENTS_BY_ID: Record<RunEventId, RunEventDef> = Object.fromEntries(
+  RUN_EVENTS.map((e) => [e.id, e]),
+) as Record<RunEventId, RunEventDef>;
+
+export interface ScheduledRunEvent {
+  id: RunEventId;
+  /** Run time (ms) the warning starts. */
+  startMs: number;
+}
+
+/** First beat can start at this run time; later ones come one window apart. */
+export const RUN_EVENT_FIRST_MS = 60_000;
+export const RUN_EVENT_WINDOW_MS = 110_000;
+const RUN_EVENT_JITTER_MS = 80_000;
+export const MIN_MAPS_FOR_RUN_EVENTS = 2;
+
+/** How many beats a run gets: none before 2 maps, then one more every 3 maps, max 4. */
+export function runEventCount(mapsCleared: number): number {
+  if (mapsCleared < MIN_MAPS_FOR_RUN_EVENTS) return 0;
+  return Math.min(4, 1 + Math.floor((mapsCleared - MIN_MAPS_FOR_RUN_EVENTS) / 3));
+}
+
+/** Pure and seeded: same seed, maps and disabled list always give the same schedule. */
+export function scheduleRunEvents(seed: number, mapsCleared: number, disabledIds: readonly string[] = []): ScheduledRunEvent[] {
+  const pool = RUN_EVENTS.filter((e) => e.unlockMaps <= mapsCleared && !disabledIds.includes(e.id));
+  const count = pool.length === 0 ? 0 : runEventCount(mapsCleared);
+  const schedule: ScheduledRunEvent[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const def = pool[Math.floor(quirkHash(seed, i, 71) * pool.length)]!;
+    const startMs = RUN_EVENT_FIRST_MS + i * RUN_EVENT_WINDOW_MS + Math.floor(quirkHash(seed, i, 72) * RUN_EVENT_JITTER_MS);
+    schedule.push({ id: def.id, startMs });
+  }
+  return schedule;
+}

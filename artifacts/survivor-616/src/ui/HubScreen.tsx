@@ -564,7 +564,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       <button
         type="button"
         onClick={onOpenRunSetup}
-        className="fixed right-3 top-3 z-50 inline-flex min-h-11 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
+        className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-50 inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
         data-testid="button-open-run-setup"
         title={t('hub.looksLokpetsTitle')}
       >
@@ -572,7 +572,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <span>{t('common.looksLokpets')}</span>
       </button>
       {companion && (
-        <div className="fixed right-3 top-16 z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
+        <div className="fixed right-[max(0.75rem,var(--safe-right))] top-[calc(4rem+var(--safe-top))] z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
           <LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={42} />
           <div className="min-w-0">
             <p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p>
@@ -584,7 +584,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       )}
       </> : null}
       {meta.hideoutStickyHeadOutEnabled && (
-        <button type="button" onClick={() => onOpen('runs')} className="fixed inset-x-3 bottom-3 z-50 flex min-h-12 items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden" data-testid="button-open-runs-sticky">Head out <ArrowRight className="h-4 w-4" /></button>
+        <button type="button" onClick={() => onOpen('runs')} className="fixed inset-x-3 bottom-[max(0.75rem,var(--safe-bottom))] z-50 flex min-h-12 active:scale-[0.98] items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden" data-testid="button-open-runs-sticky">Head out <ArrowRight className="h-4 w-4" /></button>
       )}
       <AnimatePresence mode="wait">
         <motion.div 
@@ -664,6 +664,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             className="mb-6 -mx-6 w-auto sm:mx-0 sm:w-full"
             pets={hideoutPets}
             weather={scene.weather}
+            biome={scene.biome}
+            accent={scene.homeAccent}
             eventsMode={meta.hideoutEvents}
             onPetCare={careForLokPet}
             onPetEvent={completeHideoutEvent}

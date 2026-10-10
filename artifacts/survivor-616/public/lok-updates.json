@@ -7,6 +7,280 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 108,
+      "version": "0.24.4",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Steadier Big Fights",
+      "body": [
+        "Huge particle storms are now capped at 600 visible sparks on High graphics, which keeps frame rate steadier on phones and older arcade machines without changing how fights look."
+      ]
+    },
+    {
+      "number": 107,
+      "version": "0.24.3",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:25Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Overlays Ease In",
+      "body": [
+        "Level-up choices now rise in one after another, and the pause menu, soundtrack panel and outcome banner fade and pop in instead of snapping on.",
+        "All of it respects your reduced-motion setting."
+      ]
+    },
+    {
+      "number": 106,
+      "version": "0.24.2",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:20Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Menu Dock",
+      "body": [
+        "Menu screens now have an always-there dock: Hideout, Pick a map, Roster, Card shop, Settings and Search. It sits along the bottom on phones and down the left side on bigger screens.",
+        "Search opens the Go to menu, so any unlocked screen is one tap away."
+      ]
+    },
+    {
+      "number": 105,
+      "version": "0.24.1",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:15Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Bigger Text On Demand",
+      "body": [
+        "New Text size setting (Settings, under Accessibility): Small, Normal, Large or Extra large, for phones, TVs and arcade screens viewed from across the room."
+      ]
+    },
+    {
+      "number": 104,
+      "version": "0.24.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:10Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Go To Anywhere",
+      "body": [
+        "New Go to search: press Ctrl+K or / (or tap the Go to button) to jump straight to any screen you have unlocked. Locked rooms stay locked.",
+        "Your browser or phone Back button now walks back through the menus you visited instead of leaving the game, and a stray Back never drops a live run.",
+        "Escape in the pause menu now closes Settings or Soundtrack first, and menu corner buttons stay clear of notches."
+      ]
+    },
+    {
+      "number": 103,
+      "version": "0.23.9",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:05Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Smoother Menus",
+      "body": [
+        "Menus now slide in softly, buttons press down when tapped, and Escape takes you back from any screen.",
+        "Screen shake can be turned down or off, and it follows your device's reduced-motion setting.",
+        "Pinch-zoom works again, and back buttons stay clear of phone notches."
+      ]
+    },
+    {
+      "number": 102,
+      "version": "0.23.8",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Blackout, static and hideout stories",
+      "body": [
+        "Clear 10 maps and a Blackout can hit: the lights go out and only a pool of light follows you while a few extra stalkers creep in. Get through it for cred, and come through untouched for a rare crystal.",
+        "Clear 12 maps and a Relay Storm can roll in: a field of static drifts toward you and slows you down inside it. Keep out of it for most of the storm and you find the supplies it was sitting on.",
+        "That makes six kinds of moment in a run. The Seen It All achievement now asks for all of them.",
+        "The hideout has five new little stories that depend on the weather and the hour: a leaking awning in the rain, a horn in the fog, a LokPet that wanders off into it, card night with the crew, and warm glass in the cellar."
+      ]
+    },
+    {
+      "number": 101,
+      "version": "0.23.7",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Block party",
+      "body": [
+        "Clear 8 maps and a Block Party can break out mid-run. A glowing pink ring appears nearby. Stand in it and your weapons fire faster while you slowly recover health.",
+        "Stay in the ring for at least 6 seconds and the neighbourhood says thanks with cred and a Magnet Coil. Skip it and nothing is lost."
+      ]
+    },
+    {
+      "number": 100,
+      "version": "0.23.6",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Call the crew",
+      "body": [
+        "Rescued crew can now help mid-run. Press Q (or the new round button with their name) to call the next one in line: Pippa patches you up, Nyx freezes the crowd, Bulbosa stomps, Vee pulls loot in, and more. The button fills as the shared cooldown recovers.",
+        "It costs no slot. Everyone you have rescued with a call-in takes a turn in the order you rescued them, so the bigger your crew, the more variety you get. Q can be changed on the Controls page.",
+        "New achievements for calling in your crew: Phone a Friend, On Speed Dial and Never Alone."
+      ]
+    },
+    {
+      "number": 99,
+      "version": "0.23.5",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:50:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Dash and a Controls page",
+      "body": [
+        "You can now dash on a computer: press Shift, click the new Dash button above the Ultimate button, or double-click the playfield. The button shows its cooldown. Dash goes the way you are steering, or the way you last moved.",
+        "Settings has a new Controls page with keyboard, mouse, controller and touch sections. Rebind any key (a clash swaps the two), remap controller buttons, set the stick deadzone, and switch the on-screen Dash button and double-tap dash on or off.",
+        "Controllers can now steer with the left stick or d-pad. A controller button does its job when you press it, not while you hold it."
+      ]
+    },
+    {
+      "number": 98,
+      "version": "0.23.4",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:40:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The ground shakes",
+      "body": [
+        "Clear 6 maps and a Tremor can hit mid-run. A grey ring spreads from the epicenter, then the ground shakes four times. Enemies and loose props get shoved away and enemies stagger for a moment. The tremor never hurts anything, and it leaves a heart where it centred.",
+        "The Seen It All achievement now asks for every kind of moment, Tremor included."
+      ]
+    },
+    {
+      "number": 97,
+      "version": "0.23.3",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Magnet coil and event switches",
+      "body": [
+        "Supply drops now include a Magnet Coil. Grab it and coins, gems and hearts get pulled to you from four times as far for 12 seconds.",
+        "Settings has a new Run events section where you can switch each kind of moment on or off."
+      ]
+    },
+    {
+      "number": 96,
+      "version": "0.23.2",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Things happen now",
+      "body": [
+        "Runs now have moments. Clear 2 maps and a Supply Drop can land mid-run: a glowing ring marks where the crate falls, and it comes with guards. Clear 4 maps and a Rush-Hour stampede can charge across the map; step into the green gap to dodge it.",
+        "The more maps you clear, the more moments a run can have (up to 4). Your first runs stay calm."
+      ]
+    },
+    {
+      "number": 95,
+      "version": "0.23.1",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T00:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The hideout, painted",
+      "body": [
+        "The hideout strip is no longer a flat dark band. Every room now has its own backdrop: a lit skyline over the Sanctum, stars and a blinking marker lamp on the rooftop, breathing glass growths in the cellar, a swaying service lamp in the alley and a stuttering neon sign at the Neon Sleeve.",
+        "There is a lit pool of floor light that follows your operator and pulses with whatever music is playing, dust drifting through the light, and little puffs when you walk.",
+        "With Hideout ambience on, each room now hums a slow music-box line of its own over the bed. It stays off until you turn it on."
+      ]
+    },
+    {
+      "number": 94,
+      "version": "0.23.0",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:45Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The Board Gets Weird",
+      "body": [
+        "Side jobs now have local flavor: Bait Shop After Dark, Lost Dog, Found Teeth, Winter Pothole Revenge, Meijer Cart Roulette and more.",
+        "New job: the Raccoon Scrap Union wants relic crafting scraps hauled across your runs."
+      ]
+    },
+    {
+      "number": 93,
+      "version": "0.22.9",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:30Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "More Jobs On The Board",
+      "body": [
+        "The Broadcast Board now posts three extra rotating side jobs each day: hunt a specific street enemy, reach a level in one run, crack open crates, earn Cred, clear a named district, or spot map finds.",
+        "Every side job is doable from a fresh save and tracks automatically across your runs."
+      ]
+    },
+    {
+      "number": 92,
+      "version": "0.22.8",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:59:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "A Clearer Photosensitivity Warning",
+      "body": [
+        "The warning before you enter the hideout now spells out what can trigger a reaction (strobing flashes, bright bursts, screen shake), the symptoms that mean you should stop playing, and a few ways to play more safely."
+      ]
+    },
+    {
+      "number": 91,
+      "version": "0.22.7",
+      "date": "2026-10-09",
+      "publishedAt": "2026-10-09T23:30:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Volume On The Soundbar",
+      "body": [
+        "Open the music bar and tap the small arrow to reveal volume, seek, shuffle, repeat and speed. The panel floats over the screen, so the bar itself stays the same size, and it stays hidden until you ask for it.",
+        "Your volume and mute choice are now remembered between visits."
+      ]
+    },
+    {
       "number": 90,
       "version": "0.22.6",
       "date": "2026-10-09",

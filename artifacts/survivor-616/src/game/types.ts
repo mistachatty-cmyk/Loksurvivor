@@ -391,7 +391,24 @@ export interface CompletedObjective {
   rewardTokens: number;
 }
 
-export type DailyContractKind = 'clear-area' | 'kill-any' | 'survive-sec';
+export type DailyContractKind =
+  | 'clear-area'
+  | 'kill-any'
+  | 'survive-sec'
+  /** Defeat `targetCount` of the enemy named by `targetId`, across runs. */
+  | 'kill-enemy'
+  /** Reach level `targetCount` within a single run. */
+  | 'reach-level'
+  /** Open `targetCount` loot boxes across runs. */
+  | 'open-chests'
+  /** Earn `targetCount` Cred in runs (before contract pay). */
+  | 'earn-cred'
+  /** Clear the district named by `targetId`. */
+  | 'clear-district'
+  /** Find `targetCount` map finds across runs. */
+  | 'map-finds'
+  /** Gather `targetCount` relic crafting materials across runs. */
+  | 'scrap-haul';
 
 export interface DailyContractDef {
   id: string;
@@ -399,6 +416,8 @@ export interface DailyContractDef {
   description: string;
   kind: DailyContractKind;
   targetCount: number;
+  /** Enemy id (`kill-enemy`) or area id (`clear-district`) the job is about. */
+  targetId?: string;
   rewardCred: number;
   rewardTokens: number;
   /** Rare-currency payout; 0 for the three standard jobs, nonzero for the optional wildcard. */
@@ -2447,6 +2466,10 @@ export interface MetaState {
   quirkTakenRuns: number;
   /** Quirk Surges the player has outlasted. */
   quirkSurgesSurvived: number;
+  /** Director beats (supply drops, stampedes) finished, lifetime, by beat id. */
+  runEventsSurvived: Record<string, number>;
+  /** Crew call-ins used, lifetime. */
+  callInsUsed: number;
   /** GRPD evidence seals are earned every 1,000 lifetime kills; this is the spent amount. */
   grpdSpentSeals: number;
   /** Completed field prototypes fabricated at the GRPD Armory. */
@@ -2710,6 +2733,10 @@ export interface RunResult {
   quirkTakenRun?: boolean;
   /** This run outlasted its Quirk Surge. */
   quirkSurgeSurvived?: boolean;
+  /** Director beats this run finished (survived the whole beat). */
+  runEventsSurvived?: string[];
+  /** Crew call-ins used this run. */
+  callInsUsed?: number;
   /** Growth Recap: XP, level and bond changes for pets that were out. Filled when the run is recorded. */
   petGrowth?: PetGrowthEntry[];
   rescuedAllyId?: string;
@@ -2858,6 +2885,10 @@ export interface HudSnapshot {
   millionHorde?: { population: number; peakPopulation: number; defeatedPopulation: number; liveActors: number };
   cred: number;
   ultimateReadyPct: number;
+  /** 0 to 100: how far the dash cooldown has recovered (100 = ready). */
+  dashReadyPct?: number;
+  /** The next crew call-in: who it is and how far the shared cooldown has recovered. */
+  callIn?: { name: string; label: string; readyPct: number };
   ultimateActive: boolean;
   weaponLevel: number;
   /** Storm Chaser only: the weather cloud's current mode and whether the player has taken manual control of it. */

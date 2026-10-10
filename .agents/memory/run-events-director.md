@@ -1,0 +1,55 @@
+---
+name: Run events (Director) contract
+description: How seeded run beats (supply drop, rush-hour stampede) are scheduled, unlocked, simulated, drawn and counted. Read before adding a beat.
+---
+
+Built v0.23.2, step 1 of `docs/EVENTS_AND_INTERACTIONS_PLAN.md`.
+
+- `data/runEvents.ts`: `RUN_EVENTS` records + `scheduleRunEvents(seed, mapsCleared, disabled)`.
+  Seeded with `quirkHash`, never `w.rng`. Count = 0 below 2 maps, then +1 per 3 maps (max 4);
+  one beat per 110s window with 80s jitter, so beats never overlap. `unlockMaps` gates each beat
+  (supply-drop 2, rush-hour 4). New beat = a record + one branch in `updateRunEvents` (world.ts).
+- `createWorld` setup `runEvents: { mapsCleared, disabledIds? }`; omitted = no beats, so every
+  existing test/fixture is unchanged. `RunScreen` passes `mapsCleared(meta).have`.
+- Phases wait -> warn -> active -> survived, like the Quirk Surge. Survived is pushed at the end of
+  the active window only; death or pause mid-beat pays nothing, and nothing is counted twice.
+- Supply drop pays via ordinary pickups (health, cred, prism-quartz) plus 4 guards from the
+  area's own non-boss wave enemies. Stampede enemies get the optional `EnemyActor.stampede`
+  (straight run, still damages on contact, skips normal AI); optional so hand-built test
+  fixtures keep compiling.
+- Drawn by `drawRunEventMarker` (draw.ts): drop ring + beam, stampede lane lines and green gap.
+- Counted in `meta.runEventsSurvived` (id -> count) from `RunResult.runEventsSurvived`; achievements
+  `moment-first / 10 / 50 / both`.
+
+## Added v0.23.3
+Settings > Run events (`state/runEventSetting.ts`, device-local list of switched-off ids, passed as
+`disabledIds`). Warning text doubles as the first-time hint. `magnet-coil` pickup (`World.magnetUntil`,
+12s, x4 pull radius for xp/cred/coin/health only so chests are not dragged in), included in the supply drop.
+Beat names in Settings come from `RUN_EVENTS[].name` (English, not in `en.json`).
+
+## Added v0.23.4: Tremor
+`tremorPulse` (world.ts): 4 pulses 700ms apart, radius 420, shoves non-boss enemies (`kx/ky`, scaled by
+1/mass) and movable breakables, staggers via `contactReadyAt`. Deals NO damage on purpose so it cannot
+create kills/XP/loot (impact-physics.md). Pays one heart at the epicenter when it ends. Needs 6 maps.
+
+## Added v0.23.7: Block party
+Needs 8 maps. A 130px ring near the player; while inside, `rootglassUntil` is kept topped up and HP
+trickles back (1% max HP/s). `zoneMs` counts time inside (via `lastAt`); at 6s or more the end pays
+cred + a magnet coil, otherwise nothing. Host line uses the first rescued ally if any.
+Known unrelated flake: `quickFight.test.ts` "a fainted lead sends in a teammate" fails ~1 in 8 runs on
+the base branch too.
+
+## Added v0.23.8: Blackout and Relay storm (all planned beats now exist)
+- Blackout (10 maps): `drawBlackout` (draw.ts) darkens everything but a pool around the screen centre
+  (the camera follows the player); 5 stalkers spawn at the active start; always pays cred, plus a prism
+  quartz if `p.lastDamageAt < re.phaseAt` (untouched).
+- Relay storm (12 maps): a 120px static field starts 340px away and creeps toward the player at 60px/s;
+  inside it the player moves at 60% (`relayStormSlow`, in the player speed product). `zoneMs` counts time
+  inside; at 2s or less the end pays health + cred + quartz, otherwise nothing.
+- Constants live in `data/runEvents.ts` so balance is one place.
+- Hideout choice events: 5 more in `data/choiceEvents.ts` (roof-leak, fog-horn, fog-wander, crew-card-night,
+  warm-glass), gated by weather/time, text in `en.json`. All pay through `hideoutRewards.ts` as before.
+
+## Not built yet
+Beats in the Archive/bestiary,
+a screenshot playtest of every beat, a per-ally line for the block-party host, balance tuning from real runs.

@@ -23,7 +23,10 @@ import { getRunAuraStyle } from '@/game/data/runAuras';
 import { getCelebrationStyle } from '@/game/data/celebrations';
 import { getHatStyle } from '@/game/data/hats';
 import { grpdEndgameWeaponEarned } from '@/game/data/grpdArmory';
-import { endgameReached } from '@/game/data/endgameUnlocks';
+import { callInRoster } from '@/game/data/crewCallIns';
+import { actionForKey, dashDirection, getControls, padMove } from '@/game/input/controls';
+import { getDisabledRunEvents } from '@/game/state/runEventSetting';
+import { endgameReached, mapsCleared } from '@/game/data/endgameUnlocks';
 import { isFeatureEnabled } from '@/game/state/operatorForgeStore';
 import { runHudIntelCount, selectPrimaryRunHudSignal } from '@/game/data/runHudLayout';
 import { CHARACTER_EPISODES_BY_ID } from '@/game/data/episodes';
@@ -53,6 +56,7 @@ import {
   createWorld,
   commitArtisteDraw,
   dashPlayer,
+  callInCrew,
   endCommandSelectionDrag,
   endFreezeSelectionDrag,
   hudSnapshot,
@@ -243,7 +247,10 @@ export function RunScreen({
   const keysRef = useRef(new Set<string>());
   const ultRequestRef = useRef(false);
   const interactRequestRef = useRef(false);
-  const gamepadInteractHeldRef = useRef(false);
+  const gamepadHeldRef = useRef(new Set<number>());
+  const dashRequestRef = useRef(false);
+  const callInRequestRef = useRef(false);
+  const lastMoveDirRef = useRef<{ x: number; y: number } | null>(null);
   const stickRef = useRef<StickState>({
     active: false,
     pointerId: null,
@@ -277,6 +284,8 @@ export function RunScreen({
   const fogRendererRef = useRef(new FogRenderer());
   const [tacticalViewActive, setTacticalViewActive] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  // Re-read the saved controls whenever the in-run settings panel closes, so a change shows up at once.
+  const [controlSettings, setControlSettings] = useState(getControls);
 
   const [phase, setPhase] = useState<RunPhase>('countdown');
   const [hud, setHud] = useState<HudSnapshot | null>(null);
@@ -296,7 +305,12 @@ export function RunScreen({
   const [chestFlight, setChestFlight] = useState(0);
   const [celebration, setCelebration] = useState(false);
   const [runSettingsOpen, setRunSettingsOpen] = useState(false);
+  useEffect(() => { setControlSettings(getControls()); }, [runSettingsOpen]);
   const [pauseSoundtrackOpen, setPauseSoundtrackOpen] = useState(false);
+  const runSettingsOpenRef = useRef(false);
+  const pauseSoundtrackOpenRef = useRef(false);
+  runSettingsOpenRef.current = runSettingsOpen;
+  pauseSoundtrackOpenRef.current = pauseSoundtrackOpen;
   const [lootPickups, setLootPickups] = useState<LootPickup[]>([]);
   const expireLootPickup = useCallback(
     (id: string) => setLootPickups((prev) => prev.filter((pickup) => pickup.id !== id)),
@@ -462,6 +476,8 @@ export function RunScreen({
         disabledWeaponIds: meta.disabledWeaponIds,
         grpdActiveWeaponIds: meta.grpdActiveWeaponIds.filter((id) => meta.grpdUnlockedWeaponIds.includes(id) || grpdEndgameWeaponEarned(id, meta.totalKills, endgameReached(meta))),
         endgameEvolutionsEnabled: isFeatureEnabled('weaponEvolutions'),
+        callInAllyIds: callInRoster(meta.rescuedAllyIds),
+        runEvents: { mapsCleared: mapsCleared(meta).have, disabledIds: getDisabledRunEvents() },
         quirkSurgeMode: quirkSurgeMode(meta.clearedAreaIds.length, endgameReached(meta), isFeatureEnabled('quirkSurge')),
         enemyQuirks: { enabled: isFeatureEnabled('enemyQuirks'), ...earnedQuirkRunSetup(meta.quirkKills, meta.devModeAllUnlocks) },
         grpdSpawnTierByWeaponId: meta.grpdSpawnTierByWeaponId,
@@ -482,26 +498,36 @@ export function RunScreen({
   useEffect(() => {
     const down = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase();
-      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) {
+      const controls = getControls();
+      const action = actionForKey(controls, key);
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key) || action === 'dash') {
         event.preventDefault();
       }
       keysRef.current.add(key);
-      if (key === ' ') ultRequestRef.current = true;
-      if (key === 'f' && !event.repeat) interactRequestRef.current = true;
-      if (key === 'tab') {
+      if (action === 'ultimate') ultRequestRef.current = true;
+      if (action === 'interact' && !event.repeat) interactRequestRef.current = true;
+      if (action === 'dash' && !event.repeat) dashRequestRef.current = true;
+      if (action === 'callin' && !event.repeat) callInRequestRef.current = true;
+      if (action === 'tactical') {
         event.preventDefault();
         tacticalCameraRef.current.toggleTacticalView();
         setTacticalViewActive(tacticalCameraRef.current.isTactical());
       }
-      if (key === 'z') {
+      if (action === 'zoom') {
         event.preventDefault();
         const nextZoom = tacticalCameraRef.current.cycleManualZoom();
         setZoomLevel(nextZoom);
       }
-      if (key === 'escape' || key === 'p') {
+      if (action === 'pause' || key === 'p') {
         if (phaseRef.current === 'playing' && meta.liveModeEnabled) setLiveDashboardOpen((open) => !open);
         else if (phaseRef.current === 'playing' && !worldRef.current?.player.falling) setPhaseBoth('paused');
-        else if (phaseRef.current === 'paused') setPhaseBoth('playing');
+        else if (phaseRef.current === 'paused') {
+          // Close a pause sub-panel first; a second press resumes.
+          if (runSettingsOpenRef.current || pauseSoundtrackOpenRef.current) {
+            setRunSettingsOpen(false);
+            setPauseSoundtrackOpen(false);
+          } else setPhaseBoth('playing');
+        }
       }
     };
     const up = (event: KeyboardEvent) => keysRef.current.delete(event.key.toLowerCase());
@@ -586,7 +612,8 @@ export function RunScreen({
 
     const now = performance.now();
     const previousTap = lastTapRef.current;
-    if (canvas && world && previousTap &&
+    const doubleDashAllowed = event.pointerType === 'mouse' ? getControls().mouse.doubleClickDash : getControls().touch.doubleTapDash;
+    if (canvas && world && previousTap && doubleDashAllowed &&
       now - previousTap.time <= 300 &&
       Math.hypot(event.clientX - previousTap.x, event.clientY - previousTap.y) <= 48) {
       const rect = canvas.getBoundingClientRect();
@@ -941,12 +968,48 @@ export function RunScreen({
           moveY = stick.dy / STICK_RADIUS;
         }
 
+        // Controller: the first connected pad steers (left stick or d-pad, only when nothing
+        // else is steering) and its buttons trigger actions on the press, not while held.
+        const controls = getControls();
+        const pads = controls.gamepad.enabled ? navigator.getGamepads?.() : undefined;
+        const pad = pads ? Array.from(pads).find((candidate) => candidate && candidate.connected) ?? null : null;
+        if (pad) {
+          const isDown = (button: number) => Boolean(pad.buttons[button]?.pressed);
+          if (moveX === 0 && moveY === 0) {
+            const steer = padMove(pad.axes, isDown, controls.gamepad.deadzone);
+            moveX = steer.x;
+            moveY = steer.y;
+          }
+          const held = gamepadHeldRef.current;
+          for (const [name, button] of Object.entries(controls.gamepad.buttons)) {
+            const down = isDown(button);
+            if (down && !held.has(button)) {
+              if (name === 'interact') interactRequestRef.current = true;
+              else if (name === 'ultimate') ultRequestRef.current = true;
+              else if (name === 'dash') dashRequestRef.current = true;
+              else if (name === 'callin') callInRequestRef.current = true;
+              else if (name === 'pause' && phaseRef.current === 'playing' && !world.player.falling) setPhaseBoth('paused');
+            }
+            if (down) held.add(button); else held.delete(button);
+          }
+        } else if (gamepadHeldRef.current.size > 0) {
+          gamepadHeldRef.current.clear();
+        }
+
+        if (Math.hypot(moveX, moveY) > 0.15) lastMoveDirRef.current = { x: moveX, y: moveY };
+        if (dashRequestRef.current) {
+          dashRequestRef.current = false;
+          const dir = dashDirection({ x: moveX, y: moveY }, lastMoveDirRef.current, world.player.facing);
+          dashPlayer(world, dir.x, dir.y);
+        }
+
+        if (callInRequestRef.current) {
+          callInRequestRef.current = false;
+          callInCrew(world);
+        }
+
         let ultimate = ultRequestRef.current;
         ultRequestRef.current = false;
-        const pad = navigator.getGamepads?.()[0];
-        const gamepadInteract = Boolean(pad?.buttons[0]?.pressed);
-        if (gamepadInteract && !gamepadInteractHeldRef.current) interactRequestRef.current = true;
-        gamepadInteractHeldRef.current = gamepadInteract;
         let interact = interactRequestRef.current;
         interactRequestRef.current = false;
 
@@ -2136,6 +2199,36 @@ export function RunScreen({
         </button>
       ) : null}
 
+      {/* Crew call-in: the next rescued ally in line. Hidden until someone with a call-in is rescued. */}
+      {hud?.callIn ? (
+        <button
+          type="button"
+          onClick={() => { callInRequestRef.current = true; }}
+          disabled={hud.callIn.readyPct < 100}
+          aria-label={`Call ${hud.callIn.name}: ${hud.callIn.label}`}
+          className="absolute bottom-24 right-16 h-12 w-14 rounded-full border-2 border-amber-200/40 bg-black/75 px-1 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider text-amber-100 disabled:opacity-45 sm:bottom-32 sm:right-24 sm:h-14 sm:w-16 sm:text-[9px]"
+          style={{ background: `conic-gradient(rgba(251,191,36,0.55) ${hud.callIn.readyPct * 3.6}deg, rgba(0,0,0,0.75) 0deg)` }}
+          data-testid="button-call-in"
+        >
+          {hud.callIn.name}
+        </button>
+      ) : null}
+
+      {/* Dash: on-screen for touch and mouse; Shift (or the controller's dash button) works too. */}
+      {controlSettings.touch.dashButton ? (
+        <button
+          type="button"
+          onClick={() => { dashRequestRef.current = true; }}
+          disabled={(hud?.dashReadyPct ?? 100) < 100}
+          aria-label="Dash"
+          className="absolute bottom-24 right-3 h-12 w-12 rounded-full border-2 border-white/25 bg-black/75 font-mono text-[8px] font-bold uppercase leading-tight tracking-wider text-white disabled:opacity-45 sm:bottom-32 sm:right-6 sm:h-14 sm:w-14 sm:text-[9px]"
+          style={{ background: `conic-gradient(${character.palette.accent}88 ${(hud?.dashReadyPct ?? 100) * 3.6}deg, rgba(0,0,0,0.75) 0deg)` }}
+          data-testid="button-dash"
+        >
+          Dash
+        </button>
+      ) : null}
+
       {/* Ultimate */}
       <button
         type="button"
@@ -2246,7 +2339,7 @@ export function RunScreen({
       {/* Level up */}
       {phase === 'levelup' && meta.levelUpPausesEnabled ? (
         <div
-          className="absolute inset-0 flex items-end justify-start bg-black/55 p-3"
+          className="ui-fade-in absolute inset-0 flex items-end justify-start bg-black/55 p-3"
           style={{
             paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
             paddingLeft: 'max(0.75rem, env(safe-area-inset-left))',
@@ -2268,14 +2361,15 @@ export function RunScreen({
               </button>
             ) : null}
             <div className="space-y-2">
-              {choices.map((upgrade) => {
+              {choices.map((upgrade, choiceIndex) => {
                 const cardWeapon = resolveCardWeapon(upgrade);
                 return (
                   <button
                     key={upgrade.id}
                     type="button"
                     onClick={() => pickUpgrade(upgrade)}
-                    className="flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-2 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
+                    style={{ '--i': choiceIndex } as React.CSSProperties}
+                    className="ui-rise-in flex w-full items-center gap-2 rounded-sm border border-white/20 bg-white/5 p-2 text-left transition hover:border-white/60 hover:bg-white/10 active:scale-[0.99]"
                     data-testid={`button-upgrade-${upgrade.id}`}
                   >
                     {cardWeapon ? (
@@ -2403,8 +2497,8 @@ export function RunScreen({
 
       {/* Pause */}
       {(phase === 'paused' || liveDashboardOpen) && !runSettingsOpen && !pauseSoundtrackOpen ? (
-        <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
-          <div className="pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
+        <div className={`${liveDashboardOpen ? 'pointer-events-none absolute inset-y-12 right-2 z-50 flex w-[min(78vw,420px)] items-start justify-end' : 'ui-fade-in absolute inset-0 z-50 flex items-center justify-center bg-black/72 p-3'}`} data-testid="overlay-paused">
+          <div className="ui-pop-in pointer-events-auto max-h-full w-full max-w-4xl overflow-y-auto border border-cyan-200/30 bg-[#050911]/95 p-3 shadow-[0_0_36px_rgba(34,211,238,.16)]">
             <div className="mb-3 flex items-center justify-between gap-3"><div><p className="font-mono text-[9px] uppercase tracking-[.25em] text-cyan-200">Tactical dashboard</p><h2 className="text-xl font-black uppercase text-white">{liveDashboardOpen ? 'Live view' : 'Paused'}</h2></div><div className="flex gap-2">{liveDashboardOpen ? <button type="button" onClick={() => { setLiveDashboardOpen(false); setPhaseBoth('paused'); }} className="border border-amber-300/40 px-3 py-2 font-mono text-[10px] uppercase text-amber-100">Pause</button> : null}<button type="button" onClick={() => liveDashboardOpen ? setLiveDashboardOpen(false) : setPhaseBoth('playing')} className="border border-white/25 px-3 py-2 font-mono text-[10px] uppercase text-white">{liveDashboardOpen ? 'Close' : 'Resume'}</button></div></div>
             {!liveDashboardOpen ? (
               <div className="mb-3 flex items-center gap-2 border border-cyan-200/20 bg-[#08111a] px-3 py-2" data-testid="pause-music-bar">
@@ -2521,7 +2615,7 @@ export function RunScreen({
       ) : null}
 
       {phase === 'paused' && pauseSoundtrackOpen ? (
-        <div className="absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-pause-soundtrack">
+        <div className="ui-fade-in absolute inset-0 z-[70] overflow-y-auto bg-background" data-testid="overlay-pause-soundtrack">
           <MusicPanel onBack={() => setPauseSoundtrackOpen(false)} />
         </div>
       ) : null}
@@ -2623,8 +2717,8 @@ export function RunScreen({
 
       {/* Outcome */}
       {phase === 'over' ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
-          <h2 className="text-4xl font-black uppercase tracking-widest text-white drop-shadow" data-testid="text-outcome">
+        <div className="ui-fade-in pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50">
+          <h2 className="ui-pop-in text-4xl font-black uppercase tracking-widest text-white drop-shadow" data-testid="text-outcome">
             {worldRef.current?.outcome === 'cleared'
               ? 'Block cleared'
               : worldRef.current?.deathCause === 'lethal-pothole'
