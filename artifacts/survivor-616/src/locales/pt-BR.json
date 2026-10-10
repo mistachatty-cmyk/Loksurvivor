@@ -674,5 +674,14 @@
   "soundbar.seek": "Procure na pista",
   "soundbar.shuffle": "Embaralhar",
   "soundbar.repeat": "Repetir",
-  "soundbar.speed": "Velocidade de reprodução"
+  "soundbar.speed": "Velocidade de reprodução",
+  "booster.eyebrow": "Estoque pirata · Não afiliado a ninguém",
+  "booster.title": "Caixa de reforço pirata",
+  "booster.intro": "Cópias fantasmas de rostos familiares. Cada booster adiciona uma estatística aleatória para cada corrida. Os resultados podem variar, assim como o personagem na carta.",
+  "booster.cardCount": "{count} cópias fantasmas",
+  "booster.buy": "Comprar · ◫ {custo}",
+  "booster.need": "Precisa de ◫ {cost} créditos de cartão",
+  "booster.ownedTitle": "Suas cópias fantasmas · {count}",
+  "booster.empty": "Ainda não há reforços. A lixeira está bem abastecida. Honesto.",
+  "booster.ghostLabel": "Cópia fantasma"
 }
