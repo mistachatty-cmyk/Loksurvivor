@@ -105,12 +105,12 @@ function drawBackdrop(ctx: CanvasRenderingContext2D, o: SceneryOptions) {
         ctx.fillStyle = `rgba(226,242,255,${0.2 + 0.5 * tw * hash(i + 40)})`;
         ctx.fillRect(hash(i) * w, hash(i + 90) * groundY * 0.5, 1.5, 1.5);
       }
-      skyline(ctx, o, '#0a1220', '#0f1b2c', '#7dd3fc');
+      // No skyline slabs here: the roof reads as open sky, and the tower's legs run down to the floor.
       const tx = w * 0.82;
       ctx.fillStyle = '#0a121d';
       ctx.fillRect(tx - 14, groundY * 0.22, 28, 18);
-      ctx.fillRect(tx - 12, groundY * 0.22 + 18, 3, groundY * 0.5);
-      ctx.fillRect(tx + 9, groundY * 0.22 + 18, 3, groundY * 0.5);
+      ctx.fillRect(tx - 12, groundY * 0.22 + 18, 3, groundY * 0.78 - 18);
+      ctx.fillRect(tx + 9, groundY * 0.22 + 18, 3, groundY * 0.78 - 18);
       const blink = Math.sin(t / 700) > 0.55 ? 1 : 0.18;
       ctx.fillStyle = rgba(accent, blink);
       ctx.beginPath();

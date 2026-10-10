@@ -1,4 +1,4 @@
-# Hideout crew life (v0.24.5)
+# Hideout crew life (v0.24.7) and double-click dash (v0.24.8)
 
 Crew on the hideout strip used to be fixed props with a rare, minutes-apart shuffle, and every note
 (crew speech, prop results) went into one DOM box pinned over the bottom of the strip, i.e. on
@@ -41,3 +41,11 @@ everyone's feet. Both changed.
 
 - Pure rules: `hideoutCrewLife.test.ts`, `hideoutBubble.test.ts`. Browser: `e2e/hideout-crew-life.spec.ts`.
 - Visual check: seed a save with `rescuedAllyIds` and open `/?screen=hub`, as in the e2e specs.
+
+## Double-click dash
+
+- Two taps within `DASH_DOUBLE_TAP_MS` and `DASH_DOUBLE_TAP_PX` turn the operator's walk into a dash
+  (`startDash` in `engine/hideoutWalk.ts`, speed `OPERATOR_DASH_SPEED`, short cooldown). It reuses the in-run
+  settings (`getControls().mouse.doubleClickDash` / `.touch.doubleTapDash`), works on props and crew
+  (dash to their standing spot, then use them), and never runs under reduced motion. A new goal or a held
+  key ends it. The strip draws afterimages, speed lines and a dust kick-off.

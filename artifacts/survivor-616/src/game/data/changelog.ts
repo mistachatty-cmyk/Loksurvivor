@@ -1262,12 +1262,43 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.24.5',
     date: '2026-10-10',
-    publishedAt: '2026-10-10T09:00:00Z',
+    publishedAt: '2026-10-10T19:34:18Z',
+    kind: 'update',
+    title: 'Volume Knobs and Balanced Settings',
+    body: [
+      'Settings has two new volume sliders: one for gameplay sound effects and one for the hideout room ambience. Each is saved on this device and starts at the level you already heard.',
+      'The Standard settings page now flows into two balanced columns instead of leaving gaps beside tall cards. Full-width sections still span the page.',
+    ],
+  },
+  {
+    version: '0.24.6',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T19:45:04Z',
+    kind: 'bugfix',
+    title: 'Clear Roof',
+    body: [
+      'The rooftop room in the hideout no longer has the dark building bars behind it. You get open sky, stars and the water tower, with its legs standing on the floor.',
+    ],
+  },
+  {
+    version: '0.24.7',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T20:30:00Z',
     kind: 'update',
     title: 'The Crew Gets A Life',
     body: [
       'Your crew no longer stand in a row waiting for you. Each of them now has their own way of moving: Pippa never stops, Deacon takes his time, Nyx wanders everywhere, Bulbosa holds her ground, Cinder tinkers, and the shy ones back away when you walk up while the curious ones come over to see who it is. They pace, fiddle with things, visit the props in the room, stop to talk with each other, and say hello when you pass.',
       'Talking is no longer a box sitting on top of everyone. Speech now appears as a bubble beside whoever is talking, a crew member you tap stops and turns to face you, and the things you use answer in the world: the bell rings and shakes, the lid of the crate pops, the Lucky Chest has its own look and flies open, the jukebox gets the whole room dancing, and the window seat lets you sit down.',
+    ],
+  },
+  {
+    version: '0.24.8',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T20:45:00Z',
+    kind: 'update',
+    title: 'Double-Click Dash',
+    body: [
+      'In the hideout, double-click (or double-tap) a spot and your operator dashes there instead of walking, leaving a trail of afterimages. It follows the same double-click and double-tap dash settings as a run, and works on props and crew too.',
     ],
   },
 ];
