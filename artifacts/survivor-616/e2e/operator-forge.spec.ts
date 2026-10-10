@@ -65,7 +65,7 @@ test.describe('operator forge', () => {
     // Nothing about the end game is on screen before it is earned.
     await seed(page, false);
     await page.goto('/?screen=settings');
-    await expect(page.getByTestId('settings-tabs')).toHaveCount(0);
+    await expect(page.getByTestId('tab-settings-endgame')).toHaveCount(0);
     await expect(page.getByTestId('endgame-section')).toHaveCount(0);
     await expect(page.getByTestId('button-open-forge')).toHaveCount(0);
     await page.evaluate(([forgeKey, ids]) => {

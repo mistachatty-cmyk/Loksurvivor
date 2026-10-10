@@ -1259,6 +1259,27 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Huge particle storms are now capped at 600 visible sparks on High graphics, which keeps frame rate steadier on phones and older arcade machines without changing how fights look.',
     ],
   },
+  {
+    version: '0.24.5',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T19:34:18Z',
+    kind: 'update',
+    title: 'Volume Knobs and Balanced Settings',
+    body: [
+      'Settings has two new volume sliders: one for gameplay sound effects and one for the hideout room ambience. Each is saved on this device and starts at the level you already heard.',
+      'The Standard settings page now flows into two balanced columns instead of leaving gaps beside tall cards. Full-width sections still span the page.',
+    ],
+  },
+  {
+    version: '0.24.6',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T19:45:04Z',
+    kind: 'bugfix',
+    title: 'Clear Roof',
+    body: [
+      'The rooftop room in the hideout no longer has the dark building bars behind it. You get open sky, stars and the water tower, with its legs standing on the floor.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
