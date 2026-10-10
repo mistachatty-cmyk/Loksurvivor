@@ -2288,6 +2288,15 @@ export interface MetaState {
   devModeAccessUnlocked: boolean;
   /** Settings toggle for exposing every unlockable surface regardless of progress. */
   devModeAllUnlocks: boolean;
+  /**
+   * Lok ecosystem purchase entitlements gating the upper Operator Forge custom-slot
+   * tiers. No real payment processing lives in this repo yet -- these flags are the
+   * contract the Lok platform flips once a purchase completes (see
+   * .agents/memory/lok-passport-slots.md); today they're only settable via Dev Mode.
+   */
+  lokPassOwned: boolean;
+  lokPassportActive: boolean;
+  lokPassportLifetime: boolean;
   /** Enables tapping/clicking a movable prop to prime its next player impact. */
   physicsObjectClicksEnabled: boolean;
   /** When true, level-up choices pause the run; when false, the run keeps moving. */

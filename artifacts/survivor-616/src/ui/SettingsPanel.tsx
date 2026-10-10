@@ -322,6 +322,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
     setThemeCycleCollection,
     unlockDevModeAccess,
     setDevModeAllUnlocks,
+    setLokPassportTier,
     setMusicReactive,
     setSfxEnabled,
     setHideoutAmbience,
@@ -1892,6 +1893,31 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   >
                     Dev Mode: {meta.devModeAllUnlocks ? 'On' : 'Off'}
                   </button>
+                </div>
+                <div className="mt-4 border-t border-primary/20 pt-3" data-testid="dev-lok-passport-tiers">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Lok Passport slot tiers</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    No real purchase flow lives in this build yet -- these flip the same entitlement flags the Lok Shop will
+                    set once a real purchase completes, so the paid custom-slot tiers can be tested now.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {([
+                      ['lokPassOwned', 'LokPass'],
+                      ['lokPassportActive', 'Lok Passport'],
+                      ['lokPassportLifetime', 'Lifetime Lok Passport'],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setLokPassportTier(key, !meta[key])}
+                        className={`border px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${meta[key] ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:border-primary hover:text-white'}`}
+                        aria-pressed={meta[key]}
+                        data-testid={`button-toggle-${key}`}
+                      >
+                        {label}: {meta[key] ? 'On' : 'Off'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="mt-4 border-t border-primary/20 pt-3" data-testid="dev-run-tool-registry">
                   <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-primary">Registered run diagnostics</p>

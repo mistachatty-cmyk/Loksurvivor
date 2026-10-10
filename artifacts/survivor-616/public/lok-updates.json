@@ -7,6 +7,21 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 109,
+      "version": "0.24.5",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:35Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "The 616 Roster",
+      "body": [
+        "The Operator Forge's Operators tab now has a browsable roster below the creator: every one of the 69 hand-authored operators, reinterpreted through the Forge's own engine, plus your own custom operators on top. Pick any card to load it into the creator as an editable starting point -- your real operators are never changed.",
+        "Custom save slots grew from 5 to 8 earned purely by play, with a Lok Passport shop section (behind login) offering further batches up to 24 and beyond."
+      ]
+    },
+    {
       "number": 108,
       "version": "0.24.4",
       "date": "2026-10-10",

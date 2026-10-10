@@ -8,6 +8,16 @@ import { useRef, useState } from 'react';
 import { LOKSERVER_TOPICS, LOKSHOP_STOCK } from '@/game/data/lokServer';
 import { lokServerSay } from '@/game/engine/lokServerSpeak';
 import { useT } from '@/lib/i18n';
+import { useAuth } from '@/state/authStore';
+import { useMeta } from '@/game/state/metaStore';
+import { requestLokPassportPurchase, type LokPassportTier } from '@/lib/lokPassportPurchase';
+import { toast } from '@/hooks/use-toast';
+
+const PASSPORT_TIERS: { tier: LokPassportTier; name: string; blurb: string; price: string }[] = [
+  { tier: 'lokPassOwned', name: 'LokPass', blurb: 'One-time purchase. Unlocks a second batch of custom Operator Forge save slots.', price: 'one-time' },
+  { tier: 'lokPassportActive', name: 'Lok Passport', blurb: 'Subscription. Unlocks a larger batch of custom Operator Forge save slots while active.', price: 'subscription' },
+  { tier: 'lokPassportLifetime', name: 'Lifetime Lok Passport', blurb: 'One-time purchase. Unlocks the deepest batch of custom Operator Forge save slots, for good.', price: 'one-time' },
+];
 
 const RECENT_LINES = 8;
 
@@ -26,6 +36,8 @@ function OwlFace() {
 
 export function LokShopScreen({ onBack }: { onBack: () => void }) {
   const t = useT();
+  const { session } = useAuth();
+  const { meta, setLokPassportTier } = useMeta();
   const recent = useRef<string[]>([]);
   const speak = (topicId: string) => {
     const line = lokServerSay(topicId, Math.random, recent.current);
@@ -71,6 +83,41 @@ export function LokShopScreen({ onBack }: { onBack: () => void }) {
           </li>
         ))}
       </ul>
+
+      {session ? (
+        <div className="mt-6" data-testid="section-lok-passport">
+          <h2 className="text-[11px] uppercase tracking-wide text-muted-foreground">Lok Passport</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Unlocks more custom Operator Forge save slots on top of what play earns.</p>
+          <ul className="mt-2 grid gap-2">
+            {PASSPORT_TIERS.map((item) => {
+              const owned = meta[item.tier];
+              return (
+                <li key={item.tier} className="flex items-start justify-between gap-3 border border-border bg-black/20 p-3" data-testid={`lokshop-passport-${item.tier}`}>
+                  <div>
+                    <p className="text-sm font-black">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.blurb}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-mono text-[10px] uppercase text-violet-300">{item.price}</p>
+                    <button
+                      type="button"
+                      disabled={owned}
+                      onClick={() => {
+                        const result = requestLokPassportPurchase(item.tier, meta.devModeAllUnlocks, setLokPassportTier);
+                        toast({ description: result.message });
+                      }}
+                      className="mt-1 border border-border px-2 py-1 text-[10px] font-bold uppercase tracking-wide hover:bg-white/10 disabled:opacity-50"
+                      data-testid={`button-lokshop-passport-${item.tier}`}
+                    >
+                      {owned ? 'Owned' : 'Get'}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
     </main>
   );
 }

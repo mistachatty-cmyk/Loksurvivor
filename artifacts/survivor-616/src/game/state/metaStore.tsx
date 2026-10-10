@@ -280,6 +280,9 @@ export function createInitialMeta(): MetaState {
     version: META_VERSION,
     devModeAccessUnlocked: false,
     devModeAllUnlocks: false,
+    lokPassOwned: false,
+    lokPassportActive: false,
+    lokPassportLifetime: false,
     physicsObjectClicksEnabled: true,
     levelUpPausesEnabled: true,
     liveModeEnabled: false,
@@ -1262,6 +1265,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     version: META_VERSION,
     devModeAccessUnlocked: parsed.devModeAccessUnlocked === true,
     devModeAllUnlocks: parsed.devModeAccessUnlocked === true && parsed.devModeAllUnlocks === true,
+    lokPassOwned: parsed.lokPassOwned === true,
+    lokPassportActive: parsed.lokPassportActive === true,
+    lokPassportLifetime: parsed.lokPassportLifetime === true,
     physicsObjectClicksEnabled: parsed.physicsObjectClicksEnabled !== false,
     levelUpPausesEnabled: !liveModeEnabled && parsed.levelUpPausesEnabled !== false,
     liveModeEnabled,
@@ -2041,6 +2047,7 @@ type Action =
   | { type: 'checkHiddenThemeReload' }
   | { type: 'unlockDevModeAccess' }
   | { type: 'setDevModeAllUnlocks'; enabled: boolean }
+  | { type: 'setLokPassportTier'; tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime'; enabled: boolean }
   | { type: 'setPhysicsObjectClicks'; enabled: boolean }
   | { type: 'setLevelUpPauses'; enabled: boolean }
   | { type: 'setLiveMode'; enabled: boolean }
@@ -3292,6 +3299,10 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'unlockDevModeAccess':
       return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
 
+    case 'setLokPassportTier':
+      if (!state.meta.devModeAccessUnlocked) return state;
+      return { ...state, meta: { ...state.meta, [action.tier]: action.enabled } };
+
     case 'setDevModeAllUnlocks':
       if (!state.meta.devModeAccessUnlocked) return state;
       return {
@@ -4216,6 +4227,7 @@ export interface MetaContextValue {
   checkHiddenThemeReload: () => void;
   unlockDevModeAccess: () => void;
   setDevModeAllUnlocks: (enabled: boolean) => void;
+  setLokPassportTier: (tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime', enabled: boolean) => void;
   setPhysicsObjectClicks: (enabled: boolean) => void;
   setLevelUpPauses: (enabled: boolean) => void;
   setLiveMode: (enabled: boolean) => void;
@@ -4431,6 +4443,10 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const unlockDevModeAccess = useCallback(() => dispatch({ type: 'unlockDevModeAccess' }), []);
   const setDevModeAllUnlocks = useCallback(
     (enabled: boolean) => dispatch({ type: 'setDevModeAllUnlocks', enabled }),
+    [],
+  );
+  const setLokPassportTier = useCallback(
+    (tier: 'lokPassOwned' | 'lokPassportActive' | 'lokPassportLifetime', enabled: boolean) => dispatch({ type: 'setLokPassportTier', tier, enabled }),
     [],
   );
   const setPhysicsObjectClicks = useCallback(
@@ -4739,6 +4755,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       checkHiddenThemeReload,
       unlockDevModeAccess,
       setDevModeAllUnlocks,
+      setLokPassportTier,
       setPhysicsObjectClicks,
       setLevelUpPauses,
       setLiveMode,
@@ -4910,6 +4927,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     checkHiddenThemeReload,
     unlockDevModeAccess,
     setDevModeAllUnlocks,
+    setLokPassportTier,
     setPhysicsObjectClicks,
     setLevelUpPauses,
     setLiveMode,

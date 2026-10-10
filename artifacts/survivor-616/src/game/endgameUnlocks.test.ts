@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 import {
-  CUSTOM_SLOTS, ENDGAME_FEATURES, MAX_CUSTOM_SLOTS, STANDARD_MAPS, earnedEndgame, endgameReached, isSlotEarned, mapsCleared, newlyEarned,
+  ALL_CUSTOM_SLOTS, CUSTOM_SLOTS, ENDGAME_FEATURES, MAX_CUSTOM_SLOTS, STANDARD_MAPS, earnedEndgame, endgameReached, isSlotEarned, mapsCleared, newlyEarned,
   type EndgameProgress,
 } from '@/game/data/endgameUnlocks';
 import { AREAS } from '@/game/data/areas';
@@ -28,8 +28,8 @@ function installStorage(): Map<string, string> {
 const allMaps = STANDARD_MAPS.map((a) => a.id);
 const base: EndgameProgress = { clearedAreaIds: [], totalKills: 0, rescuedAllyIds: [], discoveryIds: [], lokPetBattleWins: 0 };
 const maxed: EndgameProgress = {
-  clearedAreaIds: allMaps, totalKills: 1_000_000, rescuedAllyIds: Array.from({ length: 30 }, (_, i) => `a${i}`),
-  discoveryIds: Array.from({ length: 30 }, (_, i) => `d${i}`), lokPetBattleWins: 500,
+  clearedAreaIds: allMaps, totalKills: 1_000_000, rescuedAllyIds: Array.from({ length: 100 }, (_, i) => `a${i}`),
+  discoveryIds: Array.from({ length: 100 }, (_, i) => `d${i}`), lokPetBattleWins: 1000,
 };
 
 describe('end-game unlock rules', () => {
@@ -47,10 +47,13 @@ describe('end-game unlock rules', () => {
     assert.equal(endgameReached({ clearedAreaIds: allMaps }), true);
   });
 
-  it('has five slots, each with its own unique way to earn it', () => {
-    assert.equal(MAX_CUSTOM_SLOTS, 5);
-    assert.equal(new Set(CUSTOM_SLOTS.map((s) => s.id)).size, 5);
-    assert.equal(new Set(CUSTOM_SLOTS.map((s) => s.how)).size, 5);
+  it('has eight free slots, each with its own unique way to earn it, plus more behind the Lok Passport tiers', () => {
+    assert.equal(CUSTOM_SLOTS.length, 8);
+    assert.equal(MAX_CUSTOM_SLOTS, ALL_CUSTOM_SLOTS.length);
+    assert.ok(MAX_CUSTOM_SLOTS > CUSTOM_SLOTS.length);
+    assert.equal(new Set(CUSTOM_SLOTS.map((s) => s.id)).size, 8);
+    assert.equal(new Set(CUSTOM_SLOTS.map((s) => s.how)).size, 8);
+    assert.equal(new Set(ALL_CUSTOM_SLOTS.map((s) => s.id)).size, ALL_CUSTOM_SLOTS.length, 'every slot id across every tier is unique');
     // Clearing the maps alone earns exactly the first slot; the rest each need their own goal.
     const justMaps = { ...base, clearedAreaIds: allMaps };
     assert.deepEqual(CUSTOM_SLOTS.filter((s) => isSlotEarned(s, justMaps)).map((s) => s.id), [CUSTOM_SLOTS[0]!.id]);
@@ -64,22 +67,26 @@ describe('end-game unlock rules', () => {
   it('earns every feature and slot with full progress, and each slot depends on a different stat', () => {
     const earned = earnedEndgame(maxed);
     for (const f of ENDGAME_FEATURES) assert.ok(earned.includes(f.id));
-    for (const s of CUSTOM_SLOTS) assert.ok(earned.includes(s.id));
+    for (const s of ALL_CUSTOM_SLOTS) assert.ok(earned.includes(s.id), s.id);
     const statsMoved = new Set<string>();
+    // slot-circuit has no goal, so it's earned the moment every map is cleared
+    // regardless of which stat is probed; kills/allies/discoveries each have two
+    // free slots that key off them, lokPetBattleWins has one.
+    const expectedByKey = { totalKills: 3, rescuedAllyIds: 3, discoveryIds: 3, lokPetBattleWins: 2 } as const;
     for (const [key, value] of [['totalKills', 1_000_000], ['rescuedAllyIds', maxed.rescuedAllyIds], ['discoveryIds', maxed.discoveryIds], ['lokPetBattleWins', 500]] as const) {
       const probe = { ...base, clearedAreaIds: allMaps, [key]: value } as EndgameProgress;
       const slots = CUSTOM_SLOTS.filter((s) => isSlotEarned(s, probe)).map((s) => s.id);
-      assert.equal(slots.length, 2, key);
+      assert.equal(slots.length, expectedByKey[key], key);
       slots.forEach((s) => statsMoved.add(s));
     }
-    assert.equal(statsMoved.size, 5);
+    assert.equal(statsMoved.size, 8);
   });
 
   it('reports only what is newly earned', () => {
     const before = { ...base, clearedAreaIds: allMaps };
     const fresh = newlyEarned(before, maxed);
-    assert.equal(fresh.length, CUSTOM_SLOTS.length - 1);
-    assert.ok(fresh.every((id) => CUSTOM_SLOTS.some((s) => s.id === id)));
+    assert.equal(fresh.length, ALL_CUSTOM_SLOTS.length - 1);
+    assert.ok(fresh.every((id) => ALL_CUSTOM_SLOTS.some((s) => s.id === id)));
     assert.equal(newlyEarned(maxed, maxed).length, 0);
   });
 });
@@ -154,10 +161,10 @@ describe('end-game store: toggles, slots and the roster', () => {
     assert.equal(isFeatureAvailable('inspector'), false);
   });
 
-  it('opens the Forge and five temporary slots in Dev Mode, then restores progression', () => {
+  it('opens the Forge and every temporary slot across every tier in Dev Mode, then restores progression', () => {
     (globalThis.localStorage as Storage).setItem('survivor616.meta.v1', JSON.stringify({ devModeAccessUnlocked: true, devModeAllUnlocks: true }));
     assert.equal(isFeatureEnabled('forge'), true);
-    assert.equal(earnedSlotCount(), 5);
+    assert.equal(earnedSlotCount(), ALL_CUSTOM_SLOTS.length);
     assert.equal(saveForgedOperator(makeOp('dev-operator')), true);
     assert.equal(loadRosterForgedOperators().length, 1);
 

@@ -17,11 +17,13 @@ import {
   minWidthFor, newForgedId, rerollDesign, speciesById, type FeatureField, type ForgedOperator, type OperatorDesign,
   type OperatorFlavor, type PaletteSpec, type RerollTarget,
 } from '@/game/data/operatorForge';
-import { bumpForgeStat, deleteForgedOperator, isCustomActive, recordForgeTab, setCustomActive, earnedEndgameIds, earnedSlotCount, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
-import { CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
+import { bumpForgeStat, deleteForgedOperator, isCustomActive, isSlotTierUnlocked, recordForgeTab, setCustomActive, earnedEndgameIds, earnedSlotCount, isFeatureEnabled, loadForgedOperators, saveForgedOperator } from '@/game/state/operatorForgeStore';
+import { ALL_CUSTOM_SLOTS, endgameReached } from '@/game/data/endgameUnlocks';
 import { useMeta } from '@/game/state/metaStore';
 import type { AnimName } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
+import { OperatorRoster } from './OperatorRoster';
+import type { RosterEntry } from '@/game/data/characterForgeRoster';
 import { ClassicEnemiesTab } from './ClassicEnemiesTab';
 import { ClassicLokPetsTab } from './ClassicLokPetsTab';
 import { t } from '@/lib/i18n';
@@ -281,6 +283,22 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
     notify(`Editing ${op.name}. Save to keep changes, or Save as new to make a copy. Reload afterwards to apply.`);
   };
 
+  const loadRosterEntry = (entry: RosterEntry) => {
+    if (!confirmDiscard()) return;
+    skipHistory.current = true;
+    setPast([]);
+    setFuture([]);
+    const nextDesign: OperatorDesign = design.style === 'classic' ? { ...entry.design, style: 'classic' as const } : entry.design;
+    baseDesign.current = nextDesign;
+    setDesign(nextDesign);
+    setIdentity(generateOperatorIdentity(`roster:${entry.id}`, nextDesign));
+    setSeed(`roster:${entry.id}`);
+    if (kits.some((k) => k.id === entry.id)) setKitId(entry.id);
+    setEditingId(null);
+    setDirty(true);
+    notify(`Loaded ${entry.name}'s forged look. Edit freely, then Save to keep it.`);
+  };
+
   const remove = (op: ForgedOperator) => {
     if (!window.confirm(`Delete ${op.name}? This removes the forged operator from this device.`)) return;
     deleteForgedOperator(op.id);
@@ -350,7 +368,8 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
   const species = speciesById(design.species);
   const earnedIds = earnedEndgameIds();
   const slotsEarned = earnedSlotCount();
-  const slotAvailable = (id: string) => (meta.devModeAccessUnlocked && meta.devModeAllUnlocks) || earnedIds.includes(id);
+  const slotAvailable = (slot: (typeof ALL_CUSTOM_SLOTS)[number]) =>
+    (meta.devModeAccessUnlocked && meta.devModeAllUnlocks) || (earnedIds.includes(slot.id) && isSlotTierUnlocked(slot.tier));
   const freeSlots = Math.max(0, slotsEarned - saved.length);
 
   return createPortal(
@@ -682,19 +701,23 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
 
             <section id="forge-saved" className="scroll-mt-36 border border-border bg-card p-4" data-testid="section-forge-saved">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-black uppercase tracking-wide">Custom slots ({Math.min(saved.length, slotsEarned)}/{slotsEarned} used, {CUSTOM_SLOTS.length} total)</h2>
+                <h2 className="text-sm font-black uppercase tracking-wide">Custom slots ({Math.min(saved.length, slotsEarned)}/{slotsEarned} used, {ALL_CUSTOM_SLOTS.length} total)</h2>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">Each slot holds one operator you made, built on a copy of a premade operator&apos;s kit. Your premade operators are never replaced.</p>
               <div className="mt-3"><CustomsRunSwitch onChange={refreshSaved} /></div>
               <ul className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="list-forge-saved">
                 {(() => {
                   let cursor = 0;
-                  return CUSTOM_SLOTS.map((slot) => {
-                    if (!slotAvailable(slot.id)) {
+                  return ALL_CUSTOM_SLOTS.map((slot) => {
+                    if (!slotAvailable(slot)) {
                       return (
                         <li key={slot.id} className="border border-dashed border-border/70 bg-background/30 p-3 opacity-80" data-testid={`slot-locked-${slot.id}`}>
                           <p className="text-sm font-black uppercase">{slot.label} <span className="font-mono text-[10px] tracking-widest text-muted-foreground">locked</span></p>
-                          <p className="text-xs text-muted-foreground">{slot.how}{endgameReached(meta) ? '' : ' Clear every standard map first.'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {slot.how}
+                            {endgameReached(meta) ? '' : ' Clear every standard map first.'}
+                            {slot.tier !== 'free' && !isSlotTierUnlocked(slot.tier) ? ` Visit the Lok Shop to unlock ${slot.tier === 'lokpass' ? 'LokPass' : slot.tier === 'passport' ? 'Lok Passport' : 'Lifetime Lok Passport'}.` : ''}
+                          </p>
                         </li>
                       );
                     }
@@ -759,6 +782,7 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
             </section>
           </div>
         </div>
+        <OperatorRoster savedOperators={saved} onSelectSaved={edit} onSelectRosterEntry={loadRosterEntry} />
         </div>
       </div>
     </div>,
