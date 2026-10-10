@@ -1962,7 +1962,7 @@ export function createWorld(
     lootTokensGained: 0,
     skeletonKeysGained: 0,
     cardPacksFound: [],
-    cardEffects: setup.cardEffects ?? { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false },
+    cardEffects: setup.cardEffects ?? { statMults: {}, lokPetDamageMult: 1, lokPetHasteMult: 1, magnetMult: 1, creditMult: 1, packDropBonus: 0, propBounceMult: 1, unbreakableProps: false, allElementLokPets: false, clockworkSlow: false, enemyHpMult: 1 },
     disabledEnemyIds: setup.disabledEnemyIds ?? [],
     disabledWeaponIds: setup.disabledWeaponIds ?? [],
     grpdActiveWeaponIds: setup.grpdActiveWeaponIds ?? [],
@@ -2512,6 +2512,8 @@ function spawnEnemy(
   position?: { x: number; y: number },
 ) {
   if (w.enemies.length >= enemyCap(w)) return;
+  // Booster enemy HP stacks here outside endless areas. Endless spawning composes it inside its own Math.min(1.7, ...) cap instead (see endless-mode-engine.md), so it is never applied twice.
+  if (!w.area.endless) hpMult *= w.cardEffects.enemyHpMult;
 
   let def = incomingDef;
   if (w.disabledEnemyIds && w.disabledEnemyIds.includes(incomingDef.id)) {
@@ -12193,7 +12195,7 @@ function updateEndlessSpawning(w: World, dt: number) {
   // it here would also double-apply it, since spawnEnemy applies it too.
   const spawnRateCap = w.modifiers.millionHordeMode ? 24 : w.modifiers.unleashedMode ? 12 : 3.2;
   const spawnRate = Math.min(spawnRateCap, (0.8 + tier * 0.2) * nightMult * contractSpawnMultiplier * modifierSpawnMult(w));
-  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult);
+  const hpMult = Math.min(1.7, (1 + tier * 0.07) * nightMult * w.cardEffects.enemyHpMult);
 
   const bandPool = getEndlessBandById(e.currentBandId, w.area.endlessTheme)?.enemyPool;
   const pool = bandPool?.length

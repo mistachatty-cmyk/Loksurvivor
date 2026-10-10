@@ -680,5 +680,15 @@
   "soundbar.seek": "buscar en la pista",
   "soundbar.shuffle": "barajar",
   "soundbar.repeat": "repetir",
-  "soundbar.speed": "Velocidad de reproducción"
+  "soundbar.speed": "Velocidad de reproducción",
+  "booster.eyebrow": "Acciones piratas · No afiliado a nadie",
+  "booster.title": "Contenedor de refuerzo pirata",
+  "booster.intro": "Copias fantasmas de rostros familiares. Cada refuerzo agrega una estadística aleatoria para cada ejecución. Los resultados pueden variar, al igual que el personaje de la tarjeta.",
+  "booster.cardCount": "{count} copias fantasma",
+  "booster.buy": "Comprar · ◫ {costo}",
+  "booster.need": "Necesita ◫ {coste} Créditos de tarjeta",
+  "booster.ownedTitle": "Tus copias fantasma · {count}",
+  "booster.empty": "Aún no hay refuerzos. El contenedor está bien abastecido. Honesto.",
+  "booster.ghostLabel": "copia fantasma",
+  "sleeve.locked.visualizer": "Necesita el visualizador LokPack (tienda LOK)"
 }

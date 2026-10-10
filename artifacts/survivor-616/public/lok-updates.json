@@ -7,6 +7,51 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 115,
+      "version": "0.27.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T21:20:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "LokPack Visualizer and Live Wraps",
+      "body": [
+        "Every pack wrap now uses the Fighter Print frame: the torn edge, ribbon, price roundel and barcode sit on real foil, kraft or matte stock. The foils are crinkled metal, and Retro Neon was redrawn in retro colors only, on the same torn-edge pack shape, with a black starburst, outlined lettering and the cast in black and white.",
+        "The LOK Shop sells a new LokPack Visualizer for 1500 LokTokens. Owning it unlocks the Live pack wraps in the Sleeve Counter, animated packs that cost 480 Card Credits each: Prism Holo Live, Retro Neon Live with the cast marching across, and the bonus Retro Neon Arcade, the busy full-color version."
+      ]
+    },
+    {
+      "number": 114,
+      "version": "0.26.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T21:10:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Foil, Chrome and Neon Pack Wraps",
+      "body": [
+        "The Sleeve Counter has seven new pack wraps: Gilt Foil, Platinum Chrome, Foundry Bronze and Prism Holo in real crinkled foil with a moving highlight, plus Retro Neon, Kraft Sleeve and Street Stock.",
+        "Retro Neon is the classic neon-green trading pack, with your fighters digitized and walking across it. Every wrap prints the pack's own fighter or LokPet, drawn from the real in-game sprites."
+      ]
+    },
+    {
+      "number": 113,
+      "version": "0.25.0",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T21:00:00Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Bootleg Booster Bin",
+      "body": [
+        "The Vendor has a new Bootleg Booster Bin. Totally Real Booster Packs and Bulk Hype Booster Boxes cost Card Credits and contain ghosted copies of familiar faces.",
+        "Each booster adds a random stat for every run: operatives and crew gain HP, speed, power, area, cooldown, pickup reach or armor; LokPets gain damage or speed; enemies gain HP. Results may vary."
+      ]
+    },
+    {
       "number": 112,
       "version": "0.24.8",
       "date": "2026-10-10",

@@ -679,5 +679,15 @@
   "soundbar.seek": "トラック内でシークする",
   "soundbar.shuffle": "シャッフル",
   "soundbar.repeat": "リピート",
-  "soundbar.speed": "再生速度"
+  "soundbar.speed": "再生速度",
+  "booster.eyebrow": "海賊版在庫・誰とも関係ありません",
+  "booster.title": "海賊版ブースタービン",
+  "booster.intro": "馴染みのある顔のゴーストコピー。すべてのブースターは、実行ごとにランダムな統計を追加します。結果は異なる場合があり、カードのキャラクターも異なる場合があります。",
+  "booster.cardCount": "{count} 個のゴーストコピー",
+  "booster.buy": "購入 · ◫ {コスト}",
+  "booster.need": "◫ {コスト} カード クレジットが必要です",
+  "booster.ownedTitle": "ゴースト化されたコピー · {count}",
+  "booster.empty": "まだブースターはありません。ゴミ箱には十分な在庫があります。正直。",
+  "booster.ghostLabel": "ゴーストコピー",
+  "sleeve.locked.visualizer": "LokPack Visualizer が必要です (LOK ショップ)"
 }

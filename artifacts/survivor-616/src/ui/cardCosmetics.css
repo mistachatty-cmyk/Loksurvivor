@@ -53,7 +53,7 @@
 
 /* ============ PACK: FIGHTER PRINT (190 x 304) ============ */
 .cc-print { --ac: #ff9a2e; --dk: color-mix(in srgb, var(--ac) 42%, #000); position: relative; width: 190px; height: 304px; color: var(--cc-ink); filter: drop-shadow(0 12px 14px rgba(0,0,0,.6)); }
-.cc-print .sheet { position: absolute; inset: 0; overflow: hidden; background: var(--ac);
+.cc-print .sheet, .cc-retro .sheet { position: absolute; inset: 0; overflow: hidden; background: var(--ac);
   clip-path: polygon(0 2.4%, 3% 0, 6% 2.4%, 9% 0, 12% 2.4%, 15% 0, 18% 2.4%, 21% 0, 24% 2.4%, 27% 0, 30% 2.4%, 33% 0, 36% 2.4%, 39% 0, 42% 2.4%, 45% 0, 48% 2.4%, 51% 0, 54% 2.4%, 57% 0, 60% 2.4%, 63% 0, 66% 2.4%, 69% 0, 72% 2.4%, 75% 0, 78% 2.4%, 81% 0, 84% 2.4%, 87% 0, 90% 2.4%, 93% 0, 96% 2.4%, 100% 0, 100% 97.6%, 96% 100%, 93% 97.6%, 90% 100%, 87% 97.6%, 84% 100%, 81% 97.6%, 78% 100%, 75% 97.6%, 72% 100%, 69% 97.6%, 66% 100%, 63% 97.6%, 60% 100%, 57% 97.6%, 54% 100%, 51% 97.6%, 48% 100%, 45% 97.6%, 42% 100%, 39% 97.6%, 36% 100%, 33% 97.6%, 30% 100%, 27% 97.6%, 24% 100%, 21% 97.6%, 18% 100%, 15% 97.6%, 12% 100%, 9% 97.6%, 6% 100%, 3% 97.6%, 0 100%); }
 .cc-print .nz { position: absolute; inset: 0; opacity: .22; mix-blend-mode: multiply; z-index: 8; pointer-events: none; }
 .cc-print .crimp { position: absolute; left: 0; right: 0; height: 7%; background: repeating-linear-gradient(90deg, rgba(0,0,0,.22) 0 2px, rgba(255,255,255,.08) 2px 4px); z-index: 4; }
@@ -190,3 +190,76 @@
 /* sealed (not yet collected) */
 .cc-card--sealed .art { filter: grayscale(1) brightness(.35); }
 .cc-card--sealed .seal { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; text-align: center; color: #f4ecd6; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .14em; text-transform: uppercase; background: rgba(0,0,0,.35); padding: 14px; }
+
+/* ============ PACK WRAPS: materials on the standard frame, and Retro Neon (190 x 304) ============ */
+/* ---- Retro Neon (special-craft layout): same serrated silhouette as every wrap. Standard = retro colors only (mint, black, white, silver); .cc-retro--arcade = the busy full-color bonus ---- */
+.cc-retro { --mint: #8cf2a0; position: relative; width: 190px; height: 304px; font-family: 'Oxanium', sans-serif; filter: drop-shadow(1.5px 0 0 #0a0a0a) drop-shadow(-1.5px 0 0 #0a0a0a) drop-shadow(0 1.5px 0 #0a0a0a) drop-shadow(0 -1.5px 0 #0a0a0a) drop-shadow(0 12px 14px rgba(0,0,0,.6)); }
+.cc-retro .sheet { background: #86ee8c; }
+.cc-retro .halft { position: absolute; inset: 0; background: radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1.4px) 0 0 / 6px 6px; }
+.cc-retro .holo { position: absolute; z-index: 3; background: linear-gradient(135deg, #cfd6df, #f4f6f9 22%, #dbe9f4 42%, #efe9f7 62%, #f6eee6 80%, #cfd6df); overflow: hidden; }
+.cc-retro--arcade .holo { background: linear-gradient(135deg, #ff6ad5, #ffe066 20%, #7cf7e6 40%, #8aa8ff 60%, #d98bff 80%, #ff9a6b); }
+.cc-retro .holo::after { content: ''; position: absolute; inset: -40%; background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.8) 50%, transparent 58%); transform: translateX(-120%); }
+.cc-retro--live .holo::after { animation: ccSheen 6s ease-in-out infinite; }
+@keyframes ccSheen { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+.cc-retro .holo.t { top: 0; left: 0; right: 0; height: 13px; border-bottom: 2px solid #0a0a0a; }
+.cc-retro .holo.l { top: 0; bottom: 0; left: 0; width: 11px; border-right: 2px solid #0a0a0a; }
+.cc-retro .holo.r { top: 0; bottom: 0; right: 0; width: 11px; border-left: 2px solid #0a0a0a; }
+.cc-retro .holo.b { left: 0; right: 0; bottom: 0; height: 15px; border-top: 2px solid #0a0a0a; }
+.cc-retro .burst { position: absolute; z-index: 4; top: 12px; left: 16px; transform: rotate(-6deg); }
+.cc-retro--live .burst { animation: ccPulse 3.2s ease-in-out infinite; }
+@keyframes ccPulse { 0%, 100% { transform: rotate(-6deg) scale(1); } 50% { transform: rotate(-4deg) scale(1.05); } }
+.cc-retro .ttl { position: absolute; z-index: 4; top: 60px; left: 14px; }
+.cc-retro--live .ttl .ln { animation: ccSettle 6s ease-out infinite; transform-box: fill-box; }
+@keyframes ccSettle { 0% { opacity: 0; transform: translateY(8px); } 8%, 90% { opacity: 1; transform: none; } 100% { opacity: 1; } }
+.cc-retro .fan { position: absolute; z-index: 4; left: 22px; top: 158px; width: 80px; height: 80px; }
+.cc-retro .fan .fc { position: absolute; left: 0; top: 0; width: 38px; height: 54px; display: grid; place-items: center; border: 2.5px solid #0a0a0a; border-radius: 4px; background: #fffef6; color: #0a0a0a; transform-origin: 50% 110%; }
+.cc-retro .fan .fc b { font-weight: 900; font-size: 12px; letter-spacing: .02em; }
+.cc-retro--arcade .fan .fc { width: 46px; height: auto; display: block; padding: 0; overflow: hidden; background: #0a0a0a; box-shadow: 2px 2px 0 rgba(0,0,0,.35); }
+.cc-retro .fan .f0 { transform: translate(2px, 8px) rotate(-20deg); }
+.cc-retro .fan .f1 { transform: translate(18px, 2px) rotate(-4deg); }
+.cc-retro .fan .f2 { transform: translate(34px, 8px) rotate(12deg); }
+.cc-retro .badge { position: absolute; z-index: 5; top: 146px; right: 20px; width: 68px; height: 68px; display: grid; place-items: center; border-radius: 50%; background: #0a0a0a; color: #fffef6; text-align: center; transform: rotate(8deg); }
+.cc-retro .badge > span { font-weight: 900; font-size: 9px; line-height: 1.05; letter-spacing: .04em; }
+.cc-retro .badge > span b { font-size: 21px; line-height: .9; color: #8cf2a0; }
+.cc-retro--arcade .badge { top: 140px; width: 76px; height: 76px; box-shadow: 3px 3px 0 #ff3d8b; transform: none; }
+.cc-retro--arcade .badge .rt { position: absolute; inset: 0; box-shadow: none; }
+.cc-retro--live.cc-retro--arcade .badge .rt { animation: ccSpin 18s linear infinite; }
+@keyframes ccSpin { to { transform: rotate(360deg); } }
+.cc-retro--arcade .badge .face { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; overflow: hidden; background: #2a2a34; display: block; }
+.cc-retro--arcade .badge .face > span { position: absolute; left: 50%; top: 4px; margin-left: -42px; }
+.cc-retro .road { position: absolute; z-index: 2; left: 11px; right: 11px; bottom: 15px; height: 32px; background: repeating-linear-gradient(90deg, #0a0a0a 0 8px, transparent 8px 16px) 0 4px / 100% 3px no-repeat; }
+.cc-retro--live .road { animation: ccRoad 1.2s linear infinite; background-repeat: repeat-x; }
+@keyframes ccRoad { to { background-position: -16px 4px; } }
+.cc-retro .walk { position: absolute; z-index: 4; left: 11px; right: 11px; bottom: 30px; height: 56px; overflow: hidden; }
+.cc-retro .wk { position: absolute; left: 0; bottom: -12px; transform: translateX(var(--x, 0px)); }
+.cc-retro--live .wk { animation: ccWalk 12s linear infinite; }
+.cc-retro .wk canvas { image-rendering: pixelated; }
+@keyframes ccWalk { from { transform: translateX(-90px); } to { transform: translateX(176px); } }
+.cc-retro .spark { position: absolute; z-index: 6; width: 11px; height: 11px; background: #fff; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); opacity: 0; display: none; }
+.cc-retro--live .spark { display: block; animation: ccTwinkle 3.4s ease-in-out infinite; }
+.cc-retro .spark.s1 { top: 62px; right: 22px; } .cc-retro .spark.s2 { top: 232px; right: 24px; animation-delay: -1.7s; } .cc-retro .spark.s3 { top: 140px; left: 18px; animation-delay: -1.1s; }
+.cc-retro .stk { position: absolute; z-index: 5; bottom: 17px; left: 15px; right: 15px; text-align: center; font-family: 'Space Mono', monospace; font-size: 5.5px; font-weight: 700; letter-spacing: .14em; color: #0a0a0a; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- Materials on the standard Fighter Print frame ---- */
+.cc-print .sheet .mat { position: absolute; inset: 0; z-index: 0; }
+.cc-print--gold { --ac: #e8c35a; --dk: #4a3308; --cc-ink: #24180a; --cc-paper: #fbefc2; }
+.cc-print--platinum { --ac: #c6ced8; --dk: #2c333d; --cc-ink: #12161b; --cc-paper: #f1f4f8; }
+.cc-print--bronze { --ac: #b9783f; --dk: #2e190b; --cc-ink: #1d0f06; --cc-paper: #f6dcc0; }
+.cc-print--holo { --ac: #b58cff; --dk: #1f1840; --cc-ink: #0e0e18; --cc-paper: #f6f1ff; }
+.cc-print--kraft { --ac: #c9a26b; --dk: #4a3519; --cc-ink: #2c1f0d; --cc-paper: #efe2c3; }
+.cc-print--stock { --ac: #1c1d23; --dk: #0e0f13; --cc-ink: #e9e4d6; --cc-paper: #17181d; --spot: #ff5a3c; }
+.cc-print--gold .head b, .cc-print--platinum .head b, .cc-print--holo .head b { text-shadow: 1px 1px 0 rgba(255,255,255,.5); }
+.cc-print--bronze .head, .cc-print--bronze .foot { color: #fff3e2; text-shadow: 0 1px 0 rgba(20,8,0,.9); }
+.cc-print--bronze .head { top: 0; padding-top: 9%; padding-bottom: 6px; background: linear-gradient(rgba(26,12,4,.82) 55%, rgba(26,12,4,0)); }
+.cc-print--stock .head b { text-shadow: none; }
+.cc-print--stock .stage::before { opacity: .12; }
+.cc-print--stock .ribbon { background: var(--cc-ink); color: var(--cc-paper); border-color: var(--cc-paper); }
+.cc-print--kraft .sheet .grain { background: repeating-linear-gradient(0deg, rgba(60,40,15,.1) 0 1px, transparent 1px 4px), radial-gradient(circle, rgba(60,40,15,.14) 1px, transparent 1.5px) 0 0 / 5px 5px; }
+.cc-print--stock .sheet .dots { background: radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1.4px) 0 0 / 6px 6px; }
+.cc-print--stock .sheet .spot { position: absolute; z-index: 1; top: 0; bottom: 0; left: 0; width: 7%; background: var(--spot); }
+.cc-print--gold .stage::before, .cc-print--platinum .stage::before, .cc-print--bronze .stage::before, .cc-print--holo .stage::before { opacity: .32; }
+
+/* ---- Live wraps: twinkles on the foil. Static wraps never animate; "subtle" and "off" motion switch these off. ---- */
+.cc-print .spark { position: absolute; z-index: 6; width: 12px; height: 12px; background: #fff; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); opacity: 0; filter: drop-shadow(0 0 3px #fff); animation: ccTwinkle 3.4s ease-in-out infinite; }
+.cc-print .spark.s1 { top: 14%; left: 10%; } .cc-print .spark.s2 { top: 52%; right: 9%; animation-delay: -1.1s; } .cc-print .spark.s3 { bottom: 16%; left: 22%; animation-delay: -2.2s; }
+@keyframes ccTwinkle { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0deg); } 45% { opacity: 1; transform: scale(1) rotate(45deg); } 70% { opacity: 0; transform: scale(.5) rotate(90deg); } }

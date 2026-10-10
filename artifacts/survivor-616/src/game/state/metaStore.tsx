@@ -92,6 +92,7 @@ import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDa
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
 import { CARD_COSMETICS_BY_ID, equipCardCosmetic, grantCardCosmetic, isCardCosmeticOwned, normalizeCardCosmetics } from '@/game/data/cardCosmetics';
+import { BOOSTER_PRODUCTS_BY_ID, applyBoosterToPlayerStats, boosterUnits, rollBoosterCard } from '@/game/data/boosterCards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
@@ -291,6 +292,7 @@ export function createInitialMeta(): MetaState {
     activeDropPackId: DEFAULT_DROP_PACK_ID,
     lokPetFieldGuideUnlocked: false,
     lokPetCollectorAccessUnlocked: false,
+    lokPackVisualizerUnlocked: false,
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -380,6 +382,7 @@ export function createInitialMeta(): MetaState {
     lootTokens: 0,
     cardCredits: 0,
     cardCollection: [],
+    boosterCards: [],
     unopenedCardPacks: {},
     autoOpenPacksEnabled: true,
     activePassiveCardIds: [],
@@ -530,6 +533,11 @@ function cleanCounts(value: unknown): Record<string, number> {
     for (const [key, count] of Object.entries(value as Record<string, unknown>)) out[key] = counter(count);
   }
   return out;
+}
+
+function normalizeBoosterCards(value: unknown): MetaState['boosterCards'] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((card): card is MetaState['boosterCards'][number] => !!card && typeof card.id === 'string' && typeof card.characterId === 'string' && typeof card.stat === 'string' && typeof card.group === 'string' && typeof card.productId === 'string' && Number.isInteger(card.units) && card.units >= 1);
 }
 
 function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
@@ -1328,6 +1336,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // LokToken purchases (Lok Shop) -- off by default for a returning save that predates them.
     lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
     lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
+    lokPackVisualizerUnlocked: parsed.lokPackVisualizerUnlocked === true,
     // Falls back to the pre-existing standalone localStorage toggle
     // (AttractMode.tsx's old component-local key) so a player who already
     // turned the background sim off doesn't see it silently re-enabled.
@@ -1411,6 +1420,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
     cardCollection,
+    boosterCards: normalizeBoosterCards(parsed.boosterCards),
     unopenedCardPacks: normalizeUnopenedCardPacks(parsed.unopenedCardPacks),
     autoOpenPacksEnabled: parsed.autoOpenPacksEnabled !== false,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
@@ -1727,6 +1737,8 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   for (const [key, value] of Object.entries(boosts) as Array<[keyof BaseStats, number]>) {
     stats[key] = stats[key] + value;
   }
+  // Booster cards add to the played character (character, operatives and crew groups).
+  Object.assign(stats, applyBoosterToPlayerStats(stats, boosterUnits(meta.boosterCards ?? [])));
   for (const effect of crewActivityEffects(meta)) {
     if (effect.add) stats[effect.stat] += effect.add;
     if (effect.mult) stats[effect.stat] *= effect.mult;
@@ -1991,6 +2003,7 @@ type Action =
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
+  | { type: 'buyBoosterProduct'; productId: string; now: number }
   | { type: 'buySingleCard'; cardId: string; cost: number; variant?: CardVariant }
   | { type: 'recycleCard'; cardId: string; rewardCC: number }
   | { type: 'recycleAllDuplicates' }
@@ -2069,6 +2082,7 @@ type Action =
   | { type: 'grantDropPack'; id: string }
   | { type: 'grantLokPetFieldGuide' }
   | { type: 'grantLokPetCollectorAccess' }
+  | { type: 'grantLokPackVisualizer' }
   | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
@@ -2250,6 +2264,14 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, selectedLokPetIds } };
     }
 
+    case 'buyBoosterProduct': {
+      const product = BOOSTER_PRODUCTS_BY_ID[action.productId];
+      if (!product || state.meta.cardCredits < product.cost) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ state.meta.boosterCards.length ^ product.cost) >>> 0;
+      const rng = createRng(seed);
+      const cards = Array.from({ length: product.cards }, (_, index) => rollBoosterCard(rng, product.id, action.now, index));
+      return { ...state, meta: { ...state.meta, cardCredits: state.meta.cardCredits - product.cost, boosterCards: [...state.meta.boosterCards, ...cards] } };
+    }
     case 'buyCardPack': {
       const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
       if (!pack || state.meta.cardCredits < pack.cost) return state;
@@ -3376,6 +3398,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantLokPetCollectorAccess':
       if (state.meta.lokPetCollectorAccessUnlocked) return state;
       return { ...state, meta: { ...state.meta, lokPetCollectorAccessUnlocked: true } };
+    case 'grantLokPackVisualizer':
+      if (state.meta.lokPackVisualizerUnlocked) return state;
+      return { ...state, meta: { ...state.meta, lokPackVisualizerUnlocked: true } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -3640,6 +3665,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'buyCardCosmetic': {
       const item = CARD_COSMETICS_BY_ID[action.id];
       if (!item || item.cost <= 0 || isCardCosmeticOwned(state.meta, item) || state.meta.cardCredits < item.cost) return state;
+      if (item.requiresUnlock === 'lokPackVisualizer' && !state.meta.lokPackVisualizerUnlocked) return state;
       return { ...state, meta: { ...grantCardCosmetic(state.meta, item), cardCredits: state.meta.cardCredits - item.cost } };
     }
     case 'equipCardCosmetic': {
@@ -4200,6 +4226,7 @@ export interface MetaContextValue {
   completeRun: (result: RunResult) => void;
   resolveTravelEncounter: (result: TravelEncounterResult) => void;
   buyCardPack: (packId: CardPackId) => void;
+  buyBoosterProduct: (productId: string) => void;
   craftRelic: (relicId: string) => void;
   buyKeyItemAction: (keyItemId: string, credCost: number) => void;
   buySingleCard: (cardId: string, cost: number, variant?: CardVariant) => void;
@@ -4274,6 +4301,7 @@ export interface MetaContextValue {
   grantDropPack: (id: string) => void;
   grantLokPetFieldGuide: () => void;
   grantLokPetCollectorAccess: () => void;
+  grantLokPackVisualizer: () => void;
   equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
@@ -4403,6 +4431,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
+  const buyBoosterProduct = useCallback((productId: string) => dispatch({ type: 'buyBoosterProduct', productId, now: Date.now() }), []);
   const buySingleCard = useCallback((cardId: string, cost: number, variant?: CardVariant) => dispatch({ type: 'buySingleCard', cardId, cost, variant }), []);
   const recycleCard = useCallback((cardId: string, rewardCC: number) => dispatch({ type: 'recycleCard', cardId, rewardCC }), []);
   const recycleAllDuplicates = useCallback(() => dispatch({ type: 'recycleAllDuplicates' }), []);
@@ -4498,6 +4527,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
   const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
+  const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
   const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
@@ -4728,6 +4758,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       completeRun,
       resolveTravelEncounter,
       buyCardPack,
+      buyBoosterProduct,
       buySingleCard,
       recycleCard,
       recycleAllDuplicates,
@@ -4801,6 +4832,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantDropPack,
       grantLokPetFieldGuide,
       grantLokPetCollectorAccess,
+      grantLokPackVisualizer,
       equipDropPack,
       setDamageNumberStyle,
       setCompanionRevealStyle,
@@ -4905,6 +4937,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     completeRun,
     resolveTravelEncounter,
     buyCardPack,
+    buyBoosterProduct,
     buySingleCard,
     recycleCard,
     recycleAllDuplicates,
@@ -4974,6 +5007,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantDropPack,
     grantLokPetFieldGuide,
     grantLokPetCollectorAccess,
+    grantLokPackVisualizer,
     equipDropPack,
     setDamageNumberStyle,
     setCompanionRevealStyle,

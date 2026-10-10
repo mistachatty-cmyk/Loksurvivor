@@ -680,5 +680,15 @@
   "soundbar.seek": "在轨道中寻找",
   "soundbar.shuffle": "随机播放",
   "soundbar.repeat": "重复",
-  "soundbar.speed": "播放速度"
+  "soundbar.speed": "播放速度",
+  "booster.eyebrow": "盗版股票 · 不隶属于任何人",
+  "booster.title": "盗版助推器箱",
+  "booster.intro": "熟悉面孔的幽灵副本。每个助推器都会为每次运行添加一个随机统计数据。结果可能会有所不同，卡片上的字符也可能会有所不同。",
+  "booster.cardCount": "{count} 个幻影副本",
+  "booster.buy": "购买 · ◫ {成本}",
+  "booster.need": "需要 ◫ {cost} 卡积分",
+  "booster.ownedTitle": "你的幻影副本 · {count}",
+  "booster.empty": "还没有助推器。垃圾箱里存货充足。诚实的。",
+  "booster.ghostLabel": "幽灵副本",
+  "sleeve.locked.visualizer": "需要 LokPack Visualizer（LOK 商店）"
 }

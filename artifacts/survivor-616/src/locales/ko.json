@@ -680,5 +680,15 @@
   "soundbar.seek": "트랙에서 탐색",
   "soundbar.shuffle": "셔플",
   "soundbar.repeat": "반복",
-  "soundbar.speed": "재생 속도"
+  "soundbar.speed": "재생 속도",
+  "booster.eyebrow": "해적판 주식 · 누구와도 제휴하지 않음",
+  "booster.title": "해적판 부스터 상자",
+  "booster.intro": "친숙한 얼굴의 유령 사본. 모든 부스터는 매 실행마다 무작위 통계를 추가합니다. 결과는 다를 수 있으며 카드의 문자도 다를 수 있습니다.",
+  "booster.cardCount": "{count}개의 고스트 사본",
+  "booster.buy": "구매 · ◫ {비용}",
+  "booster.need": "◫ {cost} 카드 크레딧 필요",
+  "booster.ownedTitle": "귀하의 고스트 사본 · {count}",
+  "booster.empty": "아직 부스터가 없습니다. 쓰레기통이 잘 갖춰져 있습니다. 솔직한.",
+  "booster.ghostLabel": "고스트 카피",
+  "sleeve.locked.visualizer": "LokPack Visualizer가 필요합니다(LOK Shop)."
 }

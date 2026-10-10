@@ -680,5 +680,15 @@
   "soundbar.seek": "Auf Spur suchen",
   "soundbar.shuffle": "Mischen",
   "soundbar.repeat": "Wiederholen",
-  "soundbar.speed": "Wiedergabegeschwindigkeit"
+  "soundbar.speed": "Wiedergabegeschwindigkeit",
+  "booster.eyebrow": "Raubkopien · Mit niemandem verbunden",
+  "booster.title": "Bootleg-Booster-Behälter",
+  "booster.intro": "Geisterhafte Kopien bekannter Gesichter. Jeder Booster fügt für jeden Lauf einen zufälligen Wert hinzu. Die Ergebnisse können variieren, ebenso wie der Charakter auf der Karte.",
+  "booster.cardCount": "{count} Geisterkopien",
+  "booster.buy": "Kaufen · ◫ {Kosten}",
+  "booster.need": "Benötigen Sie ◫ {cost} Kartenguthaben",
+  "booster.ownedTitle": "Ihre Geisterkopien · {count}",
+  "booster.empty": "Noch keine Booster. Der Behälter ist gut gefüllt. Ehrlich.",
+  "booster.ghostLabel": "Geisterkopie",
+  "sleeve.locked.visualizer": "Benötigt den LokPack Visualizer (LOK Shop)"
 }
