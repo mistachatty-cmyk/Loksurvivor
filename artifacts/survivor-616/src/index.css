@@ -1010,6 +1010,12 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
   :root:not([data-motion='full']) .settings-slide-from-right, :root:not([data-motion='full']) .settings-slide-from-left { animation: none; }
 }
 
+/* Hideout direction panel slide (persistent drawer, not a one-shot page transition) */
+.hideout-direction-slide { transition: transform .3s cubic-bezier(.2, .8, .2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) .hideout-direction-slide { transition: none; }
+}
+
 @keyframes registry-art-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }

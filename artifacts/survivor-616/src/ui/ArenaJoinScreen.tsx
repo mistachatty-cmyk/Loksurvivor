@@ -26,8 +26,10 @@ interface ArenaJoinScreenProps {
 export function ArenaJoinScreen({ initialCode, onBack, onLaunch }: ArenaJoinScreenProps) {
   const { meta } = useMeta();
   const unlockedCharacters = useMemo(
-    () => CHARACTERS.filter((c) => meta.unlockedCharacterIds.includes(c.id) || meta.devModeAllUnlocks),
-    [meta.unlockedCharacterIds, meta.devModeAllUnlocks],
+    () => CHARACTERS.filter((c) =>
+      (meta.unlockedCharacterIds.includes(c.id) || meta.devModeAllUnlocks) &&
+      (!c.lokPetCollector || meta.lokPetCollectorAccessUnlocked || meta.devModeAllUnlocks)),
+    [meta.unlockedCharacterIds, meta.devModeAllUnlocks, meta.lokPetCollectorAccessUnlocked],
   );
 
   const [code, setCode] = useState(initialCode?.toUpperCase() ?? '');

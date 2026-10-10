@@ -5,6 +5,7 @@ import { RUN_AURAS } from '@/game/data/runAuras';
 import { HATS, getHatStyle } from '@/game/data/hats';
 import { CELEBRATIONS, getCelebrationStyle } from '@/game/data/celebrations';
 import { DROP_PACKS } from '@/game/data/dropPacks';
+import { LOK_SHOP_UNLOCKS } from '@/game/data/lokShopUnlocks';
 import { DropPackPreview } from './DropPackPreview';
 import { hasCatalogItem } from '@/game/data/devUnlockRegistry';
 import { THEMED_PALETTES } from '@/game/data/themedPalettes';
@@ -72,7 +73,7 @@ const TIER_BADGE_CLASS = {
   legendary: 'border-amber-400/50 text-amber-300',
 } satisfies Record<CosmeticTier, string>;
 
-type ShopCategory = 'palettes' | 'auras' | 'hats' | 'celebrations' | 'drops';
+type ShopCategory = 'palettes' | 'auras' | 'hats' | 'celebrations' | 'drops' | 'unlocks';
 
 interface Props { onBack: () => void }
 
@@ -85,6 +86,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
         ['hats', 'Floating hats', Sparkles],
         ['celebrations', 'Celebrations', Sparkles],
         ['drops', 'Drop packs', Gem],
+        ['unlocks', 'Unlocks', Lock],
       ] as const).map(([id, label, Icon]) => (
         <button
           key={id}
@@ -103,7 +105,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
 }
 
 export function PaletteGalleryPanel({ onBack }: Props) {
-  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
+  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
   // LokToken-only applies per palette, and only once the live catalog actually lists it. Until then
@@ -121,7 +123,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const [visibleCount, setVisibleCount] = useState(8);
   const [reactAnim, setReactAnim] = useState<AnimName>('idle');
   const [line, setLine] = useState(VENDOR_QUIPS[0]);
-  const [notice, setNotice] = useState('Choose a commission. Every item is cosmetic-only.');
+  const [notice, setNotice] = useState('Choose a commission. Everything here is cosmetic except the Unlocks tab.');
   const resetTimer = useRef<number | undefined>(undefined);
 
   const takeoverActive = isPrimeTakeoverActive(meta, Date.now());
@@ -150,6 +152,12 @@ export function PaletteGalleryPanel({ onBack }: Props) {
       if (ownedSkus.has(catalogSku('dropPack', pack.id)) && !meta.ownedDropPackIds.includes(pack.id)) grantDropPack(pack.id);
     }
   }, [ownedSkus, meta.ownedDropPackIds, grantDropPack]);
+
+  // A feature unlock bought on another device follows the account too.
+  useEffect(() => {
+    if (ownedSkus.has(catalogSku('fieldGuideUnlock', 'field-guide')) && !meta.lokPetFieldGuideUnlocked) grantLokPetFieldGuide();
+    if (ownedSkus.has(catalogSku('collectorAccess', 'collector-access')) && !meta.lokPetCollectorAccessUnlocked) grantLokPetCollectorAccess();
+  }, [ownedSkus, meta.lokPetFieldGuideUnlocked, meta.lokPetCollectorAccessUnlocked, grantLokPetFieldGuide, grantLokPetCollectorAccess]);
 
   const primeShowing = takeoverActive || flickerActive;
   const vendorRig = primeShowing ? PRIME.rig : ARTISAN_VALOR_RIG;
@@ -225,6 +233,37 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const dropPackPrice = (pack: (typeof DROP_PACKS)[number]) =>
     priceOf(catalogSku('dropPack', pack.id)) ?? LOKTOKEN_PRICE_BY_TIER[pack.tier] ?? LOKTOKEN_PRICE_BY_TIER.standard!;
 
+  const unlockOwned = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) =>
+    unlock.id === 'field-guide' ? meta.lokPetFieldGuideUnlocked : meta.lokPetCollectorAccessUnlocked;
+  const unlockPrice = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) =>
+    priceOf(catalogSku(unlock.kind, unlock.id)) ?? LOKTOKEN_PRICE_BY_TIER[unlock.tier]!;
+  const grantUnlock = (unlockId: string) => (unlockId === 'field-guide' ? grantLokPetFieldGuide() : grantLokPetCollectorAccess());
+
+  const handleBuyUnlock = (unlockId: string) => {
+    const unlock = LOK_SHOP_UNLOCKS.find((entry) => entry.id === unlockId);
+    if (!unlock || unlockOwned(unlock)) return;
+    if (!signedIn) {
+      setNotice('Unlocks are sold for LokTokens. Sign in from the Account room to earn and spend them.');
+      return;
+    }
+    const price = unlockPrice(unlock);
+    void spend(catalogSku(unlock.kind, unlock.id)).then((result) => {
+      if (result.ok || result.error === 'already_owned') {
+        grantUnlock(unlock.id);
+        sfx.play('purchase');
+        triggerReaction(`${unlock.name} unlocked for ${result.price ?? price} LokTokens.`);
+      } else if (result.error === 'insufficient') {
+        setNotice(`Not enough LokTokens -- ${result.need ?? price} more needed.`);
+      } else if (result.error === 'rank_locked') {
+        setNotice(`${unlock.name} needs the ${result.requires} rank.`);
+      } else if (result.error === 'unknown_item') {
+        setNotice(`${unlock.name} is not on sale yet.`);
+      } else {
+        setNotice("Couldn't complete the purchase. You were not charged.");
+      }
+    });
+  };
+
   const handleBuyAura = (auraId: string) => {
     const aura = RUN_AURAS.find((entry) => entry.id === auraId);
     if (!aura || meta.ownedRunAuraIds.includes(aura.id) || meta.lootTokens < aura.cost) return;
@@ -264,7 +303,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   const previewAura = RUN_AURAS.find((aura) => aura.id === previewAuraId)?.style ?? 'street-halo';
   const previewHat = getHatStyle(previewHatId);
   const previewCelebration = getCelebrationStyle(previewCelebrationId);
-  const categoryLength = category === 'palettes' ? THEMED_PALETTES.length : category === 'auras' ? RUN_AURAS.length : category === 'hats' ? HATS.length : category === 'drops' ? DROP_PACKS.length : CELEBRATIONS.length;
+  const categoryLength = category === 'palettes' ? THEMED_PALETTES.length : category === 'auras' ? RUN_AURAS.length : category === 'hats' ? HATS.length : category === 'drops' ? DROP_PACKS.length : category === 'unlocks' ? LOK_SHOP_UNLOCKS.length : CELEBRATIONS.length;
 
   return (
     <ScreenLayout title="Customization Shop" subtitle={`${vendorName} — Paint Gallery`} onBack={onBack}>
@@ -291,15 +330,15 @@ export function PaletteGalleryPanel({ onBack }: Props) {
         <section className="flex-1 border border-border bg-card p-5 sm:p-6" data-testid="section-customization-shop">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              {category === 'palettes' ? <Palette className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+              {category === 'palettes' ? <Palette className="h-5 w-5" /> : category === 'unlocks' ? <Lock className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">{category === 'palettes' ? 'World & character colors' : category === 'auras' ? 'Procedural run effects' : category === 'hats' ? 'Floating headwear' : category === 'drops' ? 'Gems, coins, chests & materials' : 'Reward reveal effects'}</p>
-              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Run auras' : category === 'hats' ? 'Hover hats' : category === 'drops' ? 'Drop packs' : 'Celebrations'}</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">{category === 'palettes' ? 'World & character colors' : category === 'auras' ? 'Procedural run effects' : category === 'hats' ? 'Floating headwear' : category === 'drops' ? 'Gems, coins, chests & materials' : category === 'unlocks' ? 'Account-wide feature unlocks' : 'Reward reveal effects'}</p>
+              <h2 className="mt-1 text-xl font-black uppercase text-white">{category === 'palettes' ? 'Palette commissions' : category === 'auras' ? 'Run auras' : category === 'hats' ? 'Hover hats' : category === 'drops' ? 'Drop packs' : category === 'unlocks' ? 'Unlocks' : 'Celebrations'}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
                 {category === 'palettes'
                   ? 'Recolor your fighter, weapon effects, and world accents. Palettes are sold for LokTokens where the store is open (earned by playing, shared across every LOK game). Nothing here changes combat power.'
-                  : category === 'auras' ? 'Add a lightweight Canvas2D effect around your fighter. Auras use your active palette and never alter hitboxes or stats.' : category === 'hats' ? 'Equip a hovering cosmetic above your fighter. It stays visual-only and never blocks the arena.' : category === 'drops' ? 'Change how every drop looks in a run. Potato Pack is the original look and is free; the rest are sold for LokTokens. Display only: drops, rewards and the magnet never change. Performance graphics always uses Potato.' : 'Choose the burst that plays when you open a reward. Tap a card to play it on Valor before equipping it.'}
+                  : category === 'auras' ? 'Add a lightweight Canvas2D effect around your fighter. Auras use your active palette and never alter hitboxes or stats.' : category === 'hats' ? 'Equip a hovering cosmetic above your fighter. It stays visual-only and never blocks the arena.' : category === 'drops' ? 'Change how every drop looks in a run. Potato Pack is the original look and is free; the rest are sold for LokTokens. Display only: drops, rewards and the magnet never change. Performance graphics always uses Potato.' : category === 'unlocks' ? 'Permanent, account-wide unlocks sold for LokTokens. Unlike everything else in this shop, these are not cosmetic.' : 'Choose the burst that plays when you open a reward. Tap a card to play it on Valor before equipping it.'}
               </p>
 
               {category === 'palettes' ? (
@@ -389,6 +428,32 @@ export function PaletteGalleryPanel({ onBack }: Props) {
                           <button type="button" onClick={() => handleBuyDropPack(pack.id)} disabled={signedIn && !affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable || !signedIn ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-drop-pack-${pack.id}`}>
                             {signedIn && !affordable ? <Lock className="h-3 w-3" /> : null}
                             {!signedIn ? `${price} LokTokens · sign in` : affordable ? `Buy · ${price} LokTokens` : `Need ${price} LokTokens`}
+                          </button>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : category === 'unlocks' ? (
+                <div className="mt-5 grid grid-cols-1 gap-2 sm:gap-3 xl:grid-cols-2" data-testid="shop-unlocks-grid">
+                  {LOK_SHOP_UNLOCKS.map((unlock) => {
+                    const owned = unlockOwned(unlock);
+                    const price = unlockPrice(unlock);
+                    const affordable = signedIn && (lokBalance ?? 0) >= price;
+                    return (
+                      <article key={unlock.id} className={`border p-4 ${owned ? 'border-primary bg-primary/5' : 'border-border bg-background'}`} data-testid={`card-lok-shop-unlock-${unlock.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-sm font-black uppercase tracking-wide text-white">{unlock.name}</h3>
+                          {owned ? <Check className="h-4 w-4 shrink-0 text-primary" aria-label="Unlocked" /> : null}
+                        </div>
+                        <span className={`mt-2 inline-block border px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest ${TIER_BADGE_CLASS[unlock.tier]}`}>{unlock.tier}</span>
+                        <p className="mt-2 min-h-16 text-xs leading-relaxed text-muted-foreground">{unlock.description}</p>
+                        {owned ? (
+                          <div className="mt-3 w-full border border-primary/40 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-primary/70" data-testid={`status-lok-shop-unlock-${unlock.id}`}>Unlocked</div>
+                        ) : (
+                          <button type="button" onClick={() => handleBuyUnlock(unlock.id)} disabled={signedIn && !affordable} className={`mt-3 flex w-full items-center justify-center gap-2 border px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest transition-colors ${affordable || !signedIn ? 'border-primary text-primary hover:bg-primary hover:text-primary-foreground' : 'cursor-not-allowed border-border text-muted-foreground/50'}`} data-testid={`button-buy-lok-shop-unlock-${unlock.id}`}>
+                            {signedIn && !affordable ? <Lock className="h-3 w-3" /> : null}
+                            {!signedIn ? `${price} LokTokens · sign in` : affordable ? `Unlock · ${price} LokTokens` : `Need ${price} LokTokens`}
                           </button>
                         )}
                       </article>

@@ -20,6 +20,7 @@ import { RUN_AURAS } from '../src/game/data/runAuras';
 import { HATS } from '../src/game/data/hats';
 import { CELEBRATIONS } from '../src/game/data/celebrations';
 import { DROP_PACKS } from '../src/game/data/dropPacks';
+import { LOK_SHOP_UNLOCKS } from '../src/game/data/lokShopUnlocks';
 import { LOKTOKEN_PRICE_BY_TIER, PASSPORT_TIERS, catalogSku, type StoreItemKind } from '../src/lib/lokStoreCatalog';
 
 const platform = JSON.parse(readFileSync(new URL('../lok.universe.json', import.meta.url), 'utf8')) as PlatformManifest;
@@ -79,6 +80,12 @@ const catalog = [
   ...items('celebration', 'cosmetic', CELEBRATIONS),
   ...items('dropPack', 'cosmetic', DROP_PACKS),
   ...passportTiers,
+  // Feature unlocks, not cosmetics -- each entry has its own StoreItemKind, so it goes
+  // through `items()` one kind at a time rather than as one uniformly-kinded list.
+  // itemType 'boost' is the closest fit in lib/lok-universe's lok_item_type enum
+  // (theme/cursor/ui_kit/motion_pack/tool/boost/badge/sfx/title/frame/pet/cosmetic --
+  // there is no literal "unlock" or "feature" value).
+  ...LOK_SHOP_UNLOCKS.flatMap((unlock) => items(unlock.kind, 'boost', [unlock])),
 ];
 
 const outDir = process.argv[2] ?? '.';

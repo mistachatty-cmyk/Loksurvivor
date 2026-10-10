@@ -36,6 +36,7 @@ import {
 import type { PropArt } from '@/game/data/hideoutProps';
 import { lokPetSpritePalette } from '@/game/data/lokPets';
 import { evolvedRig } from '@/game/engine/petEvolution';
+import { createCrewWanderState, crewWanderFacing, stepCrewWander } from '@/game/engine/hideoutCrewWander';
 import {
   callPets,
   createHideoutPetState,
@@ -331,6 +332,7 @@ export function HideoutPreview({
       const r = range();
       return live.current.roomProps.map((info) => ({ info, x: r.min + info.x * (r.max - r.min) }));
     };
+    const crewWander = createCrewWanderState(0, rng);
     const states = new Map<string, HideoutPetState>();
     const looks = new Map<string, { rig: SpriteRig; pal: SpritePalette; scale: number; height: number }>();
     const localHistory = new Map<string, Record<string, number>>();
@@ -562,19 +564,28 @@ export function HideoutPreview({
         nearId = closeId;
         setNearProp(close ? { id: close.info.id, label: close.info.label, ready: close.info.ready } : null);
       }
+      // A single static NPC (rescued crew, or a cameo) rarely steps out from its spot,
+      // pauses as if looking at something, then returns -- see hideoutCrewWander.ts.
+      if (!reduceMotion) {
+        const npcEligible = placed.filter((p) => p.info.art === 'npc' && p.info.npc).map((p) => ({ id: p.info.id, x: p.x }));
+        stepCrewWander(crewWander, { now, dt, eligible: npcEligible, range: r, rng });
+      }
       for (const prop of placed) {
+        const wandering = prop.info.art === 'npc' && prop.info.id === crewWander.activeId;
+        const drawX = wandering ? crewWander.x : prop.x;
         if (prop.info.art === 'npc' && prop.info.npc) {
+          const facing = wandering ? crewWanderFacing(crewWander, operator.x >= drawX ? 1 : -1) : (operator.x >= drawX ? 1 : -1);
           ctx.save();
           ctx.globalAlpha = 0.3;
           ctx.fillStyle = '#000000';
           ctx.beginPath();
-          ctx.ellipse(prop.x, groundY, 13 * propUnit, 3, 0, 0, Math.PI * 2);
+          ctx.ellipse(drawX, groundY, 13 * propUnit, 3, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
-          drawRig(ctx, prop.info.npc.rig, prop.info.npc.palette, 'idle', reduceMotion ? 0 : now, prop.x, groundY, operator.x >= prop.x ? 1 : -1, scale * 0.9, { outline: true });
+          drawRig(ctx, prop.info.npc.rig, prop.info.npc.palette, 'idle', reduceMotion ? 0 : now, drawX, groundY, facing, scale * 0.9, { outline: true });
         }
         drawProp(ctx, {
-          art: prop.info.art, x: prop.x, groundY, s: propUnit, accent: prop.info.accent,
+          art: prop.info.art, x: drawX, groundY, s: propUnit, accent: prop.info.accent,
           ready: prop.info.ready, near: prop.info.id === closeId, now, reduceMotion,
         });
       }
