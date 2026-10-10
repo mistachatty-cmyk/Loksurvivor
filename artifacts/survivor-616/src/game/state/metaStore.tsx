@@ -4108,6 +4108,26 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         ];
       }
 
+      // First run ever completed: the Looks & LokPets button and the pet
+      // Play & Bond bar were hidden until now (see their hub render guards).
+      // Announce the unlock together with this run's own pet growth, since
+      // a starter pet's first level-up naturally lands on this same run.
+      if (prev.totalRuns === 0) {
+        const firstRunHeadlines = growthHeadlines(runGrowth.entries);
+        next.pendingNotifications = [
+          ...next.pendingNotifications,
+          {
+            id: `first-run-unlocks-${runNow}`,
+            title: 'Looks & LokPets unlocked',
+            body: [
+              'The Looks & LokPets button and your LokPet\'s Play & Bond bar are now available in the Hideout.',
+              ...firstRunHeadlines,
+            ].join(' '),
+            createdAt: runNow,
+          },
+        ];
+      }
+
       return {
         meta: next,
         lastCardPackReveal: state.lastCardPackReveal,

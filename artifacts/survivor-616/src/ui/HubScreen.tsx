@@ -562,16 +562,18 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         <span>{t('hub.missionBriefing')}</span>
       </button>
 
-      <button
-        type="button"
-        onClick={onOpenRunSetup}
-        className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-50 inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
-        data-testid="button-open-run-setup"
-        title={t('hub.looksLokpetsTitle')}
-      >
-        <Sparkles className="h-4 w-4 text-cyan-200" />
-        <span>{t('common.looksLokpets')}</span>
-      </button>
+      {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
+        <button
+          type="button"
+          onClick={onOpenRunSetup}
+          className="fixed right-[max(0.75rem,var(--safe-right))] top-[max(0.75rem,var(--safe-top))] z-50 inline-flex min-h-11 active:scale-95 items-center gap-2 border border-cyan-200/45 bg-slate-950/90 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 shadow-[0_6px_24px_rgba(0,0,0,.36)] backdrop-blur transition hover:border-cyan-100 hover:bg-slate-900 sm:right-5 sm:top-5"
+          data-testid="button-open-run-setup"
+          title={t('hub.looksLokpetsTitle')}
+        >
+          <Sparkles className="h-4 w-4 text-cyan-200" />
+          <span>{t('common.looksLokpets')}</span>
+        </button>
+      )}
       {companion && (
         <div className="fixed right-[max(0.75rem,var(--safe-right))] top-[calc(4rem+var(--safe-top))] z-40 flex max-w-56 items-center gap-2 border border-pink-200/35 bg-slate-950/90 p-2 shadow-xl backdrop-blur sm:right-5 sm:top-20" data-testid="hideout-lokpet-companion">
           <LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={42} />
@@ -658,7 +660,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             <div className="flex flex-wrap items-center gap-2">
               {onBack ? <button type="button" onClick={onBack} className="inline-flex min-h-10 items-center gap-1 border border-white/15 px-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-white/40 hover:text-white" data-testid="button-hub-back-to-intro" aria-label="Back to title"><ArrowLeft className="h-4 w-4" /> Back</button> : null}
               <button type="button" onClick={() => setShowLorePopup(true)} className="inline-flex min-h-10 items-center gap-2 border border-red-500/60 bg-red-950/40 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-red-100 hover:border-red-300" data-testid="button-hub-mission-briefing" title={t('hub.missionBriefingTitle')}><ShieldAlert className="h-4 w-4 text-red-400" />{t('hub.missionBriefing')}</button>
-              <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
+              {(meta.totalRuns > 0 || meta.devModeAllUnlocks) && (
+                <button type="button" onClick={onOpenRunSetup} className="inline-flex min-h-10 items-center gap-2 border border-cyan-200/45 bg-slate-950/70 px-3 font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-50 hover:border-cyan-100" data-testid="button-open-run-setup" title={t('hub.looksLokpetsTitle')}><Sparkles className="h-4 w-4 text-cyan-200" />{t('common.looksLokpets')}</button>
+              )}
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
               {companion ? <div className="flex min-w-0 max-w-full items-center gap-2 border border-pink-200/35 bg-slate-950/80 p-2" data-testid="hideout-lokpet-companion"><LokPetIcon silhouette={companion.roll.silhouette} palette={petEvolvedLook(companion).palette} overlays={petEvolvedLook(companion).overlays} size={36} /><div className="min-w-0"><p className="truncate text-[10px] font-black uppercase text-pink-100">{companion.name ?? companion.roll.name}</p><p className="font-mono text-[8px] uppercase tracking-wider text-white/55">{companion.stamina > 0 ? 'At your side' : meta.handheldDigiScopeOwned ? 'Resting in DigiScope' : 'Resting at the kennel'}</p></div></div> : null}
@@ -712,7 +716,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             {ballOut ? <span className="text-xs text-muted-foreground">{t('hideout.ball.hint')}</span> : null}
           </div>
         ) : null}
-        {meta.hideoutPreviewEnabled && meta.hideoutPetPlay && focusPet ? (
+        {meta.hideoutPreviewEnabled && meta.hideoutPetPlay && focusPet && (meta.totalRuns > 0 || meta.devModeAllUnlocks) ? (
           <HideoutPlayBar
             pet={focusPet}
             others={hideoutPets.filter((pet) => pet.id !== focusPet.id).map((pet) => ({ id: pet.id, name: pet.name }))}
