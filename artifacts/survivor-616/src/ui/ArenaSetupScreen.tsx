@@ -42,8 +42,10 @@ interface RemoteSeat {
 export function ArenaSetupScreen({ onBack, onLaunch, onJoinOnline }: ArenaSetupScreenProps) {
   const { meta } = useMeta();
   const unlockedCharacters = useMemo(
-    () => CHARACTERS.filter((c) => meta.unlockedCharacterIds.includes(c.id) || meta.devModeAllUnlocks),
-    [meta.unlockedCharacterIds, meta.devModeAllUnlocks],
+    () => CHARACTERS.filter((c) =>
+      (meta.unlockedCharacterIds.includes(c.id) || meta.devModeAllUnlocks) &&
+      (!c.lokPetCollector || meta.lokPetCollectorAccessUnlocked || meta.devModeAllUnlocks)),
+    [meta.unlockedCharacterIds, meta.devModeAllUnlocks, meta.lokPetCollectorAccessUnlocked],
   );
   const unlockedAreas = useMemo(
     () => AREAS.filter((a) => areaOpen(a, meta)),

@@ -2625,6 +2625,10 @@ export interface MetaState {
   /** Drop art packs (render-only). The free Potato Pack is the original look. */
   ownedDropPackIds: string[];
   activeDropPackId: string;
+  /** LokToken purchase (Lok Shop): unlocks the LokPet field guide in Character Select. */
+  lokPetFieldGuideUnlocked: boolean;
+  /** LokToken purchase (Lok Shop): required to select any LokPet Collector character, in addition to that character's own progress-based unlock. */
+  lokPetCollectorAccessUnlocked: boolean;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */

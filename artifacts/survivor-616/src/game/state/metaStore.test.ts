@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createInitialMeta, isUnlocked, normalizeMeta, reducer } from './metaStore';
+import { characterUnlocked, createInitialMeta, isUnlocked, normalizeMeta, reducer } from './metaStore';
 import { getCharacter } from '@/game/data/characters';
 
 function withLegacyAttractModeStorage<T>(value: string | null, callback: () => T): T {
@@ -140,6 +140,34 @@ test('Llamá Máma inherits the Crystal Cellar unlock', () => {
     isUnlocked(getCharacter('llama-mama').unlock, { ...freshMeta, clearedAreaIds: ['crystal-cellar'] }),
     true,
   );
+});
+
+test('LokPet Collector characters need the Lok Shop access purchase on top of their own unlock rule', () => {
+  const collector = getCharacter('sleeve');
+  assert.ok(collector.lokPetCollector, 'test assumes "sleeve" is a Collector-line character');
+  const freshMeta = createInitialMeta();
+  // Sleeve's own unlock rule is 'default' (always true), but Collector access is not bought yet.
+  assert.equal(isUnlocked(collector.unlock, freshMeta), true);
+  assert.equal(characterUnlocked(collector, freshMeta), false);
+  assert.equal(characterUnlocked(collector, { ...freshMeta, lokPetCollectorAccessUnlocked: true }), true);
+  // A non-Collector character is unaffected by the flag either way.
+  const operative = getCharacter('llamaste');
+  assert.equal(characterUnlocked(operative, freshMeta), isUnlocked(operative.unlock, freshMeta));
+});
+
+test('buying the LokPet field guide and Collector access are separate, idempotent, one-time flags', () => {
+  const initial = { meta: createInitialMeta(), lastRun: null, lastCardPackReveal: null };
+  assert.equal(initial.meta.lokPetFieldGuideUnlocked, false);
+  assert.equal(initial.meta.lokPetCollectorAccessUnlocked, false);
+
+  const afterGuide = reducer(initial, { type: 'grantLokPetFieldGuide' });
+  assert.equal(afterGuide.meta.lokPetFieldGuideUnlocked, true);
+  assert.equal(afterGuide.meta.lokPetCollectorAccessUnlocked, false, 'the two unlocks must not be coupled');
+  assert.equal(reducer(afterGuide, { type: 'grantLokPetFieldGuide' }), afterGuide, 'granting twice is a no-op');
+
+  const afterAccess = reducer(afterGuide, { type: 'grantLokPetCollectorAccess' });
+  assert.equal(afterAccess.meta.lokPetFieldGuideUnlocked, true);
+  assert.equal(afterAccess.meta.lokPetCollectorAccessUnlocked, true);
 });
 
 test('the GRPD Vault grants Blue 616 once after the Site Crew zone is cleared', () => {

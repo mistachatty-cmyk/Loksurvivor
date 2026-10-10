@@ -289,6 +289,8 @@ export function createInitialMeta(): MetaState {
     graphicsQuality: 'high',
     ownedDropPackIds: [DEFAULT_DROP_PACK_ID],
     activeDropPackId: DEFAULT_DROP_PACK_ID,
+    lokPetFieldGuideUnlocked: false,
+    lokPetCollectorAccessUnlocked: false,
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -1323,6 +1325,9 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     hideoutAmbienceEnabled: parsed.hideoutAmbienceEnabled === true,
     hideoutWeatherEnabled: parsed.hideoutWeatherEnabled !== false,
     hideoutArrivalEnabled: parsed.hideoutArrivalEnabled !== false,
+    // LokToken purchases (Lok Shop) -- off by default for a returning save that predates them.
+    lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
+    lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
     // Falls back to the pre-existing standalone localStorage toggle
     // (AttractMode.tsx's old component-local key) so a player who already
     // turned the background sim off doesn't see it silently re-enabled.
@@ -1624,6 +1629,19 @@ export function isUnlocked(rule: UnlockRule | undefined | null, meta: MetaState)
     default:
       return false;
   }
+}
+
+/**
+ * Whether a character is actually selectable: its own unlock rule, AND -- for
+ * the LokPet Collector line specifically -- the separate LokToken "Collector
+ * Access" purchase from the Lok Shop. The two gates are independent: a
+ * Collector character's own progress rule can be met long before the player
+ * buys access, or vice versa if dev-mode unlocks everything.
+ */
+export function characterUnlocked(character: CharacterDef, meta: MetaState): boolean {
+  if (!isUnlocked(character.unlock, meta)) return false;
+  if (character.lokPetCollector && !meta.lokPetCollectorAccessUnlocked && !meta.devModeAllUnlocks) return false;
+  return true;
 }
 
 /** Whether a place is open to the player: its own rule, or a Light Spur they followed. */
@@ -2049,6 +2067,8 @@ type Action =
   | { type: 'setPauseMapVisible'; enabled: boolean }
   | { type: 'setGraphicsQuality'; quality: MetaState['graphicsQuality'] }
   | { type: 'grantDropPack'; id: string }
+  | { type: 'grantLokPetFieldGuide' }
+  | { type: 'grantLokPetCollectorAccess' }
   | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
@@ -3349,6 +3369,13 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'equipDropPack':
       if (!hasCatalogItem(state.meta, 'dropPacks', action.id, state.meta.ownedDropPackIds)) return state;
       return { ...state, meta: { ...state.meta, activeDropPackId: action.id } };
+    // LokToken-only feature unlocks (Lok Shop), server-verified before this fires. Idempotent.
+    case 'grantLokPetFieldGuide':
+      if (state.meta.lokPetFieldGuideUnlocked) return state;
+      return { ...state, meta: { ...state.meta, lokPetFieldGuideUnlocked: true } };
+    case 'grantLokPetCollectorAccess':
+      if (state.meta.lokPetCollectorAccessUnlocked) return state;
+      return { ...state, meta: { ...state.meta, lokPetCollectorAccessUnlocked: true } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -4028,9 +4055,10 @@ function coreReducer(state: StoreState, action: Action): StoreState {
         }
       }
 
-      // Characters whose unlock rule just became true.
+      // Characters whose unlock rule just became true (Collector characters also need
+      // the separate LokToken Collector Access purchase -- see characterUnlocked).
       const newlyUnlocked = CHARACTERS.filter(
-        (c) => !next.unlockedCharacterIds.includes(c.id) && isUnlocked(c.unlock, next),
+        (c) => !next.unlockedCharacterIds.includes(c.id) && characterUnlocked(c, next),
       ).map((c) => c.id);
 
       next.unlockedCharacterIds = [...next.unlockedCharacterIds, ...newlyUnlocked];
@@ -4244,6 +4272,8 @@ export interface MetaContextValue {
   setPauseMapVisible: (enabled: boolean) => void;
   setGraphicsQuality: (quality: MetaState['graphicsQuality']) => void;
   grantDropPack: (id: string) => void;
+  grantLokPetFieldGuide: () => void;
+  grantLokPetCollectorAccess: () => void;
   equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
@@ -4466,6 +4496,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const setLevelUpPresentation = useCallback((value: MetaState['levelUpPresentation']) => dispatch({ type: 'setLevelUpPresentation', value }), []);
   const setPauseMapVisible = useCallback((enabled: boolean) => dispatch({ type: 'setPauseMapVisible', enabled }), []);
   const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
+  const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
+  const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
   const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
@@ -4658,8 +4690,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<MetaContextValue>(() => {
     const { meta } = state;
-    const unlockedCharacters = CHARACTERS.filter((c) => isUnlocked(c.unlock, meta));
-    const lockedCharacters = CHARACTERS.filter((c) => !isUnlocked(c.unlock, meta));
+    const unlockedCharacters = CHARACTERS.filter((c) => characterUnlocked(c, meta));
+    const lockedCharacters = CHARACTERS.filter((c) => !characterUnlocked(c, meta));
     const unlockedAreas = AREAS.filter((a) => areaOpen(a, meta));
     const lockedAreas = AREAS.filter((a) => !areaOpen(a, meta));
     const unlockedRooms = HUB_ROOMS.filter((r) => isUnlocked(r.unlock, meta));
@@ -4767,6 +4799,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       setPauseMapVisible,
       setGraphicsQuality,
       grantDropPack,
+      grantLokPetFieldGuide,
+      grantLokPetCollectorAccess,
       equipDropPack,
       setDamageNumberStyle,
       setCompanionRevealStyle,
@@ -4938,6 +4972,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setPauseMapVisible,
     setGraphicsQuality,
     grantDropPack,
+    grantLokPetFieldGuide,
+    grantLokPetCollectorAccess,
     equipDropPack,
     setDamageNumberStyle,
     setCompanionRevealStyle,

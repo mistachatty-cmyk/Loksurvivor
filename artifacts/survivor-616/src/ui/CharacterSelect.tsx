@@ -13,6 +13,7 @@ import {
   episodeProgress,
   episodeStatus,
   getCharacterFatigueSummary,
+  isUnlocked,
   lokPetTeamCapacity,
   useMeta,
   type CharacterFatigueSummary,
@@ -533,7 +534,11 @@ function CharacterTile({
   );
 }
 
-function LockedCharacterTile({ character }: { character: CharacterDef }) {
+function LockedCharacterTile({ character, meta }: { character: CharacterDef; meta: MetaState }) {
+  // A Collector character's own progress rule can be met while the separate
+  // LokToken Collector Access purchase is still missing -- say so plainly
+  // rather than repeating a "challenge" description that already reads done.
+  const needsCollectorAccess = Boolean(character.lokPetCollector) && !meta.lokPetCollectorAccessUnlocked && isUnlocked(character.unlock, meta);
   return (
     <div
       className="flex flex-col items-center gap-2 border border-border/60 bg-card/30 p-3 text-center opacity-60"
@@ -543,7 +548,9 @@ function LockedCharacterTile({ character }: { character: CharacterDef }) {
         <LockKeyhole className="h-5 w-5 text-muted-foreground" />
       </div>
       <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">???</span>
-      <p className="text-[9px] leading-tight text-primary/80">{describeUnlock(character.unlock)}</p>
+      <p className="text-[9px] leading-tight text-primary/80">
+        {needsCollectorAccess ? 'Buy Collector Access in the Lok Shop' : describeUnlock(character.unlock)}
+      </p>
     </div>
   );
 }
@@ -699,7 +706,19 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
             </div>
           </section>
         ) : null}
-        <LokPetVariantSheet />
+        {meta.lokPetFieldGuideUnlocked || meta.devModeAllUnlocks ? (
+          <LokPetVariantSheet />
+        ) : (
+          <section className="mb-5 border border-pink-400/30 bg-card/70 p-3 sm:p-4" data-testid="lokpet-variant-sheet-locked">
+            <div className="flex items-center gap-2">
+              <LockKeyhole className="h-4 w-4 text-pink-300" />
+              <h2 className="text-sm font-black uppercase tracking-widest text-white">LokPet field guide</h2>
+            </div>
+            <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-muted-foreground">
+              Buy the field guide from the Lok Shop to catalogue every LokPet variant and silhouette.
+            </p>
+          </section>
+        )}
 
         {layout === 'rail' ? (
           <div className="grid gap-4 lg:grid-cols-[20rem_1fr]" data-testid="section-roster-grid">
@@ -722,7 +741,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       characterLevel={characterLevelProgress(meta, character.id).level}
                     />
                   ))}
-                  {lockedOperatives.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                  {lockedOperatives.map((character) => <LockedCharacterTile key={character.id} character={character} meta={meta} />)}
                 </div>
               </section>
               <section aria-labelledby="collector-roster-heading" className="border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
@@ -742,7 +761,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                       characterLevel={characterLevelProgress(meta, character.id).level}
                     />
                   ))}
-                  {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                  {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} meta={meta} />)}
                 </div>
               </section>
             </div>
@@ -769,7 +788,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
               </Fragment>
             ))}
             {lockedOperatives.map((character) => (
-              <LockedCharacterTile key={character.id} character={character} />
+              <LockedCharacterTile key={character.id} character={character} meta={meta} />
             ))}
             <div className="col-span-full mt-3 border border-pink-300/25 bg-pink-300/5 p-3" data-testid="section-lokpet-collectors">
               <div className="mb-2 flex items-end justify-between gap-3"><div><h2 className="font-black uppercase text-pink-100">LokPet Collectors</h2><p className="text-[9px] text-muted-foreground">Complete collector runs and catch LokPets to climb ranks.</p></div><span className="font-mono text-[9px] text-pink-200">{meta.lokCollectorRuns} runs · {meta.lokCollectorPetsFound} caught</span></div>
@@ -790,7 +809,7 @@ export function CharacterSelect({ onBack, onConfirm, onLaunchEpisode }: Characte
                     {character.id === selectedCharacter.id ? <div className="col-span-full"><CharacterDetail character={selectedCharacter} meta={meta} onLaunchEpisode={onLaunchEpisode} onSelectSkin={selectCharacterSkin} inline /></div> : null}
                   </Fragment>
                 ))}
-                {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} />)}
+                {lockedCollectors.map((character) => <LockedCharacterTile key={character.id} character={character} meta={meta} />)}
               </div>
             </div>
           </div>
