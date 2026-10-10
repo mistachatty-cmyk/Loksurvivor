@@ -20,7 +20,7 @@ import { RUN_AURAS } from '../src/game/data/runAuras';
 import { HATS } from '../src/game/data/hats';
 import { CELEBRATIONS } from '../src/game/data/celebrations';
 import { DROP_PACKS } from '../src/game/data/dropPacks';
-import { LOKTOKEN_PRICE_BY_TIER, catalogSku, type StoreItemKind } from '../src/lib/lokStoreCatalog';
+import { LOKTOKEN_PRICE_BY_TIER, PASSPORT_TIERS, catalogSku, type StoreItemKind } from '../src/lib/lokStoreCatalog';
 
 const platform = JSON.parse(readFileSync(new URL('../lok.universe.json', import.meta.url), 'utf8')) as PlatformManifest;
 
@@ -60,12 +60,25 @@ const items = (kind: StoreItemKind, itemType: string, list: Priced[]): PublishIt
       };
     });
 
+// Passport tiers have their own explicit prices, not the standard/rare/legendary
+// ladder the other kinds use -- built directly rather than through `items()`.
+const passportTiers: PublishItem[] = PASSPORT_TIERS.map((tier) => ({
+  sku: catalogSku('passportTier', tier.skuId),
+  name: tier.name,
+  description: tier.blurb,
+  price: tier.price,
+  rarity: 'legendary',
+  itemType: 'boost',
+  payload: { kind: 'passportTier', id: tier.skuId },
+}));
+
 const catalog = [
   ...items('palette', 'theme', THEMED_PALETTES),
   ...items('aura', 'cosmetic', RUN_AURAS),
   ...items('hat', 'cosmetic', HATS),
   ...items('celebration', 'cosmetic', CELEBRATIONS),
   ...items('dropPack', 'cosmetic', DROP_PACKS),
+  ...passportTiers,
 ];
 
 const outDir = process.argv[2] ?? '.';

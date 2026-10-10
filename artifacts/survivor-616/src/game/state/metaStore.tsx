@@ -3300,7 +3300,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, devModeAccessUnlocked: true } };
 
     case 'setLokPassportTier':
-      if (!state.meta.devModeAccessUnlocked) return state;
+      // Granted either by a real LokToken purchase (LokShopScreen) or, for
+      // testing, by the Dev Mode panel -- both call sites gate themselves;
+      // this reducer just records the grant.
       return { ...state, meta: { ...state.meta, [action.tier]: action.enabled } };
 
     case 'setDevModeAllUnlocks':

@@ -124,3 +124,70 @@ deciding whether LokBook's live payment webhook gets modified to also write to t
 shared project (a production-payment-system change with real blast radius, out of
 scope for this pass -- the user asked for this cross-repo state to be documented, not
 acted on). Until then, Dev Mode is the only grant path, by design, everywhere.
+
+## Update (2026-10-10, later same day): the Passport tiers are real now -- just not via Stripe
+
+The survey above is about *real-money* billing, which is correctly still unwired
+everywhere. But it missed something already live in **this** repo:
+`src/state/lokEconomyStore.tsx` is a real, working, server-authoritative LokToken
+economy (`@workspace/lok-client`'s `spendLokTokens`/`fetchCatalog`/`fetchOwnedSkus`
+against a real Supabase project), already used to sell palettes, auras, hats,
+celebrations and drop packs for LokTokens. LokTokens are *earned in-game*, not bought
+with real money anywhere in this codebase -- so a LokToken purchase needs no Stripe
+bridge at all to be genuine.
+
+So the three tiers are now sold exactly like every other LokToken-only cosmetic:
+- `lokStoreCatalog.ts` gained `'passportTier'` as a `StoreItemKind` (added to
+  `LOKTOKEN_ONLY_KINDS`) and `PASSPORT_TIERS: PassportTierDef[]`, mapping each tier to
+  a `skuId` (`lokpass`/`lokpassport`/`lifetime`), its `metaFlag`, and a placeholder
+  price (2000/5000/12000 tokens -- live `lok_catalog` prices win once seeded, same
+  rule as everything else).
+- `lokPassportPurchase.ts` now calls `useLokEconomy().spend(catalogSku('passportTier',
+  tier.skuId))` for real and grants the meta flag on success (or on `already_owned`,
+  for an account that bought it elsewhere) -- no more Dev-Mode-only gate. The
+  `setLokPassportTier` reducer in `metaStore.tsx` dropped its dev-mode check
+  accordingly; both the real purchase and the Dev Mode testing panel call the same
+  action, each gated at their own call site.
+- `LokShopScreen.tsx` mirrors `PaletteGalleryPanel.tsx`'s established pattern exactly:
+  shows the live LokToken balance, disables "Buy" when signed out or unaffordable, and
+  syncs `ownedSkus` back into the meta flags on mount so a tier bought on another
+  device follows the account.
+- `scripts/export-lok-registry.ts` now emits `survivor616.passportTier.*` rows into
+  `survivor616.catalog.sql` with their real prices -- still needs applying to the live
+  `lok_catalog` table by whoever administers it (same as any other catalog change;
+  this script has never had DB credentials and still doesn't).
+
+**What's still genuinely unwired**: real-money billing (Stripe, a subscription that
+auto-renews, "Lok Passport" as an actual recurring charge) -- everything the survey
+above found missing across the ecosystem is still missing. What changed is that the
+tiers don't need any of that to be real purchases *today*: they're LokToken sinks,
+same as a theme or a drop pack, and LokTokens are already real.
+
+## Backlog: other things worth selling for LokTokens
+
+The player asked for a plan, not just the three named tiers. Candidates, roughly
+ordered by how directly they reuse what already exists:
+
+1. **The three `LOKSHOP_STOCK` placeholders** (`game/data/lokServer.ts`: `ball`,
+   `chest-pass`, `pet-rider-saddle`). These are flavor-named shelf mockups with **no
+   backing mechanic anywhere in the codebase** -- buying one today would do nothing,
+   because nothing was ever designed for them to grant. Before wiring these to real
+   `spend()` calls, each needs an actual in-game effect decided (a cosmetic? a LokPet
+   accessory, given "saddle"/"rider"? a travel-encounter item, given "chest-pass"?).
+   Don't invent that gameplay blind -- surface the question to the player first.
+2. **A LokToken-priced Forge identity reroll pack** -- `OperatorForgePanel.tsx`
+   already has free "Reroll name and bio" / "Roll body" / "Roll palette" buttons; a
+   paid variant could be a cosmetic-only convenience (e.g. a bundle that rerolls
+   every category at once, or unlocks the faction races list without the endgame
+   gate) rather than a new mechanic.
+3. **More `THEMED_PALETTES`/`RUN_AURAS`/`HATS`/`CELEBRATIONS`/`DROP_PACKS` entries** --
+   the lowest-effort path, since the catalog plumbing, pricing tiers and export script
+   already handle arbitrary new entries in those five lists with zero new code.
+4. **A standalone single extra custom slot**, independent of the three tiers, for a
+   player who wants one or two more slots without buying a whole tier. Deliberately
+   not built alongside the tiers above: it would compete with the tier pricing/value
+   ladder (why buy LokPass's 6 slots for 2000 if one slot is available piecemeal for
+   less?), so it needs a pricing decision before it's just a code change.
+
+None of these are built; this is the plan the player asked for, to pick up when
+there's a concrete next item to ship.

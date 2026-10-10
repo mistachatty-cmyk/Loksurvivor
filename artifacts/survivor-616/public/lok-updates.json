@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 110,
+      "version": "0.24.6",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T01:20:40Z",
+      "kind": "update",
+      "categoryLabel": "Major Update",
+      "categoryColor": "#22d3ee",
+      "categoryLore": "The city finds a brighter rhythm.",
+      "title": "Lok Passport Goes Live",
+      "body": [
+        "LokPass, Lok Passport and Lifetime Lok Passport are now real purchases in the Lok Shop, paid in LokTokens just like a theme or drop pack -- your balance shows, and a tier bought on one device follows your account everywhere."
+      ]
+    },
+    {
       "number": 109,
       "version": "0.24.5",
       "date": "2026-10-10",

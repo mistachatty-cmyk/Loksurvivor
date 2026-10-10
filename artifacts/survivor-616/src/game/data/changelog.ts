@@ -1270,6 +1270,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Custom save slots grew from 5 to 8 earned purely by play, with a Lok Passport shop section (behind login) offering further batches up to 24 and beyond.',
     ],
   },
+  {
+    version: '0.24.6',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:40Z',
+    kind: 'update',
+    title: 'Lok Passport Goes Live',
+    body: [
+      'LokPass, Lok Passport and Lifetime Lok Passport are now real purchases in the Lok Shop, paid in LokTokens just like a theme or drop pack -- your balance shows, and a tier bought on one device follows your account everywhere.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
