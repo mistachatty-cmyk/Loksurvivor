@@ -12,7 +12,7 @@ import type { HubPanel, UnlockRule } from '@/game/types';
 import { bondDayKey } from '@/game/engine/petGrowth';
 import type { SmallReward } from '@/game/engine/hideoutRewards';
 
-export type PropArt = 'crate' | 'bell' | 'lamp' | 'scope' | 'jar' | 'stash' | 'seat' | 'jukebox' | 'cat' | 'npc' | 'door';
+export type PropArt = 'crate' | 'bell' | 'lamp' | 'scope' | 'jar' | 'stash' | 'seat' | 'jukebox' | 'cat' | 'npc' | 'door' | 'chest';
 
 export interface PropRewardRow {
   weight: number;
@@ -116,7 +116,7 @@ export const HIDEOUT_PROPS: HideoutPropDef[] = [
     action: { kind: 'reward', table: [{ weight: 1, reward: { cred: 6 } }] },
   },
   {
-    id: 'lucky-chest', roomIds: ['main-floor'], x: 0.68, art: 'crate', accent: '#facc15',
+    id: 'lucky-chest', roomIds: ['main-floor'], x: 0.68, art: 'chest', accent: '#facc15',
     labelKey: 'hideout.prop.lucky-chest.label',
     lineKeys: ['hideout.prop.lucky-chest.line.1', 'hideout.prop.lucky-chest.line.2'],
     cooldown: 0,

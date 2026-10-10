@@ -219,9 +219,29 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
   const [focusPetId, setFocusPetId] = useState<string | undefined>(undefined);
   const noticeSeqRef = useRef(0);
   const crewRecentRef = useRef(new Map<string, string[]>());
-  const showStripNotice = (title: string, line: string) => {
+  // `anchor` (a prop id, `operator` or `pet:<id>`) draws the note as a speech bubble beside that
+  // thing on the strip; without one it falls back to the small corner note.
+  const showStripNotice = (title: string, line: string, anchor?: string) => {
     noticeSeqRef.current += 1;
-    setStripNotice({ seq: noticeSeqRef.current, title, line });
+    setStripNotice({ seq: noticeSeqRef.current, title, line, anchor });
+  };
+  const [crewSay, setCrewSay] = useState<{ seq: number; propId: string; line: string } | undefined>(undefined);
+  // One line from a crew member's own voice. Used when you talk to them and when two of them chat.
+  const crewLineFor = (allyId: string): string | undefined => {
+    const ally = rescuedAllies.find((candidate) => candidate.id === allyId);
+    if (!ally) return undefined;
+    const seen = crewRecentRef.current.get(allyId) ?? [];
+    const line = crewSpeak({
+      allyId,
+      roomName: activeRoom?.name ?? '',
+      weather: getHideoutScene(activeRoomId).weather,
+      crewNames: rescuedAllies.filter((other) => other.id !== allyId).map((other) => other.name),
+      tone: getCrewTalkTone(),
+      rng: Math.random,
+      recent: seen,
+    });
+    crewRecentRef.current.set(allyId, [...seen, line].slice(-12));
+    return line;
   };
 
   // The props standing in this room. Memoized so a poll tick does not rebuild them (the strip
@@ -233,7 +253,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     const crewHere = rescuedAllies.filter((ally) => ally.room === activeRoomId);
     const crewInfos: HideoutPropInfo[] = crewHere.map((ally, i) => ({
       id: `ally:${ally.id}`,
-      x: Math.min(0.9, 0.2 + ((i + 1) / (crewHere.length + 1)) * 0.6),
+      // Spread across the middle of the strip with room for each to move; they roam from here.
+      x: 0.2 + ((i + 0.5) / crewHere.length) * 0.6,
       art: 'npc',
       accent: ally.palette.accent,
       label: ally.name,
@@ -274,7 +295,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     setPlayCue({ seq: noticeSeqRef.current, petId: focusPet.id, move: def.move, emote: def.emote, durationMs: def.durationMs });
     const line = t(outcome.rareTextKey ?? def.lineKeys[outcome.mood], { pet: name, you: focusPet.names?.callsYou?.trim() || 'you' });
     const found = describeReward(outcome.applied, t);
-    showStripNotice(t(def.labelKey), found ? `${line} ${t('hideout.life.found', { items: found })}` : line);
+    showStripNotice(t(def.labelKey), found ? `${line} ${t('hideout.life.found', { items: found })}` : line, `pet:${focusPet.id}`);
   };
 
   const handlePickup = (kindId: string, _seed: number): boolean => {
@@ -283,7 +304,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     const preview = grantWithFallback(meta, def.reward, undefined, { now: Date.now(), elixirCap: ELIXIR_CAP });
     if (!preview.paid) return false;
     collectHideoutPickup(kindId);
-    showStripNotice(t('hideout.ambient.title'), t('hideout.ambient.found', { items: describeReward(preview.applied, t) }));
+    showStripNotice(t('hideout.ambient.title'), t('hideout.ambient.found', { items: describeReward(preview.applied, t) }), 'operator');
     return true;
   };
 
@@ -291,19 +312,10 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     if (propId.startsWith('ally:')) {
       const ally = rescuedAllies.find((candidate) => candidate.id === propId.slice(5));
       if (!ally) return;
-      if (getCrewTalkMode() === 'blurb') { showStripNotice(ally.name, ally.blurb); return; }
-      const seen = crewRecentRef.current.get(ally.id) ?? [];
-      const line = crewSpeak({
-        allyId: ally.id,
-        roomName: activeRoom?.name ?? '',
-        weather: getHideoutScene(activeRoomId).weather,
-        crewNames: rescuedAllies.filter((other) => other.id !== ally.id).map((other) => other.name),
-        tone: getCrewTalkTone(),
-        rng: Math.random,
-        recent: seen,
-      });
-      crewRecentRef.current.set(ally.id, [...seen, line].slice(-12));
-      showStripNotice(ally.name, line);
+      const spoken = getCrewTalkMode() === 'blurb' ? ally.blurb : crewLineFor(ally.id);
+      if (!spoken) return;
+      noticeSeqRef.current += 1;
+      setCrewSay({ seq: noticeSeqRef.current, propId, line: spoken });
       return;
     }
     const def = HIDEOUT_PROPS_BY_ID[propId];
@@ -314,14 +326,14 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
     const line = t(def.lineKeys[Math.floor(Math.random() * def.lineKeys.length)] ?? def.lineKeys[0]!);
     const action = def.action;
     if (action.kind === 'talk') {
-      showStripNotice(title, line);
+      showStripNotice(title, line, propId);
     } else if (action.kind === 'panel') {
-      showStripNotice(title, line);
+      showStripNotice(title, line, propId);
       onOpen(action.panel);
     } else if (action.kind === 'reward') {
       const now = Date.now();
       if (!propReady(def, meta.hideoutClaims, now)) {
-        showStripNotice(title, t('hideout.life.usedToday'));
+        showStripNotice(title, t('hideout.life.usedToday'), propId);
         return;
       }
       // Preview with the same seed the reducer will use, so the toast shows exactly what was paid.
@@ -330,24 +342,24 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       const preview = roll ? grantWithFallback(meta, roll.reward, roll.fallback, { now, rare: roll.rare, elixirCap: ELIXIR_CAP }) : null;
       if (!preview?.paid) {
         // The daily caps would swallow this grant: say so and keep the claim for later.
-        showStripNotice(title, t('hideout.life.capped'));
+        showStripNotice(title, t('hideout.life.capped'), propId);
         return;
       }
       activateHideoutProp(propId, seed);
       const found = preview ? describeReward(preview.applied, t) : '';
       const text = roll && roll.rare && preview && !preview.usedFallback && roll.textKey ? t(roll.textKey) : line;
-      showStripNotice(title, found ? `${text} ${t('hideout.life.found', { items: found })}` : text);
+      showStripNotice(title, found ? `${text} ${t('hideout.life.found', { items: found })}` : text, propId);
     } else if (action.kind === 'chest') {
       const now = Date.now();
       const status = chestStatus(meta, now);
       if (status !== 'out') {
-        showStripNotice(title, t(status === 'opened' ? 'chest.opened' : 'chest.away'));
+        showStripNotice(title, t(status === 'opened' ? 'chest.opened' : 'chest.away'), propId);
         return;
       }
       const seed = Math.floor(Math.random() * 0x7fffffff);
       const opening = previewLuckyChest(meta, now, seed, ELIXIR_CAP);
       if (!opening) {
-        showStripNotice(title, t('hideout.life.capped'));
+        showStripNotice(title, t('hideout.life.capped'), propId);
         return;
       }
       openLuckyChest(seed);
@@ -358,7 +370,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         : loot.cosmeticId
           ? t('chest.found.cosmetic', { name: CARD_COSMETICS_BY_ID[loot.cosmeticId]?.name ?? loot.cosmeticId })
           : t('hideout.life.found', { items: describeReward(opening.applied, t) });
-      showStripNotice(`${title} - ${tierLabel}`, found);
+      showStripNotice(`${title} - ${tierLabel}`, found, propId);
     } else if (action.kind === 'sky') {
       const sky = skyAt(Date.now());
       const started = startSkyBoost(meta.skyBoost, Date.now());
@@ -367,11 +379,11 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       const running = activeSkyBoost(started ?? meta.skyBoost, Date.now());
       const suffix = started ? t('sky.started') : running ? t('sky.running', { title: t(running.titleKey as never) }) : '';
       const spurLine = spur ? t('sky.spur', { name: spur.name }) : '';
-      showStripNotice(t(sky.titleKey as never), `${t(sky.lineKey as never)} ${suffix} ${spurLine}`.replace(/\s+/g, ' ').trim());
+      showStripNotice(t(sky.titleKey as never), `${t(sky.lineKey as never)} ${suffix} ${spurLine}`.replace(/\s+/g, ' ').trim(), propId);
     } else if (action.kind === 'event') {
       const now = Date.now();
       if (!propReady(def, meta.hideoutClaims, now)) {
-        showStripNotice(title, t('hideout.life.usedToday'));
+        showStripNotice(title, t('hideout.life.usedToday'), propId);
         return;
       }
       const pet = eventPetFor(meta);
@@ -379,9 +391,9 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
         ? pickChoiceEvent(action.pool, meta.hideoutClaims, { now, pet, weather: getHideoutScene(activeRoomId).weather, musicPlaying: beatBus.read().source !== 'none' }, Math.random)
         : null;
       if (picked && onStartChoiceEvent) onStartChoiceEvent(picked.id, def.id);
-      else showStripNotice(title, line);
+      else showStripNotice(title, line, propId);
     } else {
-      showStripNotice(title, line);
+      showStripNotice(title, line, propId);
     }
   };
 
@@ -688,6 +700,8 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             interactive={meta.hideoutInteractive}
             keyboardActive={!showArrival && !showLorePopup && !showCurrencyGlossary}
             notice={stripNotice}
+            crewSpeak={crewLineFor}
+            say={crewSay}
             summonSeq={summonSeq}
             onPickup={handlePickup}
             ball={{ present: ballOut && meta.ownsBall && meta.hideoutInteractive, themeId: meta.uiTheme }}
