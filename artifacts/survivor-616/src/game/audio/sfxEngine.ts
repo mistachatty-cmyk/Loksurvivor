@@ -20,6 +20,7 @@ import {
   type SfxCueId,
   type SfxStyleDef,
 } from './sfxCues';
+import { sfxVolumeGain } from '@/game/state/audioLevelSettings';
 
 export interface SfxEngine {
   play(cueId: SfxCueId, style: SfxStyleDef, onBeat: boolean): void;
@@ -192,6 +193,7 @@ export function createSfxEngine(context: AudioContext | null): SfxEngine {
   return {
     play(cueId, style, onBeat) {
       if (!enabled || context.state === 'closed' || !master) return;
+      master.gain.value = SFX_MASTER_GAIN * sfxVolumeGain();
       const nowMs = context.currentTime * 1000;
       if (!shouldPlayCue(cueId, nowMs, lastPlayedAtMs.get(cueId), activeVoices)) return;
 

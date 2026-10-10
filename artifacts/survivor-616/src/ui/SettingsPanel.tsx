@@ -9,6 +9,7 @@ import {
   Download,
   FlaskConical,
   FlipVertical2,
+  House,
   Languages,
   LayoutDashboard,
   LayoutList,
@@ -70,6 +71,7 @@ import {
   useT,
 } from '@/lib/i18n';
 import { BUILDING_ENTRY_STYLES, getBuildingEntryStyle, setBuildingEntryStyle, type BuildingEntryStyle } from '@/game/state/buildingEntrySetting';
+import { getAmbienceVolumePercent, getSfxVolumePercent, setAmbienceVolumePercent, setSfxVolumePercent } from '@/game/state/audioLevelSettings';
 
 export interface SettingsPanelProps {
   onBack: () => void;
@@ -81,7 +83,8 @@ const SETTINGS_DESTINATIONS = [
   { id: 'settings-display', label: 'Display and performance', terms: 'graphics frame rate fog zoom fullscreen' },
   { id: 'settings-ui-layout', label: 'UI layout', terms: 'new dock classic corners music mission briefing looks companion' },
   { id: 'settings-audio', label: 'Audio and atmosphere', terms: 'music sound effects ambience weather' },
-  { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode' },
+  { id: 'settings-gameplay', label: 'Gameplay', terms: 'travel encounter fight style live mode building entrances' },
+  { id: 'settings-hideout', label: 'Hideout and intro', terms: 'hideout arrival weather pets events notices sticky splash title intro physics' },
   { id: 'settings-controls', label: 'Controls', terms: 'tilt steering gyro sensitivity touch' },
   { id: 'settings-accessibility', label: 'Accessibility', terms: 'motion animation transparency' },
   { id: 'settings-update-notices', label: 'Update notices', terms: 'popup bugfix hotfix major update expansion' },
@@ -102,7 +105,7 @@ function SettingsJumpNav() {
   const [query, setQuery] = useState('');
   const matches = SETTINGS_DESTINATIONS.filter((item) => `${item.label} ${item.terms}`.toLowerCase().includes(query.trim().toLowerCase()));
   return (
-    <nav className="border border-border bg-card p-4 lg:col-span-2" aria-label="Settings sections">
+    <nav className="border border-border bg-card p-4 lg:[column-span:all]" aria-label="Settings sections">
       <label htmlFor="settings-section-search" className="block text-sm font-black uppercase text-white">Find a section</label>
       <input id="settings-section-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try audio, controls, Forge..." className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm text-white" />
       <div className="mt-3 flex flex-wrap gap-2">
@@ -125,6 +128,41 @@ function MusicVolumeSetting() {
   </div>;
 }
 /**
+ * Device-local volume for one synthesized layer (gameplay SFX or hideout
+ * ambience). Same box and slider as the music volume above it.
+ */
+function LayerVolumeSetting({ id, title, description, read, write, disabled, testId }: {
+  id: string;
+  title: string;
+  description: string;
+  read: () => number;
+  write: (percent: number) => void;
+  disabled: boolean;
+  testId: string;
+}) {
+  const t = useT();
+  const [percent, setPercent] = useState(read);
+  return <div className="mt-3 border border-border/70 bg-background/50 p-4">
+    <h3 className="text-sm font-black uppercase tracking-wide text-white">{title}</h3>
+    <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+    <label className="mt-3 block text-xs text-white" htmlFor={id}>{t('settings.audioLevel.volume')} {percent}%</label>
+    <input
+      id={id}
+      type="range"
+      min={0}
+      max={100}
+      step={1}
+      value={percent}
+      disabled={disabled}
+      onChange={(event) => { const next = Number(event.target.value); write(next); setPercent(next); }}
+      className="mt-2 w-full accent-primary disabled:opacity-40"
+      data-testid={testId}
+    />
+    {disabled ? <p className="mt-2 text-xs text-muted-foreground">{t('settings.audioLevel.turnedOff')}</p> : null}
+  </div>;
+}
+
+/**
  * Language picker. Hidden until at least one translated file exists, so it
  * adds nothing to the screen before the Auto-translate action has run.
  */
@@ -137,7 +175,7 @@ function LanguageSetting() {
     void setLanguagePreference(next);
   };
   return (
-    <section id="settings-language" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-language-settings">
+    <section id="settings-language" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="section-language-settings">
       <div className="flex items-start gap-4">
         <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
           <Languages className="h-5 w-5" />
@@ -431,16 +469,16 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
   return (
     <ScreenLayout title={t('settings.title')} subtitle={t('settings.subtitle')} onBack={onBack} action={onOpenLooksAndLokPets ? <button type="button" onClick={onOpenLooksAndLokPets} className="border border-pink-200/40 bg-pink-300/10 px-4 py-3 font-mono text-[10px] font-bold uppercase tracking-widest text-pink-100" data-testid="button-settings-looks-lokpets">{t('common.looksLokpets')}</button> : undefined}>
     <SettingsPager endgame={<EndgameSettings />} controls={<ControlsSettings />} standard={
-      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-2">
+      <div className="mx-auto max-w-5xl lg:columns-2 lg:gap-x-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
         <SettingsJumpNav />
-        <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-ui-layout">
+        <section id="settings-ui-layout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-ui-layout">
           <h2 className="text-xl font-black uppercase text-white">Hideout control layout</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">The new dock keeps Mission Briefing, Looks & LokPets, your companion, and music above the walking scene. Classic keeps the original corner positions.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {(['new', 'classic'] as const).map((layout) => <button key={layout} type="button" onClick={() => setUiChromeLayout(layout)} aria-pressed={chromeLayout === layout} className={`min-h-11 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider ${chromeLayout === layout ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary hover:text-white'}`} data-testid={`button-ui-layout-${layout}`}>{layout === 'new' ? 'New dock' : 'Classic corners'}</button>)}
           </div>
         </section>
-        <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="settings-update-notices">
+        <section id="settings-update-notices" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="settings-update-notices">
           <h2 className="text-xl font-black uppercase text-white">Update notices</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Choose which releases open a popup when you return to the hideout. Every release remains in Updates and the Archive, even when its popup is off.
@@ -472,7 +510,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
         <LanguageSetting />
-        <div id="settings-accessibility" className="space-y-4 scroll-mt-24 lg:col-span-2">
+        <div id="settings-accessibility" className="space-y-4 scroll-mt-24 lg:[column-span:all]">
           <UiTransparencyControls />
           <section className="border border-border bg-card p-5 sm:p-6">
             <TextSizeSetting />
@@ -705,7 +743,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
 
         {/* Studio plugins -- off unless deliberately enabled, because this is
             the one feature that runs code from off the device. */}
-        <section className="border border-border bg-card/60 p-6">
+        <section className="border border-border bg-card/60 p-5 sm:p-6">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-amber-300/40 bg-amber-400/10 text-amber-200">
               <Plug className="h-5 w-5" />
@@ -815,6 +853,15 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
+              <LayerVolumeSetting
+                id="settings-sfx-volume"
+                title={t('settings.audioLevel.sfxTitle')}
+                description={t('settings.audioLevel.sfxDescription')}
+                read={getSfxVolumePercent}
+                write={setSfxVolumePercent}
+                disabled={!meta.sfxEnabled}
+                testId="input-sfx-volume"
+              />
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -838,6 +885,34 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   >
                     {meta.hideoutAmbienceEnabled ? 'On' : 'Off'}
                   </button>
+                </div>
+              </div>
+              <LayerVolumeSetting
+                id="settings-ambience-volume"
+                title={t('settings.audioLevel.ambienceTitle')}
+                description={t('settings.audioLevel.ambienceDescription')}
+                read={getAmbienceVolumePercent}
+                write={setAmbienceVolumePercent}
+                disabled={!meta.hideoutAmbienceEnabled}
+                testId="input-ambience-volume"
+              />
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-hideout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-hideout-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
+              <House className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-200">Hideout</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Hideout and intro</h2>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                    How the hideout looks and what runs in it, plus the title screen and intro you see before a run.
+                  </p>
                 </div>
               </div>
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
@@ -1175,6 +1250,22 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </label>
                 ) : null}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="settings-gameplay" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-gameplay-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              <Compass className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Gameplay</h2>
+                </div>
+              </div>
               <div className="mt-3 border border-border/70 bg-background/50 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -1200,7 +1291,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </button>
                 </div>
               </div>
-              <div id="settings-gameplay" className="scroll-mt-24"><FightStyleSetting /></div>
+              <div><FightStyleSetting /></div>
               <BuildingEntrySetting />
             </div>
           </div>
@@ -1644,7 +1735,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section id="settings-customization" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="section-ui-theme-settings">
+        <section id="settings-customization" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="section-ui-theme-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <Palette className="h-5 w-5" />
@@ -1828,7 +1919,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
-        <section id="settings-data" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:col-span-2" data-testid="save-data-panel">
+        <section id="settings-data" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6 lg:[column-span:all]" data-testid="save-data-panel">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
               <Save className="h-5 w-5" />
@@ -1868,7 +1959,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
         </section>
 
         {meta.devModeAccessUnlocked ? (
-          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-panel">
+          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-primary/60 bg-primary/5 p-5 sm:p-6 lg:[column-span:all]" data-testid="dev-mode-panel">
             <div className="flex items-start gap-4">
               <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
                 <FlaskConical className="h-5 w-5" />
@@ -1906,7 +1997,7 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
             </div>
           </section>
         ) : (
-          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:col-span-2" data-testid="dev-mode-gate">
+          <section id="settings-advanced" className="scroll-mt-24 border border-dashed border-border bg-card/60 p-5 sm:p-6 lg:[column-span:all]" data-testid="dev-mode-gate">
             <button
               type="button"
               onClick={handleDevAccessTap}
