@@ -4,12 +4,15 @@ import { describe, it } from 'node:test';
 import { createOperatorWalk, type OperatorWalk } from '@/game/engine/hideoutPets';
 import {
   AUTO_RESUME_MS,
+  DASH_COOLDOWN_MS,
+  OPERATOR_DASH_SPEED,
   OPERATOR_MANUAL_SPEED,
   createOperatorControl,
   nearestProp,
   nudgeOperator,
   setGoal,
   standingSpot,
+  startDash,
   stepOperatorControl,
 } from '@/game/engine/hideoutWalk';
 
@@ -107,5 +110,56 @@ describe('hideout operator control', () => {
     assert.equal(nearestProp(150, props, 30)?.id, 'a');
     assert.equal(standingSpot(400, 300, 30), 330);
     assert.equal(standingSpot(200, 300, 30), 270);
+  });
+});
+
+describe('hideout operator dash', () => {
+  const travel = (setup: (f: ReturnType<typeof fresh>) => void) => {
+    const f = fresh();
+    setup(f);
+    let now = 0;
+    let frames = 0;
+    for (let i = 0; i < 600 && f.ctl.mode === 'goto'; i += 1) {
+      now += 16;
+      frames += 1;
+      stepOperatorControl(f.op, f.ctl, NONE, 16, now, RANGE, rng);
+    }
+    return { ...f, frames };
+  };
+
+  it('covers the same ground several times faster than a walk, and still arrives exactly', () => {
+    const walk = travel(({ op, ctl }) => setGoal(op, ctl, 480, 0, RANGE));
+    const dash = travel(({ op, ctl }) => assert.equal(startDash(op, ctl, 480, 0, RANGE), true));
+    assert.equal(dash.op.x, 480);
+    assert.ok(dash.frames * 3 < walk.frames, `dash took ${dash.frames} frames vs ${walk.frames}`);
+    assert.equal(dash.ctl.dashing, false, 'the dash ends on arrival');
+    assert.ok(OPERATOR_DASH_SPEED > OPERATOR_MANUAL_SPEED * 3);
+  });
+
+  it('is limited by a short cooldown and ignores dashes to where you already are', () => {
+    const { op, ctl } = fresh();
+    assert.equal(startDash(op, ctl, 450, 1000, RANGE), true);
+    assert.equal(startDash(op, ctl, 150, 1000 + DASH_COOLDOWN_MS - 1, RANGE), false, 'still cooling down');
+    assert.equal(ctl.goalX, 450, 'a refused dash leaves the walk alone');
+    op.x = 450;
+    assert.equal(startDash(op, ctl, 455, 1000 + DASH_COOLDOWN_MS, RANGE), false, 'too short to be worth a dash');
+  });
+
+  it('a new tap or a held key ends the dash', () => {
+    const a = fresh();
+    startDash(a.op, a.ctl, 480, 0, RANGE);
+    setGoal(a.op, a.ctl, 200, 10, RANGE);
+    assert.equal(a.ctl.dashing, false);
+    const b = fresh();
+    startDash(b.op, b.ctl, 480, 0, RANGE);
+    stepOperatorControl(b.op, b.ctl, { left: true, right: false }, 16, 16, RANGE, rng);
+    assert.equal(b.ctl.dashing, false);
+  });
+
+  it('reduced motion never dashes', () => {
+    const { op, ctl } = fresh();
+    assert.equal(startDash(op, ctl, 480, 0, RANGE, true), false);
+    assert.equal(op.x, 480, 'the operator is simply there');
+    assert.equal(ctl.dashing, false);
   });
 });

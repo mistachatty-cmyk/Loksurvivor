@@ -18,7 +18,7 @@ test.describe('end game settings', () => {
     }, [META_KEY, standardIds] as [string, string[]]);
     await page.goto('/?screen=settings');
     await expect(page.getByText('Controls', { exact: false }).first()).toBeVisible();
-    await expect(page.getByTestId('settings-tabs')).toHaveCount(0);
+    await expect(page.getByTestId('tab-settings-endgame')).toHaveCount(0);
     await expect(page.getByTestId('endgame-section')).toHaveCount(0);
     const stored = await page.evaluate((key) => localStorage.getItem(key), FORGE_KEY);
     expect(stored === null || (JSON.parse(stored) as { earned?: string[] }).earned?.length === 0 || !JSON.parse(stored).earned).toBeTruthy();
