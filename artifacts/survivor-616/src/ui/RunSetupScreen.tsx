@@ -67,6 +67,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     selectUiThemeSwatch,
   } = useMeta();
   const [step, setStep] = useState<SetupStep>('companion');
+  const [direction, setDirection] = useState<'right' | 'left'>('right');
   const [selectedPetIds, setSelectedPetIds] = useState<string[]>(meta.selectedLokPetIds);
   const [namesOpenId, setNamesOpenId] = useState<string | null>(null);
   const [artStyle, setArtStyle] = useState(meta.lokPetArtStyle);
@@ -97,9 +98,15 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
     });
   };
 
+  const goToStep = (next: SetupStep) => {
+    if (next === step) return;
+    setDirection(next === 'look' ? 'right' : 'left');
+    setStep(next);
+  };
+
   const continueWithCompanion = () => {
     setLokPetLoadout(selectedPetIds);
-    setStep('look');
+    goToStep('look');
   };
 
   const saveLookAndFinish = () => {
@@ -132,12 +139,38 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
               {isLaunch ? `Choose ${selectedCharacter.name}'s companion, then make the screen yours.` : 'Change your companion and look anytime. Nothing here changes stats or rewards.'}
             </p>
           </div>
-          <div className="hidden min-w-32 border border-cyan-200/25 bg-cyan-300/5 p-3 text-right sm:block">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-cyan-100/65">Step {step === 'companion' ? '1' : '2'} / 2</p>
-            <p className="mt-1 text-xs font-black uppercase text-white">{step === 'companion' ? 'LokPet' : 'Your look'}</p>
-          </div>
         </header>
 
+        <div role="tablist" aria-label="Setup step" className="relative mt-5 flex border border-white/15 bg-black/25" data-testid="run-setup-tabs">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={step === 'companion'}
+            onClick={() => goToStep('companion')}
+            className={`relative flex-1 px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${step === 'companion' ? 'text-white' : 'text-white/55 hover:text-white'}`}
+            data-testid="tab-run-setup-companion"
+          >
+            1 · LokPet
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={step === 'look'}
+            onClick={() => goToStep('look')}
+            className={`relative flex-1 px-4 py-3 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${step === 'look' ? 'text-white' : 'text-white/55 hover:text-white'}`}
+            data-testid="tab-run-setup-look"
+          >
+            2 · Your look
+          </button>
+          <span
+            aria-hidden
+            className="absolute bottom-0 h-0.5 w-1/2 bg-gradient-to-r from-cyan-300 via-pink-300 to-cyan-300 transition-transform duration-300 ease-out"
+            style={{ transform: step === 'companion' ? 'translateX(0)' : 'translateX(100%)' }}
+          />
+        </div>
+
+        <div className="overflow-x-clip">
+        <div key={step} className={direction === 'right' ? 'settings-slide-from-right' : 'settings-slide-from-left'} role="tabpanel">
         {step === 'companion' ? (
           <section className="mt-5">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -352,7 +385,7 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
             </div>
 
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={() => setStep('companion')} className="min-h-11 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55 hover:text-white">Back · LokPet</button>
+              <button type="button" onClick={() => goToStep('companion')} className="min-h-11 px-3 font-mono text-[10px] font-bold uppercase tracking-widest text-white/55 hover:text-white">Back · LokPet</button>
               <button type="button" onClick={saveLookAndFinish} className="flex min-h-14 items-center justify-center gap-2 bg-cyan-100 px-7 py-4 text-sm font-black uppercase tracking-[.18em] text-slate-950 hover:bg-white" data-testid="button-run-setup-finish">
                 {isLaunch ? 'Start the run' : 'Save my look'} <ArrowLeft className="h-4 w-4 rotate-180" />
               </button>
@@ -360,6 +393,8 @@ export function RunSetupScreen({ intent, onBack, onComplete }: RunSetupScreenPro
             <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-wider text-white/40">Change this anytime from the floating Looks & LokPets button.</p>
           </section>
         )}
+        </div>
+        </div>
       </div>
     </main>
   );
