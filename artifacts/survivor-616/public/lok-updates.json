@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 110,
+      "version": "0.24.6",
+      "date": "2026-10-10",
+      "publishedAt": "2026-10-10T19:45:04Z",
+      "kind": "bugfix",
+      "categoryLabel": "Bugfix",
+      "categoryColor": "#34d399",
+      "categoryLore": "Small repairs keep the block moving.",
+      "title": "Clear Roof",
+      "body": [
+        "The rooftop room in the hideout no longer has the dark building bars behind it. You get open sky, stars and the water tower, with its legs standing on the floor."
+      ]
+    },
+    {
       "number": 109,
       "version": "0.24.5",
       "date": "2026-10-10",

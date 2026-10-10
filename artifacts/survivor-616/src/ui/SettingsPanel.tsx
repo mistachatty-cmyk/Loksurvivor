@@ -900,6 +900,49 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
           </div>
         </section>
 
+        <section id="settings-gameplay" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-gameplay-settings">
+          <div className="flex items-start gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
+              <Compass className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run</p>
+                  <h2 className="mt-1 text-xl font-black uppercase text-white">Gameplay</h2>
+                </div>
+              </div>
+              <div className="mt-3 border border-border/70 bg-background/50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                      A short pop-up scrap can trigger when you enter DigiScope or head out on a run --
+                      throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
+                      off to skip it entirely.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTravelEncountersEnabled(!meta.travelEncountersEnabled)}
+                    aria-pressed={meta.travelEncountersEnabled}
+                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      meta.travelEncountersEnabled
+                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
+                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
+                    }`}
+                    data-testid="button-toggle-travel-encounters"
+                  >
+                    {meta.travelEncountersEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+              <div><FightStyleSetting /></div>
+              <BuildingEntrySetting />
+            </div>
+          </div>
+        </section>
+
         <section id="settings-hideout" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-hideout-settings">
           <div className="flex items-start gap-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center border border-emerald-300/40 bg-emerald-400/10 text-emerald-200">
@@ -1250,49 +1293,6 @@ export function SettingsPanel({ onBack, onOpenLooksAndLokPets }: SettingsPanelPr
                   </label>
                 ) : null}
               </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="settings-gameplay" className="scroll-mt-24 border border-border bg-card p-5 sm:p-6" data-testid="section-gameplay-settings">
-          <div className="flex items-start gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center border border-primary/40 bg-primary/10 text-primary">
-              <Compass className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">Run</p>
-                  <h2 className="mt-1 text-xl font-black uppercase text-white">Gameplay</h2>
-                </div>
-              </div>
-              <div className="mt-3 border border-border/70 bg-background/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-black uppercase tracking-wide text-white">Travel encounters</h3>
-                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                      A short pop-up scrap can trigger when you enter DigiScope or head out on a run --
-                      throw a card from your Battle Deck (or a bare-knuckle punch) for a small reward. Turn this
-                      off to skip it entirely.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setTravelEncountersEnabled(!meta.travelEncountersEnabled)}
-                    aria-pressed={meta.travelEncountersEnabled}
-                    className={`shrink-0 border px-4 py-2 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                      meta.travelEncountersEnabled
-                        ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100'
-                        : 'border-border bg-background text-muted-foreground hover:border-fuchsia-300/60 hover:text-white'
-                    }`}
-                    data-testid="button-toggle-travel-encounters"
-                  >
-                    {meta.travelEncountersEnabled ? 'On' : 'Off'}
-                  </button>
-                </div>
-              </div>
-              <div><FightStyleSetting /></div>
-              <BuildingEntrySetting />
             </div>
           </div>
         </section>
