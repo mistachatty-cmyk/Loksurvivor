@@ -15,6 +15,16 @@ export interface WalkRange { min: number; max: number }
 /** A little brisker than the idle wander (0.045), so steering feels responsive. */
 export const OPERATOR_MANUAL_SPEED = 0.06;
 
+/** A double click or double tap sends the operator after the spot at this speed (about 3.5x a walk). */
+export const OPERATOR_DASH_SPEED = 0.21;
+
+/** Two taps this close together (ms) and this near each other (px) make a dash. */
+export const DASH_DOUBLE_TAP_MS = 320;
+export const DASH_DOUBLE_TAP_PX = 40;
+
+/** Dashes this close together are ignored, so spamming the double-click cannot machine-gun. */
+export const DASH_COOLDOWN_MS = 450;
+
 /** How long the operator stands where you left it before it goes back to wandering. */
 export const AUTO_RESUME_MS = 8000;
 
@@ -35,6 +45,10 @@ export interface OperatorControl {
   holdUntil: number;
   /** Distance walked under the player's control, for the long-way-round beat. */
   strollPx: number;
+  /** Heading to the goal at dash speed. Cleared on arrival, by any new goal, or by a key. */
+  dashing: boolean;
+  /** Strip time the next dash is allowed. */
+  dashReadyAt: number;
 }
 
 export interface WalkInput { left: boolean; right: boolean }
@@ -46,7 +60,7 @@ export interface StepResult {
   moved: number;
 }
 
-export const createOperatorControl = (): OperatorControl => ({ mode: 'auto', goalX: 0, holdUntil: 0, strollPx: 0 });
+export const createOperatorControl = (): OperatorControl => ({ mode: 'auto', goalX: 0, holdUntil: 0, strollPx: 0, dashing: false, dashReadyAt: 0 });
 
 const clamp = (x: number, range: WalkRange): number => Math.max(range.min, Math.min(range.max, x));
 
@@ -54,6 +68,7 @@ const clamp = (x: number, range: WalkRange): number => Math.max(range.min, Math.
 export function setGoal(op: OperatorWalk, ctl: OperatorControl, x: number, now: number, range: WalkRange, snap = false): void {
   const goal = clamp(x, range);
   ctl.goalX = goal;
+  ctl.dashing = false;
   if (Math.abs(goal - op.x) > 0.5) op.dir = goal > op.x ? 1 : -1;
   if (snap) {
     ctl.strollPx += Math.abs(goal - op.x);
@@ -65,6 +80,19 @@ export function setGoal(op: OperatorWalk, ctl: OperatorControl, x: number, now: 
   ctl.mode = 'goto';
   op.mode = 'walk';
   op.until = now + 60_000;
+}
+
+/**
+ * Turn a walk to `x` into a dash. Returns false (and changes nothing) while the last dash is
+ * still cooling down. Reduced motion never dashes: `setGoal` has already placed the operator.
+ */
+export function startDash(op: OperatorWalk, ctl: OperatorControl, x: number, now: number, range: WalkRange, snap = false): boolean {
+  if (now < ctl.dashReadyAt) return false;
+  setGoal(op, ctl, x, now, range, snap);
+  if (snap || Math.abs(ctl.goalX - op.x) < 12) return false;
+  ctl.dashing = true;
+  ctl.dashReadyAt = now + DASH_COOLDOWN_MS;
+  return true;
 }
 
 /** One discrete step (used for reduced motion, where holding a key must not animate). */
@@ -95,6 +123,7 @@ export function stepOperatorControl(
     op.dir = dir;
     op.mode = 'walk';
     ctl.mode = 'keys';
+    ctl.dashing = false;
     ctl.holdUntil = now + AUTO_RESUME_MS;
     const moved = Math.abs(op.x - before);
     ctl.strollPx += moved;
@@ -118,9 +147,10 @@ export function stepOperatorControl(
 
   if (ctl.mode === 'goto') {
     const delta = ctl.goalX - op.x;
-    const step = OPERATOR_MANUAL_SPEED * dt;
+    const step = (ctl.dashing ? OPERATOR_DASH_SPEED : OPERATOR_MANUAL_SPEED) * dt;
     if (Math.abs(delta) <= step) {
       const moved = Math.abs(delta);
+      ctl.dashing = false;
       op.x = ctl.goalX;
       op.mode = 'rest';
       ctl.mode = 'hold';

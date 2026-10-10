@@ -51,13 +51,17 @@ import {
   type HideoutPetState,
 } from '@/game/engine/hideoutPets';
 import {
+  DASH_DOUBLE_TAP_MS,
+  DASH_DOUBLE_TAP_PX,
   createOperatorControl,
   nearestProp,
   nudgeOperator,
   setGoal,
   standingSpot,
+  startDash,
   stepOperatorControl,
 } from '@/game/engine/hideoutWalk';
+import { getControls } from '@/game/input/controls';
 import type { BondRankId } from '@/game/engine/petGrowth';
 import { BOND_RANK_BY_ID } from '@/game/engine/petGrowth';
 import {
@@ -377,6 +381,11 @@ export function HideoutPreview({
     let operatorHopAt = -1e9;
     /** Sitting on the window seat: the operator settles until they walk off. */
     let operatorSitUntil = 0;
+    /** Afterimages left behind while the operator dashes, newest last. */
+    const dashTrail: Array<{ x: number; dir: 1 | -1; born: number }> = [];
+    let lastTrailX = Number.NEGATIVE_INFINITY;
+    let lastDashing = false;
+    let lastTap: { x: number; y: number; at: number } | null = null;
     const OPERATOR_HOP_MS = 420;
     /** Notes shown as bubbles beside what they are about. */
     const notes: Array<{ anchor: string; title: string; text: string; born: number; until: number }> = [];
@@ -817,10 +826,53 @@ export function HideoutPreview({
       const hopLift = !reduceMotion && hopAge >= 0 && hopAge < 1 ? Math.sin(hopAge * Math.PI) * 9 : 0;
       const sitting = !reduceMotion && now < operatorSitUntil && operator.mode === 'rest';
       if (operator.mode !== 'rest') operatorSitUntil = 0;
+      const dashing = !reduceMotion && control.dashing;
+
+      // Dash: afterimages every few pixels, a burst of dust as it kicks off, and speed lines behind.
+      if (dashing) {
+        if (!lastDashing) {
+          lastTrailX = Number.NEGATIVE_INFINITY;
+          for (let n = 0; n < 6; n += 1) {
+            sparks.push({ x: operator.x - operator.dir * 8, y: groundY - 1, vx: -operator.dir * (0.03 + rng() * 0.05), vy: -0.015 - rng() * 0.02, born: now, life: 420 + rng() * 240, color: dustColorFor(settings.biome) });
+          }
+        }
+        if (Math.abs(operator.x - lastTrailX) >= 16) {
+          dashTrail.push({ x: operator.x, dir: operator.dir, born: now });
+          lastTrailX = operator.x;
+          if (dashTrail.length > 8) dashTrail.shift();
+        }
+      }
+      lastDashing = dashing;
+      const GHOST_MS = 260;
+      for (let i = dashTrail.length - 1; i >= 0; i -= 1) {
+        const ghost = dashTrail[i]!;
+        const age = (now - ghost.born) / GHOST_MS;
+        if (age >= 1) { dashTrail.splice(i, 1); continue; }
+        drawRig(ctx, rig, palette, 'walk', now * 2.4, ghost.x, groundY, ghost.dir, scale, { outline: false, alpha: 0.4 * (1 - age), tint: { color: palette.accent, alpha: 0.55 } });
+      }
+      if (dashing) {
+        ctx.save();
+        ctx.strokeStyle = palette.accent;
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        for (let n = 0; n < 4; n += 1) {
+          const y = groundY - (8 + n * 15) * (scale / 3);
+          const len = 26 + ((n * 17 + Math.floor(now / 40) * 7) % 22);
+          ctx.globalAlpha = 0.45 - n * 0.07;
+          ctx.beginPath();
+          ctx.moveTo(operator.x - operator.dir * 14, y);
+          ctx.lineTo(operator.x - operator.dir * (14 + len), y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       ctx.save();
       ctx.translate(operator.x, groundY - hopLift + (sitting ? 2 : 0));
       if (sitting) ctx.scale(1, 0.9);
-      drawRig(ctx, rig, palette, operatorAnim, reduceMotion ? 0 : now, 0, 0, operatorFacing, scale, { outline: true });
+      // Leaning into the dash.
+      if (dashing) ctx.scale(1.07, 0.95);
+      drawRig(ctx, rig, palette, operatorAnim, reduceMotion ? 0 : dashing ? now * 2.4 : now, 0, 0, operatorFacing, scale, { outline: true });
       ctx.restore();
 
       // The ball, over the operator so a carried one stays visible.
@@ -942,9 +994,19 @@ export function HideoutPreview({
       setGoal(operator, control, spot, now, r, reduceMotion);
       if (reduceMotion) useProp(id);
     };
-    const handleTap = (px: number, py: number) => {
+    const handleTap = (px: number, py: number, pointerType: string) => {
       const now = performance.now() - start;
       const settings = live.current;
+      // A second tap right beside the first turns the walk into a dash (same setting as the in-run
+      // double-click / double-tap dash).
+      const dashAllowed = pointerType === 'mouse' ? getControls().mouse.doubleClickDash : getControls().touch.doubleTapDash;
+      const isDouble = Boolean(lastTap) && now - lastTap!.at <= DASH_DOUBLE_TAP_MS
+        && Math.hypot(px - lastTap!.x, py - lastTap!.y) <= DASH_DOUBLE_TAP_PX;
+      lastTap = isDouble ? null : { x: px, y: py, at: now };
+      const dashTo = (x: number) => {
+        if (!isDouble || !dashAllowed || !settings.interactive || reduceMotion) return;
+        startDash(operator, control, x, now, range(), false);
+      };
       if (!reduceMotion) {
         for (const actor of actors) {
           const def = AMBIENT_VISITORS_BY_ID[actor.kindId];
@@ -1009,12 +1071,14 @@ export function HideoutPreview({
           if (Math.abs(px - prop.x) <= half && py >= groundY - (PROP_HEIGHT_UNITS + 10) * propUnit && py <= groundY + 10) {
             burst(prop.x, groundY - PROP_HEIGHT_UNITS * propUnit, prop.info.accent, 4, now);
             walkToProp(prop.info.id, prop.x, now);
+            dashTo(control.goalX);
             return;
           }
         }
         pendingProp = null;
         const r = range();
         setGoal(operator, control, px, now, r, reduceMotion);
+        dashTo(px);
         ripples.push({ x: Math.max(r.min, Math.min(r.max, px)), born: now });
         return;
       }
@@ -1033,7 +1097,7 @@ export function HideoutPreview({
       if (!started || started.id !== event.pointerId) return;
       if (Math.hypot(event.clientX - started.x, event.clientY - started.y) > 10 || performance.now() - started.at > 450) return;
       const rect = canvas.getBoundingClientRect();
-      handleTap(event.clientX - rect.left, event.clientY - rect.top);
+      handleTap(event.clientX - rect.left, event.clientY - rect.top, event.pointerType);
     };
     const onPointerCancel = () => { down = null; };
     canvas.addEventListener('pointerdown', onPointerDown);

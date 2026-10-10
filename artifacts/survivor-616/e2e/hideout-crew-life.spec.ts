@@ -44,4 +44,21 @@ test.describe('hideout crew life', () => {
     expect(Buffer.compare(first, second), 'the strip changed: people moved or talked').not.toBe(0);
     expect(errors, errors.join('\n')).toEqual([]);
   });
+
+  test('double-clicking the ground sends the operator dashing there', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.addInitScript((m) => { if (!localStorage.getItem('survivor616.meta.v1')) localStorage.setItem('survivor616.meta.v1', m); }, meta({ hideoutEvents: 'off', rescuedAllyIds: [] }));
+    await page.goto('/?screen=hub');
+    const canvas = page.getByTestId('hideout-preview-canvas');
+    await expect(canvas).toBeVisible();
+    const box = (await canvas.boundingBox())!;
+    const before = await canvas.screenshot();
+    await page.mouse.dblclick(box.x + box.width * 0.2, box.y + box.height * 0.8);
+    await page.waitForTimeout(150);
+    const mid = await canvas.screenshot();
+    expect(Buffer.compare(before, mid), 'the operator started moving at once').not.toBe(0);
+    await page.waitForTimeout(1200);
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
 });
