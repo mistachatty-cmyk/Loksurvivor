@@ -674,5 +674,14 @@
   "soundbar.seek": "Rechercher dans la piste",
   "soundbar.shuffle": "Mélanger",
   "soundbar.repeat": "Répéter",
-  "soundbar.speed": "Vitesse de lecture"
+  "soundbar.speed": "Vitesse de lecture",
+  "booster.eyebrow": "Stock bootleg · Non affilié à qui que ce soit",
+  "booster.title": "Bac Booster Bootleg",
+  "booster.intro": "Copies fantômes de visages familiers. Chaque booster ajoute une statistique aléatoire pour chaque course. Les résultats peuvent varier, tout comme le personnage sur la carte.",
+  "booster.cardCount": "{count} copies fantômes",
+  "booster.buy": "Acheter · ◫ {coût}",
+  "booster.need": "Besoin de ◫ {cost} crédits de carte",
+  "booster.ownedTitle": "Vos copies fantômes · {count}",
+  "booster.empty": "Pas encore de booster. La poubelle est bien garnie. Honnête.",
+  "booster.ghostLabel": "Copie fantôme"
 }
