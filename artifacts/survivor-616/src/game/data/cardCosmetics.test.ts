@@ -7,7 +7,9 @@ import {
   ALL_CARD_COSMETICS,
   BACK_HUB_FIGURE,
   CARD_BACKS,
+  CARD_COSMETIC_COST,
   CARD_COSMETICS_BY_ID,
+  LIVE_PACK_SKINS,
   CARD_FRAMES,
   PACK_FEATURED,
   PACK_SKINS,
@@ -135,4 +137,31 @@ test('wrap finishes and the Retro Neon walkers point at real catalog skins and r
   for (const skinId of ['pack-retro', 'pack-kraft', 'pack-stock']) assert.ok(CARD_COSMETICS_BY_ID[skinId], `${skinId} missing`);
   assert.ok(RETRO_WALKERS.length >= 2);
   for (const figure of RETRO_WALKERS) assert.ok(figureExists(figure), `walker ${figure.id} is missing`);
+});
+
+test('Live wraps are the animated tier, cost double a legendary wrap, and need the LokPack Visualizer', () => {
+  assert.equal(CARD_COSMETIC_COST.animated, 480);
+  assert.equal(CARD_COSMETIC_COST.animated, CARD_COSMETIC_COST.legendary * 2);
+  assert.deepEqual([...LIVE_PACK_SKINS].sort(), ['pack-holo-live', 'pack-retro-arcade', 'pack-retro-live']);
+  for (const skinId of LIVE_PACK_SKINS) {
+    const item = CARD_COSMETICS_BY_ID[skinId]!;
+    assert.equal(item.tier, 'animated', skinId);
+    assert.equal(item.cost, 480, skinId);
+    assert.equal(item.requiresUnlock, 'lokPackVisualizer', skinId);
+  }
+  for (const skinId of ['pack-holo', 'pack-retro', 'pack-gold', 'pack-stock']) assert.equal(CARD_COSMETICS_BY_ID[skinId]!.requiresUnlock, undefined, skinId);
+});
+
+test('a Live wrap cannot be bought until the LokPack Visualizer is unlocked, and unlocking never double-grants', () => {
+  const base = { meta: { ...createInitialMeta(), cardCredits: 2000 }, lastRun: null } as any;
+  assert.equal(reducer(base, { type: 'buyCardCosmetic', id: 'pack-holo-live' }), base);
+  const unlocked = reducer(base, { type: 'grantLokPackVisualizer' }) as any;
+  assert.equal(unlocked.meta.lokPackVisualizerUnlocked, true);
+  assert.equal(reducer(unlocked, { type: 'grantLokPackVisualizer' }), unlocked);
+  const bought = reducer(unlocked, { type: 'buyCardCosmetic', id: 'pack-holo-live' }) as any;
+  assert.ok(bought.meta.ownedPackSkinIds.includes('pack-holo-live'));
+  assert.equal(bought.meta.cardCredits, 2000 - 480);
+  const reloaded = normalizeMeta(JSON.parse(JSON.stringify(bought.meta)));
+  assert.equal(reloaded.lokPackVisualizerUnlocked, true);
+  assert.equal(normalizeMeta({}).lokPackVisualizerUnlocked, false);
 });

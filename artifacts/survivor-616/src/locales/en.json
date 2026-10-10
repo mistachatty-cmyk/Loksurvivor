@@ -700,5 +700,6 @@
   "booster.need": "Need ◫ {cost} Card Credits",
   "booster.ownedTitle": "Your ghosted copies · {count}",
   "booster.empty": "No boosters yet. The bin is well stocked. Honest.",
-  "booster.ghostLabel": "Ghost copy"
+  "booster.ghostLabel": "Ghost copy",
+  "sleeve.locked.visualizer": "Needs the LokPack Visualizer (LOK Shop)"
 }

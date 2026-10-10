@@ -13,7 +13,7 @@
 import type { CardPackId } from '@/game/types';
 
 export type CardCosmeticKind = 'packSkin' | 'cardBack' | 'cardFrame';
-export type CardCosmeticTier = 'standard' | 'uncommon' | 'rare' | 'legendary';
+export type CardCosmeticTier = 'standard' | 'uncommon' | 'rare' | 'legendary' | 'animated';
 
 export interface CardCosmeticDef {
   id: string;
@@ -23,6 +23,8 @@ export interface CardCosmeticDef {
   tier: CardCosmeticTier;
   /** Card Credits (CC). 0 means a free starter. */
   cost: number;
+  /** Needs a LOK Shop unlock before it can be bought. The Live (animated) pack wraps need the LokPack Visualizer. */
+  requiresUnlock?: 'lokPackVisualizer';
 }
 
 /** Card Credit price by tier. Shop packs cost 8-64 CC, so a standard sleeve is a few packs. */
@@ -31,6 +33,8 @@ export const CARD_COSMETIC_COST: Record<CardCosmeticTier, number> = {
   uncommon: 60,
   rare: 120,
   legendary: 240,
+  /** Live (animated) wraps: double a legendary wrap, and locked behind the LokPack Visualizer. */
+  animated: 480,
 };
 
 const def = (
@@ -40,7 +44,8 @@ const def = (
   tier: CardCosmeticTier,
   description: string,
   free = false,
-): CardCosmeticDef => ({ id, kind, name, description, tier, cost: free ? 0 : CARD_COSMETIC_COST[tier] });
+  requiresUnlock?: CardCosmeticDef['requiresUnlock'],
+): CardCosmeticDef => ({ id, kind, name, description, tier, cost: free ? 0 : CARD_COSMETIC_COST[tier], ...(requiresUnlock ? { requiresUnlock } : {}) });
 
 export const PACK_SKINS: CardCosmeticDef[] = [
   def('packSkin', 'pack-classic', 'Classic Tile', 'standard', 'The plain text tile. Always free.', true),
@@ -50,10 +55,13 @@ export const PACK_SKINS: CardCosmeticDef[] = [
   def('packSkin', 'pack-gold', 'Gilt Foil', 'legendary', 'A crinkled gold foil wrap with a highlight that moves, a printed fighter and crimped seals.'),
   def('packSkin', 'pack-platinum', 'Platinum Chrome', 'legendary', 'Cold mirror-chrome foil with a hard reflection and a printed fighter.'),
   def('packSkin', 'pack-bronze', 'Foundry Bronze', 'uncommon', 'A worn, warm bronze foil wrap from the Soul Foundry, printed with a fighter.'),
-  def('packSkin', 'pack-holo', 'Prism Holo', 'rare', 'Iridescent rainbow foil that catches the light, with a printed fighter.'),
-  def('packSkin', 'pack-retro', 'Retro Neon', 'standard', 'The classic neon-green trading pack, with digitized fighters walking across it.'),
+  def('packSkin', 'pack-holo', 'Prism Holo', 'rare', 'Iridescent rainbow foil with a fixed highlight and a printed fighter.'),
+  def('packSkin', 'pack-retro', 'Retro Neon', 'standard', 'The classic neon-green trading pack, with the digitized cast standing guard.'),
   def('packSkin', 'pack-kraft', 'Kraft Sleeve', 'standard', 'A hand-stamped kraft paper sleeve. Quiet, warm and a little bit crafty.'),
   def('packSkin', 'pack-stock', 'Street Stock', 'standard', 'Matte printed stock with one spot-color stripe and a halftone fighter. Built to sit under the foils.'),
+  def('packSkin', 'pack-holo-live', 'Prism Holo Live', 'animated', 'The rainbow foil, alive: the light rolls across the wrap and the sparkles twinkle. Needs the LokPack Visualizer.', false, 'lokPackVisualizer'),
+  def('packSkin', 'pack-retro-live', 'Retro Neon Live', 'animated', 'The neon-green pack in motion: the cast marches down the road and the foil edges shimmer. Needs the LokPack Visualizer.', false, 'lokPackVisualizer'),
+  def('packSkin', 'pack-retro-arcade', 'Retro Neon Arcade', 'animated', 'Bonus: the busy full-color neon pack, with the whole cast walking across it. Needs the LokPack Visualizer.', false, 'lokPackVisualizer'),
 ];
 
 export const CARD_BACKS: CardCosmeticDef[] = [
@@ -173,7 +181,11 @@ export const WRAP_FINISH_BY_SKIN: Record<string, WrapFinish> = {
   'pack-platinum': 'platinum',
   'pack-bronze': 'bronze',
   'pack-holo': 'holo',
+  'pack-holo-live': 'holo',
 };
+
+/** Live (animated) wraps. Static wraps never animate; Live ones animate only when card motion is "full". */
+export const LIVE_PACK_SKINS: ReadonlySet<string> = new Set(['pack-holo-live', 'pack-retro-live', 'pack-retro-arcade']);
 
 /** Fighters and LokPets that walk across the Retro Neon pack, drawn with their real in-game rigs. */
 export const RETRO_WALKERS: FeaturedFigure[] = [

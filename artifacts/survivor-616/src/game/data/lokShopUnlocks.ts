@@ -35,6 +35,14 @@ export const LOK_SHOP_UNLOCKS: LokShopUnlockDef[] = [
     tier: 'legendary',
     cost: 1500,
   },
+  {
+    id: 'lokpack-visualizer',
+    kind: 'packVisualizerUnlock',
+    name: 'LokPack Visualizer',
+    description: 'Plugs a certified-genuine, not-at-all-bootleg visualizer into the Sleeve Counter. Unlocks the Live pack wraps: animated LokPacks you can buy with Card Credits.',
+    tier: 'legendary',
+    cost: 1500,
+  },
 ];
 
 export const LOK_SHOP_UNLOCKS_BY_ID: Record<string, LokShopUnlockDef> = Object.fromEntries(

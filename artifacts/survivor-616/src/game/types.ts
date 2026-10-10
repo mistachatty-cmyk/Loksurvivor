@@ -2631,6 +2631,8 @@ export interface MetaState {
   lokPetFieldGuideUnlocked: boolean;
   /** LokToken purchase (Lok Shop): required to select any LokPet Collector character, in addition to that character's own progress-based unlock. */
   lokPetCollectorAccessUnlocked: boolean;
+  /** LOK Shop unlock: lets the Sleeve Counter sell the animated Live pack wraps. */
+  lokPackVisualizerUnlocked: boolean;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */

@@ -1281,6 +1281,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Retro Neon is the classic neon-green trading pack, with your fighters digitized and walking across it. Every wrap prints the pack\'s own fighter or LokPet, drawn from the real in-game sprites.',
     ],
   },
+  {
+    version: '0.27.0',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T20:00:00Z',
+    kind: 'update',
+    title: 'LokPack Visualizer and Live Wraps',
+    body: [
+      'Every pack wrap now uses the Fighter Print frame: the torn edge, ribbon, price roundel and barcode sit on real foil, kraft or matte stock. The foils are crinkled metal, and Retro Neon was redrawn in retro colors only, on the same torn-edge pack shape, with a black starburst, outlined lettering and the cast in black and white.',
+      'The LOK Shop sells a new LokPack Visualizer for 1500 LokTokens. Owning it unlocks the Live pack wraps in the Sleeve Counter, animated packs that cost 480 Card Credits each: Prism Holo Live, Retro Neon Live with the cast marching across, and the bonus Retro Neon Arcade, the busy full-color version.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
