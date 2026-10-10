@@ -79,3 +79,48 @@ repo -- there is nowhere for them to actually run, and claiming otherwise would 
 worse than leaving the gap documented. Don't silently make the entitlement flags
 player-togglable outside Dev Mode "to unblock testing" -- that would let anyone grant
 themselves paid slots for free, defeating the entire point of the tiers.
+
+## Cross-repo survey (2026-10-10): where each Lok app actually stands
+
+The user pointed this session at four sibling repos (`Gsixhub`, `Lok-EcoSystsem`,
+`LokLingu`, `LokBook`) and asked whether a real Stripe/Passport bridge already exists
+somewhere to connect to. It does not -- here is the actual state of each, read
+directly from their code and docs rather than assumed, so this doesn't need
+re-deriving:
+
+- **Lok-EcoSystsem** (`LokToken EcoSystem/LOK_ECONOMY.md`, `01_schema.sql`): the
+  authoritative *design* for a shared, cross-app entitlement ledger. `lok_entitlements`
+  already has the exact shape this needs -- `sku` values `'lokpass:<app>' |
+  'lokpassport' | 'lifetime'`, a `source` column defaulting to `'stripe'`, a
+  `stripe_ref`, `granted_at`/`expires_at`/`active`. But its own roadmap (section 8)
+  marks this "Phase 4 -- Commercialize: wire the existing Stripe webhook to mint
+  `lok_entitlements` rows," and only Phase 1 is marked "ready now." **Phase 4 has not
+  shipped.** There is no deployed shared Supabase project backing this schema that
+  this session could find or reach.
+- **LokLingu** (`artifacts/lok-lingu/src/lib/entitlements.ts`): independently arrived
+  at the identical stub pattern this repo uses -- a `TierId = 'free' | 'pass' |
+  'passport' | 'lifetime'` model, a single `beginCheckout()` seam, and a code comment
+  stating outright: *"Payments are deliberately not wired here... Nothing wired
+  today, so this reports back that checkout is unavailable rather than pretending a
+  purchase succeeded."* This cross-confirms the approach taken here (honest stub,
+  one integration seam) rather than suggesting survivor-616 should have done more.
+- **LokBook** (`supabase/functions/stripe-webhook/index.ts`): the one REAL, working
+  Stripe webhook in the ecosystem -- but it is entirely siloed to LokBook. It verifies
+  a Stripe signature and inserts into `lok_pass_purchases`, a LokBook-only table in
+  LokBook's *own* dedicated Supabase project (its `.env.example` names a specific
+  project ref). Its schema has no `lok_entitlements` table at all. This is almost
+  certainly "the existing Stripe webhook" Lok-EcoSystsem's Phase 4 note refers to --
+  but connecting it to the shared ledger is exactly the unshipped work that note
+  describes, not something already done.
+- **Gsixhub**: not investigated this pass (the survey above already answered the
+  question that prompted it -- whether a bridge exists anywhere).
+
+**Net conclusion**: every app in the ecosystem, this one included, is at the same
+honest stopping point -- a documented seam, no live cross-app entitlement flow. Making
+survivor-616's `lokPassOwned`/`lokPassportActive`/`lokPassportLifetime` flags backed by
+real money requires, at minimum: the shared `lok_entitlements` schema actually
+deployed somewhere live, this repo given real credentials to read it, and someone
+deciding whether LokBook's live payment webhook gets modified to also write to that
+shared project (a production-payment-system change with real blast radius, out of
+scope for this pass -- the user asked for this cross-repo state to be documented, not
+acted on). Until then, Dev Mode is the only grant path, by design, everywhere.
