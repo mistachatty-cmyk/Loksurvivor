@@ -138,6 +138,7 @@ interface StoredMetaFlags {
   lokPassOwned?: unknown;
   lokPassportActive?: unknown;
   lokPassportLifetime?: unknown;
+  factionRacesUnlocked?: unknown;
 }
 
 function readMetaFlags(): StoredMetaFlags {
@@ -153,6 +154,11 @@ function readMetaFlags(): StoredMetaFlags {
 function devModeForgeAccess(): boolean {
   const meta = readMetaFlags();
   return meta.devModeAccessUnlocked === true && meta.devModeAllUnlocks === true;
+}
+
+/** A LokToken purchase (Lok Shop) that opens faction races before Victory Lap would earn them. */
+function factionRacesPurchased(): boolean {
+  return devModeForgeAccess() || readMetaFlags().factionRacesUnlocked === true;
 }
 
 /**
@@ -284,6 +290,7 @@ export function isSlotTierUnlocked(tier: SlotTier): boolean {
 /** Whether a feature has been earned (or, for the Forge, was already found before it became an unlock). */
 export function isFeatureAvailable(id: EndgameFeatureId): boolean {
   if (id === 'forge' && devModeForgeAccess()) return true;
+  if (id === 'factionRaces' && factionRacesPurchased()) return true;
   const state = read();
   if (state.earned.includes(id)) return true;
   return id === 'forge' && state.unlocked;
@@ -292,6 +299,7 @@ export function isFeatureAvailable(id: EndgameFeatureId): boolean {
 /** Whether the player has it switched on. Endgame weapon evolutions default to on when earned. */
 export function isFeatureEnabled(id: EndgameFeatureId): boolean {
   if (id === 'forge' && devModeForgeAccess()) return true;
+  if (id === 'factionRaces' && factionRacesPurchased()) return true;
   const state = read();
   const available = state.earned.includes(id) || (id === 'forge' && state.unlocked);
   if (!available) return false;

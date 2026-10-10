@@ -165,29 +165,38 @@ same as a theme or a drop pack, and LokTokens are already real.
 
 ## Backlog: other things worth selling for LokTokens
 
-The player asked for a plan, not just the three named tiers. Candidates, roughly
-ordered by how directly they reuse what already exists:
+The player asked for a plan, then asked to build it. Built this pass, in the same
+LokToken-only pattern as everything above (`LOKTOKEN_ONLY_KINDS`, `priceOf`/`spend`/
+`ownedSkus`, synced into a `MetaState` flag, exported by `export-lok-registry.ts`):
 
-1. **The three `LOKSHOP_STOCK` placeholders** (`game/data/lokServer.ts`: `ball`,
-   `chest-pass`, `pet-rider-saddle`). These are flavor-named shelf mockups with **no
-   backing mechanic anywhere in the codebase** -- buying one today would do nothing,
-   because nothing was ever designed for them to grant. Before wiring these to real
-   `spend()` calls, each needs an actual in-game effect decided (a cosmetic? a LokPet
-   accessory, given "saddle"/"rider"? a travel-encounter item, given "chest-pass"?).
-   Don't invent that gameplay blind -- surface the question to the player first.
-2. **A LokToken-priced Forge identity reroll pack** -- `OperatorForgePanel.tsx`
-   already has free "Reroll name and bio" / "Roll body" / "Roll palette" buttons; a
-   paid variant could be a cosmetic-only convenience (e.g. a bundle that rerolls
-   every category at once, or unlocks the faction races list without the endgame
-   gate) rather than a new mechanic.
-3. **More `THEMED_PALETTES`/`RUN_AURAS`/`HATS`/`CELEBRATIONS`/`DROP_PACKS` entries** --
-   the lowest-effort path, since the catalog plumbing, pricing tiers and export script
-   already handle arbitrary new entries in those five lists with zero new code.
-4. **A standalone single extra custom slot**, independent of the three tiers, for a
-   player who wants one or two more slots without buying a whole tier. Deliberately
-   not built alongside the tiers above: it would compete with the tier pricing/value
-   ladder (why buy LokPass's 6 slots for 2000 if one slot is available piecemeal for
-   less?), so it needs a pricing decision before it's just a code change.
+- **Faction Races Pass** (`game/data/lokShopUnlocks.ts`, kind `factionRacesUnlock`,
+  750 tokens): opens the Operator Forge's faction-race species list before Victory
+  Lap would otherwise earn it. Wired the same way the sibling "LokPet Field Guide" /
+  "Collector Access" unlocks already were (`PaletteGalleryPanel.tsx`'s Unlocks tab) --
+  `operatorForgeStore.ts`'s `isFeatureAvailable`/`isFeatureEnabled('factionRaces')`
+  gained a `factionRacesPurchased()` check alongside the existing Dev Mode one,
+  exactly mirroring how `'forge'` is special-cased there.
+- **Five new cosmetic catalog entries**, one per existing list, each reusing an
+  *existing* render `style`/`effect.kind` with new name/description/colors --
+  matching this codebase's own established pattern (e.g. the hat list already has
+  three separately-priced `style: 'cone'` reskins): `furniture-city-dusk` (palette,
+  `glow`), `furnace-orbit` (aura, `ember-orbit`), `relay-mast` (hat, `antenna`),
+  `ticker-tape` (celebration, `confetti-rain`). No new render code needed or written.
+- **The stale `ball` shelf entry removed** from `LOKSHOP_STOCK` (`game/data/
+  lokServer.ts`): it turned out to already be shipped, and free, as the hideout Ball
+  (`engine/hideoutBall.ts`) -- the shop was advertising something as "coming soon"
+  that had already shipped for everyone. Correcting a stale listing, not gating a
+  free feature behind a paywall.
 
-None of these are built; this is the plan the player asked for, to pick up when
-there's a concrete next item to ship.
+**Still not built, deliberately**:
+- `chest-pass` / `pet-rider-saddle` (`LOKSHOP_STOCK`): still flavor-named mockups
+  with no backing mechanic. `chest-pass`'s blurb ("lets the Lucky Chest hold the
+  extra loot from your runs") doesn't map cleanly onto the existing Lucky Chest
+  mechanic (`engine/chestOpen.ts`'s "one open per window," nothing about run loot
+  overflow) without inventing new behavior; `pet-rider-saddle`'s own blurb says
+  "a planned way," i.e. explicitly not designed yet. Both need a design decision
+  before a `spend()` call would mean anything.
+- A standalone single extra custom slot, independent of the three Passport tiers:
+  still skipped, since it would undercut the tiers' per-slot pricing (LokPass is
+  ~333/slot; a piecemeal single slot needs its own price set above that line, which
+  is a pricing decision, not a code change).

@@ -181,4 +181,15 @@ describe('end-game store: toggles, slots and the roster', () => {
     assert.equal(earnedSlotCount(), 0);
     assert.equal(isFeatureEnabled('forge'), false);
   });
+
+  it('a Faction Races Pass purchase opens faction races without the endgame gate', () => {
+    assert.equal(isFeatureAvailable('factionRaces'), false);
+    assert.equal(isFeatureEnabled('factionRaces'), false);
+
+    (globalThis.localStorage as Storage).setItem('survivor616.meta.v1', JSON.stringify({ factionRacesUnlocked: true }));
+    assert.equal(isFeatureAvailable('factionRaces'), true);
+    assert.equal(isFeatureEnabled('factionRaces'), true);
+    // Unrelated features stay gated -- this isn't a blanket bypass.
+    assert.equal(isFeatureEnabled('inspector'), false);
+  });
 });

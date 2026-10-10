@@ -294,6 +294,7 @@ export function createInitialMeta(): MetaState {
     activeDropPackId: DEFAULT_DROP_PACK_ID,
     lokPetFieldGuideUnlocked: false,
     lokPetCollectorAccessUnlocked: false,
+    factionRacesUnlocked: false,
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -1334,6 +1335,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // LokToken purchases (Lok Shop) -- off by default for a returning save that predates them.
     lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
     lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
+    factionRacesUnlocked: parsed.factionRacesUnlocked === true,
     // Falls back to the pre-existing standalone localStorage toggle
     // (AttractMode.tsx's old component-local key) so a player who already
     // turned the background sim off doesn't see it silently re-enabled.
@@ -2076,6 +2078,7 @@ type Action =
   | { type: 'grantDropPack'; id: string }
   | { type: 'grantLokPetFieldGuide' }
   | { type: 'grantLokPetCollectorAccess' }
+  | { type: 'grantFactionRacesUnlock' }
   | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
@@ -3389,6 +3392,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantLokPetCollectorAccess':
       if (state.meta.lokPetCollectorAccessUnlocked) return state;
       return { ...state, meta: { ...state.meta, lokPetCollectorAccessUnlocked: true } };
+    case 'grantFactionRacesUnlock':
+      if (state.meta.factionRacesUnlocked) return state;
+      return { ...state, meta: { ...state.meta, factionRacesUnlocked: true } };
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -4288,6 +4294,7 @@ export interface MetaContextValue {
   grantDropPack: (id: string) => void;
   grantLokPetFieldGuide: () => void;
   grantLokPetCollectorAccess: () => void;
+  grantFactionRacesUnlock: () => void;
   equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
@@ -4516,6 +4523,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
   const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
+  const grantFactionRacesUnlock = useCallback(() => dispatch({ type: 'grantFactionRacesUnlock' }), []);
   const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
@@ -4820,6 +4828,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantDropPack,
       grantLokPetFieldGuide,
       grantLokPetCollectorAccess,
+      grantFactionRacesUnlock,
       equipDropPack,
       setDamageNumberStyle,
       setCompanionRevealStyle,
@@ -4994,6 +5003,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantDropPack,
     grantLokPetFieldGuide,
     grantLokPetCollectorAccess,
+    grantFactionRacesUnlock,
     equipDropPack,
     setDamageNumberStyle,
     setCompanionRevealStyle,

@@ -69,6 +69,14 @@ export const RUN_AURAS: RunAuraDef[] = [
     tier: 'legendary',
     style: 'comet-trail',
   },
+  {
+    id: 'furnace-orbit',
+    name: 'Furnace Orbit',
+    description: 'A low ring of foundry embers circles you, slower and heavier than the others.',
+    cost: 4,
+    tier: 'legendary',
+    style: 'ember-orbit',
+  },
 ];
 
 export const RUN_AURAS_BY_ID: Record<string, RunAuraDef> = Object.fromEntries(

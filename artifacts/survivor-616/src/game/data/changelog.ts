@@ -1280,6 +1280,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'LokPass, Lok Passport and Lifetime Lok Passport are now real purchases in the Lok Shop, paid in LokTokens just like a theme or drop pack -- your balance shows, and a tier bought on one device follows your account everywhere.',
     ],
   },
+  {
+    version: '0.24.7',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T01:20:45Z',
+    kind: 'update',
+    title: 'New Faces at the Lok Shop',
+    body: [
+      'A Faction Races Pass joins the Lok Shop\'s Unlocks tab, opening the Operator Forge\'s faction races early for LokTokens.',
+      'Furniture City Dusk (palette), Furnace Orbit (run aura), Relay Mast (hat) and Ticker Tape (celebration) join the shop. The hideout Ball is free for everyone and was dropped from the "coming soon" shelf, since it already shipped.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;
