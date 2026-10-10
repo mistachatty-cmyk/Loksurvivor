@@ -1259,6 +1259,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Huge particle storms are now capped at 600 visible sparks on High graphics, which keeps frame rate steadier on phones and older arcade machines without changing how fights look.',
     ],
   },
+  {
+    version: '0.25.0',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T12:00:00Z',
+    kind: 'update',
+    title: 'Bootleg Booster Bin',
+    body: [
+      'The Vendor has a new Bootleg Booster Bin. Totally Real Booster Packs and Bulk Hype Booster Boxes cost Card Credits and contain ghosted copies of familiar faces.',
+      'Each booster adds a random stat for every run: operatives and crew gain HP, speed, power, area, cooldown, pickup reach or armor; LokPets gain damage or speed; enemies gain HP. Results may vary.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

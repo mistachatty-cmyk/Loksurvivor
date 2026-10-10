@@ -691,5 +691,14 @@
   "soundbar.seek": "Seek in track",
   "soundbar.shuffle": "Shuffle",
   "soundbar.repeat": "Repeat",
-  "soundbar.speed": "Playback speed"
+  "soundbar.speed": "Playback speed",
+  "booster.eyebrow": "Bootleg stock · Not affiliated with anyone",
+  "booster.title": "Bootleg Booster Bin",
+  "booster.intro": "Ghosted copies of familiar faces. Every booster adds a random stat for every run. Results may vary, and so may the character on the card.",
+  "booster.cardCount": "{count} ghosted copies",
+  "booster.buy": "Buy · ◫ {cost}",
+  "booster.need": "Need ◫ {cost} Card Credits",
+  "booster.ownedTitle": "Your ghosted copies · {count}",
+  "booster.empty": "No boosters yet. The bin is well stocked. Honest.",
+  "booster.ghostLabel": "Ghost copy"
 }

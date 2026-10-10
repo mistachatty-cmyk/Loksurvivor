@@ -92,6 +92,7 @@ import { BOND_RANK_BY_ID, TRAVEL_WIN_EXP_BASE, TREAT_EXP_BASE, applyBond, bondDa
 import { DIRECTORS } from '@/game/data/directors';
 import { CARD_MANIFESTS, LOKPET_CARDS } from '@/game/data/cards';
 import { CARD_COSMETICS_BY_ID, equipCardCosmetic, grantCardCosmetic, isCardCosmeticOwned, normalizeCardCosmetics } from '@/game/data/cardCosmetics';
+import { BOOSTER_PRODUCTS_BY_ID, applyBoosterToPlayerStats, boosterUnits, rollBoosterCard } from '@/game/data/boosterCards';
 import { CARD_SHOP_PACKS_BY_ID, CARD_VARIANT_VALUE, PASSIVE_CARDS_BY_ID, activeCardEffects, mergeCardPulls, passiveDeckSlots, rollCardPack, type CardPull } from '@/game/data/passiveCards';
 import { BATTLE_DECK_SLOTS, CARD_SALVAGE_COST, CARD_SALVAGE_EARN_RUNS } from '@/game/data/travelEncounters';
 import type { TravelEncounterResult } from '@/game/travelEncounter';
@@ -380,6 +381,7 @@ export function createInitialMeta(): MetaState {
     lootTokens: 0,
     cardCredits: 0,
     cardCollection: [],
+    boosterCards: [],
     unopenedCardPacks: {},
     autoOpenPacksEnabled: true,
     activePassiveCardIds: [],
@@ -530,6 +532,11 @@ function cleanCounts(value: unknown): Record<string, number> {
     for (const [key, count] of Object.entries(value as Record<string, unknown>)) out[key] = counter(count);
   }
   return out;
+}
+
+function normalizeBoosterCards(value: unknown): MetaState['boosterCards'] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((card): card is MetaState['boosterCards'][number] => !!card && typeof card.id === 'string' && typeof card.characterId === 'string' && typeof card.stat === 'string' && typeof card.group === 'string' && typeof card.productId === 'string' && Number.isInteger(card.units) && card.units >= 1);
 }
 
 function normalizeCardCollection(value: unknown): MetaState['cardCollection'] {
@@ -1411,6 +1418,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
     cardCollection,
+    boosterCards: normalizeBoosterCards(parsed.boosterCards),
     unopenedCardPacks: normalizeUnopenedCardPacks(parsed.unopenedCardPacks),
     autoOpenPacksEnabled: parsed.autoOpenPacksEnabled !== false,
     activePassiveCardIds: Array.isArray(parsed.activePassiveCardIds) ? [...new Set(parsed.activePassiveCardIds.filter((id): id is string => typeof id === 'string' && ownedPassiveIds.has(id)))].slice(0, 5) : [],
@@ -1727,6 +1735,8 @@ export function effectiveStats(character: CharacterDef, meta: MetaState, ignoreF
   for (const [key, value] of Object.entries(boosts) as Array<[keyof BaseStats, number]>) {
     stats[key] = stats[key] + value;
   }
+  // Booster cards add to the played character (character, operatives and crew groups).
+  Object.assign(stats, applyBoosterToPlayerStats(stats, boosterUnits(meta.boosterCards ?? [])));
   for (const effect of crewActivityEffects(meta)) {
     if (effect.add) stats[effect.stat] += effect.add;
     if (effect.mult) stats[effect.stat] *= effect.mult;
@@ -1991,6 +2001,7 @@ type Action =
   | { type: 'enterHideout'; now: number }
   | { type: 'completeRun'; result: RunResult }
   | { type: 'buyCardPack'; packId: CardPackId; now: number }
+  | { type: 'buyBoosterProduct'; productId: string; now: number }
   | { type: 'buySingleCard'; cardId: string; cost: number; variant?: CardVariant }
   | { type: 'recycleCard'; cardId: string; rewardCC: number }
   | { type: 'recycleAllDuplicates' }
@@ -2250,6 +2261,14 @@ function coreReducer(state: StoreState, action: Action): StoreState {
       return { ...state, meta: { ...state.meta, selectedLokPetIds } };
     }
 
+    case 'buyBoosterProduct': {
+      const product = BOOSTER_PRODUCTS_BY_ID[action.productId];
+      if (!product || state.meta.cardCredits < product.cost) return state;
+      const seed = (action.now ^ state.meta.totalRuns ^ state.meta.boosterCards.length ^ product.cost) >>> 0;
+      const rng = createRng(seed);
+      const cards = Array.from({ length: product.cards }, (_, index) => rollBoosterCard(rng, product.id, action.now, index));
+      return { ...state, meta: { ...state.meta, cardCredits: state.meta.cardCredits - product.cost, boosterCards: [...state.meta.boosterCards, ...cards] } };
+    }
     case 'buyCardPack': {
       const pack = CARD_SHOP_PACKS_BY_ID[action.packId];
       if (!pack || state.meta.cardCredits < pack.cost) return state;
@@ -4200,6 +4219,7 @@ export interface MetaContextValue {
   completeRun: (result: RunResult) => void;
   resolveTravelEncounter: (result: TravelEncounterResult) => void;
   buyCardPack: (packId: CardPackId) => void;
+  buyBoosterProduct: (productId: string) => void;
   craftRelic: (relicId: string) => void;
   buyKeyItemAction: (keyItemId: string, credCost: number) => void;
   buySingleCard: (cardId: string, cost: number, variant?: CardVariant) => void;
@@ -4403,6 +4423,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const enterHideout = useCallback(() => dispatch({ type: 'enterHideout', now: Date.now() }), []);
   const completeRun = useCallback((result: RunResult) => dispatch({ type: 'completeRun', result }), []);
   const buyCardPack = useCallback((packId: CardPackId) => dispatch({ type: 'buyCardPack', packId, now: Date.now() }), []);
+  const buyBoosterProduct = useCallback((productId: string) => dispatch({ type: 'buyBoosterProduct', productId, now: Date.now() }), []);
   const buySingleCard = useCallback((cardId: string, cost: number, variant?: CardVariant) => dispatch({ type: 'buySingleCard', cardId, cost, variant }), []);
   const recycleCard = useCallback((cardId: string, rewardCC: number) => dispatch({ type: 'recycleCard', cardId, rewardCC }), []);
   const recycleAllDuplicates = useCallback(() => dispatch({ type: 'recycleAllDuplicates' }), []);
@@ -4728,6 +4749,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       completeRun,
       resolveTravelEncounter,
       buyCardPack,
+      buyBoosterProduct,
       buySingleCard,
       recycleCard,
       recycleAllDuplicates,
@@ -4905,6 +4927,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     completeRun,
     resolveTravelEncounter,
     buyCardPack,
+    buyBoosterProduct,
     buySingleCard,
     recycleCard,
     recycleAllDuplicates,
