@@ -11,6 +11,8 @@ import {
   CARD_FRAMES,
   PACK_FEATURED,
   PACK_SKINS,
+  RETRO_WALKERS,
+  WRAP_FINISH_BY_SKIN,
   boxShellFor,
   cardLayoutForFrame,
   foilStyleFor,
@@ -124,4 +126,13 @@ test('card motion setting round-trips and falls back to subtle', () => {
   assert.equal(reducer(state, { type: 'setCardMotion', motion: 'off' }).meta.cardMotion, 'off');
   assert.equal(normalizeMeta({ version: 1, cardMotion: 'full' }).cardMotion, 'full');
   assert.equal(normalizeMeta({ version: 1, cardMotion: 'wild' as never }).cardMotion, 'subtle');
+});
+
+test('wrap finishes and the Retro Neon walkers point at real catalog skins and real game figures', () => {
+  for (const skinId of Object.keys(WRAP_FINISH_BY_SKIN)) {
+    assert.equal(CARD_COSMETICS_BY_ID[skinId]?.kind, 'packSkin', `${skinId} is not a pack skin`);
+  }
+  for (const skinId of ['pack-retro', 'pack-kraft', 'pack-stock']) assert.ok(CARD_COSMETICS_BY_ID[skinId], `${skinId} missing`);
+  assert.ok(RETRO_WALKERS.length >= 2);
+  for (const figure of RETRO_WALKERS) assert.ok(figureExists(figure), `walker ${figure.id} is missing`);
 });

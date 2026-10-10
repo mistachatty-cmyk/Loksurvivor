@@ -16,6 +16,8 @@ import {
   foilStyleFor,
   packLotNumber,
   PACK_FEATURED,
+  RETRO_WALKERS,
+  WRAP_FINISH_BY_SKIN,
   type CardMotion,
   type FeaturedFigure,
 } from '@/game/data/cardCosmetics';
@@ -24,8 +26,9 @@ import { getCardVariableProfile } from '@/game/data/cardVariables';
 import { evolvedRig } from '@/game/engine/petEvolution';
 import type { PurchasableCardPack } from '@/game/data/passiveCards';
 import type { LokAssetManifest } from '@/game/lok/types';
-import type { SpritePalette, SpriteRig } from '@/game/types';
+import type { AnimName, SpritePalette, SpriteRig } from '@/game/types';
 import { RigPortrait } from './RigPortrait';
+import { KraftPack, MetalPack, RetroPack, StockPack } from './WrapPacks';
 import './cardCosmetics.css';
 
 /* ---------- scaling and motion helpers ---------- */
@@ -111,12 +114,12 @@ export function resolveFigure(figure: FeaturedFigure): ResolvedFigure | null {
   };
 }
 
-function Figure({ figure, size, animated }: { figure: FeaturedFigure; size: number; animated: boolean }) {
+function Figure({ figure, size, animated, anim, pixelScale }: { figure: FeaturedFigure; size: number; animated: boolean; anim?: AnimName; pixelScale?: number }) {
   const resolved = resolveFigure(figure);
   if (!resolved) return null;
   return (
     <span className="cc-spr fig" style={{ display: 'block', width: size, height: size }}>
-      <RigPortrait rig={resolved.rig} palette={resolved.palette} size={size} animated={animated} />
+      <RigPortrait rig={resolved.rig} palette={resolved.palette} size={size} animated={animated} anim={anim} pixelScale={pixelScale} />
     </span>
   );
 }
@@ -201,9 +204,26 @@ function BoxedPack({ pack }: { pack: PurchasableCardPack }) {
 /** Design size of every pack skin except the box, so the shop grid stays even. */
 export const PACK_ART_SIZE = { w: 190, h: 304 };
 
+/** The wraps from ui/WrapPacks.tsx, all printed with the pack's featured fighter or LokPet. */
+function WrapBody({ pack, skin, motion }: { pack: PurchasableCardPack; skin: string; motion: CardMotion }) {
+  const featured = PACK_FEATURED[pack.id] ?? { kind: 'character' as const, id: 'shade' };
+  const resolved = resolveFigure(featured);
+  const animated = motion === 'full';
+  const art = <Figure figure={featured} size={116} animated={animated} />;
+  const finish = WRAP_FINISH_BY_SKIN[skin];
+  if (finish) return <MetalPack pack={pack} finish={finish} motion={motion} art={art} figureName={resolved?.name} />;
+  if (skin === 'pack-retro') {
+    const walkers = RETRO_WALKERS.map((figure) => <Figure key={figure.id} figure={figure} size={64} animated={animated} anim="walk" pixelScale={2} />);
+    return <RetroPack pack={pack} walkers={walkers} />;
+  }
+  if (skin === 'pack-kraft') return <KraftPack pack={pack} art={art} figureName={resolved?.name} />;
+  if (skin === 'pack-stock') return <StockPack pack={pack} art={art} accent={resolved?.accent ?? foilStyleFor(pack.id).a} figureName={resolved?.name} />;
+  return null;
+}
+
 export function PackArt({ pack, skin, motion = 'subtle', maxWidth = 170 }: { pack: PurchasableCardPack; skin: string; motion?: CardMotion; maxWidth?: number }) {
   const body =
-    skin === 'pack-foil' ? <FoilPack pack={pack} /> : skin === 'pack-printed' ? <PrintedPack pack={pack} motion={motion} /> : skin === 'pack-boxed' ? <BoxedPack pack={pack} /> : null;
+    skin === 'pack-foil' ? <FoilPack pack={pack} /> : skin === 'pack-printed' ? <PrintedPack pack={pack} motion={motion} /> : skin === 'pack-boxed' ? <BoxedPack pack={pack} /> : <WrapBody pack={pack} skin={skin} motion={motion} />;
   if (!body) return null;
   const h = PACK_ART_SIZE.h;
   return (

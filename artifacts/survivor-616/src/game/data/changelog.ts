@@ -1270,6 +1270,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Each booster adds a random stat for every run: operatives and crew gain HP, speed, power, area, cooldown, pickup reach or armor; LokPets gain damage or speed; enemies gain HP. Results may vary.',
     ],
   },
+  {
+    version: '0.26.0',
+    date: '2026-10-10',
+    publishedAt: '2026-10-10T18:00:00Z',
+    kind: 'update',
+    title: 'Foil, Chrome and Neon Pack Wraps',
+    body: [
+      'The Sleeve Counter has seven new pack wraps: Gilt Foil, Platinum Chrome, Foundry Bronze and Prism Holo in real crinkled foil with a moving highlight, plus Retro Neon, Kraft Sleeve and Street Stock.',
+      'Retro Neon is the classic neon-green trading pack, with your fighters digitized and walking across it. Every wrap prints the pack\'s own fighter or LokPet, drawn from the real in-game sprites.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

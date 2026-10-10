@@ -47,6 +47,13 @@ export const PACK_SKINS: CardCosmeticDef[] = [
   def('packSkin', 'pack-foil', 'Foil Wrapper', 'uncommon', 'A crimped foil pouch with its own color, pattern and emblem for every pack.'),
   def('packSkin', 'pack-printed', 'Fighter Print', 'rare', 'A printed booster that features a real fighter or LokPet from the game on the front.'),
   def('packSkin', 'pack-boxed', 'Collector Box', 'legendary', 'A lift-lid collector box with cards standing in the opening.'),
+  def('packSkin', 'pack-gold', 'Gilt Foil', 'legendary', 'A crinkled gold foil wrap with a highlight that moves, a printed fighter and crimped seals.'),
+  def('packSkin', 'pack-platinum', 'Platinum Chrome', 'legendary', 'Cold mirror-chrome foil with a hard reflection and a printed fighter.'),
+  def('packSkin', 'pack-bronze', 'Foundry Bronze', 'uncommon', 'A worn, warm bronze foil wrap from the Soul Foundry, printed with a fighter.'),
+  def('packSkin', 'pack-holo', 'Prism Holo', 'rare', 'Iridescent rainbow foil that catches the light, with a printed fighter.'),
+  def('packSkin', 'pack-retro', 'Retro Neon', 'standard', 'The classic neon-green trading pack, with digitized fighters walking across it.'),
+  def('packSkin', 'pack-kraft', 'Kraft Sleeve', 'standard', 'A hand-stamped kraft paper sleeve. Quiet, warm and a little bit crafty.'),
+  def('packSkin', 'pack-stock', 'Street Stock', 'standard', 'Matte printed stock with one spot-color stripe and a halftone fighter. Built to sit under the foils.'),
 ];
 
 export const CARD_BACKS: CardCosmeticDef[] = [
@@ -158,6 +165,22 @@ export const PACK_FEATURED: Partial<Record<CardPackId, FeaturedFigure>> = {
   'apex-dominion': { kind: 'pet', id: 'ember-koi' },
   'mega-vault': { kind: 'character', id: 'emberback' },
 };
+
+/** Metal and holo finishes, keyed by pack skin id. Drawn by `MetalPack` in ui/WrapPacks.tsx. */
+export type WrapFinish = 'gold' | 'platinum' | 'bronze' | 'holo';
+export const WRAP_FINISH_BY_SKIN: Record<string, WrapFinish> = {
+  'pack-gold': 'gold',
+  'pack-platinum': 'platinum',
+  'pack-bronze': 'bronze',
+  'pack-holo': 'holo',
+};
+
+/** Fighters and LokPets that walk across the Retro Neon pack, drawn with their real in-game rigs. */
+export const RETRO_WALKERS: FeaturedFigure[] = [
+  { kind: 'character', id: 'shade' },
+  { kind: 'character', id: 'queenbee' },
+  { kind: 'pet', id: 'lil-llama' },
+];
 
 /** The figure shown in the hub of each district card back. */
 export const BACK_HUB_FIGURE: Record<string, FeaturedFigure> = {

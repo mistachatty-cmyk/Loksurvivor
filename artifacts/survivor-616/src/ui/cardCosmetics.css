@@ -190,3 +190,58 @@
 /* sealed (not yet collected) */
 .cc-card--sealed .art { filter: grayscale(1) brightness(.35); }
 .cc-card--sealed .seal { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; text-align: center; color: #f4ecd6; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: .14em; text-transform: uppercase; background: rgba(0,0,0,.35); padding: 14px; }
+
+/* ============ PACK WRAPS: metal and holo foil, Retro Neon, Kraft, Street Stock (190 x 304) ============ */
+.cc-wrap { --ink: #20262d; --edge: #5b6571; position: relative; width: 190px; height: 304px; border-radius: 9px; overflow: hidden; color: var(--ink); box-shadow: 0 22px 34px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.28); }
+.cc-wrap .foil { position: absolute; inset: 0; }
+.cc-wrap .bend { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.34) 0, rgba(0,0,0,0) 12%, rgba(255,255,255,.18) 30%, rgba(0,0,0,0) 48%, rgba(0,0,0,.22) 100%); }
+.cc-wrap .crimp { position: absolute; left: 0; right: 0; height: 20px; z-index: 2; opacity: .9; mix-blend-mode: multiply; background: repeating-linear-gradient(90deg, rgba(0,0,0,.45) 0 2px, rgba(255,255,255,.35) 2px 4px, var(--edge) 4px 6px); }
+.cc-wrap .crimp.t { top: 0; } .cc-wrap .crimp.b { bottom: 0; }
+.cc-wrap .plate { position: absolute; z-index: 3; top: 32px; left: 16px; right: 16px; height: 128px; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid var(--ink); border-radius: 6px; background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); }
+.cc-wrap .halftone { position: absolute; inset: 0; background: radial-gradient(circle, rgba(0,0,0,.2) 1.2px, transparent 1.6px) 0 0 / 6px 6px; }
+.cc-wrap .fig { position: relative; filter: drop-shadow(2px 2px 0 rgba(0,0,0,.4)); }
+.cc-wrap .lock { position: absolute; z-index: 3; top: 170px; left: 8px; right: 8px; text-align: center; }
+.cc-wrap .t1 { display: block; font-family: 'Oxanium', sans-serif; font-weight: 900; font-size: 22px; line-height: .95; text-transform: uppercase; text-wrap: balance; text-shadow: 1px 1px 0 rgba(255,255,255,.45), -1px -1px 0 rgba(0,0,0,.28); }
+.cc-wrap .t2 { display: block; margin-top: 7px; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 8.5px; letter-spacing: .3em; text-transform: uppercase; }
+.cc-wrap .tier { position: absolute; z-index: 3; bottom: 31px; left: 0; right: 0; text-align: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 8.5px; letter-spacing: .22em; }
+.cc-wrap .legal { position: absolute; z-index: 3; bottom: 23px; left: 0; right: 0; text-align: center; font-family: 'Space Mono', monospace; font-size: 5.5px; letter-spacing: .14em; opacity: .7; }
+.cc-wrap .scuff { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: radial-gradient(circle at 8% 92%, rgba(0,0,0,.25), transparent 12%), radial-gradient(circle at 94% 6%, rgba(255,255,255,.3), transparent 10%); }
+.cc-wrap--bronze .t1, .cc-wrap--bronze .t2, .cc-wrap--bronze .tier, .cc-wrap--bronze .legal { text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+
+/* ---- Retro Neon ---- */
+.cc-retro { position: relative; width: 190px; height: 304px; border-radius: 8px; border: 3px solid #0a0a0a; background: #86ee8c; overflow: hidden; box-shadow: 0 22px 34px rgba(0,0,0,.55); font-family: 'Oxanium', sans-serif; }
+.cc-retro::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1.4px) 0 0 / 7px 7px; }
+.cc-retro .holo { position: absolute; background: linear-gradient(180deg, #ff6ad5, #ffe066 18%, #7cf7e6 36%, #8aa8ff 54%, #d98bff 72%, #ff9a6b); }
+.cc-retro .holo.r { top: 0; bottom: 0; right: 0; width: 17px; border-left: 2px solid #0a0a0a; }
+.cc-retro .holo.b { left: 0; right: 0; bottom: 0; height: 17px; border-top: 2px solid #0a0a0a; background: linear-gradient(90deg, #ff6ad5, #ffe066 18%, #7cf7e6 36%, #8aa8ff 54%, #d98bff 72%, #ff9a6b); }
+.cc-retro .burst { position: absolute; top: 5px; left: 50%; transform: translateX(-50%) rotate(-4deg); }
+.cc-retro .ttl { position: absolute; top: 74px; left: 0; right: 17px; text-align: center; font-weight: 900; font-size: 26px; line-height: .95; color: #0a0a0a; transform: rotate(-5deg); }
+.cc-retro .bdg { position: absolute; z-index: 2; top: 140px; right: 28px; width: 64px; height: 64px; box-sizing: border-box; padding: 6px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #0a0a0a; color: #86ee8c; font-size: 8.5px; font-weight: 900; line-height: 1.1; text-align: center; transform: rotate(8deg); }
+.cc-retro .crd { position: absolute; top: 150px; left: 16px; width: 38px; height: 54px; border: 3px solid #0a0a0a; border-radius: 4px; background: #d9ffd0; transform: rotate(-12deg); }
+.cc-retro .ground { position: absolute; left: 0; right: 17px; bottom: 36px; height: 2px; background: repeating-linear-gradient(90deg, #0a0a0a 0 8px, transparent 8px 14px); }
+.cc-retro .walk { position: absolute; z-index: 1; left: 0; right: 17px; bottom: 34px; height: 62px; overflow: hidden; }
+.cc-retro .wk { position: absolute; left: 0; bottom: -8px; transform: translateX(var(--x, 0px)); animation: ccWalk 12s linear infinite; }
+.cc-retro .wk canvas { image-rendering: pixelated; }
+@keyframes ccWalk { from { transform: translateX(-100px); } to { transform: translateX(190px); } }
+.cc-retro .stk { position: absolute; bottom: 21px; left: 8px; font-family: 'Space Mono', monospace; font-size: 6.5px; font-weight: 700; letter-spacing: .12em; color: #0a0a0a; }
+
+/* ---- Kraft Sleeve ---- */
+.cc-kraft { position: relative; width: 190px; height: 304px; border-radius: 6px; overflow: hidden; background: #c9a26b; border: 2px solid #7a5a30; color: #3a2a14; box-shadow: 0 20px 30px rgba(0,0,0,.5); text-align: center; }
+.cc-kraft .grain { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(60,40,15,.1) 0 1px, transparent 1px 4px), radial-gradient(circle, rgba(60,40,15,.14) 1px, transparent 1.5px) 0 0 / 5px 5px; }
+.cc-kraft .fold { position: absolute; top: 30px; left: 0; right: 0; height: 2px; background: #3a2a14; box-shadow: 0 6px 8px rgba(0,0,0,.18); }
+.cc-kraft .stamp { position: absolute; top: 48px; left: 22px; right: 22px; height: 138px; display: flex; align-items: center; justify-content: center; border: 3px solid #3a2a14; outline: 1px solid #3a2a14; outline-offset: 3px; }
+.cc-kraft .fig { filter: contrast(1.05) drop-shadow(2px 2px 0 rgba(58,42,20,.35)); }
+.cc-kraft .t1 { position: absolute; top: 204px; left: 8px; right: 8px; font-family: 'Oxanium', sans-serif; font-weight: 900; font-size: 20px; line-height: .95; text-transform: uppercase; text-wrap: balance; }
+.cc-kraft .t2 { position: absolute; top: 238px; left: 0; right: 0; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 8.5px; letter-spacing: .3em; }
+.cc-kraft .tag { position: absolute; bottom: 14px; left: 0; right: 0; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 8.5px; letter-spacing: .16em; }
+.cc-kraft .twine { position: absolute; top: 24px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #e9dcc0; border: 2px solid #8a7348; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
+
+/* ---- Street Stock (default candidate) ---- */
+.cc-stock { --spot: #ff5a3c; position: relative; width: 190px; height: 304px; border-radius: 6px; overflow: hidden; background: #17181d; border: 1px solid #3a3c46; color: #e9e4d6; box-shadow: 0 20px 30px rgba(0,0,0,.5); text-align: center; }
+.cc-stock .dots { position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1.4px) 0 0 / 6px 6px; }
+.cc-stock .stripe { position: absolute; top: 0; bottom: 0; left: 0; width: 14px; background: var(--spot); }
+.cc-stock .plate { position: absolute; top: 28px; left: 30px; right: 16px; height: 134px; display: flex; align-items: center; justify-content: center; border: 2px solid #e9e4d6; }
+.cc-stock .fig { filter: drop-shadow(2px 2px 0 rgba(0,0,0,.5)); }
+.cc-stock .t1 { position: absolute; top: 178px; left: 22px; right: 8px; font-family: 'Oxanium', sans-serif; font-weight: 900; font-size: 21px; line-height: .95; text-transform: uppercase; text-wrap: balance; }
+.cc-stock .t2 { position: absolute; top: 216px; left: 14px; right: 0; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 8.5px; letter-spacing: .3em; opacity: .75; }
+.cc-stock .tier { position: absolute; bottom: 16px; left: 14px; right: 0; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 8.5px; letter-spacing: .2em; opacity: .8; }
