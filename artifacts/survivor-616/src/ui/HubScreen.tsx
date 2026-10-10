@@ -58,6 +58,7 @@ import { useT, useLocale } from '@/lib/i18n';
 import { grpdArmoryLocation, grpdAvailableSeals } from '@/game/data/grpdArmory';
 import { travelLeadPet } from '@/game/data/travelEncounters';
 import { HideoutArrivalOverlay } from './HideoutArrivalOverlay';
+import { HideoutDirectionPanel } from './HideoutDirectionPanel';
 import { HideoutEndgameDock } from './HideoutEndgameDock';
 
 /** Module-level, not state: the arrival scene shows once per page load, not once per hub visit -- HubScreen remounts every time you return from a run. */
@@ -586,6 +587,15 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
       {meta.hideoutStickyHeadOutEnabled && (
         <button type="button" onClick={() => onOpen('runs')} className="fixed inset-x-3 bottom-[max(0.75rem,var(--safe-bottom))] z-50 flex min-h-12 active:scale-[0.98] items-center justify-center gap-2 border border-primary bg-primary px-4 font-mono text-sm font-black uppercase tracking-widest text-primary-foreground shadow-[0_6px_24px_rgba(0,0,0,.45)] transition hover:bg-white sm:hidden" data-testid="button-open-runs-sticky">Head out <ArrowRight className="h-4 w-4" /></button>
       )}
+      <HideoutDirectionPanel
+        hideoutRooms={hideoutRooms}
+        travelRooms={travelRooms}
+        lockedHideoutRooms={lockedHideoutRooms}
+        lockedTravelRooms={lockedTravelRooms}
+        roomId={roomId}
+        onEnterRoom={enterRoom}
+        travelEncountersEnabled={meta.travelEncountersEnabled}
+      />
       <AnimatePresence mode="wait">
         <motion.div 
           key={activeRoom.id}
