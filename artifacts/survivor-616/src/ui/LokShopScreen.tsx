@@ -32,37 +32,14 @@ import { useMeta } from '@/game/state/metaStore';
 import { useT } from '@/lib/i18n';
 import { LOKTOKEN_PRICE_BY_TIER, catalogSku } from '@/lib/lokStoreCatalog';
 import { useLokEconomy } from '@/state/lokEconomyStore';
+import { HoloOwl } from './HoloOwl';
+import { SupporterBar } from './SupporterBar';
 
 const RECENT_LINES = 8;
 /** Where Pass / Passport / Lifetime are managed (the Stripe checkout lives on the hub, not in the game). */
 const SUPPORT_URL = 'https://gsix.online';
 type Tab = 'unlocks' | 'perks' | 'charms' | 'backroom';
 const pickOf = (list: readonly string[], rng: () => number) => list[Math.floor(rng() * list.length)]!;
-
-/** Outline-and-silhouette owl: dark body, glowing stroke, mood-driven face. */
-function HoloOwl({ mood }: { mood: LokServerMood }) {
-  const stroke = '#c084fc';
-  return (
-    <svg viewBox="0 0 120 120" className="lokshop-owl h-28 w-28 shrink-0 sm:h-36 sm:w-36" data-mood={mood} aria-hidden="true" data-testid="lokserver-face">
-      <defs>
-        <linearGradient id="owl-holo" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#1e1b4b" stopOpacity=".95" />
-          <stop offset="1" stopColor="#020617" stopOpacity=".95" />
-        </linearGradient>
-      </defs>
-      <path d="M22 40 L30 12 L48 30 L72 30 L90 12 L98 40 L98 84 Q98 112 60 112 Q22 112 22 84 Z" fill="url(#owl-holo)" stroke={stroke} strokeWidth="2.5" strokeLinejoin="round" />
-      <path d="M34 78 Q60 100 86 78 M40 90 Q60 104 80 90 M46 100 Q60 108 74 100" fill="none" stroke="#67e8f9" strokeOpacity=".55" strokeWidth="1.5" />
-      <g className="brow" stroke={stroke} strokeWidth="2.5" strokeLinecap="round"><path d="M30 42 L52 48" /><path d="M90 42 L68 48" /></g>
-      {[43, 77].map((cx) => (
-        <g key={cx}>
-          <circle cx={cx} cy="58" r="15" fill="#020617" stroke={stroke} strokeWidth="2.5" />
-          <g className="eye-lid"><circle cx={cx} cy="58" r="9" fill="#fde047" fillOpacity=".92" /><circle className="pupil" cx={cx} cy="58" r="4" fill="#020617" /></g>
-        </g>
-      ))}
-      <path d="M60 66 L53 79 L67 79 Z" fill="#fb923c" fillOpacity=".9" stroke="#fdba74" strokeWidth="1.5" />
-    </svg>
-  );
-}
 
 function Feather({ color }: { color: string }) {
   return (
@@ -201,6 +178,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
         <button type="button" onClick={onBack} className="mb-4 flex items-center gap-1 text-xs uppercase tracking-wide text-muted-foreground hover:text-foreground" data-testid="button-lok-shop-back">
           <ArrowLeft className="h-3 w-3" />{t('lokshop.back')}
         </button>
+        <SupporterBar variant="inline" />
         <h1 className="text-3xl font-black uppercase tracking-[0.2em] text-violet-200 [text-shadow:0_0_14px_rgba(192,132,252,.8)]">{t('lokshop.title')}</h1>
         <p className="text-sm text-muted-foreground">{t('lokshop.subtitle')}</p>
 

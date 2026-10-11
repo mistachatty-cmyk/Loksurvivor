@@ -1,3 +1,4 @@
+import { SupporterBar } from './SupporterBar';
 import { useState } from 'react';
 import {
   BarChart3,
@@ -84,7 +85,7 @@ const SHOP_TABS: { id: ShopTab; label: string; icon: typeof PackageOpen }[] = [
   { id: 'sleeve', label: 'Sleeve Counter', icon: Palette },
 ];
 
-export function CardShopPanel({ onBack }: { onBack: () => void }) {
+export function CardShopPanel({ onBack, initialTab }: { onBack: () => void; initialTab?: ShopTab }) {
   const {
     meta,
     buyCardPack,
@@ -99,7 +100,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
     clearCardPackReveal,
   } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
-  const [tab, setTab] = useState<ShopTab>('binder');
+  const [tab, setTab] = useState<ShopTab>(initialTab ?? 'binder');
   const [showAll, setShowAll] = useState(false);
   const [showMatrixModal, setShowMatrixModal] = useState(false);
   const [showOddsModal, setShowOddsModal] = useState(false);
@@ -524,6 +525,7 @@ export function CardShopPanel({ onBack }: { onBack: () => void }) {
 
   return (
     <ScreenLayout title="Lock Pack Counter" subtitle="The Neon Sleeve · Hideout location" onBack={onBack}>
+      <SupporterBar variant="inline" />
       {/* Hero Banner with Card Credits & Action buttons */}
       <section
         className="relative mb-7 overflow-hidden border border-fuchsia-300/40 bg-[radial-gradient(circle_at_80%_15%,rgba(232,121,249,.22),transparent_38%),linear-gradient(135deg,rgba(8,47,73,.75),rgba(24,24,39,.94))] p-5 sm:p-7"

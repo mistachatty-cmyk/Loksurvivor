@@ -4,7 +4,9 @@
  * Platforms vendor a copy with `sync-sdk.sh`; never edit a vendored copy.
  */
 
-export const SDK_VERSION = "1.0.0";
+import type { SupporterBarManifest } from "./supporters";
+
+export const SDK_VERSION = "1.1.0";
 /** Bump on a breaking change to the registry row / recipe shape. Stored in lok_cards.schema_version. */
 export const SCHEMA_VERSION = 1;
 
@@ -116,5 +118,10 @@ export interface PlatformManifest {
    * `hubKey` is the hub's /games/[key].
    */
   publicLore?: { script: string; hubKey: string } | null;
+  /**
+   * Where the Lok supporter bar is mounted. REQUIRED for any platform with a shop: both
+   * "shell" (the main frame) and "shop" (every shop screen). See SUPPORTERS.md.
+   */
+  supporterBar?: SupporterBarManifest;
   sdkVersion: string;
 }

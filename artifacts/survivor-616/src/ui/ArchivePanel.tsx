@@ -55,6 +55,10 @@ import { UpdateEntryCard } from './UpdateEntryCard';
 export interface ArchivePanelProps {
   onBack: () => void;
   focusVariantId?: string;
+  /** Open on this chapter (e.g. 'updates'). */
+  initialChapter?: string;
+  /** With the updates chapter: scroll to this version's entry. */
+  focusUpdateVersion?: string;
 }
 
 const ACHIEVEMENT_TIER_STYLES: Record<string, { border: string; label: string }> = {
@@ -71,7 +75,7 @@ const CLOUD_LABEL: Record<ReturnType<typeof useCloudSyncStatus>, string> = {
   error: 'Offline',
 };
 
-export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
+export function ArchivePanel({ onBack, focusVariantId, initialChapter, focusUpdateVersion }: ArchivePanelProps) {
   const { meta, resetProgress, claimAchievement, importVisitingLokCard, buyLokPetCardPack } = useMeta();
   const isListView = meta.uiDensity === 'list';
   const { earn: earnLokTokens, balance: lokBalance, rank: lokRank } = useLokEconomy();
@@ -133,7 +137,12 @@ export function ArchivePanel({ onBack, focusVariantId }: ArchivePanelProps) {
   // The archive used to stack all 8 chapters in one continuous scroll --
   // a tab strip shows one chapter at a time instead, so most of what's
   // here is reachable without scrolling for days.
-  const [activeChapter, setActiveChapter] = useState<string>('workshop');
+  const [activeChapter, setActiveChapter] = useState<string>(initialChapter ?? 'workshop');
+
+  useEffect(() => {
+    if (!focusUpdateVersion || activeChapter !== 'updates') return;
+    document.querySelector(`[data-testid="archive-update-${focusUpdateVersion}"]`)?.scrollIntoView({ block: 'center' });
+  }, [focusUpdateVersion, activeChapter]);
 
   useEffect(() => {
     if (focusVariantId) setActiveChapter('lokpets');

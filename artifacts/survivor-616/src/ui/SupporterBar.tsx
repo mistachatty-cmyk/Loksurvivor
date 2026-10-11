@@ -6,27 +6,32 @@
  */
 import { useEffect, useState } from 'react';
 
-import { fetchSupporterFeed, type SupporterFeedEntry } from '@workspace/lok-client';
+import { fetchSupporterFeed, SUPPORTER_BAR_LABEL, SUPPORTER_REFRESH_MS, supporterItemText, supporterScrollSeconds, type SupporterFeedEntry } from '@workspace/lok-client';
 
 import { lokClient } from '@/lib/lokClient';
 
-const REFRESH_MS = 10 * 60 * 1000;
-/** Seconds each name stays on screen while it crosses; keeps the speed steady as the list grows. */
-const SECONDS_PER_ENTRY = 5;
+/** One feed per page load per 10 minutes (shared by every bar on screen) -- see docs/LOK_COST_DISCIPLINE.md. */
+let cache: { at: number; entries: SupporterFeedEntry[] } | null = null;
 
-export function SupporterBar() {
+export function SupporterBar({ variant = 'strip' }: { variant?: 'strip' | 'inline' }) {
   const [entries, setEntries] = useState<SupporterFeedEntry[]>([]);
 
   useEffect(() => {
     if (!lokClient) return;
     let alive = true;
     const load = () => {
+      if (cache && Date.now() - cache.at < SUPPORTER_REFRESH_MS) {
+        setEntries(cache.entries);
+        return;
+      }
       void fetchSupporterFeed(lokClient!).then((result) => {
-        if (alive && result.ok) setEntries(result.entries);
+        if (!result.ok) return;
+        cache = { at: Date.now(), entries: result.entries };
+        if (alive) setEntries(result.entries);
       });
     };
     load();
-    const id = window.setInterval(load, REFRESH_MS);
+    const id = window.setInterval(load, SUPPORTER_REFRESH_MS);
     return () => {
       alive = false;
       window.clearInterval(id);
@@ -34,17 +39,17 @@ export function SupporterBar() {
   }, []);
 
   if (entries.length === 0) return null;
-  const duration = Math.max(30, entries.length * SECONDS_PER_ENTRY);
+  const duration = supporterScrollSeconds(entries.length);
   const row = (suffix: string) =>
     entries.map((entry, index) => (
       <span key={`${suffix}${index}`} className="supporter-bar__item" data-tier={entry.tier} data-founder={entry.founder}>
-        {entry.founder ? '★ ' : '◆ '}{entry.display}{entry.founder ? ' · FOUNDER' : ''}
+        {supporterItemText(entry)}
       </span>
     ));
 
   return (
-    <div className="supporter-bar" role="region" aria-label="Lok supporters" data-testid="supporter-bar">
-      <span className="supporter-bar__label">LOK SUPPORTERS · THANK YOU</span>
+    <div className={`supporter-bar${variant === 'inline' ? ' supporter-bar--inline' : ''}`} role="region" aria-label="Lok supporters" data-testid={`supporter-bar-${variant}`}>
+      <span className="supporter-bar__label">{SUPPORTER_BAR_LABEL}</span>
       <div className="supporter-bar__lane">
         <div className="supporter-bar__track" style={{ animationDuration: `${duration}s` }}>
           {row('a')}

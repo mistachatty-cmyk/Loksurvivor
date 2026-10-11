@@ -7,6 +7,22 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 120,
+      "version": "0.28.0",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T23:00:00Z",
+      "kind": "expansion",
+      "categoryLabel": "Expansion",
+      "categoryColor": "#ef4444",
+      "categoryLore": "Another part of the 616 opens up.",
+      "title": "Thank You, Supporters",
+      "body": [
+        "The supporter bar now follows you into every shop. Lok Pass and Passport supporters glow teal and blue, Lifetime founders glow gold, and the bar takes on the colors of whichever world you are in.",
+        "The hideout has a new ad slot that cycles the LokShop, the Sleeve Counter and the newest updates. Click any of them to jump straight there, or straight to that update in your Archive.",
+        "Behind the scenes: Lok Pass, Passport and Lifetime are now supporter entitlements, the shared SDK carries the supporter rules for every Lok game, and everything new is drawn in code so it costs nothing extra to load."
+      ]
+    },
+    {
       "number": 119,
       "version": "0.27.4",
       "date": "2026-10-11",

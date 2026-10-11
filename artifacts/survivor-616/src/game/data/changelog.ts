@@ -1376,6 +1376,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The LokShop now sells the Chest Pass (the Lucky Chest turns up far more often) and the Rider Saddle (your lead LokPet rides on your back and attacks 20% faster). Pass and Passport perks, like extra feather tries, now come from your supporter status instead of a LokToken purchase.',
     ],
   },
+  {
+    version: '0.28.0',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T23:00:00Z',
+    kind: 'expansion',
+    title: 'Thank You, Supporters',
+    body: [
+      'The supporter bar now follows you into every shop. Lok Pass and Passport supporters glow teal and blue, Lifetime founders glow gold, and the bar takes on the colors of whichever world you are in.',
+      'The hideout has a new ad slot that cycles the LokShop, the Sleeve Counter and the newest updates. Click any of them to jump straight there, or straight to that update in your Archive.',
+      'Behind the scenes: Lok Pass, Passport and Lifetime are now supporter entitlements, the shared SDK carries the supporter rules for every Lok game, and everything new is drawn in code so it costs nothing extra to load.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -2,6 +2,8 @@
  * The hideout. Room navigation plus entry points into every other surface.
  * Owned by the design pass -- keep the export name and props stable.
  */
+import type { PromoTarget } from '@/game/data/promoSlides';
+import { LokPromoCycle } from './LokPromoCycle';
 import { ELIXIR_CAP, isPrimeTakeoverActive, spurShowing, useMeta, describeUnlock } from '@/game/state/metaStore';
 import { CREW_ACTIVITIES_BY_ID, preferredActivitiesForAlly } from '@/game/data/crewActivities';
 import { getCrewRumor } from '@/game/data/crewRumors';
@@ -80,6 +82,8 @@ export interface HubScreenProps {
   onOpenArena: () => void;
   /** Reopens the companion and visual setup screen without starting a run. */
   onOpenRunSetup: () => void;
+  /** The ad slot: jump to a shop tab, an update, or a place in the player's account. */
+  onPromo: (target: PromoTarget) => void;
   /** Opens a choice event scene (from a prop or the "something is happening" chip). */
   onStartChoiceEvent?: (eventId: string, propId?: string) => void;
   /** Returns to the cold-open title screen. */
@@ -161,7 +165,7 @@ const NPC_PROP_CAST: Record<string, NpcCastMember> = {
   'luvitnot-keeper': LUVITNOT_KEEPER,
 };
 
-export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onStartChoiceEvent, onBack }: HubScreenProps) {
+export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpenSectorCommand, onOpenLokPetBattle, onOpenArena, onOpenRunSetup, onPromo, onStartChoiceEvent, onBack }: HubScreenProps) {
   const chromeLayout = useUiChromeLayout();
   const { unlockedRooms, lockedRooms, rescuedAllies, selectedCharacter, meta, lastRun, buyGenerator, refreshGeneratorIncome, claimLegendaryPoliceDog, claimDailyLogin, careForLokPet, completeHideoutEvent, activateHideoutProp, playWithLokPet, lookThroughSpyglass, openLuckyChest, collectHideoutPickup } = useMeta();
   const { playTrackOnRepeat, ensureAudioContext } = useMusicPlayer();
@@ -953,6 +957,7 @@ export function HubScreen({ roomId, onChangeRoom, onOpen, onOpenMapEditor, onOpe
             ))}
           </div>
 
+        <LokPromoCycle onOpen={onPromo} />
         <section className="mb-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="h-px bg-border flex-1" />

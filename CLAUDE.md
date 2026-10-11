@@ -19,6 +19,10 @@ Do not confuse `/home/user/Loksurvivor` (capital L) with `/home/user/loksurvivor
 developed clone with commit history; the capitalized one is a stale duplicate
 stuck on the initial import commit.
 
+## Cost discipline — mandatory for every AI
+
+We are pre-revenue, so data and AI usage must stay minimal. **Read `docs/LOK_COST_DISCIPLINE.md` before building** (procedural SVG/CSS art only, no new network or image cost, cached shared feeds, no runtime LLM calls, no subagent fan-out unless asked, read docs/memory before searching, batch tool calls). Memory: `.agents/memory/cost-discipline.md`.
+
 ## Naming rule — never use “signal”
 
 **“Signal” is prohibited.** Do not introduce it in player-facing copy, theme

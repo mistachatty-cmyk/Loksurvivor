@@ -1,13 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sanitizeSupporterFeed, type SupporterEntry, type SupporterTier } from "@workspace/lok-universe";
 
-/** Supporter tiers, lowest to highest. `lifetime` is the founder tier. */
-export type SupporterTier = "pass" | "passport" | "lifetime";
-
-export interface SupporterFeedEntry {
-  display: string;
-  tier: SupporterTier;
-  founder: boolean;
-}
+// Supporter types and sanitising live in the shared SDK (re-exported through ./cards).
+export type SupporterFeedEntry = SupporterEntry;
 
 const TIER_ORDER: SupporterTier[] = ["pass", "passport", "lifetime"];
 export const supporterTierRank = (tier: SupporterTier | null | undefined) => (tier ? TIER_ORDER.indexOf(tier) + 1 : 0);
@@ -18,9 +13,7 @@ const isTier = (value: unknown): value is SupporterTier => value === "pass" || v
 export async function fetchSupporterFeed(client: SupabaseClient, limit = 200): Promise<{ ok: boolean; entries: SupporterFeedEntry[]; error?: string }> {
   const { data, error } = await client.rpc("lok_supporter_feed", { p_limit: limit });
   if (error) return { ok: false, entries: [], error: error.message };
-  const entries = ((data ?? []) as Array<{ display?: unknown; tier?: unknown; founder?: unknown }>).flatMap((row) =>
-    typeof row.display === "string" && isTier(row.tier) ? [{ display: row.display, tier: row.tier, founder: row.founder === true }] : [],
-  );
+  const entries = sanitizeSupporterFeed(data);
   return { ok: true, entries };
 }
 
