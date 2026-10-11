@@ -1,4 +1,5 @@
 import { SupporterBar } from './SupporterBar';
+import { LokWalletStrip } from './LokWalletStrip';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CloudRain, Gem, Flame, LayoutGrid, Lock, Palette, Radar, ScanLine, Sparkles, Star } from 'lucide-react';
 
@@ -76,7 +77,7 @@ const TIER_BADGE_CLASS = {
 
 type ShopCategory = 'palettes' | 'auras' | 'hats' | 'celebrations' | 'drops' | 'unlocks';
 
-interface Props { onBack: () => void }
+interface Props { onBack: () => void; onSignIn?: () => void }
 
 function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (category: ShopCategory) => void }) {
   return (
@@ -105,7 +106,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
   );
 }
 
-export function PaletteGalleryPanel({ onBack }: Props) {
+export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
   const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
@@ -310,6 +311,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
   return (
     <ScreenLayout title="Customization Shop" subtitle={`${vendorName} — Paint Gallery`} onBack={onBack}>
       <SupporterBar variant="inline" />
+      <LokWalletStrip onSignIn={onSignIn} />
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <aside className="flex shrink-0 flex-col items-center gap-3 border border-border bg-card px-6 py-5 lg:sticky lg:top-4 lg:w-72">
           <div className={flickerActive ? 'palette-preview-flicker' : ''}>
