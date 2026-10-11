@@ -47,6 +47,7 @@ import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { LokShopScreen } from '@/ui/LokShopScreen';
+import { SupporterBar } from '@/ui/SupporterBar';
 import { PhotosensitivityNotice, photosensitivityNoticeHidden } from '@/ui/PhotosensitivityNotice';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
@@ -105,13 +106,13 @@ type Screen =
   | { name: 'roster' }
   | { name: 'areas' }
   | { name: 'bestiary' }
-  | { name: 'archive'; variantId?: string }
+  | { name: 'archive'; variantId?: string; chapter?: string; updateVersion?: string }
   | { name: 'music' }
   | { name: 'studio' }
   | { name: 'recovery' }
   | { name: 'vendor'; initialCategory?: VendorItemCategory }
   | { name: 'workshop' }
-  | { name: 'card-shop' }
+  | { name: 'card-shop'; tab?: 'sleeve' | 'binder' | 'singles' }
   | { name: 'lok-shop' }
   | { name: 'weapon-bans' }
   | { name: 'grpd-armory' }
@@ -520,6 +521,16 @@ function Game() {
     case 'hub':
       return (
         <HubScreen
+          onPromo={(target) => {
+            sfx.play('uiNav');
+            switch (target.screen) {
+              case 'update': setScreen({ name: 'archive', chapter: 'updates', updateVersion: target.version }); break;
+              case 'card-shop': setScreen({ name: 'card-shop', tab: target.tab }); break;
+              case 'lok-shop': setScreen({ name: 'lok-shop' }); break;
+              case 'palette-store': setScreen({ name: 'palette-store' }); break;
+              case 'account': setScreen({ name: 'account' }); break;
+            }
+          }}
           roomId={roomId}
           onChangeRoom={(nextRoomId) => {
             if (nextRoomId === 'the-storefront') {
@@ -625,7 +636,7 @@ function Game() {
       return <BestiaryPanel onBack={goHub} />;
 
     case 'archive':
-      return <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} />;
+      return <ArchivePanel onBack={goHub} focusVariantId={screen.variantId} initialChapter={screen.chapter} focusUpdateVersion={screen.updateVersion} />;
 
     case 'music':
       return <MusicPanel onBack={goHub} />;
@@ -647,10 +658,10 @@ function Game() {
       return <WorkshopPanel onBack={goHub} />;
 
     case 'card-shop':
-      return <CardShopPanel onBack={goHub} />;
+      return <CardShopPanel onBack={goHub} initialTab={screen.tab} />;
 
     case 'lok-shop':
-      return <LokShopScreen onBack={goHub} />;
+      return <LokShopScreen onBack={goHub} onOpenCosmetics={() => setScreen({ name: 'palette-store' })} />;
 
     case 'weapon-bans':
       return <WeaponBansScreen onBack={goHub} />;
@@ -832,6 +843,7 @@ function ThemedGame() {
       className="min-h-[100dvh]"
     >
       <Game />
+      <SupporterBar />
     </div>
   );
 }

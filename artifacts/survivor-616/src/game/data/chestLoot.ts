@@ -16,6 +16,8 @@ export const CHEST_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 /** Chance a window has the chest out. */
 export const CHEST_OUT_CHANCE = 0.4;
+/** Chance with the LokShop Chest Pass. Same roll, higher bar, so every window that was out stays out. */
+export const CHEST_OUT_CHANCE_PASS = 0.75;
 
 export type ChestTierId = 'common' | 'uncommon' | 'rare' | 'ultra';
 
@@ -63,8 +65,8 @@ export function chestWindow(now: number): number {
 }
 
 /** Whether the chest is out during `window`. */
-export function chestOut(window: number): boolean {
-  return createRng(window * 104729 + 7)() < CHEST_OUT_CHANCE;
+export function chestOut(window: number, hasPass = false): boolean {
+  return createRng(window * 104729 + 7)() < (hasPass ? CHEST_OUT_CHANCE_PASS : CHEST_OUT_CHANCE);
 }
 
 /**

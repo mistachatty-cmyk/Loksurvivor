@@ -1344,6 +1344,60 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The Live pack wraps (Prism Holo Live, Retro Neon Live and Retro Neon Arcade) were frozen on the default Subtle card motion. They now animate in the Sleeve Counter, the card shop and on your shelf unless card motion is Off or your device asks for reduced motion.',
     ],
   },
+  {
+    version: '0.27.2',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T15:30:00Z',
+    kind: 'hotfix',
+    title: 'Skeleton Keys Stop Raining',
+    body: [
+      'Skeleton keys were dropping from the random item weather in open arenas about once every 25 seconds, each with a popup, alert and sound. They now only show up there as a rare surprise.',
+    ],
+  },
+  {
+    version: '0.27.3',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T16:30:00Z',
+    kind: 'update',
+    title: 'LokShop Has a Door Button',
+    body: [
+      'The LokShop now has a real button in the hideout rooms instead of only the counter picture. Inside, the shelf lists everything LokServer sells for LokTokens (the LokPet Field Guide, Collector Access and the LokPack Visualizer) with working buy buttons, plus a link to the full Customization Shop.',
+    ],
+  },
+  {
+    version: '0.27.4',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T18:00:00Z',
+    kind: 'update',
+    title: 'LokServer Opens the Back Room',
+    body: [
+      'The LokShop is rebuilt around LokServer, now a glowing holographic owl who greets you by how well he knows you. Visit daily to build rapport, play the feather game for Feather Charms, and open the back room.',
+      'New LokToken items: The Ball, the Lok Pass (more feather tries a day), the Lok Passport (daily stamps and doubled charm luck) and the Lifetime Passport, which counts as both.',
+    ],
+  },
+  {
+    version: '0.27.5',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T21:00:00Z',
+    kind: 'update',
+    title: 'Supporter Bar, Chest Pass and Rider Saddle',
+    body: [
+      'A live supporter bar now streams across the bottom of the game: teal and blue for Lok Pass and Lok Passport supporters, gold with a founder star for Lifetime Passport holders. Names stay on the bar for good, even if a subscription ends.',
+      'The LokShop now sells the Chest Pass (the Lucky Chest turns up far more often) and the Rider Saddle (your lead LokPet rides on your back and attacks 20% faster). Pass and Passport perks, like extra feather tries, now come from your supporter status instead of a LokToken purchase.',
+    ],
+  },
+  {
+    version: '0.28.0',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T23:00:00Z',
+    kind: 'expansion',
+    title: 'Thank You, Supporters',
+    body: [
+      'The supporter bar now follows you into every shop. Lok Pass and Passport supporters glow teal and blue, Lifetime founders glow gold, and the bar takes on the colors of whichever world you are in.',
+      'The hideout has a new ad slot that cycles the LokShop, the Sleeve Counter and the newest updates. Click any of them to jump straight there, or straight to that update in your Archive.',
+      'Behind the scenes: Lok Pass, Passport and Lifetime are now supporter entitlements, the shared SDK carries the supporter rules for every Lok game, and everything new is drawn in code so it costs nothing extra to load.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -1363,6 +1363,8 @@ export interface World {
   graphicsQuality: 'high' | 'balanced' | 'performance';
   /** Settings: enhanced (default) or classic drop art. Render-only. */
   dropStyle: DropStyle;
+  /** LokShop Rider Saddle owned: the lead LokPet rides on the player's back. */
+  riderSaddle: boolean;
   /** Settings: which damage-number style to draw. Render-only; never affects damage. */
   damageNumberStyle: DamageNumberStyle;
   /** Periodic HordeSpin wheel state; null unless `modifiers.hordeSpinEnabled`. */
@@ -1597,6 +1599,8 @@ export function createWorld(
     ownedKeyItemIds?: string[];
     craftedRelicIds?: string[];
     buildingEntryStyle?: 'seamless' | 'classic';
+    /** LokShop Rider Saddle: the lead LokPet rides on the player's back and attacks faster. */
+    riderSaddle?: boolean;
   } = {},
 ): World {
   const sizeMult = setup.sizeMult ?? 1;
@@ -1917,6 +1921,7 @@ export function createWorld(
     hordeFedThisStep: 0,
     graphicsQuality: setup.graphicsQuality ?? 'high',
     dropStyle: setup.dropStyle ?? 'classic',
+    riderSaddle: setup.riderSaddle === true,
     damageNumberStyle: setup.damageNumberStyle ?? 'classic',
     wheelSpin: modifiers.hordeSpinEnabled
       ? {
@@ -3578,6 +3583,10 @@ function triggerSpecialLokPetAbility(w: World, pet: LokPetInstance) {
   }
 }
 
+/** How far above the player's centre a riding pet sits, and how much faster it attacks. */
+const RIDER_LIFT = 14;
+const RIDER_COOLDOWN_MULT = 0.8;
+
 function updateLokPets(w: World, dt: number) {
   for (let i = w.lokPets.length - 1; i >= 0; i -= 1) {
     const pet = w.lokPets[i]!;
@@ -3594,8 +3603,10 @@ function updateLokPets(w: World, dt: number) {
     }
 
     pet.orbitAngle += dt * (pet.ghost ? 1.35 : 1.8);
-    const tx = w.player.x + Math.cos(pet.orbitAngle) * pet.orbitRadius;
-    const ty = w.player.y + Math.sin(pet.orbitAngle) * pet.orbitRadius;
+    // Rider Saddle: the lead pet sits on the player's back instead of orbiting.
+    const riding = w.riderSaddle && i === 0;
+    const tx = riding ? w.player.x : w.player.x + Math.cos(pet.orbitAngle) * pet.orbitRadius;
+    const ty = riding ? w.player.y - RIDER_LIFT : w.player.y + Math.sin(pet.orbitAngle) * pet.orbitRadius;
     const dx = tx - pet.x;
     const dy = ty - pet.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -3620,11 +3631,11 @@ function updateLokPets(w: World, dt: number) {
         pet.palette.glow,
         lokPetStatusId(pet, w),
       );
-      pet.nextPulseAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult;
+      pet.nextPulseAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult * (riding ? RIDER_COOLDOWN_MULT : 1);
       pet.readyAt = pet.nextPulseAt;
     } else {
       fireLokPetShot(w, pet, target);
-      pet.readyAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult;
+      pet.readyAt = w.now + pet.stats.cooldownMs * w.cardEffects.lokPetHasteMult * (riding ? RIDER_COOLDOWN_MULT : 1);
     }
   }
 }
@@ -11157,7 +11168,11 @@ function updateRumorPulses(w: World) {
   w.rumorMagnetNextAt += 8500;
 }
 
-const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'health', 'cred', 'coin'];
+// Skeleton keys ('coin') used to be 1 of 5 equal entries here, so random-drop arenas
+// spawned one every ~25s -- each with a popup, alert and sfx -- and the "rare" currency
+// felt like spam (common bug). They are now a rare easter-egg roll instead.
+const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'health', 'cred'];
+const AMBIENT_KEY_EASTER_EGG_CHANCE = 0.02;
 
 /**
  * area.randomDrops: pickups appear at random arena points on a cadence,
@@ -11178,7 +11193,9 @@ function updateAmbientDrops(w: World) {
     y = randRange(w.rng, -halfH, halfH);
     if (dist2(x, y, w.player.x, w.player.y) > 160 * 160) break;
   }
-  const kind = AMBIENT_DROP_KINDS[Math.floor(w.rng() * AMBIENT_DROP_KINDS.length)]!;
+  const kind = w.rng() < AMBIENT_KEY_EASTER_EGG_CHANCE
+    ? 'coin'
+    : AMBIENT_DROP_KINDS[Math.floor(w.rng() * AMBIENT_DROP_KINDS.length)]!;
   const value = kind === 'xp' ? Math.round(randRange(w.rng, 6, 14))
     : kind === 'health' ? 18
     : kind === 'cred' ? Math.round(randRange(w.rng, 4, 10))

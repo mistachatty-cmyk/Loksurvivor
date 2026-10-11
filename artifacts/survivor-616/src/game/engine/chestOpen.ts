@@ -28,9 +28,9 @@ type ChestMeta = Pick<
 
 export type ChestStatus = 'out' | 'away' | 'opened';
 
-export function chestStatus(meta: Pick<MetaState, 'hideoutClaims'>, now: number): ChestStatus {
+export function chestStatus(meta: Pick<MetaState, 'hideoutClaims'> & Partial<Pick<MetaState, 'lokShopPerks'>>, now: number): ChestStatus {
   const window = chestWindow(now);
-  if (!chestOut(window)) return 'away';
+  if (!chestOut(window, meta.lokShopPerks?.includes('chest-pass') === true)) return 'away';
   return chestOpenedThisWindow(meta.hideoutClaims[CHEST_CLAIM_KEY], now) ? 'opened' : 'out';
 }
 

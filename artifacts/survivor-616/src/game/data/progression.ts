@@ -397,7 +397,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/bar.jpeg',
     biome: 'sanctum',
     unlock: { kind: 'default' },
-    features: ['runs', 'roster', 'allies', 'settings', 'account', 'feedback'],
+    features: ['runs', 'roster', 'allies', 'lok-shop', 'settings', 'account', 'feedback'],
   },
   {
     id: 'rooftop-perch',
@@ -409,7 +409,7 @@ export const HUB_ROOMS: HubRoomDef[] = [
     backdrop: 'art/rooftops.jpeg',
     biome: 'rooftop',
     unlock: { kind: 'discovery', discoveryId: 'alley-hatch' },
-    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings', 'palette-store', 'account', 'feedback'],
+    features: ['runs', 'recovery', 'bestiary', 'unlocks', 'settings', 'palette-store', 'lok-shop', 'account', 'feedback'],
   },
   {
     id: 'the-cellar',

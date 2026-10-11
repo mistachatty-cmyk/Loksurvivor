@@ -2030,7 +2030,7 @@ export interface HubRoomDef {
   biome?: HideoutBiome;
   unlock: UnlockRule;
   /** Feature keys surfaced in this room. */
-  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal'>;
+  features: Array<'runs' | 'roster' | 'bestiary' | 'music' | 'studio' | 'unlocks' | 'allies' | 'recovery' | 'vendor' | 'kennel' | 'workshop' | 'card-shop' | 'weapon-bans' | 'settings' | 'palette-store' | 'sound-booth' | 'account' | 'feedback' | 'director-terminal' | 'lok-shop'>;
 }
 
 export type HideoutBiome = 'sanctum' | 'rooftop' | 'cellar' | 'alley' | 'archive';
@@ -2633,6 +2633,19 @@ export interface MetaState {
   lokPetCollectorAccessUnlocked: boolean;
   /** LOK Shop unlock: lets the Sleeve Counter sell the animated Live pack wraps. */
   lokPackVisualizerUnlocked: boolean;
+  /** LokShop perks owned (ids from `lokShopPerks.ts`): ball, Lok Pass, Passports. */
+  lokShopPerks: string[];
+  /** How well LokServer knows you; raised by daily visits and the feather game. */
+  lokShopRapport: number;
+  /** Passport stamps: one per local day visited while holding a Passport. */
+  lokShopStamps: number;
+  /** Local-day key of the last visit. */
+  lokShopLastVisit: string;
+  /** Feather Charm ids collected. */
+  lokShopCharms: string[];
+  /** Local-day key and count of feather-game tries used. */
+  lokShopHaggleDay: string;
+  lokShopHaggleCount: number;
   /** Local-date key for the currently active Broadcast contract board. */
   dailyContractDayKey: string;
   /** Progress accumulated against today's Broadcast contracts. */

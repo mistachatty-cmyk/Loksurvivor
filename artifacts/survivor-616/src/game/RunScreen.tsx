@@ -459,6 +459,7 @@ export function RunScreen({
         modifiers: meta.runModifiers,
         graphicsQuality: meta.graphicsQuality,
         dropStyle: getDropStyle(meta.activeDropPackId),
+        riderSaddle: meta.lokShopPerks.includes('rider-saddle'),
         damageNumberStyle: meta.damageNumberStyle,
         runtimePerformanceTier: detectRuntimePerformanceTier(),
         worldColorPalette: activeWorldPalette,

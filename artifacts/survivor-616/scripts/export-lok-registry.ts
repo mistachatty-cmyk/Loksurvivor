@@ -21,6 +21,7 @@ import { HATS } from '../src/game/data/hats';
 import { CELEBRATIONS } from '../src/game/data/celebrations';
 import { DROP_PACKS } from '../src/game/data/dropPacks';
 import { LOK_SHOP_UNLOCKS } from '../src/game/data/lokShopUnlocks';
+import { LOK_SHOP_PERKS } from '../src/game/data/lokShopPerks';
 import { LOKTOKEN_PRICE_BY_TIER, catalogSku, type StoreItemKind } from '../src/lib/lokStoreCatalog';
 
 const platform = JSON.parse(readFileSync(new URL('../lok.universe.json', import.meta.url), 'utf8')) as PlatformManifest;
@@ -73,6 +74,8 @@ const catalog = [
   // (theme/cursor/ui_kit/motion_pack/tool/boost/badge/sfx/title/frame/pet/cosmetic --
   // there is no literal "unlock" or "feature" value).
   ...LOK_SHOP_UNLOCKS.flatMap((unlock) => items(unlock.kind, 'boost', [unlock])),
+  // Passes and perks (ball, Lok Pass, Passports) share one kind; the id tells them apart.
+  ...items('perkUnlock', 'boost', LOK_SHOP_PERKS),
 ];
 
 const outDir = process.argv[2] ?? '.';

@@ -1,3 +1,4 @@
+import { SupporterBar } from './SupporterBar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, CloudRain, Gem, Flame, LayoutGrid, Lock, Palette, Radar, ScanLine, Sparkles, Star } from 'lucide-react';
 
@@ -308,6 +309,7 @@ export function PaletteGalleryPanel({ onBack }: Props) {
 
   return (
     <ScreenLayout title="Customization Shop" subtitle={`${vendorName} — Paint Gallery`} onBack={onBack}>
+      <SupporterBar variant="inline" />
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <aside className="flex shrink-0 flex-col items-center gap-3 border border-border bg-card px-6 py-5 lg:sticky lg:top-4 lg:w-72">
           <div className={flickerActive ? 'palette-preview-flicker' : ''}>
