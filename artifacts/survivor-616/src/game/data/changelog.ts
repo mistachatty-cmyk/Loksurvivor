@@ -1334,6 +1334,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The LOK Shop sells a new LokPack Visualizer for 1500 LokTokens. Owning it unlocks the Live pack wraps in the Sleeve Counter, animated packs that cost 480 Card Credits each: Prism Holo Live, Retro Neon Live with the cast marching across, and the bonus Retro Neon Arcade, the busy full-color version.',
     ],
   },
+  {
+    version: '0.27.1',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T15:00:00Z',
+    kind: 'hotfix',
+    title: 'Live Wraps Now Move',
+    body: [
+      'The Live pack wraps (Prism Holo Live, Retro Neon Live and Retro Neon Arcade) were frozen on the default Subtle card motion. They now animate in the Sleeve Counter, the card shop and on your shelf unless card motion is Off or your device asks for reduced motion.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

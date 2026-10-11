@@ -7,6 +7,20 @@
   "source": "artifacts/survivor-616/src/game/data/changelog.ts",
   "updates": [
     {
+      "number": 116,
+      "version": "0.27.1",
+      "date": "2026-10-11",
+      "publishedAt": "2026-10-11T15:00:00Z",
+      "kind": "hotfix",
+      "categoryLabel": "Hotfix",
+      "categoryColor": "#fbbf24",
+      "categoryLore": "A fast repair before the night runs on.",
+      "title": "Live Wraps Now Move",
+      "body": [
+        "The Live pack wraps (Prism Holo Live, Retro Neon Live and Retro Neon Arcade) were frozen on the default Subtle card motion. They now animate in the Sleeve Counter, the card shop and on your shelf unless card motion is Off or your device asks for reduced motion."
+      ]
+    },
+    {
       "number": 115,
       "version": "0.27.0",
       "date": "2026-10-10",
