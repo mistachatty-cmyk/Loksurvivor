@@ -1344,6 +1344,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Skeleton keys were dropping from the random item weather in open arenas about once every 25 seconds, each with a popup, alert and sound. They now only show up there as a rare surprise.',
     ],
   },
+  {
+    version: '0.27.2',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T15:00:00Z',
+    kind: 'update',
+    title: 'LokShop Has a Door Button',
+    body: [
+      'The LokShop now has a real button in the hideout rooms instead of only the counter picture. Inside, the shelf lists everything LokServer sells for LokTokens (the LokPet Field Guide, Collector Access and the LokPack Visualizer) with working buy buttons, plus a link to the full Customization Shop.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

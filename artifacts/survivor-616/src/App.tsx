@@ -650,7 +650,7 @@ function Game() {
       return <CardShopPanel onBack={goHub} />;
 
     case 'lok-shop':
-      return <LokShopScreen onBack={goHub} />;
+      return <LokShopScreen onBack={goHub} onOpenCosmetics={() => setScreen({ name: 'palette-store' })} />;
 
     case 'weapon-bans':
       return <WeaponBansScreen onBack={goHub} />;

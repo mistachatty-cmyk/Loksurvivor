@@ -2,12 +2,16 @@
  * The LokShop: LokServer, an owl-flavored digital host, talks about the world and shows
  * the shelf (`LOKSHOP_STOCK`). Nothing is for sale yet; the shelf previews what is coming.
  */
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Check, Palette } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { LOKSERVER_TOPICS, LOKSHOP_STOCK } from '@/game/data/lokServer';
+import { LOK_SHOP_UNLOCKS, type LokShopUnlockDef } from '@/game/data/lokShopUnlocks';
 import { lokServerSay } from '@/game/engine/lokServerSpeak';
+import { useMeta } from '@/game/state/metaStore';
 import { useT } from '@/lib/i18n';
+import { LOKTOKEN_PRICE_BY_TIER, catalogSku } from '@/lib/lokStoreCatalog';
+import { useLokEconomy } from '@/state/lokEconomyStore';
 
 const RECENT_LINES = 8;
 
@@ -24,8 +28,34 @@ function OwlFace() {
   );
 }
 
-export function LokShopScreen({ onBack }: { onBack: () => void }) {
+export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void; onOpenCosmetics?: () => void }) {
   const t = useT();
+  const { meta, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer } = useMeta();
+  const { signedIn, balance, priceOf, spend } = useLokEconomy();
+  const [notice, setNotice] = useState<string | null>(null);
+  const owned = (u: LokShopUnlockDef) =>
+    u.id === 'field-guide' ? meta.lokPetFieldGuideUnlocked : u.id === 'lokpack-visualizer' ? meta.lokPackVisualizerUnlocked : meta.lokPetCollectorAccessUnlocked;
+  const priceFor = (u: LokShopUnlockDef) => priceOf(catalogSku(u.kind, u.id)) ?? LOKTOKEN_PRICE_BY_TIER[u.tier]!;
+  const grant = (u: LokShopUnlockDef) =>
+    u.id === 'field-guide' ? grantLokPetFieldGuide() : u.id === 'lokpack-visualizer' ? grantLokPackVisualizer() : grantLokPetCollectorAccess();
+  const buy = (u: LokShopUnlockDef) => {
+    if (owned(u)) return;
+    if (!signedIn) {
+      setNotice(t('lokshop.signInNotice'));
+      return;
+    }
+    const price = priceFor(u);
+    void spend(catalogSku(u.kind, u.id)).then((result) => {
+      if (result.ok || result.error === 'already_owned') {
+        grant(u);
+        setNotice(t('lokshop.bought', { name: u.name }));
+      } else if (result.error === 'insufficient') {
+        setNotice(t('lokshop.insufficient', { n: result.need ?? price }));
+      } else {
+        setNotice(t('lokshop.failed'));
+      }
+    });
+  };
   const recent = useRef<string[]>([]);
   const speak = (topicId: string) => {
     const line = lokServerSay(topicId, Math.random, recent.current);
@@ -55,6 +85,37 @@ export function LokShopScreen({ onBack }: { onBack: () => void }) {
           </button>
         ))}
       </div>
+
+      {notice ? <p className="mt-4 border border-primary/50 bg-primary/10 p-2 text-xs" role="status" data-testid="lokshop-notice">{notice}</p> : null}
+
+      <h2 className="mt-6 text-[11px] uppercase tracking-wide text-muted-foreground">{t('lokshop.forSale')}</h2>
+      <ul className="mt-2 grid gap-2">
+        {LOK_SHOP_UNLOCKS.map((u) => {
+          const have = owned(u);
+          const price = priceFor(u);
+          const affordable = signedIn && (balance ?? 0) >= price;
+          return (
+            <li key={u.id} className="border border-border bg-black/20 p-3" data-testid={`lokshop-unlock-${u.id}`}>
+              <p className="text-sm font-black">{u.name}</p>
+              <p className="text-xs text-muted-foreground">{u.description}</p>
+              {have ? (
+                <p className="mt-2 flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-widest text-primary"><Check className="h-3 w-3" />{t('lokshop.owned')}</p>
+              ) : (
+                <button type="button" onClick={() => buy(u)} disabled={signedIn && !affordable} className="mt-2 w-full border border-primary px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-primary-foreground disabled:cursor-not-allowed disabled:border-border disabled:text-muted-foreground/50 disabled:hover:bg-transparent" data-testid={`button-lokshop-buy-${u.id}`}>
+                  {!signedIn ? t('lokshop.signIn', { n: price }) : affordable ? t('lokshop.buy', { n: price }) : t('lokshop.need', { n: price })}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {onOpenCosmetics ? (
+        <button type="button" onClick={onOpenCosmetics} className="mt-3 flex w-full items-center gap-3 border border-border bg-black/20 p-3 text-left hover:border-primary" data-testid="button-lokshop-cosmetics">
+          <Palette className="h-5 w-5 shrink-0 text-primary" />
+          <span><span className="block text-sm font-black">{t('lokshop.cosmetics')}</span><span className="block text-xs text-muted-foreground">{t('lokshop.cosmeticsBlurb')}</span></span>
+        </button>
+      ) : null}
 
       <h2 className="mt-6 text-[11px] uppercase tracking-wide text-muted-foreground">{t('lokshop.shelf')}</h2>
       <ul className="mt-2 grid gap-2">
