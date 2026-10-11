@@ -2098,7 +2098,7 @@ type Action =
   | { type: 'grantLokPetCollectorAccess' }
   | { type: 'grantLokPackVisualizer' }
   | { type: 'grantLokShopPerk'; id: string }
-  | { type: 'lokShopVisit'; day: string }
+  | { type: 'lokShopVisit'; day: string; stamped: boolean }
   | { type: 'lokShopHaggle'; day: string; rapport: number; charmId: string | null }
   | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
@@ -3424,8 +3424,7 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     }
     case 'lokShopVisit': {
       if (state.meta.lokShopLastVisit === action.day) return state;
-      const stamped = state.meta.lokShopPerks.includes('lok-passport') || state.meta.lokShopPerks.includes('lifetime-passport');
-      return { ...state, meta: { ...state.meta, lokShopLastVisit: action.day, lokShopRapport: state.meta.lokShopRapport + 1, lokShopStamps: state.meta.lokShopStamps + (stamped ? 1 : 0) } };
+      return { ...state, meta: { ...state.meta, lokShopLastVisit: action.day, lokShopRapport: state.meta.lokShopRapport + 1, lokShopStamps: state.meta.lokShopStamps + (action.stamped ? 1 : 0) } };
     }
     case 'lokShopHaggle': {
       const sameDay = state.meta.lokShopHaggleDay === action.day;
@@ -4334,7 +4333,7 @@ export interface MetaContextValue {
   grantLokPetCollectorAccess: () => void;
   grantLokPackVisualizer: () => void;
   grantLokShopPerk: (id: string) => void;
-  lokShopVisit: (day: string) => void;
+  lokShopVisit: (day: string, stamped: boolean) => void;
   lokShopHaggle: (day: string, rapport: number, charmId: string | null) => void;
   equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
@@ -4563,7 +4562,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
   const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
   const grantLokShopPerk = useCallback((id: string) => dispatch({ type: 'grantLokShopPerk', id }), []);
-  const lokShopVisit = useCallback((day: string) => dispatch({ type: 'lokShopVisit', day }), []);
+  const lokShopVisit = useCallback((day: string, stamped: boolean) => dispatch({ type: 'lokShopVisit', day, stamped }), []);
   const lokShopHaggle = useCallback((day: string, rapport: number, charmId: string | null) => dispatch({ type: 'lokShopHaggle', day, rapport, charmId }), []);
   const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);

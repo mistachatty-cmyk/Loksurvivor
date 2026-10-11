@@ -3,7 +3,7 @@ import type { StoreItemKind } from '@/lib/lokStoreCatalog';
 /**
  * LokToken-only perks sold by LokServer. Unlike `lokShopUnlocks.ts` (one MetaState boolean
  * each), these all live in `MetaState.lokShopPerks` as owned ids, so a new perk is a record
- * here plus a line in `perkEffects` -- not a new reducer case.
+ * here plus its effect where it applies -- not a new reducer case.
  */
 export interface LokShopPerkDef {
   id: string;
@@ -25,26 +25,18 @@ export const LOK_SHOP_PERKS: LokShopPerkDef[] = [
     cost: 750,
   },
   {
-    id: 'lok-pass',
+    id: 'chest-pass',
     kind: 'perkUnlock',
-    name: 'Lok Pass',
-    description: 'LokServer lets you try the feather game three times a day instead of once, and keeps the back room open to you.',
+    name: 'Chest Pass',
+    description: 'The Lucky Chest turns up in about three out of four windows instead of two out of five. Daily reward limits still apply.',
     tier: 'rare',
     cost: 750,
   },
   {
-    id: 'lok-passport',
+    id: 'rider-saddle',
     kind: 'perkUnlock',
-    name: 'Lok Passport',
-    description: 'A stamp book LokServer fills in on every visit. Each stamp earns rapport, and Feather Charms turn up twice as often.',
-    tier: 'legendary',
-    cost: 1500,
-  },
-  {
-    id: 'lifetime-passport',
-    kind: 'perkUnlock',
-    name: 'Lifetime Passport',
-    description: 'Counts as the Lok Pass and the Lok Passport together, forever, plus a gold stamp and a seat at the back-room table.',
+    name: 'Rider Saddle',
+    description: 'Your lead LokPet rides on your back during runs and attacks 20% faster.',
     tier: 'legendary',
     cost: 1500,
   },
@@ -52,14 +44,20 @@ export const LOK_SHOP_PERKS: LokShopPerkDef[] = [
 
 export const LOK_SHOP_PERKS_BY_ID: Record<string, LokShopPerkDef> = Object.fromEntries(LOK_SHOP_PERKS.map((p) => [p.id, p]));
 
+/**
+ * Supporter tiers are NOT LokShop purchases: Lok Pass, Lok Passport and the Lifetime Passport
+ * are entitlements (see `LokToken EcoSystem/08_supporters.sql`). `active` is the highest tier
+ * with a live entitlement; Lifetime never lapses and counts as every tier below it.
+ */
+export type ActiveSupporterTier = 'pass' | 'passport' | 'lifetime' | null;
+
 export interface PerkEffects {
   passport: boolean;
   pass: boolean;
 }
 
-export function perkEffects(owned: readonly string[]): PerkEffects {
-  const lifetime = owned.includes('lifetime-passport');
-  return { passport: lifetime || owned.includes('lok-passport'), pass: lifetime || owned.includes('lok-pass') };
+export function perkEffects(active: ActiveSupporterTier): PerkEffects {
+  return { passport: active === 'passport' || active === 'lifetime', pass: active !== null };
 }
 
 export const RAPPORT_TIERS = [
@@ -77,13 +75,12 @@ export function rapportTier(rapport: number): { id: RapportTier; index: number; 
 }
 
 /** The back room opens at Favorite rapport, or with the Pass / Passport. */
-export function backRoomOpen(rapport: number, owned: readonly string[]): boolean {
-  const fx = perkEffects(owned);
-  return rapportTier(rapport).index >= 2 || fx.pass || fx.passport;
+export function backRoomOpen(rapport: number, active: ActiveSupporterTier): boolean {
+  return rapportTier(rapport).index >= 2 || perkEffects(active).pass;
 }
 
-export function haggleAttemptsPerDay(owned: readonly string[]): number {
-  return perkEffects(owned).pass ? 3 : 1;
+export function haggleAttemptsPerDay(active: ActiveSupporterTier): number {
+  return perkEffects(active).pass ? 3 : 1;
 }
 
 export interface FeatherCharmDef { id: string; name: string; color: string; blurb: string }
@@ -107,12 +104,12 @@ export function resolveHaggle(
   pick: number,
   goldenSlot: number,
   ownedCharms: readonly string[],
-  owned: readonly string[],
+  active: ActiveSupporterTier,
   rng: () => number,
 ): HaggleOutcome {
   const win = pick === goldenSlot;
   const missing = FEATHER_CHARMS.filter((c) => !ownedCharms.includes(c.id));
-  const chance = (win ? CHARM_BASE_CHANCE : 0) * (perkEffects(owned).passport ? 2 : 1);
+  const chance = (win ? CHARM_BASE_CHANCE : 0) * (perkEffects(active).passport ? 2 : 1);
   const charm = missing.length > 0 && rng() < chance ? missing[Math.floor(rng() * missing.length)]! : null;
   return { win, rapport: win ? 3 : 1, charmId: charm?.id ?? null };
 }

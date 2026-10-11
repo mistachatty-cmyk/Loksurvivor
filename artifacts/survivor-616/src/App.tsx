@@ -47,6 +47,7 @@ import { CharacterSelect } from '@/ui/CharacterSelect';
 import { HubScreen, type HubPanel } from '@/ui/HubScreen';
 import { IntroScreen } from '@/ui/IntroScreen';
 import { LokShopScreen } from '@/ui/LokShopScreen';
+import { SupporterBar } from '@/ui/SupporterBar';
 import { PhotosensitivityNotice, photosensitivityNoticeHidden } from '@/ui/PhotosensitivityNotice';
 import { MusicPanel } from '@/ui/MusicPanel';
 import { RunSummary } from '@/ui/RunSummary';
@@ -832,6 +833,7 @@ function ThemedGame() {
       className="min-h-[100dvh]"
     >
       <Game />
+      <SupporterBar />
     </div>
   );
 }

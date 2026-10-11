@@ -20,27 +20,34 @@ describe('LokShop perks', () => {
     assert.doesNotMatch(text, BANNED);
   });
 
-  it('lifetime passport counts as pass and passport', () => {
-    assert.deepEqual(perkEffects(['lifetime-passport']), { passport: true, pass: true });
-    assert.equal(haggleAttemptsPerDay([]), 1);
-    assert.equal(haggleAttemptsPerDay(['lok-pass']), 3);
+  it('supporter tiers stack upward, lapsed gives nothing', () => {
+    assert.deepEqual(perkEffects('lifetime'), { passport: true, pass: true });
+    assert.deepEqual(perkEffects('passport'), { passport: true, pass: true });
+    assert.deepEqual(perkEffects('pass'), { passport: false, pass: true });
+    assert.deepEqual(perkEffects(null), { passport: false, pass: false });
+    assert.equal(haggleAttemptsPerDay(null), 1);
+    assert.equal(haggleAttemptsPerDay('pass'), 3);
+  });
+
+  it('sells the ball, chest pass and rider saddle but never the supporter tiers', () => {
+    assert.deepEqual(LOK_SHOP_PERKS.map((p) => p.id).sort(), ['ball', 'chest-pass', 'rider-saddle']);
   });
 
   it('rapport tiers and back room gate', () => {
     assert.equal(rapportTier(0).id, 'stranger');
     assert.equal(rapportTier(15).id, 'favorite');
     assert.equal(rapportTier(99).next, null);
-    assert.equal(backRoomOpen(0, []), false);
-    assert.equal(backRoomOpen(15, []), true);
-    assert.equal(backRoomOpen(0, ['lok-pass']), true);
+    assert.equal(backRoomOpen(0, null), false);
+    assert.equal(backRoomOpen(15, null), true);
+    assert.equal(backRoomOpen(0, 'pass'), true);
   });
 
   it('haggle pays more on a win and never repeats a charm', () => {
-    assert.equal(resolveHaggle(1, 0, [], [], createRng(1)).rapport, 1);
-    assert.equal(resolveHaggle(1, 0, [], [], createRng(1)).charmId, null);
+    assert.equal(resolveHaggle(1, 0, [], null, createRng(1)).rapport, 1);
+    assert.equal(resolveHaggle(1, 0, [], null, createRng(1)).charmId, null);
     const all = FEATHER_CHARMS.map((c) => c.id);
-    assert.equal(resolveHaggle(2, 2, all, ['lok-passport'], () => 0).charmId, null);
-    const win = resolveHaggle(2, 2, [], [], () => 0);
+    assert.equal(resolveHaggle(2, 2, all, 'passport', () => 0).charmId, null);
+    const win = resolveHaggle(2, 2, [], null, () => 0);
     assert.equal(win.rapport, 3);
     assert.ok(win.charmId);
   });

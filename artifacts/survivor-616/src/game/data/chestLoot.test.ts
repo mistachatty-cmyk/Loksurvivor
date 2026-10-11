@@ -65,3 +65,16 @@ describe('lucky chest', () => {
     for (const item of Object.values(CARD_COSMETICS_BY_ID)) assert.ok(item.id);
   });
 });
+
+describe('Chest Pass', () => {
+  it('only ever adds windows where the chest is out', async () => {
+    const { chestOut: out } = await import('@/game/data/chestLoot');
+    let base = 0;
+    let pass = 0;
+    for (let w = 0; w < 400; w += 1) {
+      if (out(w)) { base += 1; assert.ok(out(w, true), `window ${w}`); }
+      if (out(w, true)) pass += 1;
+    }
+    assert.ok(pass > base);
+  });
+});

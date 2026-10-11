@@ -7,3 +7,4 @@ export * from "./economy";
 export * from "./cards";
 export * from "./lokdex";
 export * from "./music";
+export * from "./supporters";

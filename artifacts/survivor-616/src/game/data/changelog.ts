@@ -1365,6 +1365,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'New LokToken items: The Ball, the Lok Pass (more feather tries a day), the Lok Passport (daily stamps and doubled charm luck) and the Lifetime Passport, which counts as both.',
     ],
   },
+  {
+    version: '0.27.4',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T21:00:00Z',
+    kind: 'update',
+    title: 'Supporter Bar, Chest Pass and Rider Saddle',
+    body: [
+      'A live supporter bar now streams across the bottom of the game: teal and blue for Lok Pass and Lok Passport supporters, gold with a founder star for Lifetime Passport holders. Names stay on the bar for good, even if a subscription ends.',
+      'The LokShop now sells the Chest Pass (the Lucky Chest turns up far more often) and the Rider Saddle (your lead LokPet rides on your back and attacks 20% faster). Pass and Passport perks, like extra feather tries, now come from your supporter status instead of a LokToken purchase.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

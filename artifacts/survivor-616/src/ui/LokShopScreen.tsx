@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   LOKSERVER_REACTIONS,
   LOKSERVER_TOPICS,
+  LOKSERVER_BACKROOM_NOTES,
   LOKSHOP_STOCK,
   lokServerGreeting,
   type LokServerMood,
@@ -33,6 +34,8 @@ import { LOKTOKEN_PRICE_BY_TIER, catalogSku } from '@/lib/lokStoreCatalog';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 
 const RECENT_LINES = 8;
+/** Where Pass / Passport / Lifetime are managed (the Stripe checkout lives on the hub, not in the game). */
+const SUPPORT_URL = 'https://gsix.online';
 type Tab = 'unlocks' | 'perks' | 'charms' | 'backroom';
 const pickOf = (list: readonly string[], rng: () => number) => list[Math.floor(rng() * list.length)]!;
 
@@ -73,10 +76,10 @@ function Feather({ color }: { color: string }) {
 export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void; onOpenCosmetics?: () => void }) {
   const t = useT();
   const { meta, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantLokShopPerk, lokShopVisit, lokShopHaggle } = useMeta();
-  const { signedIn, balance, ownedSkus, priceOf, spend } = useLokEconomy();
+  const { signedIn, balance, ownedSkus, priceOf, spend, activeSupporterTier, supporter, setSupporterVisible } = useLokEconomy();
   const recent = useRef<string[]>([]);
   const today = bondDayKey(Date.now());
-  const fx = perkEffects(meta.lokShopPerks);
+  const fx = perkEffects(activeSupporterTier);
   const tier = rapportTier(meta.lokShopRapport);
 
   const [tab, setTab] = useState<Tab>('unlocks');
@@ -107,7 +110,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
       ownedPerks: meta.lokShopPerks.length,
     }, Math.random);
     say(g.line, g.mood);
-    lokShopVisit(today);
+    lokShopVisit(today, fx.passport);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -144,10 +147,10 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
     });
   };
 
-  const triesLeft = Math.max(0, haggleAttemptsPerDay(meta.lokShopPerks) - (meta.lokShopHaggleDay === today ? meta.lokShopHaggleCount : 0));
+  const triesLeft = Math.max(0, haggleAttemptsPerDay(activeSupporterTier) - (meta.lokShopHaggleDay === today ? meta.lokShopHaggleCount : 0));
   const playFeather = (pick: number) => {
     if (triesLeft <= 0 || revealed) return;
-    const outcome = resolveHaggle(pick, golden, meta.lokShopCharms, meta.lokShopPerks, Math.random);
+    const outcome = resolveHaggle(pick, golden, meta.lokShopCharms, activeSupporterTier, Math.random);
     setRevealed({ pick, win: outcome.win });
     lokShopHaggle(today, outcome.rapport, outcome.charmId);
     if (outcome.charmId) say(pickOf(LOKSERVER_REACTIONS.charm, Math.random), 'pleased');
@@ -158,7 +161,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
     setGolden(Math.floor(Math.random() * 3));
   };
 
-  const backOpen = backRoomOpen(meta.lokShopRapport, meta.lokShopPerks);
+  const backOpen = backRoomOpen(meta.lokShopRapport, activeSupporterTier);
   const tabs: Array<{ id: Tab; label: string }> = useMemo(() => [
     { id: 'unlocks', label: t('lokshop.tab.unlocks') },
     { id: 'perks', label: t('lokshop.tab.perks') },
@@ -190,8 +193,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
     );
   };
 
-  const perkOwned = (p: LokShopPerkDef) =>
-    meta.lokShopPerks.includes(p.id) || (p.id === 'lok-pass' && fx.pass) || (p.id === 'lok-passport' && fx.passport);
+  const perkOwned = (p: LokShopPerkDef) => meta.lokShopPerks.includes(p.id);
 
   return (
     <main className="lokshop-room min-h-screen px-4 py-6" data-testid="screen-lok-shop">
@@ -243,9 +245,29 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
         ) : null}
 
         {tab === 'perks' ? (
-          <ul className="mt-3 grid gap-2">
+          <div className="mt-3 grid gap-2">
+          <section className="lokshop-holo p-4" data-testid="lokshop-supporter-panel">
+            <h2 className="text-sm font-black uppercase tracking-wide">{t('lokshop.support.title')}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{t('lokshop.support.blurb')}</p>
+            <p className={`mt-2 font-mono text-[11px] font-bold uppercase tracking-widest ${supporter?.tier === 'lifetime' ? 'text-amber-300' : 'text-teal-300'}`} data-testid="lokshop-supporter-status">
+              {supporter
+                ? `${t(`lokshop.support.tier.${supporter.tier}` as never)}${supporter.founder ? ` · ${t('lokshop.support.founder')}` : ''}${activeSupporterTier ? '' : ` · ${t('lokshop.support.lapsed')}`}`
+                : t('lokshop.support.none')}
+            </p>
+            {supporter ? (
+              <label className="mt-2 flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={supporter.showPublic} onChange={(e) => void setSupporterVisible(e.target.checked)} data-testid="toggle-supporter-public" />
+                {t('lokshop.support.showMe')}
+              </label>
+            ) : null}
+            <a href={SUPPORT_URL} target="_blank" rel="noreferrer" className="mt-3 block border border-teal-300/70 px-3 py-2 text-center font-mono text-[10px] font-bold uppercase tracking-widest text-teal-200 hover:bg-teal-300 hover:text-black" data-testid="link-lokshop-support">
+              {t('lokshop.support.manage')}
+            </a>
+          </section>
+          <ul className="grid gap-2">
             {LOK_SHOP_PERKS.map((p) => itemCard(p.id, p.name, p.description, p.tier, perkOwned(p), catalogSku(p.kind, p.id), () => grantLokShopPerk(p.id)))}
           </ul>
+          </div>
         ) : null}
 
         {tab === 'charms' ? (
@@ -287,18 +309,24 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
           backOpen ? (
             <section className="lokshop-holo mt-3 p-4">
               <p className="text-xs text-muted-foreground">{t('lokshop.back.body')}</p>
-              <h2 className="mt-3 text-[11px] uppercase tracking-wide text-muted-foreground">{t('lokshop.shelf')}</h2>
-              <ul className="mt-2 grid gap-2">
-                {LOKSHOP_STOCK.map((item) => (
-                  <li key={item.id} className="lokshop-card flex items-start justify-between gap-3 p-3" data-testid={`lokshop-item-soon-${item.id}`}>
-                    <div>
-                      <p className="text-sm font-black">{t(item.nameKey as never)}</p>
-                      <p className="text-xs text-muted-foreground">{t(item.blurbKey as never)}</p>
-                    </div>
-                    <p className="shrink-0 text-[10px] uppercase tracking-wide text-amber-300">{t(`lokshop.status.${item.status}` as never)}</p>
-                  </li>
+              <ul className="mt-3 grid gap-2">
+                {LOKSERVER_BACKROOM_NOTES.filter((note) => note.tier <= tier.index || fx.pass).map((note) => (
+                  <li key={note.text} className="lokshop-card p-3 text-xs italic" data-testid="lokshop-backroom-note">“{note.text}”</li>
                 ))}
               </ul>
+              {LOKSHOP_STOCK.length > 0 ? (
+                <ul className="mt-3 grid gap-2">
+                  {LOKSHOP_STOCK.map((item) => (
+                    <li key={item.id} className="lokshop-card flex items-start justify-between gap-3 p-3" data-testid={`lokshop-item-soon-${item.id}`}>
+                      <div>
+                        <p className="text-sm font-black">{t(item.nameKey as never)}</p>
+                        <p className="text-xs text-muted-foreground">{t(item.blurbKey as never)}</p>
+                      </div>
+                      <p className="shrink-0 text-[10px] uppercase tracking-wide text-amber-300">{t(`lokshop.status.${item.status}` as never)}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </section>
           ) : (
             <p className="lokshop-holo mt-3 p-4 text-sm text-muted-foreground" data-testid="lokshop-backroom-locked">{t('lokshop.back.locked')}</p>

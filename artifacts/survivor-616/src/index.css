@@ -1077,3 +1077,16 @@ header, nav, [data-testid='roster-layout-toggle'] { opacity: calc(var(--ui-opaci
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion='full']) .lokshop-holo::after, :root:not([data-motion='full']) .lokshop-owl, :root:not([data-motion='full']) .lokshop-owl .eye-lid { animation: none; }
 }
+
+/* Supporter hologram bar */
+.supporter-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; align-items: center; height: 24px; pointer-events: none; overflow: hidden;
+  background: linear-gradient(90deg, rgba(3, 12, 24, .88), rgba(5, 24, 36, .8)); border-top: 1px solid rgba(45, 212, 191, .5); box-shadow: 0 -2px 14px rgba(45, 212, 191, .22); }
+.supporter-bar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .05) 0 1px, transparent 1px 3px); mix-blend-mode: screen; }
+.supporter-bar__label { position: relative; z-index: 1; flex: none; padding: 0 10px; font: 700 9px/24px ui-monospace, monospace; letter-spacing: .18em; color: #5eead4; background: rgba(3, 12, 24, .95); border-right: 1px solid rgba(45, 212, 191, .5); }
+.supporter-bar__lane { flex: 1; overflow: hidden; }
+.supporter-bar__track { display: inline-flex; white-space: nowrap; width: max-content; animation: supporter-scroll linear infinite; }
+.supporter-bar__item { padding: 0 22px; font: 700 11px/24px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: #5eead4; text-shadow: 0 0 8px rgba(45, 212, 191, .85); }
+.supporter-bar__item[data-tier='passport'] { color: #38bdf8; text-shadow: 0 0 8px rgba(56, 189, 248, .85); }
+.supporter-bar__item[data-tier='lifetime'] { color: #fbbf24; text-shadow: 0 0 9px rgba(251, 191, 36, .9); }
+@keyframes supporter-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion='full']) .supporter-bar__track { animation: none; } }

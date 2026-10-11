@@ -88,10 +88,8 @@ export interface LokShopItemDef {
   status: 'soon' | 'planned';
 }
 
-/** The stock chart. Nothing here can be bought yet; the shelf shows what is coming. */
+/** Items on the drawing board. Empty now: Chest Pass and Rider Saddle shipped as LokShop perks (`lokShopPerks.ts`). */
 export const LOKSHOP_STOCK: LokShopItemDef[] = [
-  { id: 'chest-pass', nameKey: 'lokshop.item.chest-pass.name', blurbKey: 'lokshop.item.chest-pass.blurb', price: 200, status: 'soon' },
-  { id: 'pet-rider-saddle', nameKey: 'lokshop.item.pet-rider-saddle.name', blurbKey: 'lokshop.item.pet-rider-saddle.blurb', price: 350, status: 'planned' },
 ];
 
 export type LokServerMood = 'greet' | 'pleased' | 'sly' | 'sad';
@@ -136,3 +134,11 @@ export const LOKSERVER_REACTIONS = {
   bought: ['Pleasure doing business. I will note it in the ledger, in gold.', 'Sold! You will not regret it. Probably.'],
   locked: ['The back room is for friends and pass holders. Visit a few days and I will open it.'],
 } as const;
+
+/** Back-room whispers. `tier` is the rapport tier index (0 stranger .. 3 confidant) that unlocks each. */
+export const LOKSERVER_BACKROOM_NOTES: Array<{ tier: number; text: string }> = [
+  { tier: 0, text: 'The feather game is rigged in exactly one way: the golden feather is never in the same place twice.' },
+  { tier: 1, text: 'Supporters scroll across the bottom of the world. I read every name out loud when nobody is looking.' },
+  { tier: 2, text: 'I keep a ledger of every kindness. The Lifetime page is written in gold ink and it never fades.' },
+  { tier: 3, text: 'Confidants hear it first: new shelves are always built the night before an eclipse.' },
+];
