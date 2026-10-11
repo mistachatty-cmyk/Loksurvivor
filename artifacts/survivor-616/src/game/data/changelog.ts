@@ -1354,6 +1354,17 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The LokShop now has a real button in the hideout rooms instead of only the counter picture. Inside, the shelf lists everything LokServer sells for LokTokens (the LokPet Field Guide, Collector Access and the LokPack Visualizer) with working buy buttons, plus a link to the full Customization Shop.',
     ],
   },
+  {
+    version: '0.27.3',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T18:00:00Z',
+    kind: 'update',
+    title: 'LokServer Opens the Back Room',
+    body: [
+      'The LokShop is rebuilt around LokServer, now a glowing holographic owl who greets you by how well he knows you. Visit daily to build rapport, play the feather game for Feather Charms, and open the back room.',
+      'New LokToken items: The Ball, the Lok Pass (more feather tries a day), the Lok Passport (daily stamps and doubled charm luck) and the Lifetime Passport, which counts as both.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

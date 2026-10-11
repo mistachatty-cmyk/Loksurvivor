@@ -90,7 +90,49 @@ export interface LokShopItemDef {
 
 /** The stock chart. Nothing here can be bought yet; the shelf shows what is coming. */
 export const LOKSHOP_STOCK: LokShopItemDef[] = [
-  { id: 'ball', nameKey: 'lokshop.item.ball.name', blurbKey: 'lokshop.item.ball.blurb', price: 120, status: 'soon' },
   { id: 'chest-pass', nameKey: 'lokshop.item.chest-pass.name', blurbKey: 'lokshop.item.chest-pass.blurb', price: 200, status: 'soon' },
   { id: 'pet-rider-saddle', nameKey: 'lokshop.item.pet-rider-saddle.name', blurbKey: 'lokshop.item.pet-rider-saddle.blurb', price: 350, status: 'planned' },
 ];
+
+export type LokServerMood = 'greet' | 'pleased' | 'sly' | 'sad';
+
+export interface LokServerContext {
+  rapportTier: 'stranger' | 'regular' | 'favorite' | 'confidant';
+  firstVisit: boolean;
+  stamps: number;
+  charms: number;
+  charmTotal: number;
+  hasPassport: boolean;
+  ownedPerks: number;
+}
+
+/** A line that reacts to what the player has done here. Plain strings (no template slots). */
+export const LOKSERVER_GREETINGS = {
+  firstVisit: ['Hoo! A new face. Mind the glitter, it does not come off.', 'First time? Wonderful. Everything is on the house. (It is not.)'],
+  stranger: ['Welcome back. I only remember your name when you spend. Kidding. Mostly.'],
+  regular: ['Ah, a regular! I saved you the good perch.', 'Back again? The shelves missed you, and so did I.'],
+  favorite: ['My favorite customer, and I say that to nobody. Okay, to three people.', 'Come, come. I put the best feathers aside for you.'],
+  confidant: ['Old friend. The back room is yours, and so is the last good chair.', 'Hoo, there you are. Sit. Tell me everything the city did today.'],
+  passport: ['Passport out! I have a fresh stamp with your name on it.'],
+  complete: ['Every charm in the set. You know me better than my own logs do.'],
+  empty: ['A shop with no charms and no stamps is a shop with a story to start. Try the feather game.'],
+} as const;
+
+export function lokServerGreeting(ctx: LokServerContext, rng: () => number): { line: string; mood: LokServerMood } {
+  const pick = (list: readonly string[]) => list[Math.floor(rng() * list.length)]!;
+  if (ctx.charmTotal > 0 && ctx.charms >= ctx.charmTotal) return { line: pick(LOKSERVER_GREETINGS.complete), mood: 'pleased' };
+  if (ctx.firstVisit) return { line: pick(LOKSERVER_GREETINGS.firstVisit), mood: 'greet' };
+  if (ctx.hasPassport && ctx.stamps > 0) return { line: pick(LOKSERVER_GREETINGS.passport), mood: 'pleased' };
+  if (ctx.charms === 0 && ctx.ownedPerks === 0 && ctx.rapportTier === 'stranger') return { line: pick(LOKSERVER_GREETINGS.empty), mood: 'sly' };
+  return { line: pick(LOKSERVER_GREETINGS[ctx.rapportTier]), mood: ctx.rapportTier === 'stranger' ? 'greet' : 'pleased' };
+}
+
+/** Lines for the feather game and purchases. */
+export const LOKSERVER_REACTIONS = {
+  win: ['The golden one! Hoo, you have an eye for it.', 'Gold! I would say it was luck, but I watched you think.'],
+  lose: ['Not that one. The best birds hide well.', 'Close! A plain feather, but a fair try.'],
+  charm: ['And a charm falls out! Keep it safe, it is not on any shelf.', 'Oh, one of the rare ones. Do not tell the others.'],
+  noTries: ['That is plenty of feathers for today. Come back when the sun does.'],
+  bought: ['Pleasure doing business. I will note it in the ledger, in gold.', 'Sold! You will not regret it. Probably.'],
+  locked: ['The back room is for friends and pass holders. Visit a few days and I will open it.'],
+} as const;

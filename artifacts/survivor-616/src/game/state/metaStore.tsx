@@ -293,6 +293,13 @@ export function createInitialMeta(): MetaState {
     lokPetFieldGuideUnlocked: false,
     lokPetCollectorAccessUnlocked: false,
     lokPackVisualizerUnlocked: false,
+    lokShopPerks: [],
+    lokShopRapport: 0,
+    lokShopStamps: 0,
+    lokShopLastVisit: '',
+    lokShopCharms: [],
+    lokShopHaggleDay: '',
+    lokShopHaggleCount: 0,
     damageNumberStyle: 'classic',
     companionRevealStyle: 'ambush',
     frameRateMode: 60,
@@ -1337,6 +1344,13 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
     lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
     lokPackVisualizerUnlocked: parsed.lokPackVisualizerUnlocked === true,
+    lokShopPerks: Array.isArray(parsed.lokShopPerks) ? parsed.lokShopPerks.filter((v): v is string => typeof v === 'string') : [],
+    lokShopRapport: typeof parsed.lokShopRapport === 'number' && parsed.lokShopRapport >= 0 ? Math.floor(parsed.lokShopRapport) : 0,
+    lokShopStamps: typeof parsed.lokShopStamps === 'number' && parsed.lokShopStamps >= 0 ? Math.floor(parsed.lokShopStamps) : 0,
+    lokShopLastVisit: typeof parsed.lokShopLastVisit === 'string' ? parsed.lokShopLastVisit : '',
+    lokShopCharms: Array.isArray(parsed.lokShopCharms) ? parsed.lokShopCharms.filter((v): v is string => typeof v === 'string') : [],
+    lokShopHaggleDay: typeof parsed.lokShopHaggleDay === 'string' ? parsed.lokShopHaggleDay : '',
+    lokShopHaggleCount: typeof parsed.lokShopHaggleCount === 'number' && parsed.lokShopHaggleCount >= 0 ? Math.floor(parsed.lokShopHaggleCount) : 0,
     // Falls back to the pre-existing standalone localStorage toggle
     // (AttractMode.tsx's old component-local key) so a player who already
     // turned the background sim off doesn't see it silently re-enabled.
@@ -2083,6 +2097,9 @@ type Action =
   | { type: 'grantLokPetFieldGuide' }
   | { type: 'grantLokPetCollectorAccess' }
   | { type: 'grantLokPackVisualizer' }
+  | { type: 'grantLokShopPerk'; id: string }
+  | { type: 'lokShopVisit'; day: string }
+  | { type: 'lokShopHaggle'; day: string; rapport: number; charmId: string | null }
   | { type: 'equipDropPack'; id: string }
   | { type: 'setDamageNumberStyle'; style: MetaState['damageNumberStyle'] }
   | { type: 'setCompanionRevealStyle'; style: MetaState['companionRevealStyle'] }
@@ -3401,6 +3418,20 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantLokPackVisualizer':
       if (state.meta.lokPackVisualizerUnlocked) return state;
       return { ...state, meta: { ...state.meta, lokPackVisualizerUnlocked: true } };
+    case 'grantLokShopPerk': {
+      if (state.meta.lokShopPerks.includes(action.id)) return state;
+      return { ...state, meta: { ...state.meta, lokShopPerks: [...state.meta.lokShopPerks, action.id], ...(action.id === 'ball' ? { ownsBall: true } : {}) } };
+    }
+    case 'lokShopVisit': {
+      if (state.meta.lokShopLastVisit === action.day) return state;
+      const stamped = state.meta.lokShopPerks.includes('lok-passport') || state.meta.lokShopPerks.includes('lifetime-passport');
+      return { ...state, meta: { ...state.meta, lokShopLastVisit: action.day, lokShopRapport: state.meta.lokShopRapport + 1, lokShopStamps: state.meta.lokShopStamps + (stamped ? 1 : 0) } };
+    }
+    case 'lokShopHaggle': {
+      const sameDay = state.meta.lokShopHaggleDay === action.day;
+      const charms = action.charmId && !state.meta.lokShopCharms.includes(action.charmId) ? [...state.meta.lokShopCharms, action.charmId] : state.meta.lokShopCharms;
+      return { ...state, meta: { ...state.meta, lokShopHaggleDay: action.day, lokShopHaggleCount: (sameDay ? state.meta.lokShopHaggleCount : 0) + 1, lokShopRapport: state.meta.lokShopRapport + action.rapport, lokShopCharms: charms } };
+    }
     case 'setGraphicsQuality':
       return { ...state, meta: { ...state.meta, graphicsQuality: action.quality } };
     case 'setCompanionRevealStyle':
@@ -4302,6 +4333,9 @@ export interface MetaContextValue {
   grantLokPetFieldGuide: () => void;
   grantLokPetCollectorAccess: () => void;
   grantLokPackVisualizer: () => void;
+  grantLokShopPerk: (id: string) => void;
+  lokShopVisit: (day: string) => void;
+  lokShopHaggle: (day: string, rapport: number, charmId: string | null) => void;
   equipDropPack: (id: string) => void;
   setDamageNumberStyle: (style: MetaState['damageNumberStyle']) => void;
   setCompanionRevealStyle: (style: MetaState['companionRevealStyle']) => void;
@@ -4528,6 +4562,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
   const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
+  const grantLokShopPerk = useCallback((id: string) => dispatch({ type: 'grantLokShopPerk', id }), []);
+  const lokShopVisit = useCallback((day: string) => dispatch({ type: 'lokShopVisit', day }), []);
+  const lokShopHaggle = useCallback((day: string, rapport: number, charmId: string | null) => dispatch({ type: 'lokShopHaggle', day, rapport, charmId }), []);
   const equipDropPack = useCallback((id: string) => dispatch({ type: 'equipDropPack', id }), []);
   const setGraphicsQuality = useCallback((quality: MetaState['graphicsQuality']) => dispatch({ type: 'setGraphicsQuality', quality }), []);
   const setDamageNumberStyle = useCallback((style: MetaState['damageNumberStyle']) => dispatch({ type: 'setDamageNumberStyle', style }), []);
@@ -4833,6 +4870,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantLokPetFieldGuide,
       grantLokPetCollectorAccess,
       grantLokPackVisualizer,
+      grantLokShopPerk,
+      lokShopVisit,
+      lokShopHaggle,
       equipDropPack,
       setDamageNumberStyle,
       setCompanionRevealStyle,
@@ -5008,6 +5048,9 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantLokPetFieldGuide,
     grantLokPetCollectorAccess,
     grantLokPackVisualizer,
+    grantLokShopPerk,
+    lokShopVisit,
+    lokShopHaggle,
     equipDropPack,
     setDamageNumberStyle,
     setCompanionRevealStyle,
