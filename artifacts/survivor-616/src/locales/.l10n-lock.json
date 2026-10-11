@@ -736,7 +736,13 @@
     "soundbar.shuffle": "5b772b7bfd0a",
     "soundbar.speed": "6ff42b75c926",
     "soundbar.unmute": "91872b594bf1",
-    "soundbar.volume": "0d49fceb8d4a"
+    "soundbar.volume": "0d49fceb8d4a",
+    "wallet.balance": "ba73fd708cd4",
+    "wallet.loading": "57791d352f37",
+    "wallet.offline": "006b29816741",
+    "wallet.rank": "dd2787ce8f6d",
+    "wallet.signedOut": "c3744f96506e",
+    "wallet.signIn": "ada2e9e96fa9"
   },
   "es": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -1475,7 +1481,13 @@
     "soundbar.shuffle": "5b772b7bfd0a",
     "soundbar.speed": "6ff42b75c926",
     "soundbar.unmute": "91872b594bf1",
-    "soundbar.volume": "0d49fceb8d4a"
+    "soundbar.volume": "0d49fceb8d4a",
+    "wallet.balance": "ba73fd708cd4",
+    "wallet.loading": "57791d352f37",
+    "wallet.offline": "006b29816741",
+    "wallet.rank": "dd2787ce8f6d",
+    "wallet.signedOut": "c3744f96506e",
+    "wallet.signIn": "ada2e9e96fa9"
   },
   "fr": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -2214,7 +2226,13 @@
     "soundbar.shuffle": "5b772b7bfd0a",
     "soundbar.speed": "6ff42b75c926",
     "soundbar.unmute": "91872b594bf1",
-    "soundbar.volume": "0d49fceb8d4a"
+    "soundbar.volume": "0d49fceb8d4a",
+    "wallet.balance": "ba73fd708cd4",
+    "wallet.loading": "57791d352f37",
+    "wallet.offline": "006b29816741",
+    "wallet.rank": "dd2787ce8f6d",
+    "wallet.signedOut": "c3744f96506e",
+    "wallet.signIn": "ada2e9e96fa9"
   },
   "ja": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -2952,7 +2970,13 @@
     "soundbar.shuffle": "5b772b7bfd0a",
     "soundbar.speed": "6ff42b75c926",
     "soundbar.unmute": "91872b594bf1",
-    "soundbar.volume": "0d49fceb8d4a"
+    "soundbar.volume": "0d49fceb8d4a",
+    "wallet.balance": "ba73fd708cd4",
+    "wallet.loading": "57791d352f37",
+    "wallet.offline": "006b29816741",
+    "wallet.rank": "dd2787ce8f6d",
+    "wallet.signedOut": "c3744f96506e",
+    "wallet.signIn": "ada2e9e96fa9"
   },
   "ko": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -3691,7 +3715,13 @@
     "soundbar.shuffle": "5b772b7bfd0a",
     "soundbar.speed": "6ff42b75c926",
     "soundbar.unmute": "91872b594bf1",
-    "soundbar.volume": "0d49fceb8d4a"
+    "soundbar.volume": "0d49fceb8d4a",
+    "wallet.balance": "ba73fd708cd4",
+    "wallet.loading": "57791d352f37",
+    "wallet.offline": "006b29816741",
+    "wallet.rank": "dd2787ce8f6d",
+    "wallet.signedOut": "c3744f96506e",
+    "wallet.signIn": "ada2e9e96fa9"
   },
   "pt-BR": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -4430,7 +4460,13 @@
     "soundbar.shuffle": "5b772b7bfd0a",
     "soundbar.speed": "6ff42b75c926",
     "soundbar.unmute": "91872b594bf1",
-    "soundbar.volume": "0d49fceb8d4a"
+    "soundbar.volume": "0d49fceb8d4a",
+    "wallet.balance": "ba73fd708cd4",
+    "wallet.loading": "57791d352f37",
+    "wallet.offline": "006b29816741",
+    "wallet.rank": "dd2787ce8f6d",
+    "wallet.signedOut": "c3744f96506e",
+    "wallet.signIn": "ada2e9e96fa9"
   },
   "zh-CN": {
     "bestiary.custom.active": "4e6ab35f1a28",
@@ -5169,6 +5205,12 @@
     "soundbar.shuffle": "5b772b7bfd0a",
     "soundbar.speed": "6ff42b75c926",
     "soundbar.unmute": "91872b594bf1",
-    "soundbar.volume": "0d49fceb8d4a"
+    "soundbar.volume": "0d49fceb8d4a",
+    "wallet.balance": "ba73fd708cd4",
+    "wallet.loading": "57791d352f37",
+    "wallet.offline": "006b29816741",
+    "wallet.rank": "dd2787ce8f6d",
+    "wallet.signedOut": "c3744f96506e",
+    "wallet.signIn": "ada2e9e96fa9"
   }
 }
