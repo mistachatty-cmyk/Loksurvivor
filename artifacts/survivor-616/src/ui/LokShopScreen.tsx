@@ -34,6 +34,7 @@ import { LOKTOKEN_PRICE_BY_TIER, catalogSku } from '@/lib/lokStoreCatalog';
 import { useLokEconomy } from '@/state/lokEconomyStore';
 import { HoloOwl } from './HoloOwl';
 import { SupporterBar } from './SupporterBar';
+import { LokWalletStrip } from './LokWalletStrip';
 
 const RECENT_LINES = 8;
 /** Where Pass / Passport / Lifetime are managed (the Stripe checkout lives on the hub, not in the game). */
@@ -50,7 +51,7 @@ function Feather({ color }: { color: string }) {
   );
 }
 
-export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void; onOpenCosmetics?: () => void }) {
+export function LokShopScreen({ onBack, onOpenCosmetics, onSignIn }: { onBack: () => void; onOpenCosmetics?: () => void; onSignIn?: () => void }) {
   const t = useT();
   const { meta, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantLokShopPerk, lokShopVisit, lokShopHaggle } = useMeta();
   const { signedIn, balance, ownedSkus, priceOf, spend, activeSupporterTier, supporter, setSupporterVisible } = useLokEconomy();
@@ -179,6 +180,7 @@ export function LokShopScreen({ onBack, onOpenCosmetics }: { onBack: () => void;
           <ArrowLeft className="h-3 w-3" />{t('lokshop.back')}
         </button>
         <SupporterBar variant="inline" />
+        <LokWalletStrip onSignIn={onSignIn} />
         <h1 className="text-3xl font-black uppercase tracking-[0.2em] text-violet-200 [text-shadow:0_0_14px_rgba(192,132,252,.8)]">{t('lokshop.title')}</h1>
         <p className="text-sm text-muted-foreground">{t('lokshop.subtitle')}</p>
 

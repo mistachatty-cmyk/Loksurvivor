@@ -1398,6 +1398,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Behind the scenes: Lok Pass, Passport and Lifetime are now supporter entitlements, the shared SDK carries the supporter rules for every Lok game, and everything new is drawn in code so it costs nothing extra to load.',
     ],
   },
+  {
+    version: '0.28.1',
+    date: '2026-10-12',
+    publishedAt: '2026-10-12T01:00:00Z',
+    kind: 'update',
+    title: 'Your LokTokens, in Every Shop',
+    body: [
+      'Every shop that sells for LokTokens now shows how many you have, and if you are not signed in it offers a Sign in button that takes you straight to your account.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

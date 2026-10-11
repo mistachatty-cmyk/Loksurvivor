@@ -658,10 +658,10 @@ function Game() {
       return <WorkshopPanel onBack={goHub} />;
 
     case 'card-shop':
-      return <CardShopPanel onBack={goHub} initialTab={screen.tab} />;
+      return <CardShopPanel onBack={goHub} initialTab={screen.tab} onSignIn={() => setScreen({ name: 'account' })} />;
 
     case 'lok-shop':
-      return <LokShopScreen onBack={goHub} onOpenCosmetics={() => setScreen({ name: 'palette-store' })} />;
+      return <LokShopScreen onBack={goHub} onOpenCosmetics={() => setScreen({ name: 'palette-store' })} onSignIn={() => setScreen({ name: 'account' })} />;
 
     case 'weapon-bans':
       return <WeaponBansScreen onBack={goHub} />;
@@ -673,7 +673,7 @@ function Game() {
       return <SettingsPanel onBack={goHub} />;
 
     case 'palette-store':
-      return <PaletteGalleryPanel onBack={goHub} />;
+      return <PaletteGalleryPanel onBack={goHub} onSignIn={() => setScreen({ name: 'account' })} />;
 
     case 'sound-booth':
       return <SoundBoothPanel onBack={goHub} />;
