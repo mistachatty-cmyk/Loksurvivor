@@ -243,7 +243,9 @@ function WrapBody({ pack, skin, motion }: { pack: PurchasableCardPack; skin: str
   return null;
 }
 
-export function PackArt({ pack, skin, motion = 'subtle', maxWidth = 170 }: { pack: PurchasableCardPack; skin: string; motion?: CardMotion; maxWidth?: number }) {
+export function PackArt({ pack, skin, motion: requestedMotion = 'subtle', maxWidth = 170 }: { pack: PurchasableCardPack; skin: string; motion?: CardMotion; maxWidth?: number }) {
+  // Live wraps are the animated tier: they run on "subtle" too, and only "off" (or the OS reduced-motion setting) stops them.
+  const motion: CardMotion = LIVE_PACK_SKINS.has(skin) && requestedMotion === 'subtle' ? 'full' : requestedMotion;
   const body =
     skin === 'pack-foil' ? <FoilPack pack={pack} /> : skin === 'pack-printed' ? <PrintedPack pack={pack} motion={motion} /> : skin === 'pack-boxed' ? <BoxedPack pack={pack} /> : <WrapBody pack={pack} skin={skin} motion={motion} />;
   if (!body) return null;
