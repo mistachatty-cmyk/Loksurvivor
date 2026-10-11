@@ -1334,6 +1334,16 @@ export const CHANGELOG: ChangelogEntry[] = [
       'The LOK Shop sells a new LokPack Visualizer for 1500 LokTokens. Owning it unlocks the Live pack wraps in the Sleeve Counter, animated packs that cost 480 Card Credits each: Prism Holo Live, Retro Neon Live with the cast marching across, and the bonus Retro Neon Arcade, the busy full-color version.',
     ],
   },
+  {
+    version: '0.27.1',
+    date: '2026-10-11',
+    publishedAt: '2026-10-11T12:00:00Z',
+    kind: 'hotfix',
+    title: 'Skeleton Keys Stop Raining',
+    body: [
+      'Skeleton keys were dropping from the random item weather in open arenas about once every 25 seconds, each with a popup, alert and sound. They now only show up there as a rare surprise.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

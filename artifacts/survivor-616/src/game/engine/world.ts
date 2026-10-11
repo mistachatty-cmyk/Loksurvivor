@@ -11157,7 +11157,11 @@ function updateRumorPulses(w: World) {
   w.rumorMagnetNextAt += 8500;
 }
 
-const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'health', 'cred', 'coin'];
+// Skeleton keys ('coin') used to be 1 of 5 equal entries here, so random-drop arenas
+// spawned one every ~25s -- each with a popup, alert and sfx -- and the "rare" currency
+// felt like spam (common bug). They are now a rare easter-egg roll instead.
+const AMBIENT_DROP_KINDS: readonly PickupKind[] = ['xp', 'xp', 'health', 'cred'];
+const AMBIENT_KEY_EASTER_EGG_CHANCE = 0.02;
 
 /**
  * area.randomDrops: pickups appear at random arena points on a cadence,
@@ -11178,7 +11182,9 @@ function updateAmbientDrops(w: World) {
     y = randRange(w.rng, -halfH, halfH);
     if (dist2(x, y, w.player.x, w.player.y) > 160 * 160) break;
   }
-  const kind = AMBIENT_DROP_KINDS[Math.floor(w.rng() * AMBIENT_DROP_KINDS.length)]!;
+  const kind = w.rng() < AMBIENT_KEY_EASTER_EGG_CHANCE
+    ? 'coin'
+    : AMBIENT_DROP_KINDS[Math.floor(w.rng() * AMBIENT_DROP_KINDS.length)]!;
   const value = kind === 'xp' ? Math.round(randRange(w.rng, 6, 14))
     : kind === 'health' ? 18
     : kind === 'cred' ? Math.round(randRange(w.rng, 4, 10))
