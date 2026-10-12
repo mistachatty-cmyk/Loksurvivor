@@ -23,7 +23,7 @@ import type { AreaSky, EnemyDef, ObstacleDef, SpritePalette, StormCloudMode } fr
 import { buildingSupplyPoint, getBuildingPrefab } from '@/game/engine/chunks';
 import { blendSpritePalettes } from '@/game/data/characterSkins';
 
-import { drawRig, drawShadow } from './sprite';
+import { drawRig, drawShadow, studioDirection } from './sprite';
 import { reactionMultiplier } from '@/game/data/reactivity';
 import { clamp, dist2 } from '@/game/engine/math';
 import { drawForgeFiveProjectile } from './forgeFiveVfx';
@@ -5701,6 +5701,7 @@ function drawActors(
       p.facing,
       scale * (1 - fallProgress * 0.72) * musicVisual(w, w.character.react, 'scale'),
       {
+        direction: studioDirection(p.vx, p.vy, p.facing),
         flash: w.now < p.hitFlashUntil,
         outline: true,
         alpha: blink ? 0.45 : stealthed ? stealthAlpha : 1,
@@ -6205,6 +6206,7 @@ function drawActors(
       enemy.facing,
       SPRITE_SCALE * sizeClassScale(enemy.def) * (enemy.radius / enemy.baseRadius) * (1 - fallProgress * 0.72) * musicVisual(w, enemy.def.react, 'scale'),
       {
+        direction: studioDirection(enemy.vx, enemy.vy, enemy.facing),
         flash: w.now < enemy.hitFlashUntil,
         outline: outlineEnemies || enemy.def.family === 'Boss' || enemy.def.sizeClass === 'giant',
         dissolve,

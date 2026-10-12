@@ -27,6 +27,8 @@ import { OperatorRoster } from './OperatorRoster';
 import type { RosterEntry } from '@/game/data/characterForgeRoster';
 import { ClassicEnemiesTab } from './ClassicEnemiesTab';
 import { ClassicLokPetsTab } from './ClassicLokPetsTab';
+import { ENEMIES } from '@/game/data/enemies';
+import { CharacterStudioV3 } from './CharacterStudioV3';
 import { t } from '@/lib/i18n';
 import { CustomsRunSwitch, Switch } from './EndgameControls';
 
@@ -43,8 +45,8 @@ function freshSeed(): string {
   return `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}${seedCounter}`;
 }
 
-type ForgeTab = 'operators' | 'enemies' | 'lokpets';
-const FORGE_TABS: ForgeTab[] = ['operators', 'enemies', 'lokpets'];
+type ForgeTab = 'operators' | 'enemies' | 'lokpets' | 'studio';
+const FORGE_TABS: ForgeTab[] = ['operators', 'enemies', 'lokpets', 'studio'];
 const TAB_KEY = 'survivor616.forge.tab';
 
 function readTab(): ForgeTab {
@@ -415,13 +417,16 @@ export function OperatorForgePanel({ onClose }: OperatorForgePanelProps) {
               className={`min-h-10 flex-1 border px-4 py-2 font-mono text-xs font-bold uppercase tracking-widest sm:flex-none ${tab === id ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-white'}`}
               data-testid={`forge-tab-${id}`}
             >
-              {t(`forge.nav.${id}` as const)}
+              {id === 'studio' ? 'Studio v3' : t(`forge.nav.${id}` as const)}
             </button>
           ))}
         </nav>
 
         <div id="forge-screen-enemies" role="tabpanel" aria-labelledby="forge-tab-enemies" hidden={tab !== 'enemies'}><ClassicEnemiesTab /></div>
         <div id="forge-screen-lokpets" role="tabpanel" aria-labelledby="forge-tab-lokpets" hidden={tab !== 'lokpets'}><ClassicLokPetsTab /></div>
+        <div id="forge-screen-studio" role="tabpanel" aria-labelledby="forge-tab-studio" hidden={tab !== 'studio'}>
+          {tab === 'studio' && <CharacterStudioV3 operatorSources={kits.map((character) => ({ id: character.id, name: character.name }))} enemySources={ENEMIES.map((enemy) => ({ id: enemy.id, name: enemy.name }))} v2Operators={saved} />}
+        </div>
 
         <div id="forge-screen-operators" role="tabpanel" aria-labelledby="forge-tab-operators" hidden={tab !== 'operators'}>
         <div className="sticky top-0 z-20 mt-4 flex items-center gap-3 border border-primary/40 bg-card p-2 shadow-lg lg:hidden" data-testid="forge-mobile-preview">

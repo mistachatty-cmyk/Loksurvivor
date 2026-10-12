@@ -25,6 +25,7 @@ import { getCharacterSkins, isCharacterSkinUnlocked } from '@/game/data/characte
 import { EVOLUTIONS_BY_ID } from '@/game/data/evolutions';
 import { CITY_RELICS, CITY_RELICS_BY_ID, RELIC_BY_DISCOVERY_ID } from '@/game/data/relics';
 import { ENEMIES } from '@/game/data/enemies';
+import { applyCreatorCredTotal } from '@/game/studio/creatorCred';
 import { isStarterLokPetId, LOKPET_VARIANTS_BY_ID, rollLokPet, type StarterLokPetId } from '@/game/data/lokPets';
 import { createRng } from '@/game/engine/math';
 import { ALLIES, ALLIES_BY_ID, DISCOVERIES, HUB_ROOMS } from '@/game/data/progression';
@@ -387,6 +388,7 @@ export function createInitialMeta(): MetaState {
     bestSurvivalSec: 0,
     totalLevelUps: 0,
     cred: 0,
+    creatorCredApplied: 0,
     lootTokens: 0,
     cardCredits: 0,
     cardCollection: [],
@@ -1433,6 +1435,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     bestSurvivalSec: counter(parsed.bestSurvivalSec),
     totalLevelUps: counter(parsed.totalLevelUps),
     ...settledGeneratorIncome,
+    creatorCredApplied: counter(parsed.creatorCredApplied),
     lootTokens: counter(parsed.lootTokens),
     cardCredits: counter(parsed.cardCredits),
     cardCollection,
@@ -2014,6 +2017,7 @@ interface StoreState {
 }
 
 type Action =
+  | { type: 'applyCreatorCredTotal'; total: number }
   | { type: 'selectCharacter'; id: string }
   | { type: 'selectCharacterSkin'; characterId: string; skinId: string }
   | { type: 'enterHideout'; now: number }
@@ -2239,6 +2243,8 @@ export function reducer(state: StoreState, action: Action): StoreState {
 
 function coreReducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
+    case 'applyCreatorCredTotal':
+      return { ...state, meta: applyCreatorCredTotal(state.meta, action.total) };
     case 'selectCharacter': {
       const character = CHARACTERS.find((candidate) => candidate.id === action.id);
       if (!character) return state;
@@ -4439,6 +4445,7 @@ export interface MetaContextValue {
   resetProgress: () => void;
   /** Wholesale-replaces progress, e.g. from an imported save file or a cloud-save pull. Normalised the same way a loaded save is. */
   importMeta: (meta: Partial<MetaState>) => void;
+  applyCreatorCredTotal: (total: number) => void;
 }
 
 const MetaContext = createContext<MetaContextValue | null>(null);
@@ -4465,6 +4472,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   // metaStore helpers in tests never pulls in the Supabase-touching auth
   // module) a cloud-save pull.
   const importMeta = useCallback((meta: Partial<MetaState>) => dispatch({ type: 'replaceMeta', meta }), []);
+  const applyCreatorCredGrantTotal = useCallback((total: number) => dispatch({ type: 'applyCreatorCredTotal', total }), []);
 
   const selectCharacter = useCallback((id: string) => dispatch({ type: 'selectCharacter', id }), []);
   const selectCharacterSkin = useCallback((characterId: string, skinId: string) => dispatch({ type: 'selectCharacterSkin', characterId, skinId }), []);
@@ -4976,6 +4984,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       toggleThreatUpgrade,
       unlockDvdEasterEgg,
       importMeta,
+      applyCreatorCredTotal: applyCreatorCredGrantTotal,
     };
   }, [
     state,
@@ -5150,6 +5159,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     toggleThreatUpgrade,
     unlockDvdEasterEgg,
     importMeta,
+    applyCreatorCredGrantTotal,
   ]);
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>;
