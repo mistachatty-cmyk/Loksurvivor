@@ -24,4 +24,3 @@ export function HoloOwl({ mood, className = 'h-28 w-28 sm:h-36 sm:w-36' }: { moo
     </svg>
   );
 }
-

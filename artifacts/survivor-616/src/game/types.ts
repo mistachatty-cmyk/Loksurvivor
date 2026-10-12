@@ -2631,6 +2631,8 @@ export interface MetaState {
   lokPetFieldGuideUnlocked: boolean;
   /** LokToken purchase (Lok Shop): required to select any LokPet Collector character, in addition to that character's own progress-based unlock. */
   lokPetCollectorAccessUnlocked: boolean;
+  /** LokToken purchase (Lok Shop): unlocks the Operator Forge's faction races list before Victory Lap would otherwise earn it. */
+  factionRacesUnlocked: boolean;
   /** LOK Shop unlock: lets the Sleeve Counter sell the animated Live pack wraps. */
   lokPackVisualizerUnlocked: boolean;
   /** LokShop perks owned (ids from `lokShopPerks.ts`): ball, Lok Pass, Passports. */

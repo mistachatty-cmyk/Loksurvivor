@@ -11,10 +11,15 @@ import {
   MAX_CUSTOM_VARIANTS, bumpForgeStat, deleteCustomVariant, isCustomActive, loadCustomVariants, saveCustomVariant, setCustomActive,
   type CustomVariant, type CustomVariantKind,
 } from '@/game/state/operatorForgeStore';
+import { applyPaletteStyle, PALETTE_STYLE_IDS, seedFromId, type PaletteStyleId } from '@/game/sprites/paletteStyles';
 import type { SpritePalette, SpriteRig } from '@/game/types';
 import { t } from '@/lib/i18n';
 import { RigPortrait } from './RigPortrait';
 import { Switch } from './EndgameControls';
+
+const STYLE_LABELS: Record<PaletteStyleId, string> = {
+  original: 'Original', nocturne: 'Nocturne', countertone: 'Countertone', 'cel-broadcast': 'Cel Broadcast', 'riso-print': 'Riso Print',
+};
 
 const BUTTON =
   'min-h-10 border border-border bg-background px-3 py-2 font-mono text-[11px] font-bold uppercase tracking-widest text-white transition-colors hover:border-primary disabled:opacity-40';
@@ -57,6 +62,8 @@ export function VariantStudio({ kind, entries, intro, testId }: VariantStudioPro
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saved, setSaved] = useState<CustomVariant[]>(() => loadCustomVariants(kind));
   const [message, setMessage] = useState('');
+  const [mode, setMode] = useState<'classic' | 'styled'>('classic');
+  const showStyles = kind === 'enemy';
 
   const groups = useMemo(() => [...new Set(entries.map((e) => e.group))].sort(), [entries]);
   const byId = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
@@ -121,6 +128,29 @@ export function VariantStudio({ kind, entries, intro, testId }: VariantStudioPro
             <span className={LABEL}>{t('forge.variants.nameLabel')}</span>
             <input className={FIELD} value={name} maxLength={40} placeholder={`${selected.name} Remix`} onChange={(e) => setName(e.target.value)} data-testid={`${testId}-name`} />
           </label>
+          {showStyles && (
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <button type="button" className={mode === 'classic' ? PRIMARY : BUTTON} onClick={() => setMode('classic')} data-testid={`${testId}-mode-classic`}>Classic (v1)</button>
+                <button type="button" className={mode === 'styled' ? PRIMARY : BUTTON} onClick={() => setMode('styled')} data-testid={`${testId}-mode-styled`}>Styled (v2)</button>
+              </div>
+              {mode === 'styled' && (
+                <div className="flex flex-wrap gap-1.5" data-testid={`${testId}-styles`}>
+                  {PALETTE_STYLE_IDS.map((styleId) => (
+                    <button
+                      key={styleId}
+                      type="button"
+                      className={BUTTON}
+                      onClick={() => setPalette(applyPaletteStyle(selected.palette, styleId, seedFromId(selected.id)))}
+                      data-testid={`${testId}-style-${styleId}`}
+                    >
+                      {STYLE_LABELS[styleId]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-2">
             {PALETTE_KEYS.map((key) => (
               <label key={key} className="block">

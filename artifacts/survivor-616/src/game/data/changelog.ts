@@ -1408,6 +1408,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Every shop that sells for LokTokens now shows how many you have, and if you are not signed in it offers a Sign in button that takes you straight to your account.',
     ],
   },
+  {
+    version: '0.29.0',
+    date: '2026-10-12',
+    publishedAt: '2026-10-12T21:10:00Z',
+    kind: 'update',
+    title: 'The 616 Forge Roster',
+    body: [
+      'The Operator Forge now shows the full 616 roster as editable starting designs alongside your saved custom operators. Choosing one never changes the original character.',
+      'Custom operator slots grow beyond the first five: eight are earned through play, with more milestone slots available through Lok Pass, Lok Passport and Lifetime supporter tiers.',
+      'Enemies gain Classic and Styled palette previews. Faction Races Pass, Furniture City Dusk, Furnace Orbit, Relay Mast and Ticker Tape join the customization catalog.',
+    ],
+  },
 ];
 
 export const CURRENT_VERSION = CHANGELOG[CHANGELOG.length - 1]!.version;

@@ -30,14 +30,10 @@ The owner found the new screen content too much, so it is now an **end-game unlo
   between them (`SettingsPager`). The End game page ("Victory Lap") has a switch
   for each earned extra. All start **off**.
 - **Extras:** Operator Forge, Zoom viewer, Faction races, Champion foil, Glow aura.
-- **Five custom slots**, each earned its own way once the maps are cleared: Full
-  Circuit (the gate), Crowd Control (20,000 kills), Roll Call (15 allies), Field
-  Notes (18 discoveries), Beast Master (25 LokPet battle wins). The Forge keeps one
-  custom operator per earned slot. A custom operator is a modified copy of a premade
-  operator's kit and never replaces a premade operator.
+- **Eight free custom slots**, each earned through a distinct play milestone after the standard maps are cleared. Further milestone slots use the account's active supporter tier. A forged operator keeps its own save slot and never replaces a premade operator.
 - A Forge found with the old taps stays available and on. Operators saved beyond
   the slot count stay on the roster and are listed as "made before slots existed".
-- Turning on Dev Mode also opens the Forge and all five slots immediately. This
+- Turning on Dev Mode also opens the Forge and all current slots immediately. This
   grants temporary access, not end-game progress: turning Dev Mode off hides the
   Forge and unearned slots again, while designs stay saved. Reload after
   switching Dev Mode to refresh the roster.
@@ -157,4 +153,11 @@ This is meant to grow. Everything is a data entry:
 ## Customs control (0.21.3)
 
 See `endgame-unlocks.md` for the full table. Custom operators and looks each have a "use in runs" switch plus a master switch. Looks are applied in runs by palette only. The Custom Bestiary (Bestiary, third view) and the hideout Endgame dock are shortcuts to the same switches. Customs are kept out of card packs for now.
+
+## The 616 Roster and tiered slots (0.29.0)
+
+- **Operators tab roster** (`OperatorRoster.tsx`, rendered below the creator in `OperatorForgePanel.tsx`): every hand-authored character is reinterpreted through the Forge engine by `characterForgeRoster.ts` (`getCharacterRoster()`), biased toward the character's own accent hue so the forged look still "rhymes" with the original. Nothing about the authored `CharacterDef`s changes -- picking a roster card loads its `OperatorDesign` into the creator exactly like picking a species/flavor preset does, fully editable afterward. The player's own saved custom operators show above the roster ("Your Operators"), per the Forge's "nothing replaced, only expanded" rule.
+- **Enemies/LokPets**: no roster yet. `VariantStudio.tsx` instead got a **Classic (v1) / Styled (v2)** toggle on the Enemies tab only, reusing the player-skin style-preset engine extracted to `src/game/sprites/paletteStyles.ts` (Original/Nocturne/Countertone/Cel Broadcast/Riso Print). A full Forge-style rig/customization overhaul for Enemies and LokPets (including extending the humanoid-only feature system to quadruped/blob rigs) is a deferred follow-up.
+- **Tiered custom slots** (`endgameUnlocks.ts`): `CUSTOM_SLOTS` (free, play-earned) grew from 5 to 8. Three new tiers layer on top, each slot still gated by its own milestone *in addition to* owning the tier: `LOKPASS_SLOTS` (6, slots 9-14, needs the one-time LokPass), `PASSPORT_SLOTS` (10, slots 15-24, needs an active Lok Passport subscription), `LIFETIME_SLOTS` (an initial batch toward 100, needs the Lifetime Lok Passport). `ALL_CUSTOM_SLOTS` is the combined, ordered list; `operatorForgeStore.earnedSlotCount()`/`isSlotTierUnlocked()` are tier-aware.
+- **Supporter tier source:** the shared account service provides `activeSupporterTier` through `useLokEconomy`. The Forge uses that verified tier for slot access; a lapsed tier hides its extra slots while saved designs remain intact. Dev Mode still opens every slot for testing. No separate Forge Passport SKU or local entitlement switch is sold by this game. See `.agents/memory/lok-passport-slots.md`.
 

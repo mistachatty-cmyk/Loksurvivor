@@ -92,38 +92,115 @@ export const ENDGAME_FEATURES: EndgameFeature[] = [
 
 export const ENDGAME_FEATURE_IDS: EndgameFeatureId[] = ENDGAME_FEATURES.map((f) => f.id);
 
+/**
+ * A slot's tier: `free` is earned purely by play. The three paid tiers each add
+ * more slots, every one still gated by its own play milestone on top of owning
+ * the tier -- a purchase alone never fills a slot. No real payment processing
+ * lives in this repo; see `.agents/memory/lok-passport-slots.md` for the
+ * integration contract and today's Dev-Mode-only stand-in.
+ */
+export type SlotTier = 'free' | 'lokpass' | 'passport' | 'lifetime';
+
 export interface CustomSlot {
   id: string;
   label: string;
+  tier: SlotTier;
   /** How it is earned, in player words (shown once the end game is reached). */
   how: string;
   /** Progress toward the slot's own goal beyond clearing every map. */
   goal?: (p: EndgameProgress) => { have: number; need: number };
 }
 
+/** The 8 slots earned purely by play, no purchase required. */
 export const CUSTOM_SLOTS: CustomSlot[] = [
-  { id: 'slot-circuit', label: 'Full Circuit', how: 'Clear every standard map once.' },
+  { id: 'slot-circuit', label: 'Full Circuit', tier: 'free', how: 'Clear every standard map once.' },
   {
-    id: 'slot-crowd', label: 'Crowd Control', how: 'Defeat 20,000 enemies in total.',
+    id: 'slot-crowd', label: 'Crowd Control', tier: 'free', how: 'Defeat 20,000 enemies in total.',
     goal: (p) => ({ have: p.totalKills, need: 20000 }),
   },
   {
-    id: 'slot-roll-call', label: 'Roll Call', how: 'Rescue 15 allies.',
+    id: 'slot-roll-call', label: 'Roll Call', tier: 'free', how: 'Rescue 15 allies.',
     goal: (p) => ({ have: p.rescuedAllyIds.length, need: 15 }),
   },
   {
-    id: 'slot-field-notes', label: 'Field Notes', how: 'Find 18 discoveries.',
+    id: 'slot-field-notes', label: 'Field Notes', tier: 'free', how: 'Find 18 discoveries.',
     goal: (p) => ({ have: p.discoveryIds.length, need: 18 }),
   },
   {
-    id: 'slot-beast-master', label: 'Beast Master', how: 'Win 25 LokPet battles.',
+    id: 'slot-beast-master', label: 'Beast Master', tier: 'free', how: 'Win 25 LokPet battles.',
     goal: (p) => ({ have: p.lokPetBattleWins, need: 25 }),
+  },
+  {
+    id: 'slot-deep-circuit', label: 'Deep Circuit', tier: 'free', how: 'Defeat 50,000 enemies in total.',
+    goal: (p) => ({ have: p.totalKills, need: 50000 }),
+  },
+  {
+    id: 'slot-full-crew', label: 'Full Crew', tier: 'free', how: 'Rescue 25 allies.',
+    goal: (p) => ({ have: p.rescuedAllyIds.length, need: 25 }),
+  },
+  {
+    id: 'slot-archivist', label: 'Archivist', tier: 'free', how: 'Find 30 discoveries.',
+    goal: (p) => ({ have: p.discoveryIds.length, need: 30 }),
   },
 ];
 
+/**
+ * Slots 9-14: require owning LokPass (a one-time purchase handled by the Lok
+ * platform, not this repo) in addition to the milestone below.
+ */
+export const LOKPASS_SLOTS: CustomSlot[] = [
+  { id: 'slot-lokpass-overtime', label: 'Overtime', tier: 'lokpass', how: 'Own LokPass. Defeat 75,000 enemies in total.', goal: (p) => ({ have: p.totalKills, need: 75000 }) },
+  { id: 'slot-lokpass-rolodex', label: 'Rolodex', tier: 'lokpass', how: 'Own LokPass. Rescue 35 allies.', goal: (p) => ({ have: p.rescuedAllyIds.length, need: 35 }) },
+  { id: 'slot-lokpass-cartographer', label: 'Cartographer', tier: 'lokpass', how: 'Own LokPass. Find 40 discoveries.', goal: (p) => ({ have: p.discoveryIds.length, need: 40 }) },
+  { id: 'slot-lokpass-tamer', label: 'Tamer', tier: 'lokpass', how: 'Own LokPass. Win 50 LokPet battles.', goal: (p) => ({ have: p.lokPetBattleWins, need: 50 }) },
+  { id: 'slot-lokpass-centurion', label: 'Centurion', tier: 'lokpass', how: 'Own LokPass. Defeat 100,000 enemies in total.', goal: (p) => ({ have: p.totalKills, need: 100000 }) },
+  { id: 'slot-lokpass-benefactor', label: 'Benefactor', tier: 'lokpass', how: 'Own LokPass. Rescue 45 allies.', goal: (p) => ({ have: p.rescuedAllyIds.length, need: 45 }) },
+];
+
+/**
+ * Slots 15-24: require an active Lok Passport (a subscription) in addition to
+ * the milestone below.
+ */
+export const PASSPORT_SLOTS: CustomSlot[] = [
+  { id: 'slot-passport-surveyor', label: 'Surveyor', tier: 'passport', how: 'Hold an active Lok Passport. Find 50 discoveries.', goal: (p) => ({ have: p.discoveryIds.length, need: 50 }) },
+  { id: 'slot-passport-warden', label: 'Warden', tier: 'passport', how: 'Hold an active Lok Passport. Win 65 LokPet battles.', goal: (p) => ({ have: p.lokPetBattleWins, need: 65 }) },
+  { id: 'slot-passport-legion', label: 'Legion', tier: 'passport', how: 'Hold an active Lok Passport. Defeat 150,000 enemies in total.', goal: (p) => ({ have: p.totalKills, need: 150000 }) },
+  { id: 'slot-passport-network', label: 'Network', tier: 'passport', how: 'Hold an active Lok Passport. Rescue 55 allies.', goal: (p) => ({ have: p.rescuedAllyIds.length, need: 55 }) },
+  { id: 'slot-passport-cataloger', label: 'Cataloger', tier: 'passport', how: 'Hold an active Lok Passport. Find 60 discoveries.', goal: (p) => ({ have: p.discoveryIds.length, need: 60 }) },
+  { id: 'slot-passport-handler', label: 'Handler', tier: 'passport', how: 'Hold an active Lok Passport. Win 80 LokPet battles.', goal: (p) => ({ have: p.lokPetBattleWins, need: 80 }) },
+  { id: 'slot-passport-vanguard', label: 'Vanguard', tier: 'passport', how: 'Hold an active Lok Passport. Defeat 200,000 enemies in total.', goal: (p) => ({ have: p.totalKills, need: 200000 }) },
+  { id: 'slot-passport-syndicate', label: 'Syndicate', tier: 'passport', how: 'Hold an active Lok Passport. Rescue 65 allies.', goal: (p) => ({ have: p.rescuedAllyIds.length, need: 65 }) },
+  { id: 'slot-passport-recordkeeper', label: 'Recordkeeper', tier: 'passport', how: 'Hold an active Lok Passport. Find 70 discoveries.', goal: (p) => ({ have: p.discoveryIds.length, need: 70 }) },
+  { id: 'slot-passport-grandmaster', label: 'Grandmaster', tier: 'passport', how: 'Hold an active Lok Passport. Win 100 LokPet battles.', goal: (p) => ({ have: p.lokPetBattleWins, need: 100 }) },
+];
+
+/**
+ * Slots 25+: require Lifetime Lok Passport. Shipping an initial batch now
+ * rather than hand-tuning all the way to 100 in one pass -- each later slot
+ * simply keeps scaling the same four milestone categories; add rows here
+ * following that formula (+50,000 kills / +10 allies / +10 discoveries / +20
+ * LokPet wins per slot, cycling categories) to extend toward 100.
+ */
+export const LIFETIME_SLOTS: CustomSlot[] = [
+  { id: 'slot-lifetime-01', label: 'Veteran I', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Defeat 250,000 enemies in total.', goal: (p) => ({ have: p.totalKills, need: 250000 }) },
+  { id: 'slot-lifetime-02', label: 'Veteran II', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Rescue 75 allies.', goal: (p) => ({ have: p.rescuedAllyIds.length, need: 75 }) },
+  { id: 'slot-lifetime-03', label: 'Veteran III', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Find 80 discoveries.', goal: (p) => ({ have: p.discoveryIds.length, need: 80 }) },
+  { id: 'slot-lifetime-04', label: 'Veteran IV', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Win 120 LokPet battles.', goal: (p) => ({ have: p.lokPetBattleWins, need: 120 }) },
+  { id: 'slot-lifetime-05', label: 'Veteran V', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Defeat 300,000 enemies in total.', goal: (p) => ({ have: p.totalKills, need: 300000 }) },
+  { id: 'slot-lifetime-06', label: 'Veteran VI', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Rescue 85 allies.', goal: (p) => ({ have: p.rescuedAllyIds.length, need: 85 }) },
+  { id: 'slot-lifetime-07', label: 'Veteran VII', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Find 90 discoveries.', goal: (p) => ({ have: p.discoveryIds.length, need: 90 }) },
+  { id: 'slot-lifetime-08', label: 'Veteran VIII', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Win 140 LokPet battles.', goal: (p) => ({ have: p.lokPetBattleWins, need: 140 }) },
+  { id: 'slot-lifetime-09', label: 'Veteran IX', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Defeat 350,000 enemies in total.', goal: (p) => ({ have: p.totalKills, need: 350000 }) },
+  { id: 'slot-lifetime-10', label: 'Veteran X', tier: 'lifetime', how: 'Hold a Lifetime Lok Passport. Rescue 95 allies.', goal: (p) => ({ have: p.rescuedAllyIds.length, need: 95 }) },
+];
+
+/** Every milestone-gated slot across every tier, in unlock order. */
+export const ALL_CUSTOM_SLOTS: CustomSlot[] = [...CUSTOM_SLOTS, ...LOKPASS_SLOTS, ...PASSPORT_SLOTS, ...LIFETIME_SLOTS];
+
 export const CUSTOM_SLOT_IDS = CUSTOM_SLOTS.map((s) => s.id);
-/** The most custom operators anyone can keep in slots. */
-export const MAX_CUSTOM_SLOTS = CUSTOM_SLOTS.length;
+export const ALL_CUSTOM_SLOT_IDS = ALL_CUSTOM_SLOTS.map((s) => s.id);
+/** The most custom operators anyone can keep in slots, across every tier. */
+export const MAX_CUSTOM_SLOTS = ALL_CUSTOM_SLOTS.length;
 
 const EXTREME_IDS: ReadonlySet<string> = new Set([...AREAS_2X, ...AREAS_4X].map((a) => a.id));
 
@@ -154,7 +231,7 @@ export function isSlotEarned(slot: CustomSlot, p: EndgameProgress): boolean {
 /** Every unlock id (features and slots) the progress currently qualifies for. */
 export function earnedEndgame(p: EndgameProgress): string[] {
   if (!endgameReached(p)) return [];
-  return [...ENDGAME_FEATURE_IDS, ...CUSTOM_SLOTS.filter((s) => isSlotEarned(s, p)).map((s) => s.id)];
+  return [...ENDGAME_FEATURE_IDS, ...ALL_CUSTOM_SLOTS.filter((s) => isSlotEarned(s, p)).map((s) => s.id)];
 }
 
 /** Unlock ids earned in `next` that `before` did not have. */
@@ -167,7 +244,7 @@ export function featureById(id: string): EndgameFeature | undefined {
   return ENDGAME_FEATURES.find((f) => f.id === id);
 }
 export function slotById(id: string): CustomSlot | undefined {
-  return CUSTOM_SLOTS.find((s) => s.id === id);
+  return ALL_CUSTOM_SLOTS.find((s) => s.id === id);
 }
 
 /* ------------------------------------------------------------------ */
@@ -210,7 +287,7 @@ export const ENDGAME_UNLOCK_TABLE: EndgameUnlockRow[] = [
     why: f.blurb,
     open: (p) => endgameReached(p),
   })),
-  ...CUSTOM_SLOTS.map((s): EndgameUnlockRow => ({
+  ...ALL_CUSTOM_SLOTS.map((s): EndgameUnlockRow => ({
     id: s.id,
     name: `Custom slot: ${s.label}`,
     category: 'slot',

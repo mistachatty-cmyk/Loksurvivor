@@ -107,7 +107,7 @@ function ShopTabs({ active, onChange }: { active: ShopCategory; onChange: (categ
 }
 
 export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
-  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
+  const { meta, buyPalette, grantPalette, equipPalette, buyRunAura, equipRunAura, buyHat, equipHat, buyCelebration, equipCelebration, grantDropPack, equipDropPack, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer, grantFactionRacesUnlock, setPaletteAnimations, setWorldPaletteBlend } = useMeta();
   const sfx = useSfxPlayer(getActiveSoundPackStyle(meta.activeSoundPackId), meta.sfxEnabled);
   const { signedIn, balance: lokBalance, ownedSkus, priceOf, spend } = useLokEconomy();
   // LokToken-only applies per palette, and only once the live catalog actually lists it. Until then
@@ -159,8 +159,9 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
   useEffect(() => {
     if (ownedSkus.has(catalogSku('fieldGuideUnlock', 'field-guide')) && !meta.lokPetFieldGuideUnlocked) grantLokPetFieldGuide();
     if (ownedSkus.has(catalogSku('collectorAccess', 'collector-access')) && !meta.lokPetCollectorAccessUnlocked) grantLokPetCollectorAccess();
+    if (ownedSkus.has(catalogSku('factionRacesUnlock', 'faction-races')) && !meta.factionRacesUnlocked) grantFactionRacesUnlock();
     if (ownedSkus.has(catalogSku('packVisualizerUnlock', 'lokpack-visualizer')) && !meta.lokPackVisualizerUnlocked) grantLokPackVisualizer();
-  }, [ownedSkus, meta.lokPetFieldGuideUnlocked, meta.lokPetCollectorAccessUnlocked, meta.lokPackVisualizerUnlocked, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantLokPackVisualizer]);
+  }, [ownedSkus, meta.lokPetFieldGuideUnlocked, meta.lokPetCollectorAccessUnlocked, meta.factionRacesUnlocked, meta.lokPackVisualizerUnlocked, grantLokPetFieldGuide, grantLokPetCollectorAccess, grantFactionRacesUnlock, grantLokPackVisualizer]);
 
   const primeShowing = takeoverActive || flickerActive;
   const vendorRig = primeShowing ? PRIME.rig : ARTISAN_VALOR_RIG;
@@ -236,11 +237,22 @@ export function PaletteGalleryPanel({ onBack, onSignIn }: Props) {
   const dropPackPrice = (pack: (typeof DROP_PACKS)[number]) =>
     priceOf(catalogSku('dropPack', pack.id)) ?? LOKTOKEN_PRICE_BY_TIER[pack.tier] ?? LOKTOKEN_PRICE_BY_TIER.standard!;
 
-  const unlockOwned = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) =>
-    unlock.id === 'field-guide' ? meta.lokPetFieldGuideUnlocked : unlock.id === 'lokpack-visualizer' ? meta.lokPackVisualizerUnlocked : meta.lokPetCollectorAccessUnlocked;
+  const UNLOCK_OWNED_BY_ID: Record<string, boolean> = {
+    'field-guide': meta.lokPetFieldGuideUnlocked,
+    'collector-access': meta.lokPetCollectorAccessUnlocked,
+    'faction-races': meta.factionRacesUnlocked,
+    'lokpack-visualizer': meta.lokPackVisualizerUnlocked,
+  };
+  const UNLOCK_GRANT_BY_ID: Record<string, () => void> = {
+    'field-guide': grantLokPetFieldGuide,
+    'collector-access': grantLokPetCollectorAccess,
+    'faction-races': grantFactionRacesUnlock,
+    'lokpack-visualizer': grantLokPackVisualizer,
+  };
+  const unlockOwned = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) => UNLOCK_OWNED_BY_ID[unlock.id] ?? false;
   const unlockPrice = (unlock: (typeof LOK_SHOP_UNLOCKS)[number]) =>
     priceOf(catalogSku(unlock.kind, unlock.id)) ?? LOKTOKEN_PRICE_BY_TIER[unlock.tier]!;
-  const grantUnlock = (unlockId: string) => (unlockId === 'field-guide' ? grantLokPetFieldGuide() : unlockId === 'lokpack-visualizer' ? grantLokPackVisualizer() : grantLokPetCollectorAccess());
+  const grantUnlock = (unlockId: string) => UNLOCK_GRANT_BY_ID[unlockId]?.();
 
   const handleBuyUnlock = (unlockId: string) => {
     const unlock = LOK_SHOP_UNLOCKS.find((entry) => entry.id === unlockId);

@@ -292,6 +292,7 @@ export function createInitialMeta(): MetaState {
     activeDropPackId: DEFAULT_DROP_PACK_ID,
     lokPetFieldGuideUnlocked: false,
     lokPetCollectorAccessUnlocked: false,
+    factionRacesUnlocked: false,
     lokPackVisualizerUnlocked: false,
     lokShopPerks: [],
     lokShopRapport: 0,
@@ -1343,6 +1344,7 @@ export function normalizeMeta(parsed: Partial<MetaState>): MetaState {
     // LokToken purchases (Lok Shop) -- off by default for a returning save that predates them.
     lokPetFieldGuideUnlocked: parsed.lokPetFieldGuideUnlocked === true,
     lokPetCollectorAccessUnlocked: parsed.lokPetCollectorAccessUnlocked === true,
+    factionRacesUnlocked: parsed.factionRacesUnlocked === true,
     lokPackVisualizerUnlocked: parsed.lokPackVisualizerUnlocked === true,
     lokShopPerks: Array.isArray(parsed.lokShopPerks) ? parsed.lokShopPerks.filter((v): v is string => typeof v === 'string') : [],
     lokShopRapport: typeof parsed.lokShopRapport === 'number' && parsed.lokShopRapport >= 0 ? Math.floor(parsed.lokShopRapport) : 0,
@@ -2096,6 +2098,7 @@ type Action =
   | { type: 'grantDropPack'; id: string }
   | { type: 'grantLokPetFieldGuide' }
   | { type: 'grantLokPetCollectorAccess' }
+  | { type: 'grantFactionRacesUnlock' }
   | { type: 'grantLokPackVisualizer' }
   | { type: 'grantLokShopPerk'; id: string }
   | { type: 'lokShopVisit'; day: string; stamped: boolean }
@@ -3415,6 +3418,9 @@ function coreReducer(state: StoreState, action: Action): StoreState {
     case 'grantLokPetCollectorAccess':
       if (state.meta.lokPetCollectorAccessUnlocked) return state;
       return { ...state, meta: { ...state.meta, lokPetCollectorAccessUnlocked: true } };
+    case 'grantFactionRacesUnlock':
+      if (state.meta.factionRacesUnlocked) return state;
+      return { ...state, meta: { ...state.meta, factionRacesUnlocked: true } };
     case 'grantLokPackVisualizer':
       if (state.meta.lokPackVisualizerUnlocked) return state;
       return { ...state, meta: { ...state.meta, lokPackVisualizerUnlocked: true } };
@@ -4331,6 +4337,7 @@ export interface MetaContextValue {
   grantDropPack: (id: string) => void;
   grantLokPetFieldGuide: () => void;
   grantLokPetCollectorAccess: () => void;
+  grantFactionRacesUnlock: () => void;
   grantLokPackVisualizer: () => void;
   grantLokShopPerk: (id: string) => void;
   lokShopVisit: (day: string, stamped: boolean) => void;
@@ -4560,6 +4567,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const grantDropPack = useCallback((id: string) => dispatch({ type: 'grantDropPack', id }), []);
   const grantLokPetFieldGuide = useCallback(() => dispatch({ type: 'grantLokPetFieldGuide' }), []);
   const grantLokPetCollectorAccess = useCallback(() => dispatch({ type: 'grantLokPetCollectorAccess' }), []);
+  const grantFactionRacesUnlock = useCallback(() => dispatch({ type: 'grantFactionRacesUnlock' }), []);
   const grantLokPackVisualizer = useCallback(() => dispatch({ type: 'grantLokPackVisualizer' }), []);
   const grantLokShopPerk = useCallback((id: string) => dispatch({ type: 'grantLokShopPerk', id }), []);
   const lokShopVisit = useCallback((day: string, stamped: boolean) => dispatch({ type: 'lokShopVisit', day, stamped }), []);
@@ -4868,6 +4876,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
       grantDropPack,
       grantLokPetFieldGuide,
       grantLokPetCollectorAccess,
+      grantFactionRacesUnlock,
       grantLokPackVisualizer,
       grantLokShopPerk,
       lokShopVisit,
@@ -5046,6 +5055,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     grantDropPack,
     grantLokPetFieldGuide,
     grantLokPetCollectorAccess,
+    grantFactionRacesUnlock,
     grantLokPackVisualizer,
     grantLokShopPerk,
     lokShopVisit,

@@ -37,6 +37,7 @@ import {
 
 import { useAuth } from '@/state/authStore';
 import { lokClient } from '@/lib/lokClient';
+import { setForgeSupporterTier } from '@/game/state/operatorForgeStore';
 
 /** This app's `lok_apps.app_key`. */
 const APP_KEY = 'survivor616';
@@ -91,6 +92,7 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
   const [supporter, setSupporter] = useState<MySupporter | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const refreshedForUserId = useRef<string | null>(null);
+  const supporterFetchEpoch = useRef(0);
 
   // The catalog is public-read, so prices load even for signed-out players.
   useEffect(() => {
@@ -101,16 +103,22 @@ export function LokEconomyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
+    const epoch = ++supporterFetchEpoch.current;
+    setForgeSupporterTier(null);
+    setActiveSupporterTier(null);
     if (!lokClient || !session) {
       setBalance(null);
       setLifetimeEarned(null);
       setRank(null);
       setOwnedSkus(new Set());
-      setActiveSupporterTier(null);
       setSupporter(null);
       return;
     }
-    void fetchActiveSupporterTier(lokClient).then((r) => { if (r.ok) setActiveSupporterTier(r.tier); });
+    void fetchActiveSupporterTier(lokClient).then((r) => {
+      if (epoch !== supporterFetchEpoch.current || !r.ok) return;
+      setForgeSupporterTier(r.tier);
+      setActiveSupporterTier(r.tier);
+    });
     void fetchMySupporter(lokClient).then((r) => { if (r.ok) setSupporter(r.supporter); });
     void fetchOwnedSkus(lokClient).then((owned) => {
       if (owned.ok) setOwnedSkus(new Set(owned.skus));

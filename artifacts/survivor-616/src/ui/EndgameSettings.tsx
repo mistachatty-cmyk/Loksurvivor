@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 
-import { CUSTOM_SLOTS, ENDGAME_FEATURES, ENDGAME_UNLOCK_TABLE, endgameReached, isSlotEarned, type EndgameFeatureId } from '@/game/data/endgameUnlocks';
+import { ALL_CUSTOM_SLOTS, ENDGAME_FEATURES, ENDGAME_UNLOCK_TABLE, endgameReached, isSlotEarned, type EndgameFeatureId } from '@/game/data/endgameUnlocks';
 import { CustomsRunSwitch, Switch } from './EndgameControls';
 import { isHideoutDockEnabled, setHideoutDockEnabled } from '@/game/state/operatorForgeStore';
 import { t } from '@/lib/i18n';
@@ -109,7 +109,7 @@ export function EndgameSettings() {
 
       <h3 className="mt-6 text-sm font-black uppercase tracking-wide text-white">Custom operator slots</h3>
       <ul className="mt-2 grid gap-2 sm:grid-cols-2" data-testid="list-endgame-slots">
-        {CUSTOM_SLOTS.map((slot) => {
+        {ALL_CUSTOM_SLOTS.map((slot) => {
           const earned = meta.devModeAllUnlocks || isSlotEarned(slot, meta);
           const goal = slot.goal?.(meta);
           return (

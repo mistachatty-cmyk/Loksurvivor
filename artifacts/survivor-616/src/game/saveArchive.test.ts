@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createInitialMeta, serializeMeta } from './state/metaStore';
 import { earnedSlotCount, exportForgeState, importForgeState, loadForgedOperators } from './state/operatorForgeStore';
+import { ALL_CUSTOM_SLOTS } from './data/endgameUnlocks';
 import { parseSaveArchive, serializeSaveArchive } from './state/saveArchive';
 import { generateForgedOperator } from './data/operatorForge';
 
@@ -36,14 +37,14 @@ test('a portable save includes validated Forge designs and an old save keeps the
   }
 });
 
-test('Dev Mode provides all five Forge slots before any end-game unlocks are earned', () => {
+test('Dev Mode provides every Forge slot across every tier before any end-game unlocks are earned', () => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   const storage = new MemoryStorage();
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
   try {
     assert.equal(earnedSlotCount(), 0);
     storage.setItem('survivor616.meta.v1', JSON.stringify({ devModeAccessUnlocked: true, devModeAllUnlocks: true }));
-    assert.equal(earnedSlotCount(), 5);
+    assert.equal(earnedSlotCount(), ALL_CUSTOM_SLOTS.length);
   } finally {
     if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
     else Reflect.deleteProperty(globalThis, 'localStorage');

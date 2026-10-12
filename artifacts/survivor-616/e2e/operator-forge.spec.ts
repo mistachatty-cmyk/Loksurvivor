@@ -35,7 +35,7 @@ async function openEndgame(page: Page) {
 }
 
 test.describe('operator forge', () => {
-  test('Dev Mode exposes the Forge and five temporary slots without map clears', async ({ page }) => {
+  test('Dev Mode exposes the Forge and every temporary slot without map clears', async ({ page }) => {
     await page.addInitScript((key) => {
       if (!localStorage.getItem(key)) {
         localStorage.setItem(key, JSON.stringify({
@@ -50,8 +50,21 @@ test.describe('operator forge', () => {
     await expect(page.getByTestId('slot-endgame-slot-beast-master')).toContainText('earned');
     await page.getByTestId('button-open-forge').click();
     await expect(page.getByTestId('panel-operator-forge')).toBeVisible();
-    await expect(page.getByText('Custom slots (0/5 used, 5 total)')).toBeVisible();
+    await expect(page.getByText('Custom slots (0/34 used, 34 total)')).toBeVisible();
     await expect(page.locator('[data-testid^="slot-locked-"]')).toHaveCount(0);
+  });
+
+  test('the authored roster loads a searchable, editable Forge starting design', async ({ page }) => {
+    await seed(page);
+    await openEndgame(page);
+    await page.getByTestId('button-open-forge').click();
+    await expect(page.getByTestId('operator-roster')).toBeVisible();
+    expect(await page.getByTestId('operator-roster-grid').locator('li').count()).toBeGreaterThan(60);
+    await page.getByTestId('operator-roster-search').fill('Shade');
+    await page.getByTestId('roster-character-shade').click();
+    await expect(page.getByTestId('input-forge-seed')).toHaveValue('roster:shade');
+    await page.getByTestId('input-forge-name').fill('My Shade');
+    await expect(page.getByTestId('input-forge-name')).toHaveValue('My Shade');
   });
 
   test('is behind the end game until earned, then designs, saves and plays a new operator', async ({ page }) => {
@@ -124,6 +137,7 @@ test.describe('operator forge', () => {
   });
 
   test('generation, rolling and share codes work', async ({ page }) => {
+    test.setTimeout(90_000);
     page.on('dialog', (dialog) => void dialog.accept());
     await seed(page);
     await openEndgame(page);
@@ -154,7 +168,8 @@ test.describe('operator forge', () => {
 
     // Batch forge, then export and re-import a share code.
     await page.getByTestId('button-forge-batch').click();
-    await expect(page.getByTestId('list-forge-saved').locator('li')).toHaveCount(5);
+    await expect(page.getByTestId('list-forge-saved').locator('li')).toHaveCount(34);
+    await expect(page.getByTestId('list-forge-saved').locator('[data-testid^="item-forge-"]')).toHaveCount(5);
     await expect(page.getByTestId('button-forge-batch')).toContainText('No free slots');
     const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), FORGE_KEY) as {
       operators: Array<{ id: string }>;
